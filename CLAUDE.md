@@ -167,6 +167,12 @@ fpdart: ^1.1.0
 freezed_annotation: ^3.0.0
 json_annotation: ^4.9.0
 go_router: ^16.2.0
+flutter_svg: ^2.3.0                  # render brand vector assets (Google "G", pitch motif) faithfully
+# NOTE: google_fonts was removed in favour of bundled variable fonts. The
+# Inter / Inter Tight / JetBrains Mono TTFs live in assets/fonts/ and are
+# declared under `flutter: fonts:` in pubspec.yaml. This keeps the app
+# offline-first: fonts never fetch from fonts.gstatic.com at runtime.
+# CkType (lib/core/theme/circk_theme.dart) uses plain TextStyle(fontFamily:).
 
 # Codegen (dev_dependencies)
 build_runner: ^2.4.13
@@ -1234,12 +1240,18 @@ dart run build_runner build --delete-conflicting-outputs
 # Add Android/iOS platform folders (one-time, after unzipping a reference)
 flutter create . --org studio.novex --project-name novex_clean_arch
 
-# Run with all required dart-defines
-flutter run \
-  --dart-define=SUPABASE_URL=https://YOURPROJECT.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=eyJ... \
-  --dart-define=GOOGLE_WEB_CLIENT_ID=...apps.googleusercontent.com \
-  --dart-define=GOOGLE_IOS_CLIENT_ID=...apps.googleusercontent.com
+# Run with all required compile-time config.
+# Real values live in dart_define.json (gitignored); the committed
+# dart_define.example.json is the template. Copy it once and fill in values:
+#   cp dart_define.example.json dart_define.json
+flutter run --dart-define-from-file=dart_define.json
+
+# (Equivalent long form, still valid — flags merge with the file:)
+# flutter run \
+#   --dart-define=SUPABASE_URL=https://YOURPROJECT.supabase.co \
+#   --dart-define=SUPABASE_ANON_KEY=eyJ... \
+#   --dart-define=GOOGLE_WEB_CLIENT_ID=...apps.googleusercontent.com \
+#   --dart-define=GOOGLE_IOS_CLIENT_ID=...apps.googleusercontent.com
 
 # Watch mode for codegen during development
 dart run build_runner watch --delete-conflicting-outputs

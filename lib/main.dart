@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -39,9 +40,21 @@ Future<void> main() async {
   //    authenticate() / authorizeScopes() on it. Awaited (not fire-and-forget)
   //    so a fast tap on the sign-in button can't call authenticate() before
   //    initialize() has completed. It resolves in milliseconds.
+  //
+  //    Platform note: `clientId` means different things per platform.
+  //    - Web  : MUST be the WEB OAuth client ID (google_sign_in_web asserts
+  //             a non-null appClientId at init).
+  //    - iOS  : the iOS client ID.
+  //    - Android: not needed (uses serverClientId).
+  //    `serverClientId` is the web client ID, used to mint backend ID tokens
+  //    on mobile.
+  //    On web, serverClientId is rejected outright ("not supported on Web"),
+  //    so it must be null there; the web client ID goes in clientId instead.
+  final clientId = kIsWeb ? _googleWebClientId : _googleIosClientId;
+  final serverClientId = kIsWeb ? '' : _googleWebClientId;
   await GoogleSignIn.instance.initialize(
-    serverClientId: _googleWebClientId.isEmpty ? null : _googleWebClientId,
-    clientId: _googleIosClientId.isEmpty ? null : _googleIosClientId,
+    serverClientId: serverClientId.isEmpty ? null : serverClientId,
+    clientId: clientId.isEmpty ? null : clientId,
   );
 
   runApp(const ProviderScope(child: NovexApp()));

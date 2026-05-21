@@ -129,14 +129,14 @@ The trigger is what makes LWW conflict resolution work: every server-side update
 ```bash
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
-flutter run \
-  --dart-define=SUPABASE_URL=https://YOURPROJECT.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=eyJ... \
-  --dart-define=GOOGLE_WEB_CLIENT_ID=...apps.googleusercontent.com \
-  --dart-define=GOOGLE_IOS_CLIENT_ID=...apps.googleusercontent.com
+
+# Copy the template, then fill in your real values.
+cp dart_define.example.json dart_define.json
+
+flutter run --dart-define-from-file=dart_define.json
 ```
 
-All four `--dart-define`s are consumed only by `main.dart` (Supabase init + GoogleSignIn.initialize). No data source carries client IDs.
+`dart_define.json` holds the compile-time config (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`). The real file is gitignored; commit only `dart_define.example.json`. These values are consumed only by `main.dart` (Supabase init + GoogleSignIn.initialize) — no data source carries client IDs. They are compile-time constants, so changing the file requires a full restart (hot reload won't pick it up). VS Code users can just pick a launch config from `.vscode/launch.json`, which already passes the flag.
 
 ## Offline-first model
 

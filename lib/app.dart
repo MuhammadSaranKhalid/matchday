@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/database/database_provider.dart';
 import 'core/sync/sync_provider.dart';
+import 'core/theme/circk_theme.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'router/app_router.dart';
 
@@ -28,10 +29,7 @@ class NovexApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'Novex Clean Arch',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
-        useMaterial3: true,
-      ),
+      theme: buildCirckTheme(),
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

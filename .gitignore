@@ -33,6 +33,15 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Compile-time secrets (passed via --dart-define-from-file).
+# Keep the committed template (dart_define.example.json); ignore real values.
+dart_define.json
+dart_define.*.json
+!dart_define.example.json
+.env
+.env.*
+!.env.example
+
 # Symbolication related
 app.*.symbols
 

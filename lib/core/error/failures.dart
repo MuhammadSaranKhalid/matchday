@@ -1,0 +1,46 @@
+/// Typed errors that flow from Data → Domain → Presentation.
+///
+/// Why sealed: the compiler forces the UI to handle every case in a switch.
+/// Why a base class: lets repository signatures stay generic — `Either<Failure, T>`.
+sealed class Failure {
+  const Failure(this.message);
+  final String message;
+
+  @override
+  String toString() => '$runtimeType($message)';
+}
+
+/// No connectivity, DNS, socket errors.
+class NetworkFailure extends Failure {
+  const NetworkFailure([super.message = 'No internet connection']);
+}
+
+/// Backend reachable, but returned 5xx or an unexpected payload.
+class ServerFailure extends Failure {
+  const ServerFailure([super.message = 'Server error']);
+}
+
+/// 401/403, invalid credentials, expired session.
+class AuthFailure extends Failure {
+  const AuthFailure([super.message = 'Authentication failed']);
+}
+
+/// Local cache / DB read or write failed.
+class CacheFailure extends Failure {
+  const CacheFailure([super.message = 'Local storage error']);
+}
+
+/// Value object construction failed (invalid email, weak password, etc).
+class ValidationFailure extends Failure {
+  const ValidationFailure(super.message);
+}
+
+/// 404 from the backend, or expected row missing locally.
+class NotFoundFailure extends Failure {
+  const NotFoundFailure([super.message = 'Resource not found']);
+}
+
+/// Catch-all for anything we genuinely didn't see coming.
+class UnknownFailure extends Failure {
+  const UnknownFailure([super.message = 'Unknown error']);
+}

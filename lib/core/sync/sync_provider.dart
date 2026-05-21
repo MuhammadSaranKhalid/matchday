@@ -26,7 +26,7 @@ SyncService syncService(Ref ref) {
   // Only sync on the offline → online edge, not on every emission.
   var wasOnline = false;
   ref.listen(isOnlineProvider, (prev, next) {
-    final online = next.valueOrNull ?? false;
+    final online = next.value ?? false;
     if (online && !wasOnline) {
       service.sync();
       service.startRealtimeMirror();

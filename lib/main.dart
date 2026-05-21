@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -38,15 +36,12 @@ Future<void> main() async {
 
   // 2. Google sign-in — initialize ONCE at app boot per google_sign_in v7
   //    docs. The instance is then a singleton; data sources just call
-  //    authenticate() / authorizeScopes() on it.
-  //    unawaited because initialize is fire-and-forget; subsequent
-  //    authenticate() calls will await internally if init hasn't finished.
-  unawaited(
-    GoogleSignIn.instance.initialize(
-      serverClientId:
-          _googleWebClientId.isEmpty ? null : _googleWebClientId,
-      clientId: _googleIosClientId.isEmpty ? null : _googleIosClientId,
-    ),
+  //    authenticate() / authorizeScopes() on it. Awaited (not fire-and-forget)
+  //    so a fast tap on the sign-in button can't call authenticate() before
+  //    initialize() has completed. It resolves in milliseconds.
+  await GoogleSignIn.instance.initialize(
+    serverClientId: _googleWebClientId.isEmpty ? null : _googleWebClientId,
+    clientId: _googleIosClientId.isEmpty ? null : _googleIosClientId,
   );
 
   runApp(const ProviderScope(child: NovexApp()));

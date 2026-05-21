@@ -157,7 +157,7 @@ flutter_riverpod: ^3.3.1
 riverpod_annotation: ^4.0.2          # NOTE: 4.0.3+ are pre-release; do not pin
 supabase_flutter: ^2.12.4
 google_sign_in: ^7.2.0               # v7+ API: GoogleSignIn.instance.authenticate()
-drift: ^2.32.1
+drift: ^2.31.0                       # pinned to 2.31 line — see analyzer note below
 drift_flutter: ^0.2.4
 sqlite3_flutter_libs: ^0.5.26
 path_provider: ^2.1.5
@@ -173,11 +173,13 @@ build_runner: ^2.4.13
 riverpod_generator: ^4.0.3           # NOTE: 4.0.4+ are pre-release
 freezed: ^3.2.5
 json_serializable: ^6.8.0
-drift_dev: ^2.32.1
+drift_dev: ">=2.31.0 <2.32.0"        # capped: 2.32+ requires analyzer >=10 (see note below)
 
 # Tooling (dev_dependencies)
-riverpod_lint: ^3.3.1
-custom_lint: ^0.6.7
+# riverpod_lint and custom_lint are TEMPORARILY DISABLED due to an ecosystem
+# constraint conflict (see below). Do NOT add them back until verified.
+# riverpod_lint: ^3.1.3
+# custom_lint: ^0.8.0
 flutter_lints: ^5.0.0
 mocktail: ^1.0.4
 
@@ -186,7 +188,37 @@ sdk: ^3.7.0
 flutter: ">=3.27.0"
 ```
 
-The Riverpod ecosystem has split versioning: the runtime (`flutter_riverpod`, `riverpod`) is on the 3.x line while the codegen tooling (`riverpod_annotation`, `riverpod_generator`) is on the 4.x line. This is intentional, not a mistake — do not "fix" it.
+### Riverpod ecosystem versioning
+
+The Riverpod ecosystem has split versioning across multiple independent lines: the runtime (`flutter_riverpod`) is on 3.x, the codegen tooling (`riverpod_annotation`, `riverpod_generator`) is on 4.x, and the lint package (`riverpod_lint`) is on its own 3.1.x line. None of these track each other. This split is intentional — do not "fix" it by trying to align them. Always check pub.dev for each package's actual current stable version.
+
+Note: with `flutter_riverpod: ^3.3.1`, pub resolves the `riverpod` runtime to **3.2.1** (not 3.3.1). The `AsyncValue` API in 3.2.1 exposes `value` (null-safe) and `requireValue` — there is **no** `valueOrNull` getter. Use `.value`.
+
+### The analyzer constraint conflict (why drift is pinned and the lint tools are off)
+
+Under Flutter 3.41.x, the bundled SDK pins `meta` to `1.17.0`, which caps `analyzer` below `10.0.2`. Two demands then collide:
+
+- `drift_dev` 2.32+ requires `analyzer >=10`.
+- The entire **stable** Riverpod tooling line (`riverpod_generator` ≤4.0.3, `riverpod_lint` ≤3.1.3) requires `analyzer ^9`.
+
+No single `analyzer` version satisfies both, so they cannot coexist. The resolution:
+
+1. **Pin drift to the 2.31 line** (`analyzer >=8.1.0 <11.0.0`), which overlaps the Riverpod tooling's `^9`. This keeps `riverpod_generator` (required for codegen) working.
+2. **Remove `riverpod_lint` + `custom_lint`.** Even on the 2.31 drift line they'd resolve analyzer-wise, but `riverpod_lint` 3.1.3 hard-pins `riverpod: 3.2.1`; more importantly the lints are a dev-only nicety, not required to build.
+
+Re-enable both (drift 2.32+ and `riverpod_lint`) once `riverpod_generator`/`riverpod_lint` ship a stable release supporting `analyzer >=10`, OR once the project moves to a Flutter version whose `meta` pin allows `analyzer >=10.0.2`. Verify with `flutter pub get` before committing.
+
+### Why riverpod_lint and custom_lint are disabled
+
+As of the latest Flutter stable (3.41.x, Dart 3.7.x), there is a three-way constraint conflict that cannot be resolved:
+
+- `riverpod_lint <=3.1.3` (latest stable) requires `analyzer ^9.x`
+- `drift_dev ^2.32.1` requires `analyzer >=10.x`
+- Flutter 3.41.x pins `meta 1.17.0`, which transitively requires `analyzer <10.0.2`
+
+There is no overlap in these ranges, so `pub get` fails when all three are present. The lint package is dev-only (it does not affect runtime behavior), so the practical fix is to remove it temporarily.
+
+**Criterion for re-enabling**: when a stable `riverpod_lint` release supports `analyzer >=10`, restore both packages in `pubspec.yaml` and uncomment the `plugins: - custom_lint` line in `analysis_options.yaml`. Verify with `flutter pub get` followed by `dart run custom_lint`. Until then, the watch/read/listen and provider-DAG rules are enforced by `architecture-reviewer` agent review and by the patterns documented in this file, NOT by an automated lint.
 
 If a feature needs a dependency not listed here (e.g. file picker, image cropper, charts), add it via `flutter pub add <package>` and document it here with the chosen version and rationale.
 

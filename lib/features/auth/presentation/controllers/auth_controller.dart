@@ -2,7 +2,6 @@ import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/usecase/usecase.dart';
-import '../../domain/usecases/send_email_otp.dart';
 import '../../domain/usecases/verify_email_otp.dart';
 import '../../domain/value_objects/email.dart';
 import '../../domain/value_objects/otp_code.dart';

@@ -4,6 +4,7 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/sync/sync_provider.dart';
 import '../../../../core/usecase/usecase.dart';
 import '../../domain/entities/todo.dart';
+import '../../domain/usecases/add_todo.dart';
 import '../providers/todos_providers.dart';
 
 part 'todos_controller.g.dart';

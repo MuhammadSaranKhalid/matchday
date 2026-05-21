@@ -92,8 +92,14 @@ class AuthRemoteDataSource {
     } on AuthException catch (e) {
       throw UnauthorizedException(e.message);
     } on GoogleSignInException catch (e) {
-      // User cancelled picker, no network, OAuth misconfig, etc.
-      throw ServerException('Google sign-in cancelled or failed: ${e.code}');
+      // Distinguish a deliberate user cancellation (maps to AuthFailure, a
+      // benign "you cancelled" message) from genuine config/network failures
+      // (ServerFailure, "something's wrong"). Lumping them together shows
+      // "Server error" when the user simply dismissed the sheet.
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw UnauthorizedException('Google sign-in was cancelled');
+      }
+      throw ServerException('Google sign-in failed: ${e.code}');
     } catch (e) {
       throw ServerException('Google sign-in failed: $e');
     }
@@ -103,10 +109,11 @@ class AuthRemoteDataSource {
 
   Future<void> signOut() async {
     try {
-      // Supabase v2 sign-out defaults to global scope (revokes all sessions
-      // for this user). Pass scope: SignOutScope.local if you want only
-      // the current device.
-      await _supabase.auth.signOut();
+      // Explicit product decision: global scope revokes ALL sessions for this
+      // user across every device (more secure, but also signs them out
+      // elsewhere). Switch to SignOutScope.local if multi-device sessions are
+      // a product requirement.
+      await _supabase.auth.signOut(scope: SignOutScope.global);
     } on AuthException catch (e) {
       throw ServerException(e.message);
     }

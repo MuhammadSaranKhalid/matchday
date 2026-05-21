@@ -58,7 +58,12 @@ class TodosRepositoryImpl implements TodosRepository {
   }
 
   @override
-  Stream<List<Todo>> watchAll() => _local.watchAll();
+  Stream<List<Todo>> watchAll() => _local.watchAll().handleError(
+        // Translate raw drift/cache errors into a typed Failure carried across
+        // the stream boundary, so the UI can render `failure.message` instead
+        // of a raw exception string (see FailureWrapper in core/error).
+        (Object e) => throw FailureWrapper(CacheFailure(e.toString())),
+      );
 
   // ─── Writes ─────────────────────────────────────────────────────────────
 

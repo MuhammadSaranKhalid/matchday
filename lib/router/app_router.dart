@@ -12,14 +12,16 @@ part 'app_router.g.dart';
 /// The redirect callback reads the current-user stream's latest value.
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
-@riverpod
+@Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
-  final userStream = ref.watch(currentUserStreamProvider);
-
+  // keepAlive + ref.read inside redirect (NOT ref.watch in the body): the
+  // router is built once and the refreshListenable below re-runs `redirect`
+  // on each auth change. Watching here would rebuild a whole new GoRouter on
+  // every auth event and leak the previous _StreamListenable.
   return GoRouter(
     initialLocation: '/sign-in',
     redirect: (context, state) {
-      final user = userStream.valueOrNull;
+      final user = ref.read(currentUserStreamProvider).value;
       final isSignedIn = user != null;
       final goingToSignIn = state.matchedLocation == '/sign-in';
 

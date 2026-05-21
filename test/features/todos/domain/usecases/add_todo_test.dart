@@ -37,6 +37,7 @@ void main() {
       title: 'Buy milk',
       completed: false,
       createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
     );
     when(() => repo.add(any())).thenAnswer((_) async => Right(created));
 

@@ -44,3 +44,15 @@ class NotFoundFailure extends Failure {
 class UnknownFailure extends Failure {
   const UnknownFailure([super.message = 'Unknown error']);
 }
+
+/// Adapts a [Failure] into a throwable so it can travel as an error through a
+/// `Stream` or `AsyncNotifier`, then be recovered in the UI via
+/// `error is FailureWrapper`. Keeps the typed [Failure] intact across the
+/// reactive boundary, where only `Object` errors are allowed.
+class FailureWrapper implements Exception {
+  const FailureWrapper(this.failure);
+  final Failure failure;
+
+  @override
+  String toString() => 'FailureWrapper(${failure.message})';
+}

@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../database/app_database.dart';
 import '../database/tables.dart';
 import '../../features/todos/data/datasources/pending_operations_datasource.dart';
 import '../../features/todos/data/datasources/todos_local_datasource.dart';
@@ -44,13 +45,22 @@ class SyncService {
       await _replayPendingOps();
       await _pullAndMerge();
     } catch (e, st) {
-      if (kDebugMode) {
-        debugPrint('Sync failed: $e\n$st');
-      }
+      developer.log(
+        'Sync failed',
+        name: 'SyncService',
+        error: e,
+        stackTrace: st,
+      );
     } finally {
       _running = false;
     }
   }
+
+  /// After this many failed attempts an op is treated as permanently failing
+  /// (e.g. a row deleted server-side before its toggle synced) and is skipped
+  /// rather than replayed forever. Prevents the queue from churning on a
+  /// poison op every cycle.
+  static const _maxAttempts = 10;
 
   /// Walk the pending queue and push each op to Supabase.
   /// Successful ops are deleted; failures are recorded but don't block
@@ -58,6 +68,15 @@ class SyncService {
   Future<void> _replayPendingOps() async {
     final ops = await _pending.getAll();
     for (final op in ops) {
+      if (op.attempts >= _maxAttempts) {
+        developer.log(
+          'Skipping poison pending op ${op.id} '
+          '(${op.entityType}/${op.entityId}) after ${op.attempts} attempts; '
+          'last error: ${op.lastError}',
+          name: 'SyncService',
+        );
+        continue;
+      }
       try {
         await _executeOp(op);
         await _pending.deleteById(op.id);
@@ -129,7 +148,12 @@ class SyncService {
         );
       },
       onError: (Object e, StackTrace st) {
-        if (kDebugMode) debugPrint('Realtime stream error: $e');
+        developer.log(
+          'Realtime stream error',
+          name: 'SyncService',
+          error: e,
+          stackTrace: st,
+        );
       },
     );
   }

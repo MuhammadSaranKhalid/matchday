@@ -39,9 +39,18 @@ class UserDto {
   }
 
   /// DTO → Entity.
+  ///
+  /// Total by construction: Supabase should always return a valid email, but
+  /// if it ever returns a malformed one we fall back to a sentinel rather than
+  /// throwing. `toEntity()` is called inside an unguarded `Stream.map` in
+  /// `watchCurrentUser()`, so a throw here would become an unhandled stream
+  /// error that crashes the auth-aware router redirect.
   User toEntity() {
     final emailVO = Email.create(email).getOrElse(
-      (_) => throw StateError('Supabase returned malformed email: $email'),
+      (_) => Email.create('unknown@unknown.invalid').getOrElse(
+        // The sentinel always matches the Email regex, so this is unreachable.
+        (_) => throw StateError('sentinel email rejected by Email.create'),
+      ),
     );
     return User(
       id: UserId(id),

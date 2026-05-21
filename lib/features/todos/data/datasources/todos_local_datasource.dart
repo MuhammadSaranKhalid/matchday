@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart';
 import '../../../../core/database/app_database.dart';
-import '../../../../core/database/tables.dart';
 import '../../domain/entities/todo.dart';
 
 /// Local cache of todos, backed by drift.
@@ -49,18 +48,26 @@ class TodosLocalDataSource {
     List<Todo> remoteTodos, {
     required String userId,
   }) async {
-    await _db.batch((batch) async {
-      for (final remote in remoteTodos) {
-        final localRow = await (_db.select(_db.todos)
-              ..where((t) => t.id.equals(remote.id.value)))
-            .getSingleOrNull();
+    // Phase 1 — LWW decision. Read each local row first and keep only the
+    // remotes that should win. Done OUTSIDE the batch: awaiting SELECTs inside
+    // a batch callback runs them on a different executor than the batched
+    // writes, so the read/write pair isn't atomic.
+    final toUpsert = <Todo>[];
+    for (final remote in remoteTodos) {
+      final localRow = await (_db.select(_db.todos)
+            ..where((t) => t.id.equals(remote.id.value)))
+          .getSingleOrNull();
+      if (localRow != null && localRow.updatedAt.isAfter(remote.updatedAt)) {
+        // Local is newer — pending op will push it to remote. Skip.
+        continue;
+      }
+      toUpsert.add(remote);
+    }
+    if (toUpsert.isEmpty) return;
 
-        if (localRow != null &&
-            localRow.updatedAt.isAfter(remote.updatedAt)) {
-          // Local is newer — pending op will push it to remote. Skip.
-          continue;
-        }
-
+    // Phase 2 — atomic batch of inserts only (no awaits inside the callback).
+    await _db.batch((batch) {
+      for (final remote in toUpsert) {
         batch.insert(
           _db.todos,
           TodosCompanion.insert(

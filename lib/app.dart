@@ -18,8 +18,8 @@ class NovexApp extends ConsumerWidget {
     // Wipe the local DB on sign-out. The auth listener fires when the
     // current-user stream emits null (signed out) AFTER having a user.
     ref.listen(currentUserStreamProvider, (prev, next) {
-      final prevUser = prev?.valueOrNull;
-      final nextUser = next.valueOrNull;
+      final prevUser = prev?.value;
+      final nextUser = next.value;
       if (prevUser != null && nextUser == null) {
         ref.read(appDatabaseProvider).clear();
       }

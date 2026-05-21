@@ -2,6 +2,7 @@
 ///
 /// These never cross the Domain boundary. Repository implementations
 /// catch them and translate to Failures.
+library;
 
 class ServerException implements Exception {
   ServerException(this.message, {this.statusCode});

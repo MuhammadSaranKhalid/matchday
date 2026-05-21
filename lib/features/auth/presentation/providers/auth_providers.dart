@@ -48,6 +48,11 @@ WatchCurrentUser watchCurrentUserUseCase(Ref ref) =>
     WatchCurrentUser(ref.watch(authRepositoryProvider));
 
 /// Stream of the current user — drives router redirects + global UI.
-@riverpod
+///
+/// keepAlive: this is the app-lifetime auth session stream (a Supabase
+/// realtime channel). Letting it autodispose would tear down and re-subscribe
+/// the channel whenever listeners momentarily drop to zero, risking a missed
+/// auth event in the gap.
+@Riverpod(keepAlive: true)
 Stream<User?> currentUserStream(Ref ref) =>
     ref.watch(watchCurrentUserUseCaseProvider).call(const NoParams());

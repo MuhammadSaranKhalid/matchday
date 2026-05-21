@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/error/failures.dart';
 import '../../domain/entities/todo.dart';
 import '../controllers/todos_controller.dart';
 
 /// Todos list screen.
 ///
-/// Uses AsyncValue.when for the three branches (data/loading/error),
+/// Pattern-matches the AsyncValue with a Dart 3 switch (data/error/loading),
 /// plus RefreshIndicator wired to the controller's refresh().
 class TodosScreen extends ConsumerWidget {
   const TodosScreen({super.key});
@@ -20,24 +21,26 @@ class TodosScreen extends ConsumerWidget {
         onPressed: () => _showAddDialog(context, ref),
         child: const Icon(Icons.add),
       ),
-      body: todosAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => _ErrorView(
-          message: err is FailureWrapper ? err.failure.message : err.toString(),
-          onRetry: () => ref.read(todosControllerProvider.notifier).refresh(),
-        ),
-        data: (todos) => RefreshIndicator(
-          onRefresh: () =>
-              ref.read(todosControllerProvider.notifier).refresh(),
-          child: todos.isEmpty
-              ? const _EmptyView()
-              : ListView.separated(
-                  itemCount: todos.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) => _TodoTile(todo: todos[i]),
-                ),
-        ),
-      ),
+      body: switch (todosAsync) {
+        AsyncData(:final value) => RefreshIndicator(
+            onRefresh: () =>
+                ref.read(todosControllerProvider.notifier).refresh(),
+            child: value.isEmpty
+                ? const _EmptyView()
+                : ListView.separated(
+                    itemCount: value.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) => _TodoTile(todo: value[i]),
+                  ),
+          ),
+        AsyncError(:final error) => _ErrorView(
+            message: error is FailureWrapper
+                ? error.failure.message
+                : error.toString(),
+            onRetry: () => ref.read(todosControllerProvider.notifier).refresh(),
+          ),
+        _ => const Center(child: CircularProgressIndicator()),
+      },
     );
   }
 

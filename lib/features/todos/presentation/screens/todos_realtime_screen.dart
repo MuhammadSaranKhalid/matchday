@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/error/failures.dart';
 import '../../domain/entities/todo.dart';
 import '../controllers/todos_controller.dart';
 import '../providers/todos_providers.dart';
@@ -38,17 +39,21 @@ class TodosRealtimeScreen extends ConsumerWidget {
         onPressed: () => _showAddDialog(context, ref),
         child: const Icon(Icons.add),
       ),
-      body: todosAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('$err')),
-        data: (todos) => todos.isEmpty
+      body: switch (todosAsync) {
+        AsyncData(:final value) => value.isEmpty
             ? const Center(child: Text('Nothing here yet'))
             : ListView.separated(
-                itemCount: todos.length,
+                itemCount: value.length,
                 separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (_, i) => _TodoTile(todo: todos[i]),
+                itemBuilder: (_, i) => _TodoTile(todo: value[i]),
               ),
-      ),
+        AsyncError(:final error) => Center(
+            child: Text(
+              error is FailureWrapper ? error.failure.message : '$error',
+            ),
+          ),
+        _ => const Center(child: CircularProgressIndicator()),
+      },
     );
   }
 

@@ -37,8 +37,7 @@ class SignInScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Sign in'),
         leading: switch (state) {
-          AuthOtpSent() || AuthVerifyingOtp() || AuthFailed(email: final e?)
-              when e != null =>
+          AuthOtpSent() || AuthVerifyingOtp() || AuthFailed(email: != null) =>
             IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: () =>
@@ -52,7 +51,7 @@ class SignInScreen extends ConsumerWidget {
         child: switch (state) {
           AuthOtpSent() ||
           AuthVerifyingOtp() ||
-          AuthFailed(email: final e?) when e != null =>
+          AuthFailed(email: != null) =>
             const _CodeForm(),
           _ => const _EmailForm(),
         },

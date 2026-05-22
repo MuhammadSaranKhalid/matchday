@@ -5,15 +5,19 @@ import '../features/auth/presentation/providers/auth_providers.dart';
 import '../features/auth/presentation/screens/sign_in_screen.dart';
 import '../features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../features/pavilion/presentation/screens/pavilion_screen.dart';
 import '../features/shell/presentation/screens/coming_soon_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
 import '../features/teams/presentation/screens/team_create_screen.dart';
 import '../features/teams/presentation/screens/team_hub_screen.dart';
 import '../features/teams/presentation/screens/team_manage_screen.dart';
 import '../features/teams/presentation/screens/teams_list_screen.dart';
+import '../features/matches/presentation/screens/live_match_screen.dart';
 import '../features/matches/presentation/screens/match_request_screen.dart';
 import '../features/matches/presentation/screens/match_setup_screen.dart';
 import '../features/matches/presentation/screens/match_start_screen.dart';
+import '../features/matches/presentation/screens/scoring_screen.dart';
+import '../features/notifications/presentation/screens/notifications_screen.dart';
 import '../features/todos/presentation/screens/todos_screen.dart';
 
 part 'app_router.g.dart';
@@ -93,7 +97,7 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: '/pavilion',
-                builder: (_, __) => const ComingSoonScreen(tab: 'Pavilion'),
+                builder: (_, __) => const PavilionScreen(),
               ),
             ],
           ),
@@ -130,6 +134,22 @@ GoRouter appRouter(Ref ref) {
         path: '/matches/:matchId/start',
         builder: (_, state) =>
             MatchStartScreen(matchId: state.pathParameters['matchId']!),
+      ),
+      GoRoute(
+        path: '/matches/:matchId/score/:inningsId',
+        builder: (_, state) => ScoringScreen(
+          matchId: state.pathParameters['matchId']!,
+          inningsId: state.pathParameters['inningsId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/matches/:matchId/live',
+        builder: (_, state) =>
+            LiveMatchScreen(matchId: state.pathParameters['matchId']!),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationsScreen(),
       ),
       // Kept reachable as the Clean Architecture / offline-first reference
       // (CLAUDE.md §1). Not surfaced in the bottom nav.

@@ -1,8 +1,10 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../../../core/error/failures.dart';
 import '../../../../core/usecase/usecase.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/datasources/onboarding_datasource_providers.dart';
 import '../../data/repositories/profile_repository_impl.dart';
+import '../../domain/entities/profile.dart';
 import '../../domain/repositories/profile_repository.dart';
 import '../../domain/usecases/check_username_available.dart';
 import '../../domain/usecases/complete_onboarding.dart';
@@ -48,4 +50,15 @@ Future<bool> onboardingStatus(Ref ref) async {
     (_) => true,
     (profile) => profile?.isComplete ?? false,
   );
+}
+
+/// The signed-in user's profile, for the Pavilion header. Throws a
+/// [FailureWrapper] on error so the UI can render it via AsyncError.
+/// keepAlive so it's fetched once and shared, not refetched per screen.
+@Riverpod(keepAlive: true)
+Future<Profile?> myProfile(Ref ref) async {
+  final user = ref.watch(currentUserStreamProvider).value;
+  if (user == null) return null;
+  final result = await ref.read(getMyProfileUseCaseProvider).call(const NoParams());
+  return result.fold((f) => throw FailureWrapper(f), (p) => p);
 }

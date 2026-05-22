@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../../teams/domain/entities/team.dart';
+import '../../domain/entities/ball.dart';
 import '../../domain/entities/innings.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/repositories/matches_repository.dart';
@@ -112,6 +113,29 @@ class MatchesRepositoryImpl implements MatchesRepository {
       });
 
   @override
+  Future<Either<Failure, Match>> completeMatch({
+    required MatchId id,
+    required String description,
+  }) =>
+      _update(id, {
+        'status': 'completed',
+        'result': {'description': description},
+        'end_time': DateTime.now().toIso8601String(),
+      });
+
+  @override
+  Future<Either<Failure, Innings?>> getCurrentInnings(MatchId matchId) async {
+    try {
+      final dto = await _remote.getCurrentInnings(matchId.value);
+      return Right(dto?.toEntity());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, Innings>> startMatch({
     required MatchId id,
     required TeamId tossWonBy,
@@ -152,6 +176,68 @@ class MatchesRepositoryImpl implements MatchesRepository {
       return Left(UnknownFailure(e.toString()));
     }
   }
+
+  /// NOTE (Phase 1 consistency gap): the delivery insert and the innings
+  /// player-state update are two sequential calls. If [updateInnings] fails
+  /// after [insertBall] succeeds, the ball is persisted and the DB trigger has
+  /// already updated the aggregate totals, but current striker/non-striker/
+  /// bowler stay stale until reload (a ServerFailure is returned so the UI can
+  /// refresh). Phase 2 should atomicise this via a Supabase RPC.
+  @override
+  Future<Either<Failure, Innings>> recordBall(BallDraft d) async {
+    try {
+      await _remote.insertBall({
+        'ball_id': _uuid.v4(),
+        'innings_id': d.inningsId.value,
+        'match_id': d.matchId.value,
+        'over_number': d.overNumber,
+        'ball_number': d.ballNumber,
+        'legal_ball_number': d.legalBallNumber,
+        'bowler_id': d.bowlerId,
+        'striker_id': d.strikerId,
+        'non_striker_id': d.nonStrikerId,
+        'runs_scored': d.runsScored,
+        'extra_runs': d.extraRuns,
+        if (d.extraType != null) 'extra_type': d.extraType!.wire,
+        'total_runs': d.totalRuns,
+        'is_four': d.isFour,
+        'is_six': d.isSix,
+        'is_wicket': d.isWicket,
+        if (d.wicketType != null) 'wicket_type': d.wicketType!.wire,
+        if (d.dismissedPlayerId != null)
+          'dismissed_player_id': d.dismissedPlayerId,
+      });
+      // The trigger updated the aggregate totals; we own the player state.
+      final inn = await _remote.updateInnings(d.inningsId.value, {
+        'current_striker_id': d.nextStrikerId,
+        'current_non_striker_id': d.nextNonStrikerId,
+        'current_bowler_id': d.nextBowlerId,
+      });
+      return Right(inn.toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Stream<List<Ball>> watchBalls(InningsId inningsId) => _remote
+      .watchBalls(inningsId.value)
+      .map((dtos) => dtos.map((d) => d.toEntity()).toList())
+      .handleError(
+        (Object e) => throw FailureWrapper(ServerFailure(e.toString())),
+      );
+
+  @override
+  Stream<Innings?> watchInnings(InningsId inningsId) => _remote
+      .watchInnings(inningsId.value)
+      .map((dto) => dto?.toEntity())
+      .handleError(
+        (Object e) => throw FailureWrapper(ServerFailure(e.toString())),
+      );
 
   Future<Either<Failure, Match>> _update(
     MatchId id,

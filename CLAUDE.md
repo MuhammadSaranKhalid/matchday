@@ -130,6 +130,7 @@ lib/
     ├── shell/                            # PERMANENT — authenticated 3-tab shell (AppShell + placeholder tabs)
     ├── teams/                            # PRODUCT — offline-first teams (create/hub/manage); 1st real offline feature
     ├── matches/                          # PRODUCT — online-only match setup/lifecycle (F4+)
+    ├── pavilion/                         # PRODUCT — PAVILION tab profile hub (composes auth/onboarding/teams/matches)
     ├── todos/                            # REFERENCE — delete or replace per Section 1
     └── <your_feature>/                   # whatever the product actually needs
 
@@ -983,6 +984,10 @@ Features compose. When feature A genuinely builds on feature B (e.g. `matches` b
 - **FORBIDDEN:** importing another feature's `data/` layer (data sources, DTOs, repository impls) or its `domain/repositories` abstract. If you need B's behaviour, go through a B use-case provider.
 
 These are the only sanctioned cross-feature seams. The `todos` reference feature is exempt — never import it from a product feature (§10).
+
+**Presentation-only features.** A feature may have only a `presentation/` folder (no `domain/`/`data/`) when it is purely an aggregation view that derives everything by watching other features' providers through the seam above — e.g. `pavilion` (profile hub) and `notifications` (a match-event feed derived from `myMatches`). Don't invent a domain entity that just duplicates another feature's (`Notification` would duplicate `Match`+`MatchStatus`). The moment such a feature gains its OWN backend (push tokens, unread state, settings), promote it to a full feature with domain + data layers.
+
+**Computed-draft objects in the Domain.** A use case sometimes needs to hand the repository a structured *computed* value (not a persisted entity yet) — e.g. `BallDraft` (matches): `RecordBall` computes the delivery's numbers + resulting strike rotation, and `MatchesRepository.recordBall(BallDraft)` persists it. Place such drafts in the **entity layer** (alongside the entity they relate to), so both the use case (output) and the repository contract (input) can reference them without a use-case↔repository import cycle. They're pure Dart like any entity.
 
 Player IDs are intentionally raw `String` across `teams` (`TeamMember.playerId`) and `matches` (`Match.teamASquad`/`teamACaptain`) because they are polymorphic (a `profiles.user_id` OR an `unclaimed_id`); a single wrapper can't express that without a union. This is a deliberate, documented exception to the "wrap all IDs" rule (§5.1).
 

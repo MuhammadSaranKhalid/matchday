@@ -22,6 +22,7 @@ class Match {
     this.teamBKeeper,
     this.venue,
     this.scheduledStartTime,
+    this.resultDescription,
   });
 
   final MatchId id;
@@ -41,6 +42,9 @@ class Match {
   final String? teamBKeeper;
   final Venue? venue;
   final DateTime? scheduledStartTime;
+
+  /// Human-readable outcome once the match is completed (e.g. the final score).
+  final String? resultDescription;
 
   @override
   bool operator ==(Object other) =>

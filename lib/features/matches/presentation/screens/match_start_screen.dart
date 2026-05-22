@@ -220,12 +220,9 @@ class _MatchStartScreenState extends ConsumerState<MatchStartScreen> {
     result.fold(
       (f) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(f.message))),
-      (_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Match is live — scoring is coming soon')),
-        );
-        // Live scoring (F8) isn't built yet; return to the MATCH tab for now.
-        context.go('/match');
+      (innings) {
+        // Straight into ball-by-ball scoring.
+        context.go('/matches/${match.id.value}/score/${innings.id.value}');
       },
     );
   }

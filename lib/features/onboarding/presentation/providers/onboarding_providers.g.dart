@@ -247,3 +247,48 @@ final class OnboardingStatusProvider
 }
 
 String _$onboardingStatusHash() => r'cc660a5f9a56265f190a898a34bc0ff22987dbc7';
+
+/// The signed-in user's profile, for the Pavilion header. Throws a
+/// [FailureWrapper] on error so the UI can render it via AsyncError.
+/// keepAlive so it's fetched once and shared, not refetched per screen.
+
+@ProviderFor(myProfile)
+final myProfileProvider = MyProfileProvider._();
+
+/// The signed-in user's profile, for the Pavilion header. Throws a
+/// [FailureWrapper] on error so the UI can render it via AsyncError.
+/// keepAlive so it's fetched once and shared, not refetched per screen.
+
+final class MyProfileProvider
+    extends
+        $FunctionalProvider<AsyncValue<Profile?>, Profile?, FutureOr<Profile?>>
+    with $FutureModifier<Profile?>, $FutureProvider<Profile?> {
+  /// The signed-in user's profile, for the Pavilion header. Throws a
+  /// [FailureWrapper] on error so the UI can render it via AsyncError.
+  /// keepAlive so it's fetched once and shared, not refetched per screen.
+  MyProfileProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'myProfileProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$myProfileHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<Profile?> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<Profile?> create(Ref ref) {
+    return myProfile(ref);
+  }
+}
+
+String _$myProfileHash() => r'7e2513c296b5dc6f5d7a06db22a242911c9d4c81';

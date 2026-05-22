@@ -1,6 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../../../teams/domain/entities/team.dart';
+import '../entities/ball.dart';
 import '../entities/innings.dart';
 import '../entities/match.dart';
 
@@ -51,4 +52,24 @@ abstract class MatchesRepository {
     required String nonStrikerId,
     required String bowlerId,
   });
+
+  /// The latest innings for a match (for opening the spectator/scorer by match).
+  Future<Either<Failure, Innings?>> getCurrentInnings(MatchId matchId);
+
+  /// Mark a match completed with a result description. Moves to `completed`.
+  Future<Either<Failure, Match>> completeMatch({
+    required MatchId id,
+    required String description,
+  });
+
+  /// Persist one delivery ([BallDraft]) and update the innings' current
+  /// striker/non-striker/bowler. Aggregate totals update via a DB trigger.
+  /// Returns the refreshed innings.
+  Future<Either<Failure, Innings>> recordBall(BallDraft draft);
+
+  /// Live deliveries for an innings (oldest first), via Supabase realtime.
+  Stream<List<Ball>> watchBalls(InningsId inningsId);
+
+  /// Live innings state (totals + current players), via Supabase realtime.
+  Stream<Innings?> watchInnings(InningsId inningsId);
 }

@@ -41,7 +41,10 @@ class _List extends ConsumerWidget {
     final myTeamIds = teams.map((t) => t.id).toSet();
     final active = (ref.watch(myMatchesProvider).value ?? const <Match>[])
         .where((m) =>
-            m.status == MatchStatus.pending || m.status == MatchStatus.accepted)
+            m.status == MatchStatus.pending ||
+            m.status == MatchStatus.accepted ||
+            m.status == MatchStatus.live ||
+            m.status == MatchStatus.completed)
         .toList();
 
     return Column(
@@ -88,17 +91,29 @@ class _RequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final live = match.status == MatchStatus.live;
     final accepted = match.status == MatchStatus.accepted;
-    final route = accepted
-        ? '/matches/${match.id.value}/start'
-        : '/matches/${match.id.value}/request';
-    final title = accepted
-        ? 'Ready to start'
-        : (incoming ? 'Incoming request' : 'Awaiting reply');
-    final icon = accepted
-        ? Icons.play_circle_outline
-        : (incoming ? Icons.mark_email_unread_outlined : Icons.schedule);
-    final highlight = accepted || incoming;
+    final completed = match.status == MatchStatus.completed;
+    final route = (live || completed)
+        ? '/matches/${match.id.value}/live'
+        : accepted
+            ? '/matches/${match.id.value}/start'
+            : '/matches/${match.id.value}/request';
+    final title = completed
+        ? 'Result · scorecard'
+        : live
+            ? 'Watch live'
+            : accepted
+                ? 'Ready to start'
+                : (incoming ? 'Incoming request' : 'Awaiting reply');
+    final icon = completed
+        ? Icons.emoji_events_outlined
+        : live
+            ? Icons.sensors_rounded
+            : accepted
+                ? Icons.play_circle_outline
+                : (incoming ? Icons.mark_email_unread_outlined : Icons.schedule);
+    final highlight = live || accepted || incoming;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),

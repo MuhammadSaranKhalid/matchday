@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$MatchDto {
 
-@JsonKey(name: 'match_id') String get matchId;@JsonKey(name: 'team_a_id') String get teamAId;@JsonKey(name: 'team_b_id') String get teamBId;@JsonKey(name: 'team_a_squad') List<String> get teamASquad;@JsonKey(name: 'team_b_squad') List<String> get teamBSquad;@JsonKey(name: 'team_a_captain') String? get teamACaptain;@JsonKey(name: 'team_b_captain') String? get teamBCaptain;@JsonKey(name: 'team_a_keeper') String? get teamAKeeper;@JsonKey(name: 'team_b_keeper') String? get teamBKeeper; Map<String, dynamic> get format; Map<String, dynamic>? get venue;@JsonKey(name: 'scheduled_start_time') String? get scheduledStartTime; String get status;@JsonKey(name: 'created_by') String get createdBy;@JsonKey(name: 'created_at') String get createdAt;
+@JsonKey(name: 'match_id') String get matchId;@JsonKey(name: 'team_a_id') String get teamAId;@JsonKey(name: 'team_b_id') String get teamBId;@JsonKey(name: 'team_a_squad') List<String> get teamASquad;@JsonKey(name: 'team_b_squad') List<String> get teamBSquad;@JsonKey(name: 'team_a_captain') String? get teamACaptain;@JsonKey(name: 'team_b_captain') String? get teamBCaptain;@JsonKey(name: 'team_a_keeper') String? get teamAKeeper;@JsonKey(name: 'team_b_keeper') String? get teamBKeeper; Map<String, dynamic> get format; Map<String, dynamic>? get venue;@JsonKey(name: 'scheduled_start_time') String? get scheduledStartTime; Map<String, dynamic>? get result; String get status;@JsonKey(name: 'created_by') String get createdBy;@JsonKey(name: 'created_at') String get createdAt;
 /// Create a copy of MatchDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $MatchDtoCopyWith<MatchDto> get copyWith => _$MatchDtoCopyWithImpl<MatchDto>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchDto&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamAId, teamAId) || other.teamAId == teamAId)&&(identical(other.teamBId, teamBId) || other.teamBId == teamBId)&&const DeepCollectionEquality().equals(other.teamASquad, teamASquad)&&const DeepCollectionEquality().equals(other.teamBSquad, teamBSquad)&&(identical(other.teamACaptain, teamACaptain) || other.teamACaptain == teamACaptain)&&(identical(other.teamBCaptain, teamBCaptain) || other.teamBCaptain == teamBCaptain)&&(identical(other.teamAKeeper, teamAKeeper) || other.teamAKeeper == teamAKeeper)&&(identical(other.teamBKeeper, teamBKeeper) || other.teamBKeeper == teamBKeeper)&&const DeepCollectionEquality().equals(other.format, format)&&const DeepCollectionEquality().equals(other.venue, venue)&&(identical(other.scheduledStartTime, scheduledStartTime) || other.scheduledStartTime == scheduledStartTime)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchDto&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamAId, teamAId) || other.teamAId == teamAId)&&(identical(other.teamBId, teamBId) || other.teamBId == teamBId)&&const DeepCollectionEquality().equals(other.teamASquad, teamASquad)&&const DeepCollectionEquality().equals(other.teamBSquad, teamBSquad)&&(identical(other.teamACaptain, teamACaptain) || other.teamACaptain == teamACaptain)&&(identical(other.teamBCaptain, teamBCaptain) || other.teamBCaptain == teamBCaptain)&&(identical(other.teamAKeeper, teamAKeeper) || other.teamAKeeper == teamAKeeper)&&(identical(other.teamBKeeper, teamBKeeper) || other.teamBKeeper == teamBKeeper)&&const DeepCollectionEquality().equals(other.format, format)&&const DeepCollectionEquality().equals(other.venue, venue)&&(identical(other.scheduledStartTime, scheduledStartTime) || other.scheduledStartTime == scheduledStartTime)&&const DeepCollectionEquality().equals(other.result, result)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,matchId,teamAId,teamBId,const DeepCollectionEquality().hash(teamASquad),const DeepCollectionEquality().hash(teamBSquad),teamACaptain,teamBCaptain,teamAKeeper,teamBKeeper,const DeepCollectionEquality().hash(format),const DeepCollectionEquality().hash(venue),scheduledStartTime,status,createdBy,createdAt);
+int get hashCode => Object.hash(runtimeType,matchId,teamAId,teamBId,const DeepCollectionEquality().hash(teamASquad),const DeepCollectionEquality().hash(teamBSquad),teamACaptain,teamBCaptain,teamAKeeper,teamBKeeper,const DeepCollectionEquality().hash(format),const DeepCollectionEquality().hash(venue),scheduledStartTime,const DeepCollectionEquality().hash(result),status,createdBy,createdAt);
 
 @override
 String toString() {
-  return 'MatchDto(matchId: $matchId, teamAId: $teamAId, teamBId: $teamBId, teamASquad: $teamASquad, teamBSquad: $teamBSquad, teamACaptain: $teamACaptain, teamBCaptain: $teamBCaptain, teamAKeeper: $teamAKeeper, teamBKeeper: $teamBKeeper, format: $format, venue: $venue, scheduledStartTime: $scheduledStartTime, status: $status, createdBy: $createdBy, createdAt: $createdAt)';
+  return 'MatchDto(matchId: $matchId, teamAId: $teamAId, teamBId: $teamBId, teamASquad: $teamASquad, teamBSquad: $teamBSquad, teamACaptain: $teamACaptain, teamBCaptain: $teamBCaptain, teamAKeeper: $teamAKeeper, teamBKeeper: $teamBKeeper, format: $format, venue: $venue, scheduledStartTime: $scheduledStartTime, result: $result, status: $status, createdBy: $createdBy, createdAt: $createdAt)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $MatchDtoCopyWith<$Res>  {
   factory $MatchDtoCopyWith(MatchDto value, $Res Function(MatchDto) _then) = _$MatchDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'team_a_id') String teamAId,@JsonKey(name: 'team_b_id') String teamBId,@JsonKey(name: 'team_a_squad') List<String> teamASquad,@JsonKey(name: 'team_b_squad') List<String> teamBSquad,@JsonKey(name: 'team_a_captain') String? teamACaptain,@JsonKey(name: 'team_b_captain') String? teamBCaptain,@JsonKey(name: 'team_a_keeper') String? teamAKeeper,@JsonKey(name: 'team_b_keeper') String? teamBKeeper, Map<String, dynamic> format, Map<String, dynamic>? venue,@JsonKey(name: 'scheduled_start_time') String? scheduledStartTime, String status,@JsonKey(name: 'created_by') String createdBy,@JsonKey(name: 'created_at') String createdAt
+@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'team_a_id') String teamAId,@JsonKey(name: 'team_b_id') String teamBId,@JsonKey(name: 'team_a_squad') List<String> teamASquad,@JsonKey(name: 'team_b_squad') List<String> teamBSquad,@JsonKey(name: 'team_a_captain') String? teamACaptain,@JsonKey(name: 'team_b_captain') String? teamBCaptain,@JsonKey(name: 'team_a_keeper') String? teamAKeeper,@JsonKey(name: 'team_b_keeper') String? teamBKeeper, Map<String, dynamic> format, Map<String, dynamic>? venue,@JsonKey(name: 'scheduled_start_time') String? scheduledStartTime, Map<String, dynamic>? result, String status,@JsonKey(name: 'created_by') String createdBy,@JsonKey(name: 'created_at') String createdAt
 });
 
 
@@ -65,7 +65,7 @@ class _$MatchDtoCopyWithImpl<$Res>
 
 /// Create a copy of MatchDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? matchId = null,Object? teamAId = null,Object? teamBId = null,Object? teamASquad = null,Object? teamBSquad = null,Object? teamACaptain = freezed,Object? teamBCaptain = freezed,Object? teamAKeeper = freezed,Object? teamBKeeper = freezed,Object? format = null,Object? venue = freezed,Object? scheduledStartTime = freezed,Object? status = null,Object? createdBy = null,Object? createdAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? matchId = null,Object? teamAId = null,Object? teamBId = null,Object? teamASquad = null,Object? teamBSquad = null,Object? teamACaptain = freezed,Object? teamBCaptain = freezed,Object? teamAKeeper = freezed,Object? teamBKeeper = freezed,Object? format = null,Object? venue = freezed,Object? scheduledStartTime = freezed,Object? result = freezed,Object? status = null,Object? createdBy = null,Object? createdAt = null,}) {
   return _then(_self.copyWith(
 matchId: null == matchId ? _self.matchId : matchId // ignore: cast_nullable_to_non_nullable
 as String,teamAId: null == teamAId ? _self.teamAId : teamAId // ignore: cast_nullable_to_non_nullable
@@ -79,7 +79,8 @@ as String?,teamBKeeper: freezed == teamBKeeper ? _self.teamBKeeper : teamBKeeper
 as String?,format: null == format ? _self.format : format // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>,venue: freezed == venue ? _self.venue : venue // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,scheduledStartTime: freezed == scheduledStartTime ? _self.scheduledStartTime : scheduledStartTime // ignore: cast_nullable_to_non_nullable
-as String?,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as String?,result: freezed == result ? _self.result : result // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,createdBy: null == createdBy ? _self.createdBy : createdBy // ignore: cast_nullable_to_non_nullable
 as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as String,
@@ -167,10 +168,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_a_id')  String teamAId, @JsonKey(name: 'team_b_id')  String teamBId, @JsonKey(name: 'team_a_squad')  List<String> teamASquad, @JsonKey(name: 'team_b_squad')  List<String> teamBSquad, @JsonKey(name: 'team_a_captain')  String? teamACaptain, @JsonKey(name: 'team_b_captain')  String? teamBCaptain, @JsonKey(name: 'team_a_keeper')  String? teamAKeeper, @JsonKey(name: 'team_b_keeper')  String? teamBKeeper,  Map<String, dynamic> format,  Map<String, dynamic>? venue, @JsonKey(name: 'scheduled_start_time')  String? scheduledStartTime,  String status, @JsonKey(name: 'created_by')  String createdBy, @JsonKey(name: 'created_at')  String createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_a_id')  String teamAId, @JsonKey(name: 'team_b_id')  String teamBId, @JsonKey(name: 'team_a_squad')  List<String> teamASquad, @JsonKey(name: 'team_b_squad')  List<String> teamBSquad, @JsonKey(name: 'team_a_captain')  String? teamACaptain, @JsonKey(name: 'team_b_captain')  String? teamBCaptain, @JsonKey(name: 'team_a_keeper')  String? teamAKeeper, @JsonKey(name: 'team_b_keeper')  String? teamBKeeper,  Map<String, dynamic> format,  Map<String, dynamic>? venue, @JsonKey(name: 'scheduled_start_time')  String? scheduledStartTime,  Map<String, dynamic>? result,  String status, @JsonKey(name: 'created_by')  String createdBy, @JsonKey(name: 'created_at')  String createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MatchDto() when $default != null:
-return $default(_that.matchId,_that.teamAId,_that.teamBId,_that.teamASquad,_that.teamBSquad,_that.teamACaptain,_that.teamBCaptain,_that.teamAKeeper,_that.teamBKeeper,_that.format,_that.venue,_that.scheduledStartTime,_that.status,_that.createdBy,_that.createdAt);case _:
+return $default(_that.matchId,_that.teamAId,_that.teamBId,_that.teamASquad,_that.teamBSquad,_that.teamACaptain,_that.teamBCaptain,_that.teamAKeeper,_that.teamBKeeper,_that.format,_that.venue,_that.scheduledStartTime,_that.result,_that.status,_that.createdBy,_that.createdAt);case _:
   return orElse();
 
 }
@@ -188,10 +189,10 @@ return $default(_that.matchId,_that.teamAId,_that.teamBId,_that.teamASquad,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_a_id')  String teamAId, @JsonKey(name: 'team_b_id')  String teamBId, @JsonKey(name: 'team_a_squad')  List<String> teamASquad, @JsonKey(name: 'team_b_squad')  List<String> teamBSquad, @JsonKey(name: 'team_a_captain')  String? teamACaptain, @JsonKey(name: 'team_b_captain')  String? teamBCaptain, @JsonKey(name: 'team_a_keeper')  String? teamAKeeper, @JsonKey(name: 'team_b_keeper')  String? teamBKeeper,  Map<String, dynamic> format,  Map<String, dynamic>? venue, @JsonKey(name: 'scheduled_start_time')  String? scheduledStartTime,  String status, @JsonKey(name: 'created_by')  String createdBy, @JsonKey(name: 'created_at')  String createdAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_a_id')  String teamAId, @JsonKey(name: 'team_b_id')  String teamBId, @JsonKey(name: 'team_a_squad')  List<String> teamASquad, @JsonKey(name: 'team_b_squad')  List<String> teamBSquad, @JsonKey(name: 'team_a_captain')  String? teamACaptain, @JsonKey(name: 'team_b_captain')  String? teamBCaptain, @JsonKey(name: 'team_a_keeper')  String? teamAKeeper, @JsonKey(name: 'team_b_keeper')  String? teamBKeeper,  Map<String, dynamic> format,  Map<String, dynamic>? venue, @JsonKey(name: 'scheduled_start_time')  String? scheduledStartTime,  Map<String, dynamic>? result,  String status, @JsonKey(name: 'created_by')  String createdBy, @JsonKey(name: 'created_at')  String createdAt)  $default,) {final _that = this;
 switch (_that) {
 case _MatchDto():
-return $default(_that.matchId,_that.teamAId,_that.teamBId,_that.teamASquad,_that.teamBSquad,_that.teamACaptain,_that.teamBCaptain,_that.teamAKeeper,_that.teamBKeeper,_that.format,_that.venue,_that.scheduledStartTime,_that.status,_that.createdBy,_that.createdAt);case _:
+return $default(_that.matchId,_that.teamAId,_that.teamBId,_that.teamASquad,_that.teamBSquad,_that.teamACaptain,_that.teamBCaptain,_that.teamAKeeper,_that.teamBKeeper,_that.format,_that.venue,_that.scheduledStartTime,_that.result,_that.status,_that.createdBy,_that.createdAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -208,10 +209,10 @@ return $default(_that.matchId,_that.teamAId,_that.teamBId,_that.teamASquad,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_a_id')  String teamAId, @JsonKey(name: 'team_b_id')  String teamBId, @JsonKey(name: 'team_a_squad')  List<String> teamASquad, @JsonKey(name: 'team_b_squad')  List<String> teamBSquad, @JsonKey(name: 'team_a_captain')  String? teamACaptain, @JsonKey(name: 'team_b_captain')  String? teamBCaptain, @JsonKey(name: 'team_a_keeper')  String? teamAKeeper, @JsonKey(name: 'team_b_keeper')  String? teamBKeeper,  Map<String, dynamic> format,  Map<String, dynamic>? venue, @JsonKey(name: 'scheduled_start_time')  String? scheduledStartTime,  String status, @JsonKey(name: 'created_by')  String createdBy, @JsonKey(name: 'created_at')  String createdAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_a_id')  String teamAId, @JsonKey(name: 'team_b_id')  String teamBId, @JsonKey(name: 'team_a_squad')  List<String> teamASquad, @JsonKey(name: 'team_b_squad')  List<String> teamBSquad, @JsonKey(name: 'team_a_captain')  String? teamACaptain, @JsonKey(name: 'team_b_captain')  String? teamBCaptain, @JsonKey(name: 'team_a_keeper')  String? teamAKeeper, @JsonKey(name: 'team_b_keeper')  String? teamBKeeper,  Map<String, dynamic> format,  Map<String, dynamic>? venue, @JsonKey(name: 'scheduled_start_time')  String? scheduledStartTime,  Map<String, dynamic>? result,  String status, @JsonKey(name: 'created_by')  String createdBy, @JsonKey(name: 'created_at')  String createdAt)?  $default,) {final _that = this;
 switch (_that) {
 case _MatchDto() when $default != null:
-return $default(_that.matchId,_that.teamAId,_that.teamBId,_that.teamASquad,_that.teamBSquad,_that.teamACaptain,_that.teamBCaptain,_that.teamAKeeper,_that.teamBKeeper,_that.format,_that.venue,_that.scheduledStartTime,_that.status,_that.createdBy,_that.createdAt);case _:
+return $default(_that.matchId,_that.teamAId,_that.teamBId,_that.teamASquad,_that.teamBSquad,_that.teamACaptain,_that.teamBCaptain,_that.teamAKeeper,_that.teamBKeeper,_that.format,_that.venue,_that.scheduledStartTime,_that.result,_that.status,_that.createdBy,_that.createdAt);case _:
   return null;
 
 }
@@ -223,7 +224,7 @@ return $default(_that.matchId,_that.teamAId,_that.teamBId,_that.teamASquad,_that
 @JsonSerializable()
 
 class _MatchDto extends MatchDto {
-  const _MatchDto({@JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'team_a_id') required this.teamAId, @JsonKey(name: 'team_b_id') required this.teamBId, @JsonKey(name: 'team_a_squad') final  List<String> teamASquad = const <String>[], @JsonKey(name: 'team_b_squad') final  List<String> teamBSquad = const <String>[], @JsonKey(name: 'team_a_captain') this.teamACaptain, @JsonKey(name: 'team_b_captain') this.teamBCaptain, @JsonKey(name: 'team_a_keeper') this.teamAKeeper, @JsonKey(name: 'team_b_keeper') this.teamBKeeper, required final  Map<String, dynamic> format, final  Map<String, dynamic>? venue, @JsonKey(name: 'scheduled_start_time') this.scheduledStartTime, this.status = 'pending', @JsonKey(name: 'created_by') required this.createdBy, @JsonKey(name: 'created_at') required this.createdAt}): _teamASquad = teamASquad,_teamBSquad = teamBSquad,_format = format,_venue = venue,super._();
+  const _MatchDto({@JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'team_a_id') required this.teamAId, @JsonKey(name: 'team_b_id') required this.teamBId, @JsonKey(name: 'team_a_squad') final  List<String> teamASquad = const <String>[], @JsonKey(name: 'team_b_squad') final  List<String> teamBSquad = const <String>[], @JsonKey(name: 'team_a_captain') this.teamACaptain, @JsonKey(name: 'team_b_captain') this.teamBCaptain, @JsonKey(name: 'team_a_keeper') this.teamAKeeper, @JsonKey(name: 'team_b_keeper') this.teamBKeeper, required final  Map<String, dynamic> format, final  Map<String, dynamic>? venue, @JsonKey(name: 'scheduled_start_time') this.scheduledStartTime, final  Map<String, dynamic>? result, this.status = 'pending', @JsonKey(name: 'created_by') required this.createdBy, @JsonKey(name: 'created_at') required this.createdAt}): _teamASquad = teamASquad,_teamBSquad = teamBSquad,_format = format,_venue = venue,_result = result,super._();
   factory _MatchDto.fromJson(Map<String, dynamic> json) => _$MatchDtoFromJson(json);
 
 @override@JsonKey(name: 'match_id') final  String matchId;
@@ -264,6 +265,15 @@ class _MatchDto extends MatchDto {
 }
 
 @override@JsonKey(name: 'scheduled_start_time') final  String? scheduledStartTime;
+ final  Map<String, dynamic>? _result;
+@override Map<String, dynamic>? get result {
+  final value = _result;
+  if (value == null) return null;
+  if (_result is EqualUnmodifiableMapView) return _result;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(value);
+}
+
 @override@JsonKey() final  String status;
 @override@JsonKey(name: 'created_by') final  String createdBy;
 @override@JsonKey(name: 'created_at') final  String createdAt;
@@ -281,16 +291,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchDto&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamAId, teamAId) || other.teamAId == teamAId)&&(identical(other.teamBId, teamBId) || other.teamBId == teamBId)&&const DeepCollectionEquality().equals(other._teamASquad, _teamASquad)&&const DeepCollectionEquality().equals(other._teamBSquad, _teamBSquad)&&(identical(other.teamACaptain, teamACaptain) || other.teamACaptain == teamACaptain)&&(identical(other.teamBCaptain, teamBCaptain) || other.teamBCaptain == teamBCaptain)&&(identical(other.teamAKeeper, teamAKeeper) || other.teamAKeeper == teamAKeeper)&&(identical(other.teamBKeeper, teamBKeeper) || other.teamBKeeper == teamBKeeper)&&const DeepCollectionEquality().equals(other._format, _format)&&const DeepCollectionEquality().equals(other._venue, _venue)&&(identical(other.scheduledStartTime, scheduledStartTime) || other.scheduledStartTime == scheduledStartTime)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchDto&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamAId, teamAId) || other.teamAId == teamAId)&&(identical(other.teamBId, teamBId) || other.teamBId == teamBId)&&const DeepCollectionEquality().equals(other._teamASquad, _teamASquad)&&const DeepCollectionEquality().equals(other._teamBSquad, _teamBSquad)&&(identical(other.teamACaptain, teamACaptain) || other.teamACaptain == teamACaptain)&&(identical(other.teamBCaptain, teamBCaptain) || other.teamBCaptain == teamBCaptain)&&(identical(other.teamAKeeper, teamAKeeper) || other.teamAKeeper == teamAKeeper)&&(identical(other.teamBKeeper, teamBKeeper) || other.teamBKeeper == teamBKeeper)&&const DeepCollectionEquality().equals(other._format, _format)&&const DeepCollectionEquality().equals(other._venue, _venue)&&(identical(other.scheduledStartTime, scheduledStartTime) || other.scheduledStartTime == scheduledStartTime)&&const DeepCollectionEquality().equals(other._result, _result)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,matchId,teamAId,teamBId,const DeepCollectionEquality().hash(_teamASquad),const DeepCollectionEquality().hash(_teamBSquad),teamACaptain,teamBCaptain,teamAKeeper,teamBKeeper,const DeepCollectionEquality().hash(_format),const DeepCollectionEquality().hash(_venue),scheduledStartTime,status,createdBy,createdAt);
+int get hashCode => Object.hash(runtimeType,matchId,teamAId,teamBId,const DeepCollectionEquality().hash(_teamASquad),const DeepCollectionEquality().hash(_teamBSquad),teamACaptain,teamBCaptain,teamAKeeper,teamBKeeper,const DeepCollectionEquality().hash(_format),const DeepCollectionEquality().hash(_venue),scheduledStartTime,const DeepCollectionEquality().hash(_result),status,createdBy,createdAt);
 
 @override
 String toString() {
-  return 'MatchDto(matchId: $matchId, teamAId: $teamAId, teamBId: $teamBId, teamASquad: $teamASquad, teamBSquad: $teamBSquad, teamACaptain: $teamACaptain, teamBCaptain: $teamBCaptain, teamAKeeper: $teamAKeeper, teamBKeeper: $teamBKeeper, format: $format, venue: $venue, scheduledStartTime: $scheduledStartTime, status: $status, createdBy: $createdBy, createdAt: $createdAt)';
+  return 'MatchDto(matchId: $matchId, teamAId: $teamAId, teamBId: $teamBId, teamASquad: $teamASquad, teamBSquad: $teamBSquad, teamACaptain: $teamACaptain, teamBCaptain: $teamBCaptain, teamAKeeper: $teamAKeeper, teamBKeeper: $teamBKeeper, format: $format, venue: $venue, scheduledStartTime: $scheduledStartTime, result: $result, status: $status, createdBy: $createdBy, createdAt: $createdAt)';
 }
 
 
@@ -301,7 +311,7 @@ abstract mixin class _$MatchDtoCopyWith<$Res> implements $MatchDtoCopyWith<$Res>
   factory _$MatchDtoCopyWith(_MatchDto value, $Res Function(_MatchDto) _then) = __$MatchDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'team_a_id') String teamAId,@JsonKey(name: 'team_b_id') String teamBId,@JsonKey(name: 'team_a_squad') List<String> teamASquad,@JsonKey(name: 'team_b_squad') List<String> teamBSquad,@JsonKey(name: 'team_a_captain') String? teamACaptain,@JsonKey(name: 'team_b_captain') String? teamBCaptain,@JsonKey(name: 'team_a_keeper') String? teamAKeeper,@JsonKey(name: 'team_b_keeper') String? teamBKeeper, Map<String, dynamic> format, Map<String, dynamic>? venue,@JsonKey(name: 'scheduled_start_time') String? scheduledStartTime, String status,@JsonKey(name: 'created_by') String createdBy,@JsonKey(name: 'created_at') String createdAt
+@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'team_a_id') String teamAId,@JsonKey(name: 'team_b_id') String teamBId,@JsonKey(name: 'team_a_squad') List<String> teamASquad,@JsonKey(name: 'team_b_squad') List<String> teamBSquad,@JsonKey(name: 'team_a_captain') String? teamACaptain,@JsonKey(name: 'team_b_captain') String? teamBCaptain,@JsonKey(name: 'team_a_keeper') String? teamAKeeper,@JsonKey(name: 'team_b_keeper') String? teamBKeeper, Map<String, dynamic> format, Map<String, dynamic>? venue,@JsonKey(name: 'scheduled_start_time') String? scheduledStartTime, Map<String, dynamic>? result, String status,@JsonKey(name: 'created_by') String createdBy,@JsonKey(name: 'created_at') String createdAt
 });
 
 
@@ -318,7 +328,7 @@ class __$MatchDtoCopyWithImpl<$Res>
 
 /// Create a copy of MatchDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? matchId = null,Object? teamAId = null,Object? teamBId = null,Object? teamASquad = null,Object? teamBSquad = null,Object? teamACaptain = freezed,Object? teamBCaptain = freezed,Object? teamAKeeper = freezed,Object? teamBKeeper = freezed,Object? format = null,Object? venue = freezed,Object? scheduledStartTime = freezed,Object? status = null,Object? createdBy = null,Object? createdAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? matchId = null,Object? teamAId = null,Object? teamBId = null,Object? teamASquad = null,Object? teamBSquad = null,Object? teamACaptain = freezed,Object? teamBCaptain = freezed,Object? teamAKeeper = freezed,Object? teamBKeeper = freezed,Object? format = null,Object? venue = freezed,Object? scheduledStartTime = freezed,Object? result = freezed,Object? status = null,Object? createdBy = null,Object? createdAt = null,}) {
   return _then(_MatchDto(
 matchId: null == matchId ? _self.matchId : matchId // ignore: cast_nullable_to_non_nullable
 as String,teamAId: null == teamAId ? _self.teamAId : teamAId // ignore: cast_nullable_to_non_nullable
@@ -332,7 +342,8 @@ as String?,teamBKeeper: freezed == teamBKeeper ? _self.teamBKeeper : teamBKeeper
 as String?,format: null == format ? _self._format : format // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>,venue: freezed == venue ? _self._venue : venue // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,scheduledStartTime: freezed == scheduledStartTime ? _self.scheduledStartTime : scheduledStartTime // ignore: cast_nullable_to_non_nullable
-as String?,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as String?,result: freezed == result ? _self._result : result // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,createdBy: null == createdBy ? _self.createdBy : createdBy // ignore: cast_nullable_to_non_nullable
 as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as String,

@@ -33,6 +33,8 @@ alter table public.innings enable row level security;
 create policy innings_select on public.innings for select using (true);
 
 -- Only the match creator or an assigned scorer may create/mutate innings.
+-- (Phase 1: `assigned_scorers` is always empty — the creator scores — so the
+--  `any(assigned_scorers)` branch stays dormant until the two-phone flow, v1.1.)
 create policy innings_modify on public.innings for all using (
   exists (
     select 1 from public.matches m

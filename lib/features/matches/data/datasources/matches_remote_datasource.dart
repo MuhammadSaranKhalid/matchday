@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
+import '../models/ball_dto.dart';
 import '../models/innings_dto.dart';
 import '../models/match_dto.dart';
 
@@ -66,6 +67,76 @@ class MatchesRemoteDataSource {
       throw ServerException(e.message);
     }
   }
+
+  // ─── Innings + balls (scoring) ──────────────────────────────────────────
+
+  Future<InningsDto> updateInnings(
+      String inningsId, Map<String, dynamic> changes) async {
+    try {
+      final row = await _supabase
+          .from('innings')
+          .update(changes)
+          .eq('innings_id', inningsId)
+          .select()
+          .single();
+      return InningsDto.fromJson(row);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// The latest innings for a match (highest innings_number).
+  Future<InningsDto?> getCurrentInnings(String matchId) async {
+    try {
+      final rows = await _supabase
+          .from('innings')
+          .select()
+          .eq('match_id', matchId)
+          .order('innings_number', ascending: false)
+          .limit(1);
+      return rows.isEmpty ? null : InningsDto.fromJson(rows.first);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<InningsDto?> getInnings(String inningsId) async {
+    try {
+      final row = await _supabase
+          .from('innings')
+          .select()
+          .eq('innings_id', inningsId)
+          .maybeSingle();
+      return row == null ? null : InningsDto.fromJson(row);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Insert one delivery; the DB trigger rolls it into the innings totals.
+  Future<void> insertBall(Map<String, dynamic> payload) async {
+    try {
+      await _supabase.from('balls').insert({
+        ...payload,
+        'entered_by': _requireUid(),
+      });
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Stream<List<BallDto>> watchBalls(String inningsId) => _supabase
+      .from('balls')
+      .stream(primaryKey: ['ball_id'])
+      .eq('innings_id', inningsId)
+      .order('ball_id')
+      .map((rows) => rows.map(BallDto.fromJson).toList());
+
+  Stream<InningsDto?> watchInnings(String inningsId) => _supabase
+      .from('innings')
+      .stream(primaryKey: ['innings_id'])
+      .eq('innings_id', inningsId)
+      .map((rows) => rows.isEmpty ? null : InningsDto.fromJson(rows.first));
 
   /// All matches visible to the user (RLS-scoped), newest first.
   Future<List<MatchDto>> list() async {

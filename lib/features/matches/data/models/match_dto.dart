@@ -21,6 +21,7 @@ abstract class MatchDto with _$MatchDto {
     required Map<String, dynamic> format,
     Map<String, dynamic>? venue,
     @JsonKey(name: 'scheduled_start_time') String? scheduledStartTime,
+    Map<String, dynamic>? result,
     @Default('pending') String status,
     @JsonKey(name: 'created_by') required String createdBy,
     @JsonKey(name: 'created_at') required String createdAt,
@@ -57,6 +58,7 @@ abstract class MatchDto with _$MatchDto {
         scheduledStartTime: scheduledStartTime == null
             ? null
             : DateTime.tryParse(scheduledStartTime!),
+        resultDescription: result?['description'] as String?,
         status: MatchStatus.fromWire(status),
         createdBy: createdBy,
         createdAt: DateTime.parse(createdAt),

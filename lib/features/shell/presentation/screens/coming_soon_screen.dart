@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_screen_scaffold.dart';
@@ -28,8 +29,8 @@ class ComingSoonScreen extends StatelessWidget {
     return CkScreenScaffold(
       title: showWordmark ? null : tab,
       hasUnread: showActions,
-      onBell: showActions ? () {} : null,
-      onAvatar: showActions ? () {} : null,
+      onBell: showActions ? () => context.push('/notifications') : null,
+      onAvatar: showActions ? () => context.go('/pavilion') : null,
       avatarInitials: showActions ? '·' : null,
       child: Center(
         child: Column(

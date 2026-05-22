@@ -187,6 +187,133 @@ final class GetMatchUseCaseProvider
 
 String _$getMatchUseCaseHash() => r'37914fa256a0d840f12e73f2c5e5296ba57b1462';
 
+@ProviderFor(getCurrentInningsUseCase)
+final getCurrentInningsUseCaseProvider = GetCurrentInningsUseCaseProvider._();
+
+final class GetCurrentInningsUseCaseProvider
+    extends
+        $FunctionalProvider<
+          GetCurrentInnings,
+          GetCurrentInnings,
+          GetCurrentInnings
+        >
+    with $Provider<GetCurrentInnings> {
+  GetCurrentInningsUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'getCurrentInningsUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$getCurrentInningsUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<GetCurrentInnings> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  GetCurrentInnings create(Ref ref) {
+    return getCurrentInningsUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(GetCurrentInnings value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<GetCurrentInnings>(value),
+    );
+  }
+}
+
+String _$getCurrentInningsUseCaseHash() =>
+    r'9e65d57e4a03ea63c5849203bc467680315b0770';
+
+/// The latest innings for a match (one-shot; the spectator then streams it).
+
+@ProviderFor(currentInnings)
+final currentInningsProvider = CurrentInningsFamily._();
+
+/// The latest innings for a match (one-shot; the spectator then streams it).
+
+final class CurrentInningsProvider
+    extends
+        $FunctionalProvider<AsyncValue<Innings?>, Innings?, FutureOr<Innings?>>
+    with $FutureModifier<Innings?>, $FutureProvider<Innings?> {
+  /// The latest innings for a match (one-shot; the spectator then streams it).
+  CurrentInningsProvider._({
+    required CurrentInningsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'currentInningsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$currentInningsHash();
+
+  @override
+  String toString() {
+    return r'currentInningsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<Innings?> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<Innings?> create(Ref ref) {
+    final argument = this.argument as String;
+    return currentInnings(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CurrentInningsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$currentInningsHash() => r'970d19a9fcde0ba65e99873a0bef276390cd25a1';
+
+/// The latest innings for a match (one-shot; the spectator then streams it).
+
+final class CurrentInningsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<Innings?>, String> {
+  CurrentInningsFamily._()
+    : super(
+        retry: null,
+        name: r'currentInningsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The latest innings for a match (one-shot; the spectator then streams it).
+
+  CurrentInningsProvider call(String matchId) =>
+      CurrentInningsProvider._(argument: matchId, from: this);
+
+  @override
+  String toString() => r'currentInningsProvider';
+}
+
 @ProviderFor(acceptMatchUseCase)
 final acceptMatchUseCaseProvider = AcceptMatchUseCaseProvider._();
 
@@ -312,6 +439,334 @@ final class StartMatchUseCaseProvider
 
 String _$startMatchUseCaseHash() => r'81d86d4c53aeea67f0d7f0af6b216eb1876bd1f9';
 
+@ProviderFor(completeMatchUseCase)
+final completeMatchUseCaseProvider = CompleteMatchUseCaseProvider._();
+
+final class CompleteMatchUseCaseProvider
+    extends $FunctionalProvider<CompleteMatch, CompleteMatch, CompleteMatch>
+    with $Provider<CompleteMatch> {
+  CompleteMatchUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'completeMatchUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$completeMatchUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<CompleteMatch> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  CompleteMatch create(Ref ref) {
+    return completeMatchUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CompleteMatch value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CompleteMatch>(value),
+    );
+  }
+}
+
+String _$completeMatchUseCaseHash() =>
+    r'b57b71cf4c0e7f5e0ad0a84d6f8fffbe0082e861';
+
+@ProviderFor(recordBallUseCase)
+final recordBallUseCaseProvider = RecordBallUseCaseProvider._();
+
+final class RecordBallUseCaseProvider
+    extends $FunctionalProvider<RecordBall, RecordBall, RecordBall>
+    with $Provider<RecordBall> {
+  RecordBallUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'recordBallUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$recordBallUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<RecordBall> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  RecordBall create(Ref ref) {
+    return recordBallUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(RecordBall value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<RecordBall>(value),
+    );
+  }
+}
+
+String _$recordBallUseCaseHash() => r'73d6fd85f83b28806f878fc9f7f2ae26893992fe';
+
+@ProviderFor(watchBallsUseCase)
+final watchBallsUseCaseProvider = WatchBallsUseCaseProvider._();
+
+final class WatchBallsUseCaseProvider
+    extends $FunctionalProvider<WatchBalls, WatchBalls, WatchBalls>
+    with $Provider<WatchBalls> {
+  WatchBallsUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'watchBallsUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$watchBallsUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<WatchBalls> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  WatchBalls create(Ref ref) {
+    return watchBallsUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(WatchBalls value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<WatchBalls>(value),
+    );
+  }
+}
+
+String _$watchBallsUseCaseHash() => r'6263ff4b65609b8a97b53d91ce389aa27afadf78';
+
+@ProviderFor(watchInningsUseCase)
+final watchInningsUseCaseProvider = WatchInningsUseCaseProvider._();
+
+final class WatchInningsUseCaseProvider
+    extends $FunctionalProvider<WatchInnings, WatchInnings, WatchInnings>
+    with $Provider<WatchInnings> {
+  WatchInningsUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'watchInningsUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$watchInningsUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<WatchInnings> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  WatchInnings create(Ref ref) {
+    return watchInningsUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(WatchInnings value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<WatchInnings>(value),
+    );
+  }
+}
+
+String _$watchInningsUseCaseHash() =>
+    r'3b175efd33c786cafb4e81b5103fed65bc33268c';
+
+/// Live deliveries for an innings (realtime).
+
+@ProviderFor(balls)
+final ballsProvider = BallsFamily._();
+
+/// Live deliveries for an innings (realtime).
+
+final class BallsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Ball>>,
+          List<Ball>,
+          Stream<List<Ball>>
+        >
+    with $FutureModifier<List<Ball>>, $StreamProvider<List<Ball>> {
+  /// Live deliveries for an innings (realtime).
+  BallsProvider._({
+    required BallsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'ballsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$ballsHash();
+
+  @override
+  String toString() {
+    return r'ballsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<List<Ball>> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<Ball>> create(Ref ref) {
+    final argument = this.argument as String;
+    return balls(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is BallsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$ballsHash() => r'4cd5a20eed9811614a30bae0cbb7fb161f592315';
+
+/// Live deliveries for an innings (realtime).
+
+final class BallsFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<Ball>>, String> {
+  BallsFamily._()
+    : super(
+        retry: null,
+        name: r'ballsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Live deliveries for an innings (realtime).
+
+  BallsProvider call(String inningsId) =>
+      BallsProvider._(argument: inningsId, from: this);
+
+  @override
+  String toString() => r'ballsProvider';
+}
+
+/// Live innings state (realtime).
+
+@ProviderFor(liveInnings)
+final liveInningsProvider = LiveInningsFamily._();
+
+/// Live innings state (realtime).
+
+final class LiveInningsProvider
+    extends
+        $FunctionalProvider<AsyncValue<Innings?>, Innings?, Stream<Innings?>>
+    with $FutureModifier<Innings?>, $StreamProvider<Innings?> {
+  /// Live innings state (realtime).
+  LiveInningsProvider._({
+    required LiveInningsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'liveInningsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$liveInningsHash();
+
+  @override
+  String toString() {
+    return r'liveInningsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<Innings?> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<Innings?> create(Ref ref) {
+    final argument = this.argument as String;
+    return liveInnings(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is LiveInningsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$liveInningsHash() => r'16e2240ecfb62a8ecf55cc30a4afd2d8bf8b3bbe';
+
+/// Live innings state (realtime).
+
+final class LiveInningsFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<Innings?>, String> {
+  LiveInningsFamily._()
+    : super(
+        retry: null,
+        name: r'liveInningsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Live innings state (realtime).
+
+  LiveInningsProvider call(String inningsId) =>
+      LiveInningsProvider._(argument: inningsId, from: this);
+
+  @override
+  String toString() => r'liveInningsProvider';
+}
+
 /// One-shot fetch of a single match (for the request screen). Throws a
 /// [FailureWrapper] on error so the UI can show it via AsyncError.
 
@@ -369,7 +824,7 @@ final class MatchProvider
   }
 }
 
-String _$matchHash() => r'dd4bb3dee447b5c077c1196304adf2acc1625a7c';
+String _$matchHash() => r'c8cfa6f9701e9cde9c539a2357ad1e749e49222e';
 
 /// One-shot fetch of a single match (for the request screen). Throws a
 /// [FailureWrapper] on error so the UI can show it via AsyncError.
@@ -437,4 +892,4 @@ final class MyMatchesProvider
   }
 }
 
-String _$myMatchesHash() => r'62c725f1cc00e35b3750e7c2ae0ee640cac868f2';
+String _$myMatchesHash() => r'50ca81e8fc13b47109848645883433c1213c3b10';

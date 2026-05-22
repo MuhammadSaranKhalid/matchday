@@ -102,22 +102,39 @@ lib/
 │   ├── supabase/
 │   │   └── supabase_client_provider.dart # SupabaseClient as a keepAlive provider
 │   ├── database/
-│   │   ├── tables.dart                   # drift table definitions (add new tables here)
+│   │   ├── tables.dart                   # drift tables: Todos, PendingOperations, WizardDrafts
 │   │   ├── app_database.dart             # @DriftDatabase class (register new tables here)
-│   │   └── database_provider.dart        # AppDatabase as a keepAlive provider
+│   │   ├── wizard_draft_store.dart       # best-effort local persistence for multi-step wizard drafts
+│   │   └── database_provider.dart        # appDatabase + wizardDraftStore keepAlive providers
 │   ├── connectivity/
 │   │   └── connectivity_provider.dart    # Stream<bool> isOnline provider
+│   ├── theme/
+│   │   └── circk_theme.dart              # CkColors / CkType / CkRadii tokens + buildCirckTheme()
+│   ├── widgets/                          # shared, feature-agnostic UI (no Riverpod, no domain)
+│   │   ├── ck_button.dart                # CkButton: primary / secondary / ghost (+ busy spinner)
+│   │   ├── ck_text_field.dart            # labelled themed input with inline error/helper
+│   │   ├── ck_bottom_nav.dart            # 3-tab HOME · MATCH · PAVILION bar (presentational)
+│   │   └── ck_screen_scaffold.dart       # paper Scaffold + top bar (circk. wordmark / title / bell / avatar)
 │   └── sync/
-│       ├── sync_service.dart             # offline-first orchestrator (replay + pull + LWW)
-│       └── sync_provider.dart            # SyncService provider, watches connectivity
+│       ├── sync_service.dart             # offline-first orchestrator (replay + pull + LWW); dispatches by entityType
+│       ├── sync_provider.dart            # SyncService provider, watches connectivity
+│       ├── pending_operations_datasource.dart  # SHARED queue accessor (moved out of todos)
+│       └── pending_operations_provider.dart     # pendingOperationsDataSource provider
 ├── router/
-│   └── app_router.dart                   # go_router with auth-aware redirect
+│   └── app_router.dart                   # go_router; auth redirect + StatefulShellRoute (3-tab shell)
 ├── app.dart                              # MaterialApp.router + bootstraps sync + DB clear on sign-out
 ├── main.dart                             # Supabase.initialize + GoogleSignIn.initialize + ProviderScope
 └── features/
     ├── auth/                             # PERMANENT — every product needs auth
+    ├── onboarding/                       # PERMANENT — first-run profile (username/display name/city/player)
+    ├── shell/                            # PERMANENT — authenticated 3-tab shell (AppShell + placeholder tabs)
+    ├── teams/                            # PRODUCT — offline-first teams (create/hub/manage); 1st real offline feature
+    ├── matches/                          # PRODUCT — online-only match setup/lifecycle (F4+)
     ├── todos/                            # REFERENCE — delete or replace per Section 1
     └── <your_feature>/                   # whatever the product actually needs
+
+supabase/
+└── migrations/                          # ordered SQL (001_profiles.sql, 002_username_index.sql, ...)
         ├── domain/
         │   ├── entities/                 # plain Dart classes; manual equality
         │   ├── value_objects/            # Email-like wrappers with Either<Failure, T>.create
@@ -168,6 +185,8 @@ freezed_annotation: ^3.0.0
 json_annotation: ^4.9.0
 go_router: ^16.2.0
 flutter_svg: ^2.3.0                  # render brand vector assets (Google "G", pitch motif) faithfully
+intl: ^0.20.2                        # date/number formatting (scorecards, timestamps)
+timeago: ^3.7.1                      # relative timestamps ("3h ago") in feeds/notifications
 # NOTE: google_fonts was removed in favour of bundled variable fonts. The
 # Inter / Inter Tight / JetBrains Mono TTFs live in assets/fonts/ and are
 # declared under `flutter: fonts:` in pubspec.yaml. This keeps the app
@@ -930,14 +949,42 @@ Schema requirements for any synced table:
 - `updated_at timestamptz` with a `BEFORE UPDATE` trigger that sets it to `now()` on every change
 - Table added to the `supabase_realtime` publication
 
-**Extending sync to a new feature.** The current `SyncService._executeOp` switch handles `OpType.create / update / toggle / delete` for one entity type (currently todos). To support a new feature:
+**The pending-ops queue lives in core.** `PendingOperationsDataSource` is at `lib/core/sync/pending_operations_datasource.dart` (provider in `pending_operations_provider.dart`) — it's shared infrastructure, NOT owned by any feature. It exposes a generic `enqueue({opType, entityType, entityId, payload})` plus todos convenience wrappers. New features call `enqueue(...)` directly. Do NOT import a feature's data layer to reach the queue.
 
-1. Either reuse the existing `OpType` enum if your verbs fit, OR extend it with new variants in `lib/core/database/tables.dart`.
-2. Update the `entityType` column convention — currently `'todo'` is the only value; use a new string per feature (`'post'`, `'comment'`, etc.).
-3. In `sync_service.dart`'s `_executeOp`, add a dispatch on `op.entityType` so the right data source handles each op type.
-4. Inject your feature's remote data source into `SyncService` (currently only `TodosRemoteDataSource` is injected). At ≥3 synced features, refactor: have features register handlers with the sync service rather than the service knowing every data source.
+**Extending sync to a new feature.** `SyncService._executeOp` dispatches on `op.entityType` and currently handles `todo` + the three teams types (`team`, `team_member`, `unclaimed_player`). To support a new feature:
+
+1. Reuse the existing `OpType` enum if your verbs fit (teams reused `create/update/delete`).
+2. Pick a new `entityType` string per table (`'post'`, `'comment'`, …).
+3. In `sync_service.dart`, add a branch in `_executeOp`'s `switch (op.entityType)` and extend `_pullAndMerge` + `startRealtimeMirror` with your feature's list/stream calls.
+4. Inject your feature's local + remote data sources into `SyncService` (constructor + `sync_provider.dart`).
+
+> ⚠️ **Handler refactor is now due.** SyncService already hard-codes two features (todos + teams) and teams spans three entity types. The NEXT synced feature should trigger the §6.4 `SyncHandler` interface refactor (features register a handler that owns their `_executeOp`/pull/realtime), rather than adding a fourth `entityType` branch. A flag comment marks this in `sync_service.dart`.
+
+When sign-out happens: `app.dart` listens to `currentUserStream` and calls `AppDatabase.clear()` to wipe ALL local data (todos, teams, pending ops, wizard drafts). This prevents user A's data appearing for user B on the same device.
 
 When sign-out happens: `app.dart` listens to `currentUserStream` and calls `AppDatabase.clear()` to wipe ALL local data (todos, future offline features, pending ops). This prevents user A's data appearing for user B on the same device.
+
+### 6.5 Wizard draft persistence
+
+Multi-step wizards (onboarding, and later team-create / match-setup) autosave their in-progress form state so a killed app can resume. This is **transient presentation state, not domain data**, so it deliberately does NOT go through a domain repository / use case:
+
+- Backed by the shared `WizardDrafts` drift table (`lib/core/database/tables.dart`) — keyed by a caller string (e.g. `'onboarding'`), payload is the controller's JSON-encoded draft. Never synced, no `user_id`/`updated_at`, no pending op. Wiped by `AppDatabase.clear()` on sign-out (so a constant key is safe).
+- Accessed via `WizardDraftStore` (`lib/core/database/wizard_draft_store.dart`) — best-effort: reads/writes swallow errors (a lost draft is a minor annoyance, never an `Either<Failure,_>`).
+- A `@riverpod` **controller may depend on `wizardDraftStoreProvider` directly** (it's in `lib/core/database/`), the same way the todos controller reaches for `syncServiceProvider`. This is the one sanctioned case of a controller touching a `core/database/` class without a use case in between — justified because drafts aren't domain data. Do NOT extend this to actual domain reads/writes.
+
+The `wizardDraftStore` provider lives in `database_provider.dart` (not in the store's own file) to honour Rule 5's `lib/core/*/*_provider*.dart` convention.
+
+### 6.6 Cross-feature dependencies
+
+Features compose. When feature A genuinely builds on feature B (e.g. `matches` builds on `teams` — a match is a contest between two teams), these cross-feature references are PERMITTED, but only in specific directions:
+
+- **Domain → Domain.** A's domain may reference B's domain *entities/value objects* when the relationship is intrinsic to the model. Example: `Match` holds `TeamId` (from `teams/domain`). Do NOT duplicate the id type. Both sides stay pure Dart, so Rule 1 still holds.
+- **Presentation → Presentation providers.** A's *screen* may `ref.watch` B's *providers* to read B's data (e.g. the match-setup Pick-XI step watches `rosterProvider`; the opponent step watches `allTeamsProvider`). Read B through its `presentation/providers`, never B's data sources/DTOs/repository impls.
+- **FORBIDDEN:** importing another feature's `data/` layer (data sources, DTOs, repository impls) or its `domain/repositories` abstract. If you need B's behaviour, go through a B use-case provider.
+
+These are the only sanctioned cross-feature seams. The `todos` reference feature is exempt — never import it from a product feature (§10).
+
+Player IDs are intentionally raw `String` across `teams` (`TeamMember.playerId`) and `matches` (`Match.teamASquad`/`teamACaptain`) because they are polymorphic (a `profiles.user_id` OR an `unclaimed_id`); a single wrapper can't express that without a union. This is a deliberate, documented exception to the "wrap all IDs" rule (§5.1).
 
 ---
 

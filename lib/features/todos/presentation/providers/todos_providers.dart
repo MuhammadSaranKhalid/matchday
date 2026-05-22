@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/supabase/supabase_client_provider.dart';
+import '../../../../core/sync/pending_operations_provider.dart';
 import '../../../../core/sync/sync_provider.dart';
 import '../../../../core/usecase/usecase.dart';
 import '../../data/datasources/todos_datasource_providers.dart';

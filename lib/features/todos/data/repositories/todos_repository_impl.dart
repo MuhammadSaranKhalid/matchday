@@ -4,10 +4,10 @@ import 'package:fpdart/fpdart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/error/failures.dart';
+import '../../../../core/sync/pending_operations_datasource.dart';
 import '../../../../core/sync/sync_service.dart';
 import '../../domain/entities/todo.dart';
 import '../../domain/repositories/todos_repository.dart';
-import '../datasources/pending_operations_datasource.dart';
 import '../datasources/todos_local_datasource.dart';
 
 /// Offline-first Todos repository.

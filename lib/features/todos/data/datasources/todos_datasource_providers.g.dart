@@ -10,12 +10,18 @@ part of 'todos_datasource_providers.dart';
 // ignore_for_file: type=lint, type=warning
 /// Lives in its own file so the sync provider and the repository
 /// provider can both depend on these without creating an import cycle.
+///
+/// (The pending-ops queue datasource moved to core/sync — it's shared by
+/// every offline feature, not todos-specific.)
 
 @ProviderFor(todosLocalDataSource)
 final todosLocalDataSourceProvider = TodosLocalDataSourceProvider._();
 
 /// Lives in its own file so the sync provider and the repository
 /// provider can both depend on these without creating an import cycle.
+///
+/// (The pending-ops queue datasource moved to core/sync — it's shared by
+/// every offline feature, not todos-specific.)
 
 final class TodosLocalDataSourceProvider
     extends
@@ -27,6 +33,9 @@ final class TodosLocalDataSourceProvider
     with $Provider<TodosLocalDataSource> {
   /// Lives in its own file so the sync provider and the repository
   /// provider can both depend on these without creating an import cycle.
+  ///
+  /// (The pending-ops queue datasource moved to core/sync — it's shared by
+  /// every offline feature, not todos-specific.)
   TodosLocalDataSourceProvider._()
     : super(
         from: null,
@@ -63,55 +72,6 @@ final class TodosLocalDataSourceProvider
 
 String _$todosLocalDataSourceHash() =>
     r'805c2e4be43f9134acb4b776332ee4ff17abf149';
-
-@ProviderFor(pendingOperationsDataSource)
-final pendingOperationsDataSourceProvider =
-    PendingOperationsDataSourceProvider._();
-
-final class PendingOperationsDataSourceProvider
-    extends
-        $FunctionalProvider<
-          PendingOperationsDataSource,
-          PendingOperationsDataSource,
-          PendingOperationsDataSource
-        >
-    with $Provider<PendingOperationsDataSource> {
-  PendingOperationsDataSourceProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'pendingOperationsDataSourceProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$pendingOperationsDataSourceHash();
-
-  @$internal
-  @override
-  $ProviderElement<PendingOperationsDataSource> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  PendingOperationsDataSource create(Ref ref) {
-    return pendingOperationsDataSource(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(PendingOperationsDataSource value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<PendingOperationsDataSource>(value),
-    );
-  }
-}
-
-String _$pendingOperationsDataSourceHash() =>
-    r'dbfba8b2c80dc58d4c344d2a9dda8876441b79fd';
 
 @ProviderFor(todosRemoteDataSource)
 final todosRemoteDataSourceProvider = TodosRemoteDataSourceProvider._();

@@ -1,0 +1,305 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// coverage:ignore-file
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'profile_dto.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+// dart format off
+T _$identity<T>(T value) => value;
+
+/// @nodoc
+mixin _$ProfileDto {
+
+@JsonKey(name: 'user_id') String get userId; String? get username;@JsonKey(name: 'display_name') String? get displayName; Map<String, dynamic>? get location;@JsonKey(name: 'player_profile') Map<String, dynamic>? get playerProfile;
+/// Create a copy of ProfileDto
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProfileDtoCopyWith<ProfileDto> get copyWith => _$ProfileDtoCopyWithImpl<ProfileDto>(this as ProfileDto, _$identity);
+
+  /// Serializes this ProfileDto to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileDto&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.username, username) || other.username == username)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&const DeepCollectionEquality().equals(other.location, location)&&const DeepCollectionEquality().equals(other.playerProfile, playerProfile));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,userId,username,displayName,const DeepCollectionEquality().hash(location),const DeepCollectionEquality().hash(playerProfile));
+
+@override
+String toString() {
+  return 'ProfileDto(userId: $userId, username: $username, displayName: $displayName, location: $location, playerProfile: $playerProfile)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProfileDtoCopyWith<$Res>  {
+  factory $ProfileDtoCopyWith(ProfileDto value, $Res Function(ProfileDto) _then) = _$ProfileDtoCopyWithImpl;
+@useResult
+$Res call({
+@JsonKey(name: 'user_id') String userId, String? username,@JsonKey(name: 'display_name') String? displayName, Map<String, dynamic>? location,@JsonKey(name: 'player_profile') Map<String, dynamic>? playerProfile
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProfileDtoCopyWithImpl<$Res>
+    implements $ProfileDtoCopyWith<$Res> {
+  _$ProfileDtoCopyWithImpl(this._self, this._then);
+
+  final ProfileDto _self;
+  final $Res Function(ProfileDto) _then;
+
+/// Create a copy of ProfileDto
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? userId = null,Object? username = freezed,Object? displayName = freezed,Object? location = freezed,Object? playerProfile = freezed,}) {
+  return _then(_self.copyWith(
+userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
+as String,username: freezed == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
+as String?,displayName: freezed == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
+as String?,location: freezed == location ? _self.location : location // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,playerProfile: freezed == playerProfile ? _self.playerProfile : playerProfile // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProfileDto].
+extension ProfileDtoPatterns on ProfileDto {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProfileDto value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProfileDto() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProfileDto value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProfileDto():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProfileDto value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProfileDto() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String? username, @JsonKey(name: 'display_name')  String? displayName,  Map<String, dynamic>? location, @JsonKey(name: 'player_profile')  Map<String, dynamic>? playerProfile)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProfileDto() when $default != null:
+return $default(_that.userId,_that.username,_that.displayName,_that.location,_that.playerProfile);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String? username, @JsonKey(name: 'display_name')  String? displayName,  Map<String, dynamic>? location, @JsonKey(name: 'player_profile')  Map<String, dynamic>? playerProfile)  $default,) {final _that = this;
+switch (_that) {
+case _ProfileDto():
+return $default(_that.userId,_that.username,_that.displayName,_that.location,_that.playerProfile);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'user_id')  String userId,  String? username, @JsonKey(name: 'display_name')  String? displayName,  Map<String, dynamic>? location, @JsonKey(name: 'player_profile')  Map<String, dynamic>? playerProfile)?  $default,) {final _that = this;
+switch (_that) {
+case _ProfileDto() when $default != null:
+return $default(_that.userId,_that.username,_that.displayName,_that.location,_that.playerProfile);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProfileDto extends ProfileDto {
+  const _ProfileDto({@JsonKey(name: 'user_id') required this.userId, this.username, @JsonKey(name: 'display_name') this.displayName, final  Map<String, dynamic>? location, @JsonKey(name: 'player_profile') final  Map<String, dynamic>? playerProfile}): _location = location,_playerProfile = playerProfile,super._();
+  factory _ProfileDto.fromJson(Map<String, dynamic> json) => _$ProfileDtoFromJson(json);
+
+@override@JsonKey(name: 'user_id') final  String userId;
+@override final  String? username;
+@override@JsonKey(name: 'display_name') final  String? displayName;
+ final  Map<String, dynamic>? _location;
+@override Map<String, dynamic>? get location {
+  final value = _location;
+  if (value == null) return null;
+  if (_location is EqualUnmodifiableMapView) return _location;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(value);
+}
+
+ final  Map<String, dynamic>? _playerProfile;
+@override@JsonKey(name: 'player_profile') Map<String, dynamic>? get playerProfile {
+  final value = _playerProfile;
+  if (value == null) return null;
+  if (_playerProfile is EqualUnmodifiableMapView) return _playerProfile;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(value);
+}
+
+
+/// Create a copy of ProfileDto
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProfileDtoCopyWith<_ProfileDto> get copyWith => __$ProfileDtoCopyWithImpl<_ProfileDto>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProfileDtoToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileDto&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.username, username) || other.username == username)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&const DeepCollectionEquality().equals(other._location, _location)&&const DeepCollectionEquality().equals(other._playerProfile, _playerProfile));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,userId,username,displayName,const DeepCollectionEquality().hash(_location),const DeepCollectionEquality().hash(_playerProfile));
+
+@override
+String toString() {
+  return 'ProfileDto(userId: $userId, username: $username, displayName: $displayName, location: $location, playerProfile: $playerProfile)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProfileDtoCopyWith<$Res> implements $ProfileDtoCopyWith<$Res> {
+  factory _$ProfileDtoCopyWith(_ProfileDto value, $Res Function(_ProfileDto) _then) = __$ProfileDtoCopyWithImpl;
+@override @useResult
+$Res call({
+@JsonKey(name: 'user_id') String userId, String? username,@JsonKey(name: 'display_name') String? displayName, Map<String, dynamic>? location,@JsonKey(name: 'player_profile') Map<String, dynamic>? playerProfile
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProfileDtoCopyWithImpl<$Res>
+    implements _$ProfileDtoCopyWith<$Res> {
+  __$ProfileDtoCopyWithImpl(this._self, this._then);
+
+  final _ProfileDto _self;
+  final $Res Function(_ProfileDto) _then;
+
+/// Create a copy of ProfileDto
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? userId = null,Object? username = freezed,Object? displayName = freezed,Object? location = freezed,Object? playerProfile = freezed,}) {
+  return _then(_ProfileDto(
+userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
+as String,username: freezed == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
+as String?,displayName: freezed == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
+as String?,location: freezed == location ? _self._location : location // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,playerProfile: freezed == playerProfile ? _self._playerProfile : playerProfile // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,
+  ));
+}
+
+
+}
+
+// dart format on

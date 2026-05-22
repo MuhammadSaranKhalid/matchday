@@ -1,7 +1,9 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../core/connectivity/connectivity_provider.dart';
 import '../../core/supabase/supabase_client_provider.dart';
+import '../../features/teams/data/datasources/teams_datasource_providers.dart';
 import '../../features/todos/data/datasources/todos_datasource_providers.dart';
+import 'pending_operations_provider.dart';
 import 'sync_service.dart';
 
 part 'sync_provider.g.dart';
@@ -17,8 +19,10 @@ part 'sync_provider.g.dart';
 @Riverpod(keepAlive: true)
 SyncService syncService(Ref ref) {
   final service = SyncService(
-    local: ref.watch(todosLocalDataSourceProvider),
-    remote: ref.watch(todosRemoteDataSourceProvider),
+    todosLocal: ref.watch(todosLocalDataSourceProvider),
+    todosRemote: ref.watch(todosRemoteDataSourceProvider),
+    teamsLocal: ref.watch(teamsLocalDataSourceProvider),
+    teamsRemote: ref.watch(teamsRemoteDataSourceProvider),
     pendingOps: ref.watch(pendingOperationsDataSourceProvider),
     supabase: ref.watch(supabaseClientProvider),
   );

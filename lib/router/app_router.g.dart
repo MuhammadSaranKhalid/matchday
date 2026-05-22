@@ -13,6 +13,11 @@ part of 'app_router.dart';
 /// The redirect callback reads the current-user stream's latest value.
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
+///
+/// Authenticated users land in the three-tab shell (HOME · MATCH · PAVILION)
+/// via a [StatefulShellRoute] so each tab keeps its own navigation stack.
+/// The onboarding gate (signed-in but profile incomplete → /onboarding) is
+/// added in Feature 2 alongside the `profiles` table.
 
 @ProviderFor(appRouter)
 final appRouterProvider = AppRouterProvider._();
@@ -22,6 +27,11 @@ final appRouterProvider = AppRouterProvider._();
 /// The redirect callback reads the current-user stream's latest value.
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
+///
+/// Authenticated users land in the three-tab shell (HOME · MATCH · PAVILION)
+/// via a [StatefulShellRoute] so each tab keeps its own navigation stack.
+/// The onboarding gate (signed-in but profile incomplete → /onboarding) is
+/// added in Feature 2 alongside the `profiles` table.
 
 final class AppRouterProvider
     extends $FunctionalProvider<GoRouter, GoRouter, GoRouter>
@@ -31,6 +41,11 @@ final class AppRouterProvider
   /// The redirect callback reads the current-user stream's latest value.
   /// When it flips (sign in / sign out), the router re-evaluates and moves
   /// the user accordingly.
+  ///
+  /// Authenticated users land in the three-tab shell (HOME · MATCH · PAVILION)
+  /// via a [StatefulShellRoute] so each tab keeps its own navigation stack.
+  /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
+  /// added in Feature 2 alongside the `profiles` table.
   AppRouterProvider._()
     : super(
         from: null,
@@ -64,4 +79,4 @@ final class AppRouterProvider
   }
 }
 
-String _$appRouterHash() => r'afc947966fd4fa339a759e625bfacc44b4cb8119';
+String _$appRouterHash() => r'afec67c6d78080ad21173217de3da35f5403726c';

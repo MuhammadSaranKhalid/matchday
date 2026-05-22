@@ -62,3 +62,60 @@ final class AppDatabaseProvider
 }
 
 String _$appDatabaseHash() => r'59cce38d45eeaba199eddd097d8e149d66f9f3e1';
+
+/// Shared wizard-draft persistence (onboarding, team-create, ...). Lives here
+/// to keep DB-provider definitions in a `*_provider*.dart` file per Rule 5;
+/// the [WizardDraftStore] class itself stays in `wizard_draft_store.dart`.
+
+@ProviderFor(wizardDraftStore)
+final wizardDraftStoreProvider = WizardDraftStoreProvider._();
+
+/// Shared wizard-draft persistence (onboarding, team-create, ...). Lives here
+/// to keep DB-provider definitions in a `*_provider*.dart` file per Rule 5;
+/// the [WizardDraftStore] class itself stays in `wizard_draft_store.dart`.
+
+final class WizardDraftStoreProvider
+    extends
+        $FunctionalProvider<
+          WizardDraftStore,
+          WizardDraftStore,
+          WizardDraftStore
+        >
+    with $Provider<WizardDraftStore> {
+  /// Shared wizard-draft persistence (onboarding, team-create, ...). Lives here
+  /// to keep DB-provider definitions in a `*_provider*.dart` file per Rule 5;
+  /// the [WizardDraftStore] class itself stays in `wizard_draft_store.dart`.
+  WizardDraftStoreProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'wizardDraftStoreProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$wizardDraftStoreHash();
+
+  @$internal
+  @override
+  $ProviderElement<WizardDraftStore> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  WizardDraftStore create(Ref ref) {
+    return wizardDraftStore(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(WizardDraftStore value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<WizardDraftStore>(value),
+    );
+  }
+}
+
+String _$wizardDraftStoreHash() => r'17a684ac3a43d03bb28c01d58fe2ab025dc164dc';

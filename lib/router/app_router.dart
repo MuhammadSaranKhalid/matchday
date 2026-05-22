@@ -3,6 +3,17 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../features/auth/presentation/providers/auth_providers.dart';
 import '../features/auth/presentation/screens/sign_in_screen.dart';
+import '../features/onboarding/presentation/providers/onboarding_providers.dart';
+import '../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../features/shell/presentation/screens/coming_soon_screen.dart';
+import '../features/shell/presentation/widgets/app_shell.dart';
+import '../features/teams/presentation/screens/team_create_screen.dart';
+import '../features/teams/presentation/screens/team_hub_screen.dart';
+import '../features/teams/presentation/screens/team_manage_screen.dart';
+import '../features/teams/presentation/screens/teams_list_screen.dart';
+import '../features/matches/presentation/screens/match_request_screen.dart';
+import '../features/matches/presentation/screens/match_setup_screen.dart';
+import '../features/matches/presentation/screens/match_start_screen.dart';
 import '../features/todos/presentation/screens/todos_screen.dart';
 
 part 'app_router.g.dart';
@@ -12,6 +23,11 @@ part 'app_router.g.dart';
 /// The redirect callback reads the current-user stream's latest value.
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
+///
+/// Authenticated users land in the three-tab shell (HOME · MATCH · PAVILION)
+/// via a [StatefulShellRoute] so each tab keeps its own navigation stack.
+/// The onboarding gate (signed-in but profile incomplete → /onboarding) is
+/// added in Feature 2 alongside the `profiles` table.
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
   // keepAlive + ref.read inside redirect (NOT ref.watch in the body): the
@@ -19,14 +35,24 @@ GoRouter appRouter(Ref ref) {
   // on each auth change. Watching here would rebuild a whole new GoRouter on
   // every auth event and leak the previous _StreamListenable.
   return GoRouter(
-    initialLocation: '/sign-in',
+    initialLocation: '/home',
     redirect: (context, state) {
       final user = ref.read(currentUserStreamProvider).value;
       final isSignedIn = user != null;
-      final goingToSignIn = state.matchedLocation == '/sign-in';
+      final loc = state.matchedLocation;
+      final goingToSignIn = loc == '/sign-in';
+      final goingToOnboarding = loc == '/onboarding';
 
-      if (!isSignedIn && !goingToSignIn) return '/sign-in';
-      if (isSignedIn && goingToSignIn) return '/todos';
+      if (!isSignedIn) return goingToSignIn ? null : '/sign-in';
+
+      // Signed in. Gate on onboarding completion (has the user claimed a
+      // username?). `.value` is null while the profile status is still
+      // loading — don't bounce during that window; the refreshListenable
+      // re-runs this redirect once it resolves.
+      final onboarded = ref.read(onboardingStatusProvider).value;
+      if (onboarded == null) return null;
+      if (!onboarded) return goingToOnboarding ? null : '/onboarding';
+      if (goingToSignIn || goingToOnboarding) return '/home';
       return null;
     },
     refreshListenable: _StreamListenable(ref),
@@ -36,6 +62,78 @@ GoRouter appRouter(Ref ref) {
         builder: (_, __) => const SignInScreen(),
       ),
       GoRoute(
+        path: '/onboarding',
+        builder: (_, __) => const OnboardingScreen(),
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AppShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/home',
+                builder: (_, __) => const ComingSoonScreen(
+                  tab: 'Home',
+                  showWordmark: true,
+                  showActions: true,
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/match',
+                builder: (_, __) => const TeamsListScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/pavilion',
+                builder: (_, __) => const ComingSoonScreen(tab: 'Pavilion'),
+              ),
+            ],
+          ),
+        ],
+      ),
+      // Teams (full-screen, pushed over the shell). Gated by the redirect.
+      GoRoute(
+        path: '/teams/create',
+        builder: (_, __) => const TeamCreateScreen(),
+      ),
+      GoRoute(
+        path: '/teams/:teamId',
+        builder: (_, state) =>
+            TeamHubScreen(teamId: state.pathParameters['teamId']!),
+      ),
+      GoRoute(
+        path: '/teams/:teamId/manage',
+        builder: (_, state) => TeamManageScreen(
+          teamId: state.pathParameters['teamId']!,
+          justCreated: state.uri.queryParameters['justCreated'] == 'true',
+        ),
+      ),
+      GoRoute(
+        path: '/matches/setup/:teamAId',
+        builder: (_, state) =>
+            MatchSetupScreen(teamAId: state.pathParameters['teamAId']!),
+      ),
+      GoRoute(
+        path: '/matches/:matchId/request',
+        builder: (_, state) =>
+            MatchRequestScreen(matchId: state.pathParameters['matchId']!),
+      ),
+      GoRoute(
+        path: '/matches/:matchId/start',
+        builder: (_, state) =>
+            MatchStartScreen(matchId: state.pathParameters['matchId']!),
+      ),
+      // Kept reachable as the Clean Architecture / offline-first reference
+      // (CLAUDE.md §1). Not surfaced in the bottom nav.
+      GoRoute(
         path: '/todos',
         builder: (_, __) => const TodosScreen(),
       ),
@@ -43,10 +141,13 @@ GoRouter appRouter(Ref ref) {
   );
 }
 
-/// Tiny adapter: poke the router whenever the currentUserStream emits.
+/// Poke the router whenever auth OR onboarding status changes, so the redirect
+/// re-evaluates (e.g. after the profile-status future resolves, or after the
+/// onboarding controller invalidates it on finish).
 class _StreamListenable extends ChangeNotifier {
   _StreamListenable(this._ref) {
     _ref.listen(currentUserStreamProvider, (_, __) => notifyListeners());
+    _ref.listen(onboardingStatusProvider, (_, __) => notifyListeners());
   }
   final Ref _ref;
 }

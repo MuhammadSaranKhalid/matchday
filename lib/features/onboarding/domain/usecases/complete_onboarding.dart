@@ -32,6 +32,10 @@ class CompleteOnboarding implements UseCase<Profile, CompleteOnboardingParams> {
               displayName: displayName,
               username: username,
               city: city,
+              placeId: p.placeId,
+              latitude: p.latitude,
+              longitude: p.longitude,
+              countryCode: p.countryCode,
               playerProfile: player,
             );
           },
@@ -46,11 +50,19 @@ class CompleteOnboardingParams {
     required this.displayName,
     required this.username,
     required this.city,
+    this.placeId,
+    this.latitude,
+    this.longitude,
+    this.countryCode,
     this.playerProfile,
   });
 
   final String displayName;
   final String username;
   final String city;
+  final String? placeId;
+  final double? latitude;
+  final double? longitude;
+  final String? countryCode;
   final PlayerProfile? playerProfile;
 }

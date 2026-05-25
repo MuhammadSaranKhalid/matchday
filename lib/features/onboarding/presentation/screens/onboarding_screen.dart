@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
+import '../../../location/domain/entities/place_suggestion.dart';
 import '../../domain/entities/player_profile.dart';
 import '../controllers/onboarding_controller.dart';
 import '../state/onboarding_state.dart';
@@ -89,6 +90,15 @@ class _OnboardingBodyState extends ConsumerState<_OnboardingBody> {
       _username.value = TextEditingValue(
         text: state.username,
         selection: TextSelection.collapsed(offset: state.username.length),
+      );
+    }
+
+    // The city text can change programmatically (a picked suggestion or GPS
+    // result), so mirror it back into the field the same way.
+    if (_city.text != state.city) {
+      _city.value = TextEditingValue(
+        text: state.city,
+        selection: TextSelection.collapsed(offset: state.city.length),
       );
     }
 
@@ -240,15 +250,10 @@ class _ProfileStep extends StatelessWidget {
               const SizedBox(height: 18),
               const _FieldLabel('City / village'),
               const SizedBox(height: 8),
-              TextField(
-                controller: cityController,
-                onChanged: controller.setCity,
-                style: CkType.body(fontSize: 16),
-                decoration: const InputDecoration(
-                  hintText: 'Lahore, Punjab',
-                  prefixIcon: Icon(Icons.location_on_outlined,
-                      color: CkColors.red, size: 20),
-                ),
+              _CityField(
+                state: state,
+                controller: controller,
+                cityController: cityController,
               ),
             ],
           ),
@@ -257,7 +262,10 @@ class _ProfileStep extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
           child: CkButton(
             label: 'Continue',
-            onPressed: state.canContinueProfile ? controller.continueToPlayer : null,
+            busy: state.resolvingLocation,
+            onPressed: (state.canContinueProfile && !state.resolvingLocation)
+                ? controller.continueToPlayer
+                : null,
           ),
         ),
       ],
@@ -346,6 +354,177 @@ class _UsernameField extends StatelessWidget {
       : Icons.error_outline;
 }
 
+/// City / village picker: a debounced autocomplete field, an inline list of
+/// predictions, and a "use my location" GPS fallback. Picking a suggestion or
+/// using GPS resolves coordinates; free-typing leaves the text but no geo.
+class _CityField extends StatelessWidget {
+  const _CityField({
+    required this.state,
+    required this.controller,
+    required this.cityController,
+  });
+
+  final OnboardingState state;
+  final OnboardingController controller;
+  final TextEditingController cityController;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasGeo = state.lat != null && state.lng != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: cityController,
+          onChanged: controller.setCity,
+          style: CkType.body(fontSize: 16),
+          decoration: InputDecoration(
+            hintText: 'Start typing your city or village',
+            prefixIcon: const Icon(Icons.location_on_outlined,
+                color: CkColors.red, size: 20),
+            suffixIcon: _suffix(hasGeo),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: state.locating ? null : controller.useMyLocation,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: state.locating
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: CkColors.soft),
+                  )
+                : const Icon(Icons.my_location, size: 16, color: CkColors.ink2),
+            label: Text(
+              state.locating ? 'Locating…' : 'Use my current location',
+              style: CkType.body(fontSize: 13, color: CkColors.ink2),
+            ),
+          ),
+        ),
+        if (state.cityError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, left: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, size: 14, color: CkColors.red),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(state.cityError!,
+                      style: CkType.body(fontSize: 12, color: CkColors.red)),
+                ),
+              ],
+            ),
+          ),
+        if (state.city.trim().isNotEmpty &&
+            !hasGeo &&
+            !state.citySearching &&
+            !state.locating &&
+            state.cityError == null &&
+            state.citySuggestions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              "We'll pinpoint this when you continue — or pick a suggestion / use your current location.",
+              style: CkType.body(fontSize: 12, color: CkColors.muted),
+            ),
+          ),
+        if (state.citySuggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: CkColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: CkColors.line),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < state.citySuggestions.length; i++) ...[
+                  if (i > 0)
+                    const Divider(height: 1, color: CkColors.hairline),
+                  _SuggestionTile(
+                    suggestion: state.citySuggestions[i],
+                    onTap: () => controller
+                        .selectCitySuggestion(state.citySuggestions[i]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget? _suffix(bool hasGeo) {
+    if (state.citySearching) {
+      return const Padding(
+        padding: EdgeInsets.all(14),
+        child: SizedBox(
+          width: 16,
+          height: 16,
+          child:
+              CircularProgressIndicator(strokeWidth: 2, color: CkColors.soft),
+        ),
+      );
+    }
+    if (hasGeo) {
+      return const Icon(Icons.check_circle, color: CkColors.green, size: 20);
+    }
+    return null;
+  }
+}
+
+class _SuggestionTile extends StatelessWidget {
+  const _SuggestionTile({required this.suggestion, required this.onTap});
+  final PlaceSuggestion suggestion;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            const Icon(Icons.place_outlined, size: 18, color: CkColors.soft),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    suggestion.primaryText,
+                    style: CkType.body(
+                        fontSize: 15, fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (suggestion.secondaryText != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      suggestion.secondaryText!,
+                      style: CkType.body(fontSize: 12, color: CkColors.muted),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Step 2: Player ─────────────────────────────────────────────────────────────
 
 class _PlayerStep extends StatelessWidget {
@@ -357,7 +536,7 @@ class _PlayerStep extends StatelessWidget {
     PlayerRole.batter: 'Batter',
     PlayerRole.bowler: 'Bowler',
     PlayerRole.allRounder: 'All-rounder',
-    PlayerRole.keeper: 'Keeper',
+    PlayerRole.wicketKeeper: 'Keeper',
   };
   static const _batting = {
     BattingStyle.rightHand: 'Right-hand',
@@ -365,6 +544,7 @@ class _PlayerStep extends StatelessWidget {
   };
   static const _bowling = {
     BowlingStyle.rightArmFast: 'Right-arm fast',
+    BowlingStyle.rightArmMedium: 'Right-arm medium',
     BowlingStyle.rightArmSpin: 'Right-arm spin',
     BowlingStyle.leftArmFast: 'Left-arm fast',
     BowlingStyle.leftArmSpin: 'Left-arm spin',

@@ -1,4 +1,4 @@
-package studio.novex.novex_clean_arch
+package com.matchday.app
 
 import io.flutter.embedding.android.FlutterActivity
 

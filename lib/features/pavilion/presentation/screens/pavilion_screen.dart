@@ -171,8 +171,8 @@ class _ProfileHeader extends StatelessWidget {
                   _chip(_battingLabel(player.battingStyle!)),
                 if (player.bowlingStyle != null)
                   _chip(_bowlingLabel(player.bowlingStyle!)),
-                if (player.preferredBall != null)
-                  _chip('${_ballLabel(player.preferredBall!)} ball'),
+                for (final ball in player.preferredBallTypes)
+                  _chip('${_ballLabel(ball)} ball'),
               ],
             ),
           ],
@@ -202,12 +202,13 @@ class _ProfileHeader extends StatelessWidget {
         PlayerRole.batter => 'Batter',
         PlayerRole.bowler => 'Bowler',
         PlayerRole.allRounder => 'All-rounder',
-        PlayerRole.keeper => 'Keeper',
+        PlayerRole.wicketKeeper => 'Keeper',
       };
   String _battingLabel(BattingStyle b) =>
       b == BattingStyle.rightHand ? 'Right-hand bat' : 'Left-hand bat';
   String _bowlingLabel(BowlingStyle b) => switch (b) {
         BowlingStyle.rightArmFast => 'Right-arm fast',
+        BowlingStyle.rightArmMedium => 'Right-arm medium',
         BowlingStyle.rightArmSpin => 'Right-arm spin',
         BowlingStyle.leftArmFast => 'Left-arm fast',
         BowlingStyle.leftArmSpin => 'Left-arm spin',

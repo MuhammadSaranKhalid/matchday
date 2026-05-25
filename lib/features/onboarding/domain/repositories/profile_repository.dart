@@ -18,10 +18,16 @@ abstract class ProfileRepository {
   Future<Either<Failure, bool>> isUsernameAvailable(String username);
 
   /// Persist the completed onboarding profile and return the updated entity.
+  /// The optional geo ([placeId], [latitude], [longitude], [countryCode]) is
+  /// stored alongside the [city] label and powers proximity features later.
   Future<Either<Failure, Profile>> completeOnboarding({
     required DisplayName displayName,
     required Username username,
     required City city,
+    String? placeId,
+    double? latitude,
+    double? longitude,
+    String? countryCode,
     PlayerProfile? playerProfile,
   });
 }

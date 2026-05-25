@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/database/database_provider.dart';
+import '../../../location/domain/entities/place_suggestion.dart';
+import '../../../location/presentation/providers/location_providers.dart';
 import '../../domain/entities/player_profile.dart';
 import '../../domain/usecases/complete_onboarding.dart';
 import '../../domain/value_objects/username.dart';
@@ -21,6 +25,8 @@ part 'onboarding_controller.g.dart';
 @riverpod
 class OnboardingController extends _$OnboardingController {
   Timer? _usernameDebounce;
+  Timer? _cityDebounce;
+  final _uuid = const Uuid();
 
   // Constant key is safe: AppDatabase.clear() wipes all wizard drafts on
   // sign-out, so a different user on the same device never inherits this one.
@@ -28,7 +34,10 @@ class OnboardingController extends _$OnboardingController {
 
   @override
   Future<OnboardingState> build() async {
-    ref.onDispose(() => _usernameDebounce?.cancel());
+    ref.onDispose(() {
+      _usernameDebounce?.cancel();
+      _cityDebounce?.cancel();
+    });
 
     final draft = await ref.read(wizardDraftStoreProvider).load(_draftKey);
     var initial =
@@ -59,10 +68,149 @@ class OnboardingController extends _$OnboardingController {
     _set(s.copyWith(displayName: value));
   }
 
+  /// The user typed in the city field. Editing the text invalidates any
+  /// previously resolved coordinates (they're now hand-editing → treated as
+  /// manual until they pick a suggestion or use GPS), then debounces a search.
   void setCity(String value) {
     final s = _s;
     if (s == null) return;
-    _set(s.copyWith(city: value));
+    _set(s.copyWith(
+      city: value,
+      placeId: null,
+      lat: null,
+      lng: null,
+      countryCode: null,
+      cityError: null,
+    ));
+    _scheduleCitySearch(value);
+  }
+
+  void _scheduleCitySearch(String query) {
+    _cityDebounce?.cancel();
+    final trimmed = query.trim();
+    if (trimmed.length < AutocompletePlaces.minQueryLength) {
+      final s = _s;
+      if (s != null) {
+        _set(
+          s.copyWith(citySuggestions: const [], citySearching: false),
+          persist: false,
+        );
+      }
+      return;
+    }
+
+    final s0 = _s;
+    if (s0 == null) return;
+    // One session token spans the keystrokes of a search and the eventual
+    // details lookup, so Google bills the whole thing as a single session.
+    final token = s0.citySessionToken ?? _uuid.v4();
+    _set(
+      s0.copyWith(citySearching: true, citySessionToken: token),
+      persist: false,
+    );
+
+    _cityDebounce = Timer(const Duration(milliseconds: 350), () async {
+      final locale = ui.PlatformDispatcher.instance.locale;
+      final result = await ref.read(autocompletePlacesUseCaseProvider).call(
+            AutocompletePlacesParams(
+              query: trimmed,
+              sessionToken: token,
+              languageCode:
+                  locale.languageCode.isEmpty ? null : locale.languageCode,
+              regionCode: locale.countryCode,
+            ),
+          );
+      // Bail if the user kept typing while the request was in flight.
+      final s = _s;
+      if (s == null || s.city.trim() != trimmed) return;
+      result.fold(
+        (_) => _set(
+          s.copyWith(citySearching: false, citySuggestions: const []),
+          persist: false,
+        ),
+        (list) => _set(
+          s.copyWith(citySearching: false, citySuggestions: list),
+          persist: false,
+        ),
+      );
+    });
+  }
+
+  /// User tapped a prediction. Resolves it to coordinates (closing the billing
+  /// session) and stores the structured geo.
+  Future<void> selectCitySuggestion(PlaceSuggestion suggestion) async {
+    final s = _s;
+    if (s == null) return;
+    _cityDebounce?.cancel();
+    final token = s.citySessionToken ?? _uuid.v4();
+
+    // Optimistically show the label and dismiss the dropdown.
+    _set(s.copyWith(
+      city: suggestion.fullText,
+      citySuggestions: const [],
+      citySearching: false,
+    ));
+
+    final result = await ref.read(getPlaceDetailsUseCaseProvider).call(
+          GetPlaceDetailsParams(
+            placeId: suggestion.placeId,
+            sessionToken: token,
+          ),
+        );
+    final cur = _s;
+    if (cur == null) return;
+    result.fold(
+      (f) => _set(
+        cur.copyWith(cityError: f.message, citySessionToken: null),
+        persist: false,
+      ),
+      (place) => _set(cur.copyWith(
+        city: place.label.isEmpty ? suggestion.fullText : place.label,
+        placeId: place.placeId,
+        lat: place.latitude,
+        lng: place.longitude,
+        countryCode: place.countryCode,
+        citySessionToken: null, // session consumed
+        cityError: null,
+      )),
+    );
+  }
+
+  /// "Use my location" — reads device GPS and reverse-geocodes it. The fallback
+  /// that guarantees coordinates when autocomplete can't find the player's spot.
+  Future<void> useMyLocation() async {
+    final s = _s;
+    if (s == null || s.locating) return;
+    _cityDebounce?.cancel();
+    _set(
+      s.copyWith(locating: true, cityError: null, citySuggestions: const []),
+      persist: false,
+    );
+
+    final locale = ui.PlatformDispatcher.instance.locale;
+    final result = await ref.read(getCurrentLocationUseCaseProvider).call(
+          GetCurrentLocationParams(
+            languageCode:
+                locale.languageCode.isEmpty ? null : locale.languageCode,
+          ),
+        );
+    final cur = _s;
+    if (cur == null) return;
+    result.fold(
+      (f) => _set(
+        cur.copyWith(locating: false, cityError: f.message),
+        persist: false,
+      ),
+      (place) => _set(cur.copyWith(
+        locating: false,
+        city: place.label,
+        placeId: place.placeId,
+        lat: place.latitude,
+        lng: place.longitude,
+        countryCode: place.countryCode,
+        cityError: null,
+      )),
+    );
   }
 
   /// Cleans input to the allowed charset, validates format synchronously for
@@ -136,10 +284,52 @@ class OnboardingController extends _$OnboardingController {
     });
   }
 
-  void continueToPlayer() {
+  /// Advance to the player step. Enforces the "every profile has coordinates"
+  /// rule here (rather than gating the button): if the user typed a city
+  /// without picking a suggestion or using GPS, resolve it permission-free by
+  /// forward-geocoding the text. An unfindable place blocks with guidance.
+  Future<void> continueToPlayer() async {
     final s = _s;
-    if (s == null || !s.canContinueProfile) return;
-    _set(s.copyWith(step: OnboardingStep.player));
+    if (s == null || !s.canContinueProfile || s.resolvingLocation) return;
+
+    if (s.hasResolvedLocation) {
+      _set(s.copyWith(step: OnboardingStep.player));
+      return;
+    }
+
+    _set(s.copyWith(resolvingLocation: true, cityError: null), persist: false);
+    final locale = ui.PlatformDispatcher.instance.locale;
+    final result = await ref.read(geocodeAddressUseCaseProvider).call(
+          GeocodeAddressParams(
+            query: s.city,
+            languageCode:
+                locale.languageCode.isEmpty ? null : locale.languageCode,
+            regionCode: locale.countryCode,
+          ),
+        );
+    final cur = _s;
+    if (cur == null) return;
+    result.fold(
+      (f) => _set(
+        cur.copyWith(
+          resolvingLocation: false,
+          cityError: f is NotFoundFailure
+              ? "We couldn't locate that place — pick a suggestion or use your current location"
+              : f.message,
+        ),
+        persist: false,
+      ),
+      (place) => _set(cur.copyWith(
+        resolvingLocation: false,
+        city: place.label.isEmpty ? cur.city : place.label,
+        placeId: place.placeId,
+        lat: place.latitude,
+        lng: place.longitude,
+        countryCode: place.countryCode,
+        step: OnboardingStep.player,
+        cityError: null,
+      )),
+    );
   }
 
   // ─── Player step ──────────────────────────────────────────────────────────
@@ -181,6 +371,10 @@ class OnboardingController extends _$OnboardingController {
       displayName: s.displayName,
       username: s.username,
       city: s.city,
+      placeId: s.placeId,
+      latitude: s.lat,
+      longitude: s.lng,
+      countryCode: s.countryCode,
       playerProfile: asPlayer ? s.playerProfile : null,
     );
     final result =
@@ -225,6 +419,10 @@ class OnboardingController extends _$OnboardingController {
         'displayName': s.displayName,
         'username': s.username,
         'city': s.city,
+        'placeId': s.placeId,
+        'lat': s.lat,
+        'lng': s.lng,
+        'countryCode': s.countryCode,
         'isPlayer': s.isPlayer,
         'role': s.role?.wire,
         'battingStyle': s.battingStyle?.wire,
@@ -240,6 +438,10 @@ class OnboardingController extends _$OnboardingController {
         displayName: m['displayName'] as String? ?? '',
         username: m['username'] as String? ?? '',
         city: m['city'] as String? ?? '',
+        placeId: m['placeId'] as String?,
+        lat: (m['lat'] as num?)?.toDouble(),
+        lng: (m['lng'] as num?)?.toDouble(),
+        countryCode: m['countryCode'] as String?,
         isPlayer: m['isPlayer'] as bool? ?? false,
         role: PlayerRole.fromWire(m['role'] as String?),
         battingStyle: BattingStyle.fromWire(m['battingStyle'] as String?),

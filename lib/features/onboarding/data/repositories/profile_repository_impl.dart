@@ -8,7 +8,7 @@ import '../../domain/value_objects/city.dart';
 import '../../domain/value_objects/display_name.dart';
 import '../../domain/value_objects/username.dart';
 import '../datasources/onboarding_remote_datasource.dart';
-import '../models/profile_dto.dart';
+import '../models/player_profile_dto.dart';
 
 /// Online-only profile repository. The single place where the onboarding data
 /// source's raw exceptions are translated into [Failure]s.
@@ -49,6 +49,10 @@ class ProfileRepositoryImpl implements ProfileRepository {
     required DisplayName displayName,
     required Username username,
     required City city,
+    String? placeId,
+    double? latitude,
+    double? longitude,
+    String? countryCode,
     PlayerProfile? playerProfile,
   }) async {
     try {
@@ -56,7 +60,13 @@ class ProfileRepositoryImpl implements ProfileRepository {
         username: username.value,
         displayName: displayName.value,
         city: city.value,
-        playerProfile: ProfileDto.playerProfileToMap(playerProfile),
+        placeId: placeId,
+        latitude: latitude,
+        longitude: longitude,
+        countryCode: countryCode,
+        playerProfile: (playerProfile != null && playerProfile.hasAny)
+            ? PlayerProfileDto.toWritePayload(playerProfile)
+            : null,
       );
       return Right(dto.toEntity());
     } on UnauthorizedException catch (e) {

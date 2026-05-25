@@ -52,6 +52,8 @@ dependencies:
   flutter_svg: ^2.3.0
   intl: ^0.20.2
   timeago: ^3.7.1
+  http: ^1.6.0
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:

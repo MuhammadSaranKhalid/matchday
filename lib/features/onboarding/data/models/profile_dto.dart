@@ -1,12 +1,16 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import '../../domain/entities/player_profile.dart';
 import '../../domain/entities/profile.dart';
+import 'player_profile_dto.dart';
 
 part 'profile_dto.freezed.dart';
 part 'profile_dto.g.dart';
 
-/// Wire-format `profiles` row. `location` and `player_profile` are jsonb blobs,
-/// decoded into a plain map and unpacked in [toEntity].
+/// Wire-format `profiles` row. `location` is a jsonb blob holding the city
+/// label plus structured geo:
+/// `{ "city", "place_id", "lat", "lng", "country_code" }`.
+/// The cricketing attributes live in a separate `player_profiles` table; the
+/// data source fetches that row and injects it here under [playerProfile] so
+/// [toEntity] can assemble the full domain [Profile].
 @freezed
 abstract class ProfileDto with _$ProfileDto {
   const factory ProfileDto({
@@ -14,7 +18,8 @@ abstract class ProfileDto with _$ProfileDto {
     String? username,
     @JsonKey(name: 'display_name') String? displayName,
     Map<String, dynamic>? location,
-    @JsonKey(name: 'player_profile') Map<String, dynamic>? playerProfile,
+    @JsonKey(name: 'onboarded_at') String? onboardedAt,
+    @JsonKey(name: 'player_profile') PlayerProfileDto? playerProfile,
   }) = _ProfileDto;
 
   const ProfileDto._();
@@ -27,30 +32,12 @@ abstract class ProfileDto with _$ProfileDto {
         username: username,
         displayName: displayName,
         city: location?['city'] as String?,
-        playerProfile: playerProfileFromMap(playerProfile),
+        placeId: location?['place_id'] as String?,
+        latitude: (location?['lat'] as num?)?.toDouble(),
+        longitude: (location?['lng'] as num?)?.toDouble(),
+        countryCode: location?['country_code'] as String?,
+        onboardedAt:
+            onboardedAt == null ? null : DateTime.tryParse(onboardedAt!),
+        playerProfile: playerProfile?.toEntity(),
       );
-
-  /// jsonb → domain. Returns null when no attribute was set. Public + static so
-  /// all `player_profile` wire knowledge lives on the DTO (see [playerProfileToMap]).
-  static PlayerProfile? playerProfileFromMap(Map<String, dynamic>? m) {
-    if (m == null) return null;
-    final profile = PlayerProfile(
-      role: PlayerRole.fromWire(m['role'] as String?),
-      battingStyle: BattingStyle.fromWire(m['batting_style'] as String?),
-      bowlingStyle: BowlingStyle.fromWire(m['bowling_style'] as String?),
-      preferredBall: BallType.fromWire(m['preferred_ball'] as String?),
-    );
-    return profile.hasAny ? profile : null;
-  }
-
-  /// domain → jsonb. Omits unset attributes; returns null for an empty profile.
-  static Map<String, dynamic>? playerProfileToMap(PlayerProfile? p) {
-    if (p == null || !p.hasAny) return null;
-    return {
-      if (p.role != null) 'role': p.role!.wire,
-      if (p.battingStyle != null) 'batting_style': p.battingStyle!.wire,
-      if (p.bowlingStyle != null) 'bowling_style': p.bowlingStyle!.wire,
-      if (p.preferredBall != null) 'preferred_ball': p.preferredBall!.wire,
-    };
-  }
 }

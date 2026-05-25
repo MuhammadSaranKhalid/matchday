@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../../location/domain/entities/place_suggestion.dart';
 import '../../domain/entities/player_profile.dart';
 import '../../domain/value_objects/city.dart';
 import '../../domain/value_objects/display_name.dart';
@@ -22,6 +23,19 @@ abstract class OnboardingState with _$OnboardingState {
     @Default('') String displayName,
     @Default('') String username,
     @Default('') String city,
+    // Structured geo for the chosen location. Null when the user hand-typed a
+    // place that couldn't be resolved (the rare uncovered-village case).
+    String? placeId,
+    double? lat,
+    double? lng,
+    String? countryCode,
+    // Transient autocomplete UI state (not persisted in the draft).
+    @Default(<PlaceSuggestion>[]) List<PlaceSuggestion> citySuggestions,
+    @Default(false) bool citySearching,
+    @Default(false) bool locating,
+    @Default(false) bool resolvingLocation,
+    String? cityError,
+    String? citySessionToken,
     @Default(false) bool isPlayer,
     PlayerRole? role,
     BattingStyle? battingStyle,
@@ -36,9 +50,17 @@ abstract class OnboardingState with _$OnboardingState {
 
   const OnboardingState._();
 
-  /// Profile step is satisfiable once the name and city pass their value-object
-  /// rules and the username is confirmed available. Delegating to the value
-  /// objects keeps the rules in one place.
+  /// Whether the chosen location already has resolved coordinates — true after
+  /// a suggestion pick or GPS. A hand-typed string alone does not qualify; it
+  /// gets coordinates by forward-geocoding when the user taps Continue.
+  bool get hasResolvedLocation => lat != null && lng != null;
+
+  /// Profile step is satisfiable once the name passes its value-object rule, a
+  /// non-empty city is present, and the username is confirmed available.
+  /// Coordinates are NOT required here: a typed city is resolved (forward-
+  /// geocoded) when the user taps Continue, so the button stays tappable while
+  /// the "every profile has coordinates" guarantee is enforced in
+  /// [OnboardingController.continueToPlayer] instead.
   bool get canContinueProfile =>
       DisplayName.create(displayName).isRight() &&
       City.create(city).isRight() &&
@@ -48,6 +70,6 @@ abstract class OnboardingState with _$OnboardingState {
         role: role,
         battingStyle: battingStyle,
         bowlingStyle: bowlingStyle,
-        preferredBall: preferredBall,
+        preferredBallTypes: preferredBall == null ? const [] : [preferredBall!],
       );
 }

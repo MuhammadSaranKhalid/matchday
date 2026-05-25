@@ -40,6 +40,13 @@ class NotFoundFailure extends Failure {
   const NotFoundFailure([super.message = 'Resource not found']);
 }
 
+/// An OS-level permission was denied (location, camera, contacts, …), or the
+/// underlying service is switched off. The UI typically responds by prompting
+/// the user to grant access or open settings.
+class PermissionFailure extends Failure {
+  const PermissionFailure([super.message = 'Permission denied']);
+}
+
 /// Catch-all for anything we genuinely didn't see coming.
 class UnknownFailure extends Failure {
   const UnknownFailure([super.message = 'Unknown error']);

@@ -4,15 +4,21 @@ import 'player_profile.dart';
 /// user id, defined locally so the onboarding domain stays decoupled from the
 /// auth feature's own `UserId`.
 ///
-/// A freshly signed-up user has a profile row with a null [username] (created
-/// by the `handle_new_user` Supabase trigger). Onboarding fills it in;
-/// [isComplete] is the signal the router's onboarding gate reads.
+/// A freshly signed-up user has a profile row with a null [username] and null
+/// [onboardedAt] (created by the `handle_new_auth_user` Supabase trigger).
+/// Onboarding fills it in and stamps `onboarded_at`; [isComplete] (which reads
+/// that stamp) is the signal the router's onboarding gate reads.
 class Profile {
   const Profile({
     required this.userId,
     this.username,
     this.displayName,
     this.city,
+    this.placeId,
+    this.latitude,
+    this.longitude,
+    this.countryCode,
+    this.onboardedAt,
     this.playerProfile,
   });
 
@@ -20,19 +26,43 @@ class Profile {
   final String? username;
   final String? displayName;
 
-  /// Free-text "City / village" as entered (e.g. "Lahore, Punjab"). Stored as
-  /// `location` jsonb (`{ "city": ... }`) per the design's single-field step.
+  /// Human-readable "City / village" label (e.g. "Mardan, Khyber Pakhtunkhwa").
+  /// Stored in the `location` jsonb alongside the structured geo below.
   final String? city;
+
+  /// Google place id when the location came from autocomplete; null for a
+  /// GPS-derived or hand-typed location.
+  final String? placeId;
+
+  /// Coordinates. Present for autocomplete- and GPS-sourced locations; null only
+  /// for the rare hand-typed village that couldn't be resolved. Drives the
+  /// future "teams near you" proximity search.
+  final double? latitude;
+  final double? longitude;
+
+  /// ISO 3166-1 alpha-2 country code (e.g. "PK"), when known.
+  final String? countryCode;
+
+  /// When onboarding was completed (`profiles.onboarded_at`). Null until then.
+  final DateTime? onboardedAt;
 
   final PlayerProfile? playerProfile;
 
-  /// Onboarding is complete once a username has been claimed.
-  bool get isComplete => username != null && username!.isNotEmpty;
+  /// Whether this profile has resolved coordinates (eligible for proximity).
+  bool get hasCoordinates => latitude != null && longitude != null;
+
+  /// Onboarding is complete once the server has stamped `onboarded_at`.
+  bool get isComplete => onboardedAt != null;
 
   Profile copyWith({
     String? username,
     String? displayName,
     String? city,
+    String? placeId,
+    double? latitude,
+    double? longitude,
+    String? countryCode,
+    DateTime? onboardedAt,
     PlayerProfile? playerProfile,
   }) =>
       Profile(
@@ -40,6 +70,11 @@ class Profile {
         username: username ?? this.username,
         displayName: displayName ?? this.displayName,
         city: city ?? this.city,
+        placeId: placeId ?? this.placeId,
+        latitude: latitude ?? this.latitude,
+        longitude: longitude ?? this.longitude,
+        countryCode: countryCode ?? this.countryCode,
+        onboardedAt: onboardedAt ?? this.onboardedAt,
         playerProfile: playerProfile ?? this.playerProfile,
       );
 
@@ -51,11 +86,26 @@ class Profile {
           other.username == username &&
           other.displayName == displayName &&
           other.city == city &&
+          other.placeId == placeId &&
+          other.latitude == latitude &&
+          other.longitude == longitude &&
+          other.countryCode == countryCode &&
+          other.onboardedAt == onboardedAt &&
           other.playerProfile == playerProfile;
 
   @override
-  int get hashCode =>
-      Object.hash(userId, username, displayName, city, playerProfile);
+  int get hashCode => Object.hash(
+        userId,
+        username,
+        displayName,
+        city,
+        placeId,
+        latitude,
+        longitude,
+        countryCode,
+        onboardedAt,
+        playerProfile,
+      );
 }
 
 /// The owning user's id (the `profiles.user_id` PK, which references

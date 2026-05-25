@@ -1,0 +1,41 @@
+-- =============================================================================
+-- 0550 · bookmarks
+-- =============================================================================
+-- Spec §6.17, §8.2.6. Private "save for later" on a post.
+--
+-- Bookmarks are 1:1 — one row per (user, post). They are PRIVATE — no other
+-- user (not even the post's author) can see who bookmarked a post. RLS
+-- enforces that on every operation.
+-- =============================================================================
+
+create table public.bookmarks (
+  bookmark_id  uuid primary key default gen_random_uuid(),
+  user_id      uuid not null
+                   references public.profiles(user_id) on delete cascade,
+  post_id      uuid not null
+                   references public.posts(post_id)    on delete cascade,
+  created_at   timestamptz not null default now(),
+  unique (user_id, post_id)
+);
+
+create index bookmarks_user_created on public.bookmarks (user_id, created_at desc);
+
+-- -----------------------------------------------------------------------------
+-- RLS — owner-only on every operation. Bookmarks are private.
+-- -----------------------------------------------------------------------------
+alter table public.bookmarks enable row level security;
+
+create policy "bookmarks_read_self"
+  on public.bookmarks for select
+  to authenticated
+  using ((select auth.uid()) = user_id);
+
+create policy "bookmarks_insert_self"
+  on public.bookmarks for insert
+  to authenticated
+  with check ((select auth.uid()) = user_id);
+
+create policy "bookmarks_delete_self"
+  on public.bookmarks for delete
+  to authenticated
+  using ((select auth.uid()) = user_id);

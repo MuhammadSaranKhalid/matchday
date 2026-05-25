@@ -18,6 +18,8 @@ class Profile {
     this.latitude,
     this.longitude,
     this.countryCode,
+    this.avatarUrl,
+    this.bio,
     this.onboardedAt,
     this.playerProfile,
   });
@@ -43,6 +45,12 @@ class Profile {
   /// ISO 3166-1 alpha-2 country code (e.g. "PK"), when known.
   final String? countryCode;
 
+  /// Public URL of the avatar in the `avatars` bucket (`profiles.profile_photo_url`).
+  final String? avatarUrl;
+
+  /// Free-text bio (`profiles.bio`, ≤200 chars).
+  final String? bio;
+
   /// When onboarding was completed (`profiles.onboarded_at`). Null until then.
   final DateTime? onboardedAt;
 
@@ -62,6 +70,8 @@ class Profile {
     double? latitude,
     double? longitude,
     String? countryCode,
+    String? avatarUrl,
+    String? bio,
     DateTime? onboardedAt,
     PlayerProfile? playerProfile,
   }) =>
@@ -74,6 +84,8 @@ class Profile {
         latitude: latitude ?? this.latitude,
         longitude: longitude ?? this.longitude,
         countryCode: countryCode ?? this.countryCode,
+        avatarUrl: avatarUrl ?? this.avatarUrl,
+        bio: bio ?? this.bio,
         onboardedAt: onboardedAt ?? this.onboardedAt,
         playerProfile: playerProfile ?? this.playerProfile,
       );
@@ -90,6 +102,8 @@ class Profile {
           other.latitude == latitude &&
           other.longitude == longitude &&
           other.countryCode == countryCode &&
+          other.avatarUrl == avatarUrl &&
+          other.bio == bio &&
           other.onboardedAt == onboardedAt &&
           other.playerProfile == playerProfile;
 
@@ -103,6 +117,8 @@ class Profile {
         latitude,
         longitude,
         countryCode,
+        avatarUrl,
+        bio,
         onboardedAt,
         playerProfile,
       );

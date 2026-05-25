@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/profile_dto.dart';
@@ -114,6 +116,48 @@ class OnboardingRemoteDataSource {
       if (e.code == '23505') {
         throw ServerException('That username was just taken — try another');
       }
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Update the profiles row with the supplied [changes], stamp last_active_at,
+  /// and return the freshly assembled profile. Maps a unique-username clash to
+  /// a clear message; the 30-day username-cooldown trigger's message is passed
+  /// through as-is.
+  Future<ProfileDto> updateProfile(Map<String, dynamic> changes) async {
+    try {
+      final uid = _requireUid();
+      await _supabase
+          .from(_profiles)
+          .update({...changes, 'last_active_at': DateTime.now().toIso8601String()})
+          .eq('user_id', uid);
+      final fresh = await fetchMyProfile();
+      if (fresh == null) throw ServerException('Profile not found');
+      return fresh;
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') {
+        throw ServerException('That username is taken — try another');
+      }
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Upload an avatar to `avatars/<uid>/avatar_<ts>.jpg` and return its public
+  /// URL. The timestamped path doubles as a cache-buster on the CDN.
+  Future<String> uploadAvatar(File file) async {
+    try {
+      final uid = _requireUid();
+      final path = '$uid/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await _supabase.storage.from('avatars').upload(
+            path,
+            file,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
+      return _supabase.storage.from('avatars').getPublicUrl(path);
+    } on StorageException catch (e) {
       throw ServerException(e.message);
     }
   }

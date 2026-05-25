@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ProfileDto {
 
-@JsonKey(name: 'user_id') String get userId; String? get username;@JsonKey(name: 'display_name') String? get displayName; Map<String, dynamic>? get location;@JsonKey(name: 'onboarded_at') String? get onboardedAt;@JsonKey(name: 'player_profile') PlayerProfileDto? get playerProfile;
+@JsonKey(name: 'user_id') String get userId; String? get username;@JsonKey(name: 'display_name') String? get displayName; String? get bio;@JsonKey(name: 'profile_photo_url') String? get profilePhotoUrl; Map<String, dynamic>? get location;@JsonKey(name: 'onboarded_at') String? get onboardedAt;@JsonKey(name: 'player_profile') PlayerProfileDto? get playerProfile;
 /// Create a copy of ProfileDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $ProfileDtoCopyWith<ProfileDto> get copyWith => _$ProfileDtoCopyWithImpl<Profile
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileDto&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.username, username) || other.username == username)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&const DeepCollectionEquality().equals(other.location, location)&&(identical(other.onboardedAt, onboardedAt) || other.onboardedAt == onboardedAt)&&(identical(other.playerProfile, playerProfile) || other.playerProfile == playerProfile));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileDto&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.username, username) || other.username == username)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.profilePhotoUrl, profilePhotoUrl) || other.profilePhotoUrl == profilePhotoUrl)&&const DeepCollectionEquality().equals(other.location, location)&&(identical(other.onboardedAt, onboardedAt) || other.onboardedAt == onboardedAt)&&(identical(other.playerProfile, playerProfile) || other.playerProfile == playerProfile));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,userId,username,displayName,const DeepCollectionEquality().hash(location),onboardedAt,playerProfile);
+int get hashCode => Object.hash(runtimeType,userId,username,displayName,bio,profilePhotoUrl,const DeepCollectionEquality().hash(location),onboardedAt,playerProfile);
 
 @override
 String toString() {
-  return 'ProfileDto(userId: $userId, username: $username, displayName: $displayName, location: $location, onboardedAt: $onboardedAt, playerProfile: $playerProfile)';
+  return 'ProfileDto(userId: $userId, username: $username, displayName: $displayName, bio: $bio, profilePhotoUrl: $profilePhotoUrl, location: $location, onboardedAt: $onboardedAt, playerProfile: $playerProfile)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $ProfileDtoCopyWith<$Res>  {
   factory $ProfileDtoCopyWith(ProfileDto value, $Res Function(ProfileDto) _then) = _$ProfileDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'user_id') String userId, String? username,@JsonKey(name: 'display_name') String? displayName, Map<String, dynamic>? location,@JsonKey(name: 'onboarded_at') String? onboardedAt,@JsonKey(name: 'player_profile') PlayerProfileDto? playerProfile
+@JsonKey(name: 'user_id') String userId, String? username,@JsonKey(name: 'display_name') String? displayName, String? bio,@JsonKey(name: 'profile_photo_url') String? profilePhotoUrl, Map<String, dynamic>? location,@JsonKey(name: 'onboarded_at') String? onboardedAt,@JsonKey(name: 'player_profile') PlayerProfileDto? playerProfile
 });
 
 
@@ -65,11 +65,13 @@ class _$ProfileDtoCopyWithImpl<$Res>
 
 /// Create a copy of ProfileDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? userId = null,Object? username = freezed,Object? displayName = freezed,Object? location = freezed,Object? onboardedAt = freezed,Object? playerProfile = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? userId = null,Object? username = freezed,Object? displayName = freezed,Object? bio = freezed,Object? profilePhotoUrl = freezed,Object? location = freezed,Object? onboardedAt = freezed,Object? playerProfile = freezed,}) {
   return _then(_self.copyWith(
 userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
 as String,username: freezed == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String?,displayName: freezed == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
+as String?,bio: freezed == bio ? _self.bio : bio // ignore: cast_nullable_to_non_nullable
+as String?,profilePhotoUrl: freezed == profilePhotoUrl ? _self.profilePhotoUrl : profilePhotoUrl // ignore: cast_nullable_to_non_nullable
 as String?,location: freezed == location ? _self.location : location // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,onboardedAt: freezed == onboardedAt ? _self.onboardedAt : onboardedAt // ignore: cast_nullable_to_non_nullable
 as String?,playerProfile: freezed == playerProfile ? _self.playerProfile : playerProfile // ignore: cast_nullable_to_non_nullable
@@ -170,10 +172,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String? username, @JsonKey(name: 'display_name')  String? displayName,  Map<String, dynamic>? location, @JsonKey(name: 'onboarded_at')  String? onboardedAt, @JsonKey(name: 'player_profile')  PlayerProfileDto? playerProfile)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String? username, @JsonKey(name: 'display_name')  String? displayName,  String? bio, @JsonKey(name: 'profile_photo_url')  String? profilePhotoUrl,  Map<String, dynamic>? location, @JsonKey(name: 'onboarded_at')  String? onboardedAt, @JsonKey(name: 'player_profile')  PlayerProfileDto? playerProfile)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ProfileDto() when $default != null:
-return $default(_that.userId,_that.username,_that.displayName,_that.location,_that.onboardedAt,_that.playerProfile);case _:
+return $default(_that.userId,_that.username,_that.displayName,_that.bio,_that.profilePhotoUrl,_that.location,_that.onboardedAt,_that.playerProfile);case _:
   return orElse();
 
 }
@@ -191,10 +193,10 @@ return $default(_that.userId,_that.username,_that.displayName,_that.location,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String? username, @JsonKey(name: 'display_name')  String? displayName,  Map<String, dynamic>? location, @JsonKey(name: 'onboarded_at')  String? onboardedAt, @JsonKey(name: 'player_profile')  PlayerProfileDto? playerProfile)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String? username, @JsonKey(name: 'display_name')  String? displayName,  String? bio, @JsonKey(name: 'profile_photo_url')  String? profilePhotoUrl,  Map<String, dynamic>? location, @JsonKey(name: 'onboarded_at')  String? onboardedAt, @JsonKey(name: 'player_profile')  PlayerProfileDto? playerProfile)  $default,) {final _that = this;
 switch (_that) {
 case _ProfileDto():
-return $default(_that.userId,_that.username,_that.displayName,_that.location,_that.onboardedAt,_that.playerProfile);case _:
+return $default(_that.userId,_that.username,_that.displayName,_that.bio,_that.profilePhotoUrl,_that.location,_that.onboardedAt,_that.playerProfile);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -211,10 +213,10 @@ return $default(_that.userId,_that.username,_that.displayName,_that.location,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'user_id')  String userId,  String? username, @JsonKey(name: 'display_name')  String? displayName,  Map<String, dynamic>? location, @JsonKey(name: 'onboarded_at')  String? onboardedAt, @JsonKey(name: 'player_profile')  PlayerProfileDto? playerProfile)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'user_id')  String userId,  String? username, @JsonKey(name: 'display_name')  String? displayName,  String? bio, @JsonKey(name: 'profile_photo_url')  String? profilePhotoUrl,  Map<String, dynamic>? location, @JsonKey(name: 'onboarded_at')  String? onboardedAt, @JsonKey(name: 'player_profile')  PlayerProfileDto? playerProfile)?  $default,) {final _that = this;
 switch (_that) {
 case _ProfileDto() when $default != null:
-return $default(_that.userId,_that.username,_that.displayName,_that.location,_that.onboardedAt,_that.playerProfile);case _:
+return $default(_that.userId,_that.username,_that.displayName,_that.bio,_that.profilePhotoUrl,_that.location,_that.onboardedAt,_that.playerProfile);case _:
   return null;
 
 }
@@ -226,12 +228,14 @@ return $default(_that.userId,_that.username,_that.displayName,_that.location,_th
 @JsonSerializable()
 
 class _ProfileDto extends ProfileDto {
-  const _ProfileDto({@JsonKey(name: 'user_id') required this.userId, this.username, @JsonKey(name: 'display_name') this.displayName, final  Map<String, dynamic>? location, @JsonKey(name: 'onboarded_at') this.onboardedAt, @JsonKey(name: 'player_profile') this.playerProfile}): _location = location,super._();
+  const _ProfileDto({@JsonKey(name: 'user_id') required this.userId, this.username, @JsonKey(name: 'display_name') this.displayName, this.bio, @JsonKey(name: 'profile_photo_url') this.profilePhotoUrl, final  Map<String, dynamic>? location, @JsonKey(name: 'onboarded_at') this.onboardedAt, @JsonKey(name: 'player_profile') this.playerProfile}): _location = location,super._();
   factory _ProfileDto.fromJson(Map<String, dynamic> json) => _$ProfileDtoFromJson(json);
 
 @override@JsonKey(name: 'user_id') final  String userId;
 @override final  String? username;
 @override@JsonKey(name: 'display_name') final  String? displayName;
+@override final  String? bio;
+@override@JsonKey(name: 'profile_photo_url') final  String? profilePhotoUrl;
  final  Map<String, dynamic>? _location;
 @override Map<String, dynamic>? get location {
   final value = _location;
@@ -257,16 +261,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileDto&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.username, username) || other.username == username)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&const DeepCollectionEquality().equals(other._location, _location)&&(identical(other.onboardedAt, onboardedAt) || other.onboardedAt == onboardedAt)&&(identical(other.playerProfile, playerProfile) || other.playerProfile == playerProfile));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileDto&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.username, username) || other.username == username)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.profilePhotoUrl, profilePhotoUrl) || other.profilePhotoUrl == profilePhotoUrl)&&const DeepCollectionEquality().equals(other._location, _location)&&(identical(other.onboardedAt, onboardedAt) || other.onboardedAt == onboardedAt)&&(identical(other.playerProfile, playerProfile) || other.playerProfile == playerProfile));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,userId,username,displayName,const DeepCollectionEquality().hash(_location),onboardedAt,playerProfile);
+int get hashCode => Object.hash(runtimeType,userId,username,displayName,bio,profilePhotoUrl,const DeepCollectionEquality().hash(_location),onboardedAt,playerProfile);
 
 @override
 String toString() {
-  return 'ProfileDto(userId: $userId, username: $username, displayName: $displayName, location: $location, onboardedAt: $onboardedAt, playerProfile: $playerProfile)';
+  return 'ProfileDto(userId: $userId, username: $username, displayName: $displayName, bio: $bio, profilePhotoUrl: $profilePhotoUrl, location: $location, onboardedAt: $onboardedAt, playerProfile: $playerProfile)';
 }
 
 
@@ -277,7 +281,7 @@ abstract mixin class _$ProfileDtoCopyWith<$Res> implements $ProfileDtoCopyWith<$
   factory _$ProfileDtoCopyWith(_ProfileDto value, $Res Function(_ProfileDto) _then) = __$ProfileDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'user_id') String userId, String? username,@JsonKey(name: 'display_name') String? displayName, Map<String, dynamic>? location,@JsonKey(name: 'onboarded_at') String? onboardedAt,@JsonKey(name: 'player_profile') PlayerProfileDto? playerProfile
+@JsonKey(name: 'user_id') String userId, String? username,@JsonKey(name: 'display_name') String? displayName, String? bio,@JsonKey(name: 'profile_photo_url') String? profilePhotoUrl, Map<String, dynamic>? location,@JsonKey(name: 'onboarded_at') String? onboardedAt,@JsonKey(name: 'player_profile') PlayerProfileDto? playerProfile
 });
 
 
@@ -294,11 +298,13 @@ class __$ProfileDtoCopyWithImpl<$Res>
 
 /// Create a copy of ProfileDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? userId = null,Object? username = freezed,Object? displayName = freezed,Object? location = freezed,Object? onboardedAt = freezed,Object? playerProfile = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? userId = null,Object? username = freezed,Object? displayName = freezed,Object? bio = freezed,Object? profilePhotoUrl = freezed,Object? location = freezed,Object? onboardedAt = freezed,Object? playerProfile = freezed,}) {
   return _then(_ProfileDto(
 userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
 as String,username: freezed == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String?,displayName: freezed == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
+as String?,bio: freezed == bio ? _self.bio : bio // ignore: cast_nullable_to_non_nullable
+as String?,profilePhotoUrl: freezed == profilePhotoUrl ? _self.profilePhotoUrl : profilePhotoUrl // ignore: cast_nullable_to_non_nullable
 as String?,location: freezed == location ? _self._location : location // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,onboardedAt: freezed == onboardedAt ? _self.onboardedAt : onboardedAt // ignore: cast_nullable_to_non_nullable
 as String?,playerProfile: freezed == playerProfile ? _self.playerProfile : playerProfile // ignore: cast_nullable_to_non_nullable

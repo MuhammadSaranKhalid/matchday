@@ -2,19 +2,29 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/usecase/usecase.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../data/datasources/avatar_picker_impl.dart';
 import '../../data/datasources/onboarding_datasource_providers.dart';
 import '../../data/repositories/profile_repository_impl.dart';
 import '../../domain/entities/profile.dart';
+import '../../domain/repositories/avatar_picker.dart';
 import '../../domain/repositories/profile_repository.dart';
 import '../../domain/usecases/check_username_available.dart';
 import '../../domain/usecases/complete_onboarding.dart';
 import '../../domain/usecases/get_my_profile.dart';
+import '../../domain/usecases/update_profile.dart';
 
 part 'onboarding_providers.g.dart';
 
 @Riverpod(keepAlive: true)
 ProfileRepository profileRepository(Ref ref) =>
     ProfileRepositoryImpl(ref.watch(onboardingRemoteDataSourceProvider));
+
+@Riverpod(keepAlive: true)
+AvatarPicker avatarPicker(Ref ref) => const AvatarPickerImpl();
+
+@riverpod
+UpdateProfile updateProfileUseCase(Ref ref) =>
+    UpdateProfile(ref.watch(profileRepositoryProvider));
 
 @riverpod
 GetMyProfile getMyProfileUseCase(Ref ref) =>

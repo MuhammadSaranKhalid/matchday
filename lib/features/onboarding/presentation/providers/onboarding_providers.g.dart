@@ -56,6 +56,89 @@ final class ProfileRepositoryProvider
 
 String _$profileRepositoryHash() => r'630ed8c89d63247225ad8f1874ab1b664f3764c4';
 
+@ProviderFor(avatarPicker)
+final avatarPickerProvider = AvatarPickerProvider._();
+
+final class AvatarPickerProvider
+    extends $FunctionalProvider<AvatarPicker, AvatarPicker, AvatarPicker>
+    with $Provider<AvatarPicker> {
+  AvatarPickerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'avatarPickerProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$avatarPickerHash();
+
+  @$internal
+  @override
+  $ProviderElement<AvatarPicker> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  AvatarPicker create(Ref ref) {
+    return avatarPicker(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(AvatarPicker value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<AvatarPicker>(value),
+    );
+  }
+}
+
+String _$avatarPickerHash() => r'b24e2d75459a925011b3526f5bb3475f41d2adc2';
+
+@ProviderFor(updateProfileUseCase)
+final updateProfileUseCaseProvider = UpdateProfileUseCaseProvider._();
+
+final class UpdateProfileUseCaseProvider
+    extends $FunctionalProvider<UpdateProfile, UpdateProfile, UpdateProfile>
+    with $Provider<UpdateProfile> {
+  UpdateProfileUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'updateProfileUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$updateProfileUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<UpdateProfile> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  UpdateProfile create(Ref ref) {
+    return updateProfileUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(UpdateProfile value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<UpdateProfile>(value),
+    );
+  }
+}
+
+String _$updateProfileUseCaseHash() =>
+    r'6cddabec5a36250ecde72577ac28cdbd8c47212a';
+
 @ProviderFor(getMyProfileUseCase)
 final getMyProfileUseCaseProvider = GetMyProfileUseCaseProvider._();
 

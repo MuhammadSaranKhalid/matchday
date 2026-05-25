@@ -14,6 +14,8 @@ import 'package:novex_clean_arch/features/posts/presentation/widgets/post_card.d
 import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_modals.dart';
 import 'package:novex_clean_arch/features/auth/presentation/providers/auth_providers.dart';
+import 'package:novex_clean_arch/features/onboarding/domain/entities/profile.dart';
+import 'package:novex_clean_arch/features/onboarding/presentation/providers/onboarding_providers.dart';
 import 'package:novex_clean_arch/features/posts/presentation/providers/posts_providers.dart';
 import 'package:novex_clean_arch/features/posts/presentation/screens/composer_screen.dart';
 import 'package:novex_clean_arch/features/posts/presentation/screens/photo_viewer_screen.dart';
@@ -45,13 +47,19 @@ class ProfileScreen extends ConsumerWidget {
     final authorId = spectator
         ? null
         : ref.watch(currentUserStreamProvider).value?.id.value;
+    // Real profile for the self view; spectator keeps the mock identity.
+    final profile = spectator ? null : ref.watch(myProfileProvider).value;
 
     final scroll = SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _IdentityHero(spectator: spectator, onEdit: () => _openEdit(context)),
+          _IdentityHero(
+            spectator: spectator,
+            profile: profile,
+            onEdit: () => _openEdit(context),
+          ),
           const _PlaysForSection(),
           _PostsSection(
             onOpenComments: () => showCommentsSheet(context),
@@ -178,9 +186,67 @@ class _IconButton extends StatelessWidget {
 
 // ── Identity hero: avatar, name, handle, location, bio, signals, actions. ──
 class _IdentityHero extends StatelessWidget {
-  const _IdentityHero({required this.spectator, required this.onEdit});
+  const _IdentityHero({
+    required this.spectator,
+    this.profile,
+    required this.onEdit,
+  });
   final bool spectator;
+
+  /// Real profile for the self view; null for the spectator mock.
+  final Profile? profile;
   final VoidCallback onEdit;
+
+  String get _name {
+    final dn = profile?.displayName?.trim();
+    if (dn != null && dn.isNotEmpty) return dn;
+    return spectator ? 'Bilal Ahmed' : 'matchday player';
+  }
+
+  String get _handle {
+    final u = profile?.username;
+    return (u != null && u.isNotEmpty) ? '@$u' : (spectator ? '@bilala' : '@you');
+  }
+
+  String get _city {
+    final c = profile?.city?.trim();
+    return (c != null && c.isNotEmpty) ? c : (spectator ? 'Karachi' : '—');
+  }
+
+  String get _monogram {
+    final parts =
+        _name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    final letters =
+        parts.length == 1 ? parts.first : '${parts.first[0]}${parts[1][0]}';
+    return letters.substring(0, letters.length >= 2 ? 2 : 1).toUpperCase();
+  }
+
+  Widget _avatarCircle() {
+    final url = profile?.avatarUrl;
+    final inner = (url != null && url.isNotEmpty)
+        ? Image.network(url,
+            width: 88,
+            height: 88,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _initialsCircle())
+        : _initialsCircle();
+    return ClipOval(child: SizedBox(width: 88, height: 88, child: inner));
+  }
+
+  Widget _initialsCircle() => Container(
+        color: CkColors.ink,
+        alignment: Alignment.center,
+        child: Text(
+          _monogram,
+          style: CkType.display(
+            fontSize: 34,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.03,
+            color: CkColors.paper,
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -192,25 +258,7 @@ class _IdentityHero extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 88×88 ink circle "BA".
-              Container(
-                width: 88,
-                height: 88,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: CkColors.ink,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  'BA',
-                  style: CkType.display(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.03,
-                    color: CkColors.paper,
-                  ),
-                ),
-              ),
+              _avatarCircle(),
               const SizedBox(width: 14),
               Expanded(
                 child: Padding(
@@ -219,7 +267,9 @@ class _IdentityHero extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Bilal Ahmed',
+                        _name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: CkType.display(
                           fontSize: 26,
                           letterSpacing: -0.025,
@@ -228,7 +278,7 @@ class _IdentityHero extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '@bilala',
+                        _handle,
                         style: CkType.body(
                           fontSize: 12.5,
                           color: CkColors.muted,
@@ -243,28 +293,15 @@ class _IdentityHero extends StatelessWidget {
                             color: CkColors.muted,
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            'Karachi',
-                            style: CkType.body(
-                              fontSize: 12,
-                              color: CkColors.ink2,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                          Flexible(
                             child: Text(
-                              '·',
+                              _city,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: CkType.body(
                                 fontSize: 12,
-                                color: CkColors.soft,
+                                color: CkColors.ink2,
                               ),
-                            ),
-                          ),
-                          Text(
-                            'since Jan 2024',
-                            style: CkType.body(
-                              fontSize: 12,
-                              color: CkColors.muted,
                             ),
                           ),
                         ],
@@ -276,38 +313,54 @@ class _IdentityHero extends StatelessWidget {
             ],
           ),
 
-          // Bio — "@lahore-lions" bolded red.
-          Padding(
-            padding: const EdgeInsets.only(top: 14),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 320),
-              child: RichText(
-                text: TextSpan(
+          // Bio — real text for the self view; the styled sample for spectator.
+          if (profile != null && (profile!.bio?.trim() ?? '').isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: Text(
+                  profile!.bio!.trim(),
                   style: CkType.body(
                     fontSize: 13.5,
                     color: CkColors.ink,
                     height: 1.5,
                   ),
-                  children: [
-                    const TextSpan(text: 'Opening bat for the '),
-                    TextSpan(
-                      text: '@lahore-lions',
-                      style: CkType.body(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                        color: CkColors.red,
-                        height: 1.5,
+                ),
+              ),
+            )
+          else if (profile == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: RichText(
+                  text: TextSpan(
+                    style: CkType.body(
+                      fontSize: 13.5,
+                      color: CkColors.ink,
+                      height: 1.5,
+                    ),
+                    children: [
+                      const TextSpan(text: 'Opening bat for the '),
+                      TextSpan(
+                        text: '@lahore-lions',
+                        style: CkType.body(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: CkColors.red,
+                          height: 1.5,
+                        ),
                       ),
-                    ),
-                    const TextSpan(
-                      text: '. Tape ball weekends, leather on Sundays. '
-                          'Karachi-based but travel for anything that pays in chai.',
-                    ),
-                  ],
+                      const TextSpan(
+                        text: '. Tape ball weekends, leather on Sundays. '
+                            'Karachi-based but travel for anything that pays in chai.',
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
           // Social signals — followers / following (+ mutual on spectator).
           Padding(

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../entities/profile.dart';
@@ -29,5 +31,21 @@ abstract class ProfileRepository {
     double? longitude,
     String? countryCode,
     PlayerProfile? playerProfile,
+  });
+
+  /// Update an existing profile (the edit screen). Only [displayName] and
+  /// [city] are required; pass [username] only when it actually changed (the
+  /// server enforces a 30-day change cooldown). If [avatar] is non-null it is
+  /// uploaded to the `avatars` bucket and its URL stored on the row.
+  Future<Either<Failure, Profile>> updateProfile({
+    required DisplayName displayName,
+    Username? username,
+    String? bio,
+    required City city,
+    String? placeId,
+    double? latitude,
+    double? longitude,
+    String? countryCode,
+    File? avatar,
   });
 }

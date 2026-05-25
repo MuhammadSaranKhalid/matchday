@@ -1,54 +1,68 @@
-// Faithful Flutter port of the matchday v2 prototype's profile editor
-// (`V21ProfileEdit` in design/app/screens/v2-IA.jsx).
-//
-// PRESENTATION-ONLY, MOCK DATA. Real TextEditingControllers (disposed); GPS
-// button mocks a lookup. Save / Cancel just pop. No backend.
+// Profile editor — loads the signed-in user's real profile, edits name /
+// username / bio / location, lets them pick a new avatar, and saves to Supabase
+// (text fields + avatar upload). Visual layout ports `V21ProfileEdit`.
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:novex_clean_arch/core/theme/circk_theme.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
+import 'package:novex_clean_arch/features/onboarding/presentation/providers/onboarding_providers.dart';
+import '../controllers/profile_edit_controller.dart';
 
-class ProfileEditScreen extends StatefulWidget {
+class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});
 
   @override
-  State<ProfileEditScreen> createState() => _ProfileEditScreenState();
+  ConsumerState<ProfileEditScreen> createState() => _ProfileEditScreenState();
 }
 
-class _ProfileEditScreenState extends State<ProfileEditScreen> {
+class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   late final TextEditingController _name;
   late final TextEditingController _username;
   late final TextEditingController _bio;
   late final TextEditingController _city;
 
+  // Seeded from the loaded profile; passed through on save so we don't wipe geo
+  // or trip the username cooldown on an unchanged handle.
+  String? _originalUsername;
+  String? _avatarUrl;
+  String? _placeId;
+  double? _lat;
+  double? _lng;
+  String? _countryCode;
+
   bool _locating = false;
   int _bioLen = 0;
-  String _initials = 'BA';
+  String _initials = '?';
 
   @override
   void initState() {
     super.initState();
-    _name = TextEditingController(text: 'Bilal Ahmed')
+    final p = ref.read(myProfileProvider).value;
+    _name = TextEditingController(text: p?.displayName ?? '')
       ..addListener(_recomputeInitials);
-    _username = TextEditingController(text: 'bilala');
-    const initialBio =
-        'Opening bat for the @lahore-lions. Tape ball weekends, leather on '
-        'Sundays. Karachi-based but travel for anything that pays in chai.';
-    _bio = TextEditingController(text: initialBio)..addListener(_recomputeBioLen);
-    _bioLen = initialBio.length;
-    _city = TextEditingController(text: 'Karachi');
+    _username = TextEditingController(text: p?.username ?? '');
+    _bio = TextEditingController(text: p?.bio ?? '')..addListener(_recomputeBioLen);
+    _bioLen = _bio.text.length;
+    _city = TextEditingController(text: p?.city ?? '');
+    _originalUsername = p?.username;
+    _avatarUrl = p?.avatarUrl;
+    _placeId = p?.placeId;
+    _lat = p?.latitude;
+    _lng = p?.longitude;
+    _countryCode = p?.countryCode;
     _recomputeInitials();
   }
 
   void _recomputeInitials() {
     final words = _name.text.trim().split(RegExp(r'\s+'));
-    final letters = words
-        .where((w) => w.isNotEmpty)
-        .map((w) => w[0])
-        .join();
+    final letters =
+        words.where((w) => w.isNotEmpty).map((w) => w[0]).join();
     final next = letters.isEmpty
-        ? 'BA'
+        ? '?'
         : letters.substring(0, letters.length >= 2 ? 2 : 1).toUpperCase();
     if (next != _initials) setState(() => _initials = next);
   }
@@ -67,6 +81,29 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     });
   }
 
+  Future<void> _save() async {
+    final ok = await ref.read(profileEditControllerProvider.notifier).save(
+          displayName: _name.text,
+          username: _username.text,
+          originalUsername: _originalUsername,
+          bio: _bio.text,
+          city: _city.text,
+          placeId: _placeId,
+          latitude: _lat,
+          longitude: _lng,
+          countryCode: _countryCode,
+        );
+    if (!mounted) return;
+    if (ok) {
+      Navigator.maybePop(context);
+    } else {
+      final err = ref.read(profileEditControllerProvider).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err?.message ?? 'Could not save your profile.')),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _name.dispose();
@@ -78,20 +115,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final edit = ref.watch(profileEditControllerProvider);
     return Scaffold(
       backgroundColor: CkColors.paper,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            _nav(context),
+            _nav(context, saving: edit.saving),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _avatarAndName(),
+                    _avatarAndName(edit.avatar),
                     const SizedBox(height: 16),
                     _usernameField(),
                     const SizedBox(height: 12),
@@ -110,23 +148,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     );
   }
 
-  // Compact nav: back/cancel · EDIT PROFILE · Save pill.
-  Widget _nav(BuildContext context) {
+  Widget _nav(BuildContext context, {required bool saving}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
       child: Row(
         children: [
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.maybePop(context),
+            onTap: saving ? null : () => Navigator.maybePop(context),
             child: const Padding(
               padding: EdgeInsets.all(4),
-              child: V2Svg(
-                V2Icons.chevronLeft,
-                size: 22,
-                color: CkColors.ink,
-                strokeWidth: 2,
-              ),
+              child: V2Svg(V2Icons.chevronLeft,
+                  size: 22, color: CkColors.ink, strokeWidth: 2),
             ),
           ),
           Expanded(
@@ -144,21 +177,28 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           ),
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.maybePop(context),
+            onTap: saving ? null : _save,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
               decoration: BoxDecoration(
                 color: CkColors.ink,
                 borderRadius: BorderRadius.circular(999),
               ),
-              child: Text(
-                'Save',
-                style: CkType.body(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: CkColors.paper,
-                ),
-              ),
+              child: saving
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: CkColors.paper),
+                    )
+                  : Text(
+                      'Save',
+                      style: CkType.body(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: CkColors.paper,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -166,8 +206,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     );
   }
 
-  // Avatar (88, derived initials, camera badge) + NAME field beside it.
-  Widget _avatarAndName() {
+  Widget _avatarAndName(File? picked) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -177,49 +216,39 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                width: 88,
-                height: 88,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: CkColors.ink,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  _initials,
-                  style: CkType.display(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.03,
-                    color: CkColors.paper,
-                  ),
+              ClipOval(
+                child: SizedBox(
+                  width: 88,
+                  height: 88,
+                  child: _avatarImage(picked),
                 ),
               ),
               Positioned(
                 right: -4,
                 bottom: -4,
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: CkColors.paper,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: CkColors.paper, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        // 0 2px 6px rgba(40,30,15,0.18)
-                        color: const Color(0xFF281E0F).withValues(alpha: 0.18),
-                        offset: const Offset(0, 2),
-                        blurRadius: 6,
-                      ),
-                    ],
-                  ),
-                  child: const V2Svg(
-                    V2Icons.camera,
-                    size: 16,
-                    color: CkColors.ink,
-                    strokeWidth: 2,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => ref
+                      .read(profileEditControllerProvider.notifier)
+                      .pickAvatar(),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: CkColors.paper,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: CkColors.paper, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF281E0F).withValues(alpha: 0.18),
+                          offset: const Offset(0, 2),
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                    child: const V2Svg(V2Icons.camera,
+                        size: 16, color: CkColors.ink, strokeWidth: 2),
                   ),
                 ),
               ),
@@ -243,6 +272,37 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       ],
     );
   }
+
+  /// Picked file > existing avatar URL > initials.
+  Widget _avatarImage(File? picked) {
+    if (picked != null) {
+      return Image.file(picked, width: 88, height: 88, fit: BoxFit.cover);
+    }
+    if (_avatarUrl != null && _avatarUrl!.isNotEmpty) {
+      return Image.network(
+        _avatarUrl!,
+        width: 88,
+        height: 88,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _initialsAvatar(),
+      );
+    }
+    return _initialsAvatar();
+  }
+
+  Widget _initialsAvatar() => Container(
+        color: CkColors.ink,
+        alignment: Alignment.center,
+        child: Text(
+          _initials,
+          style: CkType.display(
+            fontSize: 34,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.03,
+            color: CkColors.paper,
+          ),
+        ),
+      );
 
   Widget _usernameField() {
     return Column(
@@ -268,17 +328,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       children: [
         const _FieldLabel('BIO'),
         const SizedBox(height: 4),
-        _EditField(
-          controller: _bio,
-          minLines: 3,
-          maxLines: 5,
-          maxLength: 160,
-        ),
+        _EditField(controller: _bio, minLines: 3, maxLines: 5, maxLength: 200),
         const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
           child: Text(
-            '$_bioLen / 160',
+            '$_bioLen / 200',
             style: CkType.mono(
               fontSize: 9,
               fontWeight: FontWeight.w600,
@@ -316,12 +371,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const V2Svg(
-                      V2Icons.pin,
-                      size: 12,
-                      color: CkColors.ink2,
-                      strokeWidth: 2,
-                    ),
+                    const V2Svg(V2Icons.pin,
+                        size: 12, color: CkColors.ink2, strokeWidth: 2),
                     const SizedBox(width: 5),
                     Text(
                       _locating ? 'Locating…' : 'GPS',
@@ -351,11 +402,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       ),
       child: RichText(
         text: TextSpan(
-          style: CkType.body(
-            fontSize: 11,
-            color: CkColors.muted,
-            height: 1.45,
-          ),
+          style: CkType.body(fontSize: 11, color: CkColors.muted, height: 1.45),
           children: [
             const TextSpan(text: 'Private account toggle lives in '),
             TextSpan(
@@ -393,8 +440,6 @@ class _FieldLabel extends StatelessWidget {
   }
 }
 
-// Styled input matching editFieldStyle: width100%, padding 10/12, radius8,
-// 1px hairline, Inter 14, optional leading "@" prefix.
 class _EditField extends StatelessWidget {
   const _EditField({
     required this.controller,
@@ -433,7 +478,8 @@ class _EditField extends StatelessWidget {
           fontWeight: FontWeight.w500,
           color: CkColors.muted,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         border: _border(CkColors.hairline),
         enabledBorder: _border(CkColors.hairline),
         focusedBorder: _border(CkColors.hairline),

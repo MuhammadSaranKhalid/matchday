@@ -220,7 +220,7 @@ class _MatchRequestScreenState extends ConsumerState<MatchRequestScreen> {
       (f) => _snack(f.message),
       (_) {
         _snack('Match confirmed');
-        context.go('/match');
+        context.go('/matches');
       },
     );
   }
@@ -301,7 +301,7 @@ class _MatchRequestScreenState extends ConsumerState<MatchRequestScreen> {
       (f) => _snack(f.message),
       (_) {
         _snack('Match declined');
-        context.go('/match');
+        context.go('/matches');
       },
     );
   }

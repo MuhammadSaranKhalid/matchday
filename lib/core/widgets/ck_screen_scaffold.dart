@@ -124,7 +124,7 @@ class _Wordmark extends StatelessWidget {
       TextSpan(
         children: [
           TextSpan(
-            text: 'circk',
+            text: 'matchday',
             style: CkType.display(fontSize: 26, letterSpacing: -0.045),
           ),
           TextSpan(

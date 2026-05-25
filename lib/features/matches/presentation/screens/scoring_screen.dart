@@ -103,7 +103,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       child: Row(
         children: [
           IconButton(
-            onPressed: () => context.go('/match'),
+            onPressed: () => context.go('/matches'),
             icon: const Icon(Icons.close_rounded, color: CkColors.ink),
           ),
           const Spacer(),

@@ -5,7 +5,9 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>circk uses your location to find your city or village and show teams near you.</string>
+	<string>matchday uses your location to find your city or village and show teams near you.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>matchday needs access to your photos so you can attach them to a post.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

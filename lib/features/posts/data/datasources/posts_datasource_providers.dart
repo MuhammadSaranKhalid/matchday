@@ -1,0 +1,15 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../../../core/supabase/supabase_client_provider.dart';
+import '../../domain/repositories/photo_picker.dart';
+import 'photo_processor.dart';
+import 'posts_remote_datasource.dart';
+
+part 'posts_datasource_providers.g.dart';
+
+@Riverpod(keepAlive: true)
+PostsRemoteDataSource postsRemoteDataSource(Ref ref) =>
+    PostsRemoteDataSource(ref.watch(supabaseClientProvider));
+
+@Riverpod(keepAlive: true)
+PhotoPicker photoPicker(Ref ref) => const PhotoProcessor();

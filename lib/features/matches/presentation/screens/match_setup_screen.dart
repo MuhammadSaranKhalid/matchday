@@ -26,7 +26,7 @@ class MatchSetupScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Request sent — awaiting reply')),
         );
-        context.go('/match');
+        context.go('/matches');
       } else if (s.submitError != null &&
           prev?.value?.submitError != s.submitError) {
         ScaffoldMessenger.of(context)

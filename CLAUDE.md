@@ -188,6 +188,15 @@ go_router: ^16.2.0
 flutter_svg: ^2.3.0                  # render brand vector assets (Google "G", pitch motif) faithfully
 intl: ^0.20.2                        # date/number formatting (scorecards, timestamps)
 timeago: ^3.7.1                      # relative timestamps ("3h ago") in feeds/notifications
+# Posts / photo pipeline (feature: posts). See §15.
+image_picker: ^1.2.2                 # pick photos from gallery/camera (composer)
+image_cropper: ^12.2.1               # crop/adjust step (ratio presets + zoom) before upload
+flutter_image_compress: ^2.4.0       # resize ≤1080px + JPEG encode on-device before upload
+cached_network_image: ^3.4.1         # disk+memory cached feed images (memCacheWidth = sized decode)
+blurhash_dart: ^1.2.1                # encode BlurHash on-device from the resized bytes
+image: ^4.8.0                        # decode pixels for BlurHash encoding
+flutter_blurhash: ^0.9.1             # render the BlurHash placeholder (blur → sharp fade)
+photo_view: ^0.15.0                  # full-screen pinch-zoom photo viewer
 # NOTE: google_fonts was removed in favour of bundled variable fonts. The
 # Inter / Inter Tight / JetBrains Mono TTFs live in assets/fonts/ and are
 # declared under `flutter: fonts:` in pubspec.yaml. This keeps the app
@@ -1428,3 +1437,18 @@ This section exists so Claude Code can look up how a specific offline-first deta
 | `OpType` enum (extend if new verbs needed) | `lib/core/database/tables.dart` |
 
 When the todos feature is deleted from a product, update this section to point at whichever real feature now demonstrates each concern (or remove the section entirely if the patterns are sufficiently internalized by the team).
+---
+
+## 15. Posts feature + image/media spec
+
+The `posts` feature (`lib/features/posts/`) is the feed. It is **online-only** (no offline-first — same posture as `matches`, Rule 7): the repository talks to Supabase directly; there is no drift table, pending-ops queue, or SyncService involvement.
+
+**Backend (already deployed).** `posts` (migration `0510`), plus `0511_post_media_metadata` which ADDS a `media jsonb` column (`[{url, blurhash, width, height}]`, ≤4) and widens `post_has_content`. The `post-media` storage bucket is public; **insert the row before uploading media** (storage RLS `is_post_author`). Paths are deterministic (`<post_id>/<i>.jpg`) so public URLs are computed up front and written to `media`/`media_urls` at insert.
+
+**Per-image storage (resize-before-upload → ONE file per image).** On device: crop → resize to **≤1080px long edge, JPEG q75**; compute BlurHash + width/height. Then 1 file at `post-media/<post_id>/<i>.jpg` + 1 metadata object `{url, blurhash, width, height}` in `posts.media` (≤4). 1080 is the display max (Instagram-style); the same file serves feed + zoom. There is no separate thumbnail file.
+
+**Read/scroll performance.** Feed = single query (media is jsonb on the post, no joins) + keyset pagination (`created_at` cursor on the `posts_status_created` index). `FeedController` is an `AsyncNotifier` with `loadMore`/`refresh`/`prepend`. The feed/profile are virtualized `ListView.builder`s; photos render via `CkFeedImage` (`lib/core/widgets/v2/ck_feed_image.dart`): `cached_network_image` with `memCacheWidth = slotPx × devicePixelRatio` (sized decode), a BlurHash placeholder, and an `AspectRatio` box to avoid reflow. Shared post UI is `FeedPostCard` + `PostMediaGrid` (`lib/core/widgets/v2/post_card.dart`).
+
+**Composer.** `lib/features/posts/presentation/screens/composer_screen.dart` (launched from the Profile FAB + Pavilion Create→Post). Photo pipeline: `data/datasources/photo_processor.dart` (image_picker → image_cropper → flutter_image_compress → blurhash_dart/image). `CreatePost` validates text-or-≥1-photo, ≤2000 chars, ≤4 photos. MVP composes `author_context='personal'` only.
+
+**Deferred (not yet built):** likes/comments/bookmarks persistence (schema + mock UI exist), drafts/scheduling/visibility-sheet/preview/Success (post-flow design), team/tournament authoring, auto post types, realtime feed, a `blurhash`-per-row already covered by `media`, avatar uploads.

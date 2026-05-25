@@ -5,13 +5,16 @@ import '../features/auth/presentation/providers/auth_providers.dart';
 import '../features/auth/presentation/screens/sign_in_screen.dart';
 import '../features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../features/onboarding/presentation/screens/onboarding_screen.dart';
-import '../features/pavilion/presentation/screens/pavilion_screen.dart';
-import '../features/shell/presentation/screens/coming_soon_screen.dart';
+import '../features/home/presentation/screens/home_feed_screen.dart';
+import '../features/matches/presentation/screens/matches_v2_screen.dart';
+import '../features/messages/presentation/screens/messages_screen.dart';
+import '../features/notifications/presentation/screens/notifications_bell_screen.dart';
+import '../features/pavilion/presentation/screens/pavilion_v2_screen.dart';
+import '../features/profile/presentation/screens/profile_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
 import '../features/teams/presentation/screens/team_create_screen.dart';
 import '../features/teams/presentation/screens/team_hub_screen.dart';
 import '../features/teams/presentation/screens/team_manage_screen.dart';
-import '../features/teams/presentation/screens/teams_list_screen.dart';
 import '../features/matches/presentation/screens/live_match_screen.dart';
 import '../features/matches/presentation/screens/match_request_screen.dart';
 import '../features/matches/presentation/screens/match_setup_screen.dart';
@@ -73,31 +76,54 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
         branches: [
+          // 0 · Home — feed
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/home',
-                builder: (_, __) => const ComingSoonScreen(
-                  tab: 'Home',
-                  showWordmark: true,
-                  showActions: true,
+                builder: (context, _) => HomeFeedScreen(
+                  onBell: () => _openBell(context),
+                  onOpenProfile: () => _openSpectatorProfile(context),
                 ),
               ),
             ],
           ),
+          // 1 · Matches — Live · Upcoming · Recent · Browse
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/match',
-                builder: (_, __) => const TeamsListScreen(),
+                path: '/matches',
+                builder: (context, _) =>
+                    MatchesV2Screen(onBell: () => _openBell(context)),
               ),
             ],
           ),
+          // 2 · Pavilion — workspace (calendar + yours + create)
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/pavilion',
-                builder: (_, __) => const PavilionScreen(),
+                builder: (context, _) =>
+                    PavilionV2Screen(onBell: () => _openBell(context)),
+              ),
+            ],
+          ),
+          // 3 · Messages — threads aggregator
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/messages',
+                builder: (context, _) =>
+                    MessagesScreen(onBell: () => _openBell(context)),
+              ),
+            ],
+          ),
+          // 4 · You — profile (self)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/profile',
+                builder: (_, __) => const ProfileScreen(isTab: true),
               ),
             ],
           ),
@@ -158,6 +184,21 @@ GoRouter appRouter(Ref ref) {
         builder: (_, __) => const TodosScreen(),
       ),
     ],
+  );
+}
+
+/// The header bell (every primary tab) opens the Notifications inbox over the
+/// whole shell, including the bottom nav (root navigator).
+void _openBell(BuildContext context) {
+  Navigator.of(context, rootNavigator: true).push(
+    MaterialPageRoute<void>(builder: (_) => const NotificationsBellScreen()),
+  );
+}
+
+/// Tapping another user in the feed opens their profile (spectator view).
+void _openSpectatorProfile(BuildContext context) {
+  Navigator.of(context, rootNavigator: true).push(
+    MaterialPageRoute<void>(builder: (_) => const ProfileScreen(spectator: true)),
   );
 }
 

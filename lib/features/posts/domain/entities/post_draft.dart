@@ -15,12 +15,26 @@ class ProcessedPhoto {
     required this.blurhash,
     required this.width,
     required this.height,
+    this.hashPending = false,
   });
 
   final File file;
   final String blurhash;
   final int width;
   final int height;
+
+  /// True while the BlurHash is still being computed in the background — the
+  /// composer shows a loading overlay on the thumbnail until it resolves.
+  final bool hashPending;
+
+  ProcessedPhoto copyWith({String? blurhash, bool? hashPending}) =>
+      ProcessedPhoto(
+        file: file,
+        blurhash: blurhash ?? this.blurhash,
+        width: width,
+        height: height,
+        hashPending: hashPending ?? this.hashPending,
+      );
 }
 
 class PostDraft {

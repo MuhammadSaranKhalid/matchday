@@ -26,10 +26,6 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
     super.dispose();
   }
 
-  bool get _canPost =>
-      _text.text.trim().isNotEmpty ||
-      ref.read(composerControllerProvider).photos.isNotEmpty;
-
   Future<void> _post() async {
     final post =
         await ref.read(composerControllerProvider.notifier).submit(_text.text);
@@ -47,7 +43,8 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(composerControllerProvider);
-    final canPost = _canPost && !state.busy;
+    final canPost =
+        (_text.text.trim().isNotEmpty || state.photos.isNotEmpty) && !state.busy;
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -59,21 +56,9 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
                 children: [
-                  TextField(
-                    controller: _text,
-                    autofocus: true,
-                    maxLines: null,
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration.collapsed(
-                      hintText: 'What happened on the field?',
-                      hintStyle:
-                          CkType.body(fontSize: 16, height: 1.5, color: CkColors.soft),
-                    ),
-                    style:
-                        CkType.body(fontSize: 16, height: 1.5, color: CkColors.ink),
-                  ),
-                  if (state.photos.isNotEmpty || state.canAddPhoto) ...[
-                    const SizedBox(height: 16),
+                  // Media-first composer: photos on top, caption below
+                  // (only after the first photo — no empty placeholder).
+                  if (state.photos.isNotEmpty) ...[
                     _PhotoStrip(
                       state: state,
                       onAdd: () =>
@@ -82,7 +67,32 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
                           .read(composerControllerProvider.notifier)
                           .removePhoto(i),
                     ),
+                    const SizedBox(height: 16),
                   ],
+                  TextField(
+                    controller: _text,
+                    autofocus: true,
+                    maxLines: null,
+                    onChanged: (_) => setState(() {}),
+                    // Borderless caption (social-composer norm) — explicit
+                    // none on every state so the theme's focused outline can't
+                    // bleed in via autofocus.
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                      hintText: 'What happened on the field?',
+                      hintStyle:
+                          CkType.body(fontSize: 16, height: 1.5, color: CkColors.soft),
+                    ),
+                    style:
+                        CkType.body(fontSize: 16, height: 1.5, color: CkColors.ink),
+                  ),
                 ],
               ),
             ),
@@ -193,22 +203,30 @@ class _PhotoStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (var i = 0; i < state.photos.length; i++)
-          _Thumb(
-            file: state.photos[i].file,
-            onRemove: () => onRemove(i),
-            cover: i == 0,
-          ),
-        if (state.canAddPhoto)
-          GestureDetector(
+    return SizedBox(
+      height: 84,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.zero,
+        itemCount: state.photos.length + (state.canAddPhoto ? 1 : 0),
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          if (i < state.photos.length) {
+            return _Thumb(
+              file: state.photos[i].file,
+              onRemove: () => onRemove(i),
+              cover: i == 0,
+              loading: state.photos[i].hashPending,
+            );
+          }
+          // Trailing "add more" tile (appears only alongside existing photos,
+          // hidden at the 4-photo cap).
+          return GestureDetector(
             onTap: onAdd,
             child: Container(
               width: 84,
               height: 84,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: CkColors.paper2,
                 borderRadius: BorderRadius.circular(10),
@@ -216,17 +234,26 @@ class _PhotoStrip extends StatelessWidget {
               ),
               child: const Icon(Icons.add, color: CkColors.muted),
             ),
-          ),
-      ],
+          );
+        },
+      ),
     );
   }
 }
 
 class _Thumb extends StatelessWidget {
-  const _Thumb({required this.file, required this.onRemove, this.cover = false});
+  const _Thumb({
+    required this.file,
+    required this.onRemove,
+    this.cover = false,
+    this.loading = false,
+  });
   final File file;
   final VoidCallback onRemove;
   final bool cover;
+
+  /// Dim + spinner overlay while the BlurHash is still being computed.
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +266,23 @@ class _Thumb extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             child: Image.file(file, width: 84, height: 84, fit: BoxFit.cover),
           ),
+          if (loading)
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (cover)
             Positioned(
               left: 4,

@@ -44,9 +44,25 @@ class ComposerController extends _$ComposerController {
 
   Future<void> addPhoto() async {
     if (!state.canAddPhoto || state.busy) return;
-    final photo = await ref.read(photoPickerProvider).pickOne();
-    if (photo == null) return;
+    final picker = ref.read(photoPickerProvider);
+
+    // 1) Pick + crop + resize — returns fast; show the thumbnail immediately.
+    final photo = await picker.pickOne();
+    // mounted guard: the composer may have been closed during the picker/crop
+    // or the (slower) hash await, which disposes this autodispose provider.
+    if (photo == null || !ref.mounted) return;
     state = state.copyWith(photos: [...state.photos, photo]);
+
+    // 2) Compute the BlurHash off the main isolate, then patch it into the
+    //    same photo (matched by identity; skipped if it was removed meanwhile).
+    final hash = await picker.blurHashFor(photo.file);
+    if (!ref.mounted) return;
+    final list = [...state.photos];
+    final i = list.indexWhere((p) => identical(p, photo));
+    if (i != -1) {
+      list[i] = photo.copyWith(blurhash: hash, hashPending: false);
+      state = state.copyWith(photos: list);
+    }
   }
 
   void removePhoto(int index) {
@@ -61,6 +77,8 @@ class ComposerController extends _$ComposerController {
     final result = await ref.read(createPostUseCaseProvider).call(
           PostDraft(text: text, photos: state.photos),
         );
+    // Composer closed mid-submit → don't touch disposed state/providers.
+    if (!ref.mounted) return null;
     return result.fold(
       (failure) {
         state = state.copyWith(busy: false, error: failure);

@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:novex_clean_arch/core/theme/circk_theme.dart';
 import 'package:novex_clean_arch/features/posts/presentation/widgets/post_card.dart';
+import 'package:novex_clean_arch/core/widgets/v2/ck_shimmer.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_modals.dart';
 import 'package:novex_clean_arch/features/auth/presentation/providers/auth_providers.dart';
@@ -48,7 +49,13 @@ class ProfileScreen extends ConsumerWidget {
         ? null
         : ref.watch(currentUserStreamProvider).value?.id.value;
     // Real profile for the self view; spectator keeps the mock identity.
-    final profile = spectator ? null : ref.watch(myProfileProvider).value;
+    // Watch the full AsyncValue so the hero can render a shimmer while the
+    // first fetch is in-flight, not just a placeholder string.
+    final profileAsync = spectator
+        ? const AsyncValue<Profile?>.data(null)
+        : ref.watch(myProfileProvider);
+    final profile = profileAsync.value;
+    final profileLoading = !spectator && profileAsync.isLoading && profile == null;
 
     final scroll = SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 12),
@@ -58,6 +65,7 @@ class ProfileScreen extends ConsumerWidget {
           _IdentityHero(
             spectator: spectator,
             profile: profile,
+            loading: profileLoading,
             onEdit: () => _openEdit(context),
           ),
           const _PlaysForSection(),
@@ -189,12 +197,17 @@ class _IdentityHero extends StatelessWidget {
   const _IdentityHero({
     required this.spectator,
     this.profile,
+    this.loading = false,
     required this.onEdit,
   });
   final bool spectator;
 
   /// Real profile for the self view; null for the spectator mock.
   final Profile? profile;
+
+  /// True while the self-view profile is being fetched for the first time
+  /// — render a shimmer skeleton instead of the placeholder strings.
+  final bool loading;
   final VoidCallback onEdit;
 
   String get _name {
@@ -250,6 +263,7 @@ class _IdentityHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (loading) return const _IdentityHeroSkeleton();
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 14, 22, 8),
       child: Column(
@@ -415,6 +429,90 @@ class _IdentityHero extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Shimmer-animated skeleton mirroring [_IdentityHero]'s layout — avatar
+/// circle + name/handle/city stack + bio lines + social signals + action
+/// buttons. Shown while the self-view profile is being fetched for the
+/// first time.
+class _IdentityHeroSkeleton extends StatelessWidget {
+  const _IdentityHeroSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(22, 14, 22, 8),
+      child: CkShimmer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CkShimmerBox(
+                    width: 88, height: 88, shape: BoxShape.circle),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CkShimmerBox(width: 200, height: 26, radius: 6),
+                        SizedBox(height: 10),
+                        CkShimmerBox(width: 110, height: 13, radius: 4),
+                        SizedBox(height: 12),
+                        CkShimmerBox(width: 96, height: 12, radius: 4),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 18),
+            CkShimmerBox(height: 13, radius: 4),
+            SizedBox(height: 8),
+            CkShimmerBox(width: 220, height: 13, radius: 4),
+            SizedBox(height: 18),
+            Row(
+              children: [
+                _SignalSkeleton(),
+                SizedBox(width: 16),
+                _SignalSkeleton(),
+              ],
+            ),
+            SizedBox(height: 18),
+            Row(
+              children: [
+                CkShimmerBox(width: 116, height: 38, radius: 999),
+                SizedBox(width: 8),
+                CkShimmerBox(width: 116, height: 38, radius: 999),
+                SizedBox(width: 8),
+                CkShimmerBox(width: 38, height: 38, radius: 999),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Two-line stat block placeholder used in [_IdentityHeroSkeleton].
+class _SignalSkeleton extends StatelessWidget {
+  const _SignalSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CkShimmerBox(width: 44, height: 18, radius: 4),
+        SizedBox(height: 6),
+        CkShimmerBox(width: 60, height: 10, radius: 3),
+      ],
     );
   }
 }
@@ -763,18 +861,78 @@ class _RealProfileList extends ConsumerWidget {
           child: Text("Couldn't load posts.",
               style: CkType.body(fontSize: 13, color: CkColors.muted)),
         ),
-      _ => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 28),
-          child: Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: CkColors.muted),
-            ),
-          ),
-        ),
+      _ => const _PostsListSkeleton(),
     };
+  }
+}
+
+/// Three feed-card-shaped shimmer placeholders shown while the author's
+/// posts are being fetched.
+class _PostsListSkeleton extends StatelessWidget {
+  const _PostsListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const CkShimmer(
+      child: Column(
+        children: [
+          _PostCardSkeleton(),
+          _PostCardSkeleton(withImage: false),
+          _PostCardSkeleton(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Single post-card placeholder: header (timestamp + meta), 2 text lines,
+/// optional image block, action row.
+class _PostCardSkeleton extends StatelessWidget {
+  const _PostCardSkeleton({this.withImage = true});
+  final bool withImage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              CkShimmerBox(width: 80, height: 10, radius: 3),
+              SizedBox(width: 8),
+              CkShimmerBox(width: 6, height: 6, shape: BoxShape.circle),
+              SizedBox(width: 8),
+              CkShimmerBox(width: 60, height: 10, radius: 3),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const CkShimmerBox(height: 13, radius: 4),
+          const SizedBox(height: 8),
+          const CkShimmerBox(width: 240, height: 13, radius: 4),
+          if (withImage) ...[
+            const SizedBox(height: 14),
+            const AspectRatio(
+              aspectRatio: 4 / 3,
+              child: CkShimmerBox(height: double.infinity, radius: 10),
+            ),
+          ],
+          const SizedBox(height: 14),
+          const Row(
+            children: [
+              CkShimmerBox(width: 44, height: 18, radius: 999),
+              SizedBox(width: 10),
+              CkShimmerBox(width: 44, height: 18, radius: 999),
+              SizedBox(width: 10),
+              CkShimmerBox(width: 44, height: 18, radius: 999),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: CkColors.hairline),
+        ],
+      ),
+    );
   }
 }
 

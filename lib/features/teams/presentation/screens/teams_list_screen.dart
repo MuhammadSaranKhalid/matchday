@@ -5,21 +5,24 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../matches/domain/entities/match.dart';
-import '../../../matches/presentation/providers/matches_providers.dart';
 import '../../domain/entities/team.dart';
-import '../providers/teams_providers.dart';
+import '../controllers/teams_list_controller.dart';
+import '../state/teams_list_view.dart';
 import '../widgets/team_avatar.dart';
 
 /// "My teams" — the user's teams + active match requests + a create entry.
 /// Pushed full-screen over the v2 shell (Pavilion → My teams). Faithful to the
 /// matchday v2 design language (mono section labels, accent crest cards, mono
 /// chevrons) using only real data — no fabricated records/roles/jerseys.
+///
+/// All cross-feature composition + filtering lives in [TeamsListController];
+/// this screen is a pure renderer of [TeamsListView].
 class TeamsListScreen extends ConsumerWidget {
   const TeamsListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final teams = ref.watch(myTeamsProvider);
+    final view = ref.watch(teamsListControllerProvider);
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -29,9 +32,15 @@ class TeamsListScreen extends ConsumerWidget {
           children: [
             const _Header(title: 'My teams'),
             Expanded(
-              child: switch (teams) {
-                AsyncData(:final value) when value.isEmpty => const _Empty(),
-                AsyncData(:final value) => _List(teams: value),
+              child: switch (view) {
+                AsyncData(:final value) => RefreshIndicator(
+                    color: CkColors.ink,
+                    onRefresh: () => ref
+                        .read(teamsListControllerProvider.notifier)
+                        .refresh(),
+                    child:
+                        value.teams.isEmpty ? const _Empty() : _List(view: value),
+                  ),
                 AsyncError() =>
                   const Center(child: Text('Could not load teams')),
                 _ => const Center(
@@ -119,30 +128,25 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _List extends ConsumerWidget {
-  const _List({required this.teams});
-  final List<Team> teams;
+/// Pure renderer of the composed [TeamsListView] — no derivation, no `ref`.
+class _List extends StatelessWidget {
+  const _List({required this.view});
+  final TeamsListView view;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final myTeamIds = teams.map((t) => t.id).toSet();
-    final active = (ref.watch(myMatchesProvider).value ?? const <Match>[])
-        .where((m) =>
-            m.status == MatchStatus.pending ||
-            m.status == MatchStatus.accepted ||
-            m.status == MatchStatus.live ||
-            m.status == MatchStatus.completed)
-        .toList();
+  Widget build(BuildContext context) {
+    final active = view.activeMatches;
+    final teams = view.teams;
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
       children: [
         if (active.isNotEmpty) ...[
           _SectionLabel('Active matches', count: active.length),
           for (var i = 0; i < active.length; i++) ...[
             if (i > 0) const SizedBox(height: 8),
-            _RequestCard(
-                match: active[i], incoming: myTeamIds.contains(active[i].teamBId)),
+            _RequestCard(entry: active[i]),
           ],
         ],
         _SectionLabel('Your teams', count: teams.length),
@@ -157,15 +161,16 @@ class _List extends ConsumerWidget {
   }
 }
 
-/// Active match request/result card in the v2 look (accent border when live or
-/// awaiting the user's action).
+/// Active match request/result card in the v2 look. Shows the resolved opponent
+/// crest + name; the route/title/accent are pure single-entity UI mapping.
 class _RequestCard extends StatelessWidget {
-  const _RequestCard({required this.match, required this.incoming});
-  final Match match;
-  final bool incoming;
+  const _RequestCard({required this.entry});
+  final TeamMatchEntry entry;
 
   @override
   Widget build(BuildContext context) {
+    final match = entry.match;
+    final opponent = entry.opponent;
     final live = match.status == MatchStatus.live;
     final accepted = match.status == MatchStatus.accepted;
     final completed = match.status == MatchStatus.completed;
@@ -174,29 +179,37 @@ class _RequestCard extends StatelessWidget {
         : accepted
             ? '/matches/${match.id.value}/start'
             : '/matches/${match.id.value}/request';
-    final title = completed
+    final phrase = completed
         ? 'Result · scorecard'
         : live
             ? 'Watch live'
             : accepted
                 ? 'Ready to start'
-                : (incoming ? 'Incoming request' : 'Awaiting reply');
+                : (entry.incoming ? 'Incoming request' : 'Awaiting reply');
     final accent = live
         ? CkColors.red
-        : (accepted || incoming)
+        : (accepted || entry.incoming)
             ? CkColors.amber
             : null;
+
+    // Opponent name as the primary title when known; otherwise the status
+    // phrase. The mono sub always carries the phrase + format.
+    final title = opponent?.name ?? phrase;
+    final format =
+        'T${match.format.oversPerInnings} · ${match.format.playersPerTeam}-a-side'
+        '${match.venue != null ? ' · ${match.venue!.ground}' : ''}';
+    final sub = opponent != null ? '$phrase · $format' : format;
+    final crestColor = opponent != null
+        ? parseHexColor(opponent.primaryColor, fallback: CkColors.ink)
+        : (accent ?? CkColors.ink);
+    final crestShort = opponent != null ? teamMonogram(opponent.name) : 'VS';
 
     return _CardShell(
       accent: accent,
       onTap: () => context.push(route),
       child: Row(
         children: [
-          Crest(
-            short: live ? 'LV' : (completed ? 'RS' : 'MT'),
-            color: accent ?? CkColors.ink,
-            size: 40,
-          ),
+          Crest(short: crestShort, color: crestColor, size: 40),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -210,15 +223,12 @@ class _RequestCard extends StatelessWidget {
                         letterSpacing: -0.01)),
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    'T${match.format.oversPerInnings} · ${match.format.playersPerTeam}-a-side'
-                    '${match.venue != null ? ' · ${match.venue!.ground}' : ''}',
-                    style: CkType.mono(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.04,
-                        color: CkColors.muted),
-                  ),
+                  child: Text(sub,
+                      style: CkType.mono(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.04,
+                          color: CkColors.muted)),
                 ),
               ],
             ),
@@ -379,6 +389,7 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
       children: [
         Padding(

@@ -46,6 +46,11 @@ class Match {
   /// Human-readable outcome once the match is completed (e.g. the final score).
   final String? resultDescription;
 
+  /// True when this match is in a state where participants are expected to
+  /// act or observe — open, in-play, or recently concluded. Delegates to
+  /// [MatchStatus.isActive].
+  bool get isActive => status.isActive;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -148,4 +153,15 @@ enum MatchStatus {
   final String wire;
   static MatchStatus fromWire(String? w) =>
       values.where((s) => s.wire == w).firstOrNull ?? MatchStatus.pending;
+
+  /// True for statuses that represent a match worth participants' attention —
+  /// open ([pending], [accepted]), in-play ([live]), or recently concluded
+  /// ([completed]). False for terminal non-event statuses (declined,
+  /// abandoned, cancelled) and pre-game logistics statuses (scheduled, toss,
+  /// inningsBreak).
+  bool get isActive =>
+      this == pending ||
+      this == accepted ||
+      this == live ||
+      this == completed;
 }

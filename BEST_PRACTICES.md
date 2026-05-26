@@ -88,6 +88,8 @@ Don't use the legacy `.when` / `.map` extensions — they predate Dart 3 pattern
 
 ## 4. Drift (Local SQLite)
 
+> **🟥 LIMITED APPLICABILITY (2026-05-26).** Per the online-only constraint at the top of CLAUDE.md, drift is currently used ONLY for the `WizardDrafts` table (transient multi-step form state). No domain data is stored locally. The items in this section remain correct general drift guidance; references to deleted concepts (`Todos`, `TodosLocalDataSource`, LWW upserts) are historical.
+
 **4.1 Bump `schemaVersion` AND write the migration, every schema change.** Adding a column, adding a table, renaming a column — each is a schema change that requires `schemaVersion++` and a step in `onUpgrade`. Forgetting either breaks app upgrades silently (existing users get crashes; fresh installs work). Test migrations by manually downgrading an install.
 
 **4.2 Companion objects, not raw insert maps.** `TodosCompanion.insert(...)` gives you compile-time checking of required vs optional fields. Raw `insert({'id': ..., 'title': ...})` doesn't. Use companions always.
@@ -112,9 +114,9 @@ class Todos extends Table {
 
 **4.6 IDs are generated in the repository, not the database.** This codebase passes client-generated UUIDs (`Uuid().v4()`) from the repository into both local writes and remote pushes. Auto-increment local IDs that differ from the server's IDs create reconciliation nightmares. UUID-first means the offline-created row's ID survives the sync.
 
-**4.7 LWW is manual.** `insertOnConflictUpdate` does NOT compare `updated_at` — it always overwrites on conflict. If you need LWW (last-write-wins by timestamp), implement it explicitly: for each incoming row, check the local `updated_at`, skip if local is newer, upsert otherwise. The codebase's `TodosLocalDataSource.upsertManyLww` is the canonical pattern.
+**4.7 LWW is manual.** `insertOnConflictUpdate` does NOT compare `updated_at` — it always overwrites on conflict. If you ever reintroduce sync (the project is online-only as of 2026-05-26), implement LWW explicitly per incoming row: check the local `updated_at`, skip if local is newer, upsert otherwise. There is no live reference implementation in the codebase right now.
 
-**4.8 Don't expose drift row types past the data source.** The local data source's job is to wrap drift's generated classes (`LocalTodo`) and return Domain entities (`Todo`). The repository sees only entities. This keeps the rest of the codebase oblivious to drift, so swapping local storage stays a one-file change.
+**4.8 Don't expose drift row types past the data source.** When a local data source exists, its job is to wrap drift's generated classes (e.g. `WizardDraftRow`) and return plain Dart values. Callers should never see `LocalThing`-style types.
 
 **4.9 Encryption when needed.** If a future product handles PII, health data, or financial records, swap `sqlite3_flutter_libs` for `sqlcipher_flutter_libs` and pass a passphrase to `NativeDatabase`. The drift API stays identical. Source the passphrase from `flutter_secure_storage` so it's not derivable from the binary.
 

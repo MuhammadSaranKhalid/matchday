@@ -1,7 +1,6 @@
 import 'team.dart';
 
 /// A roster membership linking a player (claimed or unclaimed) to a team.
-/// Synced offline-first → carries [updatedAt] for LWW.
 class TeamMember {
   const TeamMember({
     required this.id,

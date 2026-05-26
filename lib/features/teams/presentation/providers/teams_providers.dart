@@ -65,7 +65,7 @@ SetJerseyNumber setJerseyNumberUseCase(Ref ref) =>
 SetMemberRole setMemberRoleUseCase(Ref ref) =>
     SetMemberRole(ref.watch(teamsRepositoryProvider));
 
-// ─── Reactive reads (local DB streams) ─────────────────────────────────────
+// ─── Reactive reads (Supabase realtime streams) ────────────────────────────
 
 /// Teams owned/managed by the signed-in user. Empty when signed out.
 @riverpod
@@ -75,17 +75,18 @@ Stream<List<Team>> myTeams(Ref ref) {
   return ref.watch(watchMyTeamsUseCaseProvider).call(userId);
 }
 
-/// All cached teams (opponent picker).
+/// All teams visible to the signed-in user (used by match setup's opponent
+/// picker).
 @riverpod
 Stream<List<Team>> allTeams(Ref ref) =>
     ref.watch(watchAllTeamsUseCaseProvider).call(const NoParams());
 
-/// A single team (hub view), streamed from local. Null if not cached.
+/// A single team (hub view). Null if not found / not accessible.
 @riverpod
 Stream<Team?> team(Ref ref, String teamId) =>
     ref.watch(watchTeamUseCaseProvider).call(TeamId(teamId));
 
-/// A team's roster (members + names), streamed from local.
+/// A team's roster (members + display names).
 @riverpod
 Stream<List<RosterMember>> roster(Ref ref, String teamId) =>
     ref.watch(watchRosterUseCaseProvider).call(TeamId(teamId));

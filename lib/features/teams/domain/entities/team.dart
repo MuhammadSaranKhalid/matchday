@@ -1,7 +1,5 @@
-/// A team. Synced offline-first, so it carries [updatedAt] for LWW.
-///
-/// [managers] holds owner + manager user ids (Phase 1: just the owner).
-/// Colours are stored as hex strings for the crest avatar.
+/// A team. [managers] holds owner + manager user ids (Phase 1: just the
+/// owner). Colours are stored as hex strings for the crest avatar.
 class Team {
   const Team({
     required this.id,

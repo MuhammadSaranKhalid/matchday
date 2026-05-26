@@ -69,12 +69,12 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
                 color: CkColors.ink,
                 onRefresh: () =>
                     ref.read(feedControllerProvider.notifier).refresh(),
-                child: feed.when(
-                  loading: () => _scrollable([const _LiveRail(), const _Loader()]),
-                  error: (e, _) =>
-                      _scrollable([const _LiveRail(), _ErrorState(error: e)]),
-                  data: _dataList,
-                ),
+                child: switch (feed) {
+                  AsyncData(:final value) => _dataList(value),
+                  AsyncError(:final error) =>
+                      _scrollable([const _LiveRail(), _ErrorState(error: error)]),
+                  _ => _scrollable([const _LiveRail(), const _Loader()]),
+                },
               ),
             ),
           ],

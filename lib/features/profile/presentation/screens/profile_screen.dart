@@ -735,39 +735,21 @@ class _RealProfileList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(authorPostsProvider(authorId));
-    return async.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 28),
-        child: Center(
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: CkColors.muted),
-          ),
+    return switch (async) {
+      AsyncData(:final value) when value.isEmpty => Padding(
+          padding: const EdgeInsets.fromLTRB(18, 28, 18, 28),
+          child: Text('No posts yet.',
+              style: CkType.body(fontSize: 13, color: CkColors.muted)),
         ),
-      ),
-      error: (_, __) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 28, 18, 28),
-        child: Text("Couldn't load posts.",
-            style: CkType.body(fontSize: 13, color: CkColors.muted)),
-      ),
-      data: (posts) {
-        if (posts.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(18, 28, 18, 28),
-            child: Text('No posts yet.',
-                style: CkType.body(fontSize: 13, color: CkColors.muted)),
-          );
-        }
-        return Column(
+      AsyncData(:final value) => Column(
           children: [
-            for (final post in posts)
+            for (final post in value)
               FeedPostCard(
                 post: post,
                 showAuthor: false,
                 onComment: onOpenComments,
-                onOpenPhoto: (i) => Navigator.of(context, rootNavigator: true).push(
+                onOpenPhoto: (i) =>
+                    Navigator.of(context, rootNavigator: true).push(
                   MaterialPageRoute<void>(
                     builder: (_) =>
                         PhotoViewerScreen(media: post.media, initialIndex: i),
@@ -775,9 +757,24 @@ class _RealProfileList extends ConsumerWidget {
                 ),
               ),
           ],
-        );
-      },
-    );
+        ),
+      AsyncError() => Padding(
+          padding: const EdgeInsets.fromLTRB(18, 28, 18, 28),
+          child: Text("Couldn't load posts.",
+              style: CkType.body(fontSize: 13, color: CkColors.muted)),
+        ),
+      _ => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 28),
+          child: Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: CkColors.muted),
+            ),
+          ),
+        ),
+    };
   }
 }
 

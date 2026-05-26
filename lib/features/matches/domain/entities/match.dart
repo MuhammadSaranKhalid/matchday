@@ -1,6 +1,6 @@
 import '../../../teams/domain/entities/team.dart';
 
-/// A match between two teams. Online-only (Phase 1) — no offline mirror, no LWW.
+/// A match between two teams.
 ///
 /// In the setup flow (F4) a match is created in [MatchStatus.pending] with only
 /// team A's side filled in; team B's squad/captain and the status transition are

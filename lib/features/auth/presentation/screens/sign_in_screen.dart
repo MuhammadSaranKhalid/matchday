@@ -4,7 +4,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../controllers/auth_controller.dart';
@@ -22,17 +21,15 @@ class SignInScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Side effects: navigation and error snackbars.
+    // Side effects: error snackbar only. Post-auth navigation is handled by
+    // the router's `redirect` callback (BEST_PRACTICES §8.1), which moves an
+    // authenticated user off /sign-in to /home (or /onboarding if profile is
+    // incomplete) the moment the auth stream emits.
     ref.listen<AuthState>(authControllerProvider, (prev, next) {
-      switch (next) {
-        case AuthAuthenticated():
-          context.go('/todos');
-        case AuthFailed(failure: final f):
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(f.message)));
-        case _:
-          break;
+      if (next is AuthFailed) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(next.failure.message)));
       }
     });
 

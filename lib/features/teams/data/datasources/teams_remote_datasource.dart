@@ -43,10 +43,8 @@ class TeamsRemoteDataSource {
 
   Future<List<UnclaimedPlayerDto>> listUnclaimed() async {
     try {
-      final rows = await _supabase
-          .from(_unclaimed)
-          .select()
-          .eq('added_by', _requireUid());
+      // RLS scopes to rows the signed-in user added.
+      final rows = await _supabase.from(_unclaimed).select();
       return rows.map(UnclaimedPlayerDto.fromJson).toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);

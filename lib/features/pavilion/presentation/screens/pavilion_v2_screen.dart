@@ -16,6 +16,10 @@ import 'package:flutter/material.dart';
 import 'package:novex_clean_arch/core/theme/circk_theme.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
 import 'package:novex_clean_arch/features/posts/presentation/screens/composer_screen.dart';
+import '../widgets/pavilion_library_screens.dart';
+import '../widgets/pavilion_settings_screens.dart';
+import '../widgets/pavilion_status_screens.dart';
+import '../widgets/pavilion_yours_screens.dart';
 
 // ── One-off crest colours from the JSX (oklch → sRGB) ──────────────────────
 const _kEagles = Color(0xFF2E3E63); // City Eagles — oklch(0.42 0.10 260)
@@ -87,6 +91,21 @@ class _PavilionV2ScreenState extends State<PavilionV2Screen> {
         'my-teams' => 'My teams',
         'my-tournaments' => 'My tournaments',
         'calendar' => 'Calendar',
+        'status-invites' => 'Invites',
+        'status-claims' => 'Claim requests',
+        'status-drafts' => 'Drafts',
+        'status-today' => "Today's fixture",
+        'captain-duties' => 'Captain duties',
+        'organizer-duties' => 'Organizer duties',
+        'my-stats' => 'My stats',
+        'achievements' => 'Achievements',
+        'wallet' => 'Wallet',
+        'library-saved' => 'Saved',
+        'library-followed' => 'Followed',
+        'library-scorer' => 'Scorer history',
+        'settings-notifications' => 'Notifications',
+        'settings-discoverability' => 'Discoverability',
+        'settings-privacy' => 'Privacy & blocking',
         _ => 'Pavilion',
       };
 
@@ -99,6 +118,21 @@ class _PavilionV2ScreenState extends State<PavilionV2Screen> {
       'my-teams' => const _PvMyTeams(),
       'my-tournaments' => const _PvMyTournaments(),
       'calendar' => const _PvCalendar(),
+      'status-invites' => const PvStatusInvitesBody(),
+      'status-claims' => const PvStatusClaimsBody(),
+      'status-drafts' => const PvStatusDraftsBody(),
+      'status-today' => const PvStatusTodayBody(),
+      'captain-duties' => const PvCaptainDutiesBody(),
+      'organizer-duties' => const PvOrganizerDutiesBody(),
+      'my-stats' => const PvMyStatsBody(),
+      'achievements' => const PvAchievementsBody(),
+      'wallet' => const PvWalletBody(),
+      'library-saved' => const PvLibrarySavedBody(),
+      'library-followed' => const PvLibraryFollowedBody(),
+      'library-scorer' => const PvLibraryScorerBody(),
+      'settings-notifications' => const PvSettingsNotificationsBody(),
+      'settings-discoverability' => const PvSettingsDiscoverabilityBody(),
+      'settings-privacy' => const PvSettingsPrivacyBody(),
       _ => _PvHome(go: _go),
     };
   }
@@ -640,7 +674,74 @@ class _PvHome extends StatelessWidget {
             ],
           ),
         ),
+
+        // ── Needs you (status drill-downs) ──
+        const _PvSectionH('Needs you'),
+        _PvRowGroup(go: go, rows: const [
+          (glyph: '✉', title: 'Invites', sub: '2 team · 1 tournament', view: 'status-invites'),
+          (glyph: '⊕', title: 'Claim requests', sub: '1 pending', view: 'status-claims'),
+          (glyph: '✎', title: 'Drafts', sub: '3 unfinished', view: 'status-drafts'),
+          (glyph: '◉', title: "Today's fixture", sub: 'Lions vs Eagles · 18:30', view: 'status-today'),
+        ]),
+
+        // ── Duties ──
+        const _PvSectionH('Captain · organizer'),
+        _PvRowGroup(go: go, rows: const [
+          (glyph: '✦', title: 'Captain duties', sub: 'Lahore Lions', view: 'captain-duties'),
+          (glyph: '♛', title: 'Organizer duties', sub: "Spring Cup '26", view: 'organizer-duties'),
+        ]),
+
+        // ── Stats & rewards ──
+        const _PvSectionH('Stats & rewards'),
+        _PvRowGroup(go: go, rows: const [
+          (glyph: '📊', title: 'My stats', sub: 'Career · form · wagon', view: 'my-stats'),
+          (glyph: '🏆', title: 'Achievements', sub: '9 unlocked', view: 'achievements'),
+          (glyph: '₨', title: 'Wallet', sub: '₨ 12,500 available', view: 'wallet'),
+        ]),
+
+        // ── Library ──
+        const _PvSectionH('Library'),
+        _PvRowGroup(go: go, rows: const [
+          (glyph: '🔖', title: 'Saved', sub: 'Posts · matches · tours', view: 'library-saved'),
+          (glyph: '♡', title: 'Followed', sub: 'Players · teams · tournaments', view: 'library-followed'),
+          (glyph: '✓', title: 'Scorer history', sub: '38 matches scored', view: 'library-scorer'),
+        ]),
+
+        // ── Settings ──
+        const _PvSectionH('Settings'),
+        _PvRowGroup(go: go, rows: const [
+          (glyph: '🔔', title: 'Notifications', sub: 'Match · social · roles', view: 'settings-notifications'),
+          (glyph: '🔍', title: 'Discoverability', sub: 'Search · suggestions', view: 'settings-discoverability'),
+          (glyph: '🔒', title: 'Privacy & blocking', sub: 'Muted · blocked · reports', view: 'settings-privacy'),
+        ]),
       ],
+    );
+  }
+}
+
+/// A padded column of PvRows for a Home zone (each row navigates via [go]).
+class _PvRowGroup extends StatelessWidget {
+  const _PvRowGroup({required this.rows, required this.go});
+  final List<({String glyph, String title, String sub, String view})> rows;
+  final void Function(String) go;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const SizedBox(height: 6),
+            _PvRow(
+              glyph: rows[i].glyph,
+              title: rows[i].title,
+              sub: rows[i].sub,
+              onTap: () => go(rows[i].view),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

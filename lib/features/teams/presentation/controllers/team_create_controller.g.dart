@@ -40,7 +40,7 @@ final class TeamCreateControllerProvider
 }
 
 String _$teamCreateControllerHash() =>
-    r'e4b1a21491b94ea6a40cef1012c51953426e94d3';
+    r'df15acb4bc6e727ad64b8be34d132c7143317ead';
 
 /// Drives the 5-step team-create wizard. AsyncNotifier so [build] can restore a
 /// persisted draft before the form seeds (mirrors OnboardingController).

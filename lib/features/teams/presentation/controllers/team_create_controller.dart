@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/database/database_provider.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/usecases/create_team.dart';
+import '../../domain/usecases/upload_team_logo.dart';
 import '../providers/teams_providers.dart';
 import '../state/team_create_state.dart';
 
@@ -109,6 +112,8 @@ class TeamCreateController extends _$TeamCreateController {
             foundedYear: int.tryParse(s.foundedYear?.trim() ?? ''),
             primaryColor: s.primaryColor,
             secondaryColor: s.secondaryColor,
+            tagline: s.tagline,
+            logoMonogram: s.monogramOverride,
           ),
         );
 
@@ -120,6 +125,18 @@ class TeamCreateController extends _$TeamCreateController {
         persist: false,
       ),
       (team) async {
+        // If the user uploaded a logo, push it to Storage and patch
+        // logo_url. Soft-failure: a failed upload still proceeds to the
+        // Done screen — the user can replace it from the team page.
+        if (current.crestKind == CrestKind.upload &&
+            (current.logoUrl?.isNotEmpty ?? false)) {
+          await ref.read(uploadTeamLogoUseCaseProvider).call(
+                UploadTeamLogoParams(
+                  teamId: team.id,
+                  file: File(current.logoUrl!),
+                ),
+              );
+        }
         await ref.read(wizardDraftStoreProvider).clear(_draftKey);
         _set(
           current.copyWith(submitting: false, createdTeamId: team.id.value),

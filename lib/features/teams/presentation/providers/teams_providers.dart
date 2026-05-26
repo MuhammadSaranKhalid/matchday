@@ -13,6 +13,7 @@ import '../../domain/usecases/get_team.dart';
 import '../../domain/usecases/remove_member.dart';
 import '../../domain/usecases/set_jersey_number.dart';
 import '../../domain/usecases/set_member_role.dart';
+import '../../domain/usecases/upload_team_logo.dart';
 import '../../domain/usecases/watch_all_teams.dart';
 import '../../domain/usecases/watch_my_teams.dart';
 import '../../domain/usecases/watch_roster.dart';
@@ -29,6 +30,10 @@ TeamsRepository teamsRepository(Ref ref) => TeamsRepositoryImpl(
 @riverpod
 CreateTeam createTeamUseCase(Ref ref) =>
     CreateTeam(ref.watch(teamsRepositoryProvider));
+
+@riverpod
+UploadTeamLogo uploadTeamLogoUseCase(Ref ref) =>
+    UploadTeamLogo(ref.watch(teamsRepositoryProvider));
 
 @riverpod
 WatchMyTeams watchMyTeamsUseCase(Ref ref) =>

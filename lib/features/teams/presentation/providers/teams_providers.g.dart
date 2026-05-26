@@ -92,6 +92,48 @@ final class CreateTeamUseCaseProvider
 
 String _$createTeamUseCaseHash() => r'c045fad11d8851650e14bee2e7ed80bff22aefa3';
 
+@ProviderFor(uploadTeamLogoUseCase)
+final uploadTeamLogoUseCaseProvider = UploadTeamLogoUseCaseProvider._();
+
+final class UploadTeamLogoUseCaseProvider
+    extends $FunctionalProvider<UploadTeamLogo, UploadTeamLogo, UploadTeamLogo>
+    with $Provider<UploadTeamLogo> {
+  UploadTeamLogoUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'uploadTeamLogoUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$uploadTeamLogoUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<UploadTeamLogo> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  UploadTeamLogo create(Ref ref) {
+    return uploadTeamLogoUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(UploadTeamLogo value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<UploadTeamLogo>(value),
+    );
+  }
+}
+
+String _$uploadTeamLogoUseCaseHash() =>
+    r'a2bb13aac0e2b0ca8b251f169f6dd27f993bd256';
+
 @ProviderFor(watchMyTeamsUseCase)
 final watchMyTeamsUseCaseProvider = WatchMyTeamsUseCaseProvider._();
 

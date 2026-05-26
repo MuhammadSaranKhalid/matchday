@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../../core/widgets/v2/v2_kit.dart';
 import '../../state/my_teams_view.dart';
+import 'crest_palette.dart';
 
 /// Direct invite from a captain. Each card is a decision — Accept / Decline
 /// within thumb reach. Cream "INVITE" eyebrow + inviter name + team headline
@@ -26,7 +27,7 @@ class InviteCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _MiniCrest(color: invite.crest.color, mono: invite.crest.mono),
+              _MiniCrest(crest: invite.crest),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -96,27 +97,45 @@ class InviteCard extends StatelessWidget {
 }
 
 class _MiniCrest extends StatelessWidget {
-  const _MiniCrest({required this.color, required this.mono});
-  final Color color;
-  final String mono;
+  const _MiniCrest({required this.crest});
+  final CrestStyle crest;
+
+  Widget _mono() => Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: crest.color,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          crest.mono,
+          style: CkType.display(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.03,
+            color: CkColors.paper,
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        mono,
-        style: CkType.display(
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.03,
-          color: CkColors.paper,
+    if (crest.logoUrl == null || crest.logoUrl!.isEmpty) return _mono();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 40,
+        height: 40,
+        color: CkColors.paper2,
+        child: Image.network(
+          crest.logoUrl!,
+          fit: BoxFit.cover,
+          width: 40,
+          height: 40,
+          errorBuilder: (_, __, ___) => _mono(),
+          loadingBuilder: (ctx, child, progress) =>
+              progress == null ? child : _mono(),
         ),
       ),
     );

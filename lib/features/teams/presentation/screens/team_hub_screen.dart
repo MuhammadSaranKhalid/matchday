@@ -144,17 +144,7 @@ class _Hero extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(teamMonogram(team.name),
-                        style: CkType.display(fontSize: 26, color: primary)),
-                  ),
+                  _HeroCrest(team: team, primary: primary),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -174,6 +164,18 @@ class _Hero extends StatelessWidget {
                         Text(team.name,
                             style:
                                 CkType.display(fontSize: 28, color: Colors.white)),
+                        if (team.tagline != null && team.tagline!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            '“${team.tagline!.trim()}”',
+                            style: CkType.body(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              height: 1.35,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ).copyWith(fontStyle: FontStyle.italic),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -181,6 +183,54 @@ class _Hero extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 64×64 white-on-primary crest for the hub hero. Renders the uploaded logo
+/// when [Team.logoUrl] is set; otherwise the monogram (override if present,
+/// else auto-derived) in [primary] on white.
+class _HeroCrest extends StatelessWidget {
+  const _HeroCrest({required this.team, required this.primary});
+  final Team team;
+  final Color primary;
+
+  String get _mono {
+    final override = team.logoMonogram?.trim();
+    if (override != null && override.isNotEmpty) return override.toUpperCase();
+    return teamMonogram(team.name);
+  }
+
+  Widget _monoTile() => Container(
+        width: 64,
+        height: 64,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(_mono, style: CkType.display(fontSize: 26, color: primary)),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final url = team.logoUrl;
+    if (url == null || url.isEmpty) return _monoTile();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 64,
+        height: 64,
+        color: Colors.white,
+        padding: const EdgeInsets.all(6),
+        child: Image.network(
+          url,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => _monoTile(),
+          loadingBuilder: (ctx, child, progress) =>
+              progress == null ? child : _monoTile(),
         ),
       ),
     );

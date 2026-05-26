@@ -102,37 +102,60 @@ class V2Svg extends StatelessWidget {
   }
 }
 
-/// Team crest — rounded square, white initials.
+/// Team crest — rounded square. Renders the uploaded [logoUrl] when set,
+/// otherwise the team's monogram on its primary [color]. Errors / loading
+/// fall back to the monogram tile so the crest never goes blank.
 class Crest extends StatelessWidget {
   const Crest({
     super.key,
     required this.short,
     required this.color,
+    this.logoUrl,
     this.size = 36,
     this.radius = 9,
   });
 
   final String short;
   final Color color;
+  final String? logoUrl;
   final double size;
   final double radius;
 
+  Widget _monoTile() => Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+        child: Text(
+          short,
+          style: CkType.display(
+            fontSize: size * 0.34,
+            fontWeight: FontWeight.w700,
+            color: CkColors.paper,
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-      child: Text(
-        short,
-        style: CkType.display(
-          fontSize: size * 0.34,
-          fontWeight: FontWeight.w700,
-          color: CkColors.paper,
+    if (logoUrl == null || logoUrl!.isEmpty) return _monoTile();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Container(
+        width: size,
+        height: size,
+        color: CkColors.paper2,
+        child: Image.network(
+          logoUrl!,
+          fit: BoxFit.cover,
+          width: size,
+          height: size,
+          errorBuilder: (_, __, ___) => _monoTile(),
+          loadingBuilder: (ctx, child, progress) =>
+              progress == null ? child : _monoTile(),
         ),
       ),
     );

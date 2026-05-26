@@ -13,7 +13,7 @@ import '../features/pavilion/presentation/screens/pavilion_v2_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
 import '../features/teams/presentation/screens/team_create_screen.dart';
-import '../features/teams/presentation/screens/team_hub_screen.dart';
+import '../features/teams/presentation/screens/team_page_screen.dart';
 import '../features/teams/presentation/screens/team_manage_screen.dart';
 import '../features/teams/presentation/screens/teams_list_screen.dart';
 import '../features/matches/presentation/screens/live_match_screen.dart';
@@ -141,7 +141,7 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/teams/:teamId',
         builder: (_, state) =>
-            TeamHubScreen(teamId: state.pathParameters['teamId']!),
+            TeamPageScreen(teamId: state.pathParameters['teamId']!),
       ),
       GoRoute(
         path: '/teams/:teamId/manage',

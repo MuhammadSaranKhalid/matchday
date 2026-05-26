@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fpdart/fpdart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -114,6 +116,8 @@ class TeamsRepositoryImpl implements TeamsRepository {
     int? foundedYear,
     String? primaryColor,
     String? secondaryColor,
+    String? tagline,
+    String? logoMonogram,
   }) async {
     try {
       _requireUserId();
@@ -128,6 +132,8 @@ class TeamsRepositoryImpl implements TeamsRepository {
         'founded_year': foundedYear,
         'primary_color': primaryColor,
         'secondary_color': secondaryColor,
+        'tagline': tagline,
+        'logo_monogram': logoMonogram,
       });
       return Right(dto.toEntity());
     } on StateError catch (e) {
@@ -138,6 +144,60 @@ class TeamsRepositoryImpl implements TeamsRepository {
       return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> uploadTeamLogo({
+    required TeamId teamId,
+    required File file,
+  }) async {
+    try {
+      final ext = _extensionFor(file.path);
+      final contentType = _contentTypeFor(ext);
+      final url = await _remote.uploadTeamLogo(
+        teamId: teamId.value,
+        file: file,
+        contentType: contentType,
+        extension: ext,
+      );
+      return Right(url);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  String _extensionFor(String path) {
+    final dot = path.lastIndexOf('.');
+    if (dot < 0 || dot == path.length - 1) return 'jpg';
+    final raw = path.substring(dot + 1).toLowerCase();
+    // Map common extensions to the bucket's allowed MIME types.
+    switch (raw) {
+      case 'jpg':
+      case 'jpeg':
+        return 'jpg';
+      case 'png':
+        return 'png';
+      case 'webp':
+        return 'webp';
+      default:
+        return 'jpg';
+    }
+  }
+
+  String _contentTypeFor(String ext) {
+    switch (ext) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'jpg':
+      default:
+        return 'image/jpeg';
     }
   }
 

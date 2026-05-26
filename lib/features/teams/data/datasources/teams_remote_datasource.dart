@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/team_dto.dart';
@@ -78,10 +80,47 @@ class TeamsRemoteDataSource {
               if (payload['secondary_color'] != null)
                 'secondary': payload['secondary_color'],
             },
+            if (payload['tagline'] != null) 'tagline': payload['tagline'],
+            if (payload['logo_monogram'] != null)
+              'logo_monogram': payload['logo_monogram'],
           })
           .select()
           .single();
       return TeamDto.fromJson(row);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Uploads [file] to `team-logos/<teamId>/logo.<ext>` and patches the
+  /// team row's `logo_url`. Returns the public URL. Mirrors the avatar
+  /// upload pattern in `onboarding_remote_datasource.dart`.
+  Future<String> uploadTeamLogo({
+    required String teamId,
+    required File file,
+    required String contentType,
+    required String extension,
+  }) async {
+    try {
+      final path = '$teamId/logo.$extension';
+      await _supabase.storage.from('team-logos').upload(
+            path,
+            file,
+            fileOptions: FileOptions(
+              contentType: contentType,
+              upsert: true,
+            ),
+          );
+      final url = _supabase.storage.from('team-logos').getPublicUrl(path);
+      // Cache-bust so a replacement upload shows immediately at the same URL.
+      final cacheBusted = '$url?v=${DateTime.now().millisecondsSinceEpoch}';
+      await _supabase
+          .from(_teams)
+          .update({'logo_url': cacheBusted})
+          .eq('team_id', teamId);
+      return cacheBusted;
+    } on StorageException catch (e) {
+      throw ServerException(e.message);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

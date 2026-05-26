@@ -43,14 +43,13 @@ abstract class TeamCreateState with _$TeamCreateState {
   bool get canContinueBasics => TeamName.create(name).isRight();
   bool get canContinueHome => city.trim().isNotEmpty;
 
-  /// Two-letter crest monogram — user override wins, else auto-derived from
-  /// the first letters of the first two words of [name].
+  /// 1–3 character crest monogram. User override wins (honoured as typed,
+  /// up to the input field's maxLength); otherwise auto-derived from the
+  /// first letters of the first two words of [name].
   String get monogram {
     final override = monogramOverride?.trim();
     if (override != null && override.isNotEmpty) {
-      return override.length >= 2
-          ? override.substring(0, 2).toUpperCase()
-          : override.toUpperCase();
+      return override.toUpperCase();
     }
     final words = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
     if (words.isEmpty) return '–';

@@ -16,6 +16,9 @@ class Team {
     this.foundedYear,
     this.primaryColor,
     this.secondaryColor,
+    this.tagline,
+    this.logoUrl,
+    this.logoMonogram,
   });
 
   final TeamId id;
@@ -32,6 +35,17 @@ class Team {
   final int? foundedYear;
   final String? primaryColor;
   final String? secondaryColor;
+
+  /// Short marketing line shown on the team page and scorecards.
+  final String? tagline;
+
+  /// Public URL of the team's uploaded logo. Null = render the monogram
+  /// crest on [primaryColor].
+  final String? logoUrl;
+
+  /// 1–3 letter override for the crest monogram. Null = derive from [name]
+  /// at render time.
+  final String? logoMonogram;
 
   bool isManagedBy(String userId) =>
       ownerId == userId || managers.contains(userId);
@@ -51,6 +65,9 @@ class Team {
           other.foundedYear == foundedYear &&
           other.primaryColor == primaryColor &&
           other.secondaryColor == secondaryColor &&
+          other.tagline == tagline &&
+          other.logoUrl == logoUrl &&
+          other.logoMonogram == logoMonogram &&
           other.createdAt == createdAt &&
           other.updatedAt == updatedAt &&
           _sameManagers(other.managers, managers);
@@ -64,9 +81,11 @@ class Team {
   }
 
   @override
-  int get hashCode => Object.hash(id, ownerId, name, type, privacy, description,
-      homeGround, city, foundedYear, primaryColor, secondaryColor, createdAt,
-      updatedAt, Object.hashAll(managers));
+  int get hashCode => Object.hash(
+        id, ownerId, name, type, privacy, description, homeGround, city,
+        foundedYear, primaryColor, secondaryColor, tagline, logoUrl,
+        logoMonogram, createdAt, updatedAt, Object.hashAll(managers),
+      );
 }
 
 class TeamId {

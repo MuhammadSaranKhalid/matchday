@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../entities/roster_member.dart';
@@ -30,6 +32,16 @@ abstract class TeamsRepository {
     int? foundedYear,
     String? primaryColor,
     String? secondaryColor,
+    String? tagline,
+    String? logoMonogram,
+  });
+
+  /// Uploads [file] to the `team-logos` bucket under `<teamId>/...`, patches
+  /// the team row's `logo_url`, and returns the public URL. Existing logo
+  /// for the team is overwritten.
+  Future<Either<Failure, String>> uploadTeamLogo({
+    required TeamId teamId,
+    required File file,
   });
 
   /// Adds a player by name: creates an unclaimed_players row + a team_members

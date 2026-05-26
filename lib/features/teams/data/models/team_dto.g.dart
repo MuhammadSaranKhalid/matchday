@@ -20,6 +20,9 @@ _TeamDto _$TeamDtoFromJson(Map<String, dynamic> json) => _TeamDto(
       (json['managers'] as List<dynamic>?)?.map((e) => e as String).toList() ??
       const <String>[],
   privacy: json['privacy'] as String? ?? 'public',
+  tagline: json['tagline'] as String?,
+  logoUrl: json['logo_url'] as String?,
+  logoMonogram: json['logo_monogram'] as String?,
   createdAt: json['created_at'] as String,
   updatedAt: json['updated_at'] as String,
 );
@@ -36,6 +39,9 @@ Map<String, dynamic> _$TeamDtoToJson(_TeamDto instance) => <String, dynamic>{
   'team_colors': instance.teamColors,
   'managers': instance.managers,
   'privacy': instance.privacy,
+  'tagline': instance.tagline,
+  'logo_url': instance.logoUrl,
+  'logo_monogram': instance.logoMonogram,
   'created_at': instance.createdAt,
   'updated_at': instance.updatedAt,
 };

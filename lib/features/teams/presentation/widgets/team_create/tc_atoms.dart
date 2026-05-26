@@ -47,7 +47,10 @@ class TcLabel extends StatelessWidget {
 }
 
 /// Themed text input — paper background, hairline border, rounded.
-class TcInput extends StatelessWidget {
+/// Owns its own [TextEditingController] so the caret doesn't reset every
+/// rebuild; only syncs from the external [value] when it diverges from
+/// what the user is currently typing.
+class TcInput extends StatefulWidget {
   const TcInput({
     super.key,
     required this.value,
@@ -74,16 +77,49 @@ class TcInput extends StatelessWidget {
   final bool autofocus;
 
   @override
+  State<TcInput> createState() => _TcInputState();
+}
+
+class _TcInputState extends State<TcInput> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
+  }
+
+  @override
+  void didUpdateWidget(TcInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only push the external value back into the field when it changes from
+    // outside our own onChanged (e.g. draft restore, or a sibling step
+    // editing the same shared property). Without this guard, every onChanged
+    // round-trip would reset the caret to the end and break fast typing.
+    if (widget.value != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: widget.value,
+        selection: TextSelection.collapsed(offset: widget.value.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final field = TextField(
-      controller: TextEditingController(text: value)
-        ..selection = TextSelection.collapsed(offset: value.length),
-      onChanged: onChanged,
-      keyboardType: keyboardType,
-      textAlign: textAlign,
-      maxLength: maxLength,
-      autofocus: autofocus,
-      style: textStyle ?? CkType.body(fontSize: 14, color: CkColors.ink),
+      controller: _controller,
+      onChanged: widget.onChanged,
+      keyboardType: widget.keyboardType,
+      textAlign: widget.textAlign,
+      maxLength: widget.maxLength,
+      autofocus: widget.autofocus,
+      style: widget.textStyle ?? CkType.body(fontSize: 14, color: CkColors.ink),
       decoration: InputDecoration(
         counterText: '',
         isCollapsed: true,
@@ -91,28 +127,29 @@ class TcInput extends StatelessWidget {
             const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         filled: true,
         fillColor: CkColors.paper,
-        hintText: placeholder,
+        hintText: widget.placeholder,
         hintStyle: CkType.body(fontSize: 14, color: CkColors.muted),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-              color: hasError ? CkColors.red : CkColors.hairline),
+              color: widget.hasError ? CkColors.red : CkColors.hairline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-              color: hasError ? CkColors.red : CkColors.hairline),
+              color: widget.hasError ? CkColors.red : CkColors.hairline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-              color: hasError ? CkColors.red : CkColors.ink, width: 1.5),
+              color: widget.hasError ? CkColors.red : CkColors.ink,
+              width: 1.5),
         ),
       ),
     );
-    if (maxWidth != null) {
+    if (widget.maxWidth != null) {
       return ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth!),
+        constraints: BoxConstraints(maxWidth: widget.maxWidth!),
         child: field,
       );
     }

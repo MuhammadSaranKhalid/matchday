@@ -146,7 +146,9 @@ class TeamCreateController extends _$TeamCreateController {
       'secondaryColor': s.secondaryColor,
       'crestKind': s.crestKind.name,
       'monogramOverride': s.monogramOverride,
-      // logoUrl is intentionally not persisted (could be a huge data: URI).
+      'logoUrl': s.logoUrl,
+      'logoName': s.logoName,
+      'logoSize': s.logoSize,
     });
   }
 
@@ -177,5 +179,8 @@ class TeamCreateController extends _$TeamCreateController {
           orElse: () => CrestKind.monogram,
         ),
         monogramOverride: m['monogramOverride'] as String?,
+        logoUrl: m['logoUrl'] as String?,
+        logoName: m['logoName'] as String?,
+        logoSize: m['logoSize'] as int?,
       );
 }

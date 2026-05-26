@@ -24,6 +24,8 @@ class CreateTeam implements UseCase<Team, CreateTeamParams> {
         foundedYear: p.foundedYear,
         primaryColor: p.primaryColor,
         secondaryColor: p.secondaryColor,
+        tagline: _blankToNull(p.tagline),
+        logoMonogram: _blankToNull(p.logoMonogram),
       ),
     );
   }
@@ -45,6 +47,8 @@ class CreateTeamParams {
     this.foundedYear,
     this.primaryColor,
     this.secondaryColor,
+    this.tagline,
+    this.logoMonogram,
   });
 
   final String name;
@@ -56,4 +60,11 @@ class CreateTeamParams {
   final int? foundedYear;
   final String? primaryColor;
   final String? secondaryColor;
+
+  /// Optional short tagline (≤60 chars).
+  final String? tagline;
+
+  /// Optional 1–3 letter monogram override. Null = server-side / UI
+  /// auto-derive from the team name.
+  final String? logoMonogram;
 }

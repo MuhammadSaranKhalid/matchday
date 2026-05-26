@@ -33,12 +33,39 @@ class TeamCreateController extends _$TeamCreateController {
   void setName(String v) => _mutate((s) => s.copyWith(name: v));
   void setType(TeamType t) => _mutate((s) => s.copyWith(type: t));
   void setPrivacy(TeamPrivacy p) => _mutate((s) => s.copyWith(privacy: p));
+  void setTagline(String v) => _mutate((s) => s.copyWith(tagline: v));
   void setFoundedYear(String v) => _mutate((s) => s.copyWith(foundedYear: v));
   void setCity(String v) => _mutate((s) => s.copyWith(city: v));
   void setArea(String v) => _mutate((s) => s.copyWith(area: v));
   void setHomeGround(String v) => _mutate((s) => s.copyWith(homeGround: v));
   void setColors(String primary, String secondary) =>
       _mutate((s) => s.copyWith(primaryColor: primary, secondaryColor: secondary));
+  void setPrimaryColor(String hex) =>
+      _mutate((s) => s.copyWith(primaryColor: hex));
+  void setSecondaryColor(String hex) =>
+      _mutate((s) => s.copyWith(secondaryColor: hex));
+  void setMonogram(String value) =>
+      _mutate((s) => s.copyWith(monogramOverride: value));
+  void setCrestKind(CrestKind kind) => _mutate((s) => s.copyWith(
+        crestKind: kind,
+        // Picking a generated style clears any uploaded logo.
+        logoUrl: kind == CrestKind.upload ? s.logoUrl : null,
+        logoName: kind == CrestKind.upload ? s.logoName : null,
+        logoSize: kind == CrestKind.upload ? s.logoSize : null,
+      ));
+  void setLogo({required String url, required String name, required int size}) =>
+      _mutate((s) => s.copyWith(
+            crestKind: CrestKind.upload,
+            logoUrl: url,
+            logoName: name,
+            logoSize: size,
+          ));
+  void removeLogo() => _mutate((s) => s.copyWith(
+        crestKind: CrestKind.monogram,
+        logoUrl: null,
+        logoName: null,
+        logoSize: null,
+      ));
 
   void _mutate(TeamCreateState Function(TeamCreateState) f) {
     final s = _s;
@@ -110,13 +137,24 @@ class TeamCreateController extends _$TeamCreateController {
       'name': s.name,
       'type': s.type.wire,
       'privacy': s.privacy.wire,
+      'tagline': s.tagline,
       'foundedYear': s.foundedYear,
       'city': s.city,
       'area': s.area,
       'homeGround': s.homeGround,
       'primaryColor': s.primaryColor,
       'secondaryColor': s.secondaryColor,
+      'crestKind': s.crestKind.name,
+      'monogramOverride': s.monogramOverride,
+      // logoUrl is intentionally not persisted (could be a huge data: URI).
     });
+  }
+
+  /// Resets the wizard so a freshly successful submit can be followed by
+  /// "Create another team" from the Done screen.
+  void reset() {
+    state = const AsyncData(TeamCreateState());
+    ref.read(wizardDraftStoreProvider).clear(_draftKey);
   }
 
   TeamCreateState _fromDraft(Map<String, dynamic> m) => TeamCreateState(
@@ -127,11 +165,17 @@ class TeamCreateController extends _$TeamCreateController {
         name: m['name'] as String? ?? '',
         type: TeamType.fromWire(m['type'] as String?),
         privacy: TeamPrivacy.fromWire(m['privacy'] as String?),
+        tagline: m['tagline'] as String? ?? '',
         foundedYear: m['foundedYear'] as String?,
         city: m['city'] as String? ?? '',
         area: m['area'] as String? ?? '',
         homeGround: m['homeGround'] as String? ?? '',
         primaryColor: m['primaryColor'] as String? ?? '#338946',
-        secondaryColor: m['secondaryColor'] as String? ?? '#E24A3F',
+        secondaryColor: m['secondaryColor'] as String? ?? '#FDFAF4',
+        crestKind: CrestKind.values.firstWhere(
+          (e) => e.name == m['crestKind'],
+          orElse: () => CrestKind.monogram,
+        ),
+        monogramOverride: m['monogramOverride'] as String?,
       );
 }

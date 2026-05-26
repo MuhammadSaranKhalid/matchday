@@ -7,6 +7,11 @@ part 'team_create_state.freezed.dart';
 /// The 5 steps of the team-create wizard.
 enum TeamCreateStep { basics, identity, home, crest, review }
 
+/// How the team's crest renders. `upload` means the user provided their own
+/// logo (path stored in [TeamCreateState.logoUrl]); the other three are
+/// auto-generated from the team's primary color + monogram.
+enum CrestKind { monogram, initials, shield, upload }
+
 /// In-progress team-create form state. Freezed data class (same rationale as
 /// OnboardingState — concurrent fields + copyWith).
 @freezed
@@ -16,12 +21,18 @@ abstract class TeamCreateState with _$TeamCreateState {
     @Default('') String name,
     @Default(TeamType.club) TeamType type,
     @Default(TeamPrivacy.public) TeamPrivacy privacy,
+    @Default('') String tagline,
     String? foundedYear,
     @Default('') String city,
     @Default('') String area,
     @Default('') String homeGround,
     @Default('#338946') String primaryColor,
-    @Default('#E24A3F') String secondaryColor,
+    @Default('#FDFAF4') String secondaryColor,
+    @Default(CrestKind.monogram) CrestKind crestKind,
+    String? monogramOverride,
+    String? logoUrl,
+    String? logoName,
+    int? logoSize,
     @Default(false) bool submitting,
     String? submitError,
     String? createdTeamId,
@@ -32,8 +43,15 @@ abstract class TeamCreateState with _$TeamCreateState {
   bool get canContinueBasics => TeamName.create(name).isRight();
   bool get canContinueHome => city.trim().isNotEmpty;
 
-  /// Two-letter crest monogram derived from the name.
+  /// Two-letter crest monogram — user override wins, else auto-derived from
+  /// the first letters of the first two words of [name].
   String get monogram {
+    final override = monogramOverride?.trim();
+    if (override != null && override.isNotEmpty) {
+      return override.length >= 2
+          ? override.substring(0, 2).toUpperCase()
+          : override.toUpperCase();
+    }
     final words = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
     if (words.isEmpty) return '–';
     if (words.length == 1) {

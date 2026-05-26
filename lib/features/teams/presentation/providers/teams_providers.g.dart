@@ -518,12 +518,14 @@ final class MyTeamsProvider
 
 String _$myTeamsHash() => r'2c6e28eab114c9c4d04b20d8b537a2229765b21e';
 
-/// All cached teams (opponent picker).
+/// All teams visible to the signed-in user (used by match setup's opponent
+/// picker).
 
 @ProviderFor(allTeams)
 final allTeamsProvider = AllTeamsProvider._();
 
-/// All cached teams (opponent picker).
+/// All teams visible to the signed-in user (used by match setup's opponent
+/// picker).
 
 final class AllTeamsProvider
     extends
@@ -533,7 +535,8 @@ final class AllTeamsProvider
           Stream<List<Team>>
         >
     with $FutureModifier<List<Team>>, $StreamProvider<List<Team>> {
-  /// All cached teams (opponent picker).
+  /// All teams visible to the signed-in user (used by match setup's opponent
+  /// picker).
   AllTeamsProvider._()
     : super(
         from: null,
@@ -561,17 +564,17 @@ final class AllTeamsProvider
 
 String _$allTeamsHash() => r'3b977ccfee88e47c2a7f79133d32321f05e5e1d7';
 
-/// A single team (hub view), streamed from local. Null if not cached.
+/// A single team (hub view). Null if not found / not accessible.
 
 @ProviderFor(team)
 final teamProvider = TeamFamily._();
 
-/// A single team (hub view), streamed from local. Null if not cached.
+/// A single team (hub view). Null if not found / not accessible.
 
 final class TeamProvider
     extends $FunctionalProvider<AsyncValue<Team?>, Team?, Stream<Team?>>
     with $FutureModifier<Team?>, $StreamProvider<Team?> {
-  /// A single team (hub view), streamed from local. Null if not cached.
+  /// A single team (hub view). Null if not found / not accessible.
   TeamProvider._({
     required TeamFamily super.from,
     required String super.argument,
@@ -617,7 +620,7 @@ final class TeamProvider
 
 String _$teamHash() => r'33881b64e597b11b383a1d8960df7c91dc64b618';
 
-/// A single team (hub view), streamed from local. Null if not cached.
+/// A single team (hub view). Null if not found / not accessible.
 
 final class TeamFamily extends $Family
     with $FunctionalFamilyOverride<Stream<Team?>, String> {
@@ -630,7 +633,7 @@ final class TeamFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// A single team (hub view), streamed from local. Null if not cached.
+  /// A single team (hub view). Null if not found / not accessible.
 
   TeamProvider call(String teamId) =>
       TeamProvider._(argument: teamId, from: this);
@@ -639,12 +642,12 @@ final class TeamFamily extends $Family
   String toString() => r'teamProvider';
 }
 
-/// A team's roster (members + names), streamed from local.
+/// A team's roster (members + display names).
 
 @ProviderFor(roster)
 final rosterProvider = RosterFamily._();
 
-/// A team's roster (members + names), streamed from local.
+/// A team's roster (members + display names).
 
 final class RosterProvider
     extends
@@ -656,7 +659,7 @@ final class RosterProvider
     with
         $FutureModifier<List<RosterMember>>,
         $StreamProvider<List<RosterMember>> {
-  /// A team's roster (members + names), streamed from local.
+  /// A team's roster (members + display names).
   RosterProvider._({
     required RosterFamily super.from,
     required String super.argument,
@@ -703,7 +706,7 @@ final class RosterProvider
 
 String _$rosterHash() => r'1349e5783565a164ce6f2cc68d9555812348e72e';
 
-/// A team's roster (members + names), streamed from local.
+/// A team's roster (members + display names).
 
 final class RosterFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<RosterMember>>, String> {
@@ -716,7 +719,7 @@ final class RosterFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// A team's roster (members + names), streamed from local.
+  /// A team's roster (members + display names).
 
   RosterProvider call(String teamId) =>
       RosterProvider._(argument: teamId, from: this);

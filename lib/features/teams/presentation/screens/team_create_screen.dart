@@ -1,35 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/ck_button.dart';
-import '../../domain/entities/team.dart';
 import '../controllers/team_create_controller.dart';
 import '../state/team_create_state.dart';
-import '../widgets/team_avatar.dart';
+import '../widgets/team_create/tc_done.dart';
+import '../widgets/team_create/tc_overlays.dart';
+import '../widgets/team_create/tc_step_basics.dart';
+import '../widgets/team_create/tc_step_crest.dart';
+import '../widgets/team_create/tc_step_home.dart';
+import '../widgets/team_create/tc_step_identity.dart';
+import '../widgets/team_create/tc_step_review.dart';
 
-/// Preset primary/secondary colour pairs (no full picker / image upload in P1).
-const _colorPresets = <(String, String)>[
-  ('#338946', '#E24A3F'),
-  ('#E24A3F', '#161107'),
-  ('#161107', '#E6AC3D'),
-  ('#2D6CDF', '#E6AC3D'),
-  ('#7A3FD6', '#F8EAC6'),
-  ('#0E7C7B', '#E24A3F'),
-];
-
+/// "Create a team" — a 5-step wizard (Basics → Identity → Home → Crest →
+/// Review), followed by a celebration screen on successful submit. Faithful
+/// Flutter port of the matchday design (Team Creation Flow.html).
+///
+/// The Save & Exit and Ownership briefing overlays are bottom sheets
+/// surfaced from this screen.
 class TeamCreateScreen extends ConsumerWidget {
   const TeamCreateScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(teamCreateControllerProvider, (prev, next) {
-      final id = next.value?.createdTeamId;
-      if (id != null && prev?.value?.createdTeamId == null) {
-        context.go('/teams/$id/manage?justCreated=true');
-      }
       final err = next.value?.submitError;
       if (err != null && prev?.value?.submitError != err) {
         ScaffoldMessenger.of(context)
@@ -38,14 +33,16 @@ class TeamCreateScreen extends ConsumerWidget {
     });
 
     final async = ref.watch(teamCreateControllerProvider);
+
     return Scaffold(
       backgroundColor: CkColors.paper,
-      body: SafeArea(
-        child: switch (async) {
-          AsyncData(:final value) => _Wizard(state: value),
-          _ => const Center(child: CircularProgressIndicator(color: CkColors.ink)),
-        },
-      ),
+      body: switch (async) {
+        AsyncData(:final value) when value.createdTeamId != null =>
+          SafeArea(child: _DoneView(state: value)),
+        AsyncData(:final value) => SafeArea(child: _Wizard(state: value)),
+        _ => const Center(
+            child: CircularProgressIndicator(color: CkColors.ink)),
+      },
     );
   }
 }
@@ -56,473 +53,326 @@ class _Wizard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = ref.watch(teamCreateControllerProvider.notifier);
+    final controller = ref.watch(teamCreateControllerProvider.notifier);
     final stepIndex = state.step.index;
     final isLast = state.step == TeamCreateStep.review;
 
     return Column(
       children: [
-        // Top bar + progress
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: () =>
-                    stepIndex == 0 ? context.pop() : c.back(),
-                icon: const Icon(Icons.chevron_left_rounded, color: CkColors.ink),
-              ),
-              Expanded(
-                child: Text(
-                  'NEW TEAM · ${stepIndex + 1}/${TeamCreateStep.values.length}',
-                  textAlign: TextAlign.center,
-                  style: CkType.mono(fontSize: 11, color: CkColors.muted),
-                ),
-              ),
-              const SizedBox(width: 48),
-            ],
+        _TopBar(
+          onBack: () => stepIndex == 0 ? context.pop() : controller.back(),
+          onSaveExit: () => _openSaveExit(context, controller, state),
+          step: stepIndex + 1,
+          totalSteps: TeamCreateStep.values.length,
+        ),
+        _Progress(step: stepIndex + 1, totalSteps: TeamCreateStep.values.length),
+        Expanded(
+          child: _StepBody(
+            state: state,
+            controller: controller,
+            onOwnershipTap: () => showOwnershipSheet(context),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-          child: Row(
+        _Footer(
+          stepIndex: stepIndex,
+          isLast: isLast,
+          state: state,
+          controller: controller,
+          onSubmit: () => controller.submit(),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openSaveExit(BuildContext context,
+      TeamCreateController controller, TeamCreateState s) {
+    return showSaveExitSheet(
+      context,
+      step: s.step.index + 1,
+      totalSteps: TeamCreateStep.values.length,
+      onSaveAndExit: () {
+        // Draft is auto-persisted on every field change — just exit.
+        if (context.mounted) context.pop();
+      },
+      onDiscard: () {
+        controller.reset();
+        if (context.mounted) context.pop();
+      },
+    );
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({
+    required this.onBack,
+    required this.onSaveExit,
+    required this.step,
+    required this.totalSteps,
+  });
+
+  final VoidCallback onBack;
+  final VoidCallback onSaveExit;
+  final int step;
+  final int totalSteps;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 10, 14, 4),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: onBack,
+            borderRadius: BorderRadius.circular(999),
+            child: const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(Icons.chevron_left, size: 22, color: CkColors.ink),
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Text(
+                'NEW TEAM · $step/$totalSteps',
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.12,
+                  color: CkColors.muted,
+                ),
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: onSaveExit,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              child: Text(
+                'SAVE & EXIT',
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.08,
+                  color: CkColors.muted,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Progress extends StatelessWidget {
+  const _Progress({required this.step, required this.totalSteps});
+  final int step;
+  final int totalSteps;
+
+  @override
+  Widget build(BuildContext context) {
+    final stepLabels =
+        ['BASICS', 'IDENTITY', 'HOME', 'CREST', 'REVIEW'];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 6, 18, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              for (var i = 0; i < TeamCreateStep.values.length; i++) ...[
-                if (i > 0) const SizedBox(width: 6),
+              for (var i = 0; i < totalSteps; i++) ...[
+                if (i > 0) const SizedBox(width: 4),
                 Expanded(
                   child: Container(
                     height: 3,
                     decoration: BoxDecoration(
-                      color: i <= stepIndex ? CkColors.ink : CkColors.hairline,
-                      borderRadius: BorderRadius.circular(2),
+                      color: i < step ? CkColors.ink : CkColors.paper2,
+                      borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                 ),
               ],
             ],
           ),
-        ),
-        Expanded(
-          child: switch (state.step) {
-            TeamCreateStep.basics => _BasicsStep(state: state, c: c),
-            TeamCreateStep.identity => _IdentityStep(state: state, c: c),
-            TeamCreateStep.home => _HomeStep(state: state, c: c),
-            TeamCreateStep.crest => _CrestStep(state: state),
-            TeamCreateStep.review => _ReviewStep(state: state, c: c),
-          },
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-          child: CkButton(
-            label: isLast ? 'Create team' : 'Continue',
-            busy: state.submitting,
-            onPressed: _canAdvance(state)
-                ? (isLast ? c.submit : c.next)
-                : null,
+          const SizedBox(height: 8),
+          Text(
+            'STEP $step · ${stepLabels[step - 1]}',
+            style: CkType.mono(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.10,
+              color: CkColors.muted,
+            ),
           ),
-        ),
-      ],
-    );
-  }
-
-  bool _canAdvance(TeamCreateState s) => switch (s.step) {
-        TeamCreateStep.basics => s.canContinueBasics,
-        TeamCreateStep.home => s.canContinueHome,
-        _ => true,
-      };
-}
-
-// ─── Step 1: Basics ───────────────────────────────────────────────────────────
-
-class _BasicsStep extends StatefulWidget {
-  const _BasicsStep({required this.state, required this.c});
-  final TeamCreateState state;
-  final TeamCreateController c;
-  @override
-  State<_BasicsStep> createState() => _BasicsStepState();
-}
-
-class _BasicsStepState extends State<_BasicsStep> {
-  late final TextEditingController _name =
-      TextEditingController(text: widget.state.name);
-  late final TextEditingController _founded =
-      TextEditingController(text: widget.state.foundedYear ?? '');
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _founded.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = widget.state;
-    final c = widget.c;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
-      children: [
-        Text('Team basics', style: CkType.display(fontSize: 26)),
-        const SizedBox(height: 18),
-        const _Label('Team name'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _name,
-          onChanged: c.setName,
-          textCapitalization: TextCapitalization.words,
-          style: CkType.body(fontSize: 16),
-          decoration: const InputDecoration(hintText: 'Lahore Lions'),
-        ),
-        const SizedBox(height: 18),
-        const _Label('Team type'),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final t in TeamType.values)
-              _Chip(
-                label: t.name[0].toUpperCase() + t.name.substring(1),
-                active: state.type == t,
-                onTap: () => c.setType(t),
-              ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        const _Label('Founded (optional)'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _founded,
-          onChanged: c.setFoundedYear,
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(4),
-          ],
-          style: CkType.body(fontSize: 16),
-          decoration: const InputDecoration(hintText: '2019'),
-        ),
-        const SizedBox(height: 18),
-        const _Label('Privacy'),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            for (final p in TeamPrivacy.values) ...[
-              _Chip(
-                label: p.name[0].toUpperCase() + p.name.substring(1),
-                active: state.privacy == p,
-                onTap: () => c.setPrivacy(p),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-// ─── Step 2: Identity ─────────────────────────────────────────────────────────
-
-class _IdentityStep extends StatelessWidget {
-  const _IdentityStep({required this.state, required this.c});
-  final TeamCreateState state;
-  final TeamCreateController c;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
-      children: [
-        Text('Identity & colours', style: CkType.display(fontSize: 26)),
-        const SizedBox(height: 18),
-        Center(
-          child: TeamAvatar(
-            name: state.name.isEmpty ? 'New Team' : state.name,
-            primaryColor: state.primaryColor,
-            size: 84,
-            radius: 22,
-          ),
-        ),
-        const SizedBox(height: 22),
-        const _Label('Colour pair'),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final preset in _colorPresets)
-              _ColorSwatch(
-                primary: preset.$1,
-                secondary: preset.$2,
-                selected: state.primaryColor == preset.$1 &&
-                    state.secondaryColor == preset.$2,
-                onTap: () => c.setColors(preset.$1, preset.$2),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ColorSwatch extends StatelessWidget {
-  const _ColorSwatch({
-    required this.primary,
-    required this.secondary,
-    required this.selected,
-    required this.onTap,
+class _StepBody extends StatelessWidget {
+  const _StepBody({
+    required this.state,
+    required this.controller,
+    required this.onOwnershipTap,
   });
-  final String primary;
-  final String secondary;
-  final bool selected;
-  final VoidCallback onTap;
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? CkColors.ink : CkColors.hairline,
-            width: selected ? 2.5 : 1,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Row(
-          children: [
-            Expanded(child: Container(color: parseHexColor(primary))),
-            Expanded(child: Container(color: parseHexColor(secondary))),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Step 3: Home ─────────────────────────────────────────────────────────────
-
-class _HomeStep extends StatefulWidget {
-  const _HomeStep({required this.state, required this.c});
   final TeamCreateState state;
-  final TeamCreateController c;
-  @override
-  State<_HomeStep> createState() => _HomeStepState();
-}
-
-class _HomeStepState extends State<_HomeStep> {
-  late final TextEditingController _city =
-      TextEditingController(text: widget.state.city);
-  late final TextEditingController _area =
-      TextEditingController(text: widget.state.area);
-  late final TextEditingController _ground =
-      TextEditingController(text: widget.state.homeGround);
-
-  @override
-  void dispose() {
-    _city.dispose();
-    _area.dispose();
-    _ground.dispose();
-    super.dispose();
-  }
+  final TeamCreateController controller;
+  final VoidCallback onOwnershipTap;
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.c;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
-      children: [
-        Text('Home & location', style: CkType.display(fontSize: 26)),
-        const SizedBox(height: 18),
-        const _Label('City'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _city,
-          onChanged: c.setCity,
-          textCapitalization: TextCapitalization.words,
-          style: CkType.body(fontSize: 16),
-          decoration: const InputDecoration(hintText: 'Lahore'),
-        ),
-        const SizedBox(height: 18),
-        const _Label('Area / mohalla (optional)'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _area,
-          onChanged: c.setArea,
-          textCapitalization: TextCapitalization.words,
-          style: CkType.body(fontSize: 16),
-          decoration: const InputDecoration(hintText: 'Model Town'),
-        ),
-        const SizedBox(height: 18),
-        const _Label('Home ground (optional)'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _ground,
-          onChanged: c.setHomeGround,
-          textCapitalization: TextCapitalization.words,
-          style: CkType.body(fontSize: 16),
-          decoration: const InputDecoration(hintText: 'Gaddafi B Ground'),
-        ),
-      ],
-    );
+    switch (state.step) {
+      case TeamCreateStep.basics:
+        return TcStepBasics(state: state, controller: controller);
+      case TeamCreateStep.identity:
+        return TcStepIdentity(state: state, controller: controller);
+      case TeamCreateStep.home:
+        return TcStepHome(state: state, controller: controller);
+      case TeamCreateStep.crest:
+        return TcStepCrest(state: state, controller: controller);
+      case TeamCreateStep.review:
+        return TcStepReview(
+          state: state,
+          onJump: (step) => controller.goToStep(step),
+          onOwnershipTap: onOwnershipTap,
+        );
+    }
   }
 }
 
-// ─── Step 4: Crest ────────────────────────────────────────────────────────────
+class _Footer extends StatelessWidget {
+  const _Footer({
+    required this.stepIndex,
+    required this.isLast,
+    required this.state,
+    required this.controller,
+    required this.onSubmit,
+  });
 
-class _CrestStep extends StatelessWidget {
-  const _CrestStep({required this.state});
+  final int stepIndex;
+  final bool isLast;
   final TeamCreateState state;
+  final TeamCreateController controller;
+  final VoidCallback onSubmit;
 
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
-      children: [
-        Text('Crest', style: CkType.display(fontSize: 26)),
-        const SizedBox(height: 6),
-        Text('Auto-synced with your team colours. Image upload comes later.',
-            style: CkType.body(fontSize: 14, color: CkColors.muted)),
-        const SizedBox(height: 28),
-        Center(
-          child: TeamAvatar(
-            name: state.name.isEmpty ? 'New Team' : state.name,
-            primaryColor: state.primaryColor,
-            size: 120,
-            radius: 30,
-          ),
-        ),
-      ],
-    );
+  bool get _canContinue {
+    switch (state.step) {
+      case TeamCreateStep.basics:
+        return state.canContinueBasics;
+      case TeamCreateStep.home:
+        return state.canContinueHome;
+      default:
+        return true;
+    }
   }
-}
 
-// ─── Step 5: Review ───────────────────────────────────────────────────────────
-
-class _ReviewStep extends StatelessWidget {
-  const _ReviewStep({required this.state, required this.c});
-  final TeamCreateState state;
-  final TeamCreateController c;
+  String get _label {
+    if (isLast) return state.submitting ? 'Creating…' : 'Create team';
+    if (state.step == TeamCreateStep.crest) return 'Review';
+    return 'Continue';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final rows = <(String, String, TeamCreateStep)>[
-      (
-        'BASICS',
-        '${state.name} · ${state.type.name} · ${state.privacy.name}'
-            '${state.foundedYear != null && state.foundedYear!.isNotEmpty ? ' · est. ${state.foundedYear}' : ''}',
-        TeamCreateStep.basics,
+    final disabled = !_canContinue || state.submitting;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+      decoration: const BoxDecoration(
+        color: CkColors.paper,
+        border: Border(top: BorderSide(color: CkColors.hairline)),
       ),
-      (
-        'HOME',
-        state.combinedCity.isEmpty ? '—' : state.combinedCity,
-        TeamCreateStep.home,
-      ),
-      if (state.homeGround.trim().isNotEmpty)
-        ('GROUND', state.homeGround, TeamCreateStep.home),
-    ];
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
-      children: [
-        Text('Review', style: CkType.display(fontSize: 26)),
-        const SizedBox(height: 18),
-        Center(
-          child: TeamAvatar(
-            name: state.name.isEmpty ? 'New Team' : state.name,
-            primaryColor: state.primaryColor,
-            size: 72,
-          ),
-        ),
-        const SizedBox(height: 20),
-        Container(
-          decoration: BoxDecoration(
-            color: CkColors.surface,
-            borderRadius: BorderRadius.circular(CkRadii.md),
-            border: Border.all(color: CkColors.hairline),
-          ),
-          child: Column(
-            children: [
-              for (var i = 0; i < rows.length; i++)
-                InkWell(
-                  onTap: () => c.goToStep(rows[i].$3),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: i == 0
-                          ? null
-                          : const Border(
-                              top: BorderSide(color: CkColors.hairline)),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 14),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 70,
-                          child: Text(rows[i].$1,
-                              style: CkType.mono(
-                                  fontSize: 10, color: CkColors.muted)),
-                        ),
-                        Expanded(
-                          child: Text(rows[i].$2,
-                              style: CkType.body(
-                                  fontSize: 14, fontWeight: FontWeight.w500)),
-                        ),
-                        const Icon(Icons.edit_outlined,
-                            size: 16, color: CkColors.soft),
-                      ],
-                    ),
+      child: Row(
+        children: [
+          if (stepIndex > 0) ...[
+            InkWell(
+              onTap: controller.back,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                decoration: BoxDecoration(
+                  color: CkColors.paper,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: CkColors.hairline),
+                ),
+                child: Text(
+                  'Back',
+                  style: CkType.body(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: CkColors.ink,
                   ),
                 ),
-            ],
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: InkWell(
+              onTap: disabled
+                  ? null
+                  : (isLast ? onSubmit : controller.next),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: CkColors.ink.withValues(alpha: disabled ? 0.35 : 1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _label,
+                      style: CkType.body(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: CkColors.paper,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      isLast ? Icons.check_rounded : Icons.arrow_forward,
+                      size: 16,
+                      color: CkColors.paper,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-// ─── Shared bits ────────────────────────────────────────────────────────────
-
-class _Label extends StatelessWidget {
-  const _Label(this.text);
-  final String text;
-  @override
-  Widget build(BuildContext context) => Text(text,
-      style: CkType.body(
-          fontSize: 13, fontWeight: FontWeight.w600, color: CkColors.ink2));
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip(
-      {required this.label, required this.active, required this.onTap});
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
+class _DoneView extends ConsumerWidget {
+  const _DoneView({required this.state});
+  final TeamCreateState state;
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: active ? CkColors.ink : CkColors.surface,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-              color: active ? CkColors.ink : CkColors.line, width: 1.5),
-        ),
-        child: Text(label,
-            style: CkType.body(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: active ? CkColors.paper : CkColors.ink)),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return TcDone(
+      state: state,
+      onAddPlayers: () => context.go(
+        '/teams/${state.createdTeamId}/manage?justCreated=true',
       ),
+      onOpenTeam: () => context.go('/teams/${state.createdTeamId}'),
+      onScheduleFriendly: () => context.go(
+        '/matches/setup/${state.createdTeamId}',
+      ),
+      onRegisterTournament: () {
+        // No tournament route yet — a brief snack so the tap isn't silent.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tournament registration coming soon.')),
+        );
+      },
+      onCreateAnother: () =>
+          ref.read(teamCreateControllerProvider.notifier).reset(),
     );
   }
 }

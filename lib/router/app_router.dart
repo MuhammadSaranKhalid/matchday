@@ -15,6 +15,7 @@ import '../features/shell/presentation/widgets/app_shell.dart';
 import '../features/teams/presentation/screens/team_create_screen.dart';
 import '../features/teams/presentation/screens/team_hub_screen.dart';
 import '../features/teams/presentation/screens/team_manage_screen.dart';
+import '../features/teams/presentation/screens/teams_list_screen.dart';
 import '../features/matches/presentation/screens/live_match_screen.dart';
 import '../features/matches/presentation/screens/match_request_screen.dart';
 import '../features/matches/presentation/screens/match_setup_screen.dart';
@@ -130,6 +131,10 @@ GoRouter appRouter(Ref ref) {
         ],
       ),
       // Teams (full-screen, pushed over the shell). Gated by the redirect.
+      GoRoute(
+        path: '/teams',
+        builder: (_, __) => const TeamsListScreen(),
+      ),
       GoRoute(
         path: '/teams/create',
         builder: (_, __) => const TeamCreateScreen(),

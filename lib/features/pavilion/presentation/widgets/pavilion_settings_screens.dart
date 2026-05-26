@@ -506,31 +506,33 @@ class PvSettingsPrivacyBody extends StatelessWidget {
   }
 
   Widget _reportRow(_ReportRow r) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.circular(10),
-        border: Border(
-          top: const BorderSide(color: CkColors.hairline),
-          right: const BorderSide(color: CkColors.hairline),
-          bottom: const BorderSide(color: CkColors.hairline),
-          left: BorderSide(color: r.accent ?? CkColors.hairline, width: 3),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(r.title,
-              style: CkType.body(
-                  fontSize: 13, fontWeight: FontWeight.w600, height: 1.25)),
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(r.sub,
-                style: CkType.body(fontSize: 11, color: CkColors.muted)),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          border: Border(
+            top: const BorderSide(color: CkColors.hairline),
+            right: const BorderSide(color: CkColors.hairline),
+            bottom: const BorderSide(color: CkColors.hairline),
+            left: BorderSide(color: r.accent ?? CkColors.hairline, width: 3),
           ),
-        ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(r.title,
+                style: CkType.body(
+                    fontSize: 13, fontWeight: FontWeight.w600, height: 1.25)),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(r.sub,
+                  style: CkType.body(fontSize: 11, color: CkColors.muted)),
+            ),
+          ],
+        ),
       ),
     );
   }

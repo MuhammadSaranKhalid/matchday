@@ -102,22 +102,27 @@ class PvCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.circular(12),
-        border: Border(
-          top: const BorderSide(color: CkColors.hairline),
-          right: const BorderSide(color: CkColors.hairline),
-          bottom: const BorderSide(color: CkColors.hairline),
-          left: BorderSide(
-            color: accent ?? CkColors.hairline,
-            width: accent != null ? 3 : 1,
+    // Rounded corners come from the ClipRRect, not the BoxDecoration: a
+    // non-uniform Border (the 3px coloured left accent) cannot be combined
+    // with a borderRadius on the decoration itself.
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          border: Border(
+            top: const BorderSide(color: CkColors.hairline),
+            right: const BorderSide(color: CkColors.hairline),
+            bottom: const BorderSide(color: CkColors.hairline),
+            left: BorderSide(
+              color: accent ?? CkColors.hairline,
+              width: accent != null ? 3 : 1,
+            ),
           ),
         ),
+        child: child,
       ),
-      child: child,
     );
   }
 }

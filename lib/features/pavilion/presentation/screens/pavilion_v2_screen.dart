@@ -12,6 +12,7 @@
 //
 // Tokens / atoms come from circk_theme.dart + v2/v2_kit.dart.
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:novex_clean_arch/core/theme/circk_theme.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
@@ -377,22 +378,27 @@ class _PvCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.circular(12),
-        border: Border(
-          top: const BorderSide(color: CkColors.hairline),
-          right: const BorderSide(color: CkColors.hairline),
-          bottom: const BorderSide(color: CkColors.hairline),
-          left: BorderSide(
-            color: accent ?? CkColors.hairline,
-            width: accent != null ? 3 : 1,
+    // Rounded corners come from the ClipRRect, not the BoxDecoration: a
+    // non-uniform Border (the 3px coloured left accent) cannot be combined
+    // with a borderRadius on the decoration itself.
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          border: Border(
+            top: const BorderSide(color: CkColors.hairline),
+            right: const BorderSide(color: CkColors.hairline),
+            bottom: const BorderSide(color: CkColors.hairline),
+            left: BorderSide(
+              color: accent ?? CkColors.hairline,
+              width: accent != null ? 3 : 1,
+            ),
           ),
         ),
+        child: child,
       ),
-      child: child,
     );
   }
 }
@@ -661,7 +667,7 @@ class _PvHome extends StatelessWidget {
                 title: 'My teams',
                 sub: '3 teams · 1 captained',
                 meta: '3',
-                onTap: () => go('my-teams'),
+                onTap: () => context.push('/teams'),
               ),
               const SizedBox(height: 6),
               _PvRow(
@@ -1058,12 +1064,13 @@ class _PendingRequestsBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: CkColors.paper,
-        borderRadius: BorderRadius.circular(10),
-        border: const Border(
+        border: Border(
           top: BorderSide(color: CkColors.hairline),
           right: BorderSide(color: CkColors.hairline),
           bottom: BorderSide(color: CkColors.hairline),
@@ -1122,6 +1129,7 @@ class _PendingRequestsBanner extends StatelessWidget {
                 color: CkColors.amber,
               )),
         ],
+      ),
       ),
     );
   }
@@ -2209,11 +2217,12 @@ class _AgendaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: CkColors.paper,
-        borderRadius: BorderRadius.circular(10),
         border: Border(
           top: const BorderSide(color: CkColors.hairline),
           right: const BorderSide(color: CkColors.hairline),
@@ -2247,6 +2256,7 @@ class _AgendaCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -2417,12 +2427,15 @@ class _CreateSheet extends StatelessWidget {
                         topBorder: i == 0,
                         onTap: () {
                           onClose();
-                          if (_options[i].t == 'Post') {
-                            Navigator.of(context, rootNavigator: true).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const ComposerScreen(),
-                              ),
-                            );
+                          switch (_options[i].t) {
+                            case 'Post':
+                              Navigator.of(context, rootNavigator: true).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const ComposerScreen(),
+                                ),
+                              );
+                            case 'Team':
+                              context.push('/teams/create');
                           }
                         },
                       ),

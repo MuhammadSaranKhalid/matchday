@@ -24,24 +24,39 @@ String teamMonogram(String name) {
   return (words.first[0] + words.elementAt(1)[0]).toUpperCase();
 }
 
-/// The team crest: rounded square in the team's primary colour with the
-/// monogram in white (paper on dark).
+/// The team crest. Renders the uploaded logo when [logoUrl] is set; falls
+/// back to a rounded square in the team's primary colour with the monogram
+/// in paper text. [monogram] overrides the auto-derived value when set.
 class TeamAvatar extends StatelessWidget {
   const TeamAvatar({
     super.key,
     required this.name,
     this.primaryColor,
+    this.logoUrl,
+    this.monogram,
     this.size = 44,
     this.radius = 12,
   });
 
   final String name;
   final String? primaryColor;
+  final String? logoUrl;
+
+  /// 1–3 letter override. When null/blank, derived from [name].
+  final String? monogram;
+
   final double size;
   final double radius;
 
-  @override
-  Widget build(BuildContext context) {
+  String get _mono {
+    final override = monogram?.trim();
+    if (override != null && override.isNotEmpty) {
+      return override.toUpperCase();
+    }
+    return teamMonogram(name);
+  }
+
+  Widget _monoTile() {
     final bg = parseHexColor(primaryColor, fallback: CkColors.ink);
     return Container(
       width: size,
@@ -52,11 +67,33 @@ class TeamAvatar extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius),
       ),
       child: Text(
-        teamMonogram(name),
+        _mono,
         style: CkType.display(
           fontSize: size * 0.38,
           letterSpacing: -0.02,
           color: CkColors.paper,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (logoUrl == null || logoUrl!.isEmpty) return _monoTile();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Container(
+        width: size,
+        height: size,
+        color: CkColors.paper2,
+        child: Image.network(
+          logoUrl!,
+          fit: BoxFit.cover,
+          width: size,
+          height: size,
+          errorBuilder: (_, __, ___) => _monoTile(),
+          loadingBuilder: (ctx, child, progress) =>
+              progress == null ? child : _monoTile(),
         ),
       ),
     );

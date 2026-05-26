@@ -61,7 +61,14 @@ class _Manage extends ConsumerWidget {
                 onPressed: () => context.pop(),
                 icon: const Icon(Icons.chevron_left_rounded, color: CkColors.ink),
               ),
-              TeamAvatar(name: team.name, primaryColor: team.primaryColor, size: 36, radius: 10),
+              TeamAvatar(
+                name: team.name,
+                primaryColor: team.primaryColor,
+                logoUrl: team.logoUrl,
+                monogram: team.logoMonogram,
+                size: 36,
+                radius: 10,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(

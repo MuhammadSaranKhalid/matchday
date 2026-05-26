@@ -141,9 +141,12 @@ String _relativeTime(DateTime then) {
 
 CrestStyle _crestFor(Team team) => CrestStyle(
       color: parseHexColor(team.primaryColor, fallback: CkColors.ink),
-      mono: teamMonogram(team.name),
+      mono: (team.logoMonogram?.trim().isNotEmpty ?? false)
+          ? team.logoMonogram!.toUpperCase()
+          : teamMonogram(team.name),
       name: team.name,
       city: team.city,
+      logoUrl: team.logoUrl,
     );
 
 TeamMatchEntry? _pickHeroMatch(List<TeamMatchEntry> active) {

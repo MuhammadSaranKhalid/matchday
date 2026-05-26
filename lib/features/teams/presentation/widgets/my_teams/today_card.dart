@@ -203,23 +203,42 @@ class _MiniCrest extends StatelessWidget {
   const _MiniCrest({required this.crest});
   final CrestStyle crest;
 
+  Widget _mono() => Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: crest.color,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          crest.mono,
+          style: CkType.display(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.03,
+            color: CkColors.paper,
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: crest.color,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        crest.mono,
-        style: CkType.display(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.03,
-          color: CkColors.paper,
+    if (crest.logoUrl == null || crest.logoUrl!.isEmpty) return _mono();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 32,
+        height: 32,
+        color: CkColors.paper2,
+        child: Image.network(
+          crest.logoUrl!,
+          fit: BoxFit.cover,
+          width: 32,
+          height: 32,
+          errorBuilder: (_, __, ___) => _mono(),
+          loadingBuilder: (ctx, child, progress) =>
+              progress == null ? child : _mono(),
         ),
       ),
     );

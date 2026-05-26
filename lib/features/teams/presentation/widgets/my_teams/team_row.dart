@@ -103,35 +103,59 @@ class _CrestWithBadge extends StatelessWidget {
   final bool dim;
   final int? badge;
 
+  bool get _showImage =>
+      !dim && (crest.logoUrl != null && crest.logoUrl!.isNotEmpty);
+
+  Widget _monoTile() => Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: dim ? CkColors.paper2 : crest.color,
+          borderRadius: BorderRadius.circular(11),
+          border: dim
+              ? Border.all(color: CkColors.line, style: BorderStyle.solid)
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          crest.mono,
+          style: CkType.display(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.03,
+            color: dim ? CkColors.muted : CkColors.paper,
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
+    final tile = _showImage
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: Container(
+              width: 44,
+              height: 44,
+              color: CkColors.paper2,
+              child: Image.network(
+                crest.logoUrl!,
+                fit: BoxFit.cover,
+                width: 44,
+                height: 44,
+                errorBuilder: (_, __, ___) => _monoTile(),
+                loadingBuilder: (ctx, child, progress) =>
+                    progress == null ? child : _monoTile(),
+              ),
+            ),
+          )
+        : _monoTile();
     return SizedBox(
       width: 44,
       height: 44,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: dim ? CkColors.paper2 : crest.color,
-              borderRadius: BorderRadius.circular(11),
-              border: dim
-                  ? Border.all(color: CkColors.line, style: BorderStyle.solid)
-                  : null,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              crest.mono,
-              style: CkType.display(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.03,
-                color: dim ? CkColors.muted : CkColors.paper,
-              ),
-            ),
-          ),
+          tile,
           if (badge != null && badge! > 0)
             Positioned(
               top: -4,

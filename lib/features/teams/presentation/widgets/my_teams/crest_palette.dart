@@ -12,11 +12,13 @@ class CrestStyle {
     required this.mono,
     required this.name,
     this.city,
+    this.logoUrl,
   });
 
   final Color color;
 
-  /// Two-letter team monogram (e.g. "LL", "KE").
+  /// 1–3 letter team monogram (e.g. "LL", "KE"). Falls back to this when
+  /// [logoUrl] is missing or fails to load.
   final String mono;
 
   /// Full display name (e.g. "Lahore Lions").
@@ -24,6 +26,10 @@ class CrestStyle {
 
   /// Location subtitle (e.g. "Lahore · Model Town"). Optional.
   final String? city;
+
+  /// Public URL of the team's uploaded crest. When set, renderers should
+  /// prefer the image and fall back to the monogram-on-color tile on error.
+  final String? logoUrl;
 }
 
 /// The 14-team static palette used by the case fixtures (mirror of the JSX

@@ -1,40 +1,30 @@
-import 'dart:async';
-
 import 'package:fpdart/fpdart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
-import '../../../../core/sync/op_type.dart';
-import '../../../../core/sync/pending_operations_datasource.dart';
-import '../../../../core/sync/sync_service.dart';
 import '../../domain/entities/roster_member.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
-import '../../domain/entities/unclaimed_player.dart';
 import '../../domain/repositories/teams_repository.dart';
 import '../../domain/value_objects/jersey_number.dart';
 import '../../domain/value_objects/player_display_name.dart';
 import '../../domain/value_objects/team_name.dart';
-import '../datasources/teams_local_datasource.dart';
+import '../datasources/teams_remote_datasource.dart';
 
-/// Offline-first teams repository (coordinator). Reads stream from local;
-/// writes go local-first → enqueue pending op → fire-and-forget sync.
+/// Online-only teams repository. Reads stream directly from Supabase realtime;
+/// writes go straight to the server. The only place remote exceptions become
+/// [Failure]s.
 class TeamsRepositoryImpl implements TeamsRepository {
   TeamsRepositoryImpl({
-    required TeamsLocalDataSource local,
-    required PendingOperationsDataSource pendingOps,
-    required SyncService syncService,
+    required TeamsRemoteDataSource remote,
     required SupabaseClient supabase,
     Uuid? uuid,
-  })  : _local = local,
-        _pending = pendingOps,
-        _sync = syncService,
+  })  : _remote = remote,
         _supabase = supabase,
         _uuid = uuid ?? const Uuid();
 
-  final TeamsLocalDataSource _local;
-  final PendingOperationsDataSource _pending;
-  final SyncService _sync;
+  final TeamsRemoteDataSource _remote;
   final SupabaseClient _supabase;
   final Uuid _uuid;
 
@@ -48,33 +38,67 @@ class TeamsRepositoryImpl implements TeamsRepository {
 
   @override
   Stream<List<Team>> watchMyTeams(String userId) =>
-      _local.watchMyTeams(userId).handleError(
-            (Object e) => throw FailureWrapper(CacheFailure(e.toString())),
-          );
+      _remote.watchTeams().map((dtos) {
+        final mine = dtos
+            .map((d) => d.toEntity())
+            .where((t) => t.ownerId == userId || t.managers.contains(userId))
+            .toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        return mine;
+      });
 
   @override
-  Stream<List<Team>> watchAllTeams() => _local.watchAllTeams().handleError(
-        (Object e) => throw FailureWrapper(CacheFailure(e.toString())),
-      );
+  Stream<List<Team>> watchAllTeams() => _remote.watchTeams().map((dtos) {
+        final all = dtos.map((d) => d.toEntity()).toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+        return all;
+      });
 
   @override
-  Stream<Team?> watchTeam(TeamId id) => _local.watchTeam(id.value).handleError(
-        (Object e) => throw FailureWrapper(CacheFailure(e.toString())),
-      );
-
-  @override
-  Stream<List<RosterMember>> watchRoster(TeamId teamId) =>
-      _local.watchRoster(teamId.value).handleError(
-            (Object e) => throw FailureWrapper(CacheFailure(e.toString())),
-          );
+  Stream<Team?> watchTeam(TeamId id) => _remote.watchTeams().map((dtos) {
+        for (final d in dtos) {
+          if (d.teamId == id.value) return d.toEntity();
+        }
+        return null;
+      });
 
   @override
   Future<Either<Failure, Team?>> getTeam(TeamId id) async {
     try {
-      return Right(await _local.getTeam(id.value));
+      final dtos = await _remote.listTeams();
+      for (final d in dtos) {
+        if (d.teamId == id.value) return Right(d.toEntity());
+      }
+      return const Right(null);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(CacheFailure(e.toString()));
+      return Left(UnknownFailure(e.toString()));
     }
+  }
+
+  @override
+  Stream<List<RosterMember>> watchRoster(TeamId teamId) {
+    // Stream the members table; re-fetch the unclaimed-players table on each
+    // tick to resolve display names. Acceptable trade-off for online-only:
+    // renames to an unclaimed player won't reflect until the member stream
+    // pings again (typically next edit or pull-to-refresh).
+    return _remote.watchMembers().asyncMap((memberDtos) async {
+      final teamMembers =
+          memberDtos.where((m) => m.teamId == teamId.value).toList();
+      final unclaimed = await _remote.listUnclaimed();
+      final byId = {for (final u in unclaimed) u.unclaimedId: u};
+      final roster = teamMembers
+          .map((m) => RosterMember(
+                member: m.toEntity(),
+                displayName: byId[m.playerId]?.displayName ?? 'Unknown player',
+              ))
+          .toList()
+        ..sort((a, b) => a.member.joinedAt.compareTo(b.member.joinedAt));
+      return roster;
+    });
   }
 
   // ─── Writes ─────────────────────────────────────────────────────────────
@@ -92,49 +116,28 @@ class TeamsRepositoryImpl implements TeamsRepository {
     String? secondaryColor,
   }) async {
     try {
-      final userId = _requireUserId();
-      final now = DateTime.now();
-      final team = Team(
-        id: TeamId(_uuid.v4()),
-        ownerId: userId,
-        name: name.value,
-        type: type,
-        privacy: privacy,
-        managers: [userId],
-        description: description,
-        homeGround: homeGround,
-        city: city,
-        foundedYear: foundedYear,
-        primaryColor: primaryColor,
-        secondaryColor: secondaryColor,
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      await _local.upsertTeam(team);
-      await _pending.enqueue(
-        opType: OpType.create,
-        entityType: 'team',
-        entityId: team.id.value,
-        payload: {
-          'id': team.id.value,
-          'team_name': team.name,
-          'team_type': team.type.wire,
-          'privacy': team.privacy.wire,
-          'description': team.description,
-          'home_ground': team.homeGround,
-          'city': team.city,
-          'founded_year': team.foundedYear,
-          'primary_color': team.primaryColor,
-          'secondary_color': team.secondaryColor,
-        },
-      );
-      unawaited(_sync.sync());
-      return Right(team);
+      _requireUserId();
+      final dto = await _remote.createTeam({
+        'id': _uuid.v4(),
+        'team_name': name.value,
+        'team_type': type.wire,
+        'privacy': privacy.wire,
+        'description': description,
+        'home_ground': homeGround,
+        'city': city,
+        'founded_year': foundedYear,
+        'primary_color': primaryColor,
+        'secondary_color': secondaryColor,
+      });
+      return Right(dto.toEntity());
     } on StateError catch (e) {
       return Left(AuthFailure(e.message));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(CacheFailure(e.toString()));
+      return Left(UnknownFailure(e.toString()));
     }
   }
 
@@ -144,74 +147,41 @@ class TeamsRepositoryImpl implements TeamsRepository {
     required PlayerDisplayName displayName,
   }) async {
     try {
-      final userId = _requireUserId();
-      final now = DateTime.now();
-      final unclaimed = UnclaimedPlayer(
-        id: UnclaimedPlayerId(_uuid.v4()),
-        displayName: displayName.value,
-        addedBy: userId,
-        createdAt: now,
-        updatedAt: now,
-      );
-      final member = TeamMember(
-        id: MembershipId(_uuid.v4()),
-        teamId: teamId,
-        playerId: unclaimed.id.value,
-        playerType: PlayerType.unclaimed,
-        role: MemberRole.player,
-        addedBy: userId,
-        joinedAt: now,
-        updatedAt: now,
-      );
-
-      await _local.upsertUnclaimed(unclaimed);
-      await _local.upsertMember(member);
-
-      // FIFO: the unclaimed player must be pushed before the member row.
-      await _pending.enqueue(
-        opType: OpType.create,
-        entityType: 'unclaimed_player',
-        entityId: unclaimed.id.value,
-        payload: {
-          'id': unclaimed.id.value,
-          'display_name': unclaimed.displayName,
-        },
-      );
-      await _pending.enqueue(
-        opType: OpType.create,
-        entityType: 'team_member',
-        entityId: member.id.value,
-        payload: {
-          'id': member.id.value,
-          'team_id': teamId.value,
-          'player_id': unclaimed.id.value,
-          'player_type': member.playerType.wire,
-          'role': member.role.wire,
-          'jersey_number': null,
-        },
-      );
-      unawaited(_sync.sync());
+      _requireUserId();
+      final unclaimedId = _uuid.v4();
+      await _remote.createUnclaimed({
+        'id': unclaimedId,
+        'display_name': displayName.value,
+      });
+      await _remote.createMember({
+        'id': _uuid.v4(),
+        'team_id': teamId.value,
+        'player_id': unclaimedId,
+        'player_type': PlayerType.unclaimed.wire,
+        'role': MemberRole.player.wire,
+        'jersey_number': null,
+      });
       return const Right(unit);
     } on StateError catch (e) {
       return Left(AuthFailure(e.message));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(CacheFailure(e.toString()));
+      return Left(UnknownFailure(e.toString()));
     }
   }
 
   @override
   Future<Either<Failure, Unit>> removeMember(MembershipId id) async {
     try {
-      await _local.deleteMember(id.value);
-      await _pending.enqueue(
-        opType: OpType.delete,
-        entityType: 'team_member',
-        entityId: id.value,
-      );
-      unawaited(_sync.sync());
+      await _remote.deleteMember(id.value);
       return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(CacheFailure(e.toString()));
+      return Left(UnknownFailure(e.toString()));
     }
   }
 
@@ -221,37 +191,16 @@ class TeamsRepositoryImpl implements TeamsRepository {
     JerseyNumber? jersey,
   ) async {
     try {
-      final member = await _local.getMember(id.value);
-      if (member == null) {
-        return const Left(NotFoundFailure('Member not found'));
-      }
-      // Local uniqueness pre-check (the DB partial index is the backstop).
-      if (jersey != null) {
-        final roster = await _local.getMembersForTeam(member.teamId.value);
-        final clash = roster.any(
-          (m) => m.id != id && m.jerseyNumber == jersey.value,
-        );
-        if (clash) {
-          return Left(ValidationFailure('#${jersey.value} is already taken'));
-        }
-      }
-
-      final updated = member.copyWith(
-        jerseyNumber: jersey?.value,
-        clearJersey: jersey == null,
-        updatedAt: DateTime.now(),
-      );
-      await _local.upsertMember(updated);
-      await _pending.enqueue(
-        opType: OpType.update,
-        entityType: 'team_member',
-        entityId: id.value,
-        payload: {'jersey_number': jersey?.value},
-      );
-      unawaited(_sync.sync());
+      // Server's partial-unique index is the authoritative check; the remote
+      // translates code 23505 to "That jersey number is already taken".
+      await _remote.updateMember(id.value, {
+        'jersey_number': jersey?.value,
+      });
       return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(CacheFailure(e.toString()));
+      return Left(UnknownFailure(e.toString()));
     }
   }
 
@@ -261,36 +210,41 @@ class TeamsRepositoryImpl implements TeamsRepository {
     MemberRole role,
   ) async {
     try {
-      final member = await _local.getMember(id.value);
-      if (member == null) {
-        return const Left(NotFoundFailure('Member not found'));
-      }
-
-      // One captain per team: demote the current captain first.
+      // One captain per team: when promoting, demote the current captain
+      // first. Two sequential remote calls — not atomic, but acceptable for
+      // online-only (a Postgres function would be the next step if this needs
+      // to be transactional).
       if (role == MemberRole.captain) {
-        final roster = await _local.getMembersForTeam(member.teamId.value);
+        final target = await _findMember(id);
+        if (target == null) {
+          return const Left(NotFoundFailure('Member not found'));
+        }
+        final roster = (await _remote.listMembers())
+            .where((m) => m.teamId == target.teamId.value)
+            .map((m) => m.toEntity())
+            .toList();
         for (final m in roster) {
           if (m.id != id && m.role == MemberRole.captain) {
-            await _applyRole(m, MemberRole.player);
+            await _remote.updateMember(m.id.value, {
+              'role': MemberRole.player.wire,
+            });
           }
         }
       }
-
-      await _applyRole(member, role);
-      unawaited(_sync.sync());
+      await _remote.updateMember(id.value, {'role': role.wire});
       return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(CacheFailure(e.toString()));
+      return Left(UnknownFailure(e.toString()));
     }
   }
 
-  Future<void> _applyRole(TeamMember member, MemberRole role) async {
-    await _local.upsertMember(member.copyWith(role: role, updatedAt: DateTime.now()));
-    await _pending.enqueue(
-      opType: OpType.update,
-      entityType: 'team_member',
-      entityId: member.id.value,
-      payload: {'role': role.wire},
-    );
+  Future<TeamMember?> _findMember(MembershipId id) async {
+    final members = await _remote.listMembers();
+    for (final m in members) {
+      if (m.membershipId == id.value) return m.toEntity();
+    }
+    return null;
   }
 }

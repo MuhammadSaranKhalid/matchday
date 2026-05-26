@@ -43,7 +43,7 @@ final class TeamsListControllerProvider
 }
 
 String _$teamsListControllerHash() =>
-    r'7d5d57346fb8815613031843a62c11b37e019d22';
+    r'91242c30b69d313d0954fe7b116ea8f91f80766c';
 
 /// Composes the "My teams" view from three sources — the user's teams (local),
 /// their active matches (online), and the cached teams used to resolve opponent

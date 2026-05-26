@@ -1,5 +1,12 @@
 # Novex Clean Architecture — Project Guide
 
+> **🟥 ARCHITECTURAL CONSTRAINT (2026-05-26): This codebase is ONLINE-ONLY.**
+> The offline-first patterns described in some sections below (Rule 7, §6.4 Offline-First Sync, the offline variant of §5.2 / §7) are **NOT currently in use**. The `todos` reference feature, `lib/core/sync/` infrastructure, `pending_operations` queue, `TeamsLocalDataSource`, and all LWW machinery have been removed.
+>
+> When adding any new feature: follow the **online-only** variant only. Repositories talk to Supabase directly via a remote data source; reads return `Future<Either<Failure, T>>` or wrap a Supabase real-time stream; writes call the remote and translate exceptions. No drift table (except `WizardDrafts`), no pending ops, no SyncService.
+>
+> Do NOT propose offline-first patterns "for resilience" or "for faster reads." This restriction holds until explicitly lifted.
+
 This file is the source of truth for how this codebase is structured. Any agent (Claude Code or otherwise) modifying this project MUST follow these rules without exception. When in doubt, prefer the conventions documented here over patterns found elsewhere on the internet.
 
 The README.md is a human-readable overview of the same architecture. This file (CLAUDE.md) is the agent-readable contract.
@@ -8,20 +15,13 @@ The README.md is a human-readable overview of the same architecture. This file (
 
 ## 1. What this codebase is
 
-A **foundation** — not a product. It's a Flutter chassis built with Clean Architecture, Riverpod 3.x, Supabase, and offline-first persistence (drift + sync orchestrator + LWW conflict resolution). The actual product's features are unknown to this guide and will be decided by the team building on top.
+A **foundation** — not a product. It's a Flutter chassis built with Clean Architecture, Riverpod 3.x, and Supabase. As of 2026-05-26 it is **online-only** — every feature reads/writes directly against Supabase. The drift package is retained ONLY for the `WizardDrafts` table (transient multi-step form persistence); no other local DB usage exists.
 
-The codebase ships with two pre-built features. They exist for different reasons:
+History note: the codebase originally shipped with offline-first scaffolding (a `todos` reference feature, a `SyncService`, a `pending_operations` queue, LWW upserts, and a local mirror of teams). All of that was removed on 2026-05-26 per a deliberate architectural decision. Sections in this doc that describe offline-first patterns are kept as historical reference but are NOT applicable to new code — see the banner at the top.
 
-**`auth` is real.** Every product needs authentication. The auth feature (email OTP + native Google OAuth) stays in any product built on this foundation. Adapt the UI, add more providers (Apple, Facebook, magic link variants), wire in profile creation — but the feature itself is permanent infrastructure.
+The auth feature (email OTP + native Google OAuth) is permanent infrastructure for any product built on this foundation.
 
-**`todos` is a reference implementation, NOT part of the product.** It exists solely to demonstrate the offline-first pattern (local DB + pending ops queue + sync service + LWW + real-time mirror). The actual product's features will look completely different — they might be posts, messages, calendars, transactions, comments, profiles, documents, or anything else. The architectural patterns generalize to all of them; the specific entity called "Todo" does not.
-
-What to do with the `todos` feature depends on the product:
-- **Keep it indefinitely** as a learning reference for new team members.
-- **Delete it** once the team has internalized the pattern and at least one real feature has been built using the same offline-first shape: `rm -rf lib/features/todos test/features/todos`, drop the `Todos` table from `lib/core/database/tables.dart`, remove it from `@DriftDatabase`, bump `schemaVersion` and add a migration that drops the table, remove todos references from `lib/router/app_router.dart`.
-- **Replace it** with the first real offline-supported feature using the same shape.
-
-When asked to add a new feature, follow Section 7 — it's a generic recipe that works for any feature regardless of domain. Do not assume the new feature should integrate with `todos`. Do not write code that imports from `lib/features/todos/` unless you're explicitly modifying todos itself.
+When asked to add a new feature, follow Section 7 — it's a generic recipe that works for any online-only feature regardless of domain.
 
 ---
 
@@ -81,11 +81,9 @@ Riverpod imports are FORBIDDEN in:
 
 If adding a new provider would create an import cycle between files, split the provider definitions into a separate "providers-only" file (see `lib/features/todos/data/datasources/todos_datasource_providers.dart` for the pattern). Never use forward declarations, late initialization hacks, or `late final` workarounds.
 
-### Rule 7 — For offline-first features: reads from local; writes write-through to local then enqueue
+### Rule 7 — All features are online-only
 
-For any feature with offline support, the repository's read methods MUST read from the local DB. Write methods MUST write to the local DB synchronously, enqueue a pending operation, and then trigger sync (fire-and-forget). The UI never blocks on the network for either reads or writes.
-
-For online-only features, the repository's read and write methods talk to the remote data source directly. No local DB involvement.
+> **🟥 SUPERSEDED 2026-05-26.** The original Rule 7 described a split between offline-first and online-only features. As of 2026-05-26 there is no offline-first capability in this codebase. Every repository's read and write methods talk to the remote data source directly. No drift tables (except `WizardDrafts`), no pending ops, no sync service. The matches feature is the canonical online-only shape; teams was converted to match it.
 
 ---
 
@@ -102,24 +100,19 @@ lib/
 │   ├── supabase/
 │   │   └── supabase_client_provider.dart # SupabaseClient as a keepAlive provider
 │   ├── database/
-│   │   ├── tables.dart                   # drift tables: Todos, PendingOperations, WizardDrafts
-│   │   ├── app_database.dart             # @DriftDatabase class (register new tables here)
+│   │   ├── tables.dart                   # ONLY WizardDrafts (transient form state — not domain data)
+│   │   ├── app_database.dart             # @DriftDatabase class
 │   │   ├── wizard_draft_store.dart       # best-effort local persistence for multi-step wizard drafts
 │   │   └── database_provider.dart        # appDatabase + wizardDraftStore keepAlive providers
 │   ├── connectivity/
-│   │   └── connectivity_provider.dart    # Stream<bool> isOnline provider
+│   │   └── connectivity_provider.dart    # Stream<bool> isOnline provider (informational only)
 │   ├── theme/
 │   │   └── circk_theme.dart              # CkColors / CkType / CkRadii tokens + buildCirckTheme()
-│   ├── widgets/                          # shared, feature-agnostic UI (no Riverpod, no domain)
-│   │   ├── ck_button.dart                # CkButton: primary / secondary / ghost (+ busy spinner)
-│   │   ├── ck_text_field.dart            # labelled themed input with inline error/helper
-│   │   ├── ck_bottom_nav.dart            # 3-tab HOME · MATCH · PAVILION bar (presentational)
-│   │   └── ck_screen_scaffold.dart       # paper Scaffold + top bar (circk. wordmark / title / bell / avatar)
-│   └── sync/
-│       ├── sync_service.dart             # offline-first orchestrator (replay + pull + LWW); dispatches by entityType
-│       ├── sync_provider.dart            # SyncService provider, watches connectivity
-│       ├── pending_operations_datasource.dart  # SHARED queue accessor (moved out of todos)
-│       └── pending_operations_provider.dart     # pendingOperationsDataSource provider
+│   └── widgets/                          # shared, feature-agnostic UI (no Riverpod, no domain)
+│       ├── ck_button.dart                # CkButton: primary / secondary / ghost (+ busy spinner)
+│       ├── ck_text_field.dart            # labelled themed input with inline error/helper
+│       ├── ck_bottom_nav.dart            # 3-tab HOME · MATCH · PAVILION bar (presentational)
+│       └── ck_screen_scaffold.dart       # paper Scaffold + top bar (circk. wordmark / title / bell / avatar)
 ├── router/
 │   └── app_router.dart                   # go_router; auth redirect + StatefulShellRoute (3-tab shell)
 ├── app.dart                              # MaterialApp.router + bootstraps sync + DB clear on sign-out
@@ -127,12 +120,12 @@ lib/
 └── features/
     ├── auth/                             # PERMANENT — every product needs auth
     ├── onboarding/                       # PERMANENT — first-run profile (username/display name/city/player)
-    ├── shell/                            # PERMANENT — authenticated 3-tab shell (AppShell + placeholder tabs)
-    ├── teams/                            # PRODUCT — offline-first teams (create/hub/manage); 1st real offline feature
+    ├── shell/                            # PERMANENT — authenticated 5-tab shell (AppShell + tabs)
+    ├── teams/                            # PRODUCT — online-only teams (create/hub/manage)
     ├── matches/                          # PRODUCT — online-only match setup/lifecycle (F4+)
-    ├── pavilion/                         # PRODUCT — PAVILION tab profile hub (composes auth/onboarding/teams/matches)
-    ├── todos/                            # REFERENCE — delete or replace per Section 1
-    └── <your_feature>/                   # whatever the product actually needs
+    ├── posts/                            # PRODUCT — online-only feed + photo composer (F10)
+    ├── pavilion/                         # PRODUCT — PAVILION profile hub (composes auth/onboarding/teams/matches/posts)
+    └── <your_feature>/                   # online-only by default
 
 supabase/
 └── migrations/                          # ordered SQL (001_profiles.sql, 002_username_index.sql, ...)
@@ -161,7 +154,7 @@ test/
     └── presentation/controllers/<name>_test.dart   # Notifier tests with ProviderContainer.test() + overrideWithValue
 ```
 
-The shared `PendingOperations` table lives in `lib/core/database/tables.dart` so it can be reused by any offline-supported feature, not just todos. The `OpType` enum currently lists `create / update / toggle / delete`; if your feature needs different op verbs, extend the enum and handle the new variants in `lib/core/sync/sync_service.dart`'s `_executeOp` switch.
+The only drift table in this codebase is `WizardDrafts` (transient form state for multi-step wizards). All domain data lives in Supabase; no domain entity is mirrored locally.
 
 ---
 
@@ -933,9 +926,9 @@ final message = switch (result) {
 };
 ```
 
-### 6.4 Offline-First Sync
+### 6.4 Offline-First Sync — REMOVED 2026-05-26
 
-The offline-first pattern is implemented end-to-end in `lib/core/sync/` plus the `todos` reference feature. When building any feature that needs offline support, mirror this structure.
+> **🟥 SUPERSEDED.** The offline-first machinery (sync service, pending ops queue, LWW upserts, real-time mirror, todos reference) was removed from this codebase on 2026-05-26. New features must NOT reintroduce any of it. The text below is preserved as historical documentation of what the pattern looked like; it does NOT apply to current code.
 
 Three storage primitives:
 1. **Local DB (drift)** — source of truth for UI reads
@@ -1418,25 +1411,18 @@ When any of these come up for the first time, follow Section 13's guidance: exte
 
 ---
 
-## 14. The todos reference feature — quick reference
+## 14. Online-only reference features — quick map
 
-This section exists so Claude Code can look up how a specific offline-first detail is implemented in the todos reference without re-reading every file. Use it as a map, not as a template (the templates are in Section 5).
+The `todos` reference feature and all offline-first wiring were removed on 2026-05-26. The current canonical online-only references are `matches` (one-shot reads + real-time streams for live data) and `teams` (real-time stream reads + direct write-through). When you need to see how a pattern is implemented in this codebase:
 
-| Concern | File |
+| Concern | Where to look |
 |---|---|
-| Offline-first repository coordinator pattern | `lib/features/todos/data/repositories/todos_repository_impl.dart` |
-| Local data source with LWW upsert | `lib/features/todos/data/datasources/todos_local_datasource.dart` |
-| Pending operations queue accessor | `lib/features/todos/data/datasources/pending_operations_datasource.dart` |
-| Remote data source with Supabase + real-time stream | `lib/features/todos/data/datasources/todos_remote_datasource.dart` |
-| StreamNotifier-based controller (thin actions) | `lib/features/todos/presentation/controllers/todos_controller.dart` |
-| AsyncValue.when in screen with pull-to-refresh | `lib/features/todos/presentation/screens/todos_screen.dart` |
-| Provider DAG split (datasource providers separate file) | `lib/features/todos/data/datasources/todos_datasource_providers.dart` |
-| Sync service orchestration | `lib/core/sync/sync_service.dart` |
-| Sync triggers (boot, connectivity, listen) | `lib/core/sync/sync_provider.dart` |
-| Drift schema + PendingOperations table | `lib/core/database/tables.dart` |
-| `OpType` enum (extend if new verbs needed) | `lib/core/database/tables.dart` |
-
-When the todos feature is deleted from a product, update this section to point at whichever real feature now demonstrates each concern (or remove the section entirely if the patterns are sufficiently internalized by the team).
+| Online-only repository (one-shot + stream reads, direct writes, exception translation) | `lib/features/matches/data/repositories/matches_repository_impl.dart` |
+| Real-time stream reads via Supabase | `lib/features/teams/data/repositories/teams_repository_impl.dart` (`watch*` methods) |
+| Remote data source pattern | `lib/features/matches/data/datasources/matches_remote_datasource.dart` |
+| AsyncNotifier composing cross-feature providers | `lib/features/teams/presentation/controllers/teams_list_controller.dart` |
+| Provider DI shape | `lib/features/teams/presentation/providers/teams_providers.dart`, `lib/features/matches/presentation/providers/matches_providers.dart` |
+| Wizard draft persistence (the only drift use) | `lib/core/database/wizard_draft_store.dart` + `lib/core/database/tables.dart` |
 ---
 
 ## 15. Posts feature + image/media spec

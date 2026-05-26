@@ -7,19 +7,19 @@ import '../value_objects/jersey_number.dart';
 import '../value_objects/player_display_name.dart';
 import '../value_objects/team_name.dart';
 
-/// Offline-first teams contract. Reads stream from the local DB; writes go
-/// local-first then enqueue a pending op and nudge sync.
+/// Online-only teams contract. Reads stream from Supabase realtime; writes
+/// go straight to the server.
 abstract class TeamsRepository {
-  // ─── Reads (local) ─────────────────────────────────────────────────────
+  // ─── Reads ─────────────────────────────────────────────────────────────
   Stream<List<Team>> watchMyTeams(String userId);
 
-  /// All cached teams (for picking an opponent).
+  /// All teams the signed-in user can see (for picking an opponent).
   Stream<List<Team>> watchAllTeams();
   Stream<Team?> watchTeam(TeamId id);
   Future<Either<Failure, Team?>> getTeam(TeamId id);
   Stream<List<RosterMember>> watchRoster(TeamId teamId);
 
-  // ─── Writes (local-first) ──────────────────────────────────────────────
+  // ─── Writes ────────────────────────────────────────────────────────────
   Future<Either<Failure, Team>> createTeam({
     required TeamName name,
     required TeamType type,

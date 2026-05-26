@@ -1,8 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/usecase/usecase.dart';
-import '../../../../core/sync/pending_operations_provider.dart';
-import '../../../../core/sync/sync_provider.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/datasources/teams_datasource_providers.dart';
 import '../../data/repositories/teams_repository_impl.dart';
@@ -24,9 +22,7 @@ part 'teams_providers.g.dart';
 
 @Riverpod(keepAlive: true)
 TeamsRepository teamsRepository(Ref ref) => TeamsRepositoryImpl(
-      local: ref.watch(teamsLocalDataSourceProvider),
-      pendingOps: ref.watch(pendingOperationsDataSourceProvider),
-      syncService: ref.watch(syncServiceProvider),
+      remote: ref.watch(teamsRemoteDataSourceProvider),
       supabase: ref.watch(supabaseClientProvider),
     );
 

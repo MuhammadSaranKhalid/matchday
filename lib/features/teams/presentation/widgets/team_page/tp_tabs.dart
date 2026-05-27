@@ -25,26 +25,18 @@ class TpTabs extends StatelessWidget {
         color: CkColors.paper,
         border: Border(bottom: BorderSide(color: CkColors.hairline)),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: MediaQuery.of(context).size.width,
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              children: [
-                for (final t in items)
-                  Expanded(
-                    child: _Tab(
-                      item: t,
-                      isActive: t.id == active,
-                      onTap: () => onSelect(t.id),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            for (final t in items)
+              Expanded(
+                child: _Tab(
+                  item: t,
+                  isActive: t.id == active,
+                  onTap: () => onSelect(t.id),
+                ),
+              ),
+          ],
         ),
       ),
     );

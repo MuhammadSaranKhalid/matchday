@@ -126,6 +126,7 @@ class TeamRowVm {
   const TeamRowVm({
     required this.crest,
     required this.role,
+    this.teamId,
     this.jersey,
     this.meta,
     this.verified = false,
@@ -135,6 +136,11 @@ class TeamRowVm {
 
   final CrestStyle crest;
   final MyTeamsRole role;
+
+  /// The team's id when this row maps to a real backend record. Null for
+  /// fixture rows (cases gallery / static mocks). The screen uses this to
+  /// route to `/teams/$teamId` on tap.
+  final String? teamId;
 
   /// Jersey number when the user plays in this team.
   final int? jersey;

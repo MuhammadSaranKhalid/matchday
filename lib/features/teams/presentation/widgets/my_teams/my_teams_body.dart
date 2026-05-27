@@ -27,6 +27,7 @@ class MyTeamsBody extends StatelessWidget {
     this.onBack,
     this.onSelectFilter,
     this.onCreate,
+    this.onTeamTap,
   });
 
   final MyTeamsView view;
@@ -36,6 +37,10 @@ class MyTeamsBody extends StatelessWidget {
   final VoidCallback? onBack;
   final ValueChanged<MyTeamsFilter>? onSelectFilter;
   final VoidCallback? onCreate;
+
+  /// Tapping any [TeamRow] with a non-null `teamId` invokes this with the
+  /// id. Screen wires it to navigate to `/teams/$id`.
+  final ValueChanged<String>? onTeamTap;
 
   int get _totalActive {
     final t = view.teams;
@@ -85,7 +90,13 @@ class MyTeamsBody extends StatelessWidget {
                   counts: counts,
                   onSelect: onSelectFilter,
                 ),
-              Expanded(child: _Scroll(view: view, onCreate: onCreate)),
+              Expanded(
+                child: _Scroll(
+                  view: view,
+                  onCreate: onCreate,
+                  onTeamTap: onTeamTap,
+                ),
+              ),
             ],
           ),
           if (!view.isEmpty)
@@ -101,9 +112,20 @@ class MyTeamsBody extends StatelessWidget {
 }
 
 class _Scroll extends StatelessWidget {
-  const _Scroll({required this.view, required this.onCreate});
+  const _Scroll({
+    required this.view,
+    required this.onCreate,
+    required this.onTeamTap,
+  });
   final MyTeamsView view;
   final VoidCallback? onCreate;
+  final ValueChanged<String>? onTeamTap;
+
+  VoidCallback? _tapFor(TeamRowVm vm) {
+    final id = vm.teamId;
+    if (id == null || onTeamTap == null) return null;
+    return () => onTeamTap!(id);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -147,11 +169,11 @@ class _Scroll extends StatelessWidget {
       children.add(Subhead('You lead', count: leadCount));
       var first = true;
       for (final row in t.captain) {
-        children.add(TeamRow(vm: row, isFirst: first));
+        children.add(TeamRow(vm: row, isFirst: first, onTap: _tapFor(row)));
         first = false;
       }
       for (final row in t.vc) {
-        children.add(TeamRow(vm: row, isFirst: first));
+        children.add(TeamRow(vm: row, isFirst: first, onTap: _tapFor(row)));
         first = false;
       }
     }
@@ -160,7 +182,8 @@ class _Scroll extends StatelessWidget {
     if (t.playing.isNotEmpty) {
       children.add(Subhead('You play', count: t.playing.length));
       for (var i = 0; i < t.playing.length; i++) {
-        children.add(TeamRow(vm: t.playing[i], isFirst: i == 0));
+        children.add(TeamRow(
+            vm: t.playing[i], isFirst: i == 0, onTap: _tapFor(t.playing[i])));
       }
     }
 
@@ -171,15 +194,15 @@ class _Scroll extends StatelessWidget {
       children.add(Subhead('You manage', count: manageCount));
       var first = true;
       for (final row in t.manage) {
-        children.add(TeamRow(vm: row, isFirst: first));
+        children.add(TeamRow(vm: row, isFirst: first, onTap: _tapFor(row)));
         first = false;
       }
       for (final row in t.draft) {
-        children.add(TeamRow(vm: row, isFirst: first));
+        children.add(TeamRow(vm: row, isFirst: first, onTap: _tapFor(row)));
         first = false;
       }
       for (final row in t.scorer) {
-        children.add(TeamRow(vm: row, isFirst: first));
+        children.add(TeamRow(vm: row, isFirst: first, onTap: _tapFor(row)));
         first = false;
       }
     }
@@ -194,7 +217,8 @@ class _Scroll extends StatelessWidget {
         ),
       );
       for (var i = 0; i < t.pending.length; i++) {
-        children.add(TeamRow(vm: t.pending[i], isFirst: i == 0));
+        children.add(TeamRow(
+            vm: t.pending[i], isFirst: i == 0, onTap: _tapFor(t.pending[i])));
       }
     }
 
@@ -202,7 +226,10 @@ class _Scroll extends StatelessWidget {
     if (view.following.isNotEmpty) {
       children.add(Subhead('Following', count: view.following.length));
       for (var i = 0; i < view.following.length; i++) {
-        children.add(TeamRow(vm: view.following[i], isFirst: i == 0));
+        children.add(TeamRow(
+            vm: view.following[i],
+            isFirst: i == 0,
+            onTap: _tapFor(view.following[i])));
       }
     }
 
@@ -211,7 +238,12 @@ class _Scroll extends StatelessWidget {
       children.add(Subhead('Archived', count: t.archived.length));
       for (var i = 0; i < t.archived.length; i++) {
         children.add(
-          TeamRow(vm: t.archived[i], isFirst: i == 0, withChevron: false),
+          TeamRow(
+            vm: t.archived[i],
+            isFirst: i == 0,
+            withChevron: false,
+            onTap: _tapFor(t.archived[i]),
+          ),
         );
       }
     }

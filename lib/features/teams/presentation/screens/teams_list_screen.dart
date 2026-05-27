@@ -52,6 +52,7 @@ class _TeamsListScreenState extends ConsumerState<TeamsListScreen> {
                 onBack: () => context.pop(),
                 onSelectFilter: (f) => setState(() => _filter = f),
                 onCreate: () => context.push('/teams/create'),
+                onTeamTap: (id) => context.push('/teams/$id'),
               ),
             ),
           AsyncError() => _ErrorState(onBack: () => context.pop()),

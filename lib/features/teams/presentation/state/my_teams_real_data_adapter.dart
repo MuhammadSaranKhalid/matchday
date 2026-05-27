@@ -46,6 +46,7 @@ MyTeamsView buildMyTeamsViewFromReal({
     final row = TeamRowVm(
       crest: _crestFor(team),
       role: role,
+      teamId: team.id.value,
       meta: team.city,
     );
     if (role == MyTeamsRole.captain || role == MyTeamsRole.manager) {
@@ -82,6 +83,7 @@ MyTeamsView buildMyTeamsViewFromReal({
       TeamRowVm(
         crest: captainBucket.first.crest,
         role: captainBucket.first.role,
+        teamId: team.id.value,
         meta: 'You · ${_relativeTime(team.createdAt)}',
       ),
     ];

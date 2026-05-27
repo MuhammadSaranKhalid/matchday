@@ -2,6 +2,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
+import '../../domain/entities/player_skills.dart';
 import '../../domain/entities/roster_member.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
@@ -158,12 +159,25 @@ class TeamsRepositoryImpl implements TeamsRepository {
   Future<Either<Failure, Unit>> addUnclaimedPlayer({
     required TeamId teamId,
     required PlayerDisplayName displayName,
+    JerseyNumber? jerseyNumber,
+    PlayingRole? playingRole,
+    BattingStyle? battingStyle,
+    BowlingStyle? bowlingStyle,
   }) async {
+    // TODO: wrap createUnclaimed + createMember in a Postgres RPC so a
+    // failure on the membership insert doesn't leave an orphaned
+    // unclaimed_players row.
     try {
       final unclaimedId = _uuid.v4();
+      final profile = <String, dynamic>{
+        if (playingRole != null) 'playing_role': playingRole.wire,
+        if (battingStyle != null) 'batting_style': battingStyle.wire,
+        if (bowlingStyle != null) 'bowling_style': bowlingStyle.wire,
+      };
       await _remote.createUnclaimed({
         'id': unclaimedId,
         'display_name': displayName.value,
+        if (profile.isNotEmpty) 'player_profile': profile,
       });
       await _remote.createMember({
         'id': _uuid.v4(),
@@ -171,7 +185,7 @@ class TeamsRepositoryImpl implements TeamsRepository {
         'player_id': unclaimedId,
         'player_type': PlayerType.unclaimed.wire,
         'role': MemberRole.player.wire,
-        'jersey_number': null,
+        'jersey_number': jerseyNumber?.value,
       });
       return const Right(unit);
     } on UnauthorizedException catch (e) {

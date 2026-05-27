@@ -12,6 +12,7 @@ import '../features/notifications/presentation/screens/notifications_bell_screen
 import '../features/pavilion/presentation/screens/pavilion_v2_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
+import '../features/teams/presentation/screens/add_unclaimed_player_screen.dart';
 import '../features/teams/presentation/screens/team_create_screen.dart';
 import '../features/teams/presentation/screens/team_page_screen.dart';
 import '../features/teams/presentation/screens/team_manage_screen.dart';
@@ -148,6 +149,12 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) => TeamManageScreen(
           teamId: state.pathParameters['teamId']!,
           justCreated: state.uri.queryParameters['justCreated'] == 'true',
+        ),
+      ),
+      GoRoute(
+        path: '/teams/:teamId/add-unclaimed',
+        builder: (_, state) => AddUnclaimedPlayerScreen(
+          teamId: state.pathParameters['teamId']!,
         ),
       ),
       GoRoute(

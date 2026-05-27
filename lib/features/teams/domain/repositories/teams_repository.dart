@@ -1,5 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
+import '../entities/player_skills.dart';
 import '../entities/roster_member.dart';
 import '../entities/team.dart';
 import '../entities/team_member.dart';
@@ -45,10 +46,16 @@ abstract class TeamsRepository {
   });
 
   /// Adds a player by name: creates an unclaimed_players row + a team_members
-  /// row pointing at it (player_type = unclaimed).
+  /// row pointing at it (player_type = unclaimed). Jersey number is set on
+  /// the membership row; playing-skill enums are stashed in the unclaimed
+  /// player's `player_profile` jsonb for display in the squad list.
   Future<Either<Failure, Unit>> addUnclaimedPlayer({
     required TeamId teamId,
     required PlayerDisplayName displayName,
+    JerseyNumber? jerseyNumber,
+    PlayingRole? playingRole,
+    BattingStyle? battingStyle,
+    BowlingStyle? bowlingStyle,
   });
 
   Future<Either<Failure, Unit>> removeMember(MembershipId id);

@@ -77,6 +77,7 @@ class _LoadedBody extends ConsumerWidget {
             .toList();
 
     return _TeamPageBody(
+      teamId: teamId,
       view: buildTeamPageViewFromReal(
         team: team,
         roster: rosterAsync.value ?? const [],
@@ -392,7 +393,9 @@ String _short(String uid) => uid.length <= 8 ? uid : uid.substring(0, 8);
 /// active tab body. Local `_active` state; everything else flows from the
 /// [TeamPageView] in.
 class _TeamPageBody extends StatefulWidget {
-  const _TeamPageBody({required this.view, this.onBack});
+  const _TeamPageBody({required this.teamId, required this.view, this.onBack});
+
+  final String teamId;
 
   final TeamPageView view;
   final VoidCallback? onBack;
@@ -424,6 +427,7 @@ class _TeamPageBodyState extends State<_TeamPageBody> {
     switch (_active) {
       case TeamPageTab.squad:
         return _SquadTab(
+          teamId: widget.teamId,
           team: widget.view.team,
           viewer: widget.view.viewer,
           viewerPlayerId: widget.view.viewerPlayerId,
@@ -1520,14 +1524,19 @@ String _tpTabLabel(TeamPageTab t) {
 
 class _SquadTab extends StatelessWidget {
   const _SquadTab({
+    required this.teamId,
     required this.team,
     required this.viewer,
     this.viewerPlayerId,
   });
 
+  final String teamId;
   final TpTeam team;
   final TeamPageViewer viewer;
   final String? viewerPlayerId;
+
+  bool get _canAddPlayers =>
+      viewer == TeamPageViewer.owner || viewer == TeamPageViewer.captain;
 
   bool get _isOwnerEmpty =>
       viewer == TeamPageViewer.owner && team.squad.length <= 1;
@@ -1547,7 +1556,11 @@ class _SquadTab extends StatelessWidget {
     }
     if (_privateGated) return _PrivateGate(team: team);
     if (_isOwnerEmpty) {
-      return _OwnerOnboarding(team: team, viewerPlayerId: viewerPlayerId);
+      return _OwnerOnboarding(
+        teamId: teamId,
+        team: team,
+        viewerPlayerId: viewerPlayerId,
+      );
     }
 
     final lead =
@@ -1563,6 +1576,20 @@ class _SquadTab extends StatelessWidget {
         team.squad.where((p) => p.role == TpPlayerRole.player).toList();
 
     final builders = <WidgetBuilder>[];
+    if (_canAddPlayers) {
+      builders.add(
+        (ctx) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+          child: _AddOption(
+            primary: true,
+            icon: Icons.person_add_alt_1,
+            title: 'Add player',
+            sub: 'Search registered, or add as unclaimed',
+            onTap: () => ctx.push('/teams/$teamId/add-unclaimed'),
+          ),
+        ),
+      );
+    }
     builders.add((_) => _FilterChips());
     if (lead.isNotEmpty) {
       builders.add(
@@ -1668,7 +1695,12 @@ class _PrivateGate extends StatelessWidget {
 }
 
 class _OwnerOnboarding extends StatelessWidget {
-  const _OwnerOnboarding({required this.team, required this.viewerPlayerId});
+  const _OwnerOnboarding({
+    required this.teamId,
+    required this.team,
+    required this.viewerPlayerId,
+  });
+  final String teamId;
   final TpTeam team;
   final String? viewerPlayerId;
 
@@ -1736,10 +1768,11 @@ class _OwnerOnboarding extends StatelessWidget {
           sub: 'Phone number → download link',
         ),
         const SizedBox(height: 8),
-        const _AddOption(
+        _AddOption(
           icon: Icons.person_outline,
           title: 'Add as unclaimed',
           sub: 'Just a name — they can claim later',
+          onTap: () => context.push('/teams/$teamId/add-unclaimed'),
         ),
         const SizedBox(height: 22),
         Padding(
@@ -1818,15 +1851,17 @@ class _AddOption extends StatelessWidget {
     required this.title,
     required this.sub,
     this.primary = false,
+    this.onTap,
   });
   final IconData icon;
   final String title;
   final String sub;
   final bool primary;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: primary ? CkColors.ink : CkColors.paper,
@@ -1890,6 +1925,16 @@ class _AddOption extends StatelessWidget {
                     : CkColors.muted,
           ),
         ],
+      ),
+    );
+
+    if (onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: card,
       ),
     );
   }

@@ -161,6 +161,8 @@ class TeamsRemoteDataSource {
           .insert({
             'unclaimed_id': payload['id'],
             'display_name': payload['display_name'],
+            if (payload['player_profile'] != null)
+              'player_profile': payload['player_profile'],
             'added_by': _requireUid(),
           })
           .select()

@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../domain/entities/player_skills.dart';
 import '../../domain/entities/unclaimed_player.dart';
 
 part 'unclaimed_player_dto.freezed.dart';
@@ -13,6 +14,9 @@ abstract class UnclaimedPlayerDto with _$UnclaimedPlayerDto {
     @JsonKey(name: 'added_by') required String addedBy,
     @JsonKey(name: 'created_at') required String createdAt,
     @JsonKey(name: 'updated_at') required String updatedAt,
+    @JsonKey(name: 'player_profile')
+    @Default(<String, dynamic>{})
+    Map<String, dynamic> playerProfile,
   }) = _UnclaimedPlayerDto;
 
   const UnclaimedPlayerDto._();
@@ -26,5 +30,10 @@ abstract class UnclaimedPlayerDto with _$UnclaimedPlayerDto {
         addedBy: addedBy,
         createdAt: DateTime.parse(createdAt),
         updatedAt: DateTime.parse(updatedAt),
+        playingRole: PlayingRole.fromWire(playerProfile['playing_role'] as String?),
+        battingStyle:
+            BattingStyle.fromWire(playerProfile['batting_style'] as String?),
+        bowlingStyle:
+            BowlingStyle.fromWire(playerProfile['bowling_style'] as String?),
       );
 }

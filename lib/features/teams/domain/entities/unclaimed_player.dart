@@ -1,5 +1,8 @@
+import 'player_skills.dart';
+
 /// A player added to a team by name only — no Circk account yet. The claim
-/// flow (unclaimed → claimed) is v1.1; for Phase 1 these just hold a name.
+/// flow (unclaimed → claimed) is v1.1; for Phase 1 these just hold a name,
+/// plus optional playing-skill metadata persisted to `player_profile` jsonb.
 class UnclaimedPlayer {
   const UnclaimedPlayer({
     required this.id,
@@ -7,6 +10,9 @@ class UnclaimedPlayer {
     required this.addedBy,
     required this.createdAt,
     required this.updatedAt,
+    this.playingRole,
+    this.battingStyle,
+    this.bowlingStyle,
   });
 
   final UnclaimedPlayerId id;
@@ -14,6 +20,9 @@ class UnclaimedPlayer {
   final String addedBy;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final PlayingRole? playingRole;
+  final BattingStyle? battingStyle;
+  final BowlingStyle? bowlingStyle;
 
   @override
   bool operator ==(Object other) =>
@@ -22,10 +31,21 @@ class UnclaimedPlayer {
           other.id == id &&
           other.displayName == displayName &&
           other.addedBy == addedBy &&
-          other.updatedAt == updatedAt;
+          other.updatedAt == updatedAt &&
+          other.playingRole == playingRole &&
+          other.battingStyle == battingStyle &&
+          other.bowlingStyle == bowlingStyle;
 
   @override
-  int get hashCode => Object.hash(id, displayName, addedBy, updatedAt);
+  int get hashCode => Object.hash(
+        id,
+        displayName,
+        addedBy,
+        updatedAt,
+        playingRole,
+        battingStyle,
+        bowlingStyle,
+      );
 }
 
 class UnclaimedPlayerId {

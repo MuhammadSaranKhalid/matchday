@@ -1,137 +1,1936 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../../core/widgets/v2/v2_kit.dart';
 import '../controllers/teams_list_controller.dart';
-import '../state/my_teams_real_data_adapter.dart';
 import '../state/my_teams_view.dart';
-import '../widgets/my_teams/my_teams_body.dart';
+import '../widgets/my_teams/crest_palette.dart';
+import '../widgets/my_teams/role_pill.dart';
 
 /// "My teams" — the faithful Flutter realisation of the matchday v2 design
-/// (`design/screens/MyTeams.jsx`). The screen renders the [MyTeamsBody]
-/// driven by a [MyTeamsView] built from real provider data via
-/// [buildMyTeamsViewFromReal]. Sections only appear when their data is
-/// non-empty, so the same widget tree covers every state — empty, first
-/// team, active player, today live, captain, manager, archived, …
-class TeamsListScreen extends ConsumerStatefulWidget {
+/// (`design/screens/MyTeams.jsx`). [TeamsListController] builds the
+/// [MyTeamsView] (including the active filter) directly from provider data, so
+/// this screen is a pure renderer: it watches the view and forwards user
+/// affordances back to the controller / router.
+class TeamsListScreen extends ConsumerWidget {
   const TeamsListScreen({super.key});
 
+  static const _filterChipDefs = [
+    (MyTeamsFilter.all, 'All'),
+    (MyTeamsFilter.playing, 'Playing'),
+    (MyTeamsFilter.managing, 'Manage'),
+    (MyTeamsFilter.following, 'Following'),
+    (MyTeamsFilter.archived, 'Archived'),
+  ];
+
   @override
-  ConsumerState<TeamsListScreen> createState() => _TeamsListScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncView = ref.watch(teamsListControllerProvider);
+    final controller = ref.read(teamsListControllerProvider.notifier);
 
-class _TeamsListScreenState extends ConsumerState<TeamsListScreen> {
-  MyTeamsFilter _filter = MyTeamsFilter.all;
+    switch (asyncView) {
+      // ── Loaded — the whole screen as one tree. Sections only appear
+      //    when their list/value is non-empty, so each case stays
+      //    focused. ──────────────────────────────────────────────────
+      case AsyncData(value: final view):
+        final t = view.teams;
+        final totalActive =
+            t.captain.length +
+            t.vc.length +
+            t.playing.length +
+            t.manage.length +
+            t.scorer.length +
+            t.draft.length +
+            t.pending.length;
+        final leadCount = t.captain.length + t.vc.length;
+        final manageCount = t.manage.length + t.draft.length + t.scorer.length;
+        final counts = <MyTeamsFilter, int>{
+          MyTeamsFilter.all:
+              totalActive + view.following.length + t.archived.length,
+          MyTeamsFilter.playing:
+              t.vc.length + t.playing.length + t.captain.length,
+          MyTeamsFilter.managing:
+              t.manage.length + t.draft.length + t.scorer.length,
+          MyTeamsFilter.following: view.following.length,
+          MyTeamsFilter.archived: t.archived.length,
+        };
+        final showChips = !view.isEmpty && (counts[MyTeamsFilter.all] ?? 0) > 1;
 
-  @override
-  Widget build(BuildContext context) {
-    final view = ref.watch(teamsListControllerProvider);
-    final userId =
-        ref.watch(currentUserStreamProvider).value?.id.value ?? '';
+        // Filter chips — visible filters for the segmented row (All always shows;
+        // others only when their count > 0).
+        final visibleChips =
+            _filterChipDefs
+                .where(
+                  (p) => p.$1 == MyTeamsFilter.all || (counts[p.$1] ?? 0) > 0,
+                )
+                .toList();
 
-    return Scaffold(
-      backgroundColor: CkColors.paper,
-      body: SafeArea(
-        bottom: false,
-        child: switch (view) {
-          AsyncData(:final value) => RefreshIndicator(
+        return Scaffold(
+          backgroundColor: CkColors.paper,
+          body: SafeArea(
+            bottom: false,
+            child: RefreshIndicator(
               color: CkColors.ink,
-              onRefresh: () =>
-                  ref.read(teamsListControllerProvider.notifier).refresh(),
-              child: MyTeamsBody(
-                view: _applyFilter(
-                  buildMyTeamsViewFromReal(
-                    source: value,
-                    userId: userId,
-                    onAddPlayers: (teamId) =>
-                        context.push('/teams/$teamId/manage'),
-                  ),
+              onRefresh: controller.refresh,
+              child: ColoredBox(
+                color: CkColors.paper,
+                child: Stack(
+                  children: [
+                    Column(
+                      children: [
+                        // ── Header — back chevron, title (with optional `· N`
+                        //    count), and subtitle. ─────────────────────────
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(6, 6, 18, 12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              InkWell(
+                                onTap: () => context.pop(),
+                                borderRadius: BorderRadius.circular(999),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(8),
+                                  child: Icon(
+                                    Icons.chevron_left,
+                                    size: 22,
+                                    color: CkColors.ink,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.baseline,
+                                      textBaseline: TextBaseline.alphabetic,
+                                      children: [
+                                        Text(
+                                          'My teams',
+                                          style: CkType.display(
+                                            fontSize: 26,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: -0.025,
+                                          ),
+                                        ),
+                                        if (totalActive > 0) ...[
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '· $totalActive',
+                                            style: CkType.mono(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 0.10,
+                                              color: CkColors.muted,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    if (view.subtitle != null) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        view.subtitle!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: CkType.body(
+                                          fontSize: 12,
+                                          color: CkColors.muted,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // ── Filter chips: All / Playing / Manage / Following /
+                        //    Archived. Hidden chips for zero-count filters. ──
+                        if (showChips)
+                          SizedBox(
+                            height: 32,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+                              itemCount: visibleChips.length,
+                              separatorBuilder:
+                                  (_, __) => const SizedBox(width: 6),
+                              itemBuilder: (_, i) {
+                                final (filter, label) = visibleChips[i];
+                                final isActive = filter == view.activeFilter;
+                                final count = counts[filter] ?? 0;
+                                return InkWell(
+                                  onTap: () => controller.setFilter(filter),
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 11,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          isActive
+                                              ? CkColors.ink
+                                              : CkColors.paper,
+                                      borderRadius: BorderRadius.circular(999),
+                                      border:
+                                          isActive
+                                              ? null
+                                              : Border.all(
+                                                color: CkColors.hairline,
+                                              ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          label,
+                                          style: CkType.body(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color:
+                                                isActive
+                                                    ? CkColors.paper
+                                                    : CkColors.ink2,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          '$count',
+                                          style: CkType.mono(
+                                            fontSize: 8.5,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.10,
+                                            color:
+                                                isActive
+                                                    ? CkColors.paper.withValues(
+                                                      alpha: 0.55,
+                                                    )
+                                                    : CkColors.muted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        Expanded(
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(bottom: 12),
+                            children: [
+                              // ── Empty-state card — dashed border, faded crest
+                              //    trio (LL · MK · GG), headline + body + Create
+                              //    button. ───────────────────────────────────
+                              if (view.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    18,
+                                    20,
+                                    18,
+                                    0,
+                                  ),
+                                  child: CustomPaint(
+                                    painter: _EmptyDashedBorderPainter(
+                                      color: CkColors.line,
+                                      radius: 16,
+                                      strokeWidth: 1.2,
+                                      dashLength: 5,
+                                      dashGap: 4,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        20,
+                                        24,
+                                        20,
+                                        24,
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              _dimCrest(MyTeamsCrests.ll),
+                                              _dimCrest(MyTeamsCrests.mk),
+                                              _dimCrest(MyTeamsCrests.gg),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            'No teams yet',
+                                            textAlign: TextAlign.center,
+                                            style: CkType.display(
+                                              fontSize: 19,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: -0.025,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                            ),
+                                            child: Text(
+                                              'Start your mohalla side, claim your spot on a team, or follow the clubs you watch every Sunday.',
+                                              textAlign: TextAlign.center,
+                                              style: CkType.body(
+                                                fontSize: 13,
+                                                color: CkColors.ink2,
+                                                height: 1.5,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: InkWell(
+                                                  onTap:
+                                                      () => context.push(
+                                                        '/teams/create',
+                                                      ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                  child: Container(
+                                                    height: 42,
+                                                    alignment: Alignment.center,
+                                                    decoration: BoxDecoration(
+                                                      color: CkColors.ink,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            10,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      'Create a team',
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      style: CkType.body(
+                                                        fontSize: 13,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: CkColors.paper,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              // "Find teams near you" intentionally
+                                              // hidden — discovery backend isn't
+                                              // wired yet. Restore when ready.
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                              // ── "STATUS · WHAT NEEDS YOU" banner ────────
+                              if (view.needsYou.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    14,
+                                    0,
+                                    14,
+                                    4,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          4,
+                                          0,
+                                          4,
+                                          8,
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.baseline,
+                                          textBaseline: TextBaseline.alphabetic,
+                                          children: [
+                                            Text(
+                                              'STATUS · WHAT NEEDS YOU',
+                                              style: CkType.mono(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w600,
+                                                letterSpacing: 0.10,
+                                                color: CkColors.red,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: CkColors.ink,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                '${view.needsYou.length}',
+                                                style: CkType.mono(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.10,
+                                                  color: CkColors.paper,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      for (
+                                        var i = 0;
+                                        i < view.needsYou.length;
+                                        i++
+                                      ) ...[
+                                        if (i > 0) const SizedBox(height: 6),
+                                        _needsYouCard(
+                                          context,
+                                          view.needsYou[i],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+
+                              // ── Today / Live match hero card ────────────
+                              if (view.today != null)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    14,
+                                    12,
+                                    14,
+                                    0,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          view.today!.live
+                                              ? CkColors.ink
+                                              : CkColors.paper,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border:
+                                          view.today!.live
+                                              ? null
+                                              : Border.all(
+                                                color: CkColors.hairline,
+                                              ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        // top row
+                                        Row(
+                                          children: [
+                                            if (view.today!.live)
+                                              const LivePill()
+                                            else
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: CkColors.cream,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  'TODAY · ${view.today!.when ?? ''}',
+                                                  style: CkType.mono(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: 0.10,
+                                                    color: CkInk.amber,
+                                                  ),
+                                                ),
+                                              ),
+                                            if (view.today!.ctx != null) ...[
+                                              const SizedBox(width: 8),
+                                              Flexible(
+                                                child: Text(
+                                                  view.today!.ctx!,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: CkType.mono(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w600,
+                                                    letterSpacing: 0.10,
+                                                    color:
+                                                        view.today!.live
+                                                            ? CkColors.paper
+                                                                .withValues(
+                                                                  alpha: 0.60,
+                                                                )
+                                                            : CkColors.muted,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                            if (view.today!.role != null) ...[
+                                              const Spacer(),
+                                              Text(
+                                                view.today!.role!,
+                                                style: CkType.body(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color:
+                                                      view.today!.live
+                                                          ? CkColors.paper
+                                                              .withValues(
+                                                                alpha: 0.85,
+                                                              )
+                                                          : CkColors.ink,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        // sides
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            _todayMiniCrest(view.today!.a),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: _sideName(
+                                                name: view.today!.a.name,
+                                                score: view.today!.aScore,
+                                                fg:
+                                                    view.today!.live
+                                                        ? CkColors.paper
+                                                        : CkColors.ink,
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 4,
+                                                  ),
+                                              child: Text(
+                                                'VS',
+                                                style: CkType.mono(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w600,
+                                                  letterSpacing: 0.10,
+                                                  color:
+                                                      view.today!.live
+                                                          ? CkColors.paper
+                                                              .withValues(
+                                                                alpha: 0.55,
+                                                              )
+                                                          : CkColors.muted,
+                                                ),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: _sideName(
+                                                name: view.today!.b.name,
+                                                score: view.today!.bScore,
+                                                fg:
+                                                    view.today!.live
+                                                        ? CkColors.paper
+                                                        : CkColors.ink,
+                                                alignEnd: true,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            _todayMiniCrest(view.today!.b),
+                                          ],
+                                        ),
+                                        if (view.today!.note != null) ...[
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                              top: 10,
+                                            ),
+                                            padding: const EdgeInsets.only(
+                                              top: 10,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              border: Border(
+                                                top: BorderSide(
+                                                  color:
+                                                      view.today!.live
+                                                          ? CkColors.paper
+                                                              .withValues(
+                                                                alpha: 0.12,
+                                                              )
+                                                          : CkColors.hairline,
+                                                ),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    view.today!.note!,
+                                                    style: CkType.body(
+                                                      fontSize: 12,
+                                                      color:
+                                                          view.today!.live
+                                                              ? CkColors.paper
+                                                                  .withValues(
+                                                                    alpha: 0.75,
+                                                                  )
+                                                              : CkColors.ink2,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (view.today!.venue != null)
+                                                  Text(
+                                                    view.today!.venue!,
+                                                    style: CkType.mono(
+                                                      fontSize: 9,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      letterSpacing: 0.10,
+                                                      color:
+                                                          view.today!.live
+                                                              ? CkColors.paper
+                                                                  .withValues(
+                                                                    alpha: 0.60,
+                                                                  )
+                                                              : CkColors.muted,
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                              // ── Invites ─────────────────────────────────
+                              if (view.invites.isNotEmpty) ...[
+                                Subhead(
+                                  'Invites',
+                                  accent: CkColors.red,
+                                  count: view.invites.length,
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      for (
+                                        var i = 0;
+                                        i < view.invites.length;
+                                        i++
+                                      ) ...[
+                                        if (i > 0) const SizedBox(height: 8),
+                                        // Direct invite card — Accept / Decline.
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: CkColors.paper,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            border: Border.all(
+                                              color: CkColors.hairline,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  _inviteMiniCrest(
+                                                    view.invites[i].crest,
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            // INVITE chip
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        6,
+                                                                    vertical: 2,
+                                                                  ),
+                                                              decoration: BoxDecoration(
+                                                                color:
+                                                                    CkColors
+                                                                        .cream,
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      4,
+                                                                    ),
+                                                              ),
+                                                              child: Text(
+                                                                'INVITE',
+                                                                style: CkType.mono(
+                                                                  fontSize: 8.5,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                  letterSpacing:
+                                                                      0.08,
+                                                                  color:
+                                                                      CkInk
+                                                                          .amber,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 6,
+                                                            ),
+                                                            Flexible(
+                                                              child: Text(
+                                                                view
+                                                                    .invites[i]
+                                                                    .fromName
+                                                                    .toUpperCase(),
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: CkType.mono(
+                                                                  fontSize: 9,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                  letterSpacing:
+                                                                      0.10,
+                                                                  color:
+                                                                      CkColors
+                                                                          .muted,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 3,
+                                                        ),
+                                                        Text(
+                                                          '${view.invites[i].fromName} invited you to ${view.invites[i].crest.name}.',
+                                                          style: CkType.display(
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                            letterSpacing:
+                                                                -0.02,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 2,
+                                                        ),
+                                                        Text(
+                                                          '${view.invites[i].role}${view.invites[i].crest.city == null ? '' : ' · ${view.invites[i].crest.city}'}',
+                                                          style: CkType.body(
+                                                            fontSize: 12,
+                                                            color:
+                                                                CkColors.muted,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 10),
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: InkWell(
+                                                      onTap: () {},
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            10,
+                                                          ),
+                                                      child: Container(
+                                                        height: 38,
+                                                        alignment:
+                                                            Alignment.center,
+                                                        decoration: BoxDecoration(
+                                                          color: CkColors.ink,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                10,
+                                                              ),
+                                                        ),
+                                                        child: Text(
+                                                          'Accept',
+                                                          style: CkType.body(
+                                                            fontSize: 13,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                            color:
+                                                                CkColors.paper,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Expanded(
+                                                    child: InkWell(
+                                                      onTap: () {},
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            10,
+                                                          ),
+                                                      child: Container(
+                                                        height: 38,
+                                                        alignment:
+                                                            Alignment.center,
+                                                        decoration: BoxDecoration(
+                                                          color: CkColors.paper,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                10,
+                                                              ),
+                                                          border: Border.all(
+                                                            color:
+                                                                CkColors
+                                                                    .hairline,
+                                                          ),
+                                                        ),
+                                                        child: Text(
+                                                          'Decline',
+                                                          style: CkType.body(
+                                                            fontSize: 13,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: CkColors.ink,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+
+                              // ── You lead (captain + vc) ─────────────────
+                              if (leadCount > 0) ...[
+                                Subhead('You lead', count: leadCount),
+                                for (final row in t.captain)
+                                  TeamRow(
+                                    vm: row,
+                                    isFirst: identical(row, t.captain.first),
+                                    withChevron: true,
+                                    onTap:
+                                        row.teamId == null
+                                            ? null
+                                            : () => context.push(
+                                              '/teams/${row.teamId}',
+                                            ),
+                                  ),
+                                for (final row in t.vc)
+                                  TeamRow(
+                                    vm: row,
+                                    isFirst:
+                                        t.captain.isEmpty &&
+                                        identical(row, t.vc.first),
+                                    withChevron: true,
+                                    onTap:
+                                        row.teamId == null
+                                            ? null
+                                            : () => context.push(
+                                              '/teams/${row.teamId}',
+                                            ),
+                                  ),
+                              ],
+
+                              // ── You play ────────────────────────────────
+                              if (t.playing.isNotEmpty) ...[
+                                Subhead('You play', count: t.playing.length),
+                                for (final row in t.playing)
+                                  TeamRow(
+                                    vm: row,
+                                    isFirst: identical(row, t.playing.first),
+                                    withChevron: true,
+                                    onTap:
+                                        row.teamId == null
+                                            ? null
+                                            : () => context.push(
+                                              '/teams/${row.teamId}',
+                                            ),
+                                  ),
+                              ],
+
+                              // ── You manage (manage + draft + scorer) ────
+                              if (manageCount > 0) ...[
+                                Subhead('You manage', count: manageCount),
+                                for (final row in t.manage)
+                                  TeamRow(
+                                    vm: row,
+                                    isFirst: identical(row, t.manage.first),
+                                    withChevron: true,
+                                    onTap:
+                                        row.teamId == null
+                                            ? null
+                                            : () => context.push(
+                                              '/teams/${row.teamId}',
+                                            ),
+                                  ),
+                                for (final row in t.draft)
+                                  TeamRow(
+                                    vm: row,
+                                    isFirst:
+                                        t.manage.isEmpty &&
+                                        identical(row, t.draft.first),
+                                    withChevron: true,
+                                    onTap:
+                                        row.teamId == null
+                                            ? null
+                                            : () => context.push(
+                                              '/teams/${row.teamId}',
+                                            ),
+                                  ),
+                                for (final row in t.scorer)
+                                  TeamRow(
+                                    vm: row,
+                                    isFirst:
+                                        t.manage.isEmpty &&
+                                        t.draft.isEmpty &&
+                                        identical(row, t.scorer.first),
+                                    withChevron: true,
+                                    onTap:
+                                        row.teamId == null
+                                            ? null
+                                            : () => context.push(
+                                              '/teams/${row.teamId}',
+                                            ),
+                                  ),
+                              ],
+
+                              // ── Awaiting approval ───────────────────────
+                              if (t.pending.isNotEmpty) ...[
+                                Subhead(
+                                  'Awaiting approval',
+                                  accent: CkColors.amber,
+                                  count: t.pending.length,
+                                ),
+                                for (final row in t.pending)
+                                  TeamRow(
+                                    vm: row,
+                                    isFirst: identical(row, t.pending.first),
+                                    withChevron: true,
+                                    onTap:
+                                        row.teamId == null
+                                            ? null
+                                            : () => context.push(
+                                              '/teams/${row.teamId}',
+                                            ),
+                                  ),
+                              ],
+
+                              // ── Following ───────────────────────────────
+                              if (view.following.isNotEmpty) ...[
+                                Subhead(
+                                  'Following',
+                                  count: view.following.length,
+                                ),
+                                for (final row in view.following)
+                                  TeamRow(
+                                    vm: row,
+                                    isFirst: identical(
+                                      row,
+                                      view.following.first,
+                                    ),
+                                    withChevron: true,
+                                    onTap:
+                                        row.teamId == null
+                                            ? null
+                                            : () => context.push(
+                                              '/teams/${row.teamId}',
+                                            ),
+                                  ),
+                              ],
+
+                              // ── Archived ────────────────────────────────
+                              if (t.archived.isNotEmpty) ...[
+                                Subhead('Archived', count: t.archived.length),
+                                for (final row in t.archived)
+                                  TeamRow(
+                                    vm: row,
+                                    isFirst: identical(row, t.archived.first),
+                                    withChevron: false,
+                                    onTap:
+                                        row.teamId == null
+                                            ? null
+                                            : () => context.push(
+                                              '/teams/${row.teamId}',
+                                            ),
+                                  ),
+                              ],
+
+                              // ── Suggested ───────────────────────────────
+                              if (view.suggested.isNotEmpty) ...[
+                                Subhead(
+                                  view.suggestedTitle ?? 'Near you · Karachi',
+                                ),
+                                // Horizontal scroll of suggested team cards.
+                                SizedBox(
+                                  height: 132,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.fromLTRB(
+                                      14,
+                                      0,
+                                      14,
+                                      4,
+                                    ),
+                                    itemCount: view.suggested.length,
+                                    separatorBuilder:
+                                        (_, __) => const SizedBox(width: 8),
+                                    itemBuilder: (_, i) {
+                                      final item = view.suggested[i];
+                                      return Container(
+                                        width: 168,
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: CkColors.paper,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: CkColors.hairline,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: BoxDecoration(
+                                                color: item.crest.color,
+                                                borderRadius:
+                                                    BorderRadius.circular(9),
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Text(
+                                                item.crest.mono,
+                                                style: CkType.display(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing: -0.03,
+                                                  color: CkColors.paper,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              item.crest.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: CkType.display(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: -0.02,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Expanded(
+                                              child: Text(
+                                                item.meta,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: CkType.body(
+                                                  fontSize: 11,
+                                                  color: CkColors.muted,
+                                                ),
+                                              ),
+                                            ),
+                                            Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 5,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: CkColors.paper,
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        999,
+                                                      ),
+                                                  border: Border.all(
+                                                    color: CkColors.hairline,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  '+ Follow',
+                                                  style: CkType.body(
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: CkColors.ink,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+
+                              // ── "Play, don't just watch." nudge ─────────
+                              if (view.showCreateNudge)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    14,
+                                    18,
+                                    14,
+                                    0,
+                                  ),
+                                  child: CustomPaint(
+                                    painter: _NudgeDashedBorderPainter(),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 12,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: BoxDecoration(
+                                              color: CkColors.paper2,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: const Icon(
+                                              Icons.add,
+                                              size: 18,
+                                              color: CkColors.ink,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  "Play, don't just watch.",
+                                                  style: CkType.display(
+                                                    fontSize: 13.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: -0.02,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  'Create your own side or join one near Karachi.',
+                                                  style: CkType.body(
+                                                    fontSize: 11.5,
+                                                    color: CkColors.muted,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          InkWell(
+                                            onTap:
+                                                () => context.push(
+                                                  '/teams/create',
+                                                ),
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 7,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: CkColors.ink,
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Text(
+                                                'Start',
+                                                style: CkType.body(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: CkColors.paper,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                              const SizedBox(height: 24),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!view.isEmpty)
+                      Positioned(
+                        right: 14,
+                        bottom: 22,
+                        child: InkWell(
+                          onTap: () => context.push('/teams/create'),
+                          borderRadius: BorderRadius.circular(999),
+                          child: Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: CkColors.ink,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF281E0F,
+                                  ).withValues(alpha: 0.18),
+                                  offset: const Offset(0, 10),
+                                  blurRadius: 28,
+                                ),
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF281E0F,
+                                  ).withValues(alpha: 0.10),
+                                  offset: const Offset(0, 3),
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.add,
+                              size: 22,
+                              color: CkColors.paper,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                onBack: () => context.pop(),
-                onSelectFilter: (f) => setState(() => _filter = f),
-                onCreate: () => context.push('/teams/create'),
-                onTeamTap: (id) => context.push('/teams/$id'),
               ),
             ),
-          AsyncError() => _ErrorState(onBack: () => context.pop()),
-          _ => const Center(
+          ),
+        );
+      case AsyncError():
+        return Scaffold(
+          backgroundColor: CkColors.paper,
+          body: SafeArea(
+            bottom: false,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Could not load teams',
+                    style: CkType.body(fontSize: 14, color: CkColors.ink2),
+                  ),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () => context.pop(),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Text(
+                        'Go back',
+                        style: CkType.body(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: CkColors.ink,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      case AsyncLoading():
+        return const Scaffold(
+          backgroundColor: CkColors.paper,
+          body: SafeArea(
+            bottom: false,
+            child: Center(
               child: CircularProgressIndicator(color: CkColors.ink),
             ),
-        },
+          ),
+        );
+    }
+  }
+
+  // ── Empty-state crest (used 3×) ────────────────────────────────────
+  Widget _dimCrest(CrestStyle crest) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: CkColors.paper2,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: CkColors.line),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        crest.mono,
+        style: CkType.display(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.03,
+          color: CkColors.muted,
+        ),
       ),
     );
   }
 
-  /// Layer the local filter selection on top of the base real-data view.
-  /// The base view stays pure; this transformation is purely presentation.
-  MyTeamsView _applyFilter(MyTeamsView base) => MyTeamsView(
-        subtitle: base.subtitle,
-        isEmpty: base.isEmpty,
-        needsYou: base.needsYou,
-        today: base.today,
-        invites: base.invites,
-        teams: _filterTeams(base.teams, _filter),
-        following: _filter == MyTeamsFilter.following ||
-                _filter == MyTeamsFilter.all
-            ? base.following
-            : const [],
-        suggested: base.suggested,
-        suggestedTitle: base.suggestedTitle,
-        showCreateNudge: base.showCreateNudge,
-        activeFilter: _filter,
-      );
-
-  TeamGroups _filterTeams(TeamGroups t, MyTeamsFilter f) {
-    switch (f) {
-      case MyTeamsFilter.all:
-        return t;
-      case MyTeamsFilter.playing:
-        return TeamGroups(captain: t.captain, vc: t.vc, playing: t.playing);
-      case MyTeamsFilter.managing:
-        return TeamGroups(manage: t.manage, draft: t.draft, scorer: t.scorer);
-      case MyTeamsFilter.following:
-        // "following" lives on MyTeamsView, not TeamGroups. Suppress all
-        // bucket sections so only Following is visible.
-        return const TeamGroups();
-      case MyTeamsFilter.archived:
-        return TeamGroups(archived: t.archived);
+  // ── Needs-you accent color + card (card used 1× via loop) ──────────
+  Color _accent(NeedsYouItem item) {
+    switch (item.tone) {
+      case NeedsYouTone.red:
+        return CkColors.red;
+      case NeedsYouTone.amber:
+        return CkColors.amber;
+      case NeedsYouTone.ink:
+        return CkColors.ink;
     }
   }
-}
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onBack});
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Could not load teams',
-            style: CkType.body(fontSize: 14, color: CkColors.ink2),
-          ),
-          const SizedBox(height: 12),
-          InkWell(
-            onTap: onBack,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                'Go back',
-                style: CkType.body(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: CkColors.ink,
+  Widget _needsYouCard(BuildContext context, NeedsYouItem item) {
+    // Flutter disallows borderRadius with non-uniform border colors, so the
+    // accent left edge is rendered as an inner stripe clipped to the
+    // rounded corners rather than as a border side.
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: CkColors.paper,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: CkColors.hairline),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: 3, color: _accent(item)),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (RolePill.hasSpec(item.role)) ...[
+                          RolePill(role: item.role),
+                          const SizedBox(width: 6),
+                        ],
+                        if (item.subTag != null)
+                          Flexible(
+                            child: Text(
+                              item.subTag!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: CkType.mono(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.10,
+                                color: CkColors.muted,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      item.title,
+                      style: CkType.display(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.02,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.body,
+                      style: CkType.body(fontSize: 12, color: CkColors.ink2),
+                    ),
+                    if (item.actions.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          for (var i = 0; i < item.actions.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 6),
+                            _actionBtn(context, item.actions[i], i == 0),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _actionBtn(BuildContext context, NeedsYouAction action, bool primary) {
+    final pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: primary ? CkColors.ink : CkColors.paper,
+        borderRadius: BorderRadius.circular(999),
+        border: primary ? null : Border.all(color: CkColors.hairline),
+      ),
+      child: Text(
+        action.label,
+        style: CkType.body(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: primary ? CkColors.paper : CkColors.ink,
+        ),
+      ),
+    );
+    final teamId = action.manageTeamId;
+    if (teamId == null) return pill; // inert (e.g. "Later")
+    return InkWell(
+      onTap: () => context.push('/teams/$teamId/manage'),
+      borderRadius: BorderRadius.circular(999),
+      child: pill,
+    );
+  }
+
+  // ── Today mini-crest (image used 2×, mono used 3×) + side name (2×) ─
+  Widget _todayMiniCrestMono(CrestStyle crest) => Container(
+    width: 32,
+    height: 32,
+    decoration: BoxDecoration(
+      color: crest.color,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    alignment: Alignment.center,
+    child: Text(
+      crest.mono,
+      style: CkType.display(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.03,
+        color: CkColors.paper,
+      ),
+    ),
+  );
+
+  Widget _todayMiniCrest(CrestStyle crest) {
+    if (crest.logoUrl == null || crest.logoUrl!.isEmpty) {
+      return _todayMiniCrestMono(crest);
+    }
+    return Builder(
+      builder: (context) {
+        final memW = (32 * MediaQuery.devicePixelRatioOf(context)).round();
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 32,
+            height: 32,
+            color: CkColors.paper2,
+            child: CachedNetworkImage(
+              imageUrl: crest.logoUrl!,
+              fit: BoxFit.cover,
+              width: 32,
+              height: 32,
+              memCacheWidth: memW,
+              errorWidget: (_, __, ___) => _todayMiniCrestMono(crest),
+              placeholder: (_, __) => _todayMiniCrestMono(crest),
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _sideName({
+    required String name,
+    required String? score,
+    required Color fg,
+    bool alignEnd = false,
+  }) {
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: CkType.display(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.02,
+            color: fg,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          score ?? '—',
+          style: CkType.mono(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+            color: fg,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Invite mini-crest (image used 1×, mono used 2×) ────────────────
+  Widget _inviteMiniCrestMono(CrestStyle crest) => Container(
+    width: 40,
+    height: 40,
+    decoration: BoxDecoration(
+      color: crest.color,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    alignment: Alignment.center,
+    child: Text(
+      crest.mono,
+      style: CkType.display(
+        fontSize: 13,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.03,
+        color: CkColors.paper,
+      ),
+    ),
+  );
+
+  Widget _inviteMiniCrest(CrestStyle crest) {
+    if (crest.logoUrl == null || crest.logoUrl!.isEmpty) {
+      return _inviteMiniCrestMono(crest);
+    }
+    return Builder(
+      builder: (context) {
+        final memW = (40 * MediaQuery.devicePixelRatioOf(context)).round();
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            width: 40,
+            height: 40,
+            color: CkColors.paper2,
+            child: CachedNetworkImage(
+              imageUrl: crest.logoUrl!,
+              fit: BoxFit.cover,
+              width: 40,
+              height: 40,
+              memCacheWidth: memW,
+              errorWidget: (_, __, ___) => _inviteMiniCrestMono(crest),
+              placeholder: (_, __) => _inviteMiniCrestMono(crest),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Section subhead — mono uppercase label, optional accent color, optional
+/// trailing `· N` count. Used between every section of the My Teams body.
+class Subhead extends StatelessWidget {
+  const Subhead(this.label, {super.key, this.accent, this.count});
+
+  /// Header text — rendered as-typed (the JSX source uses Title Case, not
+  /// uppercase — the mono style font is what gives it the "label" feel).
+  final String label;
+
+  /// Color override for the label (e.g. red on "Invites · 2").
+  final Color? accent;
+
+  /// When non-null renders ` · N` next to the label in muted mono.
+  final int? count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(
+            label,
+            style: CkType.mono(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.10,
+              color: accent ?? CkColors.muted,
+            ),
+          ),
+          if (count != null) ...[
+            const SizedBox(width: 6),
+            Text(
+              '· $count',
+              style: CkType.mono(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.10,
+                color: CkColors.muted,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
+}
+
+/// Swiss-army row used by every team-list section (captain/vc/playing/manage/
+/// draft/scorer/pending/archived/following). Crest on the left (with optional
+/// notification badge), name + verified tick + role pill, mono meta line with
+/// optional jersey number and inline LIVE pill, chevron on the right.
+///
+/// Archived rows render with a dim opacity, a dashed crest, and no chevron
+/// (controllable via [withChevron]).
+class TeamRow extends StatelessWidget {
+  const TeamRow({
+    super.key,
+    required this.vm,
+    this.isFirst = false,
+    this.withChevron = true,
+    this.onTap,
+  });
+
+  final TeamRowVm vm;
+
+  /// When true skips the top hairline divider (used by the first row in a section).
+  final bool isFirst;
+
+  /// Archived rows pass false — they are present but quiet.
+  final bool withChevron;
+  final VoidCallback? onTap;
+
+  bool get _inactive =>
+      vm.role == MyTeamsRole.archived || vm.role == MyTeamsRole.pending;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Opacity(
+        opacity: _inactive ? 0.74 : 1,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          decoration: BoxDecoration(
+            border:
+                isFirst
+                    ? null
+                    : const Border(top: BorderSide(color: CkColors.hairline)),
+          ),
+          child: Row(
+            children: [
+              _crestWithBadge(
+                context,
+                crest: vm.crest,
+                dim: vm.role == MyTeamsRole.archived,
+                badge: vm.notifCount,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            vm.crest.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: CkType.display(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.02,
+                            ),
+                          ),
+                        ),
+                        if (vm.verified) ...[
+                          const SizedBox(width: 6),
+                          const VerifiedTick(),
+                        ],
+                        if (RolePill.hasSpec(vm.role)) ...[
+                          const SizedBox(width: 6),
+                          RolePill(role: vm.role),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    _metaLine(),
+                  ],
+                ),
+              ),
+              if (withChevron) ...[
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: CkColors.muted,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _monoTile(CrestStyle crest, bool dim) => Container(
+    width: 44,
+    height: 44,
+    decoration: BoxDecoration(
+      color: dim ? CkColors.paper2 : crest.color,
+      borderRadius: BorderRadius.circular(11),
+      border:
+          dim
+              ? Border.all(color: CkColors.line, style: BorderStyle.solid)
+              : null,
+    ),
+    alignment: Alignment.center,
+    child: Text(
+      crest.mono,
+      style: CkType.display(
+        fontSize: 14,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.03,
+        color: dim ? CkColors.muted : CkColors.paper,
+      ),
+    ),
+  );
+
+  Widget _crestWithBadge(
+    BuildContext context, {
+    required CrestStyle crest,
+    required bool dim,
+    int? badge,
+  }) {
+    final showImage =
+        !dim && (crest.logoUrl != null && crest.logoUrl!.isNotEmpty);
+    final memW = (44 * MediaQuery.devicePixelRatioOf(context)).round();
+    final tile =
+        showImage
+            ? ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: Container(
+                width: 44,
+                height: 44,
+                color: CkColors.paper2,
+                child: CachedNetworkImage(
+                  imageUrl: crest.logoUrl!,
+                  fit: BoxFit.cover,
+                  width: 44,
+                  height: 44,
+                  memCacheWidth: memW,
+                  errorWidget: (_, __, ___) => _monoTile(crest, dim),
+                  placeholder: (_, __) => _monoTile(crest, dim),
+                ),
+              ),
+            )
+            : _monoTile(crest, dim);
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          tile,
+          if (badge != null && badge > 0)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: CkColors.red,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: CkColors.paper, width: 2),
+                ),
+                child: Text(
+                  '$badge',
+                  style: CkType.display(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: CkColors.paper,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dot(TextStyle style) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 6),
+    child: Text('·', style: style),
+  );
+
+  Widget _metaLine() {
+    final style = CkType.mono(
+      fontSize: 11.5,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.02,
+      color: CkColors.muted,
+    );
+    final parts = <Widget>[];
+    if (vm.jersey != null) {
+      parts.add(Text('#${vm.jersey}', style: style));
+      parts.add(_dot(style));
+    }
+    parts.add(
+      Flexible(
+        child: Text(
+          vm.meta ?? vm.crest.city ?? '',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: style,
+        ),
+      ),
+    );
+    if (vm.live) {
+      parts.add(_dot(style));
+      parts.add(const LivePill());
+    }
+    return Row(children: parts);
+  }
+}
+
+/// Paints a dashed rounded-rect border. Used by the empty-state and
+/// create-nudge cards.
+class _EmptyDashedBorderPainter extends CustomPainter {
+  _EmptyDashedBorderPainter({
+    required this.color,
+    required this.radius,
+    required this.strokeWidth,
+    required this.dashLength,
+    required this.dashGap,
+  });
+
+  final Color color;
+  final double radius;
+  final double strokeWidth;
+  final double dashLength;
+  final double dashGap;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint =
+        Paint()
+          ..color = color
+          ..strokeWidth = strokeWidth
+          ..style = PaintingStyle.stroke;
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+    final metrics = path.computeMetrics();
+    for (final m in metrics) {
+      var d = 0.0;
+      final total = m.length;
+      while (d < total) {
+        final extract = m.extractPath(d, (d + dashLength).clamp(0, total));
+        canvas.drawPath(extract, paint);
+        d += dashLength + dashGap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_EmptyDashedBorderPainter old) =>
+      old.color != color ||
+      old.radius != radius ||
+      old.strokeWidth != strokeWidth ||
+      old.dashLength != dashLength ||
+      old.dashGap != dashGap;
+}
+
+class _NudgeDashedBorderPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint =
+        Paint()
+          ..color = CkColors.line
+          ..strokeWidth = 1.2
+          ..style = PaintingStyle.stroke;
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(12),
+    );
+    final path = Path()..addRRect(rrect);
+    for (final m in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < m.length) {
+        final extract = m.extractPath(d, (d + 5).clamp(0, m.length));
+        canvas.drawPath(extract, paint);
+        d += 9;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
 }

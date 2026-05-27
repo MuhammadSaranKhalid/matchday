@@ -4,18 +4,29 @@ import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:novex_clean_arch/core/error/failures.dart';
 import 'package:novex_clean_arch/core/usecase/usecase.dart';
+import 'package:novex_clean_arch/features/auth/domain/entities/user.dart';
+import 'package:novex_clean_arch/features/auth/domain/value_objects/email.dart';
+import 'package:novex_clean_arch/features/auth/presentation/providers/auth_providers.dart';
 import 'package:novex_clean_arch/features/matches/domain/entities/match.dart';
 import 'package:novex_clean_arch/features/matches/domain/usecases/list_my_matches.dart';
 import 'package:novex_clean_arch/features/matches/presentation/providers/matches_providers.dart';
 import 'package:novex_clean_arch/features/teams/domain/entities/team.dart';
 import 'package:novex_clean_arch/features/teams/presentation/controllers/teams_list_controller.dart';
 import 'package:novex_clean_arch/features/teams/presentation/providers/teams_providers.dart';
+import 'package:novex_clean_arch/features/teams/presentation/state/my_teams_view.dart';
 
 class _MockListMyMatches extends Mock implements ListMyMatches {}
 
-Team _team(String id, {String name = 'Team', String? color}) => Team(
+User _user(String id) => User(
+      id: UserId(id),
+      email: Email.create('$id@example.com').toNullable()!,
+      displayName: id,
+    );
+
+Team _team(String id, {String name = 'Team', String? color, String owner = 'u1'}) =>
+    Team(
       id: TeamId(id),
-      ownerId: 'u1',
+      ownerId: owner,
       name: name,
       type: TeamType.club,
       privacy: TeamPrivacy.public,
@@ -59,6 +70,7 @@ void main() {
     List<Team> cached = const [],
     List<Match> matches = const [],
     Failure? matchesFailure,
+    String userId = 'u1',
   }) {
     when(() => listMatches.call(any())).thenAnswer(
       (_) async => matchesFailure != null ? Left(matchesFailure) : Right(matches),
@@ -68,6 +80,8 @@ void main() {
         myTeamsProvider.overrideWith((ref) => Stream.value(teams)),
         allTeamsProvider.overrideWith((ref) => Stream.value(cached)),
         listMyMatchesUseCaseProvider.overrideWithValue(listMatches),
+        currentUserStreamProvider
+            .overrideWith((ref) => Stream.value(_user(userId))),
       ],
     );
     addTearDown(container.dispose);
@@ -75,44 +89,59 @@ void main() {
     return container;
   }
 
-  test('filters to active matches, resolves opponent + incoming', () async {
+  test('owned teams land in the captain bucket with a count subtitle', () async {
+    final container = makeContainer(
+      teams: [_team('a'), _team('b')], // both owned by u1
+    );
+
+    final view = await container.read(teamsListControllerProvider.future);
+
+    expect(view.isEmpty, isFalse);
+    expect(view.teams.captain, hasLength(2));
+    expect(view.teams.playing, isEmpty);
+    expect(view.subtitle, '2 teams');
+    expect(view.today, isNull);
+  });
+
+  test('hero match resolves opponent crest + which side is mine (live)',
+      () async {
     final container = makeContainer(
       teams: [_team('a', name: 'My Side')],
       cached: [_team('b', name: 'Karachi Eagles', color: '#123456')],
       matches: [
-        _match('m1', a: 'a', b: 'b', status: MatchStatus.pending), // I am A
-        _match('m2', a: 'b', b: 'a', status: MatchStatus.live), // I am B (incoming)
-        _match('m3', a: 'a', b: 'c', status: MatchStatus.declined), // excluded
+        _match('m1', a: 'a', b: 'b', status: MatchStatus.pending),
+        _match('m2', a: 'b', b: 'a', status: MatchStatus.live), // live wins
+        _match('m3', a: 'a', b: 'c', status: MatchStatus.declined), // inactive
       ],
     );
 
     final view = await container.read(teamsListControllerProvider.future);
 
-    expect(view.teams, hasLength(1));
-    expect(view.activeMatches, hasLength(2)); // declined dropped
-
-    final m1 = view.activeMatches.firstWhere((e) => e.match.id.value == 'm1');
-    expect(m1.incoming, isFalse);
-    expect(m1.opponent?.name, 'Karachi Eagles');
-
-    final m2 = view.activeMatches.firstWhere((e) => e.match.id.value == 'm2');
-    expect(m2.incoming, isTrue);
-    expect(m2.opponent?.name, 'Karachi Eagles');
+    final today = view.today;
+    expect(today, isNotNull);
+    expect(today!.live, isTrue);
+    // m2 has teamA = 'b' (opponent), so my side is B.
+    expect(today.a.name, 'Karachi Eagles');
+    expect(today.b.name, 'My Side');
   });
 
-  test('opponent stays null when the team is not cached', () async {
+  test('incoming pending match surfaces an "Incoming request" phrase', () async {
     final container = makeContainer(
-      teams: [_team('a')],
-      matches: [_match('m1', a: 'a', b: 'z', status: MatchStatus.pending)],
+      teams: [_team('a', name: 'My Side')],
+      cached: [_team('b', name: 'Karachi Eagles')],
+      // I am team B → incoming request.
+      matches: [_match('m1', a: 'b', b: 'a', status: MatchStatus.pending)],
     );
 
     final view = await container.read(teamsListControllerProvider.future);
 
-    expect(view.activeMatches, hasLength(1));
-    expect(view.activeMatches.single.opponent, isNull);
+    expect(view.today, isNotNull);
+    expect(view.today!.live, isFalse);
+    expect(view.today!.when, 'Incoming request');
+    expect(view.subtitle, '1 team');
   });
 
-  test('a matches failure still yields teams with no active matches', () async {
+  test('a matches failure still buckets teams with no hero match', () async {
     final container = makeContainer(
       teams: [_team('a'), _team('b')],
       matchesFailure: const ServerFailure('offline'),
@@ -120,25 +149,40 @@ void main() {
 
     final view = await container.read(teamsListControllerProvider.future);
 
-    expect(view.teams, hasLength(2));
-    expect(view.activeMatches, isEmpty);
+    expect(view.teams.captain, hasLength(2));
+    expect(view.today, isNull);
+    expect(view.isEmpty, isFalse);
   });
 
-  test('empty teams list with active matches yields no active match entries',
+  test('first-team onboarding: subtitle + NeedsYou CTA targets the team',
       () async {
-    final container = makeContainer(
-      teams: const [],
-      matches: [_match('m1', a: 'x', b: 'y', status: MatchStatus.live)],
-    );
+    final container = makeContainer(teams: [_team('a', name: 'Lions')]);
 
     final view = await container.read(teamsListControllerProvider.future);
 
-    expect(view.teams, isEmpty);
-    // With no user teams, the match has no incoming/owning side — but
-    // [TeamsListController.build] still includes it (incoming=false,
-    // opponent=teamA). This documents that contract.
-    expect(view.activeMatches, hasLength(1));
-    expect(view.activeMatches.single.incoming, isFalse);
+    expect(view.subtitle, '1 team · onboarding');
+    expect(view.needsYou, hasLength(1));
+    expect(view.needsYou.single.actions.first.label, 'Add players');
+    expect(view.needsYou.single.actions.first.manageTeamId, 'a');
+  });
+
+  test('setFilter re-derives synchronously without re-fetching matches',
+      () async {
+    final container = makeContainer(
+      teams: [_team('a'), _team('b')],
+    );
+    await container.read(teamsListControllerProvider.future);
+
+    container
+        .read(teamsListControllerProvider.notifier)
+        .setFilter(MyTeamsFilter.archived);
+
+    final view = container.read(teamsListControllerProvider).value!;
+    expect(view.activeFilter, MyTeamsFilter.archived);
+    // Archived filter hides the captain bucket.
+    expect(view.teams.captain, isEmpty);
+    // Matches use case was called once (build), not again on filter change.
+    verify(() => listMatches.call(any())).called(1);
   });
 
   test('refresh re-runs build and picks up new matches', () async {
@@ -149,9 +193,9 @@ void main() {
     );
 
     final first = await container.read(teamsListControllerProvider.future);
-    expect(first.activeMatches, hasLength(1));
+    expect(first.today, isNotNull);
+    expect(first.today!.live, isFalse);
 
-    // Reconfigure the mock to return a different match set, then refresh.
     when(() => listMatches.call(any())).thenAnswer((_) async => Right([
           _match('m1', a: 'a', b: 'b', status: MatchStatus.pending),
           _match('m2', a: 'a', b: 'b', status: MatchStatus.live),
@@ -160,10 +204,6 @@ void main() {
     await container.read(teamsListControllerProvider.notifier).refresh();
 
     final second = await container.read(teamsListControllerProvider.future);
-    expect(second.activeMatches, hasLength(2));
-    expect(
-      second.activeMatches.map((e) => e.match.id.value).toSet(),
-      {'m1', 'm2'},
-    );
+    expect(second.today!.live, isTrue); // live match now wins the hero slot
   });
 }

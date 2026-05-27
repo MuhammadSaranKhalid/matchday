@@ -49,7 +49,7 @@ final class TeamsRepositoryProvider
   }
 }
 
-String _$teamsRepositoryHash() => r'04dc3e8ab6fe7f445e49dd0752e42e7bb6c3507f';
+String _$teamsRepositoryHash() => r'ab9db3bdded7261464d685b4fe83a5b845fdb68e';
 
 @ProviderFor(createTeamUseCase)
 final createTeamUseCaseProvider = CreateTeamUseCaseProvider._();

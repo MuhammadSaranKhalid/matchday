@@ -1,12 +1,17 @@
 // View model for the "My Teams" screen — a faithful port of the JSX
 // `CASES.*` shape from design/screens/MyTeams.jsx.
 //
-// One [MyTeamsView] feeds [MyTeamsBody]. Two construction sites build it:
-//   • Real data: [buildMyTeamsViewFromReal] in [my_teams_real_data_adapter.dart]
-//   • Static mocks: `kMyTeamsCaseFixtures` in [my_teams_case_fixtures.dart]
+// One [MyTeamsView] feeds the My Teams screen. It is built from real provider
+// data by [TeamsListController] (the derivation lives in
+// teams_list_controller.dart).
 //
 // Sections render only when their list/value is non-empty (`isEmpty` short-
 // circuits everything else), so each case yields a focused screen.
+//
+// NOTE: many fields below (invites, following, suggested, vc, scorer, draft,
+// pending, archived) have no backend yet and are always empty in production.
+// They mirror the design's full state set; add real population when the
+// corresponding backend ships, adjusting the shape to match it.
 import 'package:flutter/foundation.dart';
 
 import '../widgets/my_teams/crest_palette.dart';
@@ -36,12 +41,13 @@ enum MyTeamsFilter { all, playing, managing, following, archived }
 
 @immutable
 class NeedsYouAction {
-  const NeedsYouAction(this.label, {this.onTap});
+  const NeedsYouAction(this.label, {this.manageTeamId});
   final String label;
 
-  /// Null = inert button (rendered but not tappable). Real handlers come
-  /// from the adapter when the action has a known destination.
-  final VoidCallback? onTap;
+  /// When set, tapping this action navigates to `/teams/$manageTeamId/manage`.
+  /// Null = inert button (rendered but not tappable). The view model stays
+  /// pure data — the screen turns this id into navigation via `onManageTeam`.
+  final String? manageTeamId;
 }
 
 @immutable
@@ -251,4 +257,34 @@ class MyTeamsView {
   final bool showCreateNudge;
 
   final MyTeamsFilter activeFilter;
+
+  /// Returns a copy with the given fields replaced. Used by the screen to
+  /// layer the local filter selection on top of the base real-data view
+  /// without re-listing every field (which silently drops new ones).
+  MyTeamsView copyWith({
+    String? subtitle,
+    bool? isEmpty,
+    List<NeedsYouItem>? needsYou,
+    TodayMatch? today,
+    List<InviteEntry>? invites,
+    TeamGroups? teams,
+    List<TeamRowVm>? following,
+    List<SuggestedTeam>? suggested,
+    String? suggestedTitle,
+    bool? showCreateNudge,
+    MyTeamsFilter? activeFilter,
+  }) =>
+      MyTeamsView(
+        subtitle: subtitle ?? this.subtitle,
+        isEmpty: isEmpty ?? this.isEmpty,
+        needsYou: needsYou ?? this.needsYou,
+        today: today ?? this.today,
+        invites: invites ?? this.invites,
+        teams: teams ?? this.teams,
+        following: following ?? this.following,
+        suggested: suggested ?? this.suggested,
+        suggestedTitle: suggestedTitle ?? this.suggestedTitle,
+        showCreateNudge: showCreateNudge ?? this.showCreateNudge,
+        activeFilter: activeFilter ?? this.activeFilter,
+      );
 }

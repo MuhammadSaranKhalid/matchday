@@ -1,13 +1,17 @@
 // View model for the Team Page — a faithful port of the JSX `CASES.*`
 // shape from design/screens/tp-data.jsx + tp-tabs.jsx.
 //
-// One [TeamPageView] feeds [TeamPageBody]. Two construction sites build it:
-//   • Real data: buildTeamPageViewFromReal(...) in tp_real_data_adapter.dart
-//   • Static mocks: kTeamPageCaseFixtures in tp_case_fixtures.dart
+// One [TeamPageView] feeds the Team Page body. It is built from real provider
+// data by buildTeamPageViewFromReal(...) in team_page_screen.dart.
 //
 // Sections are nullable / empty-by-default — the body short-circuits any
 // section whose data is absent so each viewer × state lands on a focused
 // screen.
+//
+// NOTE: many fields below (record, form, stats, tournament, actionQueue,
+// performers, live details) have no backend yet and stay null/empty in
+// production. They mirror the design's full state set; populate them when the
+// corresponding backend ships, adjusting the shape to match it.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter/widgets.dart' show IconData;

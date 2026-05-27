@@ -646,13 +646,46 @@ Notes:
 
 ### 5.3 Presentation Layer
 
-#### View state — when to use sealed unions vs `AsyncValue<T>`
+#### Folder layout — what goes where
 
-**Use a hand-rolled sealed `<Feature>State` class** when the controller's lifecycle has multiple meaningful sub-states that aren't loading/error/data. Example: a sign-in flow with `AuthInitial → AuthSendingOtp → AuthOtpSent(email) → AuthVerifyingOtp → AuthAuthenticated | AuthFailed`. Multi-step wizards, payment flows, OTP entry — these need sealed states because the UI changes shape per state.
+The presentation layer has five subfolders. Each has a precise role; do not collapse them.
 
-**Use `AsyncValue<T>` directly** (from a `StreamNotifier` or `AsyncNotifier`) when the controller's state is just "the data, possibly loading or errored". Simple CRUD lists, profile views, settings screens — these don't need a sealed wrapper; `AsyncValue<List<Foo>>` is enough.
+| Folder | What goes in it |
+|---|---|
+| `state/`       | Immutable types describing what the screen sees. Three legitimate shapes — see below |
+| `controllers/` | `@riverpod` `Notifier` / `AsyncNotifier` / `StreamNotifier` classes — the view-model behaviour (the Riverpod community treats the Notifier *as* the view model; there is no separate ViewModel class) |
+| `screens/`     | One file per route. Top-level `ConsumerWidget` / `ConsumerStatefulWidget` |
+| `widgets/`     | Reusable widgets extracted from THIS feature's screens. Flat by default |
+| `providers/`   | Repository + use-case DI providers. Nothing else (controller/notifier providers are generated from `@riverpod` and live with the controller) |
 
-**Don't** create a sealed state class just because you can. Extra wrapping is cost without value for simple states.
+##### `state/` — three legitimate patterns, one folder
+
+A `state/` file is always an immutable type describing what the controller exposes. There are three distinct shapes, all valid:
+
+1. **Sealed lifecycle state** — `sealed class FooState` with discrete sub-states (`Initial`, `SendingOtp`, `OtpSent(email)`, `Verifying`, `Authenticated`, `Failed`). Use when the UI itself changes shape per state (OTP flow, payment flow). Hand-rolled (NOT freezed) to keep `switch`-pattern matching simple. Reference: `lib/features/auth/presentation/state/auth_state.dart`.
+2. **Form / wizard state** — `@freezed` class with many fields and `copyWith` for step-by-step mutation. Use for multi-step wizards. References: `onboarding_state.dart`, `team_create_state.dart`, `match_setup_state.dart`.
+3. **View-model struct** — immutable class composing multiple data sources into one screen-ready shape. Use when the controller's `build()` returns a derived value (not raw entities) — typically because the screen needs data from several features (teams + matches + currentUser → `MyTeamsView`). This is Uncle Bob's original "ViewModel": a passive data struct, not behaviour. Reference: `lib/features/teams/presentation/state/my_teams_view.dart`.
+
+**Skip `state/` entirely** if the controller returns `AsyncValue<List<Foo>>` or `AsyncValue<Foo>` directly — no wrapping for the sake of wrapping. Simple CRUD lists, profile views, settings screens don't need a state file.
+
+##### `controllers/` — the view-model behaviour
+
+The `@riverpod` Notifier IS the view model. It owns the state, exposes action methods, and reads use cases via `ref.read`. Pick:
+- `Notifier` when initial state is synchronous (multi-step flow seeded from defaults).
+- `AsyncNotifier` when `build()` awaits an async fetch (composing data sources, restoring wizard drafts).
+- `StreamNotifier` when `build()` returns a `Stream` directly — uncommon here; the prevailing pattern is an intermediate `@riverpod Stream<T>` free-function provider in `providers/` that the controller `await`s via `.future`.
+
+##### `screens/` — one file per route
+
+Each screen file owns one route. **Keep it monolithic until ~800 LOC, or until a sub-widget is reused by another screen.** Premature splitting fragments the screen across many files and forces readers to jump around. Extraction is a response to size or reuse, not the starting layout. (`team_page_screen.dart` at 3,142 LOC and `team_create_screen.dart` at 2,798 LOC are past the threshold — both have decomposed into `widgets/team_page/` and `widgets/team_create/`.)
+
+##### `widgets/` — flat by default
+
+Place feature-local extracted widgets flat in `widgets/` (e.g. `post_card.dart`, `ball_pill.dart`, `circk_brand.dart`). Promote to a `widgets/<screen_name>/` sub-folder ONLY when a single screen's extractions exceed ~3 files (`widgets/team_page/`, `widgets/team_create/`, `widgets/my_teams/`). Do not use a feature's `widgets/` for cross-feature shared widgets — those live in `lib/core/widgets/`.
+
+##### `providers/` — DI only
+
+Repository provider (returning the abstract type) and one provider per use case. Intermediate `@riverpod Stream<T>` fan-out providers (e.g. `myTeamsProvider`, `ballsProvider`) also live here — they wrap a use case so multiple consumers share one subscription. Controller providers are generated automatically by `@riverpod`; do not declare them by hand.
 
 #### Sealed view state template (`presentation/state/foo_state.dart`)
 

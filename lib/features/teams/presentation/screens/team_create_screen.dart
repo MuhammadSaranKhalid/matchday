@@ -53,7 +53,7 @@ class _Wizard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final controller = ref.watch(teamCreateControllerProvider.notifier);
+    final controller = ref.read(teamCreateControllerProvider.notifier);
     final stepIndex = state.step.index;
     final isLast = state.step == TeamCreateStep.review;
 

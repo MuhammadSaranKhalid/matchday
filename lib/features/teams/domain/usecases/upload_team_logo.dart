@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/usecase/usecase.dart';
@@ -14,11 +12,20 @@ class UploadTeamLogo implements UseCase<String, UploadTeamLogoParams> {
 
   @override
   Future<Either<Failure, String>> call(UploadTeamLogoParams p) =>
-      _repo.uploadTeamLogo(teamId: p.teamId, file: p.file);
+      _repo.uploadTeamLogo(
+        teamId: p.teamId,
+        bytes: p.bytes,
+        extension: p.extension,
+      );
 }
 
 class UploadTeamLogoParams {
-  const UploadTeamLogoParams({required this.teamId, required this.file});
+  const UploadTeamLogoParams({
+    required this.teamId,
+    required this.bytes,
+    required this.extension,
+  });
   final TeamId teamId;
-  final File file;
+  final List<int> bytes;
+  final String extension;
 }

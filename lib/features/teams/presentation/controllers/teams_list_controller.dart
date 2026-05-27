@@ -25,7 +25,7 @@ class TeamsListController extends _$TeamsListController {
     // of erroring the whole view (the use case never throws). Watching the
     // use-case provider keeps the seam to the matches feature (CLAUDE.md §6.6).
     final matchesResult =
-        await ref.watch(listMyMatchesUseCaseProvider).call(const NoParams());
+        await ref.read(listMyMatchesUseCaseProvider).call(const NoParams());
     final matches = switch (matchesResult) {
       Right(value: final v) => v,
       Left() => const <Match>[],

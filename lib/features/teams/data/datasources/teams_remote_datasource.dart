@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
@@ -92,22 +92,22 @@ class TeamsRemoteDataSource {
     }
   }
 
-  /// Uploads [file] to `team-logos/<teamId>/logo.<ext>` and patches the
+  /// Uploads [bytes] to `team-logos/<teamId>/logo.<ext>` and patches the
   /// team row's `logo_url`. Returns the public URL. Mirrors the avatar
   /// upload pattern in `onboarding_remote_datasource.dart`.
   Future<String> uploadTeamLogo({
     required String teamId,
-    required File file,
-    required String contentType,
+    required List<int> bytes,
     required String extension,
   }) async {
     try {
-      final path = '$teamId/logo.$extension';
-      await _supabase.storage.from('team-logos').upload(
+      final ext = _normalizeExtension(extension);
+      final path = '$teamId/logo.$ext';
+      await _supabase.storage.from('team-logos').uploadBinary(
             path,
-            file,
+            Uint8List.fromList(bytes),
             fileOptions: FileOptions(
-              contentType: contentType,
+              contentType: _contentTypeFor(ext),
               upsert: true,
             ),
           );
@@ -123,6 +123,33 @@ class TeamsRemoteDataSource {
       throw ServerException(e.message);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
+    }
+  }
+
+  String _normalizeExtension(String raw) {
+    final stripped = raw.startsWith('.') ? raw.substring(1) : raw;
+    switch (stripped.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'jpg';
+      case 'png':
+        return 'png';
+      case 'webp':
+        return 'webp';
+      default:
+        return 'jpg';
+    }
+  }
+
+  String _contentTypeFor(String ext) {
+    switch (ext) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'jpg':
+      default:
+        return 'image/jpeg';
     }
   }
 

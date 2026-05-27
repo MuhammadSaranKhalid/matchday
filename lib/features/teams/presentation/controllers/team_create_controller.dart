@@ -130,10 +130,17 @@ class TeamCreateController extends _$TeamCreateController {
         // Done screen — the user can replace it from the team page.
         if (current.crestKind == CrestKind.upload &&
             (current.logoUrl?.isNotEmpty ?? false)) {
+          final file = File(current.logoUrl!);
+          final bytes = await file.readAsBytes();
+          final dot = file.path.lastIndexOf('.');
+          final extension = dot >= 0 && dot < file.path.length - 1
+              ? file.path.substring(dot + 1)
+              : 'jpg';
           await ref.read(uploadTeamLogoUseCaseProvider).call(
                 UploadTeamLogoParams(
                   teamId: team.id,
-                  file: File(current.logoUrl!),
+                  bytes: bytes,
+                  extension: extension,
                 ),
               );
         }

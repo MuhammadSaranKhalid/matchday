@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:fpdart/fpdart.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
@@ -20,21 +17,12 @@ import '../datasources/teams_remote_datasource.dart';
 class TeamsRepositoryImpl implements TeamsRepository {
   TeamsRepositoryImpl({
     required TeamsRemoteDataSource remote,
-    required SupabaseClient supabase,
     Uuid? uuid,
   })  : _remote = remote,
-        _supabase = supabase,
         _uuid = uuid ?? const Uuid();
 
   final TeamsRemoteDataSource _remote;
-  final SupabaseClient _supabase;
   final Uuid _uuid;
-
-  String _requireUserId() {
-    final id = _supabase.auth.currentUser?.id;
-    if (id == null) throw StateError('No signed-in user');
-    return id;
-  }
 
   // ─── Reads ──────────────────────────────────────────────────────────────
 
@@ -120,7 +108,6 @@ class TeamsRepositoryImpl implements TeamsRepository {
     String? logoMonogram,
   }) async {
     try {
-      _requireUserId();
       final dto = await _remote.createTeam({
         'id': _uuid.v4(),
         'team_name': name.value,
@@ -136,8 +123,6 @@ class TeamsRepositoryImpl implements TeamsRepository {
         'logo_monogram': logoMonogram,
       });
       return Right(dto.toEntity());
-    } on StateError catch (e) {
-      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
@@ -150,16 +135,14 @@ class TeamsRepositoryImpl implements TeamsRepository {
   @override
   Future<Either<Failure, String>> uploadTeamLogo({
     required TeamId teamId,
-    required File file,
+    required List<int> bytes,
+    required String extension,
   }) async {
     try {
-      final ext = _extensionFor(file.path);
-      final contentType = _contentTypeFor(ext);
       final url = await _remote.uploadTeamLogo(
         teamId: teamId.value,
-        file: file,
-        contentType: contentType,
-        extension: ext,
+        bytes: bytes,
+        extension: extension,
       );
       return Right(url);
     } on UnauthorizedException catch (e) {
@@ -171,43 +154,12 @@ class TeamsRepositoryImpl implements TeamsRepository {
     }
   }
 
-  String _extensionFor(String path) {
-    final dot = path.lastIndexOf('.');
-    if (dot < 0 || dot == path.length - 1) return 'jpg';
-    final raw = path.substring(dot + 1).toLowerCase();
-    // Map common extensions to the bucket's allowed MIME types.
-    switch (raw) {
-      case 'jpg':
-      case 'jpeg':
-        return 'jpg';
-      case 'png':
-        return 'png';
-      case 'webp':
-        return 'webp';
-      default:
-        return 'jpg';
-    }
-  }
-
-  String _contentTypeFor(String ext) {
-    switch (ext) {
-      case 'png':
-        return 'image/png';
-      case 'webp':
-        return 'image/webp';
-      case 'jpg':
-      default:
-        return 'image/jpeg';
-    }
-  }
-
   @override
   Future<Either<Failure, Unit>> addUnclaimedPlayer({
     required TeamId teamId,
     required PlayerDisplayName displayName,
   }) async {
     try {
-      _requireUserId();
       final unclaimedId = _uuid.v4();
       await _remote.createUnclaimed({
         'id': unclaimedId,
@@ -222,8 +174,6 @@ class TeamsRepositoryImpl implements TeamsRepository {
         'jersey_number': null,
       });
       return const Right(unit);
-    } on StateError catch (e) {
-      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {

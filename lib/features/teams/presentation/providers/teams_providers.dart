@@ -1,5 +1,4 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/usecase/usecase.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/datasources/teams_datasource_providers.dart';
@@ -24,7 +23,6 @@ part 'teams_providers.g.dart';
 @Riverpod(keepAlive: true)
 TeamsRepository teamsRepository(Ref ref) => TeamsRepositoryImpl(
       remote: ref.watch(teamsRemoteDataSourceProvider),
-      supabase: ref.watch(supabaseClientProvider),
     );
 
 @riverpod

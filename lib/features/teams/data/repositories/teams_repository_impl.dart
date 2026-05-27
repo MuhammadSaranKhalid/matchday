@@ -84,7 +84,8 @@ class TeamsRepositoryImpl implements TeamsRepository {
       final roster = teamMembers
           .map((m) => RosterMember(
                 member: m.toEntity(),
-                displayName: byId[m.playerId]?.displayName ?? 'Unknown player',
+                displayName:
+                    byId[m.unclaimedId]?.displayName ?? 'Unknown player',
               ))
           .toList()
         ..sort((a, b) => a.member.joinedAt.compareTo(b.member.joinedAt));

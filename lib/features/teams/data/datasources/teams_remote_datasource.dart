@@ -175,13 +175,19 @@ class TeamsRemoteDataSource {
 
   Future<TeamMemberDto> createMember(Map<String, dynamic> payload) async {
     try {
+      // Polymorphic player ref: the table has user_id XOR unclaimed_id, no
+      // player_id/player_type columns. Caller still speaks the domain
+      // vocabulary (player_id + player_type) — split it here at the wire
+      // boundary.
+      final playerType = payload['player_type'] as String;
+      final playerId = payload['player_id'] as String;
       final row = await _supabase
           .from(_members)
           .insert({
             'membership_id': payload['id'],
             'team_id': payload['team_id'],
-            'player_id': payload['player_id'],
-            'player_type': payload['player_type'],
+            if (playerType == 'claimed') 'user_id': playerId,
+            if (playerType == 'unclaimed') 'unclaimed_id': playerId,
             'role': payload['role'],
             if (payload['jersey_number'] != null)
               'jersey_number': payload['jersey_number'],

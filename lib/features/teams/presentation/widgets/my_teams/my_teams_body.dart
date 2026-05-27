@@ -130,141 +130,120 @@ class _Scroll extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = view.teams;
-    final children = <Widget>[];
+    // List of factories — each only materialises its widget when the row is
+    // scrolled into view. Captures the row data in a closure so we don't
+    // build every TeamRow up-front.
+    final builders = <WidgetBuilder>[];
 
     if (view.isEmpty) {
-      children.add(MyTeamsEmptyState(onCreate: onCreate));
+      builders.add((_) => MyTeamsEmptyState(onCreate: onCreate));
     }
-
     if (view.needsYou.isNotEmpty) {
-      children.add(NeedsYouSection(items: view.needsYou));
+      builders.add((_) => NeedsYouSection(items: view.needsYou));
     }
-
     if (view.today != null) {
-      children.add(TodayCard(data: view.today!));
+      builders.add((_) => TodayCard(data: view.today!));
     }
 
     if (view.invites.isNotEmpty) {
-      children.add(
-        Subhead('Invites', accent: CkColors.red, count: view.invites.length),
-      );
-      children.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Column(
-            children: [
-              for (var i = 0; i < view.invites.length; i++) ...[
-                if (i > 0) const SizedBox(height: 8),
-                InviteCard(invite: view.invites[i]),
+      builders.add((_) => Subhead(
+            'Invites',
+            accent: CkColors.red,
+            count: view.invites.length,
+          ));
+      builders.add((_) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Column(
+              children: [
+                for (var i = 0; i < view.invites.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  InviteCard(invite: view.invites[i]),
+                ],
               ],
-            ],
-          ),
-        ),
-      );
+            ),
+          ));
     }
 
-    // ── You lead (captain + vc) ────────────────────────────────────────
+    void addRows(List<TeamRowVm> rows,
+        {bool withChevron = true, bool resetFirst = true}) {
+      for (var i = 0; i < rows.length; i++) {
+        final row = rows[i];
+        final isFirst = resetFirst && i == 0;
+        builders.add((_) => TeamRow(
+              vm: row,
+              isFirst: isFirst,
+              withChevron: withChevron,
+              onTap: _tapFor(row),
+            ));
+      }
+    }
+
+    // ── You lead (captain + vc) ───────────────────────────────────────
     final leadCount = t.captain.length + t.vc.length;
     if (leadCount > 0) {
-      children.add(Subhead('You lead', count: leadCount));
-      var first = true;
-      for (final row in t.captain) {
-        children.add(TeamRow(vm: row, isFirst: first, onTap: _tapFor(row)));
-        first = false;
-      }
-      for (final row in t.vc) {
-        children.add(TeamRow(vm: row, isFirst: first, onTap: _tapFor(row)));
-        first = false;
-      }
+      builders.add((_) => Subhead('You lead', count: leadCount));
+      addRows(t.captain);
+      addRows(t.vc, resetFirst: t.captain.isEmpty);
     }
 
     // ── You play ──────────────────────────────────────────────────────
     if (t.playing.isNotEmpty) {
-      children.add(Subhead('You play', count: t.playing.length));
-      for (var i = 0; i < t.playing.length; i++) {
-        children.add(TeamRow(
-            vm: t.playing[i], isFirst: i == 0, onTap: _tapFor(t.playing[i])));
-      }
+      builders.add((_) => Subhead('You play', count: t.playing.length));
+      addRows(t.playing);
     }
 
-    // ── You manage (manage + draft + scorer) ───────────────────────────
+    // ── You manage (manage + draft + scorer) ──────────────────────────
     final manageCount =
         t.manage.length + t.draft.length + t.scorer.length;
     if (manageCount > 0) {
-      children.add(Subhead('You manage', count: manageCount));
-      var first = true;
-      for (final row in t.manage) {
-        children.add(TeamRow(vm: row, isFirst: first, onTap: _tapFor(row)));
-        first = false;
-      }
-      for (final row in t.draft) {
-        children.add(TeamRow(vm: row, isFirst: first, onTap: _tapFor(row)));
-        first = false;
-      }
-      for (final row in t.scorer) {
-        children.add(TeamRow(vm: row, isFirst: first, onTap: _tapFor(row)));
-        first = false;
-      }
+      builders.add((_) => Subhead('You manage', count: manageCount));
+      addRows(t.manage);
+      addRows(t.draft, resetFirst: t.manage.isEmpty);
+      addRows(t.scorer,
+          resetFirst: t.manage.isEmpty && t.draft.isEmpty);
     }
 
     // ── Awaiting approval ─────────────────────────────────────────────
     if (t.pending.isNotEmpty) {
-      children.add(
-        Subhead(
-          'Awaiting approval',
-          accent: CkColors.amber,
-          count: t.pending.length,
-        ),
-      );
-      for (var i = 0; i < t.pending.length; i++) {
-        children.add(TeamRow(
-            vm: t.pending[i], isFirst: i == 0, onTap: _tapFor(t.pending[i])));
-      }
+      builders.add((_) => Subhead(
+            'Awaiting approval',
+            accent: CkColors.amber,
+            count: t.pending.length,
+          ));
+      addRows(t.pending);
     }
 
     // ── Following ─────────────────────────────────────────────────────
     if (view.following.isNotEmpty) {
-      children.add(Subhead('Following', count: view.following.length));
-      for (var i = 0; i < view.following.length; i++) {
-        children.add(TeamRow(
-            vm: view.following[i],
-            isFirst: i == 0,
-            onTap: _tapFor(view.following[i])));
-      }
+      builders.add((_) => Subhead('Following', count: view.following.length));
+      addRows(view.following);
     }
 
     // ── Archived ──────────────────────────────────────────────────────
     if (t.archived.isNotEmpty) {
-      children.add(Subhead('Archived', count: t.archived.length));
-      for (var i = 0; i < t.archived.length; i++) {
-        children.add(
-          TeamRow(
-            vm: t.archived[i],
-            isFirst: i == 0,
-            withChevron: false,
-            onTap: _tapFor(t.archived[i]),
-          ),
-        );
-      }
+      builders.add((_) => Subhead('Archived', count: t.archived.length));
+      addRows(t.archived, withChevron: false);
     }
 
     // ── Suggested ─────────────────────────────────────────────────────
     if (view.suggested.isNotEmpty) {
-      children.add(Subhead(view.suggestedTitle ?? 'Near you · Karachi'));
-      children.add(SuggestedStrip(items: view.suggested));
+      builders.add(
+          (_) => Subhead(view.suggestedTitle ?? 'Near you · Karachi'));
+      builders.add((_) => SuggestedStrip(items: view.suggested));
     }
 
     // ── "Play, don't just watch." nudge ───────────────────────────────
     if (view.showCreateNudge) {
-      children.add(CreateNudgeCard(onStart: onCreate));
+      builders.add((_) => CreateNudgeCard(onStart: onCreate));
     }
 
-    children.add(const SizedBox(height: 24));
+    builders.add((_) => const SizedBox(height: 24));
 
-    return ListView(
+    return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 12),
-      children: children,
+      itemCount: builders.length,
+      itemBuilder: (ctx, i) => builders[i](ctx),
     );
   }
 }

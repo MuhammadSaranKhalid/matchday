@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
@@ -225,20 +226,21 @@ class _MiniCrest extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (crest.logoUrl == null || crest.logoUrl!.isEmpty) return _mono();
+    final memW = (32 * MediaQuery.devicePixelRatioOf(context)).round();
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: Container(
         width: 32,
         height: 32,
         color: CkColors.paper2,
-        child: Image.network(
-          crest.logoUrl!,
+        child: CachedNetworkImage(
+          imageUrl: crest.logoUrl!,
           fit: BoxFit.cover,
           width: 32,
           height: 32,
-          errorBuilder: (_, __, ___) => _mono(),
-          loadingBuilder: (ctx, child, progress) =>
-              progress == null ? child : _mono(),
+          memCacheWidth: memW,
+          errorWidget: (_, __, ___) => _mono(),
+          placeholder: (_, __) => _mono(),
         ),
       ),
     );

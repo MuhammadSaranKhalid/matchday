@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/circk_theme.dart';
@@ -80,20 +81,21 @@ class TeamAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (logoUrl == null || logoUrl!.isEmpty) return _monoTile();
+    final memW = (size * MediaQuery.devicePixelRatioOf(context)).round();
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: Container(
         width: size,
         height: size,
         color: CkColors.paper2,
-        child: Image.network(
-          logoUrl!,
+        child: CachedNetworkImage(
+          imageUrl: logoUrl!,
           fit: BoxFit.cover,
           width: size,
           height: size,
-          errorBuilder: (_, __, ___) => _monoTile(),
-          loadingBuilder: (ctx, child, progress) =>
-              progress == null ? child : _monoTile(),
+          memCacheWidth: memW,
+          errorWidget: (_, __, ___) => _monoTile(),
+          placeholder: (_, __) => _monoTile(),
         ),
       ),
     );

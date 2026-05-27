@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
@@ -130,6 +131,7 @@ class _CrestWithBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final memW = (44 * MediaQuery.devicePixelRatioOf(context)).round();
     final tile = _showImage
         ? ClipRRect(
             borderRadius: BorderRadius.circular(11),
@@ -137,14 +139,14 @@ class _CrestWithBadge extends StatelessWidget {
               width: 44,
               height: 44,
               color: CkColors.paper2,
-              child: Image.network(
-                crest.logoUrl!,
+              child: CachedNetworkImage(
+                imageUrl: crest.logoUrl!,
                 fit: BoxFit.cover,
                 width: 44,
                 height: 44,
-                errorBuilder: (_, __, ___) => _monoTile(),
-                loadingBuilder: (ctx, child, progress) =>
-                    progress == null ? child : _monoTile(),
+                memCacheWidth: memW,
+                errorWidget: (_, __, ___) => _monoTile(),
+                placeholder: (_, __) => _monoTile(),
               ),
             ),
           )

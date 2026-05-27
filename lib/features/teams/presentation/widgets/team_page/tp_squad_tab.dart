@@ -50,31 +50,41 @@ class TpSquadTab extends StatelessWidget {
     final players =
         team.squad.where((p) => p.role == TpPlayerRole.player).toList();
 
-    return ListView(
+    final builders = <WidgetBuilder>[];
+    builders.add((_) => _FilterChips());
+    if (lead.isNotEmpty) {
+      builders.add(
+          (_) => TpSectionHeader(label: 'Captaincy & keeper', count: lead.length));
+      for (var i = 0; i < lead.length; i++) {
+        final player = lead[i];
+        final isFirst = i == 0;
+        builders.add((_) => TpPlayerRowWidget(
+              player: player,
+              primary: team.primary,
+              isFirst: isFirst,
+              viewerPlayerId: viewerPlayerId,
+            ));
+      }
+    }
+    if (players.isNotEmpty) {
+      builders.add(
+          (_) => TpSectionHeader(label: 'Players', count: players.length));
+      for (var i = 0; i < players.length; i++) {
+        final player = players[i];
+        final isFirst = i == 0;
+        builders.add((_) => TpPlayerRowWidget(
+              player: player,
+              primary: team.primary,
+              isFirst: isFirst,
+              viewerPlayerId: viewerPlayerId,
+            ));
+      }
+    }
+
+    return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      children: [
-        _FilterChips(),
-        if (lead.isNotEmpty) ...[
-          TpSectionHeader(label: 'Captaincy & keeper', count: lead.length),
-          for (var i = 0; i < lead.length; i++)
-            TpPlayerRowWidget(
-              player: lead[i],
-              primary: team.primary,
-              isFirst: i == 0,
-              viewerPlayerId: viewerPlayerId,
-            ),
-        ],
-        if (players.isNotEmpty) ...[
-          TpSectionHeader(label: 'Players', count: players.length),
-          for (var i = 0; i < players.length; i++)
-            TpPlayerRowWidget(
-              player: players[i],
-              primary: team.primary,
-              isFirst: i == 0,
-              viewerPlayerId: viewerPlayerId,
-            ),
-        ],
-      ],
+      itemCount: builders.length,
+      itemBuilder: (ctx, i) => builders[i](ctx),
     );
   }
 }

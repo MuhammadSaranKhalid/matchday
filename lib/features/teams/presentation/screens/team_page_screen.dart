@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../matches/presentation/providers/matches_providers.dart';
+import '../../domain/entities/team.dart';
 import '../providers/teams_providers.dart';
 import '../state/team_page_real_data_adapter.dart';
 import '../widgets/team_page/tp_body.dart';
@@ -19,24 +20,21 @@ class TeamPageScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final teamAsync = ref.watch(teamProvider(teamId));
-    final rosterAsync = ref.watch(rosterProvider(teamId));
-    final matchesAsync = ref.watch(myMatchesProvider);
-    final userId =
-        ref.watch(currentUserStreamProvider).value?.id.value;
+    // Narrow user with .select — String == is stable so unrelated user-stream
+    // ticks won't rebuild this screen.
+    final userId = ref.watch(
+      currentUserStreamProvider.select((u) => u.value?.id.value),
+    );
 
     return Scaffold(
       backgroundColor: CkColors.paper,
       body: switch (teamAsync) {
         AsyncData(value: final team?) => SafeArea(
             top: false,
-            child: TeamPageBody(
-              view: buildTeamPageViewFromReal(
-                team: team,
-                roster: rosterAsync.value ?? const [],
-                matches: matchesAsync.value ?? const [],
-                viewerUserId: userId,
-              ),
-              onBack: () => context.pop(),
+            child: _LoadedBody(
+              teamId: teamId,
+              team: team,
+              userId: userId,
             ),
           ),
         AsyncData(value: null) => _NotFound(onBack: () => context.pop()),
@@ -44,6 +42,42 @@ class TeamPageScreen extends ConsumerWidget {
         _ => const Center(
             child: CircularProgressIndicator(color: CkColors.ink)),
       },
+    );
+  }
+}
+
+/// Isolates roster + matches subscriptions so they don't rebuild the outer
+/// scaffold (loader/not-found chrome) on every stream tick. Also pre-filters
+/// matches to just this team's so the adapter does proportional work.
+class _LoadedBody extends ConsumerWidget {
+  const _LoadedBody({
+    required this.teamId,
+    required this.team,
+    required this.userId,
+  });
+
+  final String teamId;
+  final Team team;
+  final String? userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rosterAsync = ref.watch(rosterProvider(teamId));
+    final matchesAsync = ref.watch(myMatchesProvider);
+    final allMatches = matchesAsync.value ?? const [];
+    final matchesForTeam = allMatches
+        .where((m) =>
+            m.teamAId.value == teamId || m.teamBId.value == teamId)
+        .toList();
+
+    return TeamPageBody(
+      view: buildTeamPageViewFromReal(
+        team: team,
+        roster: rosterAsync.value ?? const [],
+        matches: matchesForTeam,
+        viewerUserId: userId,
+      ),
+      onBack: () => context.pop(),
     );
   }
 }

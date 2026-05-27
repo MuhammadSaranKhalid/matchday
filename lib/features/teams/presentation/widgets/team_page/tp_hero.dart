@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
@@ -212,6 +213,7 @@ class _HeroCrest extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = team.logoUrl;
     if (url == null || url.isEmpty) return _mono();
+    final memW = (72 * MediaQuery.devicePixelRatioOf(context)).round();
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: Container(
@@ -219,11 +221,12 @@ class _HeroCrest extends StatelessWidget {
         height: 72,
         color: Colors.white,
         padding: const EdgeInsets.all(8),
-        child: Image.network(
-          url,
+        child: CachedNetworkImage(
+          imageUrl: url,
           fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => _mono(),
-          loadingBuilder: (ctx, child, p) => p == null ? child : _mono(),
+          memCacheWidth: memW,
+          errorWidget: (_, __, ___) => _mono(),
+          placeholder: (_, __) => _mono(),
         ),
       ),
     );

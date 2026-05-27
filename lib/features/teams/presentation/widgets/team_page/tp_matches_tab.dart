@@ -19,34 +19,45 @@ class TpMatchesTab extends StatelessWidget {
         body: 'Schedule a friendly or register for a tournament.',
       );
     }
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      children: [
-        if (team.form.isNotEmpty) _FormStrip(form: team.form),
-        if (team.tournament != null)
-          _TournamentCard(
-              tournament: team.tournament!, primary: team.primary),
-        if (team.upcoming.isNotEmpty) ...[
-          Padding(
+    final builders = <WidgetBuilder>[];
+    if (team.form.isNotEmpty) {
+      builders.add((_) => _FormStrip(form: team.form));
+    }
+    if (team.tournament != null) {
+      builders.add((_) => _TournamentCard(
+            tournament: team.tournament!,
+            primary: team.primary,
+          ));
+    }
+    if (team.upcoming.isNotEmpty) {
+      builders.add((_) => Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
             child: Text(
               'UPCOMING · ${team.upcoming.length}',
               style: tpMono(),
             ),
-          ),
-          for (final m in team.upcoming) _UpcomingRow(match: m),
-        ],
-        if (team.recent.isNotEmpty) ...[
-          Padding(
+          ));
+      for (final m in team.upcoming) {
+        builders.add((_) => _UpcomingRow(match: m));
+      }
+    }
+    if (team.recent.isNotEmpty) {
+      builders.add((_) => Padding(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
             child: Text(
               'RECENT · ${team.recent.length}',
               style: tpMono(),
             ),
-          ),
-          for (final m in team.recent) _RecentRow(match: m),
-        ],
-      ],
+          ));
+      for (final m in team.recent) {
+        builders.add((_) => _RecentRow(match: m));
+      }
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      itemCount: builders.length,
+      itemBuilder: (ctx, i) => builders[i](ctx),
     );
   }
 }

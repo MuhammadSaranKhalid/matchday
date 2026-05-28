@@ -3,17 +3,18 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/ball_dto.dart';
-import '../models/innings_dto.dart';
 import '../models/match_dto.dart';
 import '../models/match_request_dto.dart';
 
-/// Talks to Supabase for the `matches` table. Returns DTOs, throws raw
-/// exceptions. RLS scopes reads/writes.
+/// Talks to Supabase for the `matches`, `balls`, and `match_requests`
+/// tables. Returns DTOs / RPC result types, throws raw exceptions. RLS +
+/// SECURITY DEFINER RPCs scope reads/writes.
 class MatchesRemoteDataSource {
   MatchesRemoteDataSource(this._supabase);
   final SupabaseClient _supabase;
 
-  static const _table = 'matches';
+  static const _matches = 'matches';
+  static const _balls = 'balls';
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
@@ -21,23 +22,12 @@ class MatchesRemoteDataSource {
     return id;
   }
 
-  Future<MatchDto> create(Map<String, dynamic> payload) async {
-    try {
-      final row = await _supabase
-          .from(_table)
-          .insert({...payload, 'created_by': _requireUid()})
-          .select()
-          .single();
-      return MatchDto.fromJson(row);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
+  // ─── Matches ────────────────────────────────────────────────────────────
 
   Future<MatchDto> update(String id, Map<String, dynamic> changes) async {
     try {
       final row = await _supabase
-          .from(_table)
+          .from(_matches)
           .update(changes)
           .eq('match_id', id)
           .select()
@@ -45,7 +35,7 @@ class MatchesRemoteDataSource {
       return MatchDto.fromJson(row);
     } on PostgrestException catch (e) {
       if (e.code == 'PGRST116') {
-        throw NotFoundException('Match $id not found or already responded');
+        throw NotFoundException('Match $id not found');
       }
       throw ServerException(e.message);
     }
@@ -53,112 +43,32 @@ class MatchesRemoteDataSource {
 
   Future<MatchDto?> getById(String id) async {
     try {
-      final row =
-          await _supabase.from(_table).select().eq('match_id', id).maybeSingle();
+      final row = await _supabase
+          .from(_matches)
+          .select()
+          .eq('match_id', id)
+          .maybeSingle();
       return row == null ? null : MatchDto.fromJson(row);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
   }
 
-  Future<InningsDto> createInnings(Map<String, dynamic> payload) async {
-    try {
-      final row =
-          await _supabase.from('innings').insert(payload).select().single();
-      return InningsDto.fromJson(row);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  // ─── Innings + balls (scoring) ──────────────────────────────────────────
-
-  Future<InningsDto> updateInnings(
-      String inningsId, Map<String, dynamic> changes) async {
-    try {
-      final row = await _supabase
-          .from('innings')
-          .update(changes)
-          .eq('innings_id', inningsId)
-          .select()
-          .single();
-      return InningsDto.fromJson(row);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  /// The latest innings for a match (highest innings_number).
-  Future<InningsDto?> getCurrentInnings(String matchId) async {
+  /// All matches visible to the user (RLS-scoped), newest first.
+  Future<List<MatchDto>> list() async {
     try {
       final rows = await _supabase
-          .from('innings')
+          .from(_matches)
           .select()
-          .eq('match_id', matchId)
-          .order('innings_number', ascending: false)
-          .limit(1);
-      return rows.isEmpty ? null : InningsDto.fromJson(rows.first);
+          .order('created_at', ascending: false);
+      return rows.map(MatchDto.fromJson).toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
   }
 
-  Future<InningsDto?> getInnings(String inningsId) async {
-    try {
-      final row = await _supabase
-          .from('innings')
-          .select()
-          .eq('innings_id', inningsId)
-          .maybeSingle();
-      return row == null ? null : InningsDto.fromJson(row);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
+  // ─── Match Start RPCs (deployed in migration 0623) ───────────────────────
 
-  /// Insert one delivery; the DB trigger rolls it into the innings totals.
-  Future<void> insertBall(Map<String, dynamic> payload) async {
-    try {
-      await _supabase.from('balls').insert({
-        ...payload,
-        'entered_by': _requireUid(),
-      });
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  Stream<List<BallDto>> watchBalls(String inningsId) => _supabase
-      .from('balls')
-      .stream(primaryKey: ['ball_id'])
-      .eq('innings_id', inningsId)
-      .order('ball_id')
-      .map((rows) => rows.map(BallDto.fromJson).toList());
-
-  Stream<InningsDto?> watchInnings(String inningsId) => _supabase
-      .from('innings')
-      .stream(primaryKey: ['innings_id'])
-      .eq('innings_id', inningsId)
-      .map((rows) => rows.isEmpty ? null : InningsDto.fromJson(rows.first));
-
-  /// Innings rows for a bounded set of match ids. One query rather than N.
-  /// Returns the raw DTOs; the repository groups them by match.
-  Future<List<InningsDto>> listInningsForMatches(List<String> matchIds) async {
-    if (matchIds.isEmpty) return const [];
-    try {
-      final rows = await _supabase
-          .from('innings')
-          .select()
-          .inFilter('match_id', matchIds);
-      return rows.map(InningsDto.fromJson).toList();
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  // ─── Match Start RPCs (deployed in migration 0623) ──────────────────────
-
-  /// Host phone records the toss outcome.
   Future<void> recordMatchToss({
     required String matchId,
     required String wonBy,
@@ -177,7 +87,6 @@ class MatchesRemoteDataSource {
     }
   }
 
-  /// Batting captain locks striker + non-striker.
   Future<void> submitMatchOpeners({
     required String matchId,
     required String strikerId,
@@ -194,7 +103,6 @@ class MatchesRemoteDataSource {
     }
   }
 
-  /// Batting captain tips the match into Live.
   Future<void> startMatchNow(String matchId) async {
     try {
       await _supabase.rpc<void>('start_match_now', params: {
@@ -205,12 +113,8 @@ class MatchesRemoteDataSource {
     }
   }
 
-  /// Subscribes to the `match:<id>:state` private broadcast channel. The
-  /// server-side `broadcast_match_state` trigger fires on every UPDATE; we
-  /// emit a hydrated MatchDto each time. Also performs an initial GET so the
-  /// caller sees the current row before any broadcast arrives.
+  /// Subscribes to the `match:<id>:state` private broadcast channel.
   Stream<MatchDto?> watchMatch(String matchId) async* {
-    // Initial hydration — broadcast only fires on UPDATE, not on subscribe.
     yield await getById(matchId);
 
     final controller = StreamController<MatchDto?>();
@@ -223,9 +127,8 @@ class MatchesRemoteDataSource {
         .onBroadcast(
           event: 'match_state_updated',
           callback: (payload) {
-            // The trigger sends `to_jsonb(new)` as the payload — the row
-            // shape, but realtime wraps it in `{payload: {...}}`.
-            final data = (payload['payload'] as Map<String, dynamic>?) ?? payload;
+            final data =
+                (payload['payload'] as Map<String, dynamic>?) ?? payload;
             try {
               controller.add(MatchDto.fromJson(data));
             } catch (e) {
@@ -243,20 +146,152 @@ class MatchesRemoteDataSource {
     );
   }
 
-  /// Translate RPC failures into our own exceptions. `42501` is the
-  /// permission-check error our RPCs raise via `raise exception ... using
-  /// errcode = '42501'`. Other codes route to ServerException.
-  Exception _rpcException(PostgrestException e) {
-    if (e.code == '42501' || e.code == '28000') {
-      return UnauthorizedException(e.message);
+  // ─── Scoring RPCs (deployed in migration 0420 / 0410 / 0623) ─────────────
+
+  Future<void> startInnings({
+    required String matchId,
+    required int inningsNumber,
+    required String strikerId,
+    required String nonStrikerId,
+    required String bowlerId,
+  }) async {
+    try {
+      await _supabase.rpc<void>('start_innings', params: {
+        'p_match_id': matchId,
+        'p_innings_number': inningsNumber,
+        'p_striker_id': strikerId,
+        'p_non_striker_id': nonStrikerId,
+        'p_bowler_id': bowlerId,
+      });
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
     }
-    if (e.code == '23502' || e.code == '23000' || e.code == '23514') {
-      return ServerException(e.message);
-    }
-    return ServerException(e.message);
   }
 
-  // ─── Match Requests (Challenge handshake — deployed via migration 0600) ──
+  /// `record_ball` returns the inserted balls row (the RPC's RETURN type).
+  Future<BallDto> recordBall(Map<String, dynamic> params) async {
+    try {
+      final result = await _supabase.rpc<dynamic>('record_ball', params: params);
+      if (result is Map) {
+        return BallDto.fromJson(Map<String, dynamic>.from(result));
+      }
+      if (result is List && result.isNotEmpty) {
+        return BallDto.fromJson(Map<String, dynamic>.from(result.first as Map));
+      }
+      throw ServerException('record_ball returned no row');
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
+    }
+  }
+
+  Future<bool> undoLastBall({
+    required String matchId,
+    required int inningsNumber,
+  }) async {
+    try {
+      final result = await _supabase.rpc<dynamic>(
+        'undo_last_ball',
+        params: {
+          'p_match_id': matchId,
+          'p_innings_number': inningsNumber,
+        },
+      );
+      return result == true;
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
+    }
+  }
+
+  /// Initial-hydration GET for balls in (match, innings) — feeds the
+  /// broadcast stream's first emission.
+  Future<List<BallDto>> listBalls({
+    required String matchId,
+    required int inningsNumber,
+  }) async {
+    try {
+      final rows = await _supabase
+          .from(_balls)
+          .select()
+          .eq('match_id', matchId)
+          .eq('innings_number', inningsNumber)
+          .order('seq', ascending: true);
+      return rows.map(BallDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Subscribes to the `match:<id>:balls` broadcast channel and emits the
+  /// list of balls for `inningsNumber`, oldest-first, after each broadcast.
+  Stream<List<BallDto>> watchBalls({
+    required String matchId,
+    required int inningsNumber,
+  }) async* {
+    // Initial hydration.
+    var current = await listBalls(matchId: matchId, inningsNumber: inningsNumber);
+    yield current;
+
+    final controller = StreamController<List<BallDto>>();
+    final channel = _supabase.channel(
+      'match:$matchId:balls',
+      opts: const RealtimeChannelConfig(self: true, private: true),
+    );
+
+    channel
+        .onBroadcast(
+          event: 'ball_recorded',
+          callback: (payload) {
+            final data =
+                (payload['payload'] as Map<String, dynamic>?) ?? payload;
+            try {
+              final dto = BallDto.fromJson(data);
+              if (dto.inningsNumber != inningsNumber) return;
+              current = [...current, dto]..sort((a, b) => a.seq.compareTo(b.seq));
+              controller.add(List.unmodifiable(current));
+            } catch (e) {
+              controller.addError(ServerException(e.toString()));
+            }
+          },
+        )
+        .onBroadcast(
+          event: 'ball_deleted',
+          callback: (payload) {
+            final data =
+                (payload['payload'] as Map<String, dynamic>?) ?? payload;
+            final deletedId = data['ball_id'] as String?;
+            if (deletedId == null) return;
+            current = current.where((b) => b.ballId != deletedId).toList();
+            controller.add(List.unmodifiable(current));
+          },
+        )
+        .subscribe();
+
+    yield* controller.stream.asBroadcastStream(
+      onCancel: (sub) async {
+        await _supabase.removeChannel(channel);
+        await controller.close();
+      },
+    );
+  }
+
+  /// Per-team innings aggregates for a set of matches. We pull all balls
+  /// for the requested match ids in one query then bucket by
+  /// (match_id, innings_number, batting team) — the batting team is
+  /// derived from the match row, since balls only carry batsman_id.
+  Future<List<BallDto>> listBallsForMatches(List<String> matchIds) async {
+    if (matchIds.isEmpty) return const [];
+    try {
+      final rows = await _supabase
+          .from(_balls)
+          .select()
+          .inFilter('match_id', matchIds);
+      return rows.map(BallDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // ─── Match Requests (Challenge handshake — migration 0600) ───────────────
 
   Future<String> sendMatchChallenge(Map<String, dynamic> params) async {
     try {
@@ -264,7 +299,6 @@ class MatchesRemoteDataSource {
         'send_match_request',
         params: params,
       );
-      // RPC returns the new request_id as a string-typed uuid.
       if (result is String) return result;
       if (result is List && result.isNotEmpty) return result.first.toString();
       throw ServerException('send_match_request returned no id');
@@ -339,9 +373,6 @@ class MatchesRemoteDataSource {
     }
   }
 
-  /// All match_requests the caller can read (manager-of-either-team RLS).
-  /// One-shot fetch — realtime updates ride the user:notifications broadcast
-  /// channel, which invalidates the caller's list provider.
   Future<List<MatchRequestDto>> listMyMatchChallenges() async {
     try {
       final rows = await _supabase
@@ -354,14 +385,17 @@ class MatchesRemoteDataSource {
     }
   }
 
-  /// All matches visible to the user (RLS-scoped), newest first.
-  Future<List<MatchDto>> list() async {
-    try {
-      final rows =
-          await _supabase.from(_table).select().order('created_at', ascending: false);
-      return rows.map(MatchDto.fromJson).toList();
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
+  /// Translate RPC PostgrestException codes into our own exceptions.
+  Exception _rpcException(PostgrestException e) {
+    if (e.code == '42501' || e.code == '28000') {
+      return UnauthorizedException(e.message);
     }
+    return ServerException(e.message);
   }
+
+  /// Tag the auth-required guard on inserts that don't go through an RPC.
+  /// Currently only used internally — kept to avoid unused-warning churn
+  /// if a future helper needs it.
+  // ignore: unused_element
+  String _ensureAuthed() => _requireUid();
 }

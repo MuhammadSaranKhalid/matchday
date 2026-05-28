@@ -1,33 +1,33 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../domain/entities/ball.dart';
-import '../../domain/entities/innings.dart';
 import '../../domain/entities/match.dart';
 
 part 'ball_dto.freezed.dart';
 part 'ball_dto.g.dart';
 
-/// Wire-format `balls` row.
+/// Wire-format `balls` row. Mirrors the deployed schema — there is no
+/// innings table; deliveries are keyed by `(match_id, innings_number, seq)`.
 @freezed
 abstract class BallDto with _$BallDto {
   const factory BallDto({
     @JsonKey(name: 'ball_id') required String ballId,
-    @JsonKey(name: 'innings_id') required String inningsId,
     @JsonKey(name: 'match_id') required String matchId,
+    @JsonKey(name: 'innings_number') required int inningsNumber,
+    required int seq,
     @JsonKey(name: 'over_number') required int overNumber,
-    @JsonKey(name: 'ball_number') required int ballNumber,
-    @JsonKey(name: 'legal_ball_number') required int legalBallNumber,
-    @JsonKey(name: 'bowler_id') required String bowlerId,
-    @JsonKey(name: 'striker_id') required String strikerId,
-    @JsonKey(name: 'non_striker_id') required String nonStrikerId,
+    @JsonKey(name: 'ball_in_over') required int ballInOver,
+    @JsonKey(name: 'is_legal_delivery') @Default(true) bool isLegalDelivery,
+    @JsonKey(name: 'ball_type') @Default('legal') String ballType,
     @JsonKey(name: 'runs_scored') @Default(0) int runsScored,
-    @JsonKey(name: 'extra_runs') @Default(0) int extraRuns,
-    @JsonKey(name: 'extra_type') String? extraType,
-    @JsonKey(name: 'total_runs') @Default(0) int totalRuns,
-    @JsonKey(name: 'is_four') @Default(false) bool isFour,
-    @JsonKey(name: 'is_six') @Default(false) bool isSix,
+    @Default(0) int extras,
     @JsonKey(name: 'is_wicket') @Default(false) bool isWicket,
     @JsonKey(name: 'wicket_type') String? wicketType,
-    @JsonKey(name: 'dismissed_player_id') String? dismissedPlayerId,
+    @JsonKey(name: 'is_free_hit') @Default(false) bool isFreeHit,
+    @JsonKey(name: 'batsman_id') String? batsmanId,
+    @JsonKey(name: 'non_striker_id') String? nonStrikerId,
+    @JsonKey(name: 'bowler_id') String? bowlerId,
+    @JsonKey(name: 'fielder_id') String? fielderId,
+    String? commentary,
   }) = _BallDto;
 
   const BallDto._();
@@ -37,22 +37,22 @@ abstract class BallDto with _$BallDto {
 
   Ball toEntity() => Ball(
         id: BallId(ballId),
-        inningsId: InningsId(inningsId),
         matchId: MatchId(matchId),
+        inningsNumber: inningsNumber,
+        seq: seq,
         overNumber: overNumber,
-        ballNumber: ballNumber,
-        legalBallNumber: legalBallNumber,
-        bowlerId: bowlerId,
-        strikerId: strikerId,
-        nonStrikerId: nonStrikerId,
+        ballInOver: ballInOver,
+        isLegalDelivery: isLegalDelivery,
+        ballKind: BallKind.fromWire(ballType),
         runsScored: runsScored,
-        extraRuns: extraRuns,
-        totalRuns: totalRuns,
-        extraType: ExtraType.fromWire(extraType),
-        isFour: isFour,
-        isSix: isSix,
+        extras: extras,
         isWicket: isWicket,
+        isFreeHit: isFreeHit,
         wicketType: WicketType.fromWire(wicketType),
-        dismissedPlayerId: dismissedPlayerId,
+        batsmanId: batsmanId,
+        nonStrikerId: nonStrikerId,
+        bowlerId: bowlerId,
+        fielderId: fielderId,
+        commentary: commentary,
       );
 }

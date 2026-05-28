@@ -74,7 +74,7 @@ class _MatchStartScreenState extends ConsumerState<MatchStartScreen> {
       // Match is already live — bounce the captain into the scoring screen.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          context.go('/matches/${state.match.id.value}/live');
+          context.go('/matches/${state.match.id.value}/score');
         }
       });
       return const Center(child: CircularProgressIndicator(color: CkColors.ink));
@@ -230,7 +230,7 @@ class _MatchStartScreenState extends ConsumerState<MatchStartScreen> {
       (f) => ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(f.message)),
       ),
-      (_) => context.go('/matches/${widget.matchId}/live'),
+      (_) => context.go('/matches/${widget.matchId}/score'),
     );
   }
 }

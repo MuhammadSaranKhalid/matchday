@@ -8,7 +8,6 @@ import '../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../features/home/presentation/screens/home_feed_screen.dart';
 import '../features/matches/presentation/screens/matches_v2_screen.dart';
 import '../features/messages/presentation/screens/messages_screen.dart';
-import '../features/notifications/presentation/screens/notifications_bell_screen.dart';
 import '../features/pavilion/presentation/screens/pavilion_v2_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
@@ -21,9 +20,6 @@ import '../features/matches/presentation/screens/challenge_counter_screen.dart';
 import '../features/matches/presentation/screens/challenge_detail_screen.dart';
 import '../features/matches/presentation/screens/challenge_send_screen.dart';
 import '../features/matches/presentation/screens/challenge_sent_screen.dart';
-import '../features/matches/presentation/screens/live_match_screen.dart';
-import '../features/matches/presentation/screens/match_request_screen.dart';
-import '../features/matches/presentation/screens/match_setup_screen.dart';
 import '../features/matches/presentation/screens/match_start_screen.dart';
 import '../features/matches/presentation/screens/scoring_screen.dart';
 import '../features/notifications/presentation/screens/notifications_screen.dart';
@@ -162,31 +158,14 @@ GoRouter appRouter(Ref ref) {
         ),
       ),
       GoRoute(
-        path: '/matches/setup/:teamAId',
-        builder: (_, state) =>
-            MatchSetupScreen(teamAId: state.pathParameters['teamAId']!),
-      ),
-      GoRoute(
-        path: '/matches/:matchId/request',
-        builder: (_, state) =>
-            MatchRequestScreen(matchId: state.pathParameters['matchId']!),
-      ),
-      GoRoute(
         path: '/matches/:matchId/start',
         builder: (_, state) =>
             MatchStartScreen(matchId: state.pathParameters['matchId']!),
       ),
       GoRoute(
-        path: '/matches/:matchId/score/:inningsId',
-        builder: (_, state) => ScoringScreen(
-          matchId: state.pathParameters['matchId']!,
-          inningsId: state.pathParameters['inningsId']!,
-        ),
-      ),
-      GoRoute(
-        path: '/matches/:matchId/live',
+        path: '/matches/:matchId/score',
         builder: (_, state) =>
-            LiveMatchScreen(matchId: state.pathParameters['matchId']!),
+            ScoringScreen(matchId: state.pathParameters['matchId']!),
       ),
       GoRoute(
         path: '/challenge',
@@ -228,7 +207,7 @@ GoRouter appRouter(Ref ref) {
 /// whole shell, including the bottom nav (root navigator).
 void _openBell(BuildContext context) {
   Navigator.of(context, rootNavigator: true).push(
-    MaterialPageRoute<void>(builder: (_) => const NotificationsBellScreen()),
+    MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
   );
 }
 

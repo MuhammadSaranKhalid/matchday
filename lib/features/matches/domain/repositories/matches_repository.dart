@@ -2,68 +2,26 @@ import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../entities/ball.dart';
-import '../entities/innings.dart';
+import '../entities/innings_summary.dart';
 import '../entities/match.dart';
 import '../entities/match_request.dart';
 
-/// Online-only matches contract (Phase 1). Reads/writes hit Supabase directly;
-/// no local mirror.
+/// Online-only matches contract. Reads/writes hit Supabase directly; no
+/// local mirror. The deployed schema has NO innings table — innings are
+/// keyed by `(match_id, innings_number)` on the `balls` table; per-team
+/// totals are aggregated from balls.
 abstract class MatchesRepository {
-  /// Propose a friendly. Creates a match in [MatchStatus.pending] with team A's
-  /// side filled in.
-  Future<Either<Failure, Match>> createMatchRequest({
-    required TeamId teamAId,
-    required TeamId teamBId,
-    required MatchFormat format,
-    required List<String> squad,
-    required String captain,
-    String? keeper,
-    Venue? venue,
-    DateTime? scheduledStartTime,
-  });
-
   Future<Either<Failure, Match?>> getMatch(MatchId id);
 
   /// Matches involving any team the user owns/manages.
   Future<Either<Failure, List<Match>>> listMyMatches();
 
-  /// Innings rows for the given match ids in one query. Returns a map keyed
-  /// by match id so callers can render per-match score breakdowns without
-  /// an N+1 fan-out. Matches not in the result map have no innings yet.
-  Future<Either<Failure, Map<MatchId, List<Innings>>>> listInningsForMatches(
-    Iterable<MatchId> matchIds,
-  );
-
-  /// Opponent accepts: fills team B's side and moves the match to `accepted`.
-  Future<Either<Failure, Match>> acceptMatch({
-    required MatchId id,
-    required List<String> squad,
-    required String captain,
-    String? keeper,
-  });
-
-  /// Opponent declines, with an optional reason. Moves to `declined`.
-  Future<Either<Failure, Match>> declineMatch({
-    required MatchId id,
-    String? reason,
-  });
-
-  /// Single-phone match start: records the toss, creates innings 1 with its
-  /// openers, and moves the match accepted → live. Returns the new innings.
-  ///
-  /// Deprecated by the 2-phone Match Start flow ([recordMatchToss] +
-  /// [submitMatchOpeners] + [startMatchNow]) but kept until the legacy
-  /// single-phone screen is removed.
-  Future<Either<Failure, Innings>> startMatch({
-    required MatchId id,
-    required TeamId tossWonBy,
-    required TossDecision tossDecision,
-    required TeamId battingTeamId,
-    required TeamId bowlingTeamId,
-    required String strikerId,
-    required String nonStrikerId,
-    required String bowlerId,
-  });
+  /// Per-team innings totals (runs/wickets/overs) for a set of matches,
+  /// aggregated from the `balls` table. Used by My Matches past tiles.
+  /// Matches with no balls return an empty list. Returns a map keyed by
+  /// match id.
+  Future<Either<Failure, Map<MatchId, List<InningsSummary>>>>
+      listInningsForMatches(Iterable<MatchId> matchIds);
 
   /// Real-time match row updates. Subscribes to the broadcast channel
   /// `match:<id>:state` (per migration 0810) and decodes the payload into
@@ -152,32 +110,50 @@ abstract class MatchesRepository {
   );
 
   /// One-shot list of all match requests the user can see (managers of
-  /// either side). Both incoming and outgoing. Realtime updates ride the
-  /// `user:<id>:notifications` broadcast channel — when a match_request
-  /// notification arrives, callers invalidate this provider and re-fetch.
+  /// either side). Both incoming and outgoing.
   Future<Either<Failure, List<MatchRequest>>> listMyMatchChallenges();
 
-  /// Lookup the 6-digit in-person share code. Returns null when unknown,
-  /// expired, or visible only via the SECURITY DEFINER lookup.
+  /// Lookup the 6-digit in-person share code.
   Future<Either<Failure, MatchRequest?>> findMatchChallengeByCode(String code);
 
-  /// The latest innings for a match (for opening the spectator/scorer by match).
-  Future<Either<Failure, Innings?>> getCurrentInnings(MatchId matchId);
-
-  /// Mark a match completed with a result description. Moves to `completed`.
+  /// Mark a match completed with a result description.
   Future<Either<Failure, Match>> completeMatch({
     required MatchId id,
     required String description,
   });
 
-  /// Persist one delivery ([BallDraft]) and update the innings' current
-  /// striker/non-striker/bowler. Aggregate totals update via a DB trigger.
-  /// Returns the refreshed innings.
-  Future<Either<Failure, Innings>> recordBall(BallDraft draft);
+  // ─── Live scoring ────────────────────────────────────────────────────────
 
-  /// Live deliveries for an innings (oldest first), via Supabase realtime.
-  Stream<List<Ball>> watchBalls(InningsId inningsId);
+  /// Open innings N — sets matches.current_striker/non_striker/bowler and
+  /// (if scheduled) flips status → live. Idempotent: re-calling overwrites
+  /// the on-strike trio without inserting any balls. Used for the
+  /// "pick opening bowler" prompt at ball 1 of innings 1, and for opening
+  /// the chase at innings 2.
+  Future<Either<Failure, Unit>> startInnings({
+    required MatchId matchId,
+    required int inningsNumber,
+    required String strikerId,
+    required String nonStrikerId,
+    required String bowlerId,
+  });
 
-  /// Live innings state (totals + current players), via Supabase realtime.
-  Stream<Innings?> watchInnings(InningsId inningsId);
+  /// Persist one delivery via the `record_ball` RPC. The RPC also advances
+  /// the on-field trio (strike rotation, end-of-over swap) based on the
+  /// delivery's kind and runs, so the client doesn't have to mirror that
+  /// logic.
+  Future<Either<Failure, Ball>> recordBall(BallDraft draft);
+
+  /// Delete the last delivery in (matchId, inningsNumber). The server-side
+  /// RPC reverses any state changes the delivery caused. Returns true when
+  /// a row was removed.
+  Future<Either<Failure, bool>> undoLastBall({
+    required MatchId matchId,
+    required int inningsNumber,
+  });
+
+  /// Live deliveries for (match, innings). Subscribes to the broadcast
+  /// channel `match:<id>:balls` (per migration 0810) and emits the full
+  /// list filtered to this innings, oldest-first. Initial hydration via a
+  /// one-shot SELECT.
+  Stream<List<Ball>> watchBalls(MatchId matchId, int inningsNumber);
 }

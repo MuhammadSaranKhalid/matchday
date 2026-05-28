@@ -1,19 +1,22 @@
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/usecase/usecase.dart';
-import '../entities/innings.dart';
+import '../entities/innings_summary.dart';
 import '../entities/match.dart';
 import '../repositories/matches_repository.dart';
 
-/// Bulk-fetch innings for a set of matches. Used by My Matches to compose
-/// per-team final scores on Past tiles without an N+1 query fan-out.
+/// Per-team innings totals (runs / wickets / balls faced) for a set of
+/// matches, aggregated from the `balls` table. Used by My Matches past
+/// tiles to render `181/6 v 178/10` without N+1 fan-out.
 class ListInningsForMatches
-    implements UseCase<Map<MatchId, List<Innings>>, ListInningsForMatchesParams> {
+    implements
+        UseCase<Map<MatchId, List<InningsSummary>>,
+            ListInningsForMatchesParams> {
   const ListInningsForMatches(this._repo);
   final MatchesRepository _repo;
 
   @override
-  Future<Either<Failure, Map<MatchId, List<Innings>>>> call(
+  Future<Either<Failure, Map<MatchId, List<InningsSummary>>>> call(
     ListInningsForMatchesParams params,
   ) =>
       _repo.listInningsForMatches(params.matchIds);

@@ -1,66 +1,86 @@
-import 'innings.dart';
 import 'match.dart';
 
-/// One recorded delivery. Aggregate innings totals are derived server-side by a
-/// trigger (see migration 006); this entity is the raw delivery record.
+/// One recorded delivery. The deployed `balls` table keys by
+/// `(match_id, innings_number, seq)` — there is no separate innings table;
+/// the innings is identified by the match_id + innings_number pair.
 class Ball {
   const Ball({
     required this.id,
-    required this.inningsId,
     required this.matchId,
+    required this.inningsNumber,
+    required this.seq,
     required this.overNumber,
-    required this.ballNumber,
-    required this.legalBallNumber,
-    required this.bowlerId,
-    required this.strikerId,
-    required this.nonStrikerId,
+    required this.ballInOver,
+    required this.isLegalDelivery,
+    required this.ballKind,
     required this.runsScored,
-    required this.extraRuns,
-    required this.totalRuns,
-    this.extraType,
-    this.isFour = false,
-    this.isSix = false,
-    this.isWicket = false,
+    required this.extras,
+    required this.isWicket,
+    required this.isFreeHit,
     this.wicketType,
-    this.dismissedPlayerId,
+    this.batsmanId,
+    this.nonStrikerId,
+    this.bowlerId,
+    this.fielderId,
+    this.commentary,
   });
 
   final BallId id;
-  final InningsId inningsId;
   final MatchId matchId;
-  final int overNumber;
-  final int ballNumber;
-  final int legalBallNumber;
-  final String bowlerId;
-  final String strikerId;
-  final String nonStrikerId;
-  final int runsScored;
-  final int extraRuns;
-  final int totalRuns;
-  final ExtraType? extraType;
-  final bool isFour;
-  final bool isSix;
-  final bool isWicket;
-  final WicketType? wicketType;
-  final String? dismissedPlayerId;
+  final int inningsNumber;
 
-  /// True for deliveries that count towards the over (everything except a
+  /// Global delivery sequence within this innings (1, 2, 3...). Server-side
+  /// trigger `_balls_assign_seq` fills this on insert.
+  final int seq;
+
+  final int overNumber;
+
+  /// Position within the over: 1-based for legal deliveries, illegal ones
+  /// keep the same `ball_in_over` as the next legal ball but with a wide /
+  /// no-ball flag.
+  final int ballInOver;
+
+  /// True when this delivery counts towards the over (everything except a
   /// wide or no-ball).
-  bool get isLegal => extraType == null || extraType == ExtraType.bye || extraType == ExtraType.legBye;
+  final bool isLegalDelivery;
+
+  final BallKind ballKind;
+
+  /// Runs off the bat (or off the body for byes/leg-byes — see ballKind).
+  final int runsScored;
+
+  /// Penalty / extra runs not credited to the batter (1 for wide/no-ball
+  /// plus any overthrows or completed bye runs depending on ballKind).
+  final int extras;
+
+  final bool isWicket;
+  final bool isFreeHit;
+  final WicketType? wicketType;
+
+  /// Striker at the time of the delivery. Nullable because retired-hurt /
+  /// timed-out paths can record a wicket without a batter on strike.
+  final String? batsmanId;
+  final String? nonStrikerId;
+  final String? bowlerId;
+  final String? fielderId;
+  final String? commentary;
+
+  /// Total runs charged to the bowler / added to the team total.
+  int get totalRuns => runsScored + extras;
+
+  bool get isFour => ballKind == BallKind.legal && runsScored == 4;
+  bool get isSix => ballKind == BallKind.legal && runsScored == 6;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Ball &&
           other.id == id &&
-          other.overNumber == overNumber &&
-          other.ballNumber == ballNumber &&
-          other.totalRuns == totalRuns &&
+          other.seq == seq &&
           other.isWicket == isWicket;
 
   @override
-  int get hashCode =>
-      Object.hash(id, overNumber, ballNumber, totalRuns, isWicket);
+  int get hashCode => Object.hash(id, seq, isWicket);
 }
 
 class BallId {
@@ -74,81 +94,98 @@ class BallId {
   String toString() => value;
 }
 
-enum ExtraType {
+/// Mirrors the deployed `ball_kind` enum — the kind of delivery, NOT the
+/// physical ball type (which is `MatchBallType` on the match format).
+enum BallKind {
+  /// A normal legal delivery (could be a dot, 1, 2, 3, 4, 6).
+  legal('legal'),
   wide('wide'),
   noBall('no_ball'),
   bye('bye'),
-  legBye('leg_bye'),
-  penalty('penalty');
+  legBye('leg_bye');
 
-  const ExtraType(this.wire);
+  const BallKind(this.wire);
   final String wire;
-  static ExtraType? fromWire(String? w) =>
-      w == null ? null : values.where((e) => e.wire == w).firstOrNull;
+  static BallKind fromWire(String? w) =>
+      values.where((e) => e.wire == w).firstOrNull ?? BallKind.legal;
 }
 
-/// A computed delivery (no id yet) plus the resulting current-players state.
-/// Produced by the RecordBall use case; the repository assigns the id, inserts
-/// the ball, and updates the innings. Lives in the entity layer so both the
-/// use case and the repository contract can reference it without a cycle.
-class BallDraft {
-  const BallDraft({
-    required this.inningsId,
-    required this.matchId,
-    required this.overNumber,
-    required this.ballNumber,
-    required this.legalBallNumber,
-    required this.bowlerId,
-    required this.strikerId,
-    required this.nonStrikerId,
-    required this.runsScored,
-    required this.extraRuns,
-    required this.totalRuns,
-    required this.extraType,
-    required this.isFour,
-    required this.isSix,
-    required this.isWicket,
-    required this.wicketType,
-    required this.dismissedPlayerId,
-    required this.nextStrikerId,
-    required this.nextNonStrikerId,
-    required this.nextBowlerId,
-    required this.overEnded,
-  });
-
-  final InningsId inningsId;
-  final MatchId matchId;
-  final int overNumber;
-  final int ballNumber;
-  final int legalBallNumber;
-  final String bowlerId;
-  final String strikerId;
-  final String nonStrikerId;
-  final int runsScored;
-  final int extraRuns;
-  final int totalRuns;
-  final ExtraType? extraType;
-  final bool isFour;
-  final bool isSix;
-  final bool isWicket;
-  final WicketType? wicketType;
-  final String? dismissedPlayerId;
-  final String nextStrikerId;
-  final String nextNonStrikerId;
-  final String nextBowlerId;
-  final bool overEnded;
-}
-
+/// Mirrors the deployed `wicket_kind` enum — all 10 dismissal types.
 enum WicketType {
   bowled('bowled'),
   caught('caught'),
   lbw('lbw'),
   runOut('run_out'),
   stumped('stumped'),
-  hitWicket('hit_wicket');
+  hitWicket('hit_wicket'),
+  retiredHurt('retired_hurt'),
+  obstructing('obstructing'),
+  timedOut('timed_out'),
+  handledBall('handled_ball');
 
   const WicketType(this.wire);
   final String wire;
   static WicketType? fromWire(String? w) =>
       w == null ? null : values.where((e) => e.wire == w).firstOrNull;
+
+  String get label {
+    switch (this) {
+      case bowled:
+        return 'Bowled';
+      case caught:
+        return 'Caught';
+      case lbw:
+        return 'LBW';
+      case runOut:
+        return 'Run out';
+      case stumped:
+        return 'Stumped';
+      case hitWicket:
+        return 'Hit wicket';
+      case retiredHurt:
+        return 'Retired hurt';
+      case obstructing:
+        return 'Obstructing';
+      case timedOut:
+        return 'Timed out';
+      case handledBall:
+        return 'Handled ball';
+    }
+  }
+}
+
+/// Input payload for the `record_ball` RPC. Built by [RecordBall] use case
+/// from a tap on the scoring keypad + any sheet selections (wicket type,
+/// fielder, etc.). Lives in the entity layer so the use case + repo can
+/// both reference it without an import cycle.
+class BallDraft {
+  const BallDraft({
+    required this.matchId,
+    required this.inningsNumber,
+    required this.isLegalDelivery,
+    required this.ballKind,
+    this.runsScored = 0,
+    this.extras = 0,
+    this.isWicket = false,
+    this.wicketType,
+    this.batsmanId,
+    this.nonStrikerId,
+    this.bowlerId,
+    this.fielderId,
+    this.commentary,
+  });
+
+  final MatchId matchId;
+  final int inningsNumber;
+  final bool isLegalDelivery;
+  final BallKind ballKind;
+  final int runsScored;
+  final int extras;
+  final bool isWicket;
+  final WicketType? wicketType;
+  final String? batsmanId;
+  final String? nonStrikerId;
+  final String? bowlerId;
+  final String? fielderId;
+  final String? commentary;
 }

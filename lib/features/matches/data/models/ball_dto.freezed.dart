@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$BallDto {
 
-@JsonKey(name: 'ball_id') String get ballId;@JsonKey(name: 'innings_id') String get inningsId;@JsonKey(name: 'match_id') String get matchId;@JsonKey(name: 'over_number') int get overNumber;@JsonKey(name: 'ball_number') int get ballNumber;@JsonKey(name: 'legal_ball_number') int get legalBallNumber;@JsonKey(name: 'bowler_id') String get bowlerId;@JsonKey(name: 'striker_id') String get strikerId;@JsonKey(name: 'non_striker_id') String get nonStrikerId;@JsonKey(name: 'runs_scored') int get runsScored;@JsonKey(name: 'extra_runs') int get extraRuns;@JsonKey(name: 'extra_type') String? get extraType;@JsonKey(name: 'total_runs') int get totalRuns;@JsonKey(name: 'is_four') bool get isFour;@JsonKey(name: 'is_six') bool get isSix;@JsonKey(name: 'is_wicket') bool get isWicket;@JsonKey(name: 'wicket_type') String? get wicketType;@JsonKey(name: 'dismissed_player_id') String? get dismissedPlayerId;
+@JsonKey(name: 'ball_id') String get ballId;@JsonKey(name: 'match_id') String get matchId;@JsonKey(name: 'innings_number') int get inningsNumber; int get seq;@JsonKey(name: 'over_number') int get overNumber;@JsonKey(name: 'ball_in_over') int get ballInOver;@JsonKey(name: 'is_legal_delivery') bool get isLegalDelivery;@JsonKey(name: 'ball_type') String get ballType;@JsonKey(name: 'runs_scored') int get runsScored; int get extras;@JsonKey(name: 'is_wicket') bool get isWicket;@JsonKey(name: 'wicket_type') String? get wicketType;@JsonKey(name: 'is_free_hit') bool get isFreeHit;@JsonKey(name: 'batsman_id') String? get batsmanId;@JsonKey(name: 'non_striker_id') String? get nonStrikerId;@JsonKey(name: 'bowler_id') String? get bowlerId;@JsonKey(name: 'fielder_id') String? get fielderId; String? get commentary;
 /// Create a copy of BallDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $BallDtoCopyWith<BallDto> get copyWith => _$BallDtoCopyWithImpl<BallDto>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is BallDto&&(identical(other.ballId, ballId) || other.ballId == ballId)&&(identical(other.inningsId, inningsId) || other.inningsId == inningsId)&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.overNumber, overNumber) || other.overNumber == overNumber)&&(identical(other.ballNumber, ballNumber) || other.ballNumber == ballNumber)&&(identical(other.legalBallNumber, legalBallNumber) || other.legalBallNumber == legalBallNumber)&&(identical(other.bowlerId, bowlerId) || other.bowlerId == bowlerId)&&(identical(other.strikerId, strikerId) || other.strikerId == strikerId)&&(identical(other.nonStrikerId, nonStrikerId) || other.nonStrikerId == nonStrikerId)&&(identical(other.runsScored, runsScored) || other.runsScored == runsScored)&&(identical(other.extraRuns, extraRuns) || other.extraRuns == extraRuns)&&(identical(other.extraType, extraType) || other.extraType == extraType)&&(identical(other.totalRuns, totalRuns) || other.totalRuns == totalRuns)&&(identical(other.isFour, isFour) || other.isFour == isFour)&&(identical(other.isSix, isSix) || other.isSix == isSix)&&(identical(other.isWicket, isWicket) || other.isWicket == isWicket)&&(identical(other.wicketType, wicketType) || other.wicketType == wicketType)&&(identical(other.dismissedPlayerId, dismissedPlayerId) || other.dismissedPlayerId == dismissedPlayerId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is BallDto&&(identical(other.ballId, ballId) || other.ballId == ballId)&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.inningsNumber, inningsNumber) || other.inningsNumber == inningsNumber)&&(identical(other.seq, seq) || other.seq == seq)&&(identical(other.overNumber, overNumber) || other.overNumber == overNumber)&&(identical(other.ballInOver, ballInOver) || other.ballInOver == ballInOver)&&(identical(other.isLegalDelivery, isLegalDelivery) || other.isLegalDelivery == isLegalDelivery)&&(identical(other.ballType, ballType) || other.ballType == ballType)&&(identical(other.runsScored, runsScored) || other.runsScored == runsScored)&&(identical(other.extras, extras) || other.extras == extras)&&(identical(other.isWicket, isWicket) || other.isWicket == isWicket)&&(identical(other.wicketType, wicketType) || other.wicketType == wicketType)&&(identical(other.isFreeHit, isFreeHit) || other.isFreeHit == isFreeHit)&&(identical(other.batsmanId, batsmanId) || other.batsmanId == batsmanId)&&(identical(other.nonStrikerId, nonStrikerId) || other.nonStrikerId == nonStrikerId)&&(identical(other.bowlerId, bowlerId) || other.bowlerId == bowlerId)&&(identical(other.fielderId, fielderId) || other.fielderId == fielderId)&&(identical(other.commentary, commentary) || other.commentary == commentary));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,ballId,inningsId,matchId,overNumber,ballNumber,legalBallNumber,bowlerId,strikerId,nonStrikerId,runsScored,extraRuns,extraType,totalRuns,isFour,isSix,isWicket,wicketType,dismissedPlayerId);
+int get hashCode => Object.hash(runtimeType,ballId,matchId,inningsNumber,seq,overNumber,ballInOver,isLegalDelivery,ballType,runsScored,extras,isWicket,wicketType,isFreeHit,batsmanId,nonStrikerId,bowlerId,fielderId,commentary);
 
 @override
 String toString() {
-  return 'BallDto(ballId: $ballId, inningsId: $inningsId, matchId: $matchId, overNumber: $overNumber, ballNumber: $ballNumber, legalBallNumber: $legalBallNumber, bowlerId: $bowlerId, strikerId: $strikerId, nonStrikerId: $nonStrikerId, runsScored: $runsScored, extraRuns: $extraRuns, extraType: $extraType, totalRuns: $totalRuns, isFour: $isFour, isSix: $isSix, isWicket: $isWicket, wicketType: $wicketType, dismissedPlayerId: $dismissedPlayerId)';
+  return 'BallDto(ballId: $ballId, matchId: $matchId, inningsNumber: $inningsNumber, seq: $seq, overNumber: $overNumber, ballInOver: $ballInOver, isLegalDelivery: $isLegalDelivery, ballType: $ballType, runsScored: $runsScored, extras: $extras, isWicket: $isWicket, wicketType: $wicketType, isFreeHit: $isFreeHit, batsmanId: $batsmanId, nonStrikerId: $nonStrikerId, bowlerId: $bowlerId, fielderId: $fielderId, commentary: $commentary)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $BallDtoCopyWith<$Res>  {
   factory $BallDtoCopyWith(BallDto value, $Res Function(BallDto) _then) = _$BallDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'ball_id') String ballId,@JsonKey(name: 'innings_id') String inningsId,@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'over_number') int overNumber,@JsonKey(name: 'ball_number') int ballNumber,@JsonKey(name: 'legal_ball_number') int legalBallNumber,@JsonKey(name: 'bowler_id') String bowlerId,@JsonKey(name: 'striker_id') String strikerId,@JsonKey(name: 'non_striker_id') String nonStrikerId,@JsonKey(name: 'runs_scored') int runsScored,@JsonKey(name: 'extra_runs') int extraRuns,@JsonKey(name: 'extra_type') String? extraType,@JsonKey(name: 'total_runs') int totalRuns,@JsonKey(name: 'is_four') bool isFour,@JsonKey(name: 'is_six') bool isSix,@JsonKey(name: 'is_wicket') bool isWicket,@JsonKey(name: 'wicket_type') String? wicketType,@JsonKey(name: 'dismissed_player_id') String? dismissedPlayerId
+@JsonKey(name: 'ball_id') String ballId,@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'innings_number') int inningsNumber, int seq,@JsonKey(name: 'over_number') int overNumber,@JsonKey(name: 'ball_in_over') int ballInOver,@JsonKey(name: 'is_legal_delivery') bool isLegalDelivery,@JsonKey(name: 'ball_type') String ballType,@JsonKey(name: 'runs_scored') int runsScored, int extras,@JsonKey(name: 'is_wicket') bool isWicket,@JsonKey(name: 'wicket_type') String? wicketType,@JsonKey(name: 'is_free_hit') bool isFreeHit,@JsonKey(name: 'batsman_id') String? batsmanId,@JsonKey(name: 'non_striker_id') String? nonStrikerId,@JsonKey(name: 'bowler_id') String? bowlerId,@JsonKey(name: 'fielder_id') String? fielderId, String? commentary
 });
 
 
@@ -65,26 +65,26 @@ class _$BallDtoCopyWithImpl<$Res>
 
 /// Create a copy of BallDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? ballId = null,Object? inningsId = null,Object? matchId = null,Object? overNumber = null,Object? ballNumber = null,Object? legalBallNumber = null,Object? bowlerId = null,Object? strikerId = null,Object? nonStrikerId = null,Object? runsScored = null,Object? extraRuns = null,Object? extraType = freezed,Object? totalRuns = null,Object? isFour = null,Object? isSix = null,Object? isWicket = null,Object? wicketType = freezed,Object? dismissedPlayerId = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? ballId = null,Object? matchId = null,Object? inningsNumber = null,Object? seq = null,Object? overNumber = null,Object? ballInOver = null,Object? isLegalDelivery = null,Object? ballType = null,Object? runsScored = null,Object? extras = null,Object? isWicket = null,Object? wicketType = freezed,Object? isFreeHit = null,Object? batsmanId = freezed,Object? nonStrikerId = freezed,Object? bowlerId = freezed,Object? fielderId = freezed,Object? commentary = freezed,}) {
   return _then(_self.copyWith(
 ballId: null == ballId ? _self.ballId : ballId // ignore: cast_nullable_to_non_nullable
-as String,inningsId: null == inningsId ? _self.inningsId : inningsId // ignore: cast_nullable_to_non_nullable
 as String,matchId: null == matchId ? _self.matchId : matchId // ignore: cast_nullable_to_non_nullable
-as String,overNumber: null == overNumber ? _self.overNumber : overNumber // ignore: cast_nullable_to_non_nullable
-as int,ballNumber: null == ballNumber ? _self.ballNumber : ballNumber // ignore: cast_nullable_to_non_nullable
-as int,legalBallNumber: null == legalBallNumber ? _self.legalBallNumber : legalBallNumber // ignore: cast_nullable_to_non_nullable
-as int,bowlerId: null == bowlerId ? _self.bowlerId : bowlerId // ignore: cast_nullable_to_non_nullable
-as String,strikerId: null == strikerId ? _self.strikerId : strikerId // ignore: cast_nullable_to_non_nullable
-as String,nonStrikerId: null == nonStrikerId ? _self.nonStrikerId : nonStrikerId // ignore: cast_nullable_to_non_nullable
+as String,inningsNumber: null == inningsNumber ? _self.inningsNumber : inningsNumber // ignore: cast_nullable_to_non_nullable
+as int,seq: null == seq ? _self.seq : seq // ignore: cast_nullable_to_non_nullable
+as int,overNumber: null == overNumber ? _self.overNumber : overNumber // ignore: cast_nullable_to_non_nullable
+as int,ballInOver: null == ballInOver ? _self.ballInOver : ballInOver // ignore: cast_nullable_to_non_nullable
+as int,isLegalDelivery: null == isLegalDelivery ? _self.isLegalDelivery : isLegalDelivery // ignore: cast_nullable_to_non_nullable
+as bool,ballType: null == ballType ? _self.ballType : ballType // ignore: cast_nullable_to_non_nullable
 as String,runsScored: null == runsScored ? _self.runsScored : runsScored // ignore: cast_nullable_to_non_nullable
-as int,extraRuns: null == extraRuns ? _self.extraRuns : extraRuns // ignore: cast_nullable_to_non_nullable
-as int,extraType: freezed == extraType ? _self.extraType : extraType // ignore: cast_nullable_to_non_nullable
-as String?,totalRuns: null == totalRuns ? _self.totalRuns : totalRuns // ignore: cast_nullable_to_non_nullable
-as int,isFour: null == isFour ? _self.isFour : isFour // ignore: cast_nullable_to_non_nullable
-as bool,isSix: null == isSix ? _self.isSix : isSix // ignore: cast_nullable_to_non_nullable
-as bool,isWicket: null == isWicket ? _self.isWicket : isWicket // ignore: cast_nullable_to_non_nullable
+as int,extras: null == extras ? _self.extras : extras // ignore: cast_nullable_to_non_nullable
+as int,isWicket: null == isWicket ? _self.isWicket : isWicket // ignore: cast_nullable_to_non_nullable
 as bool,wicketType: freezed == wicketType ? _self.wicketType : wicketType // ignore: cast_nullable_to_non_nullable
-as String?,dismissedPlayerId: freezed == dismissedPlayerId ? _self.dismissedPlayerId : dismissedPlayerId // ignore: cast_nullable_to_non_nullable
+as String?,isFreeHit: null == isFreeHit ? _self.isFreeHit : isFreeHit // ignore: cast_nullable_to_non_nullable
+as bool,batsmanId: freezed == batsmanId ? _self.batsmanId : batsmanId // ignore: cast_nullable_to_non_nullable
+as String?,nonStrikerId: freezed == nonStrikerId ? _self.nonStrikerId : nonStrikerId // ignore: cast_nullable_to_non_nullable
+as String?,bowlerId: freezed == bowlerId ? _self.bowlerId : bowlerId // ignore: cast_nullable_to_non_nullable
+as String?,fielderId: freezed == fielderId ? _self.fielderId : fielderId // ignore: cast_nullable_to_non_nullable
+as String?,commentary: freezed == commentary ? _self.commentary : commentary // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
 }
@@ -170,10 +170,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'ball_id')  String ballId, @JsonKey(name: 'innings_id')  String inningsId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'over_number')  int overNumber, @JsonKey(name: 'ball_number')  int ballNumber, @JsonKey(name: 'legal_ball_number')  int legalBallNumber, @JsonKey(name: 'bowler_id')  String bowlerId, @JsonKey(name: 'striker_id')  String strikerId, @JsonKey(name: 'non_striker_id')  String nonStrikerId, @JsonKey(name: 'runs_scored')  int runsScored, @JsonKey(name: 'extra_runs')  int extraRuns, @JsonKey(name: 'extra_type')  String? extraType, @JsonKey(name: 'total_runs')  int totalRuns, @JsonKey(name: 'is_four')  bool isFour, @JsonKey(name: 'is_six')  bool isSix, @JsonKey(name: 'is_wicket')  bool isWicket, @JsonKey(name: 'wicket_type')  String? wicketType, @JsonKey(name: 'dismissed_player_id')  String? dismissedPlayerId)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'ball_id')  String ballId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'innings_number')  int inningsNumber,  int seq, @JsonKey(name: 'over_number')  int overNumber, @JsonKey(name: 'ball_in_over')  int ballInOver, @JsonKey(name: 'is_legal_delivery')  bool isLegalDelivery, @JsonKey(name: 'ball_type')  String ballType, @JsonKey(name: 'runs_scored')  int runsScored,  int extras, @JsonKey(name: 'is_wicket')  bool isWicket, @JsonKey(name: 'wicket_type')  String? wicketType, @JsonKey(name: 'is_free_hit')  bool isFreeHit, @JsonKey(name: 'batsman_id')  String? batsmanId, @JsonKey(name: 'non_striker_id')  String? nonStrikerId, @JsonKey(name: 'bowler_id')  String? bowlerId, @JsonKey(name: 'fielder_id')  String? fielderId,  String? commentary)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _BallDto() when $default != null:
-return $default(_that.ballId,_that.inningsId,_that.matchId,_that.overNumber,_that.ballNumber,_that.legalBallNumber,_that.bowlerId,_that.strikerId,_that.nonStrikerId,_that.runsScored,_that.extraRuns,_that.extraType,_that.totalRuns,_that.isFour,_that.isSix,_that.isWicket,_that.wicketType,_that.dismissedPlayerId);case _:
+return $default(_that.ballId,_that.matchId,_that.inningsNumber,_that.seq,_that.overNumber,_that.ballInOver,_that.isLegalDelivery,_that.ballType,_that.runsScored,_that.extras,_that.isWicket,_that.wicketType,_that.isFreeHit,_that.batsmanId,_that.nonStrikerId,_that.bowlerId,_that.fielderId,_that.commentary);case _:
   return orElse();
 
 }
@@ -191,10 +191,10 @@ return $default(_that.ballId,_that.inningsId,_that.matchId,_that.overNumber,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'ball_id')  String ballId, @JsonKey(name: 'innings_id')  String inningsId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'over_number')  int overNumber, @JsonKey(name: 'ball_number')  int ballNumber, @JsonKey(name: 'legal_ball_number')  int legalBallNumber, @JsonKey(name: 'bowler_id')  String bowlerId, @JsonKey(name: 'striker_id')  String strikerId, @JsonKey(name: 'non_striker_id')  String nonStrikerId, @JsonKey(name: 'runs_scored')  int runsScored, @JsonKey(name: 'extra_runs')  int extraRuns, @JsonKey(name: 'extra_type')  String? extraType, @JsonKey(name: 'total_runs')  int totalRuns, @JsonKey(name: 'is_four')  bool isFour, @JsonKey(name: 'is_six')  bool isSix, @JsonKey(name: 'is_wicket')  bool isWicket, @JsonKey(name: 'wicket_type')  String? wicketType, @JsonKey(name: 'dismissed_player_id')  String? dismissedPlayerId)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'ball_id')  String ballId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'innings_number')  int inningsNumber,  int seq, @JsonKey(name: 'over_number')  int overNumber, @JsonKey(name: 'ball_in_over')  int ballInOver, @JsonKey(name: 'is_legal_delivery')  bool isLegalDelivery, @JsonKey(name: 'ball_type')  String ballType, @JsonKey(name: 'runs_scored')  int runsScored,  int extras, @JsonKey(name: 'is_wicket')  bool isWicket, @JsonKey(name: 'wicket_type')  String? wicketType, @JsonKey(name: 'is_free_hit')  bool isFreeHit, @JsonKey(name: 'batsman_id')  String? batsmanId, @JsonKey(name: 'non_striker_id')  String? nonStrikerId, @JsonKey(name: 'bowler_id')  String? bowlerId, @JsonKey(name: 'fielder_id')  String? fielderId,  String? commentary)  $default,) {final _that = this;
 switch (_that) {
 case _BallDto():
-return $default(_that.ballId,_that.inningsId,_that.matchId,_that.overNumber,_that.ballNumber,_that.legalBallNumber,_that.bowlerId,_that.strikerId,_that.nonStrikerId,_that.runsScored,_that.extraRuns,_that.extraType,_that.totalRuns,_that.isFour,_that.isSix,_that.isWicket,_that.wicketType,_that.dismissedPlayerId);case _:
+return $default(_that.ballId,_that.matchId,_that.inningsNumber,_that.seq,_that.overNumber,_that.ballInOver,_that.isLegalDelivery,_that.ballType,_that.runsScored,_that.extras,_that.isWicket,_that.wicketType,_that.isFreeHit,_that.batsmanId,_that.nonStrikerId,_that.bowlerId,_that.fielderId,_that.commentary);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -211,10 +211,10 @@ return $default(_that.ballId,_that.inningsId,_that.matchId,_that.overNumber,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'ball_id')  String ballId, @JsonKey(name: 'innings_id')  String inningsId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'over_number')  int overNumber, @JsonKey(name: 'ball_number')  int ballNumber, @JsonKey(name: 'legal_ball_number')  int legalBallNumber, @JsonKey(name: 'bowler_id')  String bowlerId, @JsonKey(name: 'striker_id')  String strikerId, @JsonKey(name: 'non_striker_id')  String nonStrikerId, @JsonKey(name: 'runs_scored')  int runsScored, @JsonKey(name: 'extra_runs')  int extraRuns, @JsonKey(name: 'extra_type')  String? extraType, @JsonKey(name: 'total_runs')  int totalRuns, @JsonKey(name: 'is_four')  bool isFour, @JsonKey(name: 'is_six')  bool isSix, @JsonKey(name: 'is_wicket')  bool isWicket, @JsonKey(name: 'wicket_type')  String? wicketType, @JsonKey(name: 'dismissed_player_id')  String? dismissedPlayerId)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'ball_id')  String ballId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'innings_number')  int inningsNumber,  int seq, @JsonKey(name: 'over_number')  int overNumber, @JsonKey(name: 'ball_in_over')  int ballInOver, @JsonKey(name: 'is_legal_delivery')  bool isLegalDelivery, @JsonKey(name: 'ball_type')  String ballType, @JsonKey(name: 'runs_scored')  int runsScored,  int extras, @JsonKey(name: 'is_wicket')  bool isWicket, @JsonKey(name: 'wicket_type')  String? wicketType, @JsonKey(name: 'is_free_hit')  bool isFreeHit, @JsonKey(name: 'batsman_id')  String? batsmanId, @JsonKey(name: 'non_striker_id')  String? nonStrikerId, @JsonKey(name: 'bowler_id')  String? bowlerId, @JsonKey(name: 'fielder_id')  String? fielderId,  String? commentary)?  $default,) {final _that = this;
 switch (_that) {
 case _BallDto() when $default != null:
-return $default(_that.ballId,_that.inningsId,_that.matchId,_that.overNumber,_that.ballNumber,_that.legalBallNumber,_that.bowlerId,_that.strikerId,_that.nonStrikerId,_that.runsScored,_that.extraRuns,_that.extraType,_that.totalRuns,_that.isFour,_that.isSix,_that.isWicket,_that.wicketType,_that.dismissedPlayerId);case _:
+return $default(_that.ballId,_that.matchId,_that.inningsNumber,_that.seq,_that.overNumber,_that.ballInOver,_that.isLegalDelivery,_that.ballType,_that.runsScored,_that.extras,_that.isWicket,_that.wicketType,_that.isFreeHit,_that.batsmanId,_that.nonStrikerId,_that.bowlerId,_that.fielderId,_that.commentary);case _:
   return null;
 
 }
@@ -226,27 +226,27 @@ return $default(_that.ballId,_that.inningsId,_that.matchId,_that.overNumber,_tha
 @JsonSerializable()
 
 class _BallDto extends BallDto {
-  const _BallDto({@JsonKey(name: 'ball_id') required this.ballId, @JsonKey(name: 'innings_id') required this.inningsId, @JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'over_number') required this.overNumber, @JsonKey(name: 'ball_number') required this.ballNumber, @JsonKey(name: 'legal_ball_number') required this.legalBallNumber, @JsonKey(name: 'bowler_id') required this.bowlerId, @JsonKey(name: 'striker_id') required this.strikerId, @JsonKey(name: 'non_striker_id') required this.nonStrikerId, @JsonKey(name: 'runs_scored') this.runsScored = 0, @JsonKey(name: 'extra_runs') this.extraRuns = 0, @JsonKey(name: 'extra_type') this.extraType, @JsonKey(name: 'total_runs') this.totalRuns = 0, @JsonKey(name: 'is_four') this.isFour = false, @JsonKey(name: 'is_six') this.isSix = false, @JsonKey(name: 'is_wicket') this.isWicket = false, @JsonKey(name: 'wicket_type') this.wicketType, @JsonKey(name: 'dismissed_player_id') this.dismissedPlayerId}): super._();
+  const _BallDto({@JsonKey(name: 'ball_id') required this.ballId, @JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'innings_number') required this.inningsNumber, required this.seq, @JsonKey(name: 'over_number') required this.overNumber, @JsonKey(name: 'ball_in_over') required this.ballInOver, @JsonKey(name: 'is_legal_delivery') this.isLegalDelivery = true, @JsonKey(name: 'ball_type') this.ballType = 'legal', @JsonKey(name: 'runs_scored') this.runsScored = 0, this.extras = 0, @JsonKey(name: 'is_wicket') this.isWicket = false, @JsonKey(name: 'wicket_type') this.wicketType, @JsonKey(name: 'is_free_hit') this.isFreeHit = false, @JsonKey(name: 'batsman_id') this.batsmanId, @JsonKey(name: 'non_striker_id') this.nonStrikerId, @JsonKey(name: 'bowler_id') this.bowlerId, @JsonKey(name: 'fielder_id') this.fielderId, this.commentary}): super._();
   factory _BallDto.fromJson(Map<String, dynamic> json) => _$BallDtoFromJson(json);
 
 @override@JsonKey(name: 'ball_id') final  String ballId;
-@override@JsonKey(name: 'innings_id') final  String inningsId;
 @override@JsonKey(name: 'match_id') final  String matchId;
+@override@JsonKey(name: 'innings_number') final  int inningsNumber;
+@override final  int seq;
 @override@JsonKey(name: 'over_number') final  int overNumber;
-@override@JsonKey(name: 'ball_number') final  int ballNumber;
-@override@JsonKey(name: 'legal_ball_number') final  int legalBallNumber;
-@override@JsonKey(name: 'bowler_id') final  String bowlerId;
-@override@JsonKey(name: 'striker_id') final  String strikerId;
-@override@JsonKey(name: 'non_striker_id') final  String nonStrikerId;
+@override@JsonKey(name: 'ball_in_over') final  int ballInOver;
+@override@JsonKey(name: 'is_legal_delivery') final  bool isLegalDelivery;
+@override@JsonKey(name: 'ball_type') final  String ballType;
 @override@JsonKey(name: 'runs_scored') final  int runsScored;
-@override@JsonKey(name: 'extra_runs') final  int extraRuns;
-@override@JsonKey(name: 'extra_type') final  String? extraType;
-@override@JsonKey(name: 'total_runs') final  int totalRuns;
-@override@JsonKey(name: 'is_four') final  bool isFour;
-@override@JsonKey(name: 'is_six') final  bool isSix;
+@override@JsonKey() final  int extras;
 @override@JsonKey(name: 'is_wicket') final  bool isWicket;
 @override@JsonKey(name: 'wicket_type') final  String? wicketType;
-@override@JsonKey(name: 'dismissed_player_id') final  String? dismissedPlayerId;
+@override@JsonKey(name: 'is_free_hit') final  bool isFreeHit;
+@override@JsonKey(name: 'batsman_id') final  String? batsmanId;
+@override@JsonKey(name: 'non_striker_id') final  String? nonStrikerId;
+@override@JsonKey(name: 'bowler_id') final  String? bowlerId;
+@override@JsonKey(name: 'fielder_id') final  String? fielderId;
+@override final  String? commentary;
 
 /// Create a copy of BallDto
 /// with the given fields replaced by the non-null parameter values.
@@ -261,16 +261,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _BallDto&&(identical(other.ballId, ballId) || other.ballId == ballId)&&(identical(other.inningsId, inningsId) || other.inningsId == inningsId)&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.overNumber, overNumber) || other.overNumber == overNumber)&&(identical(other.ballNumber, ballNumber) || other.ballNumber == ballNumber)&&(identical(other.legalBallNumber, legalBallNumber) || other.legalBallNumber == legalBallNumber)&&(identical(other.bowlerId, bowlerId) || other.bowlerId == bowlerId)&&(identical(other.strikerId, strikerId) || other.strikerId == strikerId)&&(identical(other.nonStrikerId, nonStrikerId) || other.nonStrikerId == nonStrikerId)&&(identical(other.runsScored, runsScored) || other.runsScored == runsScored)&&(identical(other.extraRuns, extraRuns) || other.extraRuns == extraRuns)&&(identical(other.extraType, extraType) || other.extraType == extraType)&&(identical(other.totalRuns, totalRuns) || other.totalRuns == totalRuns)&&(identical(other.isFour, isFour) || other.isFour == isFour)&&(identical(other.isSix, isSix) || other.isSix == isSix)&&(identical(other.isWicket, isWicket) || other.isWicket == isWicket)&&(identical(other.wicketType, wicketType) || other.wicketType == wicketType)&&(identical(other.dismissedPlayerId, dismissedPlayerId) || other.dismissedPlayerId == dismissedPlayerId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _BallDto&&(identical(other.ballId, ballId) || other.ballId == ballId)&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.inningsNumber, inningsNumber) || other.inningsNumber == inningsNumber)&&(identical(other.seq, seq) || other.seq == seq)&&(identical(other.overNumber, overNumber) || other.overNumber == overNumber)&&(identical(other.ballInOver, ballInOver) || other.ballInOver == ballInOver)&&(identical(other.isLegalDelivery, isLegalDelivery) || other.isLegalDelivery == isLegalDelivery)&&(identical(other.ballType, ballType) || other.ballType == ballType)&&(identical(other.runsScored, runsScored) || other.runsScored == runsScored)&&(identical(other.extras, extras) || other.extras == extras)&&(identical(other.isWicket, isWicket) || other.isWicket == isWicket)&&(identical(other.wicketType, wicketType) || other.wicketType == wicketType)&&(identical(other.isFreeHit, isFreeHit) || other.isFreeHit == isFreeHit)&&(identical(other.batsmanId, batsmanId) || other.batsmanId == batsmanId)&&(identical(other.nonStrikerId, nonStrikerId) || other.nonStrikerId == nonStrikerId)&&(identical(other.bowlerId, bowlerId) || other.bowlerId == bowlerId)&&(identical(other.fielderId, fielderId) || other.fielderId == fielderId)&&(identical(other.commentary, commentary) || other.commentary == commentary));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,ballId,inningsId,matchId,overNumber,ballNumber,legalBallNumber,bowlerId,strikerId,nonStrikerId,runsScored,extraRuns,extraType,totalRuns,isFour,isSix,isWicket,wicketType,dismissedPlayerId);
+int get hashCode => Object.hash(runtimeType,ballId,matchId,inningsNumber,seq,overNumber,ballInOver,isLegalDelivery,ballType,runsScored,extras,isWicket,wicketType,isFreeHit,batsmanId,nonStrikerId,bowlerId,fielderId,commentary);
 
 @override
 String toString() {
-  return 'BallDto(ballId: $ballId, inningsId: $inningsId, matchId: $matchId, overNumber: $overNumber, ballNumber: $ballNumber, legalBallNumber: $legalBallNumber, bowlerId: $bowlerId, strikerId: $strikerId, nonStrikerId: $nonStrikerId, runsScored: $runsScored, extraRuns: $extraRuns, extraType: $extraType, totalRuns: $totalRuns, isFour: $isFour, isSix: $isSix, isWicket: $isWicket, wicketType: $wicketType, dismissedPlayerId: $dismissedPlayerId)';
+  return 'BallDto(ballId: $ballId, matchId: $matchId, inningsNumber: $inningsNumber, seq: $seq, overNumber: $overNumber, ballInOver: $ballInOver, isLegalDelivery: $isLegalDelivery, ballType: $ballType, runsScored: $runsScored, extras: $extras, isWicket: $isWicket, wicketType: $wicketType, isFreeHit: $isFreeHit, batsmanId: $batsmanId, nonStrikerId: $nonStrikerId, bowlerId: $bowlerId, fielderId: $fielderId, commentary: $commentary)';
 }
 
 
@@ -281,7 +281,7 @@ abstract mixin class _$BallDtoCopyWith<$Res> implements $BallDtoCopyWith<$Res> {
   factory _$BallDtoCopyWith(_BallDto value, $Res Function(_BallDto) _then) = __$BallDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'ball_id') String ballId,@JsonKey(name: 'innings_id') String inningsId,@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'over_number') int overNumber,@JsonKey(name: 'ball_number') int ballNumber,@JsonKey(name: 'legal_ball_number') int legalBallNumber,@JsonKey(name: 'bowler_id') String bowlerId,@JsonKey(name: 'striker_id') String strikerId,@JsonKey(name: 'non_striker_id') String nonStrikerId,@JsonKey(name: 'runs_scored') int runsScored,@JsonKey(name: 'extra_runs') int extraRuns,@JsonKey(name: 'extra_type') String? extraType,@JsonKey(name: 'total_runs') int totalRuns,@JsonKey(name: 'is_four') bool isFour,@JsonKey(name: 'is_six') bool isSix,@JsonKey(name: 'is_wicket') bool isWicket,@JsonKey(name: 'wicket_type') String? wicketType,@JsonKey(name: 'dismissed_player_id') String? dismissedPlayerId
+@JsonKey(name: 'ball_id') String ballId,@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'innings_number') int inningsNumber, int seq,@JsonKey(name: 'over_number') int overNumber,@JsonKey(name: 'ball_in_over') int ballInOver,@JsonKey(name: 'is_legal_delivery') bool isLegalDelivery,@JsonKey(name: 'ball_type') String ballType,@JsonKey(name: 'runs_scored') int runsScored, int extras,@JsonKey(name: 'is_wicket') bool isWicket,@JsonKey(name: 'wicket_type') String? wicketType,@JsonKey(name: 'is_free_hit') bool isFreeHit,@JsonKey(name: 'batsman_id') String? batsmanId,@JsonKey(name: 'non_striker_id') String? nonStrikerId,@JsonKey(name: 'bowler_id') String? bowlerId,@JsonKey(name: 'fielder_id') String? fielderId, String? commentary
 });
 
 
@@ -298,26 +298,26 @@ class __$BallDtoCopyWithImpl<$Res>
 
 /// Create a copy of BallDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? ballId = null,Object? inningsId = null,Object? matchId = null,Object? overNumber = null,Object? ballNumber = null,Object? legalBallNumber = null,Object? bowlerId = null,Object? strikerId = null,Object? nonStrikerId = null,Object? runsScored = null,Object? extraRuns = null,Object? extraType = freezed,Object? totalRuns = null,Object? isFour = null,Object? isSix = null,Object? isWicket = null,Object? wicketType = freezed,Object? dismissedPlayerId = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? ballId = null,Object? matchId = null,Object? inningsNumber = null,Object? seq = null,Object? overNumber = null,Object? ballInOver = null,Object? isLegalDelivery = null,Object? ballType = null,Object? runsScored = null,Object? extras = null,Object? isWicket = null,Object? wicketType = freezed,Object? isFreeHit = null,Object? batsmanId = freezed,Object? nonStrikerId = freezed,Object? bowlerId = freezed,Object? fielderId = freezed,Object? commentary = freezed,}) {
   return _then(_BallDto(
 ballId: null == ballId ? _self.ballId : ballId // ignore: cast_nullable_to_non_nullable
-as String,inningsId: null == inningsId ? _self.inningsId : inningsId // ignore: cast_nullable_to_non_nullable
 as String,matchId: null == matchId ? _self.matchId : matchId // ignore: cast_nullable_to_non_nullable
-as String,overNumber: null == overNumber ? _self.overNumber : overNumber // ignore: cast_nullable_to_non_nullable
-as int,ballNumber: null == ballNumber ? _self.ballNumber : ballNumber // ignore: cast_nullable_to_non_nullable
-as int,legalBallNumber: null == legalBallNumber ? _self.legalBallNumber : legalBallNumber // ignore: cast_nullable_to_non_nullable
-as int,bowlerId: null == bowlerId ? _self.bowlerId : bowlerId // ignore: cast_nullable_to_non_nullable
-as String,strikerId: null == strikerId ? _self.strikerId : strikerId // ignore: cast_nullable_to_non_nullable
-as String,nonStrikerId: null == nonStrikerId ? _self.nonStrikerId : nonStrikerId // ignore: cast_nullable_to_non_nullable
+as String,inningsNumber: null == inningsNumber ? _self.inningsNumber : inningsNumber // ignore: cast_nullable_to_non_nullable
+as int,seq: null == seq ? _self.seq : seq // ignore: cast_nullable_to_non_nullable
+as int,overNumber: null == overNumber ? _self.overNumber : overNumber // ignore: cast_nullable_to_non_nullable
+as int,ballInOver: null == ballInOver ? _self.ballInOver : ballInOver // ignore: cast_nullable_to_non_nullable
+as int,isLegalDelivery: null == isLegalDelivery ? _self.isLegalDelivery : isLegalDelivery // ignore: cast_nullable_to_non_nullable
+as bool,ballType: null == ballType ? _self.ballType : ballType // ignore: cast_nullable_to_non_nullable
 as String,runsScored: null == runsScored ? _self.runsScored : runsScored // ignore: cast_nullable_to_non_nullable
-as int,extraRuns: null == extraRuns ? _self.extraRuns : extraRuns // ignore: cast_nullable_to_non_nullable
-as int,extraType: freezed == extraType ? _self.extraType : extraType // ignore: cast_nullable_to_non_nullable
-as String?,totalRuns: null == totalRuns ? _self.totalRuns : totalRuns // ignore: cast_nullable_to_non_nullable
-as int,isFour: null == isFour ? _self.isFour : isFour // ignore: cast_nullable_to_non_nullable
-as bool,isSix: null == isSix ? _self.isSix : isSix // ignore: cast_nullable_to_non_nullable
-as bool,isWicket: null == isWicket ? _self.isWicket : isWicket // ignore: cast_nullable_to_non_nullable
+as int,extras: null == extras ? _self.extras : extras // ignore: cast_nullable_to_non_nullable
+as int,isWicket: null == isWicket ? _self.isWicket : isWicket // ignore: cast_nullable_to_non_nullable
 as bool,wicketType: freezed == wicketType ? _self.wicketType : wicketType // ignore: cast_nullable_to_non_nullable
-as String?,dismissedPlayerId: freezed == dismissedPlayerId ? _self.dismissedPlayerId : dismissedPlayerId // ignore: cast_nullable_to_non_nullable
+as String?,isFreeHit: null == isFreeHit ? _self.isFreeHit : isFreeHit // ignore: cast_nullable_to_non_nullable
+as bool,batsmanId: freezed == batsmanId ? _self.batsmanId : batsmanId // ignore: cast_nullable_to_non_nullable
+as String?,nonStrikerId: freezed == nonStrikerId ? _self.nonStrikerId : nonStrikerId // ignore: cast_nullable_to_non_nullable
+as String?,bowlerId: freezed == bowlerId ? _self.bowlerId : bowlerId // ignore: cast_nullable_to_non_nullable
+as String?,fielderId: freezed == fielderId ? _self.fielderId : fielderId // ignore: cast_nullable_to_non_nullable
+as String?,commentary: freezed == commentary ? _self.commentary : commentary // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
 }

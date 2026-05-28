@@ -6,7 +6,7 @@ import '../../../../core/usecase/usecase.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
-import '../../domain/entities/innings.dart';
+import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_role.dart';
 import '../../domain/usecases/list_innings_for_matches.dart';
@@ -58,7 +58,7 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
       .toList()
     ..sort(_byScheduledThenCreated);
 
-  Map<MatchId, List<Innings>> inningsByMatch = const {};
+  Map<MatchId, List<InningsSummary>> inningsByMatch = const {};
   if (past.isNotEmpty) {
     final result = await ref.read(listInningsForMatchesUseCaseProvider).call(
           ListInningsForMatchesParams(past.map((m) => m.id)),
@@ -137,15 +137,15 @@ MyMatchConfirmed _confirmedFor(
 MyMatchPast _pastFor(
   Match m,
   Map<String, Team> teamsById, {
-  required List<Innings> innings,
+  required List<InningsSummary> innings,
   required String currentUserId,
 }) {
   final home = teamsById[m.teamAId.value];
   final away = teamsById[m.teamBId.value];
 
   // Per-team final score = innings where batting_team_id matches.
-  Innings? innFor(TeamId id) =>
-      innings.where((i) => i.battingTeamId == id).fold<Innings?>(
+  InningsSummary? innFor(TeamId id) =>
+      innings.where((i) => i.battingTeamId == id).fold<InningsSummary?>(
             null,
             (acc, it) =>
                 acc == null || it.inningsNumber > acc.inningsNumber ? it : acc,

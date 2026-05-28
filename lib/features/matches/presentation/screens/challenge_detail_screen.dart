@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/ck_button.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/match.dart';
@@ -56,17 +55,21 @@ class _ChallengeDetailScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Header(onBack: () => context.pop(), kicker: 'INCOMING CHALLENGE'),
+        _Header(
+          onBack: () => context.pop(),
+          kicker: 'INCOMING CHALLENGE',
+          title: 'From ${from?.name ?? 'a team'}',
+        ),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
             children: [
               _Hero(req: req, from: from, to: to),
-              const SizedBox(height: 14),
+              const _SectionLabel('Match spec'),
               _Spec(req: req),
               if (req.message != null && req.message!.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                _Note(text: req.message!),
+                _SectionLabel('Note from ${_firstName(from?.name)}'),
+                _Note(text: req.message!, sentAt: req.createdAt),
               ],
               if (!actionable) ...[
                 const SizedBox(height: 14),
@@ -84,6 +87,11 @@ class _ChallengeDetailScreenState
           ),
       ],
     );
+  }
+
+  String _firstName(String? teamName) {
+    if (teamName == null || teamName.isEmpty) return 'sender';
+    return teamName.split(' ').first;
   }
 
   Future<void> _onAccept(MatchRequest req) async {
@@ -141,38 +149,74 @@ class _ChallengeDetailScreenState
 // ─── Atoms ─────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
-  const _Header({required this.onBack, required this.kicker});
+  const _Header({
+    required this.onBack,
+    required this.kicker,
+    required this.title,
+  });
   final VoidCallback onBack;
   final String kicker;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 18, 12),
       decoration: const BoxDecoration(
         color: CkColors.paper,
         border: Border(bottom: BorderSide(color: CkColors.hairline)),
       ),
-      child: Row(children: [
-        IconButton(
-          onPressed: onBack,
-          icon: const Icon(Icons.chevron_left_rounded, color: CkColors.ink),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          kicker,
-          style: CkType.mono(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.1,
-            color: CkColors.muted,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onBack,
+            child: const Padding(
+              padding: EdgeInsets.only(top: 2, right: 8, bottom: 4, left: 0),
+              child: Icon(
+                Icons.chevron_left_rounded,
+                size: 22,
+                color: CkColors.ink,
+              ),
+            ),
           ),
-        ),
-      ]),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  kicker.toUpperCase(),
+                  style: CkType.mono(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.12,
+                    color: CkColors.muted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: CkType.display(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.025,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
+/// Faithful port of the design's match hero: header strip with red
+/// CHALLENGE pill + date/time mono, 3-col crest row (team / vs / team)
+/// with team-name + "captain" caption underneath, and the H2H footnote
+/// row split by a 1px dashed top border.
 class _Hero extends StatelessWidget {
   const _Hero({required this.req, required this.from, required this.to});
   final MatchRequest req;
@@ -182,107 +226,211 @@ class _Hero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final start = req.effectiveStartTime;
-    final venue = req.effectiveVenue;
-    final timeLabel = start == null
-        ? 'No date proposed'
-        : '${_dow(start)} ${start.day} · ${_hhmm(start)}';
+    final expiry = req.proposalExpiresAt;
+    final expiresLabel = expiry == null
+        ? 'CHALLENGE'
+        : 'CHALLENGE · EXPIRES ${_humanRemaining(expiry)}';
+    final whenLabel = start == null
+        ? ''
+        : '${_dowShort(start)} ${start.day} · ${_hhmm(start)}';
 
     return Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: CkColors.paper,
         border: Border.all(color: CkColors.hairline),
         borderRadius: BorderRadius.circular(14),
       ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       child: Column(
         children: [
-          Row(children: [
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: CkColors.red,
-                borderRadius: BorderRadius.circular(4),
+          // Header strip — red pill left, mono date right.
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            decoration: const BoxDecoration(
+              color: CkColors.paper2,
+              border: Border(
+                bottom: BorderSide(color: CkColors.hairline),
               ),
-              child: Text('CHALLENGE',
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: CkColors.red,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      expiresLabel,
+                      overflow: TextOverflow.ellipsis,
+                      style: CkType.mono(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.08,
+                        color: CkColors.paper,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  whenLabel.toUpperCase(),
                   style: CkType.mono(
                     fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: CkColors.paper,
-                  )),
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.06,
+                    color: CkColors.muted,
+                  ),
+                ),
+              ],
             ),
-            const Spacer(),
-            Text(timeLabel,
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.08,
-                  color: CkColors.muted,
-                )),
-          ]),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _Crest(team: from, fallback: 'A'),
-              Text('vs',
+          ),
+          // Crest row — 3 columns: team / vs / team.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _CrestColumn(
+                    team: from,
+                    fallback: 'A',
+                    captain: 'Captain',
+                  ),
+                ),
+                Text(
+                  'vs',
                   style: CkType.display(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
                     color: CkColors.muted,
                     letterSpacing: -0.025,
-                  )),
-              _Crest(team: to, fallback: 'B'),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            '${from?.name ?? 'Sender'}  vs  ${to?.name ?? 'You'}',
-            textAlign: TextAlign.center,
-            style: CkType.display(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.01,
+                  ),
+                ),
+                Expanded(
+                  child: _CrestColumn(
+                    team: to,
+                    fallback: 'B',
+                    overrideName: 'You',
+                    captain: 'You · cap',
+                  ),
+                ),
+              ],
             ),
           ),
-          if (venue != null) ...[
-            const SizedBox(height: 4),
-            Text(venue,
-                textAlign: TextAlign.center,
-                style: CkType.body(fontSize: 12, color: CkColors.muted)),
-          ],
+          // H2H footnote — dashed top border, ink2 + mono.
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: CkColors.hairline,
+                  width: 1,
+                  style: BorderStyle.solid,
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text.rich(
+                    TextSpan(
+                      style: CkType.body(
+                        fontSize: 11.5,
+                        color: CkColors.ink2,
+                      ),
+                      children: const [
+                        TextSpan(text: 'Head-to-head · '),
+                        TextSpan(
+                          text: 'First meeting',
+                          style: TextStyle(
+                            color: CkColors.ink,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'NEW RIVAL',
+                  style: CkType.mono(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.04,
+                    color: CkColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _Crest extends StatelessWidget {
-  const _Crest({required this.team, required this.fallback});
+class _CrestColumn extends StatelessWidget {
+  const _CrestColumn({
+    required this.team,
+    required this.fallback,
+    required this.captain,
+    this.overrideName,
+  });
   final Team? team;
   final String fallback;
+  final String captain;
+  final String? overrideName;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 52,
-      height: 52,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: _teamColor(team?.primaryColor),
-        borderRadius: BorderRadius.circular(13),
-      ),
-      child: Text(_short(team, fallback: fallback),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 52,
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _teamColor(team?.primaryColor),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Text(
+            _short(team, fallback: fallback),
+            style: CkType.display(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: CkColors.paper,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          overrideName ?? team?.name ?? 'Team',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: CkType.display(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: CkColors.paper,
-          )),
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.02,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          captain,
+          style: CkType.body(fontSize: 11, color: CkColors.muted),
+        ),
+      ],
     );
   }
 }
 
+/// Spec list — 5 rows separated by 1px hairline, mono key (60px wide) +
+/// body value. Mirrors the design's bordered card.
 class _Spec extends StatelessWidget {
   const _Spec({required this.req});
   final MatchRequest req;
@@ -291,30 +439,21 @@ class _Spec extends StatelessWidget {
   Widget build(BuildContext context) {
     final f = req.effectiveFormat;
     final start = req.effectiveStartTime;
-    Widget row(String key, String value) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(children: [
-            SizedBox(
-              width: 64,
-              child: Text(key.toUpperCase(),
-                  style: CkType.mono(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: CkColors.muted,
-                  )),
-            ),
-            Expanded(
-              child: Text(value,
-                  style: CkType.body(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  )),
-            ),
-          ]),
-        );
+    final rows = <(String, String)>[
+      if (f != null)
+        (
+          'Format',
+          'T${f.oversPerInnings} · ${_ballName(f.ballType)} · '
+              '${f.maxOversPerBowler} ov/bowler',
+        ),
+      if (start != null) ('When', '${_human(start)} PKT'),
+      if (req.effectiveVenue != null) ('Venue', req.effectiveVenue!),
+      const ('Stakes', 'Friendly · no pot'),
+      const ('Type', 'Friendly'),
+    ];
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: CkColors.paper,
         border: Border.all(color: CkColors.hairline),
@@ -322,40 +461,115 @@ class _Spec extends StatelessWidget {
       ),
       child: Column(
         children: [
-          if (f != null)
-            row('Format',
-                'T${f.oversPerInnings} · ${_ballName(f.ballType)} · '
-                '${f.maxOversPerBowler} ov/bowler'),
-          if (start != null) row('When', _human(start)),
-          if (req.effectiveVenue != null) row('Venue', req.effectiveVenue!),
-          row('Stakes', 'Friendly · no pot'),
-          row('Type', 'Friendly'),
+          for (var i = 0; i < rows.length; i++)
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: i < rows.length - 1
+                      ? const BorderSide(color: CkColors.hairline)
+                      : BorderSide.none,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 60,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Text(
+                        rows[i].$1.toUpperCase(),
+                        style: CkType.mono(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.1,
+                          color: CkColors.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      rows[i].$2,
+                      style: CkType.body(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 14, 0, 8),
+      child: Text(
+        label.toUpperCase(),
+        style: CkType.mono(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.12,
+          color: CkColors.muted,
+        ),
+      ),
+    );
+  }
+}
+
+/// Sender's note — paper2 card with 3px red left border, italic quote,
+/// mono SENT timestamp footer.
 class _Note extends StatelessWidget {
-  const _Note({required this.text});
+  const _Note({required this.text, required this.sentAt});
   final String text;
+  final DateTime sentAt;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: const BoxDecoration(
+      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
         color: CkColors.paper2,
-        border: Border(
+        borderRadius: BorderRadius.circular(12),
+        border: const Border(
           left: BorderSide(color: CkColors.red, width: 3),
         ),
       ),
-      child: Text(
-        text,
-        style: CkType.body(
-          fontSize: 13,
-          color: CkColors.ink2,
-        ).copyWith(fontStyle: FontStyle.italic),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '"$text"',
+            style: CkType.body(
+              fontSize: 13.5,
+              color: CkColors.ink,
+              height: 1.5,
+            ).copyWith(fontStyle: FontStyle.italic),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'SENT ${_hhmm(sentAt)}'.toUpperCase(),
+            style: CkType.mono(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.04,
+              color: CkColors.muted,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -389,6 +603,9 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
+/// Sticky 3-button reply bar matching the design — paper outlines for
+/// Decline (red text) + Counter, ink-filled Accept with `flex 1.6` so the
+/// primary action feels bigger.
 class _ReplyBar extends StatelessWidget {
   const _ReplyBar({
     required this.busy,
@@ -404,38 +621,112 @@ class _ReplyBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
       decoration: const BoxDecoration(
         color: CkColors.paper,
         border: Border(top: BorderSide(color: CkColors.hairline)),
       ),
-      child: Row(children: [
-        Expanded(
-          child: CkButton.secondary(
-            label: 'Decline',
-            onPressed: busy ? null : onDecline,
+      child: Row(
+        children: [
+          Expanded(
+            flex: 10,
+            child: _ReplyButton(
+              label: 'Decline',
+              onTap: busy ? null : onDecline,
+              foreground: CkColors.red,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: CkButton.secondary(
-            label: 'Counter',
-            onPressed: busy ? null : onCounter,
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 10,
+            child: _ReplyButton(
+              label: 'Counter',
+              onTap: busy ? null : onCounter,
+              foreground: CkColors.ink,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          flex: 2,
-          child: CkButton(
-            label: 'Accept →',
-            busy: busy,
-            onPressed: busy ? null : onAccept,
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 16,
+            child: _ReplyButton(
+              label: 'Accept →',
+              onTap: busy ? null : onAccept,
+              primary: true,
+              busy: busy,
+            ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }
+
+class _ReplyButton extends StatelessWidget {
+  const _ReplyButton({
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+    this.busy = false,
+    this.foreground = CkColors.ink,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool primary;
+  final bool busy;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = primary ? CkColors.ink : CkColors.paper;
+    final fg = primary ? CkColors.paper : foreground;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: bg,
+          border: primary
+              ? null
+              : Border.all(color: CkColors.line, width: 1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: busy
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: CkColors.paper,
+                ),
+              )
+            : Text(
+                label,
+                style: CkType.body(
+                  fontSize: primary ? 14 : 13,
+                  fontWeight: primary ? FontWeight.w700 : FontWeight.w600,
+                  color: fg,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+/// Format a "human remaining" label like "47H" / "3D" / "12M" for the
+/// CHALLENGE pill. Falls back to "expired" past zero.
+String _humanRemaining(DateTime expiry) {
+  final remaining = expiry.difference(DateTime.now());
+  if (remaining.isNegative) return 'EXPIRED';
+  if (remaining.inHours < 1) return '${remaining.inMinutes}M';
+  if (remaining.inHours < 48) return '${remaining.inHours}H';
+  return '${remaining.inDays}D';
+}
+
+String _dowShort(DateTime t) =>
+    const ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'][t.weekday - 1];
 
 class _DeclineResult {
   const _DeclineResult({required this.reason, this.note});

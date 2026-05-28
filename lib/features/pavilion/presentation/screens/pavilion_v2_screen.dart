@@ -12,21 +12,21 @@
 //
 // Tokens / atoms come from circk_theme.dart + v2/v2_kit.dart.
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:novex_clean_arch/core/error/failures.dart';
 import 'package:novex_clean_arch/core/theme/circk_theme.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
+import 'package:novex_clean_arch/features/matches/presentation/providers/my_matches_providers.dart';
+import 'package:novex_clean_arch/features/matches/presentation/state/my_matches_view.dart';
 import 'package:novex_clean_arch/features/posts/presentation/screens/composer_screen.dart';
 import '../widgets/pavilion_library_screens.dart';
 import '../widgets/pavilion_settings_screens.dart';
 import '../widgets/pavilion_status_screens.dart';
 import '../widgets/pavilion_yours_screens.dart';
 
-// ── One-off crest colours from the JSX (oklch → sRGB) ──────────────────────
-const _kEagles = Color(0xFF2E3E63); // City Eagles — oklch(0.42 0.10 260)
-const _kDha = Color(0xFF2E3E63); // DHA United — oklch(0.42 0.10 260)
-const _kPractice = Color(0xFF7A746A); // Practice "INT" — oklch(0.52 0.02 80)
-const _kKingsXi = CkColors.amber; // Kings XI — oklch(0.78 0.14 80)
+// ── One-off colours used elsewhere in pavilion ─────────────────────────────
 const _kBackdrop = Color(0x6B14120E); // rgba(20,18,14,0.42) Create backdrop
 const _kGrabber = Color(0x2E14120E); // rgba(20,18,14,0.18) sheet grabber
 
@@ -833,15 +833,19 @@ class _ChallengeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: CkColors.hairline),
+    return InkWell(
+      onTap: () => context.push('/challenge'),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: CkColors.hairline),
+        ),
+        child: Text('+ Challenge',
+            style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600)),
       ),
-      child: Text('+ Challenge',
-          style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600)),
     );
   }
 }
@@ -877,136 +881,63 @@ typedef _Past = ({
   String mine,
 });
 
-class _PvMyMatches extends StatefulWidget {
+class _PvMyMatches extends ConsumerStatefulWidget {
   const _PvMyMatches();
 
   @override
-  State<_PvMyMatches> createState() => _PvMyMatchesState();
+  ConsumerState<_PvMyMatches> createState() => _PvMyMatchesState();
 }
 
-class _PvMyMatchesState extends State<_PvMyMatches> {
+class _PvMyMatchesState extends ConsumerState<_PvMyMatches> {
   String _tab = 'confirmed';
-
-  static const List<_Confirmed> _confirmed = [
-    (
-      tag: "Spring Cup '26 · QF",
-      homeShort: 'LAH',
-      homeColor: CkColors.red,
-      homeName: 'Lahore Lions',
-      awayShort: 'CTY',
-      awayColor: _kEagles,
-      awayName: 'City Eagles',
-      when: 'Today · 18:30',
-      venue: 'Model Town · Pitch 2',
-      role: 'On the XI · #3',
-      countdown: 'In 4h 12m',
-      urgent: true,
-    ),
-    (
-      tag: 'Spring Cup · SF',
-      homeShort: 'LAH',
-      homeColor: CkColors.red,
-      homeName: 'Lahore Lions',
-      awayShort: 'DHA',
-      awayColor: _kDha,
-      awayName: 'DHA United',
-      when: 'Sat 18 · 15:00',
-      venue: 'Gulberg Sports',
-      role: 'Captain · pick XI by Fri',
-      countdown: 'In 4 days',
-      urgent: false,
-    ),
-    (
-      tag: 'Friendly',
-      homeShort: 'LAH',
-      homeColor: CkColors.red,
-      homeName: 'Lahore Lions',
-      awayShort: 'INT',
-      awayColor: _kPractice,
-      awayName: 'Practice',
-      when: 'Sun 19 · 07:00',
-      venue: 'Home ground',
-      role: 'Optional',
-      countdown: 'In 5 days',
-      urgent: false,
-    ),
-  ];
-
-  static const List<_Past> _past = [
-    (
-      tag: 'Spring Cup · QF',
-      when: 'Mon 10 May',
-      homeShort: 'LAH',
-      homeColor: CkColors.red,
-      homeRuns: 181,
-      homeWkts: 6,
-      awayShort: 'CTY',
-      awayColor: _kEagles,
-      awayRuns: 178,
-      awayWkts: 10,
-      homeWon: true,
-      result: 'won by 3 runs',
-      mine: 'You: 78 (52) · MOM',
-    ),
-    (
-      tag: 'Friendly',
-      when: 'Thu 6 May',
-      homeShort: 'LAH',
-      homeColor: CkColors.red,
-      homeRuns: 138,
-      homeWkts: 8,
-      awayShort: 'OB',
-      awayColor: CkCrest.ob,
-      awayRuns: 150,
-      awayWkts: 6,
-      homeWon: false,
-      result: 'lost by 12',
-      mine: 'You: 12 (15)',
-    ),
-    (
-      tag: 'Friday League · R4',
-      when: 'Fri 30 Apr',
-      homeShort: 'LAH',
-      homeColor: CkColors.red,
-      homeRuns: 142,
-      homeWkts: 8,
-      awayShort: 'KXI',
-      awayColor: _kKingsXi,
-      awayRuns: 144,
-      awayWkts: 4,
-      homeWon: false,
-      result: 'lost by 6 wkts',
-      mine: 'You: 41 (28)',
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        // Pending-requests banner.
-        const Padding(
-          padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
-          child: _PendingRequestsBanner(count: 2),
+    final async = ref.watch(myMatchesViewProvider);
+
+    return async.when(
+      loading: () => const _MyMatchesLoading(),
+      error: (e, _) => _MyMatchesError(
+        message: e is FailureWrapper ? e.failure.message : e.toString(),
+        onRetry: () => ref.invalidate(myMatchesViewProvider),
+      ),
+      data: (view) => RefreshIndicator.adaptive(
+        onRefresh: () async => ref.invalidate(myMatchesViewProvider),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            if (view.pendingRequestsCount > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                child: _PendingRequestsBanner(
+                  count: view.pendingRequestsCount,
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
+              child: _Segmented(
+                value: _tab,
+                tabs: [
+                  (
+                    id: 'confirmed',
+                    label: 'Confirmed',
+                    badge: view.confirmed.length,
+                  ),
+                  (id: 'past', label: 'Past', badge: view.past.length),
+                ],
+                onSelect: (v) => setState(() => _tab = v),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+              child: _tab == 'confirmed'
+                  ? _confirmedBody(view)
+                  : _pastBody(view),
+            ),
+          ],
         ),
-        // Segmented sub-tabs.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
-          child: _Segmented(
-            value: _tab,
-            tabs: [
-              (id: 'confirmed', label: 'Confirmed', badge: _confirmed.length),
-              (id: 'past', label: 'Past', badge: _past.length),
-            ],
-            onSelect: (v) => setState(() => _tab = v),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-          child: _tab == 'confirmed' ? _confirmedBody() : _pastBody(),
-        ),
-      ],
+      ),
     );
   }
 
@@ -1029,31 +960,190 @@ class _PvMyMatchesState extends State<_PvMyMatches> {
         ),
       );
 
-  Widget _confirmedBody() {
+  Widget _confirmedBody(MyMatchesView view) {
+    if (view.confirmed.isEmpty) {
+      return const _ConfirmedEmpty();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _subhead('Confirmed · ${_confirmed.length}', 'upcoming · next 14 days'),
-        for (var i = 0; i < _confirmed.length; i++) ...[
+        _subhead(
+          'Confirmed · ${view.confirmed.length}',
+          'upcoming',
+        ),
+        for (var i = 0; i < view.confirmed.length; i++) ...[
           if (i > 0) const SizedBox(height: 10),
-          _ConfirmedCard(m: _confirmed[i]),
+          _ConfirmedCard(m: _confirmedToRecord(view.confirmed[i])),
         ],
       ],
     );
   }
 
-  Widget _pastBody() {
+  Widget _pastBody(MyMatchesView view) {
+    if (view.past.isEmpty) {
+      return const _PastEmpty();
+    }
+    final total = view.totalPastCount;
+    final shown = view.past.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _subhead('Past · ${_past.length} shown', 'last 30 days'),
-        for (var i = 0; i < _past.length; i++) ...[
+        _subhead('Past · $shown shown', 'most recent'),
+        for (var i = 0; i < view.past.length; i++) ...[
           if (i > 0) const SizedBox(height: 6),
-          _PastRow(m: _past[i]),
+          _PastRow(m: _pastToRecord(view.past[i])),
         ],
-        const SizedBox(height: 12),
-        const _SeeAllButton(label: 'SEE ALL 142 MATCHES →'),
+        if (total > shown) ...[
+          const SizedBox(height: 12),
+          _SeeAllButton(label: 'SEE ALL $total MATCHES →'),
+        ],
       ],
+    );
+  }
+}
+
+_Confirmed _confirmedToRecord(MyMatchConfirmed v) => (
+      tag: v.tag,
+      homeShort: v.homeShort,
+      homeColor: v.homeColor,
+      homeName: v.homeName,
+      awayShort: v.awayShort,
+      awayColor: v.awayColor,
+      awayName: v.awayName,
+      when: v.when,
+      venue: v.venue,
+      role: v.role,
+      countdown: v.countdown,
+      urgent: v.urgent,
+    );
+
+_Past _pastToRecord(MyMatchPast v) => (
+      tag: v.tag,
+      when: v.when,
+      homeShort: v.homeShort,
+      homeColor: v.homeColor,
+      homeRuns: v.homeRuns,
+      homeWkts: v.homeWkts,
+      awayShort: v.awayShort,
+      awayColor: v.awayColor,
+      awayRuns: v.awayRuns,
+      awayWkts: v.awayWkts,
+      homeWon: v.homeWon,
+      result: v.result,
+      mine: v.mine,
+    );
+
+class _MyMatchesLoading extends StatelessWidget {
+  const _MyMatchesLoading();
+
+  @override
+  Widget build(BuildContext context) =>
+      const Center(child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 64),
+        child: CircularProgressIndicator(),
+      ));
+}
+
+class _MyMatchesError extends StatelessWidget {
+  const _MyMatchesError({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 32, 18, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Couldn't load your matches.",
+            style: CkType.display(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.01,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            style: CkType.body(fontSize: 12, color: CkColors.muted),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: onRetry,
+            child: const Text('Try again'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConfirmedEmpty extends StatelessWidget {
+  const _ConfirmedEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 28, 0, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Nothing on the schedule.',
+            style: CkType.display(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.02,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "Confirmed fixtures will appear here once you accept a "
+            "challenge or your captain picks the XI.",
+            style: CkType.body(
+              fontSize: 12,
+              color: CkColors.muted,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PastEmpty extends StatelessWidget {
+  const _PastEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 28, 0, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'No past matches.',
+            style: CkType.display(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.02,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "Once you play or captain a match, the result will live here. "
+            "It builds your career record.",
+            style: CkType.body(
+              fontSize: 12,
+              color: CkColors.muted,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

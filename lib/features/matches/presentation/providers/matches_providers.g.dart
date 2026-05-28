@@ -850,6 +850,794 @@ final class MatchFamily extends $Family
   String toString() => r'matchProvider';
 }
 
+@ProviderFor(watchMatchUseCase)
+final watchMatchUseCaseProvider = WatchMatchUseCaseProvider._();
+
+final class WatchMatchUseCaseProvider
+    extends $FunctionalProvider<WatchMatch, WatchMatch, WatchMatch>
+    with $Provider<WatchMatch> {
+  WatchMatchUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'watchMatchUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$watchMatchUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<WatchMatch> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  WatchMatch create(Ref ref) {
+    return watchMatchUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(WatchMatch value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<WatchMatch>(value),
+    );
+  }
+}
+
+String _$watchMatchUseCaseHash() => r'05618fe58ffdfb86a10e0348865d9bbbbdbf0007';
+
+@ProviderFor(recordMatchTossUseCase)
+final recordMatchTossUseCaseProvider = RecordMatchTossUseCaseProvider._();
+
+final class RecordMatchTossUseCaseProvider
+    extends
+        $FunctionalProvider<RecordMatchToss, RecordMatchToss, RecordMatchToss>
+    with $Provider<RecordMatchToss> {
+  RecordMatchTossUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'recordMatchTossUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$recordMatchTossUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<RecordMatchToss> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  RecordMatchToss create(Ref ref) {
+    return recordMatchTossUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(RecordMatchToss value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<RecordMatchToss>(value),
+    );
+  }
+}
+
+String _$recordMatchTossUseCaseHash() =>
+    r'e15c4079c4bca3db3a51aab9a085726b0e1a5849';
+
+@ProviderFor(submitMatchOpenersUseCase)
+final submitMatchOpenersUseCaseProvider = SubmitMatchOpenersUseCaseProvider._();
+
+final class SubmitMatchOpenersUseCaseProvider
+    extends
+        $FunctionalProvider<
+          SubmitMatchOpeners,
+          SubmitMatchOpeners,
+          SubmitMatchOpeners
+        >
+    with $Provider<SubmitMatchOpeners> {
+  SubmitMatchOpenersUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'submitMatchOpenersUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$submitMatchOpenersUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<SubmitMatchOpeners> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SubmitMatchOpeners create(Ref ref) {
+    return submitMatchOpenersUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SubmitMatchOpeners value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SubmitMatchOpeners>(value),
+    );
+  }
+}
+
+String _$submitMatchOpenersUseCaseHash() =>
+    r'6ff2026040b809beb55e83b0bb2faa77d5ca5e5c';
+
+@ProviderFor(startMatchNowUseCase)
+final startMatchNowUseCaseProvider = StartMatchNowUseCaseProvider._();
+
+final class StartMatchNowUseCaseProvider
+    extends $FunctionalProvider<StartMatchNow, StartMatchNow, StartMatchNow>
+    with $Provider<StartMatchNow> {
+  StartMatchNowUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'startMatchNowUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$startMatchNowUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<StartMatchNow> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  StartMatchNow create(Ref ref) {
+    return startMatchNowUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(StartMatchNow value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<StartMatchNow>(value),
+    );
+  }
+}
+
+String _$startMatchNowUseCaseHash() =>
+    r'08ce4dbaed019770e4ab146f89369005c310a9af';
+
+/// Live match-row updates (broadcast channel). Each subscription opens its
+/// own channel; keep usage to one consumer per route (the Match Start
+/// screen + the spectator scoreboard).
+
+@ProviderFor(liveMatch)
+final liveMatchProvider = LiveMatchFamily._();
+
+/// Live match-row updates (broadcast channel). Each subscription opens its
+/// own channel; keep usage to one consumer per route (the Match Start
+/// screen + the spectator scoreboard).
+
+final class LiveMatchProvider
+    extends $FunctionalProvider<AsyncValue<Match?>, Match?, Stream<Match?>>
+    with $FutureModifier<Match?>, $StreamProvider<Match?> {
+  /// Live match-row updates (broadcast channel). Each subscription opens its
+  /// own channel; keep usage to one consumer per route (the Match Start
+  /// screen + the spectator scoreboard).
+  LiveMatchProvider._({
+    required LiveMatchFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'liveMatchProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$liveMatchHash();
+
+  @override
+  String toString() {
+    return r'liveMatchProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<Match?> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<Match?> create(Ref ref) {
+    final argument = this.argument as String;
+    return liveMatch(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is LiveMatchProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$liveMatchHash() => r'5de59b19f8b0fe4105cbf4b3b841a54a66140d23';
+
+/// Live match-row updates (broadcast channel). Each subscription opens its
+/// own channel; keep usage to one consumer per route (the Match Start
+/// screen + the spectator scoreboard).
+
+final class LiveMatchFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<Match?>, String> {
+  LiveMatchFamily._()
+    : super(
+        retry: null,
+        name: r'liveMatchProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Live match-row updates (broadcast channel). Each subscription opens its
+  /// own channel; keep usage to one consumer per route (the Match Start
+  /// screen + the spectator scoreboard).
+
+  LiveMatchProvider call(String matchId) =>
+      LiveMatchProvider._(argument: matchId, from: this);
+
+  @override
+  String toString() => r'liveMatchProvider';
+}
+
+@ProviderFor(sendMatchChallengeUseCase)
+final sendMatchChallengeUseCaseProvider = SendMatchChallengeUseCaseProvider._();
+
+final class SendMatchChallengeUseCaseProvider
+    extends
+        $FunctionalProvider<
+          SendMatchChallenge,
+          SendMatchChallenge,
+          SendMatchChallenge
+        >
+    with $Provider<SendMatchChallenge> {
+  SendMatchChallengeUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'sendMatchChallengeUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$sendMatchChallengeUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<SendMatchChallenge> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SendMatchChallenge create(Ref ref) {
+    return sendMatchChallengeUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SendMatchChallenge value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SendMatchChallenge>(value),
+    );
+  }
+}
+
+String _$sendMatchChallengeUseCaseHash() =>
+    r'158b5cfeabd5e7a72ab1fcefddbc2ec86b8e2b25';
+
+@ProviderFor(acceptMatchChallengeUseCase)
+final acceptMatchChallengeUseCaseProvider =
+    AcceptMatchChallengeUseCaseProvider._();
+
+final class AcceptMatchChallengeUseCaseProvider
+    extends
+        $FunctionalProvider<
+          AcceptMatchChallenge,
+          AcceptMatchChallenge,
+          AcceptMatchChallenge
+        >
+    with $Provider<AcceptMatchChallenge> {
+  AcceptMatchChallengeUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'acceptMatchChallengeUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$acceptMatchChallengeUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<AcceptMatchChallenge> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  AcceptMatchChallenge create(Ref ref) {
+    return acceptMatchChallengeUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(AcceptMatchChallenge value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<AcceptMatchChallenge>(value),
+    );
+  }
+}
+
+String _$acceptMatchChallengeUseCaseHash() =>
+    r'c2b4f180531790d83f3326b2f26a927eb4a23617';
+
+@ProviderFor(counterMatchChallengeUseCase)
+final counterMatchChallengeUseCaseProvider =
+    CounterMatchChallengeUseCaseProvider._();
+
+final class CounterMatchChallengeUseCaseProvider
+    extends
+        $FunctionalProvider<
+          CounterMatchChallenge,
+          CounterMatchChallenge,
+          CounterMatchChallenge
+        >
+    with $Provider<CounterMatchChallenge> {
+  CounterMatchChallengeUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'counterMatchChallengeUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$counterMatchChallengeUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<CounterMatchChallenge> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  CounterMatchChallenge create(Ref ref) {
+    return counterMatchChallengeUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CounterMatchChallenge value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CounterMatchChallenge>(value),
+    );
+  }
+}
+
+String _$counterMatchChallengeUseCaseHash() =>
+    r'9ea7a5aa5f4a0936a475210cec65d023563c04a2';
+
+@ProviderFor(declineMatchChallengeUseCase)
+final declineMatchChallengeUseCaseProvider =
+    DeclineMatchChallengeUseCaseProvider._();
+
+final class DeclineMatchChallengeUseCaseProvider
+    extends
+        $FunctionalProvider<
+          DeclineMatchChallenge,
+          DeclineMatchChallenge,
+          DeclineMatchChallenge
+        >
+    with $Provider<DeclineMatchChallenge> {
+  DeclineMatchChallengeUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'declineMatchChallengeUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$declineMatchChallengeUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<DeclineMatchChallenge> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  DeclineMatchChallenge create(Ref ref) {
+    return declineMatchChallengeUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DeclineMatchChallenge value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DeclineMatchChallenge>(value),
+    );
+  }
+}
+
+String _$declineMatchChallengeUseCaseHash() =>
+    r'441cdaf312bfe2800744bdb2d698506e05f5a772';
+
+@ProviderFor(withdrawMatchChallengeUseCase)
+final withdrawMatchChallengeUseCaseProvider =
+    WithdrawMatchChallengeUseCaseProvider._();
+
+final class WithdrawMatchChallengeUseCaseProvider
+    extends
+        $FunctionalProvider<
+          WithdrawMatchChallenge,
+          WithdrawMatchChallenge,
+          WithdrawMatchChallenge
+        >
+    with $Provider<WithdrawMatchChallenge> {
+  WithdrawMatchChallengeUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'withdrawMatchChallengeUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$withdrawMatchChallengeUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<WithdrawMatchChallenge> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  WithdrawMatchChallenge create(Ref ref) {
+    return withdrawMatchChallengeUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(WithdrawMatchChallenge value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<WithdrawMatchChallenge>(value),
+    );
+  }
+}
+
+String _$withdrawMatchChallengeUseCaseHash() =>
+    r'42c448f04368128019c1f643bf8a1e0fd067636b';
+
+@ProviderFor(getMatchChallengeUseCase)
+final getMatchChallengeUseCaseProvider = GetMatchChallengeUseCaseProvider._();
+
+final class GetMatchChallengeUseCaseProvider
+    extends
+        $FunctionalProvider<
+          GetMatchChallenge,
+          GetMatchChallenge,
+          GetMatchChallenge
+        >
+    with $Provider<GetMatchChallenge> {
+  GetMatchChallengeUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'getMatchChallengeUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$getMatchChallengeUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<GetMatchChallenge> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  GetMatchChallenge create(Ref ref) {
+    return getMatchChallengeUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(GetMatchChallenge value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<GetMatchChallenge>(value),
+    );
+  }
+}
+
+String _$getMatchChallengeUseCaseHash() =>
+    r'dbe1df804d7e64c081748c2eaf40e2ad3502fd7b';
+
+@ProviderFor(listMyMatchChallengesUseCase)
+final listMyMatchChallengesUseCaseProvider =
+    ListMyMatchChallengesUseCaseProvider._();
+
+final class ListMyMatchChallengesUseCaseProvider
+    extends
+        $FunctionalProvider<
+          ListMyMatchChallenges,
+          ListMyMatchChallenges,
+          ListMyMatchChallenges
+        >
+    with $Provider<ListMyMatchChallenges> {
+  ListMyMatchChallengesUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'listMyMatchChallengesUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$listMyMatchChallengesUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<ListMyMatchChallenges> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ListMyMatchChallenges create(Ref ref) {
+    return listMyMatchChallengesUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ListMyMatchChallenges value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ListMyMatchChallenges>(value),
+    );
+  }
+}
+
+String _$listMyMatchChallengesUseCaseHash() =>
+    r'7113b1a37bdc1cedb762c49955aeaa25e95a62ca';
+
+@ProviderFor(findMatchChallengeByCodeUseCase)
+final findMatchChallengeByCodeUseCaseProvider =
+    FindMatchChallengeByCodeUseCaseProvider._();
+
+final class FindMatchChallengeByCodeUseCaseProvider
+    extends
+        $FunctionalProvider<
+          FindMatchChallengeByCode,
+          FindMatchChallengeByCode,
+          FindMatchChallengeByCode
+        >
+    with $Provider<FindMatchChallengeByCode> {
+  FindMatchChallengeByCodeUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'findMatchChallengeByCodeUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$findMatchChallengeByCodeUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<FindMatchChallengeByCode> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  FindMatchChallengeByCode create(Ref ref) {
+    return findMatchChallengeByCodeUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(FindMatchChallengeByCode value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<FindMatchChallengeByCode>(value),
+    );
+  }
+}
+
+String _$findMatchChallengeByCodeUseCaseHash() =>
+    r'b4b517e46c738251e29ef68df5a5b6592cd72737';
+
+/// One-shot list of the user's match requests. Invalidate this provider when
+/// a `match_request` / `match_request_decision` notification arrives so the
+/// UI re-fetches.
+
+@ProviderFor(myMatchChallenges)
+final myMatchChallengesProvider = MyMatchChallengesProvider._();
+
+/// One-shot list of the user's match requests. Invalidate this provider when
+/// a `match_request` / `match_request_decision` notification arrives so the
+/// UI re-fetches.
+
+final class MyMatchChallengesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<MatchRequest>>,
+          List<MatchRequest>,
+          FutureOr<List<MatchRequest>>
+        >
+    with
+        $FutureModifier<List<MatchRequest>>,
+        $FutureProvider<List<MatchRequest>> {
+  /// One-shot list of the user's match requests. Invalidate this provider when
+  /// a `match_request` / `match_request_decision` notification arrives so the
+  /// UI re-fetches.
+  MyMatchChallengesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'myMatchChallengesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$myMatchChallengesHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<MatchRequest>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<MatchRequest>> create(Ref ref) {
+    return myMatchChallenges(ref);
+  }
+}
+
+String _$myMatchChallengesHash() => r'b02cb0f6df156a47361bb84d1b27fd5cfa961401';
+
+/// Single challenge by id (drives the receiver detail screen).
+
+@ProviderFor(matchChallenge)
+final matchChallengeProvider = MatchChallengeFamily._();
+
+/// Single challenge by id (drives the receiver detail screen).
+
+final class MatchChallengeProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<MatchRequest?>,
+          MatchRequest?,
+          FutureOr<MatchRequest?>
+        >
+    with $FutureModifier<MatchRequest?>, $FutureProvider<MatchRequest?> {
+  /// Single challenge by id (drives the receiver detail screen).
+  MatchChallengeProvider._({
+    required MatchChallengeFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'matchChallengeProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$matchChallengeHash();
+
+  @override
+  String toString() {
+    return r'matchChallengeProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<MatchRequest?> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<MatchRequest?> create(Ref ref) {
+    final argument = this.argument as String;
+    return matchChallenge(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MatchChallengeProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$matchChallengeHash() => r'7be0c6481138d81da8f828dd888dd69411375009';
+
+/// Single challenge by id (drives the receiver detail screen).
+
+final class MatchChallengeFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<MatchRequest?>, String> {
+  MatchChallengeFamily._()
+    : super(
+        retry: null,
+        name: r'matchChallengeProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Single challenge by id (drives the receiver detail screen).
+
+  MatchChallengeProvider call(String requestId) =>
+      MatchChallengeProvider._(argument: requestId, from: this);
+
+  @override
+  String toString() => r'matchChallengeProvider';
+}
+
 /// Matches involving the user's teams (for the MATCH tab's requests section).
 
 @ProviderFor(myMatches)

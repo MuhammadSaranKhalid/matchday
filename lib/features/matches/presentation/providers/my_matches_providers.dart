@@ -1,0 +1,271 @@
+import 'package:flutter/material.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../../../core/error/failures.dart';
+import '../../../../core/usecase/usecase.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../teams/domain/entities/team.dart';
+import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../domain/entities/innings.dart';
+import '../../domain/entities/match.dart';
+import '../../domain/entities/match_role.dart';
+import '../../domain/usecases/list_innings_for_matches.dart';
+import '../state/my_matches_view.dart';
+import 'matches_providers.dart';
+
+part 'my_matches_providers.g.dart';
+
+@riverpod
+ListInningsForMatches listInningsForMatchesUseCase(Ref ref) =>
+    ListInningsForMatches(ref.watch(matchesRepositoryProvider));
+
+/// Composes matches + teams + currentUser + innings into a pre-rendered
+/// [MyMatchesView] for the Pavilion screen. Online-only one-shot fetch;
+/// pull-to-refresh invalidates self.
+@riverpod
+Future<MyMatchesView> myMatchesView(Ref ref) async {
+  final user = ref.watch(currentUserStreamProvider).value;
+  if (user == null) return const MyMatchesView.empty();
+
+  final matchesResult =
+      await ref.watch(listMyMatchesUseCaseProvider).call(const NoParams());
+  final matches = matchesResult.fold<List<Match>>(
+    (f) => throw FailureWrapper(f),
+    (list) => list,
+  );
+  if (matches.isEmpty) return const MyMatchesView.empty();
+
+  final teams = ref.watch(myTeamsProvider).value ?? const <Team>[];
+  final teamsById = <String, Team>{for (final t in teams) t.id.value: t};
+
+  // Fan-out: any team referenced by a match that isn't already in myTeams
+  // (e.g. the opponent). One-shot fetch via getTeam — cheap relative to the
+  // single list-matches roundtrip.
+  final missingTeamIds = <String>{};
+  for (final m in matches) {
+    if (!teamsById.containsKey(m.teamAId.value)) missingTeamIds.add(m.teamAId.value);
+    if (!teamsById.containsKey(m.teamBId.value)) missingTeamIds.add(m.teamBId.value);
+  }
+  for (final id in missingTeamIds) {
+    final result = await ref.read(getTeamUseCaseProvider).call(TeamId(id));
+    final team = result.fold((_) => null, (t) => t);
+    if (team != null) teamsById[id] = team;
+  }
+
+  final past = matches.where((m) => m.status.isPast).toList();
+  final upcoming = matches
+      .where((m) => m.status.isUpcoming || m.status.isLive)
+      .toList()
+    ..sort(_byScheduledThenCreated);
+
+  Map<MatchId, List<Innings>> inningsByMatch = const {};
+  if (past.isNotEmpty) {
+    final result = await ref.read(listInningsForMatchesUseCaseProvider).call(
+          ListInningsForMatchesParams(past.map((m) => m.id)),
+        );
+    inningsByMatch = result.fold((_) => const {}, (map) => map);
+  }
+
+  // Past sorted by recency descending (createdAt as proxy when end_time not
+  // surfaced on the entity).
+  past.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  final confirmedRows = [
+    for (final m in upcoming)
+      _confirmedFor(m, teamsById, currentUserId: user.id.value),
+  ];
+  final pastRows = [
+    for (final m in past)
+      _pastFor(m, teamsById,
+          innings: inningsByMatch[m.id] ?? const [],
+          currentUserId: user.id.value),
+  ];
+
+  return MyMatchesView(
+    confirmed: confirmedRows,
+    past: pastRows.take(_pastWindow).toList(),
+    totalPastCount: pastRows.length,
+    // v1: match_requests count comes in Slice B. Surface 0 for now so the
+    // banner never renders.
+    pendingRequestsCount: 0,
+  );
+}
+
+const _pastWindow = 5;
+
+int _byScheduledThenCreated(Match a, Match b) {
+  final aT = a.scheduledStartTime ?? a.createdAt;
+  final bT = b.scheduledStartTime ?? b.createdAt;
+  return aT.compareTo(bT);
+}
+
+MyMatchConfirmed _confirmedFor(
+  Match m,
+  Map<String, Team> teamsById, {
+  required String currentUserId,
+}) {
+  final home = teamsById[m.teamAId.value];
+  final away = teamsById[m.teamBId.value];
+  final start = m.scheduledStartTime;
+  final isToday = start != null && _isSameDay(start, DateTime.now());
+
+  final userTeamIds = {
+    if (home?.isManagedBy(currentUserId) ?? false) m.teamAId.value,
+    if (away?.isManagedBy(currentUserId) ?? false) m.teamBId.value,
+  };
+  final role = roleOnMatch(m, currentUserId, userTeamIds: userTeamIds);
+  final roleLine = roleLineFor(role, m, isToday: isToday);
+
+  return MyMatchConfirmed(
+    id: m.id.value,
+    tag: 'Friendly',
+    homeShort: _short(home, fallback: 'A'),
+    homeColor: _color(home?.primaryColor, fallback: const Color(0xFF7A746A)),
+    homeName: home?.name ?? 'Team A',
+    awayShort: _short(away, fallback: 'B'),
+    awayColor: _color(away?.primaryColor, fallback: const Color(0xFF7A746A)),
+    awayName: away?.name ?? 'Team B',
+    when: _formatWhen(start, m.createdAt),
+    venue: _venueLine(m),
+    role: roleLine.label,
+    roleKind: role,
+    countdown: _countdown(start, status: m.status),
+    urgent: roleLine.urgent || _isUrgent(start, status: m.status),
+  );
+}
+
+MyMatchPast _pastFor(
+  Match m,
+  Map<String, Team> teamsById, {
+  required List<Innings> innings,
+  required String currentUserId,
+}) {
+  final home = teamsById[m.teamAId.value];
+  final away = teamsById[m.teamBId.value];
+
+  // Per-team final score = innings where batting_team_id matches.
+  Innings? innFor(TeamId id) =>
+      innings.where((i) => i.battingTeamId == id).fold<Innings?>(
+            null,
+            (acc, it) =>
+                acc == null || it.inningsNumber > acc.inningsNumber ? it : acc,
+          );
+  final homeInn = innFor(m.teamAId);
+  final awayInn = innFor(m.teamBId);
+
+  final homeWon = (homeInn?.totalRuns ?? -1) > (awayInn?.totalRuns ?? -1);
+  // Is the user on the home side? (manager OR in squad OR captain).
+  final onHome = (home?.isManagedBy(currentUserId) ?? false) ||
+      m.teamASquad.contains(currentUserId) ||
+      m.teamACaptain == currentUserId;
+  final myWon = onHome ? homeWon : !homeWon;
+
+  return MyMatchPast(
+    id: m.id.value,
+    tag: 'Friendly',
+    when: _formatDate(m.scheduledStartTime ?? m.createdAt),
+    homeShort: _short(home, fallback: 'A'),
+    homeColor: _color(home?.primaryColor, fallback: const Color(0xFF7A746A)),
+    homeName: home?.name ?? 'Team A',
+    homeRuns: homeInn?.totalRuns ?? 0,
+    homeWkts: homeInn?.totalWickets ?? 0,
+    awayShort: _short(away, fallback: 'B'),
+    awayColor: _color(away?.primaryColor, fallback: const Color(0xFF7A746A)),
+    awayName: away?.name ?? 'Team B',
+    awayRuns: awayInn?.totalRuns ?? 0,
+    awayWkts: awayInn?.totalWickets ?? 0,
+    homeWon: homeWon,
+    result: m.status == MatchStatus.completed
+        ? (myWon ? 'WON' : 'LOST')
+        : m.status == MatchStatus.walkover
+            ? 'WALKOVER'
+            : 'ABANDONED',
+    mine: '',
+  );
+}
+
+String _short(Team? t, {required String fallback}) {
+  if (t == null) return fallback;
+  final mono = t.logoMonogram;
+  if (mono != null && mono.isNotEmpty) return mono.toUpperCase();
+  // Derive from the team's name: first letters of up to three words.
+  final words = t.name.split(RegExp(r'\s+'));
+  final letters = words
+      .where((w) => w.isNotEmpty)
+      .take(3)
+      .map((w) => w[0])
+      .join();
+  return letters.isEmpty ? fallback : letters.toUpperCase();
+}
+
+Color _color(String? hex, {required Color fallback}) {
+  if (hex == null || hex.isEmpty) return fallback;
+  final cleaned = hex.replaceAll('#', '').trim();
+  if (cleaned.length == 6) {
+    final n = int.tryParse(cleaned, radix: 16);
+    if (n != null) return Color(0xFF000000 | n);
+  } else if (cleaned.length == 8) {
+    final n = int.tryParse(cleaned, radix: 16);
+    if (n != null) return Color(n);
+  }
+  return fallback;
+}
+
+bool _isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+String _venueLine(Match m) {
+  final v = m.venue;
+  if (v == null) return '';
+  if (v.city == null || v.city!.isEmpty) return v.ground;
+  return '${v.ground} · ${v.city}';
+}
+
+String _formatWhen(DateTime? scheduled, DateTime fallback) {
+  final t = scheduled ?? fallback;
+  final now = DateTime.now();
+  if (_isSameDay(t, now)) {
+    return 'Today · ${_hhmm(t)}';
+  }
+  final tomorrow = DateTime(now.year, now.month, now.day + 1);
+  if (_isSameDay(t, tomorrow)) {
+    return 'Tomorrow · ${_hhmm(t)}';
+  }
+  return '${_dayOfWeekShort(t)} ${t.day} · ${_hhmm(t)}';
+}
+
+String _formatDate(DateTime t) =>
+    '${_dayOfWeekShort(t)} ${t.day} ${_monthShort(t)}';
+
+String _hhmm(DateTime t) =>
+    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+String _dayOfWeekShort(DateTime t) =>
+    const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][t.weekday - 1];
+
+String _monthShort(DateTime t) => const [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ][t.month - 1];
+
+String _countdown(DateTime? scheduled, {required MatchStatus status}) {
+  if (status.isLive) return 'LIVE';
+  if (scheduled == null) return '';
+  final delta = scheduled.difference(DateTime.now());
+  if (delta.isNegative) return 'Past';
+  if (delta.inHours < 1) return 'In ${delta.inMinutes}m';
+  if (delta.inHours < 24) {
+    final h = delta.inHours;
+    final m = delta.inMinutes - h * 60;
+    return m == 0 ? 'In ${h}h' : 'In ${h}h ${m}m';
+  }
+  final days = delta.inDays;
+  return days == 1 ? 'In 1 day' : 'In $days days';
+}
+
+bool _isUrgent(DateTime? scheduled, {required MatchStatus status}) {
+  if (status.isLive) return true;
+  if (scheduled == null) return false;
+  final delta = scheduled.difference(DateTime.now());
+  return !delta.isNegative && delta.inHours < 24;
+}

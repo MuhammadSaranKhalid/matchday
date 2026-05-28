@@ -3,15 +3,35 @@ import 'package:novex_clean_arch/features/matches/domain/entities/match.dart';
 import 'package:novex_clean_arch/features/teams/domain/entities/team.dart';
 
 void main() {
-  test('MatchStatus.isActive is true only for open/in-play/recent statuses', () {
+  test('MatchStatus.isActive covers upcoming, in-play, completed + legacy',
+      () {
     const active = {
+      // Upcoming
+      MatchStatus.scheduled,
+      MatchStatus.toss,
+      MatchStatus.rescheduled,
+      // In-play
+      MatchStatus.live,
+      MatchStatus.inningsBreak,
+      MatchStatus.superOver,
+      // Recently concluded
+      MatchStatus.completed,
+      // Legacy (kept reachable so older clients/teams-list keep working)
       MatchStatus.pending,
       MatchStatus.accepted,
-      MatchStatus.live,
-      MatchStatus.completed,
     };
     for (final s in MatchStatus.values) {
       expect(s.isActive, active.contains(s), reason: '${s.name}.isActive');
+    }
+  });
+
+  test('MatchStatus partitions cleanly across upcoming/live/past', () {
+    // Each status is in at most one bucket (live is in-play but not past).
+    for (final s in MatchStatus.values) {
+      final inBuckets =
+          [s.isUpcoming, s.isLive, s.isPast].where((b) => b).length;
+      expect(inBuckets, lessThanOrEqualTo(1),
+          reason: '${s.name} is in multiple state buckets');
     }
   });
 
@@ -31,11 +51,10 @@ void main() {
           createdAt: DateTime(2026),
         );
 
-    expect(build(MatchStatus.pending).isActive, isTrue);
-    expect(build(MatchStatus.accepted).isActive, isTrue);
+    expect(build(MatchStatus.scheduled).isActive, isTrue);
     expect(build(MatchStatus.live).isActive, isTrue);
     expect(build(MatchStatus.completed).isActive, isTrue);
-    expect(build(MatchStatus.declined).isActive, isFalse);
-    expect(build(MatchStatus.cancelled).isActive, isFalse);
+    expect(build(MatchStatus.abandoned).isActive, isFalse);
+    expect(build(MatchStatus.walkover).isActive, isFalse);
   });
 }

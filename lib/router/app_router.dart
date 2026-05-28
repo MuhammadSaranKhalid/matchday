@@ -17,6 +17,10 @@ import '../features/teams/presentation/screens/team_create_screen.dart';
 import '../features/teams/presentation/screens/team_page_screen.dart';
 import '../features/teams/presentation/screens/team_manage_screen.dart';
 import '../features/teams/presentation/screens/teams_list_screen.dart';
+import '../features/matches/presentation/screens/challenge_counter_screen.dart';
+import '../features/matches/presentation/screens/challenge_detail_screen.dart';
+import '../features/matches/presentation/screens/challenge_send_screen.dart';
+import '../features/matches/presentation/screens/challenge_sent_screen.dart';
 import '../features/matches/presentation/screens/live_match_screen.dart';
 import '../features/matches/presentation/screens/match_request_screen.dart';
 import '../features/matches/presentation/screens/match_setup_screen.dart';
@@ -183,6 +187,34 @@ GoRouter appRouter(Ref ref) {
         path: '/matches/:matchId/live',
         builder: (_, state) =>
             LiveMatchScreen(matchId: state.pathParameters['matchId']!),
+      ),
+      GoRoute(
+        path: '/challenge',
+        builder: (_, __) => const ChallengeSendScreen(),
+      ),
+      GoRoute(
+        path: '/teams/:teamId/challenge',
+        builder: (_, state) => ChallengeSendScreen(
+          fromTeamId: state.pathParameters['teamId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/challenges/:requestId',
+        builder: (_, state) => ChallengeDetailScreen(
+          requestId: state.pathParameters['requestId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/challenges/:requestId/sent',
+        builder: (_, state) => ChallengeSentScreen(
+          requestId: state.pathParameters['requestId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/challenges/:requestId/counter',
+        builder: (_, state) => ChallengeCounterScreen(
+          requestId: state.pathParameters['requestId']!,
+        ),
       ),
       GoRoute(
         path: '/notifications',

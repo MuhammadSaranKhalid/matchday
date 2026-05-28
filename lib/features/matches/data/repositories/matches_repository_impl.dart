@@ -6,8 +6,10 @@ import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/ball.dart';
 import '../../domain/entities/innings.dart';
 import '../../domain/entities/match.dart';
+import '../../domain/entities/match_request.dart';
 import '../../domain/repositories/matches_repository.dart';
 import '../datasources/matches_remote_datasource.dart';
+import '../models/match_request_dto.dart';
 
 /// Online-only matches repository. The only place the remote data source's raw
 /// exceptions become [Failure]s.
@@ -81,6 +83,31 @@ class MatchesRepositoryImpl implements MatchesRepository {
     try {
       final dtos = await _remote.list();
       return Right(dtos.map((d) => d.toEntity()).toList());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Map<MatchId, List<Innings>>>> listInningsForMatches(
+    Iterable<MatchId> matchIds,
+  ) async {
+    try {
+      final dtos = await _remote.listInningsForMatches(
+        matchIds.map((m) => m.value).toList(),
+      );
+      final grouped = <MatchId, List<Innings>>{};
+      for (final dto in dtos) {
+        final entity = dto.toEntity();
+        grouped.putIfAbsent(entity.matchId, () => []).add(entity);
+      }
+      // Stable order: innings 1 before innings 2.
+      for (final list in grouped.values) {
+        list.sort((a, b) => a.inningsNumber.compareTo(b.inningsNumber));
+      }
+      return Right(grouped);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -216,6 +243,266 @@ class MatchesRepositoryImpl implements MatchesRepository {
       return Right(inn.toEntity());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Stream<Match?> watchMatch(MatchId id) => _remote
+      .watchMatch(id.value)
+      .map((dto) => dto?.toEntity())
+      .handleError(
+        (Object e) => throw FailureWrapper(ServerFailure(e.toString())),
+      );
+
+  @override
+  Future<Either<Failure, Unit>> recordMatchToss({
+    required MatchId id,
+    required TeamId wonBy,
+    required TossDecision decision,
+    String? face,
+  }) async {
+    try {
+      await _remote.recordMatchToss(
+        matchId: id.value,
+        wonBy: wonBy.value,
+        decision: decision.wire,
+        face: face,
+      );
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> submitMatchOpeners({
+    required MatchId id,
+    required String strikerId,
+    required String nonStrikerId,
+  }) async {
+    try {
+      await _remote.submitMatchOpeners(
+        matchId: id.value,
+        strikerId: strikerId,
+        nonStrikerId: nonStrikerId,
+      );
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> startMatchNow(MatchId id) async {
+    try {
+      await _remote.startMatchNow(id.value);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  // ─── Match Requests ───────────────────────────────────────────────────────
+
+  @override
+  Future<Either<Failure, MatchRequestId>> sendMatchChallenge({
+    required TeamId fromTeamId,
+    TeamId? toTeamId,
+    DateTime? proposedStartTime,
+    String? proposedVenue,
+    MatchFormat? proposedFormat,
+    String? message,
+    int playersPerSide = 11,
+    List<String> fromTeamXi = const [],
+    String? fromTeamKeeperId,
+  }) async {
+    try {
+      final id = await _remote.sendMatchChallenge({
+        'p_from_team_id': fromTeamId.value,
+        if (toTeamId != null) 'p_to_team_id': toTeamId.value,
+        if (proposedStartTime != null)
+          'p_proposed_start_time': proposedStartTime.toUtc().toIso8601String(),
+        if (proposedVenue != null) 'p_proposed_venue': proposedVenue,
+        if (proposedFormat != null)
+          'p_proposed_format': MatchRequestDto.formatToJson(proposedFormat),
+        if (message != null) 'p_message': message,
+        'p_players_per_side': playersPerSide,
+        'p_from_team_xi': fromTeamXi,
+        if (fromTeamKeeperId != null) 'p_from_team_keeper_id': fromTeamKeeperId,
+      });
+      return Right(MatchRequestId(id));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, MatchId>> acceptMatchChallenge({
+    required MatchRequestId requestId,
+    DateTime? scheduledStartTime,
+    String? venue,
+    MatchFormat? format,
+    String? decisionNote,
+    TeamId? toTeamId,
+    List<String> toTeamXi = const [],
+    String? toTeamKeeperId,
+  }) async {
+    try {
+      final id = await _remote.acceptMatchChallenge({
+        'p_request_id': requestId.value,
+        if (scheduledStartTime != null)
+          'p_scheduled_start_time':
+              scheduledStartTime.toUtc().toIso8601String(),
+        if (venue != null) 'p_venue': venue,
+        if (format != null) 'p_format': MatchRequestDto.formatToJson(format),
+        if (decisionNote != null) 'p_decision_note': decisionNote,
+        if (toTeamId != null) 'p_to_team_id': toTeamId.value,
+        'p_to_team_xi': toTeamXi,
+        if (toTeamKeeperId != null) 'p_to_team_keeper_id': toTeamKeeperId,
+      });
+      if (id == null) {
+        return const Left(ServerFailure('Accept returned no match id'));
+      }
+      return Right(MatchId(id));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> counterMatchChallenge({
+    required MatchRequestId requestId,
+    DateTime? counteredStartTime,
+    String? counteredVenue,
+    MatchFormat? counteredFormat,
+    int? counteredPlayersPerSide,
+    String? decisionNote,
+  }) async {
+    try {
+      await _remote.counterMatchChallenge({
+        'p_request_id': requestId.value,
+        if (counteredStartTime != null)
+          'p_countered_start_time':
+              counteredStartTime.toUtc().toIso8601String(),
+        if (counteredVenue != null) 'p_countered_venue': counteredVenue,
+        if (counteredFormat != null)
+          'p_countered_format':
+              MatchRequestDto.formatToJson(counteredFormat),
+        if (counteredPlayersPerSide != null)
+          'p_countered_players_per_side': counteredPlayersPerSide,
+        if (decisionNote != null) 'p_decision_note': decisionNote,
+      });
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> declineMatchChallenge({
+    required MatchRequestId requestId,
+    String? decisionNote,
+    DeclineReason? decisionReason,
+  }) async {
+    try {
+      await _remote.declineMatchChallenge({
+        'p_request_id': requestId.value,
+        if (decisionNote != null) 'p_decision_note': decisionNote,
+        if (decisionReason != null) 'p_decision_reason': decisionReason.wire,
+      });
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> withdrawMatchChallenge({
+    required MatchRequestId requestId,
+    String? decisionNote,
+  }) async {
+    try {
+      await _remote.withdrawMatchChallenge({
+        'p_request_id': requestId.value,
+        if (decisionNote != null) 'p_decision_note': decisionNote,
+      });
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, MatchRequest?>> getMatchChallenge(
+    MatchRequestId requestId,
+  ) async {
+    try {
+      final dto = await _remote.getMatchChallenge(requestId.value);
+      return Right(dto?.toEntity());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, MatchRequest?>> findMatchChallengeByCode(
+    String code,
+  ) async {
+    try {
+      final dto = await _remote.findMatchChallengeByCode(code);
+      return Right(dto?.toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<MatchRequest>>> listMyMatchChallenges() async {
+    try {
+      final dtos = await _remote.listMyMatchChallenges();
+      return Right(dtos.map((d) => d.toEntity()).toList());
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

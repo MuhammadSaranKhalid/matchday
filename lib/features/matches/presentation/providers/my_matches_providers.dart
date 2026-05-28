@@ -116,6 +116,37 @@ MyMatchConfirmed _confirmedFor(
   final role = roleOnMatch(m, currentUserId, userTeamIds: userTeamIds);
   final roleLine = roleLineFor(role, m, isToday: isToday);
 
+  // Toss-time detection — design's Case 03b. The card flips to "tap to
+  // start" when the captain is approximately AT match time, not just
+  // because a row was created with a default start_phase. Triggers when:
+  //   (a) Captain has actively opened Match Start (status = toss), OR
+  //   (b) We're within 30 min before scheduled start and up to 6h after
+  //       (covering "I'm at the ground but late") on a still-pre-live row.
+  // Excludes future-scheduled matches that just happen to have start_phase
+  // defaulting to 'toss' on the row.
+  final now = DateTime.now();
+  final timeBracket = start != null &&
+      now.isAfter(start.subtract(const Duration(minutes: 30))) &&
+      now.isBefore(start.add(const Duration(hours: 6)));
+  final isCaptain = role == MatchRoleKind.captain;
+  final tossInProgress = m.status == MatchStatus.toss && isCaptain;
+  final tossReady = tossInProgress ||
+      (isCaptain &&
+          (m.status == MatchStatus.scheduled ||
+              m.status == MatchStatus.rescheduled) &&
+          timeBracket);
+
+  final when = tossReady
+      ? 'Toss · ${_hhmm(start ?? DateTime.now())}'
+      : _formatWhen(start, m.createdAt);
+  final role0 = tossReady ? 'Captain · ready when you are' : roleLine.label;
+  final countdown =
+      tossReady ? 'Now' : _countdown(start, status: m.status);
+  final urgent = tossReady || roleLine.urgent || _isUrgent(start, status: m.status);
+  final helper = tossReady
+      ? 'Both captains here. Tap to flip the coin together.'
+      : null;
+
   return MyMatchConfirmed(
     id: m.id.value,
     tag: 'Friendly',
@@ -125,12 +156,14 @@ MyMatchConfirmed _confirmedFor(
     awayShort: _short(away, fallback: 'B'),
     awayColor: _color(away?.primaryColor, fallback: const Color(0xFF7A746A)),
     awayName: away?.name ?? 'Team B',
-    when: _formatWhen(start, m.createdAt),
+    when: when,
     venue: _venueLine(m),
-    role: roleLine.label,
+    role: role0,
     roleKind: role,
-    countdown: _countdown(start, status: m.status),
-    urgent: roleLine.urgent || _isUrgent(start, status: m.status),
+    countdown: countdown,
+    urgent: urgent,
+    tossReady: tossReady,
+    helper: helper,
   );
 }
 

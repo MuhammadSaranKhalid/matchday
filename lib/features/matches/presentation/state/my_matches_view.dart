@@ -58,6 +58,8 @@ class MyMatchConfirmed {
     required this.roleKind,
     required this.countdown,
     required this.urgent,
+    this.tossReady = false,
+    this.helper,
   });
 
   final String id;
@@ -74,6 +76,17 @@ class MyMatchConfirmed {
   final MatchRoleKind roleKind;
   final String countdown;
   final bool urgent;
+
+  /// True when the match has entered the toss → lineup → ready window —
+  /// the captain can tap to open Match Start. Drives the red-glow card +
+  /// pulsing red dot + big red "Start match → Toss" CTA per the design's
+  /// Case 03b ("Toss time").
+  final bool tossReady;
+
+  /// Optional helper caption shown below the action buttons in a
+  /// `tossReady` card. e.g. "Both captains here. Tap to flip the coin
+  /// together."
+  final String? helper;
 }
 
 /// Pre-rendered Past row data.

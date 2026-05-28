@@ -850,21 +850,6 @@ class _ChallengeButton extends StatelessWidget {
   }
 }
 
-typedef _Confirmed = ({
-  String tag,
-  String homeShort,
-  Color homeColor,
-  String homeName,
-  String awayShort,
-  Color awayColor,
-  String awayName,
-  String when,
-  String venue,
-  String role,
-  String countdown,
-  bool urgent,
-});
-
 typedef _Past = ({
   String tag,
   String when,
@@ -973,7 +958,7 @@ class _PvMyMatchesState extends ConsumerState<_PvMyMatches> {
         ),
         for (var i = 0; i < view.confirmed.length; i++) ...[
           if (i > 0) const SizedBox(height: 10),
-          _ConfirmedCard(m: _confirmedToRecord(view.confirmed[i])),
+          _ConfirmedCard(v: view.confirmed[i]),
         ],
       ],
     );
@@ -1001,21 +986,6 @@ class _PvMyMatchesState extends ConsumerState<_PvMyMatches> {
     );
   }
 }
-
-_Confirmed _confirmedToRecord(MyMatchConfirmed v) => (
-      tag: v.tag,
-      homeShort: v.homeShort,
-      homeColor: v.homeColor,
-      homeName: v.homeName,
-      awayShort: v.awayShort,
-      awayColor: v.awayColor,
-      awayName: v.awayName,
-      when: v.when,
-      venue: v.venue,
-      role: v.role,
-      countdown: v.countdown,
-      urgent: v.urgent,
-    );
 
 _Past _pastToRecord(MyMatchPast v) => (
       tag: v.tag,
@@ -1309,130 +1279,303 @@ class _Segmented extends StatelessWidget {
 }
 
 class _ConfirmedCard extends StatelessWidget {
-  const _ConfirmedCard({required this.m});
-  final _Confirmed m;
+  const _ConfirmedCard({required this.v});
+  final MyMatchConfirmed v;
 
   @override
   Widget build(BuildContext context) {
-    final captain = m.role.startsWith('Captain');
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: m.urgent ? CkColors.red : CkColors.hairline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header bar.
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: const BoxDecoration(
-              color: CkColors.paper2,
-              border: Border(bottom: BorderSide(color: CkColors.hairline)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(
-                  child: Text(
-                    m.when.toUpperCase(),
-                    style: CkType.mono(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.1,
-                      color: m.urgent ? CkColors.red : CkColors.ink,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  m.tag,
-                  style: CkType.mono(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.06,
-                    color: CkColors.muted,
-                  ),
-                ),
-              ],
-            ),
+    final captain = v.role.startsWith('Captain');
+    final tossReady = v.tossReady;
+    // Soft red wash for the header strip when toss-ready — oklch(0.97 0.018
+    // 28) per the design source.
+    const tossHeaderBg = Color(0xFFFFEEEC);
+
+    return InkWell(
+      onTap: tossReady ? () => _openMatchStart(context) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: (v.urgent || tossReady) ? CkColors.red : CkColors.hairline,
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    _MiniCrest(short: m.homeShort, color: m.homeColor),
-                    const SizedBox(width: 10),
-                    Text('vs',
-                        style: CkType.mono(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0,
-                          color: CkColors.muted,
-                        )),
-                    const SizedBox(width: 10),
-                    _MiniCrest(short: m.awayShort, color: m.awayColor),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('${m.homeName} vs ${m.awayName}',
-                              style: CkType.body(
-                                  fontSize: 13, fontWeight: FontWeight.w600)),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(m.venue,
-                                style: CkType.body(
-                                    fontSize: 11, color: CkColors.muted)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  margin: const EdgeInsets.only(top: 10),
-                  padding: const EdgeInsets.only(top: 8),
-                  decoration: const BoxDecoration(
-                    border: Border(top: BorderSide(color: CkColors.hairline)),
+          boxShadow: tossReady
+              ? const [
+                  BoxShadow(
+                    color: Color(0x2EBE3C28), // rgba(190,60,40,0.18)
+                    blurRadius: 20,
+                    offset: Offset(0, 6),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          (captain ? '✦ ' : '') + m.role,
-                          style: CkType.mono(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.06,
-                            color: captain ? CkColors.red : CkColors.ink,
+                ]
+              : v.urgent
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x14BE3C28), // rgba(190,60,40,0.08)
+                        blurRadius: 16,
+                        offset: Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header strip — soft red bg + pulsing dot in toss-ready mode.
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: tossReady ? tossHeaderBg : CkColors.paper2,
+                border: const Border(
+                    bottom: BorderSide(color: CkColors.hairline)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (tossReady) ...[
+                          const _PulsingDot(),
+                          const SizedBox(width: 6),
+                        ],
+                        Flexible(
+                          child: Text(
+                            v.when.toUpperCase(),
+                            overflow: TextOverflow.ellipsis,
+                            style: CkType.mono(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.1,
+                              color: (v.urgent || tossReady)
+                                  ? CkColors.red
+                                  : CkColors.ink,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        m.countdown,
-                        style: CkType.mono(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.06,
-                          color: m.urgent ? CkColors.red : CkColors.muted,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    v.tag,
+                    style: CkType.mono(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.06,
+                      color: CkColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Body.
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      _MiniCrest(short: v.homeShort, color: v.homeColor),
+                      const SizedBox(width: 10),
+                      Text('vs',
+                          style: CkType.mono(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0,
+                            color: CkColors.muted,
+                          )),
+                      const SizedBox(width: 10),
+                      _MiniCrest(short: v.awayShort, color: v.awayColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${v.homeName} vs ${v.awayName}',
+                              style: CkType.body(
+                                  fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(v.venue,
+                                  style: CkType.body(
+                                      fontSize: 11, color: CkColors.muted)),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  Container(
+                    margin: const EdgeInsets.only(top: 10),
+                    padding: const EdgeInsets.only(top: 8),
+                    decoration: const BoxDecoration(
+                      border: Border(top: BorderSide(color: CkColors.hairline)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            (captain ? '✦ ' : '') + v.role,
+                            style: CkType.mono(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.06,
+                              color: captain ? CkColors.red : CkColors.ink,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          v.countdown,
+                          style: CkType.mono(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.06,
+                            color: (v.urgent || tossReady)
+                                ? CkColors.red
+                                : CkColors.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (tossReady) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 14,
+                          child: _TossActionButton(
+                            label: 'Start match → Toss',
+                            primary: true,
+                            onTap: () => _openMatchStart(context),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 10,
+                          child: _TossActionButton(
+                            label: 'View squad',
+                            onTap: () {/* squad view — follow-up */},
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (v.helper != null) ...[
+                      const SizedBox(height: 6),
+                      Center(
+                        child: Text(
+                          v.helper!,
+                          textAlign: TextAlign.center,
+                          style: CkType.body(
+                            fontSize: 11,
+                            color: CkColors.muted,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openMatchStart(BuildContext context) {
+    context.push('/matches/${v.id}/start');
+  }
+}
+
+/// Red 7×7 dot that pulses with a 1.4s ease-in-out cycle (matches the
+/// design's `pvm-pulse` keyframes: opacity 1 → 0.35 → 1).
+class _PulsingDot extends StatefulWidget {
+  const _PulsingDot();
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) => Opacity(
+        opacity: 0.35 + 0.65 * _c.value,
+        child: Container(
+          width: 7,
+          height: 7,
+          decoration: const BoxDecoration(
+            color: CkColors.red,
+            shape: BoxShape.circle,
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TossActionButton extends StatelessWidget {
+  const _TossActionButton({
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+  });
+  final String label;
+  final VoidCallback onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: primary ? CkColors.red : CkColors.paper,
+          border: primary ? null : Border.all(color: CkColors.hairline),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: CkType.body(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: primary ? CkColors.paper : CkColors.ink,
+          ),
+        ),
       ),
     );
   }

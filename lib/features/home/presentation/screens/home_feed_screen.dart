@@ -60,7 +60,6 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
             V2Header(
               title: 'Home',
               sub: 'Karachi · Captains you follow',
-              notifCount: 3,
               onBell: widget.onBell,
             ),
             const FeedFilters(),

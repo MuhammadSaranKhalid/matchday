@@ -12,9 +12,11 @@
 // This is presentation-only chassis for the faithful UI rebuild; the prototype
 // itself ships mock data and inert affordances, mirrored here.
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../theme/circk_theme.dart';
+import '../../../features/notifications/presentation/providers/notifications_providers.dart';
 
 /// `Color` → `#RRGGBB` for embedding in raw SVG markup.
 String ckHex(Color c) {
@@ -240,22 +242,28 @@ class Pill extends StatelessWidget {
 }
 
 /// Universal top header: large title on the left, bell (→ notifications) right.
-class V2Header extends StatelessWidget {
+///
+/// The bell badge auto-reads the unread notifications count via the
+/// `unreadNotificationsCountProvider` if no explicit [notifCount] is passed.
+/// Callers can still override (e.g. in widget tests).
+class V2Header extends ConsumerWidget {
   const V2Header({
     super.key,
     required this.title,
     this.sub,
-    this.notifCount = 3,
+    this.notifCount,
     this.onBell,
   });
 
   final String title;
   final String? sub;
-  final int notifCount;
+  final int? notifCount;
   final VoidCallback? onBell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int count =
+        notifCount ?? ref.watch(unreadNotificationsCountProvider);
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 6, 18, 12),
       child: Row(
@@ -279,7 +287,7 @@ class V2Header extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          _BellButton(count: notifCount, onTap: onBell),
+          _BellButton(count: count, onTap: onBell),
         ],
       ),
     );

@@ -71,7 +71,6 @@ class _MatchesV2ScreenState extends State<MatchesV2Screen> {
             V2Header(
               title: 'Matches',
               sub: _sub,
-              notifCount: 3,
               onBell: widget.onBell,
             ),
             _MatchTabs(

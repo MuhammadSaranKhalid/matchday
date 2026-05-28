@@ -118,7 +118,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
             V2Header(
               title: 'Messages',
               sub: '3 active · 2 unread',
-              notifCount: 3,
               onBell: widget.onBell,
             ),
             Padding(

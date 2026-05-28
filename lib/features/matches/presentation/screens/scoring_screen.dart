@@ -156,7 +156,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       child: Row(
         children: [
           IconButton(
-            onPressed: () => context.go('/'),
+            onPressed: () => context.go('/home'),
             icon: const Icon(Icons.close_rounded, color: CkColors.ink),
           ),
           const Spacer(),

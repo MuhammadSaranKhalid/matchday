@@ -95,6 +95,28 @@ class _ChallengeDetailScreenState
   }
 
   Future<void> _onAccept(MatchRequest req) async {
+    // Step 5 in the design — bottom-sheet confirmation with the green
+    // "FINAL STEP" pill before the RPC fires.
+    final fromTeam = ref.read(teamProvider(req.fromTeamId.value)).value;
+    final toTeam = req.toTeamId == null
+        ? null
+        : ref.read(teamProvider(req.toTeamId!.value)).value;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: CkColors.paper,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _AcceptConfirmSheet(
+        fromName: fromTeam?.name ?? 'Them',
+        toName: toTeam?.name ?? 'You',
+        startTime: req.effectiveStartTime,
+        venue: req.effectiveVenue,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
     setState(() => _busy = true);
     final result = await ref.read(acceptMatchChallengeUseCaseProvider).call(
           AcceptMatchChallengeParams(requestId: req.id),
@@ -105,10 +127,13 @@ class _ChallengeDetailScreenState
       (f) => ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(f.message)),
       ),
-      (matchId) {
+      (_) {
         ref.invalidate(myMatchChallengesProvider);
         ref.invalidate(myMatchesViewProvider);
-        context.go('/matches/${matchId.value}/start');
+        // Land on My Matches — the new fixture appears in Confirmed; the
+        // user can tap into the match to Pick XI / start it when they're
+        // ready. The design's green "you accepted" banner lives there.
+        context.go('/pavilion');
       },
     );
   }
@@ -140,7 +165,7 @@ class _ChallengeDetailScreenState
       ),
       (_) {
         ref.invalidate(myMatchChallengesProvider);
-        context.go('/');
+        context.go('/pavilion');
       },
     );
   }
@@ -710,6 +735,170 @@ class _ReplyButton extends StatelessWidget {
                   color: fg,
                 ),
               ),
+      ),
+    );
+  }
+}
+
+/// Accept Challenge Flow · Step 5 confirmation sheet. Green "FINAL STEP"
+/// pill, display headline, body copy explaining the 12h renegotiation
+/// window, stacked Yes-accept (primary) + Cancel (ghost) buttons.
+class _AcceptConfirmSheet extends StatelessWidget {
+  const _AcceptConfirmSheet({
+    required this.fromName,
+    required this.toName,
+    required this.startTime,
+    required this.venue,
+  });
+
+  final String fromName;
+  final String toName;
+  final DateTime? startTime;
+  final String? venue;
+
+  @override
+  Widget build(BuildContext context) {
+    final headline = 'Accept $fromName vs $toName?';
+    final timeLabel = startTime == null
+        ? ''
+        : '${_dowShort(startTime!)} ${startTime!.day} · ${_hhmm(startTime!)}';
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: CkColors.hairline,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: CkColors.green,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'FINAL STEP',
+                    style: CkType.mono(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.08,
+                      color: CkColors.paper,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                headline,
+                style: CkType.display(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.025,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Both teams will be committed. Captains can renegotiate '
+                'up to 12h before the toss — after that the slot is yours.',
+                style: CkType.body(
+                  fontSize: 13.5,
+                  color: CkColors.ink2,
+                  height: 1.5,
+                ),
+              ),
+              if (startTime != null || venue != null) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  decoration: BoxDecoration(
+                    color: CkColors.paper2,
+                    border: Border.all(color: CkColors.hairline),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (timeLabel.isNotEmpty)
+                        Text(timeLabel,
+                            style: CkType.display(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.02,
+                            )),
+                      if (venue != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            venue!,
+                            style: CkType.body(
+                                fontSize: 12, color: CkColors.muted),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: CkColors.ink,
+                    foregroundColor: CkColors.paper,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Text(
+                      startTime == null
+                          ? 'Yes, accept ✓'
+                          : 'Yes, accept · $timeLabel ✓',
+                      style: CkType.body(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: CkColors.paper,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  style: TextButton.styleFrom(
+                    foregroundColor: CkColors.muted,
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Text('Cancel'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

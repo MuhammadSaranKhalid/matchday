@@ -75,7 +75,7 @@ class _ChallengeSentScreenState extends ConsumerState<ChallengeSentScreen> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               IconButton(
-                onPressed: () => context.go('/'),
+                onPressed: () => context.go('/pavilion'),
                 icon: const Icon(Icons.close, color: CkColors.ink),
               ),
             ],
@@ -144,7 +144,7 @@ class _ChallengeSentScreenState extends ConsumerState<ChallengeSentScreen> {
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
           child: CkButton(
             label: 'Go to My matches',
-            onPressed: () => context.go('/'),
+            onPressed: () => context.go('/pavilion'),
           ),
         ),
         Padding(
@@ -172,7 +172,7 @@ class _ChallengeSentScreenState extends ConsumerState<ChallengeSentScreen> {
       ),
       (_) {
         ref.invalidate(myMatchChallengesProvider);
-        context.go('/');
+        context.go('/pavilion');
       },
     );
   }

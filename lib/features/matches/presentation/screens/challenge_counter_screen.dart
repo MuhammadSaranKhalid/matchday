@@ -181,7 +181,7 @@ class _ChallengeCounterScreenState
       (_) {
         ref.invalidate(myMatchChallengesProvider);
         ref.invalidate(matchChallengeProvider(req.id.value));
-        context.go('/');
+        context.go('/pavilion');
       },
     );
   }

@@ -22,8 +22,9 @@
 -- they belong to; all other publishes are server-side via SECURITY DEFINER
 -- trigger functions defined inline in each per-table migration.
 --
--- Depends on `public.is_chat_member(uuid)` defined in 0800_chats.sql — this
--- migration is numbered 0810 to live immediately after it.
+-- Depends on `public.is_chat_member(uuid)` defined in 0801_chat_members.sql
+-- — this migration is numbered 0810 to live after the full chat
+-- layer (0800 chats → 0801 chat_members → 0802 messages) is in place.
 -- =============================================================================
 
 -- Allow Realtime to run RLS on the messages table. Idempotent.

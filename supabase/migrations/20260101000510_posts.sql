@@ -66,9 +66,22 @@ create table public.posts (
 
   post_type            public.post_type not null,
   text                 text check (text is null or length(text) <= 2000),
-  -- Up to 4 media URLs per spec §6.5.
+  -- Up to 4 media URLs per spec §6.5. Legacy "URLs only" column; kept in
+  -- sync with `media` below for clients that haven't migrated to the
+  -- richer shape.
   media_urls           text[] not null default '{}'
                           check (cardinality(media_urls) <= 4),
+  -- Per-image metadata for instant blur placeholders and reserved layout
+  -- space before the image loads. One object per image:
+  --   [{ "url": "...", "blurhash": "LEHV6n...", "width": 1080, "height": 1350 }]
+  -- The client computes blurhash + width/height locally (from the
+  -- resized image) and writes BOTH `media` (rich) and `media_urls`
+  -- (URLs) at insert. Cap at 4 to match media_urls.
+  media                jsonb not null default '[]'::jsonb
+                          constraint posts_media_shape check (
+                            jsonb_typeof(media) = 'array'
+                            and jsonb_array_length(media) <= 4
+                          ),
 
   linked_match_id      uuid references public.matches(match_id)        on delete set null,
   linked_tournament_id uuid references public.tournaments(tournament_id) on delete set null,
@@ -98,12 +111,18 @@ create table public.posts (
     or (author_context = 'tournament_organizer' and context_entity_id is not null)
   ),
 
-  -- Photo posts must carry at least one media URL; otherwise text required.
+  -- Photo posts must carry at least one media entry (in EITHER column —
+  -- supports clients that only write media_urls and clients that write
+  -- the richer `media` jsonb). Otherwise non-empty text is required.
   constraint post_has_content check (
-    (post_type = 'photo' and cardinality(media_urls) >= 1)
+    (post_type = 'photo'
+       and (cardinality(media_urls) >= 1 or jsonb_array_length(media) >= 1))
     or (text is not null and length(trim(text)) > 0)
   )
 );
+
+comment on column public.posts.media is
+  'Per-image metadata [{url, blurhash, width, height}], max 4. Supersedes media_urls (kept in sync for compatibility).';
 
 -- -----------------------------------------------------------------------------
 -- Indexes
@@ -136,6 +155,7 @@ create trigger posts_set_updated_at
 create or replace function public.stamp_post_edited_at()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   if new.text is distinct from old.text

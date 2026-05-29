@@ -95,12 +95,16 @@ create table public.tournaments (
   max_teams              integer check (max_teams is null or max_teams between 2 and 256),
   min_teams              integer check (min_teams is null or min_teams >= 2),
 
-  created_by             uuid not null
-                            references public.profiles(user_id) on delete restrict,
+  -- Nullable + ON DELETE SET NULL so a self-service account deletion
+  -- (delete_user RPC in 0700) anonymises the creator without orphaning
+  -- the tournament. Same posture as matches.created_by (0400).
+  created_by             uuid
+                            references public.profiles(user_id) on delete set null,
   organizers             uuid[] not null default '{}',
-  -- Scorers an organizer has pre-blessed for matches in this tournament.
-  -- Application code uses this to gate the "score this match" CTA.
-  assigned_scorers       uuid[] not null default '{}',
+  -- Per-match scorer assignment lives in match_officials (0407) — a
+  -- tournament-level scorer set has no live consumer in the current
+  -- schema. If a tournament-wide default ever ships, model it as a
+  -- separate tournament_officials table mirroring 0407.
 
   status                 public.tournament_status  not null default 'draft',
   privacy                public.tournament_privacy not null default 'public',
@@ -168,25 +172,25 @@ create policy "tournaments_read_visible"
   on public.tournaments for select
   using (
     privacy = 'public'
-    or auth.uid() = created_by
-    or auth.uid() = any(organizers)
+    or (select auth.uid()) = created_by
+    or (select auth.uid()) = any(organizers)
   );
 
 create policy "tournaments_insert_self_creator"
   on public.tournaments for insert
   to authenticated
-  with check (auth.uid() = created_by);
+  with check ((select auth.uid()) = created_by);
 
 create policy "tournaments_update_organizers"
   on public.tournaments for update
   to authenticated
-  using (auth.uid() = created_by or auth.uid() = any(organizers))
-  with check (auth.uid() = created_by or auth.uid() = any(organizers));
+  using ((select auth.uid()) = created_by or (select auth.uid()) = any(organizers))
+  with check ((select auth.uid()) = created_by or (select auth.uid()) = any(organizers));
 
 create policy "tournaments_delete_creator"
   on public.tournaments for delete
   to authenticated
-  using (auth.uid() = created_by);
+  using ((select auth.uid()) = created_by);
 
 -- =============================================================================
 -- Storage buckets: tournament-banners (10 MB cap) + tournament-logos (5 MB).

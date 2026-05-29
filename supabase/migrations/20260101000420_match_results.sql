@@ -51,6 +51,7 @@ create or replace function public._innings_runs(
 returns integer
 language sql
 immutable
+set search_path = public, pg_temp
 as $$
   select sum((i->>'runs')::int)::int
     from jsonb_array_elements(coalesce(p_result->'innings', '[]'::jsonb)) i
@@ -70,6 +71,7 @@ create or replace function public._innings_overs(
 returns numeric
 language sql
 immutable
+set search_path = public, pg_temp
 as $$
   select sum((i->>'overs')::numeric)
     from jsonb_array_elements(coalesce(p_result->'innings', '[]'::jsonb)) i
@@ -199,10 +201,51 @@ revoke all on function public.recalculate_standings(uuid) from public;
 grant execute on function public.recalculate_standings(uuid) to authenticated;
 
 -- =============================================================================
--- submit_match_result — manual scorecard / live-scorer "End match" RPC.
--- Validates the caller is authorized + the result payload is sane, then
--- flips the row to 'completed' and stamps timestamps. The after-complete
--- trigger does standings recompute + bracket auto-advance.
+-- submit_match_result — finalise a match with its scorecard payload
+-- =============================================================================
+-- WHEN IT IS CALLED
+-- -----------------
+--   * From the LiveScoringScreen's "End match" action, after the last
+--     ball of the last innings is recorded.
+--   * From a future post-match scorecard import flow for matches that
+--     are scored offline.
+--
+-- AUTHORISATION
+-- -------------
+-- Routes through _can_score_match (0407). Tournament organisers,
+-- per-match scorers, and the friendly/practice creator are accepted.
+-- The previous shape inlined `auth.uid() = any(assigned_scorers)` here;
+-- now match_officials owns that set and _can_score_match is the single
+-- predicate.
+--
+-- INPUTS
+-- ------
+-- p_match_id  The match.
+-- p_result    The result jsonb (§4.10) — winner_team_id, win_type,
+--             win_margin, summary, plus a per-innings array used by the
+--             post-match trigger's standings recompute.
+--
+-- WHAT IT DOES
+-- ------------
+--   1. Auth + signed-in checks.
+--   2. Lock matches row and read team identities + current status.
+--   3. Reject if the match is already finalised (re-finalising would
+--      corrupt the after-complete trigger's idempotence).
+--   4. Validate winner_team_id (must be one of the two playing teams,
+--      or NULL for a tie / no-result).
+--   5. UPDATE matches SET status='completed', result=p_result, end_time
+--      → fires _after_match_complete which:
+--        - inserts a match_result_history audit row,
+--        - calls recalculate_standings for the tournament,
+--        - propagates winners into downstream knockout matches via
+--          prev_match_a_id / prev_match_b_id linkage.
+--
+-- WHAT IT DOES NOT DO
+-- -------------------
+-- It does not touch balls / match_innings_state / match_players.
+-- Per-innings totals are sourced from the p_result payload, not
+-- recomputed. The ledger is the truth, and the client builds the result
+-- jsonb from it before calling this.
 -- =============================================================================
 create or replace function public.submit_match_result(
   p_match_id uuid,
@@ -219,33 +262,27 @@ declare
   v_team_a        uuid;
   v_team_b        uuid;
   v_status        public.match_status;
-  v_scorers       uuid[];
   v_winner        uuid;
-  v_match_type    public.match_type;
 begin
   if v_uid is null then
     raise exception 'Not authenticated' using errcode = '28000';
   end if;
 
-  select tournament_id, team_a_id, team_b_id, status, assigned_scorers, match_type
-    into v_tournament_id, v_team_a, v_team_b, v_status, v_scorers, v_match_type
+  -- Authorization via the shared scoring predicate (tournament organiser,
+  -- per-match scorer in match_officials, or friendly/practice creator).
+  if not public._can_score_match(p_match_id) then
+    raise exception 'Only organizers or assigned scorers can submit results'
+      using errcode = '42501';
+  end if;
+
+  select tournament_id, team_a_id, team_b_id, status
+    into v_tournament_id, v_team_a, v_team_b, v_status
     from public.matches
    where match_id = p_match_id
    for update;
 
   if not found then
     raise exception 'Match not found' using errcode = '42501';
-  end if;
-
-  -- Authorization mirrors matches_update RLS.
-  if not (
-    (v_tournament_id is not null and public.is_tournament_organizer(v_tournament_id))
-    or v_uid = any(coalesce(v_scorers, '{}'::uuid[]))
-    or (v_match_type in ('friendly', 'practice')
-        and v_uid = (select created_by from public.matches where match_id = p_match_id))
-  ) then
-    raise exception 'Only organizers or assigned scorers can submit results'
-      using errcode = '42501';
   end if;
 
   if v_status in ('completed', 'abandoned', 'walkover') then

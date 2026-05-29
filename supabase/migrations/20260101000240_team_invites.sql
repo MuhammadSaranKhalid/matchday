@@ -170,18 +170,18 @@ alter table public.team_invites enable row level security;
 
 create policy "team_invites_read_self_or_manager"
   on public.team_invites for select
-  using (auth.uid() = invitee_id or public.is_team_manager(team_id));
+  using ((select auth.uid()) = invitee_id or public.is_team_manager(team_id));
 
 create policy "team_invites_insert_manager"
   on public.team_invites for insert
   to authenticated
   with check (
     public.is_team_manager(team_id)
-    and auth.uid() = invited_by
+    and (select auth.uid()) = invited_by
   );
 
 create policy "team_invites_update_self_or_manager"
   on public.team_invites for update
   to authenticated
-  using (auth.uid() = invitee_id or public.is_team_manager(team_id))
-  with check (auth.uid() = invitee_id or public.is_team_manager(team_id));
+  using ((select auth.uid()) = invitee_id or public.is_team_manager(team_id))
+  with check ((select auth.uid()) = invitee_id or public.is_team_manager(team_id));

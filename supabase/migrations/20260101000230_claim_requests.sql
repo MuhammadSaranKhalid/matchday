@@ -120,15 +120,15 @@ alter table public.claim_requests enable row level security;
 
 create policy "claim_requests_read_self_or_owner"
   on public.claim_requests for select
-  using (auth.uid() = requester_id or public.is_unclaimed_owner(unclaimed_id));
+  using ((select auth.uid()) = requester_id or public.is_unclaimed_owner(unclaimed_id));
 
 create policy "claim_requests_insert_self"
   on public.claim_requests for insert
   to authenticated
-  with check (auth.uid() = requester_id);
+  with check ((select auth.uid()) = requester_id);
 
 create policy "claim_requests_update_self_or_owner"
   on public.claim_requests for update
   to authenticated
-  using (auth.uid() = requester_id or public.is_unclaimed_owner(unclaimed_id))
-  with check (auth.uid() = requester_id or public.is_unclaimed_owner(unclaimed_id));
+  using ((select auth.uid()) = requester_id or public.is_unclaimed_owner(unclaimed_id))
+  with check ((select auth.uid()) = requester_id or public.is_unclaimed_owner(unclaimed_id));

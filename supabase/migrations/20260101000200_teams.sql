@@ -80,8 +80,12 @@ create table public.teams (
                               or founded_year between 1700
                                  and date_part('year', now())::int + 1),
 
-  owner_id            uuid not null
-                          references public.profiles(user_id) on delete restrict,
+  -- Nullable + ON DELETE SET NULL so self-service account deletion (the
+  -- delete_user RPC in 0700) does not block on team ownership. An
+  -- ownerless team is a "needs attention" state; a manager from the
+  -- `managers` array can take over via a future ownership-transfer RPC.
+  owner_id            uuid
+                          references public.profiles(user_id) on delete set null,
   managers            uuid[] not null default '{}',
 
   is_verified         boolean not null default false,

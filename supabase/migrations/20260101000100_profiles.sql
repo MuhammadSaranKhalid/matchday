@@ -133,6 +133,7 @@ create trigger profiles_set_updated_at
 create or replace function public.enforce_username_cooldown()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   if new.username is distinct from old.username

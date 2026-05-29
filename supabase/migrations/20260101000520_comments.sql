@@ -65,6 +65,7 @@ create trigger comments_set_updated_at
 create or replace function public.enforce_comment_single_level()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 declare
   v_parent_post   uuid;
@@ -144,6 +145,7 @@ create trigger comments_bump_post_count
 create or replace function public.stamp_comment_edited_at()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   if new.text is distinct from old.text

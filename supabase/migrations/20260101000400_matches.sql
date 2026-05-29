@@ -21,24 +21,27 @@
 --   prev_match_a_id /     point at the two feeder matches whose winners flow
 --   prev_match_b_id       in here.
 --
--- Toss / XI / scoring:
+-- Toss / captains:
 --   toss_won_by + toss_decision flip together (CHECK constraint).
---   team_a_squad / team_b_squad are uuid[] of the playing XI locked at toss.
---   captain / keeper indices are stored separately to avoid a follow-up scan.
+--   team_a_captain / team_b_captain stay on this table as plain profile FKs
+--   so toss-time auth (`_is_match_captain` in 0623) works before any
+--   match_players rows exist. Squad selection, keepers, scorers, and
+--   live state live in:
+--     * match_players       (0405) — per-match XI, polymorphic profile/unclaimed
+--     * match_officials     (0407) — per-match scorers / umpires / referee
+--     * match_innings_state (0409) — per-innings live trio + denormalised totals
 --
 -- Scoring mode (§4.6):
 --   live_ball_by_ball — scorer enters every delivery (drives 0410 balls).
 --   post_match_scorecard — final result is jsonb-blob via submit_match_result.
 --
--- On-field state (§4.6):
---   current_striker_id / current_non_striker_id / current_bowler_id persist
---   the live-scoring widget state on the match row so a reconnecting scorer
---   (or a second authorized scorer) picks up exactly where the last one
---   left off, and the spectator scoreboard can render the on-strike
---   batter's name. All three are nullable: pre-toss the field is empty,
---   between innings (status='innings_break') they reset to null, and the
---   bowler is cleared at the end of every over until the scorer picks the
---   next one.
+-- _can_score_match:
+--   Authorisation predicate shared by balls RLS and the scoring RPCs. This
+--   file declares a STUB that only knows about tournament organisers and
+--   friendly/practice creators. 0407 (match_officials) does a CREATE OR
+--   REPLACE that extends it with the per-match scorer check. This keeps
+--   matches.sql free of forward references to a table that doesn't exist
+--   yet at this point in the migration order.
 --
 -- This file owns the table, RLS, and the fixture-generation RPCs for the
 -- two formats currently supported (round-robin / league / knockout). Result
@@ -105,12 +108,12 @@ create table public.matches (
 
   team_a_id             uuid references public.teams(team_id) on delete set null,
   team_b_id             uuid references public.teams(team_id) on delete set null,
-  team_a_squad          uuid[] not null default '{}',
-  team_b_squad          uuid[] not null default '{}',
+  -- Captains stay on matches as plain profile FKs so the toss-time auth check
+  -- (_is_match_captain in 0623) works before any match_players rows exist.
+  -- Squads, keepers, scorers, and live state all live on match_players /
+  -- match_officials / match_innings_state (0405, 0407, 0409).
   team_a_captain        uuid references public.profiles(user_id) on delete set null,
   team_b_captain        uuid references public.profiles(user_id) on delete set null,
-  team_a_keeper         uuid references public.profiles(user_id) on delete set null,
-  team_b_keeper         uuid references public.profiles(user_id) on delete set null,
 
   -- Per-match override of tournament defaults; falls back to the parent
   -- tournament's `format` jsonb when null/empty.
@@ -133,22 +136,20 @@ create table public.matches (
   openers_submitted_at  timestamptz,
 
   scoring_mode          public.scoring_mode not null default 'live_ball_by_ball',
-  assigned_scorers      uuid[] not null default '{}',
-  current_innings       integer not null default 1
-                          check (current_innings between 1 and 4),
-
-  -- Live on-field state — persisted so scorer-handoff and spectator
-  -- scoreboard both see the same striker / non-striker / bowler.
-  current_striker_id     uuid references public.profiles(user_id) on delete set null,
-  current_non_striker_id uuid references public.profiles(user_id) on delete set null,
-  current_bowler_id      uuid references public.profiles(user_id) on delete set null,
 
   status                public.match_status not null default 'scheduled',
   result                jsonb,                       -- §4.10 result jsonb
-  man_of_the_match      uuid references public.profiles(user_id) on delete set null,
+  -- man_of_the_match references match_players(match_player_id) so an
+  -- unclaimed local-club player can win MOTM. The FK constraint is added
+  -- by 0405_match_players.sql (after that table exists).
+  man_of_the_match      uuid,
 
-  created_by            uuid not null
-                            references public.profiles(user_id) on delete restrict,
+  -- created_by is nullable + ON DELETE SET NULL so a self-service account
+  -- deletion (delete_user RPC in 0700) anonymises the creator without
+  -- orphaning historical matches — the /m/<id> spectator URL keeps
+  -- working after the creator deletes their account.
+  created_by            uuid
+                            references public.profiles(user_id) on delete set null,
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
 
@@ -164,12 +165,6 @@ create table public.matches (
   -- A team can't play itself (when both are set).
   constraint matches_distinct_teams check (
     team_a_id is null or team_b_id is null or team_a_id <> team_b_id
-  ),
-  -- Striker and non-striker must be two different players (when both are set).
-  constraint matches_current_batters_distinct check (
-    current_striker_id is null
-    or current_non_striker_id is null
-    or current_striker_id <> current_non_striker_id
   )
 );
 
@@ -239,6 +234,7 @@ create or replace function public.tournament_approved_teams(p_tournament_id uuid
 returns table(team_id uuid)
 language sql
 stable
+set search_path = public, pg_temp
 as $$
   select tt.team_id
     from public.tournament_teams tt
@@ -256,6 +252,7 @@ create or replace function public._knockout_round_label(
 ) returns text
 language sql
 immutable
+set search_path = public, pg_temp
 as $$
   select case
     when p_round = p_total then 'Final'
@@ -641,10 +638,13 @@ revoke all on function public.reschedule_match(uuid, timestamptz, text) from pub
 grant execute on function public.reschedule_match(uuid, timestamptz, text) to authenticated;
 
 -- =============================================================================
--- _can_score_match — auth shared by every scoring RPC (start_innings,
--- record_ball, undo_last_ball). Returns true when the caller is the
--- tournament organiser, an assigned scorer, or the friendly/practice
--- creator. Mirrors the matches_update / balls_insert RLS predicates.
+-- _can_score_match — auth shared by every scoring RPC and balls RLS.
+--
+-- STUB version: only the tournament-organiser and friendly/practice-creator
+-- branches. The per-match scorer branch is added by 0407_match_officials.sql
+-- (CREATE OR REPLACE), which can reference the match_officials table once
+-- it exists. Splitting the definition this way avoids forward references
+-- here and keeps the predicate in one logical place across files.
 -- =============================================================================
 create or replace function public._can_score_match(p_match_id uuid)
 returns boolean
@@ -659,9 +659,8 @@ as $$
        and (
          (m.tournament_id is not null
            and public.is_tournament_organizer(m.tournament_id))
-         or auth.uid() = any(coalesce(m.assigned_scorers, '{}'::uuid[]))
          or (m.match_type in ('friendly', 'practice')
-             and m.created_by = auth.uid())
+             and m.created_by = (select auth.uid()))
        )
   );
 $$;
@@ -669,77 +668,9 @@ $$;
 revoke all on function public._can_score_match(uuid) from public;
 grant execute on function public._can_score_match(uuid) to authenticated;
 
--- =============================================================================
--- start_innings — open or reopen an innings on the live scoring screen.
---
--- Sets matches.current_innings + (current_striker_id, current_non_striker_id,
--- current_bowler_id) and flips status to 'live'. Called once at toss (innings
--- 1) and again after the innings break (innings 2). The two batters must
--- be distinct; the bowler can be either side's player but in practice is
--- from the bowling XI — we do not enforce squad membership here because
--- squads aren't required to be locked in v1.0.
---
--- No-op-safe: re-calling with the same innings_number just updates the
--- on-field trio (useful when the scorer corrects a wrong pick at the toss).
--- =============================================================================
-create or replace function public.start_innings(
-  p_match_id uuid,
-  p_innings_number integer,
-  p_striker_id uuid,
-  p_non_striker_id uuid,
-  p_bowler_id uuid
-)
-returns void
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_uid    uuid := auth.uid();
-  v_status public.match_status;
-begin
-  if v_uid is null then
-    raise exception 'Not authenticated' using errcode = '28000';
-  end if;
-  if not public._can_score_match(p_match_id) then
-    raise exception 'Only organisers or assigned scorers can score this match'
-      using errcode = '42501';
-  end if;
-  if p_innings_number not between 1 and 4 then
-    raise exception 'innings_number must be between 1 and 4' using errcode = '23514';
-  end if;
-  if p_striker_id is null or p_non_striker_id is null or p_bowler_id is null then
-    raise exception 'Striker, non-striker and bowler are all required'
-      using errcode = '23502';
-  end if;
-  if p_striker_id = p_non_striker_id then
-    raise exception 'Striker and non-striker must be different players'
-      using errcode = '23514';
-  end if;
-
-  select status into v_status from public.matches
-   where match_id = p_match_id for update;
-  if not found then
-    raise exception 'Match not found' using errcode = '42501';
-  end if;
-  if v_status in ('completed', 'abandoned', 'walkover') then
-    raise exception 'Cannot start innings on a finalised match (status %)', v_status
-      using errcode = '23000';
-  end if;
-
-  update public.matches
-     set current_innings        = p_innings_number,
-         current_striker_id     = p_striker_id,
-         current_non_striker_id = p_non_striker_id,
-         current_bowler_id      = p_bowler_id,
-         status                 = 'live',
-         actual_start_time      = coalesce(actual_start_time, now())
-   where match_id = p_match_id;
-end;
-$$;
-
-revoke all on function public.start_innings(uuid, integer, uuid, uuid, uuid) from public;
-grant execute on function public.start_innings(uuid, integer, uuid, uuid, uuid) to authenticated;
+-- start_innings is declared by 0409_match_innings_state.sql (it inserts /
+-- upserts a match_innings_state row, which doesn't exist at this point in
+-- the migration order).
 
 -- -----------------------------------------------------------------------------
 -- RLS (§4.11) — public read; organizers + assigned scorers write tournament
@@ -775,19 +706,11 @@ create policy "matches_update_pre_live"
   to authenticated
   using (
     status in ('scheduled', 'rescheduled', 'toss')
-    and (
-      (tournament_id is not null and public.is_tournament_organizer(tournament_id))
-      or (select auth.uid()) = any(assigned_scorers)
-      or (match_type in ('friendly', 'practice') and (select auth.uid()) = created_by)
-    )
+    and public._can_score_match(match_id)
   )
   with check (
     status in ('scheduled', 'rescheduled', 'toss', 'live')
-    and (
-      (tournament_id is not null and public.is_tournament_organizer(tournament_id))
-      or (select auth.uid()) = any(assigned_scorers)
-      or (match_type in ('friendly', 'practice') and (select auth.uid()) = created_by)
-    )
+    and public._can_score_match(match_id)
   );
 
 create policy "matches_delete_organizer"
@@ -825,20 +748,21 @@ $$;
 
 revoke all on function public.broadcast_match_state() from public;
 
+-- Metadata changes only. Live scoring broadcasts come from match_innings_state
+-- (0409) and balls (0410), each on their own channel.
 create trigger matches_after_update_state_broadcast
   after update on public.matches
   for each row
   when (
-    old.status                    is distinct from new.status
-    or old.team_a_squad           is distinct from new.team_a_squad
-    or old.team_b_squad           is distinct from new.team_b_squad
-    or old.current_striker_id     is distinct from new.current_striker_id
-    or old.current_non_striker_id is distinct from new.current_non_striker_id
-    or old.current_bowler_id      is distinct from new.current_bowler_id
-    or old.toss_won_by            is distinct from new.toss_won_by
-    or old.toss_decision          is distinct from new.toss_decision
-    or old.toss_face              is distinct from new.toss_face
-    or old.start_phase            is distinct from new.start_phase
-    or old.openers_submitted_by   is distinct from new.openers_submitted_by
+    old.status                  is distinct from new.status
+    or old.toss_won_by          is distinct from new.toss_won_by
+    or old.toss_decision        is distinct from new.toss_decision
+    or old.toss_face            is distinct from new.toss_face
+    or old.start_phase          is distinct from new.start_phase
+    or old.openers_submitted_by is distinct from new.openers_submitted_by
+    or old.team_a_id            is distinct from new.team_a_id
+    or old.team_b_id            is distinct from new.team_b_id
+    or old.team_a_captain       is distinct from new.team_a_captain
+    or old.team_b_captain       is distinct from new.team_b_captain
   )
   execute function public.broadcast_match_state();

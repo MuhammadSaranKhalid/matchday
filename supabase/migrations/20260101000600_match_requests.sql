@@ -19,12 +19,15 @@
 --
 -- XI exchange + counter-proposal:
 --   The sender pencils their playing XI at send time; the receiver supplies
---   their XI at accept time. Both XIs snapshot into matches.team_a_squad /
---   team_b_squad so the toss / openers screen has a roster from move one.
---   The receiver can counter-propose changes (date, venue, format, players-
---   per-side) instead of accepting outright; status flips to `countered`
---   and the original sender then accepts (match is created with countered
---   terms) or declines (status flips to declined).
+--   their XI at accept time. Both XIs materialise into match_players rows
+--   (see 0405) at the moment accept_match_request runs — one row per
+--   (match, side, player), already polymorphism-resolved against
+--   team_members. The countered flow leaves the receiver-side XI empty
+--   until a follow-up Pick-XI flow locks it in. The receiver can
+--   counter-propose changes (date, venue, format, players-per-side) instead
+--   of accepting outright; status flips to `countered` and the original
+--   sender then accepts (match is created with countered terms) or declines
+--   (status flips to declined).
 --
 -- Captains derive from `team_members.role = 'captain'` (falling back to
 -- `teams.owner_id`) at the moment of accept, snapshotted into
@@ -48,12 +51,12 @@ create type public.match_request_status as enum (
 );
 
 create type public.decline_reason as enum (
-  'roster',   -- "Roster too thin"
-  'busy',     -- "Already playing that day"
-  'unknown',  -- "Don't know this team"
-  'format',   -- "Format doesn't suit us"
-  'venue',    -- "Venue too far"
-  'other'     -- free-text in decision_note
+  'roster',       -- "Roster too thin"
+  'busy',         -- "Already playing that day"
+  'no_interest',  -- "No interest right now"
+  'format',       -- "Format doesn't suit us"
+  'venue',        -- "Venue too far"
+  'other'         -- free-text in decision_note
 );
 
 -- Extend the notification_type enum (declared in 0500) with the two values
@@ -71,8 +74,10 @@ create table public.match_requests (
   -- Nullable so an open challenge can be sent without picking the opponent.
   -- The accept RPC fills this in when the receiving team claims the code.
   to_team_id            uuid references public.teams(team_id) on delete cascade,
-  requested_by          uuid not null
-                            references public.profiles(user_id) on delete restrict,
+  -- ON DELETE SET NULL so a deleted sender's account doesn't block.
+  -- The request row outlives them; the inbox renders "deleted user".
+  requested_by          uuid
+                            references public.profiles(user_id) on delete set null,
 
   -- Proposed terms (sender side).
   proposed_start_time   timestamptz,
@@ -113,6 +118,18 @@ create table public.match_requests (
   -- collisions against the partial unique index below.
   share_code            text,
   code_expires_at       timestamptz,
+
+  -- Three independent timers, set by the RPCs below.
+  --   proposal_expires_at — pending lifetime  (now + 48h on send).
+  --   counter_expires_at  — countered lifetime (now + 24h on counter,
+  --                          restarted from the counter moment).
+  --   code_expires_at     — share-code lifetime (now + 24h on send).
+  -- Folding them into one column caused the worst-case behaviour where a
+  -- counter posted at T+47h on a 24h budget got only 1 hour to live.
+  -- expire_stale_match_requests (0610) branches on status to honour
+  -- whichever timer governs the current state.
+  proposal_expires_at   timestamptz,
+  counter_expires_at    timestamptz,
 
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
@@ -306,7 +323,7 @@ begin
         from_team_id, to_team_id, requested_by,
         proposed_start_time, proposed_venue, proposed_format, message,
         players_per_side, from_team_xi, from_team_keeper_id,
-        share_code, code_expires_at
+        share_code, code_expires_at, proposal_expires_at
       ) values (
         p_from_team_id, p_to_team_id, auth.uid(),
         p_proposed_start_time, p_proposed_venue,
@@ -314,7 +331,9 @@ begin
         v_pps,
         coalesce(p_from_team_xi, '{}'::uuid[]),
         p_from_team_keeper_id,
-        v_code, now() + interval '24 hours'
+        v_code,
+        now() + interval '24 hours',   -- share code lifetime
+        now() + interval '48 hours'    -- proposal lifetime
       )
       returning request_id into v_request_id;
       exit;
@@ -454,22 +473,80 @@ begin
   insert into public.matches (
     match_type, tournament_id,
     team_a_id, team_b_id,
-    team_a_squad, team_b_squad,
     team_a_captain, team_b_captain,
-    team_a_keeper, team_b_keeper,
     format, venue, scheduled_start_time,
     status, created_by
   ) values (
     'friendly', null,
     v_req.from_team_id, v_to_team,
-    coalesce(v_req.from_team_xi, '{}'::uuid[]),
-    coalesce(v_to_team_xi, '{}'::uuid[]),
     v_a_captain, v_b_captain,
-    v_req.from_team_keeper_id, v_to_keeper,
     v_format, v_venue, v_start,
     'scheduled', auth.uid()
   )
   returning match_id into v_match_id;
+
+  -- ---------------------------------------------------------------------------
+  -- MATERIALISE THE PLAYING XIS INTO match_players
+  --
+  -- The request carries two uuid[] columns (`from_team_xi`, `to_team_xi`),
+  -- each one a list of either profile ids or unclaimed_player ids in any
+  -- mix — that polymorphism is the same one team_members handles.
+  --
+  -- We resolve every uuid by JOINing against team_members for the
+  -- team-on-this-side and pulling whichever of (user_id, unclaimed_id) is
+  -- set on the matching row. This means:
+  --   * we never have to probe both `profiles` and `unclaimed_players`
+  --     separately and reconcile,
+  --   * any uuid not present in the team's active roster is silently
+  --     dropped (consistent with _validate_team_xi which already rejected
+  --     foreign uuids upstream — this is the belt to that braces),
+  --   * the polymorphism check on match_players (profile_id XOR
+  --     unclaimed_id) is satisfied row-by-row because team_members
+  --     itself already enforces the same XOR.
+  --
+  -- KEEPER FLAG
+  --   `from_team_keeper_id` / `v_to_keeper` are uuids that may resolve to
+  --   either column. We match on either, so an unclaimed wicket-keeper is
+  --   first-class.
+  --
+  -- CAPTAIN FLAG
+  --   v_a_captain / v_b_captain come from _team_current_captain (0240),
+  --   which returns the team's owner or captain — always a real profile.
+  --   Matching only on tm.user_id is therefore correct.
+  --
+  -- The countered flow leaves to_team_xi empty; the receiver-side XI is
+  -- locked later by the Pick-XI step (separate RPC). We skip the second
+  -- INSERT in that case to avoid emitting an empty side-B lineup.
+  -- ---------------------------------------------------------------------------
+  insert into public.match_players (
+    match_id, team_side, profile_id, unclaimed_id, is_captain, is_keeper
+  )
+  select v_match_id, 'a',
+         tm.user_id, tm.unclaimed_id,
+         coalesce(tm.user_id = v_a_captain, false),
+         coalesce(tm.user_id    = v_req.from_team_keeper_id
+                  or tm.unclaimed_id = v_req.from_team_keeper_id, false)
+    from public.team_members tm
+   where tm.team_id = v_req.from_team_id
+     and tm.status  = 'active'
+     and (tm.user_id      = any(coalesce(v_req.from_team_xi, '{}'::uuid[]))
+          or tm.unclaimed_id = any(coalesce(v_req.from_team_xi, '{}'::uuid[])));
+
+  if v_to_team_xi is not null and array_length(v_to_team_xi, 1) > 0 then
+    insert into public.match_players (
+      match_id, team_side, profile_id, unclaimed_id, is_captain, is_keeper
+    )
+    select v_match_id, 'b',
+           tm.user_id, tm.unclaimed_id,
+           coalesce(tm.user_id = v_b_captain, false),
+           coalesce(tm.user_id    = v_to_keeper
+                    or tm.unclaimed_id = v_to_keeper, false)
+      from public.team_members tm
+     where tm.team_id = v_to_team
+       and tm.status  = 'active'
+       and (tm.user_id      = any(v_to_team_xi)
+            or tm.unclaimed_id = any(v_to_team_xi));
+  end if;
 
   -- Race guard: the inner UPDATE re-asserts the status we read above. If
   -- another concurrent transaction (counter / cancel / decline) already
@@ -566,7 +643,10 @@ begin
          countered_start_time       = p_countered_start_time,
          countered_venue            = p_countered_venue,
          countered_format           = p_countered_format,
-         countered_players_per_side = p_countered_players_per_side
+         countered_players_per_side = p_countered_players_per_side,
+         -- Counter timer is restarted from THIS moment, not from the
+         -- original send. The countered party gets a fresh 24h to decide.
+         counter_expires_at         = now() + interval '24 hours'
    where request_id = p_request_id
      and status     = 'pending';
   get diagnostics v_updated = row_count;

@@ -69,6 +69,6 @@ create policy "player_profiles_read_public"
 
 create policy "player_profiles_write_self"
   on public.player_profiles for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 

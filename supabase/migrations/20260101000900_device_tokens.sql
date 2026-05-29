@@ -51,18 +51,18 @@ create trigger device_tokens_set_updated_at
 alter table public.device_tokens enable row level security;
 
 create policy "device_tokens_self_select" on public.device_tokens
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 
 create policy "device_tokens_self_insert" on public.device_tokens
-  for insert to authenticated with check (auth.uid() = user_id);
+  for insert to authenticated with check ((select auth.uid()) = user_id);
 
 create policy "device_tokens_self_update" on public.device_tokens
   for update to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "device_tokens_self_delete" on public.device_tokens
-  for delete to authenticated using (auth.uid() = user_id);
+  for delete to authenticated using ((select auth.uid()) = user_id);
 
 -- -----------------------------------------------------------------------------
 -- invoke_send_push — fire the Edge Function on every new notifications row.

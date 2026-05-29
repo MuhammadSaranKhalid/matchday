@@ -53,8 +53,15 @@ create table public.team_members (
   joined_at        timestamptz not null default now(),
   left_at          timestamptz,
   status           public.member_status not null default 'active',
-  added_by         uuid not null
-                       references public.profiles(user_id) on delete restrict,
+  -- "Current club" — at most one active team per user can carry is_primary,
+  -- enforced by the partial unique index below. Setting a new primary is the
+  -- application's job (unset old + set new in one transaction); the DB only
+  -- enforces the invariant.
+  is_primary       boolean not null default false,
+  -- Manager who added this membership. ON DELETE SET NULL so a deleted
+  -- manager's account doesn't block; the membership row outlives them.
+  added_by         uuid
+                       references public.profiles(user_id) on delete set null,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
 
@@ -85,6 +92,15 @@ create unique index team_members_unique_jersey
   on public.team_members (team_id, jersey_number)
   where status = 'active' and jersey_number is not null;
 
+-- At most one primary active team per user. Drops out of the constraint
+-- automatically when the row becomes inactive/removed, so a new primary
+-- can be chosen without manual cleanup.
+create unique index team_members_unique_primary_per_user
+  on public.team_members (user_id)
+  where is_primary = true
+    and status = 'active'
+    and user_id is not null;
+
 create index team_members_team       on public.team_members (team_id);
 create index team_members_user       on public.team_members (user_id)
   where user_id is not null;
@@ -95,33 +111,12 @@ create trigger team_members_set_updated_at
   before update on public.team_members
   for each row execute function public.set_updated_at();
 
--- -----------------------------------------------------------------------------
--- cascade_unclaimed_claim — fired when unclaimed_players.claimed_by_user_id
--- transitions null→non-null. Rewrites this table to point at the real user
--- and triggers stat migration.
--- -----------------------------------------------------------------------------
-create or replace function public.cascade_unclaimed_claim()
-returns trigger
-language plpgsql
-as $$
-begin
-  if new.claimed_by_user_id is not null
-     and old.claimed_by_user_id is distinct from new.claimed_by_user_id then
-    update public.team_members
-       set user_id      = new.claimed_by_user_id,
-           unclaimed_id = null
-     where unclaimed_id = new.unclaimed_id
-       and status = 'active';
-
-    perform public.migrate_player_stats(new.unclaimed_id, new.claimed_by_user_id);
-  end if;
-  return new;
-end;
-$$;
-
-create trigger unclaimed_players_cascade_claim
-  after update on public.unclaimed_players
-  for each row execute function public.cascade_unclaimed_claim();
+-- cascade_unclaimed_claim (the trigger function that flips team_members
+-- rows from unclaimed_id → user_id when an unclaimed player claims a
+-- profile) is declared by 0411_cascade_unclaimed_claim_extension.sql,
+-- because the same function also rewrites match_players (created in
+-- 0405). That file owns both the function and the AFTER UPDATE trigger
+-- on unclaimed_players.
 
 -- -----------------------------------------------------------------------------
 -- leave_team — spec §2.9 Flow 3.

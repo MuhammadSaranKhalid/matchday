@@ -150,17 +150,55 @@ grant execute on function public.record_match_toss(
 ) to authenticated;
 
 -- =============================================================================
--- submit_match_openers — batting captain locks striker + non-striker.
+-- submit_match_openers — batting captain locks the opening pair
+-- =============================================================================
+-- WHEN IT IS CALLED
+-- -----------------
+-- After the toss has been recorded (record_match_toss) and the batting
+-- captain's phone has moved to the Lineup screen, this RPC is called
+-- when they pick their two openers and tap Confirm.
 --
--- Both ids must be in the batting team's locked XI (`team_*_squad`).
--- Sets matches.current_striker_id / current_non_striker_id directly so
--- LiveScoringScreen has the on-field trio populated on first paint.
--- Advances start_phase: lineup → ready. Bowling captain's phone is
--- entirely passive in this stage (no companion RPC).
+-- WHO CAN CALL IT
+-- ---------------
+-- Only the captain of the batting team for the first innings. The
+-- batting team is derived from the toss outcome via _batting_first_team;
+-- the captain check compares auth.uid() against that team's captain
+-- column on matches. The bowling captain's phone is passive at this
+-- stage — no companion RPC.
 --
--- Idempotent: editing picks before the match starts (chat3 EDIT PICKS
--- affordance) re-submits with the new ids; openers_submitted_at gets
--- bumped on each call.
+-- INPUTS
+-- ------
+-- p_match_id       The match.
+-- p_striker_id     The opening striker — a match_player_id (NOT a
+-- p_non_striker_id The non-striker — a match_player_id.
+--
+-- The Lineup screen surfaces match_players rows for the batting side, so
+-- the client always has match_player_id values handy. Passing a profile
+-- uuid here is a client bug and will be rejected by the lineup
+-- membership check below.
+--
+-- WHAT IT DOES
+-- ------------
+-- 1. Authn check (28000).
+-- 2. Input shape: both non-null and distinct (23502 / 23514).
+-- 3. Determine batting side from the toss; raise 23000 if the toss
+--    hasn't been recorded yet.
+-- 4. Lock the matches row and verify the caller IS the batting
+--    captain (42501 otherwise).
+-- 5. Both supplied ids must be match_players rows for THIS match on
+--    the batting side (23514 otherwise).
+-- 6. Upsert the (match, innings=1) row in match_innings_state with the
+--    opening pair. The bowler is left null — it gets picked on the
+--    Live screen before the first ball, by record_ball's normal flow.
+-- 7. Stamp matches.openers_submitted_by / openers_submitted_at and
+--    advance start_phase: lineup → ready (if it was 'lineup').
+--
+-- IDEMPOTENCY
+-- -----------
+-- Re-calling with the same or different opener ids before the match
+-- starts updates the match_innings_state row in place. The version
+-- counter is bumped so any co-scorer's UI re-fetches. start_phase only
+-- advances on the first call; subsequent calls are pure edits.
 -- =============================================================================
 create or replace function public.submit_match_openers(
   p_match_id uuid,
@@ -173,16 +211,14 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_uid         uuid := auth.uid();
-  v_batting     uuid;
-  v_team_a      uuid;
-  v_team_b      uuid;
-  v_team_a_cap  uuid;
-  v_team_b_cap  uuid;
-  v_team_a_xi   uuid[];
-  v_team_b_xi   uuid[];
-  v_batting_xi  uuid[];
-  v_phase       public.match_start_phase;
+  v_uid          uuid := auth.uid();
+  v_batting      uuid;
+  v_team_a       uuid;
+  v_team_b       uuid;
+  v_team_a_cap   uuid;
+  v_team_b_cap   uuid;
+  v_batting_side char(1);
+  v_phase        public.match_start_phase;
 begin
   if v_uid is null then
     raise exception 'Not authenticated' using errcode = '28000';
@@ -201,10 +237,8 @@ begin
     raise exception 'Toss must be recorded before openers' using errcode = '23000';
   end if;
 
-  select team_a_id, team_b_id, team_a_captain, team_b_captain,
-         team_a_squad, team_b_squad, start_phase
-    into v_team_a, v_team_b, v_team_a_cap, v_team_b_cap,
-         v_team_a_xi, v_team_b_xi, v_phase
+  select team_a_id, team_b_id, team_a_captain, team_b_captain, start_phase
+    into v_team_a, v_team_b, v_team_a_cap, v_team_b_cap, v_phase
     from public.matches
    where match_id = p_match_id
      for update;
@@ -217,28 +251,47 @@ begin
       using errcode = '42501';
   end if;
 
-  v_batting_xi := case
-    when v_batting = v_team_a then v_team_a_xi
-    else v_team_b_xi
-  end;
-  if not (p_striker_id = any(v_batting_xi)) then
-    raise exception 'Striker must be in the batting XI' using errcode = '23514';
+  v_batting_side := case when v_batting = v_team_a then 'a' else 'b' end;
+
+  -- Both ids must be match_players rows for this match on the batting side.
+  if not exists (
+    select 1 from public.match_players
+     where match_player_id = p_striker_id
+       and match_id   = p_match_id
+       and team_side  = v_batting_side
+  ) then
+    raise exception 'Striker must be in the batting XI for this match'
+      using errcode = '23514';
   end if;
-  if not (p_non_striker_id = any(v_batting_xi)) then
-    raise exception 'Non-striker must be in the batting XI'
+  if not exists (
+    select 1 from public.match_players
+     where match_player_id = p_non_striker_id
+       and match_id   = p_match_id
+       and team_side  = v_batting_side
+  ) then
+    raise exception 'Non-striker must be in the batting XI for this match'
       using errcode = '23514';
   end if;
 
+  -- Persist openers in match_innings_state. Idempotent — re-call updates
+  -- the trio without resetting innings totals or version drift.
+  insert into public.match_innings_state (
+    match_id, innings_number, striker_id, non_striker_id
+  )
+  values (p_match_id, 1::smallint, p_striker_id, p_non_striker_id)
+  on conflict (match_id, innings_number) do update
+     set striker_id     = excluded.striker_id,
+         non_striker_id = excluded.non_striker_id,
+         version        = match_innings_state.version + 1;
+
   update public.matches
-     set current_striker_id     = p_striker_id,
-         current_non_striker_id = p_non_striker_id,
-         openers_submitted_by   = v_uid,
-         openers_submitted_at   = now(),
-         start_phase            = case
-                                    when start_phase = 'lineup'
-                                      then 'ready'::public.match_start_phase
-                                    else start_phase
-                                  end
+     set openers_submitted_by = v_uid,
+         openers_submitted_at = now(),
+         start_phase          = case
+                                  when start_phase = 'lineup'
+                                    then 'ready'::public.match_start_phase
+                                  else start_phase
+                                end
    where match_id = p_match_id;
 end;
 $$;
@@ -248,13 +301,61 @@ grant execute on function public.submit_match_openers(uuid, uuid, uuid)
   to authenticated;
 
 -- =============================================================================
--- start_match_now — batting captain tips the match into Live.
+-- start_match_now — batting captain tips the match into Live
+-- =============================================================================
+-- WHEN IT IS CALLED
+-- -----------------
+-- After submit_match_openers has locked the openers (start_phase has
+-- advanced to 'ready'), the batting captain's screen shows a "Start
+-- match" CTA. Tapping it calls this RPC.
 --
--- Promotes status → 'live', start_phase → 'live', stamps actual_start_time,
--- and adds the caller to `assigned_scorers` so the existing scoring RPC
--- RLS (record_ball / undo_last_ball) lets them record the first delivery.
--- Opening bowler is deferred to ball 1 — LiveScoringScreen prompts for
--- them when current_bowler_id is null on first paint.
+-- WHY THE BATTING CAPTAIN (and not any scorer)
+-- --------------------------------------------
+-- v1 product decision: the batting captain is the implicit scorer for
+-- innings 1, because they're the one with the openers in hand and the
+-- match-ready phone. Once Live, anyone in match_officials with role
+-- 'scorer' can take over.
+--
+-- INPUTS
+-- ------
+-- p_match_id  The match.
+--
+-- WHAT IT DOES
+-- ------------
+-- 1. Authn check (28000).
+-- 2. Determine the batting side from the toss; raise 23000 if the toss
+--    hasn't been recorded.
+-- 3. Lock the matches row and verify caller IS the batting captain
+--    (42501 otherwise).
+-- 4. Read the openers from match_innings_state (innings = 1). If
+--    striker or non-striker is null, openers were not locked — raise
+--    23000 with the "Openers must be locked" message.
+-- 5. Re-entry guard: only allow a Live transition from scheduled /
+--    rescheduled / toss. A double-tap on the CTA after the match has
+--    already started raises 23000 so the client can recover from the
+--    network retry without corrupting state.
+-- 6. UPDATE matches: status='live', start_phase='live',
+--    actual_start_time=now() (only if not already set).
+-- 7. Register the caller as a match_official with role='scorer'. ON
+--    CONFLICT DO NOTHING makes the call idempotent if they were
+--    already a scorer (e.g. previously assigned by an organiser).
+--
+-- WHY THE OPENER CHECK COMES FROM match_innings_state
+-- ---------------------------------------------------
+-- match_innings_state is the source of truth for "the openers have been
+-- locked" — submit_match_openers writes them there. We could instead
+-- check start_phase == 'ready', but that is the UI hint, not the
+-- persisted commitment. Reading the actual ids gives defence in depth:
+-- if anything ever moved start_phase to 'ready' without writing
+-- match_innings_state (a bug, a manual fix), we still refuse to start
+-- a match whose scoreboard would be blank.
+--
+-- WHAT IT DOES NOT DO
+-- -------------------
+-- It does not set the opening bowler. That's deferred to ball 1 —
+-- LiveScoringScreen sees match_innings_state.bowler_id is null on
+-- first paint and prompts the captain to pick one. This is cheaper
+-- UX-wise than asking for the bowler before the toss is even verified.
 -- =============================================================================
 create or replace function public.start_match_now(p_match_id uuid)
 returns void
@@ -283,10 +384,8 @@ begin
       using errcode = '23000';
   end if;
 
-  select team_a_id, team_b_id, team_a_captain, team_b_captain,
-         current_striker_id, current_non_striker_id, status
-    into v_team_a, v_team_b, v_team_a_cap, v_team_b_cap,
-         v_striker, v_non_striker, v_status
+  select team_a_id, team_b_id, team_a_captain, team_b_captain, status
+    into v_team_a, v_team_b, v_team_a_cap, v_team_b_cap, v_status
     from public.matches
    where match_id = p_match_id
      for update;
@@ -298,15 +397,18 @@ begin
     raise exception 'Only the batting captain can start the match'
       using errcode = '42501';
   end if;
+
+  -- Openers must be in match_innings_state for innings 1.
+  select striker_id, non_striker_id
+    into v_striker, v_non_striker
+    from public.match_innings_state
+   where match_id = p_match_id and innings_number = 1;
   if v_striker is null or v_non_striker is null then
     raise exception 'Openers must be locked before starting'
       using errcode = '23000';
   end if;
-  -- Re-entry guard: only callable from a pre-Live status. Calling on a
-  -- match already 'live' or beyond silently re-added the caller to
-  -- assigned_scorers and bumped actual_start_time — now it raises so the
-  -- caller can recover (e.g. retry policy after a flaky network) without
-  -- corrupting state.
+
+  -- Re-entry guard: only callable from a pre-Live status.
   if v_status not in ('scheduled', 'rescheduled', 'toss') then
     raise exception 'Match has already started or finalised (status %)', v_status
       using errcode = '23000';
@@ -315,14 +417,13 @@ begin
   update public.matches
      set status            = 'live',
          start_phase       = 'live',
-         current_innings   = 1,
-         actual_start_time = coalesce(actual_start_time, now()),
-         assigned_scorers  = case
-           when v_uid = any(coalesce(assigned_scorers, '{}'::uuid[]))
-             then assigned_scorers
-           else coalesce(assigned_scorers, '{}'::uuid[]) || v_uid
-         end
+         actual_start_time = coalesce(actual_start_time, now())
    where match_id = p_match_id;
+
+  -- Register the caller as a scorer. Idempotent if they're already on.
+  insert into public.match_officials (match_id, user_id, role, assigned_by)
+  values (p_match_id, v_uid, 'scorer', v_uid)
+  on conflict (match_id, role, user_id) do nothing;
 end;
 $$;
 

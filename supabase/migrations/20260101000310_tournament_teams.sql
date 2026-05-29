@@ -49,8 +49,10 @@ create table public.tournament_teams (
                        references public.tournaments(tournament_id) on delete cascade,
   team_id           uuid not null
                        references public.teams(team_id) on delete cascade,
-  registered_by     uuid not null
-                       references public.profiles(user_id) on delete restrict,
+  -- ON DELETE SET NULL so a deleted registrar's account doesn't block.
+  -- The registration row itself outlives them.
+  registered_by     uuid
+                       references public.profiles(user_id) on delete set null,
   registered_at     timestamptz not null default now(),
   status            public.tournament_registration_status not null default 'pending',
   -- Player UUIDs from the team's roster locked in for this tournament.
@@ -183,7 +185,7 @@ create policy "tournament_teams_insert_manager"
   to authenticated
   with check (
     public.is_team_manager(team_id)
-    and auth.uid() = registered_by
+    and (select auth.uid()) = registered_by
     and exists (
       select 1 from public.tournaments t
        where t.tournament_id = tournament_teams.tournament_id

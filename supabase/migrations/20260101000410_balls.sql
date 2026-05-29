@@ -1,38 +1,76 @@
 -- =============================================================================
--- 0410 · balls (live ball-by-ball ledger)
+-- 0410 · balls — the ball-by-ball delivery ledger
 -- =============================================================================
--- Spec §4.5, §4.6. The source-of-truth ledger for every delivery in a match.
--- The scoring screen, scoreboard, and the "build result jsonb" step all
--- aggregate from this table.
+-- WHAT THIS TABLE IS
+-- ------------------
+-- One row per delivery in every match in the system. Wides, no-balls,
+-- byes, leg-byes, dot balls, boundaries, wickets — all of it. This is the
+-- source-of-truth ledger; everything else (scoreboard, scorecard, end-of-
+-- innings result jsonb, per-player stats once they ship) is computed
+-- from this table.
 --
--- Permissive batter/bowler refs (nullable) — squad selection ships in
--- phase 2b. Recording a delivery only requires runs/wicket/extras data.
+-- PLAYER REFERENCES
+-- -----------------
+-- batsman_id, non_striker_id, bowler_id, fielder_id all reference
+-- match_players(match_player_id) — NOT profiles. That is the whole point
+-- of match_players (0405): the polymorphism (profile vs unclaimed) is
+-- resolved once per match, and downstream tables hold a clean uuid.
 --
--- Sequence numbering:
---   `seq` is monotonic 1-indexed per (match_id, innings_number). The
---   _balls_assign_seq BEFORE-INSERT trigger picks max(seq)+1 so the client
---   never has to know the next value. Undo (delete) frees the highest seq
---   so the next insert reuses it cleanly.
+-- The practical consequence is that an unclaimed player at a club match
+-- can be on strike, can bowl, can take a catch. The old schema's FK to
+-- profiles rejected those rows outright.
 --
--- ball_in_over:
---   1..6 for legal deliveries. 0 for wides/no-balls (which don't advance
---   the over). is_legal_delivery is the single boolean used by the rollup
---   view to count overs cleanly.
+-- RELATIONSHIP TO match_innings_state (0409)
+-- ------------------------------------------
+-- balls is the LEDGER. match_innings_state is the RUNNING TOTAL.
 --
--- Free-hit (§4.6):
---   `is_free_hit` is true for the next legal delivery after a no-ball
---   (intervening wides do not consume the free-hit). On a free-hit only
---   run-out, hit-wicket, obstructing-the-field, or handled-ball can dismiss
---   the batter — the CHECK below is the server-side guard. The flag is
---   computed by the client / record_ball RPC (Phase 2) by walking back
---   through the same (match, innings); persisting it lets the spectator
---   scoreboard render the FH chip without re-deriving on every read.
+-- record_ball below appends one row to balls AND updates a single row in
+-- match_innings_state (incrementing legal_ball_count, total_runs,
+-- total_wickets, total_extras and rotating striker/non-striker/bowler).
+-- The two writes happen in the same transaction; the totals never drift
+-- from the ledger they are summarising.
 --
--- Result jsonb construction:
---   The match result blob (§4.10) is built by the live scorer's "End match"
---   action on the client by reading this table via the
---   match_innings_summary view, then submitting via submit_match_result
---   (declared in 0420).
+-- The previous design read legal_ball_count from balls via
+--    SELECT SUM(is_legal_delivery::int) FROM balls
+--    WHERE match_id = ? AND innings_number = ?
+-- on EVERY ball insert, to compute over_number and ball_in_over. That
+-- scan grew linearly through the innings (ball 239 of a T20 read 238
+-- rows). The new shape reads the counter off match_innings_state in O(1),
+-- and the SUM is gone.
+--
+-- SEQUENCE NUMBERING (`seq`)
+-- --------------------------
+-- Monotonic 1-indexed per (match_id, innings_number). The
+-- _balls_assign_seq BEFORE-INSERT trigger picks max(seq)+1 so the client
+-- never has to know the next value. Undo (DELETE the top seq row) frees
+-- that number so the next insert reuses it cleanly — there is no gap.
+--
+-- ball_in_over
+-- ------------
+-- 1..6 for legal deliveries. 0 for wides and no-balls (those do not
+-- advance the over). The match_innings_summary view (still present in
+-- this file) uses is_legal_delivery to count overs cleanly.
+--
+-- FREE HIT (Laws 21.6 / 21.18)
+-- ----------------------------
+-- The delivery immediately following a no-ball is a free hit. Intervening
+-- wides do NOT consume the free hit (the law specifically excludes them).
+-- On a free hit only run-out, hit-wicket, obstructing-the-field, or
+-- handled-the-ball can dismiss the batter; bowled / caught / lbw /
+-- stumped are not valid. The balls_free_hit_dismissal_check constraint
+-- enforces that server-side.
+--
+-- record_ball derives is_free_hit by looking up the most recent non-wide
+-- ball in this innings; if it was a no-ball, the new delivery is a free
+-- hit. The flag is persisted on the row so the spectator scoreboard can
+-- render the FH chip without re-deriving on every read.
+--
+-- RESULT JSONB
+-- ------------
+-- The match result blob (§4.10) is built by the live scorer's "End match"
+-- action on the client by reading this table via the
+-- match_innings_summary view, then submitting via submit_match_result
+-- (declared in 0420).
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -85,13 +123,19 @@ create table public.balls (
   is_wicket          boolean not null default false,
   wicket_type        public.wicket_kind,
   is_free_hit        boolean not null default false,
-  batsman_id         uuid references public.profiles(user_id) on delete set null,
-  non_striker_id     uuid references public.profiles(user_id) on delete set null,
-  bowler_id          uuid references public.profiles(user_id) on delete set null,
-  fielder_id         uuid references public.profiles(user_id) on delete set null,
+  -- Player FKs reference match_players, so unclaimed players can bat/bowl/
+  -- field. RESTRICT preserves the per-ball history — match_players promotion
+  -- (delete_user RPC) must run before any rows can be removed.
+  batsman_id         uuid references public.match_players(match_player_id) on delete restrict,
+  non_striker_id     uuid references public.match_players(match_player_id) on delete restrict,
+  bowler_id          uuid references public.match_players(match_player_id) on delete restrict,
+  fielder_id         uuid references public.match_players(match_player_id) on delete restrict,
   commentary         text,
-  created_by         uuid not null
-                       references public.profiles(user_id) on delete restrict,
+  -- created_by is the authoring user (the scorer) — always a real profile.
+  -- ON DELETE SET NULL so self-service account deletion (delete_user RPC
+  -- in 0700) can anonymise the scorer without orphaning the ledger.
+  created_by         uuid
+                       references public.profiles(user_id) on delete set null,
   created_at         timestamptz not null default now(),
 
   unique (match_id, innings_number, seq),
@@ -122,6 +166,7 @@ create index balls_match_innings_over
 create or replace function public._balls_assign_seq()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 declare
   v_max int;
@@ -165,28 +210,90 @@ create or replace view public.match_innings_summary as
    group by b.match_id, b.innings_number;
 
 -- =============================================================================
--- record_ball — server-owned ball insert + on-field state mutation.
+-- record_ball — append a delivery and advance the live innings state
+-- =============================================================================
+-- WHEN IT IS CALLED
+-- -----------------
+-- Every time a scorer taps a scoring chip on the LiveScoringScreen. A
+-- dot ball, a single, a four, a wide, a wicket — each is one call. The
+-- screen pre-fills (batsman, non-striker, bowler) from the live trio so
+-- the scorer only chooses outcome details.
 --
--- Why an RPC instead of a direct insert:
---   1. seq, over_number, ball_in_over, and is_free_hit can all be derived
---      from prior balls — making the client compute them invites races when
---      two scorers share a match (RLS allows it).
---   2. Strike rotation (odd-runs swap, end-of-over rotation, wicket nulls
---      striker) and bowler clearing at over end need to mutate matches —
---      doing it in the same transaction as the insert keeps the persisted
---      `current_*_id` columns coherent with the ball ledger.
+-- WHO CAN CALL IT
+-- ---------------
+-- Anyone for whom _can_score_match (0407) returns true: tournament
+-- organisers, anyone with a 'scorer' role in match_officials, and the
+-- creator of a friendly / practice match.
 --
--- Free-hit: this delivery is a free-hit when the most recent prior ball that
--- was not a wide was a no-ball (intervening wides do not consume the
--- free-hit, per Laws 21.6/21.18).
+-- INPUTS
+-- ------
+-- p_match_id          The match.
+-- p_innings_number    Which innings this delivery belongs to (1..4).
+-- p_is_legal_delivery Whether this delivery advances the over (false for
+--                     wides and no-balls).
+-- p_ball_type         enum: legal | wide | no_ball | bye | leg_bye.
+-- p_runs_scored       Runs charged to the batter (0..7 — six plus an
+--                     overthrow). Excludes extras.
+-- p_extras            Penalty / overthrown runs added to the team total
+--                     (0..10). Side-charged to the bowling team.
+-- p_is_wicket         True if a wicket fell on this delivery.
+-- p_wicket_type       Required when is_wicket is true; null otherwise.
+-- p_batsman_id        match_player_id of the batter on strike.
+-- p_non_striker_id    match_player_id of the non-striker.
+-- p_bowler_id         match_player_id of the bowler.
+-- p_fielder_id        match_player_id of the relevant fielder (catch /
+--                     run-out), if any.
+-- p_commentary        Free-form text the scorer attached to the
+--                     delivery (optional).
+-- p_expected_version  The version of match_innings_state the client
+--                     last read. NULL opts out of optimistic locking
+--                     (single-scorer mode). Non-null triggers a
+--                     "stale state" rejection if the server has since
+--                     advanced.
 --
--- Strike rotation, mirrored from the live-scoring widget logic:
+-- WHAT IT DOES, IN ORDER
+-- ----------------------
+-- 1. Authn / authz checks (28000 / 42501 on failure).
+-- 2. Input shape validation (23502 / 23514 on failure).
+-- 3. Lock match_innings_state(match, innings) FOR UPDATE. This
+--    serialises concurrent record_ball / undo_last_ball calls on the
+--    same innings without locking the whole matches row (and therefore
+--    without blocking spectators reading match metadata).
+-- 4. Optimistic-lock guard. If p_expected_version is provided and does
+--    not match the current version, abort with 40001 — the client
+--    re-fetches and retries.
+-- 5. Compute over_number = legal_ball_count / 6 and ball_in_over from
+--    the same counter. NO scan of balls.
+-- 6. Look up the most recent non-wide ball this innings to decide
+--    is_free_hit. Indexed lookup; bounded to one row.
+-- 7. INSERT the row into balls. The BEFORE-INSERT trigger
+--    _balls_assign_seq stamps `seq`.
+-- 8. UPDATE match_innings_state with the deltas (legal_ball_count,
+--    totals) and the rotated on-field trio. Bump `version`.
+--
+-- STRIKE / BOWLER ROTATION
+-- ------------------------
+-- Mirrors the live-scoring widget logic in the Flutter app:
 --   swap if runs_scored is odd
---   swap if is_legal_delivery and extras is odd  (byes / leg-byes)
+--   swap if is_legal_delivery AND extras is odd   (byes / leg-byes)
 --   swap if this ball completes the 6th legal delivery of the over
---          (and clear current_bowler_id)
---   if is_wicket → null current_striker_id (forces the next pick)
--- All three swap conditions XOR-combine, then wicket override applies last.
+--          (and NULL bowler_id so the scorer picks the next bowler)
+--   if is_wicket → NULL striker_id (forces the next pick)
+-- The three swap conditions XOR-combine; the wicket override applies
+-- last.
+--
+-- WHAT IT DOES NOT DO
+-- -------------------
+-- It does not touch the matches row at all (other than the implicit
+-- match_innings_state cascade). Live scoring contention is entirely
+-- isolated from the metadata row that scoreboards / fixture lists /
+-- profile pages all read from.
+--
+-- RETURN VALUE
+-- ------------
+-- The freshly-inserted balls row. The Flutter client uses it to render
+-- the over-summary chip and to make the undo button's "undo this exact
+-- ball" affordance unambiguous.
 -- =============================================================================
 create or replace function public.record_ball(
   p_match_id          uuid,
@@ -201,7 +308,8 @@ create or replace function public.record_ball(
   p_non_striker_id    uuid default null,
   p_bowler_id         uuid default null,
   p_fielder_id        uuid default null,
-  p_commentary        text default null
+  p_commentary        text default null,
+  p_expected_version  bigint default null
 )
 returns public.balls
 language plpgsql
@@ -210,13 +318,15 @@ set search_path = public, pg_temp
 as $$
 declare
   v_uid          uuid := auth.uid();
-  v_legal_count  integer;
+  v_state        public.match_innings_state;
   v_over_number  integer;
   v_ball_in_over integer;
   v_prev_kind    public.ball_kind;
   v_is_free_hit  boolean;
   v_swap         boolean;
   v_over_ended   boolean;
+  v_runs         integer := coalesce(p_runs_scored, 0);
+  v_extras       integer := coalesce(p_extras, 0);
   v_row          public.balls;
 begin
   if v_uid is null then
@@ -236,27 +346,35 @@ begin
     raise exception 'wicket_type must be null when is_wicket=false' using errcode = '23514';
   end if;
 
-  -- Lock the match row so concurrent record_ball / undo_last_ball calls in
-  -- the same (match, innings) serialise on the on-field state update.
-  perform 1 from public.matches where match_id = p_match_id for update;
+  -- Lock the live innings row. Concurrent record_ball / undo_last_ball in
+  -- the same (match, innings) serialise here.
+  select * into v_state
+    from public.match_innings_state
+   where match_id = p_match_id and innings_number = p_innings_number
+   for update;
   if not found then
-    raise exception 'Match not found' using errcode = '42501';
+    raise exception 'Innings % has not been started for this match', p_innings_number
+      using errcode = '23000';
   end if;
 
-  -- Compute over_number / ball_in_over from prior legal deliveries.
-  select coalesce(sum((is_legal_delivery)::int), 0)::int
-    into v_legal_count
-    from public.balls
-   where match_id = p_match_id and innings_number = p_innings_number;
+  -- Optimistic-lock guard. Client may pass the version it last read; if
+  -- it's stale, the call is rejected and the client retries with fresh
+  -- state. NULL means the client opts out (single-scorer mode).
+  if p_expected_version is not null
+     and v_state.version <> p_expected_version then
+    raise exception 'Innings state changed under us (expected v%, got v%)',
+      p_expected_version, v_state.version
+      using errcode = '40001';
+  end if;
 
-  v_over_number := v_legal_count / 6;
+  v_over_number := v_state.legal_ball_count / 6;
   if p_is_legal_delivery then
-    v_ball_in_over := (v_legal_count % 6) + 1;
+    v_ball_in_over := (v_state.legal_ball_count % 6) + 1;
   else
     v_ball_in_over := 0;
   end if;
 
-  -- Free-hit if the most recent non-wide prior ball was a no-ball.
+  -- Free-hit lookup — most recent non-wide ball in this innings.
   select ball_type into v_prev_kind
     from public.balls
    where match_id = p_match_id
@@ -275,36 +393,42 @@ begin
   )
   values (
     p_match_id, p_innings_number, v_over_number, v_ball_in_over,
-    p_is_legal_delivery, p_ball_type, coalesce(p_runs_scored, 0), coalesce(p_extras, 0),
+    p_is_legal_delivery, p_ball_type, v_runs, v_extras,
     p_is_wicket, p_wicket_type, v_is_free_hit,
     p_batsman_id, p_non_striker_id, p_bowler_id, p_fielder_id,
     p_commentary, v_uid
   )
   returning * into v_row;
 
-  -- Strike + bowler rotation on the matches row.
-  v_swap := (coalesce(p_runs_scored, 0) % 2 = 1)
-            <> (p_is_legal_delivery and coalesce(p_extras, 0) % 2 = 1);
-  v_over_ended := p_is_legal_delivery and (v_legal_count + 1) % 6 = 0;
+  -- Strike + bowler rotation.
+  v_swap := (v_runs % 2 = 1)
+            <> (p_is_legal_delivery and v_extras % 2 = 1);
+  v_over_ended := p_is_legal_delivery and (v_state.legal_ball_count + 1) % 6 = 0;
   if v_over_ended then
     v_swap := not v_swap;
   end if;
 
-  update public.matches m
-     set current_striker_id = case
+  update public.match_innings_state mis
+     set legal_ball_count = mis.legal_ball_count + (p_is_legal_delivery)::int,
+         total_runs       = mis.total_runs + v_runs + v_extras,
+         total_wickets    = mis.total_wickets + (p_is_wicket)::smallint,
+         total_extras     = mis.total_extras + v_extras,
+         striker_id       = case
            when p_is_wicket then null
-           when v_swap then m.current_non_striker_id
-           else m.current_striker_id
+           when v_swap then mis.non_striker_id
+           else mis.striker_id
          end,
-         current_non_striker_id = case
-           when v_swap and not p_is_wicket then m.current_striker_id
-           else m.current_non_striker_id
+         non_striker_id   = case
+           when v_swap and not p_is_wicket then mis.striker_id
+           else mis.non_striker_id
          end,
-         current_bowler_id = case
+         bowler_id        = case
            when v_over_ended then null
-           else m.current_bowler_id
-         end
-   where m.match_id = p_match_id;
+           else mis.bowler_id
+         end,
+         version          = mis.version + 1
+   where mis.match_id       = p_match_id
+     and mis.innings_number = p_innings_number;
 
   return v_row;
 end;
@@ -312,19 +436,65 @@ $$;
 
 revoke all on function public.record_ball(
   uuid, integer, boolean, public.ball_kind, integer, integer, boolean,
-  public.wicket_kind, uuid, uuid, uuid, uuid, text
+  public.wicket_kind, uuid, uuid, uuid, uuid, text, bigint
 ) from public;
 grant execute on function public.record_ball(
   uuid, integer, boolean, public.ball_kind, integer, integer, boolean,
-  public.wicket_kind, uuid, uuid, uuid, uuid, text
+  public.wicket_kind, uuid, uuid, uuid, uuid, text, bigint
 ) to authenticated;
 
 -- =============================================================================
--- undo_last_ball — drop the highest-seq ball in (match, innings) and
--- restore matches.current_striker_id / current_non_striker_id / current_bowler_id
--- to the values stamped on that deleted row (which captured the pre-ball
--- on-field state). Returns true if a row was removed, false if the innings
--- was already empty.
+-- undo_last_ball — reverse the most recent delivery in an innings
+-- =============================================================================
+-- WHEN IT IS CALLED
+-- -----------------
+-- When a scorer realises the last delivery was recorded incorrectly. The
+-- LiveScoringScreen has an undo button that pops the most recent ball
+-- off the over chip and reverts the scoreboard. This is the RPC behind
+-- that button.
+--
+-- INPUTS
+-- ------
+-- p_match_id        The match.
+-- p_innings_number  Which innings to undo from. (You cannot undo across
+--                   an innings break — call this for innings 1 to fix
+--                   innings 1; the scorer would not be allowed to undo
+--                   their way back into a closed innings.)
+--
+-- WHAT IT DOES
+-- ------------
+-- 1. Authn / authz (28000 / 42501 on failure).
+-- 2. Locks the (match, innings) match_innings_state row FOR UPDATE —
+--    same serialisation point as record_ball, so an undo and a record
+--    cannot interleave.
+-- 3. Finds the highest-seq ball in this innings via index on
+--    (match_id, innings_number, seq) and DELETEs it. The deleted row's
+--    full record is captured for the rollback.
+-- 4. If no row was found (innings was empty), returns false and exits.
+-- 5. UPDATEs match_innings_state to reverse the deltas the original
+--    record_ball applied:
+--      legal_ball_count -= is_legal_delivery::int
+--      total_runs       -= runs_scored + extras
+--      total_wickets    -= is_wicket::int
+--      total_extras     -= extras
+--    All reads use greatest(0, ...) to defend against counter drift —
+--    if a backfill or manual correction left the counter inconsistent,
+--    undo never drives a column negative. This is purely defensive; the
+--    write path keeps the counters consistent on its own.
+-- 6. Restores striker_id / non_striker_id / bowler_id to the values the
+--    deleted ball was stamped with — which by construction are the
+--    PRE-ball on-field trio. Undo therefore "rewinds" the over.
+-- 7. Bumps `version` so any co-scorer sees the change on next read.
+--
+-- WHAT IT DOES NOT DO
+-- -------------------
+-- It does not touch the matches row, the same as record_ball. The match
+-- metadata is unaffected by scorer corrections.
+--
+-- RETURN VALUE
+-- ------------
+-- true if a row was actually removed; false if the innings ledger was
+-- already empty (idempotent re-call on an empty over).
 -- =============================================================================
 create or replace function public.undo_last_ball(
   p_match_id uuid,
@@ -347,9 +517,13 @@ begin
       using errcode = '42501';
   end if;
 
-  perform 1 from public.matches where match_id = p_match_id for update;
+  -- Lock the live innings row so we serialise against concurrent record_ball.
+  perform 1 from public.match_innings_state
+   where match_id = p_match_id and innings_number = p_innings_number
+   for update;
   if not found then
-    raise exception 'Match not found' using errcode = '42501';
+    raise exception 'Innings % has not been started for this match', p_innings_number
+      using errcode = '23000';
   end if;
 
   delete from public.balls
@@ -365,11 +539,23 @@ begin
     return false;
   end if;
 
-  update public.matches
-     set current_striker_id     = v_row.batsman_id,
-         current_non_striker_id = v_row.non_striker_id,
-         current_bowler_id      = v_row.bowler_id
-   where match_id = p_match_id;
+  -- Reverse deltas + restore the on-field trio captured on the deleted row.
+  -- greatest(0, ...) defends against drift if a backfill produced an
+  -- inconsistent counter — never go negative.
+  update public.match_innings_state mis
+     set legal_ball_count = greatest(0, mis.legal_ball_count
+                                       - (v_row.is_legal_delivery)::int),
+         total_runs       = greatest(0, mis.total_runs
+                                       - v_row.runs_scored - v_row.extras),
+         total_wickets    = greatest(0::smallint,
+                              mis.total_wickets - (v_row.is_wicket)::smallint),
+         total_extras     = greatest(0, mis.total_extras - v_row.extras),
+         striker_id       = v_row.batsman_id,
+         non_striker_id   = v_row.non_striker_id,
+         bowler_id        = v_row.bowler_id,
+         version          = mis.version + 1
+   where mis.match_id       = p_match_id
+     and mis.innings_number = p_innings_number;
 
   return true;
 end;

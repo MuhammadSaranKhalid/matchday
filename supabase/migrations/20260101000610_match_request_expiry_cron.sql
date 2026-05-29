@@ -20,9 +20,17 @@
 create extension if not exists pg_cron with schema extensions;
 
 -- -----------------------------------------------------------------------------
--- Cleanup function — flips pending → expired once the row has been sitting
--- for more than 24h with no response. SECURITY DEFINER so the cron runner
--- (minimal privileges) can still bypass RLS and write the update.
+-- expire_stale_match_requests — flips pending/countered → expired by
+-- branching on status so each state uses its own timer:
+--
+--   pending   → proposal_expires_at  (48h budget set on send)
+--   countered → counter_expires_at   (24h budget restarted at counter)
+--
+-- Falls back to code_expires_at for any row that somehow lacks the
+-- status-specific timer (defensive — a tighter guard is cheap).
+--
+-- SECURITY DEFINER so the cron runner (minimal privileges) can bypass
+-- RLS and write the update.
 -- -----------------------------------------------------------------------------
 create or replace function public.expire_stale_match_requests()
 returns integer
@@ -33,17 +41,29 @@ as $$
 declare
   v_count integer;
 begin
-  -- Drives expiry off `code_expires_at` (set by send_match_request) so the
-  -- semantics match what the sender sees on the share-code chip. Also
-  -- catches `countered` rows that have been sitting un-responded — the
-  -- code is still live during a counter, so the same cutoff applies.
   update public.match_requests
      set status        = 'expired',
          decided_at    = now(),
-         decision_note = 'auto-expired after 24h with no response'
-   where status in ('pending', 'countered')
-     and code_expires_at is not null
-     and code_expires_at < now();
+         decision_note = case status
+                           when 'pending'   then 'auto-expired after 48h with no response'
+                           when 'countered' then 'auto-expired after 24h with no response to counter'
+                           else 'auto-expired'
+                         end
+   where (
+     (status = 'pending'
+        and (
+          (proposal_expires_at is not null and proposal_expires_at < now())
+          or (proposal_expires_at is null and code_expires_at is not null
+              and code_expires_at < now() - interval '24 hours')
+        ))
+     or
+     (status = 'countered'
+        and (
+          (counter_expires_at is not null and counter_expires_at < now())
+          or (counter_expires_at is null and code_expires_at is not null
+              and code_expires_at < now())
+        ))
+   );
   get diagnostics v_count = row_count;
   return v_count;
 end;

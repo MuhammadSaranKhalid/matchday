@@ -36,10 +36,11 @@ create table public.unclaimed_players (
   -- style without needing a real player_profiles row.
   player_profile       jsonb not null default '{}'::jsonb,
 
-  -- Manager who created this placeholder. ON DELETE RESTRICT prevents an
-  -- orphaned unclaimed row when the manager's profile is deleted.
-  added_by             uuid not null
-                          references public.profiles(user_id) on delete restrict,
+  -- Manager who created this placeholder. ON DELETE SET NULL so
+  -- self-service account deletion (delete_user RPC in 0700) doesn't
+  -- block; the placeholder lives on under its display name.
+  added_by             uuid
+                          references public.profiles(user_id) on delete set null,
 
   -- Set when the placeholder is claimed. claimed_at is auto-stamped by the
   -- BEFORE-UPDATE trigger below if the caller didn't set it.
@@ -85,6 +86,7 @@ create trigger unclaimed_players_set_updated_at
 create or replace function public.normalize_unclaimed_claim_timestamp()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   if new.claimed_by_user_id is not null
@@ -112,6 +114,7 @@ create or replace function public.migrate_player_stats(
 )
 returns void
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   -- TODO: rewrite balls.batsman_id, balls.bowler_id, etc. to point at the
@@ -158,13 +161,13 @@ create policy "unclaimed_players_read_public"
 create policy "unclaimed_players_insert_authed"
   on public.unclaimed_players for insert
   to authenticated
-  with check (auth.uid() = added_by);
+  with check ((select auth.uid()) = added_by);
 
 create policy "unclaimed_players_update_owner"
   on public.unclaimed_players for update
-  using (auth.uid() = added_by)
-  with check (auth.uid() = added_by);
+  using ((select auth.uid()) = added_by)
+  with check ((select auth.uid()) = added_by);
 
 create policy "unclaimed_players_delete_owner"
   on public.unclaimed_players for delete
-  using (auth.uid() = added_by);
+  using ((select auth.uid()) = added_by);

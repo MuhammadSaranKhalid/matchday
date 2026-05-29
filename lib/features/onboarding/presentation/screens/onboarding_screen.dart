@@ -41,9 +41,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         context.go('/home');
       } else if (s.submitError != null &&
           prev?.value?.submitError != s.submitError) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(s.submitError!)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(s.submitError!)));
       }
     });
 
@@ -71,14 +71,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         _username.value = TextEditingValue(
           text: state.profile.username,
           selection: TextSelection.collapsed(
-              offset: state.profile.username.length),
+            offset: state.profile.username.length,
+          ),
         );
       }
       if (_city.text != state.profile.city) {
         _city.value = TextEditingValue(
           text: state.profile.city,
-          selection:
-              TextSelection.collapsed(offset: state.profile.city.length),
+          selection: TextSelection.collapsed(offset: state.profile.city.length),
         );
       }
     }
@@ -87,86 +87,106 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       backgroundColor: CkColors.paper,
       body: SafeArea(
         child: switch (async) {
-          AsyncError() =>
-            const Center(child: Text('Something went wrong')),
+          AsyncError() => const Center(child: Text('Something went wrong')),
           AsyncData(:final value) => Column(
-              children: [
-            // ─── Top bar ────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: Row(
-                children: [
-                  Opacity(
-                    opacity: value.step == OnboardingStep.player ? 1 : 0,
-                    child: IconButton(
-                      onPressed: value.step == OnboardingStep.player
-                          ? controller.back
-                          : null,
-                      icon: const Icon(Icons.chevron_left_rounded,
-                          color: CkColors.ink),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text.rich(TextSpan(children: [
-                    TextSpan(
-                        text: 'circk',
-                        style: CkType.display(
-                            fontSize: 22, letterSpacing: -0.045)),
-                    TextSpan(
-                        text: '.',
-                        style: CkType.display(
-                            fontSize: 22,
-                            letterSpacing: -0.045,
-                            color: CkColors.red)),
-                  ])),
-                  const Spacer(),
-                  const SizedBox(width: 48),
-                ],
-              ),
-            ),
-
-            // ─── Step dots ──────────────────────────────────────────────────
-            if (value.step != OnboardingStep.welcome)
+            children: [
+              // ─── Top bar ────────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                 child: Row(
                   children: [
-                    for (var i = 0;
-                        i < OnboardingStep.values.length;
-                        i++) ...[
-                      if (i > 0) const SizedBox(width: 6),
-                      Expanded(
-                        child: Container(
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color: i <= value.step.index
-                                ? CkColors.ink
-                                : CkColors.hairline,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+                    Opacity(
+                      opacity: value.step == OnboardingStep.player ? 1 : 0,
+                      child: IconButton(
+                        onPressed:
+                            value.step == OnboardingStep.player
+                                ? controller.back
+                                : null,
+                        icon: const Icon(
+                          Icons.chevron_left_rounded,
+                          color: CkColors.ink,
                         ),
                       ),
-                    ],
+                    ),
+                    const Spacer(),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'circk',
+                            style: CkType.display(
+                              fontSize: 22,
+                              letterSpacing: -0.045,
+                            ),
+                          ),
+                          TextSpan(
+                            text: '.',
+                            style: CkType.display(
+                              fontSize: 22,
+                              letterSpacing: -0.045,
+                              color: CkColors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    const SizedBox(width: 48),
                   ],
                 ),
               ),
 
-            // ─── Step body ──────────────────────────────────────────────────
-            Expanded(
-              child: switch (value.step) {
-                // ── Step 1: Profile ────────────────────────────────────────
-                OnboardingStep.profile => Column(
+              // ─── Step dots ──────────────────────────────────────────────────
+              if (value.step != OnboardingStep.welcome)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+                  child: Row(
+                    children: [
+                      for (
+                        var i = 0;
+                        i < OnboardingStep.values.length;
+                        i++
+                      ) ...[
+                        if (i > 0) const SizedBox(width: 6),
+                        Expanded(
+                          child: Container(
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color:
+                                  i <= value.step.index
+                                      ? CkColors.ink
+                                      : CkColors.hairline,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+              // ─── Step body ──────────────────────────────────────────────────
+              Expanded(
+                child: switch (value.step) {
+                  // ── Step 1: Profile ────────────────────────────────────────
+                  OnboardingStep.profile => Column(
                     children: [
                       Expanded(
                         child: ListView(
                           padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
                           children: [
-                            Text('Set up your profile',
-                                style: CkType.display(fontSize: 28)),
+                            Text(
+                              'Set up your profile',
+                              style: CkType.display(fontSize: 28),
+                            ),
                             const SizedBox(height: 4),
-                            Text('So teams can find you.',
-                                style: CkType.body(
-                                    fontSize: 14, color: CkColors.muted)),
+                            Text(
+                              'So teams can find you.',
+                              style: CkType.body(
+                                fontSize: 14,
+                                color: CkColors.muted,
+                              ),
+                            ),
                             const SizedBox(height: 22),
 
                             // Display name
@@ -193,33 +213,42 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                               inputFormatters: [
                                 LengthLimitingTextInputFormatter(20),
                                 FilteringTextInputFormatter.allow(
-                                    RegExp('[a-zA-Z0-9_]')),
+                                  RegExp('[a-zA-Z0-9_]'),
+                                ),
                               ],
                               style: CkType.body(fontSize: 16),
                               decoration: InputDecoration(
                                 prefixText: '@',
                                 prefixStyle: CkType.body(
-                                    fontSize: 16, color: CkColors.soft),
+                                  fontSize: 16,
+                                  color: CkColors.soft,
+                                ),
                                 hintText: 'ahmed_khan',
-                                suffixIcon: switch (value.profile.usernameStatus) {
+                                suffixIcon: switch (value
+                                    .profile
+                                    .usernameStatus) {
                                   UsernameStatus.checking => const Padding(
-                                      padding: EdgeInsets.all(14),
-                                      child: SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: CkColors.soft),
+                                    padding: EdgeInsets.all(14),
+                                    child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: CkColors.soft,
                                       ),
                                     ),
+                                  ),
                                   UsernameStatus.available => const Icon(
-                                      Icons.check_circle,
-                                      color: CkColors.green,
-                                      size: 20),
+                                    Icons.check_circle,
+                                    color: CkColors.green,
+                                    size: 20,
+                                  ),
                                   UsernameStatus.taken ||
-                                  UsernameStatus.invalid =>
-                                    const Icon(Icons.error_outline,
-                                        color: CkColors.red, size: 20),
+                                  UsernameStatus.invalid => const Icon(
+                                    Icons.error_outline,
+                                    color: CkColors.red,
+                                    size: 20,
+                                  ),
                                   UsernameStatus.idle => null,
                                 },
                               ),
@@ -238,10 +267,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                         ? Icons.check_circle
                                         : Icons.error_outline,
                                     size: 14,
-                                    color: value.profile.usernameStatus ==
-                                            UsernameStatus.available
-                                        ? CkColors.green
-                                        : CkColors.red,
+                                    color:
+                                        value.profile.usernameStatus ==
+                                                UsernameStatus.available
+                                            ? CkColors.green
+                                            : CkColors.red,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -251,10 +281,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                         : value.profile.usernameMessage!,
                                     style: CkType.body(
                                       fontSize: 12,
-                                      color: value.profile.usernameStatus ==
-                                              UsernameStatus.available
-                                          ? CkColors.green
-                                          : CkColors.red,
+                                      color:
+                                          value.profile.usernameStatus ==
+                                                  UsernameStatus.available
+                                              ? CkColors.green
+                                              : CkColors.red,
                                     ),
                                   ),
                                 ],
@@ -273,72 +304,92 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                               decoration: InputDecoration(
                                 hintText: 'Start typing your city or village',
                                 prefixIcon: const Icon(
-                                    Icons.location_on_outlined,
-                                    color: CkColors.red,
-                                    size: 20),
-                                suffixIcon: value.profile.citySearching
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(14),
-                                        child: SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
+                                  Icons.location_on_outlined,
+                                  color: CkColors.red,
+                                  size: 20,
+                                ),
+                                suffixIcon:
+                                    value.profile.citySearching
+                                        ? const Padding(
+                                          padding: EdgeInsets.all(14),
+                                          child: SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
                                               strokeWidth: 2,
-                                              color: CkColors.soft),
-                                        ),
-                                      )
-                                    : (hasGeo
-                                        ? const Icon(Icons.check_circle,
-                                            color: CkColors.green, size: 20)
-                                        : null),
+                                              color: CkColors.soft,
+                                            ),
+                                          ),
+                                        )
+                                        : (hasGeo
+                                            ? const Icon(
+                                              Icons.check_circle,
+                                              color: CkColors.green,
+                                              size: 20,
+                                            )
+                                            : null),
                               ),
                             ),
                             Align(
                               alignment: Alignment.centerLeft,
                               child: TextButton.icon(
-                                onPressed: value.profile.locating
-                                    ? null
-                                    : controller.useMyLocation,
+                                onPressed:
+                                    value.profile.locating
+                                        ? null
+                                        : controller.useMyLocation,
                                 style: TextButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 4),
+                                    horizontal: 4,
+                                  ),
                                   minimumSize: Size.zero,
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
                                 ),
-                                icon: value.profile.locating
-                                    ? const SizedBox(
-                                        width: 14,
-                                        height: 14,
-                                        child: CircularProgressIndicator(
+                                icon:
+                                    value.profile.locating
+                                        ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            color: CkColors.soft),
-                                      )
-                                    : const Icon(Icons.my_location,
-                                        size: 16, color: CkColors.ink2),
+                                            color: CkColors.soft,
+                                          ),
+                                        )
+                                        : const Icon(
+                                          Icons.my_location,
+                                          size: 16,
+                                          color: CkColors.ink2,
+                                        ),
                                 label: Text(
                                   value.profile.locating
                                       ? 'Locating…'
                                       : 'Use my current location',
                                   style: CkType.body(
-                                      fontSize: 13, color: CkColors.ink2),
+                                    fontSize: 13,
+                                    color: CkColors.ink2,
+                                  ),
                                 ),
                               ),
                             ),
                             if (value.profile.cityError != null)
                               Padding(
-                                padding:
-                                    const EdgeInsets.only(top: 2, left: 4),
+                                padding: const EdgeInsets.only(top: 2, left: 4),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.error_outline,
-                                        size: 14, color: CkColors.red),
+                                    const Icon(
+                                      Icons.error_outline,
+                                      size: 14,
+                                      color: CkColors.red,
+                                    ),
                                     const SizedBox(width: 6),
                                     Expanded(
-                                      child: Text(value.profile.cityError!,
-                                          style: CkType.body(
-                                              fontSize: 12,
-                                              color: CkColors.red)),
+                                      child: Text(
+                                        value.profile.cityError!,
+                                        style: CkType.body(
+                                          fontSize: 12,
+                                          color: CkColors.red,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -350,12 +401,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 value.profile.cityError == null &&
                                 value.profile.citySuggestions.isEmpty)
                               Padding(
-                                padding:
-                                    const EdgeInsets.only(top: 4, left: 4),
+                                padding: const EdgeInsets.only(top: 4, left: 4),
                                 child: Text(
                                   "We'll pinpoint this when you continue — or pick a suggestion / use your current location.",
                                   style: CkType.body(
-                                      fontSize: 12, color: CkColors.muted),
+                                    fontSize: 12,
+                                    color: CkColors.muted,
+                                  ),
                                 ),
                               ),
                             if (value.profile.citySuggestions.isNotEmpty)
@@ -368,65 +420,75 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 ),
                                 child: Column(
                                   children: [
-                                    for (var i = 0;
-                                        i < value.profile.citySuggestions.length;
-                                        i++) ...[
+                                    for (
+                                      var i = 0;
+                                      i < value.profile.citySuggestions.length;
+                                      i++
+                                    ) ...[
                                       if (i > 0)
                                         const Divider(
-                                            height: 1,
-                                            color: CkColors.hairline),
+                                          height: 1,
+                                          color: CkColors.hairline,
+                                        ),
                                       InkWell(
-                                        onTap: () =>
-                                            controller.selectCitySuggestion(
-                                                value.profile.citySuggestions[i]),
+                                        onTap:
+                                            () =>
+                                                controller.selectCitySuggestion(
+                                                  value
+                                                      .profile
+                                                      .citySuggestions[i],
+                                                ),
                                         child: Padding(
-                                          padding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 14,
-                                                  vertical: 12),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 12,
+                                          ),
                                           child: Row(
                                             children: [
                                               const Icon(
-                                                  Icons.place_outlined,
-                                                  size: 18,
-                                                  color: CkColors.soft),
+                                                Icons.place_outlined,
+                                                size: 18,
+                                                color: CkColors.soft,
+                                              ),
                                               const SizedBox(width: 12),
                                               Expanded(
                                                 child: Column(
                                                   crossAxisAlignment:
-                                                      CrossAxisAlignment
-                                                          .start,
+                                                      CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
-                                                      value.profile.citySuggestions[i]
+                                                      value
+                                                          .profile
+                                                          .citySuggestions[i]
                                                           .primaryText,
                                                       style: CkType.body(
-                                                          fontSize: 15,
-                                                          fontWeight:
-                                                              FontWeight.w600),
+                                                        fontSize: 15,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
                                                       maxLines: 1,
-                                                      overflow: TextOverflow
-                                                          .ellipsis,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                     ),
-                                                    if (value.profile
-                                                            .citySuggestions[
-                                                                i]
+                                                    if (value
+                                                            .profile
+                                                            .citySuggestions[i]
                                                             .secondaryText !=
                                                         null) ...[
-                                                      const SizedBox(
-                                                          height: 2),
+                                                      const SizedBox(height: 2),
                                                       Text(
-                                                        value.profile
-                                                            .citySuggestions[
-                                                                i]
+                                                        value
+                                                            .profile
+                                                            .citySuggestions[i]
                                                             .secondaryText!,
                                                         style: CkType.body(
-                                                            fontSize: 12,
-                                                            color: CkColors
-                                                                .muted),
+                                                          fontSize: 12,
+                                                          color: CkColors.muted,
+                                                        ),
                                                         maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
+                                                        overflow:
+                                                            TextOverflow
+                                                                .ellipsis,
                                                       ),
                                                     ],
                                                   ],
@@ -448,17 +510,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         child: CkButton(
                           label: 'Continue',
                           busy: value.profile.resolvingLocation,
-                          onPressed: (value.canContinueProfile &&
-                                  !value.profile.resolvingLocation)
-                              ? controller.continueToPlayer
-                              : null,
+                          onPressed:
+                              (value.canContinueProfile &&
+                                      !value.profile.resolvingLocation)
+                                  ? controller.continueToPlayer
+                                  : null,
                         ),
                       ),
                     ],
                   ),
 
-                // ── Step 2: Player ─────────────────────────────────────────
-                OnboardingStep.player => Column(
+                  // ── Step 2: Player ─────────────────────────────────────────
+                  OnboardingStep.player => Column(
                     children: [
                       Expanded(
                         child: ListView(
@@ -466,23 +529,34 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 5),
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
                               decoration: BoxDecoration(
                                 color: CkColors.cream,
                                 borderRadius: BorderRadius.circular(999),
                               ),
-                              child: Text('Optional',
-                                  style: CkType.mono(
-                                      fontSize: 10, color: CkColors.ink2)),
+                              child: Text(
+                                'Optional',
+                                style: CkType.mono(
+                                  fontSize: 10,
+                                  color: CkColors.ink2,
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 10),
-                            Text('Are you a cricket player?',
-                                style: CkType.display(fontSize: 28)),
+                            Text(
+                              'Are you a cricket player?',
+                              style: CkType.display(fontSize: 28),
+                            ),
                             const SizedBox(height: 4),
                             Text(
-                                'Add your style so teams can scout you. You can edit later.',
-                                style: CkType.body(
-                                    fontSize: 14, color: CkColors.muted)),
+                              'Add your style so teams can scout you. You can edit later.',
+                              style: CkType.body(
+                                fontSize: 14,
+                                color: CkColors.muted,
+                              ),
+                            ),
                             const SizedBox(height: 22),
 
                             Text('Role', style: labelStyle),
@@ -491,12 +565,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: [
-                                for (final e in const {
-                                  PlayerRole.batter: 'Batter',
-                                  PlayerRole.bowler: 'Bowler',
-                                  PlayerRole.allRounder: 'All-rounder',
-                                  PlayerRole.wicketKeeper: 'Keeper',
-                                }.entries)
+                                for (final e
+                                    in const {
+                                      PlayerRole.batter: 'Batter',
+                                      PlayerRole.bowler: 'Bowler',
+                                      PlayerRole.allRounder: 'All-rounder',
+                                      PlayerRole.wicketKeeper: 'Keeper',
+                                    }.entries)
                                   _pill(
                                     label: e.value,
                                     active: value.player.role == e.key,
@@ -512,10 +587,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: [
-                                for (final e in const {
-                                  BattingStyle.rightHand: 'Right-hand',
-                                  BattingStyle.leftHand: 'Left-hand',
-                                }.entries)
+                                for (final e
+                                    in const {
+                                      BattingStyle.rightHand: 'Right-hand',
+                                      BattingStyle.leftHand: 'Left-hand',
+                                    }.entries)
                                   _pill(
                                     label: e.value,
                                     active: value.player.battingStyle == e.key,
@@ -531,15 +607,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: [
-                                for (final e in const {
-                                  BowlingStyle.rightArmFast: 'Right-arm fast',
-                                  BowlingStyle.rightArmMedium:
-                                      'Right-arm medium',
-                                  BowlingStyle.rightArmSpin: 'Right-arm spin',
-                                  BowlingStyle.leftArmFast: 'Left-arm fast',
-                                  BowlingStyle.leftArmSpin: 'Left-arm spin',
-                                  BowlingStyle.doesntBowl: "Doesn't bowl",
-                                }.entries)
+                                for (final e
+                                    in const {
+                                      BowlingStyle.rightArmFast:
+                                          'Right-arm fast',
+                                      BowlingStyle.rightArmMedium:
+                                          'Right-arm medium',
+                                      BowlingStyle.rightArmSpin:
+                                          'Right-arm spin',
+                                      BowlingStyle.leftArmFast: 'Left-arm fast',
+                                      BowlingStyle.leftArmSpin: 'Left-arm spin',
+                                      BowlingStyle.doesntBowl: "Doesn't bowl",
+                                    }.entries)
                                   _pill(
                                     label: e.value,
                                     active: value.player.bowlingStyle == e.key,
@@ -555,16 +634,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: [
-                                for (final e in const {
-                                  BallType.leather: 'Leather',
-                                  BallType.tape: 'Tape',
-                                  BallType.tennis: 'Tennis',
-                                }.entries)
+                                for (final e
+                                    in const {
+                                      BallType.leather: 'Leather',
+                                      BallType.tape: 'Tape',
+                                      BallType.tennis: 'Tennis',
+                                    }.entries)
                                   _pill(
                                     label: e.value,
                                     active: value.player.preferredBall == e.key,
-                                    onTap: () =>
-                                        controller.setPreferredBall(e.key),
+                                    onTap:
+                                        () =>
+                                            controller.setPreferredBall(e.key),
                                   ),
                               ],
                             ),
@@ -578,15 +659,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             CkButton(
                               label: 'Save profile',
                               busy: value.submitting,
-                              onPressed: () =>
-                                  controller.submit(asPlayer: true),
+                              onPressed:
+                                  () => controller.submit(asPlayer: true),
                             ),
                             const SizedBox(height: 8),
                             CkButton.ghost(
                               label: 'Skip — I just watch',
-                              onPressed: value.submitting
-                                  ? null
-                                  : () => controller.submit(asPlayer: false),
+                              onPressed:
+                                  value.submitting
+                                      ? null
+                                      : () =>
+                                          controller.submit(asPlayer: false),
                             ),
                           ],
                         ),
@@ -594,8 +677,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ],
                   ),
 
-                // ── Step 3: Welcome ────────────────────────────────────────
-                OnboardingStep.welcome => Column(
+                  // ── Step 3: Welcome ────────────────────────────────────────
+                  OnboardingStep.welcome => Column(
                     children: [
                       const SizedBox(height: 24),
                       Expanded(
@@ -609,15 +692,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 color: CkColors.greenSoft,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.check_rounded,
-                                  color: CkColors.green, size: 38),
+                              child: const Icon(
+                                Icons.check_rounded,
+                                color: CkColors.green,
+                                size: 38,
+                              ),
                             ),
                             const SizedBox(height: 16),
                             Text(
                               "You're in,\n${(value.profile.displayName.trim().split(' ').first).isEmpty ? 'player' : value.profile.displayName.trim().split(' ').first}.",
                               textAlign: TextAlign.center,
-                              style:
-                                  CkType.display(fontSize: 30, height: 1.05),
+                              style: CkType.display(fontSize: 30, height: 1.05),
                             ),
                           ],
                         ),
@@ -632,12 +717,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ),
                     ],
                   ),
-              },
-            ),
-          ],
-            ),
+                },
+              ),
+            ],
+          ),
           _ => const Center(
-              child: CircularProgressIndicator(color: CkColors.ink)),
+            child: CircularProgressIndicator(color: CkColors.ink),
+          ),
         },
       ),
     );
@@ -649,28 +735,27 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     required String label,
     required bool active,
     required VoidCallback onTap,
-  }) =>
-      GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: active ? CkColors.ink : CkColors.surface,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: active ? CkColors.ink : CkColors.line,
-              width: 1.5,
-            ),
-          ),
-          child: Text(
-            label,
-            style: CkType.body(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: active ? CkColors.paper : CkColors.ink,
-            ),
-          ),
+  }) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: active ? CkColors.ink : CkColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: active ? CkColors.ink : CkColors.line,
+          width: 1.5,
         ),
-      );
+      ),
+      child: Text(
+        label,
+        style: CkType.body(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: active ? CkColors.paper : CkColors.ink,
+        ),
+      ),
+    ),
+  );
 }

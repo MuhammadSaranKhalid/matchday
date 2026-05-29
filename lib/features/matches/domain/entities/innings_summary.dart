@@ -1,3 +1,5 @@
+import 'package:equatable/equatable.dart';
+
 import '../../../teams/domain/entities/team.dart';
 import 'match.dart';
 
@@ -9,7 +11,7 @@ import 'match.dart';
 /// This is a passive value object — produced by
 /// [MatchesRepository.listInningsForMatches] for past-tile scores on My
 /// Matches and any scorecard view.
-class InningsSummary {
+class InningsSummary extends Equatable {
   const InningsSummary({
     required this.matchId,
     required this.inningsNumber,
@@ -36,15 +38,6 @@ class InningsSummary {
   }
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is InningsSummary &&
-          other.matchId == matchId &&
-          other.inningsNumber == inningsNumber &&
-          other.totalRuns == totalRuns &&
-          other.totalWickets == totalWickets;
-
-  @override
-  int get hashCode =>
-      Object.hash(matchId, inningsNumber, totalRuns, totalWickets);
+  List<Object?> get props =>
+      [matchId, inningsNumber, totalRuns, totalWickets, legalBallsFaced];
 }

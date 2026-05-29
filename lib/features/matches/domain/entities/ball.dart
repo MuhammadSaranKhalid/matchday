@@ -1,9 +1,11 @@
+import 'package:equatable/equatable.dart';
+
 import 'match.dart';
 
 /// One recorded delivery. The deployed `balls` table keys by
 /// `(match_id, innings_number, seq)` — there is no separate innings table;
 /// the innings is identified by the match_id + innings_number pair.
-class Ball {
+class Ball extends Equatable {
   const Ball({
     required this.id,
     required this.matchId,
@@ -72,24 +74,14 @@ class Ball {
   bool get isSix => ballKind == BallKind.legal && runsScored == 6;
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Ball &&
-          other.id == id &&
-          other.seq == seq &&
-          other.isWicket == isWicket;
-
-  @override
-  int get hashCode => Object.hash(id, seq, isWicket);
+  List<Object?> get props => [id, seq, isWicket, runsScored, extras];
 }
 
-class BallId {
+class BallId extends Equatable {
   const BallId(this.value);
   final String value;
   @override
-  bool operator ==(Object other) => other is BallId && other.value == value;
-  @override
-  int get hashCode => value.hashCode;
+  List<Object?> get props => [value];
   @override
   String toString() => value;
 }

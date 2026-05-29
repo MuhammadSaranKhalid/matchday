@@ -62,6 +62,7 @@ dependencies:
   image: ^4.8.0
   flutter_blurhash: ^0.9.1
   photo_view: ^0.15.0
+  equatable: ^2.0.8
 
 dev_dependencies:
   flutter_test:

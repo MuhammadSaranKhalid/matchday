@@ -1,7 +1,9 @@
+import 'package:equatable/equatable.dart';
+
 /// One in-app notification. Mirrors the deployed `public.notifications`
 /// table 1:1; the `payload` jsonb carries per-type extra context (e.g.
 /// `request_id` for match_request, `team_id` for team_invitation).
-class AppNotification {
+class AppNotification extends Equatable {
   const AppNotification({
     required this.id,
     required this.recipientId,
@@ -59,22 +61,14 @@ class AppNotification {
       type == NotificationType.matchStarting;
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AppNotification && other.id == id && other.isRead == isRead;
-
-  @override
-  int get hashCode => Object.hash(id, isRead);
+  List<Object?> get props => [id, isRead];
 }
 
-class NotificationId {
+class NotificationId extends Equatable {
   const NotificationId(this.value);
   final String value;
   @override
-  bool operator ==(Object other) =>
-      other is NotificationId && other.value == value;
-  @override
-  int get hashCode => value.hashCode;
+  List<Object?> get props => [value];
   @override
   String toString() => value;
 }

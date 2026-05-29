@@ -1,3 +1,5 @@
+import 'package:equatable/equatable.dart';
+
 import '../../../teams/domain/entities/team.dart';
 
 /// A match between two teams.
@@ -5,7 +7,7 @@ import '../../../teams/domain/entities/team.dart';
 /// In the setup flow (F4) a match is created in [MatchStatus.pending] with only
 /// team A's side filled in; team B's squad/captain and the status transition are
 /// the opponent's job (F5).
-class Match {
+class Match extends Equatable {
   const Match({
     required this.id,
     required this.teamAId,
@@ -93,33 +95,33 @@ class Match {
   bool get isActive => status.isActive;
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Match &&
-          other.id == id &&
-          other.teamAId == teamAId &&
-          other.teamBId == teamBId &&
-          other.status == status &&
-          other.scheduledStartTime == scheduledStartTime;
-
-  @override
-  int get hashCode =>
-      Object.hash(id, teamAId, teamBId, status, scheduledStartTime);
+  List<Object?> get props => [
+        id,
+        teamAId,
+        teamBId,
+        status,
+        scheduledStartTime,
+        tossWonBy,
+        tossDecision,
+        startPhase,
+        currentInnings,
+        currentStrikerId,
+        currentNonStrikerId,
+        currentBowlerId,
+      ];
 }
 
-class MatchId {
+class MatchId extends Equatable {
   const MatchId(this.value);
   final String value;
   @override
-  bool operator ==(Object other) => other is MatchId && other.value == value;
-  @override
-  int get hashCode => value.hashCode;
+  List<Object?> get props => [value];
   @override
   String toString() => value;
 }
 
 /// Match format: overs, players a side, ball type, bowling cap.
-class MatchFormat {
+class MatchFormat extends Equatable {
   const MatchFormat({
     required this.oversPerInnings,
     required this.playersPerTeam,
@@ -133,28 +135,17 @@ class MatchFormat {
   final int maxOversPerBowler;
 
   @override
-  bool operator ==(Object other) =>
-      other is MatchFormat &&
-      other.oversPerInnings == oversPerInnings &&
-      other.playersPerTeam == playersPerTeam &&
-      other.ballType == ballType &&
-      other.maxOversPerBowler == maxOversPerBowler;
-
-  @override
-  int get hashCode =>
-      Object.hash(oversPerInnings, playersPerTeam, ballType, maxOversPerBowler);
+  List<Object?> get props =>
+      [oversPerInnings, playersPerTeam, ballType, maxOversPerBowler];
 }
 
-class Venue {
+class Venue extends Equatable {
   const Venue({required this.ground, this.city});
   final String ground;
   final String? city;
 
   @override
-  bool operator ==(Object other) =>
-      other is Venue && other.ground == ground && other.city == city;
-  @override
-  int get hashCode => Object.hash(ground, city);
+  List<Object?> get props => [ground, city];
 }
 
 enum MatchBallType {

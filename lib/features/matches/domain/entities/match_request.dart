@@ -1,3 +1,5 @@
+import 'package:equatable/equatable.dart';
+
 import '../../../teams/domain/entities/team.dart';
 import 'match.dart';
 
@@ -5,7 +7,7 @@ import 'match.dart';
 /// `send_match_request`; transitions through `pending → countered → accepted
 /// | declined | cancelled | expired` driven by the 5 SECURITY DEFINER RPCs
 /// in migration 0600. The matches row is materialised only on accept.
-class MatchRequest {
+class MatchRequest extends Equatable {
   const MatchRequest({
     required this.id,
     required this.fromTeamId,
@@ -102,25 +104,14 @@ class MatchRequest {
       status == MatchRequestStatus.countered;
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is MatchRequest &&
-          other.id == id &&
-          other.status == status &&
-          other.updatedAt == updatedAt;
-
-  @override
-  int get hashCode => Object.hash(id, status, updatedAt);
+  List<Object?> get props => [id, status, updatedAt];
 }
 
-class MatchRequestId {
+class MatchRequestId extends Equatable {
   const MatchRequestId(this.value);
   final String value;
   @override
-  bool operator ==(Object other) =>
-      other is MatchRequestId && other.value == value;
-  @override
-  int get hashCode => value.hashCode;
+  List<Object?> get props => [value];
   @override
   String toString() => value;
 }

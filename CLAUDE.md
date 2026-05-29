@@ -261,8 +261,11 @@ Code templates below use deliberately generic names (`Foo`, `Bar`) so they read 
 #### Entity template (`domain/entities/foo.dart`)
 
 ```dart
-// Pure Dart. No imports outside dart:* and other Domain files.
-class Foo {
+// Pure Dart. No imports outside dart:*, `package:equatable/equatable.dart`,
+// and other Domain files.
+import 'package:equatable/equatable.dart';
+
+class Foo extends Equatable {
   const Foo({
     required this.id,
     required this.title,
@@ -283,33 +286,22 @@ class Foo {
       );
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Foo &&
-          other.id == id &&
-          other.title == title &&
-          other.createdAt == createdAt &&
-          other.updatedAt == updatedAt;
-
-  @override
-  int get hashCode => Object.hash(id, title, createdAt, updatedAt);
+  List<Object?> get props => [id, title, createdAt, updatedAt];
 }
 
-class FooId {
+class FooId extends Equatable {
   const FooId(this.value);
   final String value;
   @override
-  bool operator ==(Object other) => other is FooId && other.value == value;
-  @override
-  int get hashCode => value.hashCode;
+  List<Object?> get props => [value];
   @override
   String toString() => value;
 }
 ```
 
 Notes:
-- Entities are plain Dart classes with manual `==`/`hashCode`. Do NOT use Freezed for entities — it pulls Domain into Data's serialization concerns.
-- ID types are always wrapped (`FooId`, `UserId`, etc.), never raw `String`.
+- Entities are plain Dart classes that `extends Equatable` and expose a `List<Object?> get props => [...]` getter for value equality. Equatable is pure-Dart (no codegen, no serialization concerns) — it keeps Domain pure while removing the risk of forgetting a field when manually rolling `==`/`hashCode`. Do NOT use Freezed for entities — it pulls Domain into Data's serialization concerns.
+- ID types are always wrapped (`FooId`, `UserId`, etc.), never raw `String`. They also `extends Equatable` so `==` on the wrapper works as expected.
 - Add `updatedAt` to any entity that will be synced offline (needed for LWW conflict resolution). Omit if the feature is online-only and the timestamp isn't business-relevant.
 - Mutable transitions go through `copyWith`, never field reassignment.
 
@@ -914,9 +906,9 @@ When to use freezed:
 - Sealed unions where each variant needs `copyWith`
 
 When NOT to use freezed:
-- Domain entities (manual `==`/`hashCode` keeps Domain pure Dart)
+- Domain entities (use `extends Equatable` + `props` to keep Domain pure Dart while still getting safe value equality)
 - View state with sub-states that don't need `copyWith` (hand-rolled sealed classes are simpler)
-- Value objects (private constructor + factory `create` is the pattern)
+- Value objects (private constructor + factory `create` is the pattern; `extends Equatable` for the equality)
 
 Syntax:
 

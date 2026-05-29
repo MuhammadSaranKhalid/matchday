@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:novex_clean_arch/core/error/exceptions.dart';
@@ -5,6 +7,9 @@ import 'package:novex_clean_arch/core/error/failures.dart';
 import 'package:novex_clean_arch/features/posts/data/datasources/posts_remote_datasource.dart';
 import 'package:novex_clean_arch/features/posts/data/repositories/posts_repository_impl.dart';
 import 'package:novex_clean_arch/features/posts/domain/entities/post_draft.dart';
+
+ProcessedPhoto _photo() =>
+    ProcessedPhoto(file: File('x.webp'), blurhash: 'L', width: 1, height: 1);
 
 class _MockRemote extends Mock implements PostsRemoteDataSource {}
 
@@ -33,5 +38,24 @@ void main() {
     expect(result.getLeft().toNullable(), isA<AuthFailure>());
     // Text-only post: no media upload attempted.
     verifyNever(() => remote.uploadMedia(any(), any()));
+  });
+
+  test('createPost rejects an empty draft (no text, no photos)', () async {
+    final result = await repo.createPost(const PostDraft(text: '   '));
+    expect(result.getLeft().toNullable(), isA<ValidationFailure>());
+    verifyNever(() => remote.insertPost(any()));
+  });
+
+  test('createPost rejects text over 2000 chars', () async {
+    final result = await repo.createPost(PostDraft(text: 'a' * 2001));
+    expect(result.getLeft().toNullable(), isA<ValidationFailure>());
+    verifyNever(() => remote.insertPost(any()));
+  });
+
+  test('createPost rejects more than 4 photos', () async {
+    final result = await repo
+        .createPost(PostDraft(photos: List.generate(5, (_) => _photo())));
+    expect(result.getLeft().toNullable(), isA<ValidationFailure>());
+    verifyNever(() => remote.insertPost(any()));
   });
 }

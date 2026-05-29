@@ -58,7 +58,7 @@ final class TeamsListControllerProvider
 }
 
 String _$teamsListControllerHash() =>
-    r'72e1cc2d94b94e877ac31fbb08f56cff44cb19e0';
+    r'3b29121c7957853f7599a01edec6151171ddaa43';
 
 /// Builds the "My teams" screen's [MyTeamsView] directly from three sources —
 /// the user's teams (local stream), their active matches (online), and the

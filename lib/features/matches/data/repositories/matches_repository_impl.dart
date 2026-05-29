@@ -149,6 +149,14 @@ class MatchesRepositoryImpl implements MatchesRepository {
     required String strikerId,
     required String nonStrikerId,
   }) async {
+    if (strikerId.isEmpty || nonStrikerId.isEmpty) {
+      return const Left(ValidationFailure('Both openers are required'));
+    }
+    if (strikerId == nonStrikerId) {
+      return const Left(
+        ValidationFailure('Striker and non-striker must be different players'),
+      );
+    }
     try {
       await _remote.submitMatchOpeners(
         matchId: id.value,
@@ -189,6 +197,16 @@ class MatchesRepositoryImpl implements MatchesRepository {
     required String nonStrikerId,
     required String bowlerId,
   }) async {
+    if (strikerId.isEmpty || nonStrikerId.isEmpty || bowlerId.isEmpty) {
+      return const Left(
+        ValidationFailure('Striker, non-striker, and bowler are all required'),
+      );
+    }
+    if (strikerId == nonStrikerId) {
+      return const Left(
+        ValidationFailure('Striker and non-striker must be different'),
+      );
+    }
     try {
       await _remote.startInnings(
         matchId: matchId.value,
@@ -209,6 +227,22 @@ class MatchesRepositoryImpl implements MatchesRepository {
 
   @override
   Future<Either<Failure, Ball>> recordBall(BallDraft d) async {
+    // Cricket invariants the server also checks, but failing fast here gives
+    // a clean ValidationFailure rather than a Postgres error.
+    if (d.isWicket && d.wicketType == null) {
+      return const Left(ValidationFailure('A wicket needs a wicket type'));
+    }
+    if (d.runsScored < 0 || d.extras < 0) {
+      return const Left(
+        ValidationFailure('Runs and extras must be non-negative'),
+      );
+    }
+    if ((d.ballKind == BallKind.bye || d.ballKind == BallKind.legBye) &&
+        d.runsScored != 0) {
+      return const Left(
+        ValidationFailure('Bye / leg-bye runs belong in extras'),
+      );
+    }
     try {
       final dto = await _remote.recordBall({
         'p_match_id': d.matchId.value,
@@ -277,6 +311,20 @@ class MatchesRepositoryImpl implements MatchesRepository {
     List<String> fromTeamXi = const [],
     String? fromTeamKeeperId,
   }) async {
+    if (message != null && message.length > 500) {
+      return const Left(ValidationFailure('Message too long (max 500 chars)'));
+    }
+    if (playersPerSide < 5 || playersPerSide > 15) {
+      return const Left(
+        ValidationFailure('Players per side must be between 5 and 15'),
+      );
+    }
+    if (fromTeamXi.length > playersPerSide) {
+      return const Left(
+        ValidationFailure('XI has more players than players_per_side'),
+      );
+    }
+    final trimmedMessage = message?.trim();
     try {
       final id = await _remote.sendMatchChallenge({
         'p_from_team_id': fromTeamId.value,
@@ -286,7 +334,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
         if (proposedVenue != null) 'p_proposed_venue': proposedVenue,
         if (proposedFormat != null)
           'p_proposed_format': MatchRequestDto.formatToJson(proposedFormat),
-        if (message != null) 'p_message': message,
+        if (trimmedMessage != null) 'p_message': trimmedMessage,
         'p_players_per_side': playersPerSide,
         'p_from_team_xi': fromTeamXi,
         if (fromTeamKeeperId != null) 'p_from_team_keeper_id': fromTeamKeeperId,
@@ -347,6 +395,22 @@ class MatchesRepositoryImpl implements MatchesRepository {
     int? counteredPlayersPerSide,
     String? decisionNote,
   }) async {
+    final changesAny = counteredStartTime != null ||
+        (counteredVenue != null && counteredVenue.trim().isNotEmpty) ||
+        counteredFormat != null ||
+        counteredPlayersPerSide != null;
+    if (!changesAny) {
+      return const Left(
+        ValidationFailure('A counter must change at least one field'),
+      );
+    }
+    if (counteredPlayersPerSide != null &&
+        (counteredPlayersPerSide < 5 || counteredPlayersPerSide > 15)) {
+      return const Left(
+        ValidationFailure('Players per side must be between 5 and 15'),
+      );
+    }
+    final trimmedNote = decisionNote?.trim();
     try {
       await _remote.counterMatchChallenge({
         'p_request_id': requestId.value,
@@ -359,7 +423,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
               MatchRequestDto.formatToJson(counteredFormat),
         if (counteredPlayersPerSide != null)
           'p_countered_players_per_side': counteredPlayersPerSide,
-        if (decisionNote != null) 'p_decision_note': decisionNote,
+        if (trimmedNote != null) 'p_decision_note': trimmedNote,
       });
       return const Right(unit);
     } on UnauthorizedException catch (e) {
@@ -377,10 +441,11 @@ class MatchesRepositoryImpl implements MatchesRepository {
     String? decisionNote,
     DeclineReason? decisionReason,
   }) async {
+    final trimmedNote = decisionNote?.trim();
     try {
       await _remote.declineMatchChallenge({
         'p_request_id': requestId.value,
-        if (decisionNote != null) 'p_decision_note': decisionNote,
+        if (trimmedNote != null) 'p_decision_note': trimmedNote,
         if (decisionReason != null) 'p_decision_reason': decisionReason.wire,
       });
       return const Right(unit);
@@ -398,10 +463,11 @@ class MatchesRepositoryImpl implements MatchesRepository {
     required MatchRequestId requestId,
     String? decisionNote,
   }) async {
+    final trimmedNote = decisionNote?.trim();
     try {
       await _remote.withdrawMatchChallenge({
         'p_request_id': requestId.value,
-        if (decisionNote != null) 'p_decision_note': decisionNote,
+        if (trimmedNote != null) 'p_decision_note': trimmedNote,
       });
       return const Right(unit);
     } on UnauthorizedException catch (e) {
@@ -431,8 +497,12 @@ class MatchesRepositoryImpl implements MatchesRepository {
   Future<Either<Failure, MatchRequest?>> findMatchChallengeByCode(
     String code,
   ) async {
+    final trimmed = code.trim();
+    if (trimmed.length != 6 || int.tryParse(trimmed) == null) {
+      return const Left(ValidationFailure('Share code must be 6 digits'));
+    }
     try {
-      final dto = await _remote.findMatchChallengeByCode(code);
+      final dto = await _remote.findMatchChallengeByCode(trimmed);
       return Right(dto?.toEntity());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -462,10 +532,14 @@ class MatchesRepositoryImpl implements MatchesRepository {
     required MatchId id,
     required String description,
   }) async {
+    final desc = description.trim();
+    if (desc.isEmpty) {
+      return const Left(ValidationFailure('A result is required'));
+    }
     try {
       final dto = await _remote.update(id.value, {
         'status': 'completed',
-        'result': {'description': description},
+        'result': {'description': desc},
         'end_time': DateTime.now().toIso8601String(),
       });
       return Right(dto.toEntity());

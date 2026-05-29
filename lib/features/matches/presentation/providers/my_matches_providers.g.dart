@@ -8,56 +8,6 @@ part of 'my_matches_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-
-@ProviderFor(listInningsForMatchesUseCase)
-final listInningsForMatchesUseCaseProvider =
-    ListInningsForMatchesUseCaseProvider._();
-
-final class ListInningsForMatchesUseCaseProvider
-    extends
-        $FunctionalProvider<
-          ListInningsForMatches,
-          ListInningsForMatches,
-          ListInningsForMatches
-        >
-    with $Provider<ListInningsForMatches> {
-  ListInningsForMatchesUseCaseProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'listInningsForMatchesUseCaseProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$listInningsForMatchesUseCaseHash();
-
-  @$internal
-  @override
-  $ProviderElement<ListInningsForMatches> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  ListInningsForMatches create(Ref ref) {
-    return listInningsForMatchesUseCase(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(ListInningsForMatches value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<ListInningsForMatches>(value),
-    );
-  }
-}
-
-String _$listInningsForMatchesUseCaseHash() =>
-    r'59e1640b5650d5fd7bf7d4847eea74735ef766b4';
-
 /// Composes matches + teams + currentUser + innings into a pre-rendered
 /// [MyMatchesView] for the Pavilion screen. Online-only one-shot fetch;
 /// pull-to-refresh invalidates self.
@@ -106,4 +56,4 @@ final class MyMatchesViewProvider
   }
 }
 
-String _$myMatchesViewHash() => r'ee301178babd6699dbbf9c07d606fa7d94fa2dee';
+String _$myMatchesViewHash() => r'6a1f8d4776f0d6305c57ba931c6641de268621e6';

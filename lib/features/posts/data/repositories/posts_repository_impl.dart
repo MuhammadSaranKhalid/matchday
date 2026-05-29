@@ -16,6 +16,10 @@ class PostsRepositoryImpl implements PostsRepository {
   final PostsRemoteDataSource _remote;
   final Uuid _uuid;
 
+  // Content rules: text OR ≥1 photo; text ≤ 2000 chars; ≤ 4 photos.
+  static const _maxPostChars = 2000;
+  static const _maxPostPhotos = 4;
+
   @override
   Future<Either<Failure, List<Post>>> getFeed({
     int limit = 20,
@@ -52,6 +56,34 @@ class PostsRepositoryImpl implements PostsRepository {
 
   @override
   Future<Either<Failure, Post>> createPost(PostDraft draft) async {
+    final text = draft.text?.trim();
+    final hasText = text != null && text.isNotEmpty;
+
+    if (!hasText && !draft.hasPhotos) {
+      return const Left(
+        ValidationFailure('Add some text or a photo to post.'),
+      );
+    }
+    if (text != null && text.length > _maxPostChars) {
+      return const Left(
+        ValidationFailure('Post is too long (max $_maxPostChars characters).'),
+      );
+    }
+    if (draft.photos.length > _maxPostPhotos) {
+      return const Left(
+        ValidationFailure('A post can have at most $_maxPostPhotos photos.'),
+      );
+    }
+
+    // Normalise: stored text is the trimmed form (or null when empty).
+    final normalised = PostDraft(
+      text: hasText ? text : null,
+      photos: draft.photos,
+      authorContext: draft.authorContext,
+      contextEntityId: draft.contextEntityId,
+    );
+    draft = normalised;
+
     try {
       // Deterministic post id → deterministic media paths → predictable public
       // URLs, so we can write media_urls/media at INSERT and upload after.

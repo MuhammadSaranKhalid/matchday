@@ -3,10 +3,14 @@ import 'dart:io';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
-import '../../../onboarding/domain/usecases/update_profile.dart';
+import '../../../onboarding/domain/value_objects/city.dart';
+import '../../../onboarding/domain/value_objects/display_name.dart';
+import '../../../onboarding/domain/value_objects/username.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 
 part 'profile_edit_controller.g.dart';
+
+const _maxBio = 200;
 
 class ProfileEditState {
   const ProfileEditState({this.avatar, this.saving = false, this.error});
@@ -54,19 +58,48 @@ class ProfileEditController extends _$ProfileEditController {
     String? countryCode,
   }) async {
     state = state.copyWith(saving: true, clearError: true);
-    final result = await ref.read(updateProfileUseCaseProvider).call(
-          UpdateProfileParams(
-            displayName: displayName,
-            username: username,
-            usernameChanged: username.trim() != (originalUsername ?? ''),
-            bio: bio,
-            city: city,
-            placeId: placeId,
-            latitude: latitude,
-            longitude: longitude,
-            countryCode: countryCode,
-            avatar: state.avatar,
-          ),
+
+    final nameRes = DisplayName.create(displayName);
+    if (nameRes.isLeft()) {
+      state = state.copyWith(saving: false, error: nameRes.getLeft().toNullable());
+      return false;
+    }
+    final cityRes = City.create(city);
+    if (cityRes.isLeft()) {
+      state = state.copyWith(saving: false, error: cityRes.getLeft().toNullable());
+      return false;
+    }
+
+    final usernameChanged = username.trim() != (originalUsername ?? '');
+    Username? usernameVo;
+    if (usernameChanged) {
+      final uRes = Username.create(username);
+      if (uRes.isLeft()) {
+        state = state.copyWith(saving: false, error: uRes.getLeft().toNullable());
+        return false;
+      }
+      usernameVo = uRes.getRight().toNullable();
+    }
+
+    final bioTrimmed = bio.trim();
+    if (bioTrimmed.length > _maxBio) {
+      state = state.copyWith(
+        saving: false,
+        error: const ValidationFailure('Bio is too long (max $_maxBio characters).'),
+      );
+      return false;
+    }
+
+    final result = await ref.read(profileRepositoryProvider).updateProfile(
+          displayName: nameRes.getRight().toNullable()!,
+          username: usernameVo,
+          bio: bioTrimmed.isEmpty ? null : bioTrimmed,
+          city: cityRes.getRight().toNullable()!,
+          placeId: placeId,
+          latitude: latitude,
+          longitude: longitude,
+          countryCode: countryCode,
+          avatar: state.avatar,
         );
     if (!ref.mounted) return false;
     return result.fold(

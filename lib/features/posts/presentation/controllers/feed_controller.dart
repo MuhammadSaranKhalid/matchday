@@ -2,7 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/post.dart';
-import '../../domain/usecases/get_feed.dart';
+import '../../domain/repositories/posts_repository.dart';
 import '../providers/posts_providers.dart';
 
 part 'feed_controller.g.dart';
@@ -15,14 +15,13 @@ class FeedController extends _$FeedController {
   bool _hasMore = true;
   bool get hasMore => _hasMore;
 
-  // build() watches the use-case provider (reactive); action methods read it.
+  // build() watches the repository provider (reactive); action methods read it.
   @override
   Future<List<Post>> build() =>
-      _fetch(ref.watch(getFeedUseCaseProvider), before: null);
+      _fetch(ref.watch(postsRepositoryProvider), before: null);
 
-  Future<List<Post>> _fetch(GetFeed useCase, {DateTime? before}) async {
-    final result =
-        await useCase.call(GetFeedParams(limit: _pageSize, before: before));
+  Future<List<Post>> _fetch(PostsRepository repo, {DateTime? before}) async {
+    final result = await repo.getFeed(limit: _pageSize, before: before);
     return result.fold(
       (f) => throw FailureWrapper(f),
       (posts) {
@@ -37,7 +36,7 @@ class FeedController extends _$FeedController {
     _hasMore = true;
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => _fetch(ref.read(getFeedUseCaseProvider), before: null),
+      () => _fetch(ref.read(postsRepositoryProvider), before: null),
     );
   }
 
@@ -46,7 +45,7 @@ class FeedController extends _$FeedController {
     final current = state.value;
     if (current == null || current.isEmpty || !_hasMore) return;
     final more = await _fetch(
-      ref.read(getFeedUseCaseProvider),
+      ref.read(postsRepositoryProvider),
       before: current.last.createdAt,
     );
     state = AsyncData([...current, ...more]);

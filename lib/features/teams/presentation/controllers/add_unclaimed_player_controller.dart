@@ -3,7 +3,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/player_skills.dart';
 import '../../domain/entities/team.dart';
-import '../../domain/usecases/add_unclaimed_player.dart';
+import '../../domain/value_objects/jersey_number.dart';
+import '../../domain/value_objects/player_display_name.dart';
 import '../providers/teams_providers.dart';
 import '../state/add_unclaimed_player_state.dart';
 
@@ -55,15 +56,35 @@ class AddUnclaimedPlayerController extends _$AddUnclaimedPlayerController {
     if (state.submitting) return;
     state = state.copyWith(submitting: true, submitError: null);
 
-    final result = await ref.read(addUnclaimedPlayerUseCaseProvider).call(
-          AddUnclaimedPlayerParams(
-            teamId: TeamId(teamId),
-            displayName: state.name,
-            jerseyNumber: state.jerseyNumber,
-            playingRole: state.playingRole,
-            battingStyle: state.battingStyle,
-            bowlingStyle: state.bowlingStyle,
-          ),
+    final nameRes = PlayerDisplayName.create(state.name);
+    if (nameRes.isLeft()) {
+      state = state.copyWith(
+        submitting: false,
+        submitError: nameRes.getLeft().toNullable()!.message,
+      );
+      return;
+    }
+
+    JerseyNumber? jersey;
+    if (state.jerseyNumber != null) {
+      final jerseyRes = JerseyNumber.create(state.jerseyNumber!);
+      if (jerseyRes.isLeft()) {
+        state = state.copyWith(
+          submitting: false,
+          submitError: jerseyRes.getLeft().toNullable()!.message,
+        );
+        return;
+      }
+      jersey = jerseyRes.getRight().toNullable();
+    }
+
+    final result = await ref.read(teamsRepositoryProvider).addUnclaimedPlayer(
+          teamId: TeamId(teamId),
+          displayName: nameRes.getRight().toNullable()!,
+          jerseyNumber: jersey,
+          playingRole: state.playingRole,
+          battingStyle: state.battingStyle,
+          bowlingStyle: state.bowlingStyle,
         );
 
     state = result.fold(
@@ -73,6 +94,14 @@ class AddUnclaimedPlayerController extends _$AddUnclaimedPlayerController {
         step: AddUnclaimedPlayerStep.success,
       ),
     );
+
+    // The `team_members` table is not (yet) in the `supabase_realtime`
+    // publication, so the open roster stream on the Team Page doesn't see
+    // our new row pushed to it. Force a re-subscription — that emits a fresh
+    // initial snapshot that DOES include the row.
+    if (result.isRight()) {
+      ref.invalidate(rosterProvider(teamId));
+    }
   }
 
   /// Reset to the empty Step 1 — used by "Add another" on the success view.

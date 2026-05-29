@@ -2,22 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
-import '../../../../core/usecase/usecase.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_role.dart';
-import '../../domain/usecases/list_innings_for_matches.dart';
 import '../state/my_matches_view.dart';
 import 'matches_providers.dart';
 
 part 'my_matches_providers.g.dart';
-
-@riverpod
-ListInningsForMatches listInningsForMatchesUseCase(Ref ref) =>
-    ListInningsForMatches(ref.watch(matchesRepositoryProvider));
 
 /// Composes matches + teams + currentUser + innings into a pre-rendered
 /// [MyMatchesView] for the Pavilion screen. Online-only one-shot fetch;
@@ -28,7 +22,7 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   if (user == null) return const MyMatchesView.empty();
 
   final matchesResult =
-      await ref.watch(listMyMatchesUseCaseProvider).call(const NoParams());
+      await ref.watch(matchesRepositoryProvider).listMyMatches();
   final matches = matchesResult.fold<List<Match>>(
     (f) => throw FailureWrapper(f),
     (list) => list,
@@ -47,7 +41,8 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
     if (!teamsById.containsKey(m.teamBId.value)) missingTeamIds.add(m.teamBId.value);
   }
   for (final id in missingTeamIds) {
-    final result = await ref.read(getTeamUseCaseProvider).call(TeamId(id));
+    final result =
+        await ref.read(teamsRepositoryProvider).getTeam(TeamId(id));
     final team = result.fold((_) => null, (t) => t);
     if (team != null) teamsById[id] = team;
   }
@@ -60,9 +55,9 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
 
   Map<MatchId, List<InningsSummary>> inningsByMatch = const {};
   if (past.isNotEmpty) {
-    final result = await ref.read(listInningsForMatchesUseCaseProvider).call(
-          ListInningsForMatchesParams(past.map((m) => m.id)),
-        );
+    final result = await ref
+        .read(matchesRepositoryProvider)
+        .listInningsForMatches(past.map((m) => m.id));
     inningsByMatch = result.fold((_) => const {}, (map) => map);
   }
 

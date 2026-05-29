@@ -10,9 +10,8 @@ import '../../../../core/widgets/ck_button.dart';
 import '../../domain/entities/roster_member.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
-import '../../domain/usecases/add_unclaimed_player.dart';
-import '../../domain/usecases/set_jersey_number.dart';
-import '../../domain/usecases/set_member_role.dart';
+import '../../domain/value_objects/jersey_number.dart';
+import '../../domain/value_objects/player_display_name.dart';
 import '../providers/teams_providers.dart';
 import '../widgets/team_avatar.dart';
 
@@ -219,9 +218,15 @@ Future<void> _addPlayer(BuildContext context, WidgetRef ref, Team team) async {
     builder: (_) => const _AddPlayerSheet(),
   );
   if (name == null || !context.mounted) return;
-  final result = await ref
-      .read(addUnclaimedPlayerUseCaseProvider)
-      .call(AddUnclaimedPlayerParams(teamId: team.id, displayName: name));
+  final nameRes = PlayerDisplayName.create(name);
+  if (nameRes.isLeft()) {
+    _snack(context, nameRes.getLeft().toNullable()!.message);
+    return;
+  }
+  final result = await ref.read(teamsRepositoryProvider).addUnclaimedPlayer(
+        teamId: team.id,
+        displayName: nameRes.getRight().toNullable()!,
+      );
   if (context.mounted) _showFailure(context, result);
 }
 
@@ -246,21 +251,29 @@ Future<void> _memberActions(
         builder: (_) => _JerseySheet(initial: m.jerseyNumber),
       );
       if (picked == null || !context.mounted) return;
-      final result = await ref
-          .read(setJerseyNumberUseCaseProvider)
-          .call(SetJerseyNumberParams(id: m.id, number: picked.value));
+      JerseyNumber? jersey;
+      if (picked.value != null) {
+        final jerseyRes = JerseyNumber.create(picked.value!);
+        if (jerseyRes.isLeft()) {
+          _snack(context, jerseyRes.getLeft().toNullable()!.message);
+          return;
+        }
+        jersey = jerseyRes.getRight().toNullable();
+      }
+      final result =
+          await ref.read(teamsRepositoryProvider).setJerseyNumber(m.id, jersey);
       if (context.mounted) _showFailure(context, result);
     case _MemberAction.captain:
     case _MemberAction.viceCaptain:
     case _MemberAction.keeper:
     case _MemberAction.player:
       final result = await ref
-          .read(setMemberRoleUseCaseProvider)
-          .call(SetMemberRoleParams(id: m.id, role: action.role!));
+          .read(teamsRepositoryProvider)
+          .setMemberRole(m.id, action.role!);
       if (context.mounted) _showFailure(context, result);
     case _MemberAction.remove:
       final result =
-          await ref.read(removeMemberUseCaseProvider).call(m.id);
+          await ref.read(teamsRepositoryProvider).removeMember(m.id);
       if (context.mounted) _showFailure(context, result);
   }
 }

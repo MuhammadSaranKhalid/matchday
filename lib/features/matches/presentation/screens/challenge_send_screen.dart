@@ -8,7 +8,6 @@ import '../../../../core/widgets/ck_button.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/match.dart';
-import '../../domain/usecases/send_match_challenge.dart';
 import '../providers/matches_providers.dart';
 
 /// Sender side of the challenge handshake. 5 steps on one screen, matching
@@ -178,23 +177,21 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
     final fromId = _resolvedFromTeamId;
     if (opp == null || start == null || fromId == null) return;
     setState(() => _busy = true);
-    final result = await ref.read(sendMatchChallengeUseCaseProvider).call(
-          SendMatchChallengeParams(
-            fromTeamId: TeamId(fromId),
-            toTeamId: opp.id,
-            proposedStartTime: start,
-            proposedVenue: _venueCtrl.text.trim(),
-            proposedFormat: MatchFormat(
-              oversPerInnings: _overs,
-              playersPerTeam: _playersPerSide,
-              ballType: _ball,
-              maxOversPerBowler: _maxOversPerBowler,
-            ),
-            message: _messageCtrl.text.trim().isEmpty
-                ? null
-                : _messageCtrl.text.trim(),
-            playersPerSide: _playersPerSide,
+    final result = await ref.read(matchesRepositoryProvider).sendMatchChallenge(
+          fromTeamId: TeamId(fromId),
+          toTeamId: opp.id,
+          proposedStartTime: start,
+          proposedVenue: _venueCtrl.text.trim(),
+          proposedFormat: MatchFormat(
+            oversPerInnings: _overs,
+            playersPerTeam: _playersPerSide,
+            ballType: _ball,
+            maxOversPerBowler: _maxOversPerBowler,
           ),
+          message: _messageCtrl.text.trim().isEmpty
+              ? null
+              : _messageCtrl.text.trim(),
+          playersPerSide: _playersPerSide,
         );
     if (!mounted) return;
     setState(() => _busy = false);

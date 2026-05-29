@@ -66,6 +66,9 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
     required DevicePlatform platform,
     String? appVersion,
   }) async {
+    if (fcmToken.trim().isEmpty) {
+      return const Left(ValidationFailure('FCM token is required'));
+    }
     try {
       await _remote.registerDeviceToken(
         fcmToken: fcmToken,

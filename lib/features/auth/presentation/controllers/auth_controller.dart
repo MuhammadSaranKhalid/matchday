@@ -1,8 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
-import '../../../../core/usecase/usecase.dart';
-import '../../domain/usecases/verify_email_otp.dart';
 import '../../domain/value_objects/email.dart';
 import '../../domain/value_objects/otp_code.dart';
 import '../providers/auth_providers.dart';
@@ -29,7 +27,8 @@ class AuthController extends _$AuthController {
         state = AuthFailed(failure);
       case Right(value: final email):
         state = const AuthSendingOtp();
-        final result = await ref.read(sendEmailOtpUseCaseProvider).call(email);
+        final result =
+            await ref.read(authRepositoryProvider).sendEmailOtp(email);
         state = result.fold(
           (f) => AuthFailed(f, email: email),
           (_) => AuthOtpSent(email),
@@ -60,8 +59,8 @@ class AuthController extends _$AuthController {
       case Right(value: final code):
         state = AuthVerifyingOtp(email);
         final result = await ref
-            .read(verifyEmailOtpUseCaseProvider)
-            .call(VerifyEmailOtpParams(email: email, code: code));
+            .read(authRepositoryProvider)
+            .verifyEmailOtp(email: email, code: code);
         state = result.fold(
           (f) => AuthFailed(f, email: email),
           AuthAuthenticated.new,
@@ -89,17 +88,15 @@ class AuthController extends _$AuthController {
 
   Future<void> signInWithGoogle() async {
     state = const AuthSigningInWithGoogle();
-    final result = await ref
-        .read(signInWithGoogleUseCaseProvider)
-        .call(const NoParams());
+    final result =
+        await ref.read(authRepositoryProvider).signInWithGoogle();
     state = result.fold(AuthFailed.new, AuthAuthenticated.new);
   }
 
   // ─── Sign out ───────────────────────────────────────────────────────────
 
   Future<void> signOut() async {
-    final result =
-        await ref.read(signOutUseCaseProvider).call(const NoParams());
+    final result = await ref.read(authRepositoryProvider).signOut();
     state = result.fold(
       AuthFailed.new,
       (_) => const AuthInitial(),

@@ -80,7 +80,7 @@ final class AddUnclaimedPlayerControllerProvider
 }
 
 String _$addUnclaimedPlayerControllerHash() =>
-    r'44104fe1232c7372c06037150ec4ead4d6a4e839';
+    r'12b972ef2e2cdf529701c7b7a50aa695352d8024';
 
 /// Drives the 2-step add-as-unclaimed wizard.
 ///

@@ -5,36 +5,36 @@ import 'package:mocktail/mocktail.dart';
 import 'package:novex_clean_arch/core/database/database_provider.dart';
 import 'package:novex_clean_arch/core/database/wizard_draft_store.dart';
 import 'package:novex_clean_arch/features/onboarding/domain/entities/profile.dart';
-import 'package:novex_clean_arch/features/onboarding/domain/usecases/check_username_available.dart';
-import 'package:novex_clean_arch/features/onboarding/domain/usecases/complete_onboarding.dart';
+import 'package:novex_clean_arch/features/onboarding/domain/repositories/profile_repository.dart';
+import 'package:novex_clean_arch/features/onboarding/domain/value_objects/city.dart';
+import 'package:novex_clean_arch/features/onboarding/domain/value_objects/display_name.dart';
+import 'package:novex_clean_arch/features/onboarding/domain/value_objects/username.dart';
 import 'package:novex_clean_arch/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:novex_clean_arch/features/onboarding/presentation/providers/onboarding_providers.dart';
 import 'package:novex_clean_arch/features/onboarding/presentation/state/onboarding_state.dart';
 
-class _MockCheck extends Mock implements CheckUsernameAvailable {}
-
-class _MockComplete extends Mock implements CompleteOnboarding {}
+class _MockProfileRepo extends Mock implements ProfileRepository {}
 
 class _MockDraftStore extends Mock implements WizardDraftStore {}
 
 void main() {
-  late _MockCheck check;
-  late _MockComplete complete;
+  late _MockProfileRepo repo;
   late _MockDraftStore store;
 
   setUpAll(() {
     registerFallbackValue(
-      const CompleteOnboardingParams(
-        displayName: 'x',
-        username: 'xxx',
-        city: 'x',
-      ),
+      DisplayName.create('Test User').getOrElse((_) => throw ''),
+    );
+    registerFallbackValue(
+      Username.create('test_user').getOrElse((_) => throw ''),
+    );
+    registerFallbackValue(
+      City.create('Lahore').getOrElse((_) => throw ''),
     );
   });
 
   setUp(() {
-    check = _MockCheck();
-    complete = _MockComplete();
+    repo = _MockProfileRepo();
     store = _MockDraftStore();
     when(() => store.load(any())).thenAnswer((_) async => null);
     when(() => store.save(any(), any())).thenAnswer((_) async {});
@@ -44,8 +44,7 @@ void main() {
   ProviderContainer makeContainer() {
     final container = ProviderContainer.test(
       overrides: [
-        checkUsernameAvailableUseCaseProvider.overrideWithValue(check),
-        completeOnboardingUseCaseProvider.overrideWithValue(complete),
+        profileRepositoryProvider.overrideWithValue(repo),
         wizardDraftStoreProvider.overrideWithValue(store),
       ],
     );
@@ -66,7 +65,7 @@ void main() {
 
   test('a valid username goes checking → available after the debounce',
       () async {
-    when(() => check.call('ahmed_k92'))
+    when(() => repo.isUsernameAvailable('ahmed_k92'))
         .thenAnswer((_) async => const Right(true));
 
     final container = makeContainer();
@@ -85,7 +84,7 @@ void main() {
       container.read(onboardingControllerProvider).value!.usernameStatus,
       UsernameStatus.available,
     );
-    verify(() => check.call('ahmed_k92')).called(1);
+    verify(() => repo.isUsernameAvailable('ahmed_k92')).called(1);
   });
 
   test('an invalid username is rejected synchronously, no network check',
@@ -101,11 +100,20 @@ void main() {
     );
 
     await Future<void>.delayed(const Duration(milliseconds: 600));
-    verifyNever(() => check.call(any()));
+    verifyNever(() => repo.isUsernameAvailable(any()));
   });
 
   test('submit success advances to the welcome step', () async {
-    when(() => complete.call(any())).thenAnswer(
+    when(() => repo.completeOnboarding(
+          displayName: any(named: 'displayName'),
+          username: any(named: 'username'),
+          city: any(named: 'city'),
+          placeId: any(named: 'placeId'),
+          latitude: any(named: 'latitude'),
+          longitude: any(named: 'longitude'),
+          countryCode: any(named: 'countryCode'),
+          playerProfile: any(named: 'playerProfile'),
+        )).thenAnswer(
       (_) async => const Right(
         Profile(userId: ProfileUserId('u1'), username: 'ahmed_k92'),
       ),
@@ -116,6 +124,7 @@ void main() {
     final controller = container.read(onboardingControllerProvider.notifier);
 
     controller.setDisplayName('Ahmed Khan');
+    controller.setUsername('ahmed_k92');
     controller.setCity('Lahore, Punjab');
 
     await controller.submit(asPlayer: false);
@@ -124,6 +133,15 @@ void main() {
     expect(state.step, OnboardingStep.welcome);
     expect(state.submitting, isFalse);
     expect(state.submitError, isNull);
-    verify(() => complete.call(any())).called(1);
+    verify(() => repo.completeOnboarding(
+          displayName: any(named: 'displayName'),
+          username: any(named: 'username'),
+          city: any(named: 'city'),
+          placeId: any(named: 'placeId'),
+          latitude: any(named: 'latitude'),
+          longitude: any(named: 'longitude'),
+          countryCode: any(named: 'countryCode'),
+          playerProfile: any(named: 'playerProfile'),
+        )).called(1);
   });
 }

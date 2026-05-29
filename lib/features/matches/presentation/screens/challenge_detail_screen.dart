@@ -7,8 +7,6 @@ import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_request.dart';
-import '../../domain/usecases/accept_match_challenge.dart';
-import '../../domain/usecases/decline_match_challenge.dart';
 import '../providers/matches_providers.dart';
 import '../providers/my_matches_providers.dart';
 
@@ -118,9 +116,9 @@ class _ChallengeDetailScreenState
     if (confirmed != true || !mounted) return;
 
     setState(() => _busy = true);
-    final result = await ref.read(acceptMatchChallengeUseCaseProvider).call(
-          AcceptMatchChallengeParams(requestId: req.id),
-        );
+    final result = await ref
+        .read(matchesRepositoryProvider)
+        .acceptMatchChallenge(requestId: req.id);
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(
@@ -150,12 +148,10 @@ class _ChallengeDetailScreenState
     );
     if (picked == null || !mounted) return;
     setState(() => _busy = true);
-    final result = await ref.read(declineMatchChallengeUseCaseProvider).call(
-          DeclineMatchChallengeParams(
-            requestId: req.id,
-            decisionReason: picked.reason,
-            decisionNote: picked.note,
-          ),
+    final result = await ref.read(matchesRepositoryProvider).declineMatchChallenge(
+          requestId: req.id,
+          decisionReason: picked.reason,
+          decisionNote: picked.note,
         );
     if (!mounted) return;
     setState(() => _busy = false);

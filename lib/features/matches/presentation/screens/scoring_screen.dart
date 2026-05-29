@@ -9,8 +9,6 @@ import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/ball.dart';
 import '../../domain/entities/match.dart';
-import '../../domain/usecases/start_innings.dart';
-import '../../domain/usecases/undo_last_ball.dart';
 import '../providers/matches_providers.dart';
 import '../widgets/ball_pill.dart';
 
@@ -683,19 +681,19 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     // After recording, set the new batter as striker. The RPC doesn't take
     // it, so we patch the match row directly.
     if (newBatterId != null) {
-      await ref.read(startInningsUseCaseProvider).call(StartInningsParams(
+      await ref.read(matchesRepositoryProvider).startInnings(
             matchId: match.id,
             inningsNumber: match.currentInnings ?? 1,
             strikerId: newBatterId,
             nonStrikerId: match.currentNonStrikerId ?? '',
             bowlerId: match.currentBowlerId ?? '',
-          ));
+          );
     }
   }
 
   Future<void> _submit(BallDraft draft) async {
     setState(() => _busy = true);
-    final result = await ref.read(recordBallUseCaseProvider).call(draft);
+    final result = await ref.read(matchesRepositoryProvider).recordBall(draft);
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(
@@ -746,14 +744,14 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       ),
     );
     if (newBowlerId == null || !mounted) return;
-    await ref.read(startInningsUseCaseProvider).call(StartInningsParams(
+    await ref.read(matchesRepositoryProvider).startInnings(
           matchId: match.id,
           inningsNumber: match.currentInnings ?? 1,
           // Strike rotates at end of over: previous non-striker is on strike.
           strikerId: match.currentNonStrikerId ?? '',
           nonStrikerId: match.currentStrikerId ?? '',
           bowlerId: newBowlerId,
-        ));
+        );
   }
 
   Future<void> _onPickOpeningBowler(
@@ -762,14 +760,12 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     String bowlerId,
   ) async {
     setState(() => _busy = true);
-    final result = await ref.read(startInningsUseCaseProvider).call(
-          StartInningsParams(
-            matchId: match.id,
-            inningsNumber: inningsNumber,
-            strikerId: match.currentStrikerId ?? '',
-            nonStrikerId: match.currentNonStrikerId ?? '',
-            bowlerId: bowlerId,
-          ),
+    final result = await ref.read(matchesRepositoryProvider).startInnings(
+          matchId: match.id,
+          inningsNumber: inningsNumber,
+          strikerId: match.currentStrikerId ?? '',
+          nonStrikerId: match.currentNonStrikerId ?? '',
+          bowlerId: bowlerId,
         );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -782,8 +778,9 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
 
   Future<void> _onUndo(MatchId matchId, int inningsNumber) async {
     setState(() => _busy = true);
-    final result = await ref.read(undoLastBallUseCaseProvider).call(
-          UndoLastBallParams(matchId: matchId, inningsNumber: inningsNumber),
+    final result = await ref.read(matchesRepositoryProvider).undoLastBall(
+          matchId: matchId,
+          inningsNumber: inningsNumber,
         );
     if (!mounted) return;
     setState(() => _busy = false);

@@ -5,8 +5,6 @@ import '../../../../core/error/failures.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/match.dart';
-import '../../domain/usecases/record_match_toss.dart';
-import '../../domain/usecases/submit_match_openers.dart';
 import '../providers/matches_providers.dart';
 import '../state/match_start_state.dart';
 
@@ -52,23 +50,23 @@ class MatchStartController extends _$MatchStartController {
     required TossDecision decision,
     String? face,
   }) =>
-      ref.read(recordMatchTossUseCaseProvider).call(RecordMatchTossParams(
-            matchId: MatchId(matchId),
+      ref.read(matchesRepositoryProvider).recordMatchToss(
+            id: MatchId(matchId),
             wonBy: wonBy,
             decision: decision,
             face: face,
-          ));
+          );
 
   Future<Either<Failure, Unit>> submitOpeners({
     required String strikerId,
     required String nonStrikerId,
   }) =>
-      ref.read(submitMatchOpenersUseCaseProvider).call(SubmitMatchOpenersParams(
-            matchId: MatchId(matchId),
+      ref.read(matchesRepositoryProvider).submitMatchOpeners(
+            id: MatchId(matchId),
             strikerId: strikerId,
             nonStrikerId: nonStrikerId,
-          ));
+          );
 
   Future<Either<Failure, Unit>> startMatchNow() =>
-      ref.read(startMatchNowUseCaseProvider).call(MatchId(matchId));
+      ref.read(matchesRepositoryProvider).startMatchNow(MatchId(matchId));
 }

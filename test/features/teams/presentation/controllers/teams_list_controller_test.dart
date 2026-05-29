@@ -3,19 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:novex_clean_arch/core/error/failures.dart';
-import 'package:novex_clean_arch/core/usecase/usecase.dart';
 import 'package:novex_clean_arch/features/auth/domain/entities/user.dart';
 import 'package:novex_clean_arch/features/auth/domain/value_objects/email.dart';
 import 'package:novex_clean_arch/features/auth/presentation/providers/auth_providers.dart';
 import 'package:novex_clean_arch/features/matches/domain/entities/match.dart';
-import 'package:novex_clean_arch/features/matches/domain/usecases/list_my_matches.dart';
+import 'package:novex_clean_arch/features/matches/domain/repositories/matches_repository.dart';
 import 'package:novex_clean_arch/features/matches/presentation/providers/matches_providers.dart';
 import 'package:novex_clean_arch/features/teams/domain/entities/team.dart';
 import 'package:novex_clean_arch/features/teams/presentation/controllers/teams_list_controller.dart';
 import 'package:novex_clean_arch/features/teams/presentation/providers/teams_providers.dart';
 import 'package:novex_clean_arch/features/teams/presentation/state/my_teams_view.dart';
 
-class _MockListMyMatches extends Mock implements ListMyMatches {}
+class _MockMatchesRepo extends Mock implements MatchesRepository {}
 
 User _user(String id) => User(
       id: UserId(id),
@@ -59,11 +58,9 @@ Match _match(
     );
 
 void main() {
-  late _MockListMyMatches listMatches;
+  late _MockMatchesRepo matchesRepo;
 
-  setUpAll(() => registerFallbackValue(const NoParams()));
-
-  setUp(() => listMatches = _MockListMyMatches());
+  setUp(() => matchesRepo = _MockMatchesRepo());
 
   ProviderContainer makeContainer({
     required List<Team> teams,
@@ -72,14 +69,14 @@ void main() {
     Failure? matchesFailure,
     String userId = 'u1',
   }) {
-    when(() => listMatches.call(any())).thenAnswer(
+    when(() => matchesRepo.listMyMatches()).thenAnswer(
       (_) async => matchesFailure != null ? Left(matchesFailure) : Right(matches),
     );
     final container = ProviderContainer.test(
       overrides: [
         myTeamsProvider.overrideWith((ref) => Stream.value(teams)),
         allTeamsProvider.overrideWith((ref) => Stream.value(cached)),
-        listMyMatchesUseCaseProvider.overrideWithValue(listMatches),
+        matchesRepositoryProvider.overrideWithValue(matchesRepo),
         currentUserStreamProvider
             .overrideWith((ref) => Stream.value(_user(userId))),
       ],
@@ -181,8 +178,8 @@ void main() {
     expect(view.activeFilter, MyTeamsFilter.archived);
     // Archived filter hides the captain bucket.
     expect(view.teams.captain, isEmpty);
-    // Matches use case was called once (build), not again on filter change.
-    verify(() => listMatches.call(any())).called(1);
+    // Repo was called once (build), not again on filter change.
+    verify(() => matchesRepo.listMyMatches()).called(1);
   });
 
   test('refresh re-runs build and picks up new matches', () async {
@@ -196,7 +193,7 @@ void main() {
     expect(first.today, isNotNull);
     expect(first.today!.live, isFalse);
 
-    when(() => listMatches.call(any())).thenAnswer((_) async => Right([
+    when(() => matchesRepo.listMyMatches()).thenAnswer((_) async => Right([
           _match('m1', a: 'a', b: 'b', status: MatchStatus.pending),
           _match('m2', a: 'a', b: 'b', status: MatchStatus.live),
         ]));

@@ -5,17 +5,18 @@ import 'package:mocktail/mocktail.dart';
 import 'package:novex_clean_arch/core/database/database_provider.dart';
 import 'package:novex_clean_arch/core/database/wizard_draft_store.dart';
 import 'package:novex_clean_arch/features/teams/domain/entities/team.dart';
-import 'package:novex_clean_arch/features/teams/domain/usecases/create_team.dart';
+import 'package:novex_clean_arch/features/teams/domain/repositories/teams_repository.dart';
+import 'package:novex_clean_arch/features/teams/domain/value_objects/team_name.dart';
 import 'package:novex_clean_arch/features/teams/presentation/controllers/team_create_controller.dart';
 import 'package:novex_clean_arch/features/teams/presentation/providers/teams_providers.dart';
 import 'package:novex_clean_arch/features/teams/presentation/state/team_create_state.dart';
 
-class _MockCreateTeam extends Mock implements CreateTeam {}
+class _MockTeamsRepo extends Mock implements TeamsRepository {}
 
 class _MockDraftStore extends Mock implements WizardDraftStore {}
 
 void main() {
-  late _MockCreateTeam createTeam;
+  late _MockTeamsRepo repo;
   late _MockDraftStore store;
 
   final team = Team(
@@ -30,11 +31,15 @@ void main() {
   );
 
   setUpAll(() {
-    registerFallbackValue(const CreateTeamParams(name: 'x', type: TeamType.club));
+    registerFallbackValue(
+      TeamName.create('Lahore Lions').getOrElse((_) => throw ''),
+    );
+    registerFallbackValue(TeamType.club);
+    registerFallbackValue(TeamPrivacy.public);
   });
 
   setUp(() {
-    createTeam = _MockCreateTeam();
+    repo = _MockTeamsRepo();
     store = _MockDraftStore();
     when(() => store.load(any())).thenAnswer((_) async => null);
     when(() => store.save(any(), any())).thenAnswer((_) async {});
@@ -44,7 +49,7 @@ void main() {
   ProviderContainer makeContainer() {
     final container = ProviderContainer.test(
       overrides: [
-        createTeamUseCaseProvider.overrideWithValue(createTeam),
+        teamsRepositoryProvider.overrideWithValue(repo),
         wizardDraftStoreProvider.overrideWithValue(store),
       ],
     );
@@ -74,7 +79,19 @@ void main() {
 
   test('submit success records the created team id and clears the draft',
       () async {
-    when(() => createTeam.call(any())).thenAnswer((_) async => Right(team));
+    when(() => repo.createTeam(
+          name: any(named: 'name'),
+          type: any(named: 'type'),
+          privacy: any(named: 'privacy'),
+          description: any(named: 'description'),
+          homeGround: any(named: 'homeGround'),
+          city: any(named: 'city'),
+          foundedYear: any(named: 'foundedYear'),
+          primaryColor: any(named: 'primaryColor'),
+          secondaryColor: any(named: 'secondaryColor'),
+          tagline: any(named: 'tagline'),
+          logoMonogram: any(named: 'logoMonogram'),
+        )).thenAnswer((_) async => Right(team));
 
     final container = makeContainer();
     await container.read(teamCreateControllerProvider.future);
@@ -87,7 +104,19 @@ void main() {
     final state = container.read(teamCreateControllerProvider).value!;
     expect(state.createdTeamId, 't1');
     expect(state.submitting, isFalse);
-    verify(() => createTeam.call(any())).called(1);
+    verify(() => repo.createTeam(
+          name: any(named: 'name'),
+          type: any(named: 'type'),
+          privacy: any(named: 'privacy'),
+          description: any(named: 'description'),
+          homeGround: any(named: 'homeGround'),
+          city: any(named: 'city'),
+          foundedYear: any(named: 'foundedYear'),
+          primaryColor: any(named: 'primaryColor'),
+          secondaryColor: any(named: 'secondaryColor'),
+          tagline: any(named: 'tagline'),
+          logoMonogram: any(named: 'logoMonogram'),
+        )).called(1);
     verify(() => store.clear(any())).called(1);
   });
 }

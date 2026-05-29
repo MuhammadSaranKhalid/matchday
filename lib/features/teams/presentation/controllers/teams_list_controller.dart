@@ -2,7 +2,6 @@ import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/usecase/usecase.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../matches/domain/entities/match.dart';
 import '../../../matches/presentation/providers/matches_providers.dart';
@@ -41,12 +40,12 @@ class TeamsListController extends _$TeamsListController {
     final user = await ref.watch(currentUserStreamProvider.future);
     final userId = user?.id.value ?? '';
 
-    // Matches are online-only. Call the use case directly and pattern-match
-    // the Either so a failure/offline fetch yields no active matches instead
-    // of erroring the whole view (the use case never throws). Watching the
-    // use-case provider keeps the seam to the matches feature (CLAUDE.md §6.6).
+    // Matches are online-only. Call the repo directly and pattern-match the
+    // Either so a failure/offline fetch yields no active matches instead of
+    // erroring the whole view (the repo never throws). Reading the matches
+    // repo provider keeps the seam to the matches feature (CLAUDE.md §6.6).
     final matchesResult =
-        await ref.read(listMyMatchesUseCaseProvider).call(const NoParams());
+        await ref.read(matchesRepositoryProvider).listMyMatches();
     final matches = switch (matchesResult) {
       Right(value: final v) => v,
       Left() => const <Match>[],

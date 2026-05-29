@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -9,7 +10,8 @@ import '../../../../core/database/database_provider.dart';
 import '../../../location/domain/entities/place_suggestion.dart';
 import '../../../location/presentation/providers/location_providers.dart';
 import '../../domain/entities/player_profile.dart';
-import '../../domain/usecases/complete_onboarding.dart';
+import '../../domain/value_objects/city.dart';
+import '../../domain/value_objects/display_name.dart';
 import '../../domain/value_objects/username.dart';
 import '../providers/onboarding_providers.dart';
 import '../state/onboarding_state.dart';
@@ -31,6 +33,10 @@ class OnboardingController extends _$OnboardingController {
   // Constant key is safe: AppDatabase.clear() wipes all wizard drafts on
   // sign-out, so a different user on the same device never inherits this one.
   static const _draftKey = 'onboarding';
+
+  // Skip the autocomplete network call on 0–1 char queries (pure noise +
+  // burns quota); the Places API never returns useful predictions below 2.
+  static const _minAutocompleteLength = 2;
 
   @override
   Future<OnboardingState> build() async {
@@ -88,7 +94,7 @@ class OnboardingController extends _$OnboardingController {
   void _scheduleCitySearch(String query) {
     _cityDebounce?.cancel();
     final trimmed = query.trim();
-    if (trimmed.length < AutocompletePlaces.minQueryLength) {
+    if (trimmed.length < _minAutocompleteLength) {
       final s = _s;
       if (s != null) {
         _set(
@@ -111,14 +117,12 @@ class OnboardingController extends _$OnboardingController {
 
     _cityDebounce = Timer(const Duration(milliseconds: 350), () async {
       final locale = ui.PlatformDispatcher.instance.locale;
-      final result = await ref.read(autocompletePlacesUseCaseProvider).call(
-            AutocompletePlacesParams(
-              query: trimmed,
-              sessionToken: token,
-              languageCode:
-                  locale.languageCode.isEmpty ? null : locale.languageCode,
-              regionCode: locale.countryCode,
-            ),
+      final result = await ref.read(locationRepositoryProvider).autocomplete(
+            trimmed,
+            sessionToken: token,
+            languageCode:
+                locale.languageCode.isEmpty ? null : locale.languageCode,
+            regionCode: locale.countryCode,
           );
       // Bail if the user kept typing while the request was in flight.
       final s = _s;
@@ -151,11 +155,9 @@ class OnboardingController extends _$OnboardingController {
       citySearching: false,
     ));
 
-    final result = await ref.read(getPlaceDetailsUseCaseProvider).call(
-          GetPlaceDetailsParams(
-            placeId: suggestion.placeId,
-            sessionToken: token,
-          ),
+    final result = await ref.read(locationRepositoryProvider).placeDetails(
+          suggestion.placeId,
+          sessionToken: token,
         );
     final cur = _s;
     if (cur == null) return;
@@ -188,11 +190,9 @@ class OnboardingController extends _$OnboardingController {
     );
 
     final locale = ui.PlatformDispatcher.instance.locale;
-    final result = await ref.read(getCurrentLocationUseCaseProvider).call(
-          GetCurrentLocationParams(
-            languageCode:
-                locale.languageCode.isEmpty ? null : locale.languageCode,
-          ),
+    final result = await ref.read(locationRepositoryProvider).currentLocation(
+          languageCode:
+              locale.languageCode.isEmpty ? null : locale.languageCode,
         );
     final cur = _s;
     if (cur == null) return;
@@ -254,8 +254,14 @@ class OnboardingController extends _$OnboardingController {
   void _scheduleAvailabilityCheck(String username) {
     _usernameDebounce?.cancel();
     _usernameDebounce = Timer(const Duration(milliseconds: 500), () async {
-      final result =
-          await ref.read(checkUsernameAvailableUseCaseProvider).call(username);
+      // Re-validate format before hitting the network — caller already did,
+      // but the contract is "valid Username → repo lookup".
+      final usernameRes = Username.create(username);
+      final result = await usernameRes.fold(
+        (failure) async => Left<Failure, bool>(failure),
+        (vo) async =>
+            ref.read(profileRepositoryProvider).isUsernameAvailable(vo.value),
+      );
       // Bail if the user kept typing while we were checking.
       final s = _s;
       if (s == null || s.username != username) return;
@@ -299,13 +305,11 @@ class OnboardingController extends _$OnboardingController {
 
     _set(s.copyWith(resolvingLocation: true, cityError: null), persist: false);
     final locale = ui.PlatformDispatcher.instance.locale;
-    final result = await ref.read(geocodeAddressUseCaseProvider).call(
-          GeocodeAddressParams(
-            query: s.city,
-            languageCode:
-                locale.languageCode.isEmpty ? null : locale.languageCode,
-            regionCode: locale.countryCode,
-          ),
+    final result = await ref.read(locationRepositoryProvider).geocode(
+          s.city,
+          languageCode:
+              locale.languageCode.isEmpty ? null : locale.languageCode,
+          regionCode: locale.countryCode,
         );
     final cur = _s;
     if (cur == null) return;
@@ -367,18 +371,40 @@ class OnboardingController extends _$OnboardingController {
     _set(s.copyWith(submitting: true, submitError: null, isPlayer: asPlayer),
         persist: false);
 
-    final params = CompleteOnboardingParams(
-      displayName: s.displayName,
-      username: s.username,
-      city: s.city,
-      placeId: s.placeId,
-      latitude: s.lat,
-      longitude: s.lng,
-      countryCode: s.countryCode,
-      playerProfile: asPlayer ? s.playerProfile : null,
-    );
-    final result =
-        await ref.read(completeOnboardingUseCaseProvider).call(params);
+    // Validate inputs via value objects; the first failure short-circuits and
+    // is surfaced as the submitError so the form can render it.
+    final displayNameRes = DisplayName.create(s.displayName);
+    final usernameRes = Username.create(s.username);
+    final cityRes = City.create(s.city);
+    Failure? failure;
+    for (final e in <Either<Failure, Object>>[displayNameRes, usernameRes, cityRes]) {
+      final f = e.getLeft().toNullable();
+      if (f != null) {
+        failure = f;
+        break;
+      }
+    }
+    if (failure != null) {
+      final current = _s;
+      if (current == null) return;
+      _set(
+        current.copyWith(submitting: false, submitError: failure.message),
+        persist: false,
+      );
+      return;
+    }
+
+    final player = (s.playerProfile.hasAny && asPlayer) ? s.playerProfile : null;
+    final result = await ref.read(profileRepositoryProvider).completeOnboarding(
+          displayName: displayNameRes.getRight().toNullable()!,
+          username: usernameRes.getRight().toNullable()!,
+          city: cityRes.getRight().toNullable()!,
+          placeId: s.placeId,
+          latitude: s.lat,
+          longitude: s.lng,
+          countryCode: s.countryCode,
+          playerProfile: player,
+        );
 
     final current = _s;
     if (current == null) return;

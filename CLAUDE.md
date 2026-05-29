@@ -7,6 +7,11 @@
 >
 > Do NOT propose offline-first patterns "for resilience" or "for faster reads." This restriction holds until explicitly lifted.
 
+> **🟥 ARCHITECTURAL CONSTRAINT (2026-05-29): NO USE-CASE LAYER.**
+> The Use Case / Interactor layer described in §5.1 (`domain/usecases/<verb>.dart`), §7 Step 2.4, §8, and §9, plus `lib/core/usecase/usecase.dart` (the `UseCase` / `StreamUseCase` / `NoParams` contracts), have been **removed from this codebase**. Controllers and presentation providers depend on **repositories directly** via `ref.read(<feature>RepositoryProvider).method(...)`. Business rules and value-object validation live inside the repository implementation (so the controller hands raw inputs to the repo, which returns `Either<ValidationFailure, T>` or `Either<DomainFailure, T>`). Form-level input validation may still happen in the controller before the repo call (e.g. `Username.create(...)`).
+>
+> Do NOT generate, propose, or reinstate `domain/usecases/*.dart` files or `*UseCaseProvider` providers. This restriction holds until explicitly lifted.
+
 This file is the source of truth for how this codebase is structured. Any agent (Claude Code or otherwise) modifying this project MUST follow these rules without exception. When in doubt, prefer the conventions documented here over patterns found elsewhere on the internet.
 
 The README.md is a human-readable overview of the same architecture. This file (CLAUDE.md) is the agent-readable contract.
@@ -1442,11 +1447,12 @@ The `todos` reference feature and all offline-first wiring were removed on 2026-
 
 | Concern | Where to look |
 |---|---|
-| Online-only repository (one-shot + stream reads, direct writes, exception translation) | `lib/features/matches/data/repositories/matches_repository_impl.dart` |
+| Online-only repository (one-shot + stream reads, direct writes, exception translation, **inlined business validation**) | `lib/features/matches/data/repositories/matches_repository_impl.dart` |
 | Real-time stream reads via Supabase | `lib/features/teams/data/repositories/teams_repository_impl.dart` (`watch*` methods) |
 | Remote data source pattern | `lib/features/matches/data/datasources/matches_remote_datasource.dart` |
-| AsyncNotifier composing cross-feature providers | `lib/features/teams/presentation/controllers/teams_list_controller.dart` |
-| Provider DI shape | `lib/features/teams/presentation/providers/teams_providers.dart`, `lib/features/matches/presentation/providers/matches_providers.dart` |
+| AsyncNotifier composing cross-feature providers (calls `matchesRepositoryProvider` directly) | `lib/features/teams/presentation/controllers/teams_list_controller.dart` |
+| Provider DI shape (no use-case providers — just `<feature>Repository` + intermediate `Stream`/`Future` views) | `lib/features/teams/presentation/providers/teams_providers.dart`, `lib/features/matches/presentation/providers/matches_providers.dart` |
+| Controller calling repo directly with value-object validation inlined | `lib/features/onboarding/presentation/controllers/onboarding_controller.dart` (`submit`), `lib/features/teams/presentation/controllers/add_unclaimed_player_controller.dart` (`submit`) |
 | Wizard draft persistence (the only drift use) | `lib/core/database/wizard_draft_store.dart` + `lib/core/database/tables.dart` |
 ---
 

@@ -83,9 +83,13 @@ class LocationRepositoryImpl implements LocationRepository {
     String? languageCode,
     String? regionCode,
   }) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return const Left(ValidationFailure('Enter a place to locate'));
+    }
     try {
       final dto = await _remote.forwardGeocode(
-        query,
+        trimmed,
         languageCode: languageCode,
         regionCode: regionCode,
       );

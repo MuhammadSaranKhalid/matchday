@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
 import '../../domain/entities/match_request.dart';
-import '../../domain/usecases/withdraw_match_challenge.dart';
 import '../providers/matches_providers.dart';
 
 /// Confirmation screen shown immediately after the sender taps "Send
@@ -161,9 +160,9 @@ class _ChallengeSentScreenState extends ConsumerState<ChallengeSentScreen> {
 
   Future<void> _withdraw(MatchRequest req) async {
     setState(() => _busy = true);
-    final result = await ref.read(withdrawMatchChallengeUseCaseProvider).call(
-          WithdrawMatchChallengeParams(requestId: req.id),
-        );
+    final result = await ref
+        .read(matchesRepositoryProvider)
+        .withdrawMatchChallenge(requestId: req.id);
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(

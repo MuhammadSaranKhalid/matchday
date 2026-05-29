@@ -1538,8 +1538,14 @@ class _SquadTab extends StatelessWidget {
   bool get _canAddPlayers =>
       viewer == TeamPageViewer.owner || viewer == TeamPageViewer.captain;
 
-  bool get _isOwnerEmpty =>
-      viewer == TeamPageViewer.owner && team.squad.length <= 1;
+  /// True when the viewer is the owner and the squad has no players besides
+  /// the viewer themselves. The owner is not auto-rostered, so when no other
+  /// players have been added, `team.squad` is empty (or contains only the
+  /// owner if they later add themselves as a claimed member).
+  bool get _isOwnerEmpty {
+    if (viewer != TeamPageViewer.owner) return false;
+    return team.squad.every((p) => p.id == viewerPlayerId);
+  }
   bool get _privateGated =>
       team.privacy.toLowerCase().startsWith('private') &&
       (viewer == TeamPageViewer.stranger ||

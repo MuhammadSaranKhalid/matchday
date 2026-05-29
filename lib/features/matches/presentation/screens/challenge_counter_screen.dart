@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
 import '../../domain/entities/match_request.dart';
-import '../../domain/usecases/counter_match_challenge.dart';
 import '../providers/matches_providers.dart';
 
 /// Receiver counter screen. The 0600 RPC `counter_match_request` is the only
@@ -160,17 +159,15 @@ class _ChallengeCounterScreenState
 
   Future<void> _submit(MatchRequest req) async {
     setState(() => _busy = true);
-    final result = await ref.read(counterMatchChallengeUseCaseProvider).call(
-          CounterMatchChallengeParams(
-            requestId: req.id,
-            counteredStartTime: _newStart,
-            counteredVenue: _venueCtrl.text.trim().isEmpty
-                ? null
-                : _venueCtrl.text.trim(),
-            decisionNote: _noteCtrl.text.trim().isEmpty
-                ? null
-                : _noteCtrl.text.trim(),
-          ),
+    final result = await ref.read(matchesRepositoryProvider).counterMatchChallenge(
+          requestId: req.id,
+          counteredStartTime: _newStart,
+          counteredVenue: _venueCtrl.text.trim().isEmpty
+              ? null
+              : _venueCtrl.text.trim(),
+          decisionNote: _noteCtrl.text.trim().isEmpty
+              ? null
+              : _noteCtrl.text.trim(),
         );
     if (!mounted) return;
     setState(() => _busy = false);

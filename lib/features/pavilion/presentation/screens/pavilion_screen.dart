@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/usecase/usecase.dart';
 import '../../../../core/widgets/ck_screen_scaffold.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../matches/domain/entities/match.dart';
@@ -99,7 +98,7 @@ class PavilionScreen extends ConsumerWidget {
     );
     if (confirm != true) return;
     // On success the auth stream emits null and the router redirects to /sign-in.
-    await ref.read(signOutUseCaseProvider).call(const NoParams());
+    await ref.read(authRepositoryProvider).signOut();
   }
 
   Widget _sectionLabel(String text) =>

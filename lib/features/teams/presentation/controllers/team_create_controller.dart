@@ -4,12 +4,16 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/database/database_provider.dart';
 import '../../domain/entities/team.dart';
-import '../../domain/usecases/create_team.dart';
-import '../../domain/usecases/upload_team_logo.dart';
+import '../../domain/value_objects/team_name.dart';
 import '../providers/teams_providers.dart';
 import '../state/team_create_state.dart';
 
 part 'team_create_controller.g.dart';
+
+String? _blankToNull(String? v) {
+  final t = v?.trim();
+  return (t == null || t.isEmpty) ? null : t;
+}
 
 /// Drives the 5-step team-create wizard. AsyncNotifier so [build] can restore a
 /// persisted draft before the form seeds (mirrors OnboardingController).
@@ -102,19 +106,29 @@ class TeamCreateController extends _$TeamCreateController {
     if (s == null || s.submitting) return;
     _set(s.copyWith(submitting: true, submitError: null), persist: false);
 
-    final result = await ref.read(createTeamUseCaseProvider).call(
-          CreateTeamParams(
-            name: s.name,
-            type: s.type,
-            privacy: s.privacy,
-            city: s.combinedCity,
-            homeGround: s.homeGround,
-            foundedYear: int.tryParse(s.foundedYear?.trim() ?? ''),
-            primaryColor: s.primaryColor,
-            secondaryColor: s.secondaryColor,
-            tagline: s.tagline,
-            logoMonogram: s.monogramOverride,
-          ),
+    final nameRes = TeamName.create(s.name);
+    if (nameRes.isLeft()) {
+      _set(
+        s.copyWith(
+          submitting: false,
+          submitError: nameRes.getLeft().toNullable()!.message,
+        ),
+        persist: false,
+      );
+      return;
+    }
+
+    final result = await ref.read(teamsRepositoryProvider).createTeam(
+          name: nameRes.getRight().toNullable()!,
+          type: s.type,
+          privacy: s.privacy,
+          city: _blankToNull(s.combinedCity),
+          homeGround: _blankToNull(s.homeGround),
+          foundedYear: int.tryParse(s.foundedYear?.trim() ?? ''),
+          primaryColor: s.primaryColor,
+          secondaryColor: s.secondaryColor,
+          tagline: _blankToNull(s.tagline),
+          logoMonogram: _blankToNull(s.monogramOverride),
         );
 
     final current = _s;
@@ -136,12 +150,10 @@ class TeamCreateController extends _$TeamCreateController {
           final extension = dot >= 0 && dot < file.path.length - 1
               ? file.path.substring(dot + 1)
               : 'jpg';
-          await ref.read(uploadTeamLogoUseCaseProvider).call(
-                UploadTeamLogoParams(
-                  teamId: team.id,
-                  bytes: bytes,
-                  extension: extension,
-                ),
+          await ref.read(teamsRepositoryProvider).uploadTeamLogo(
+                teamId: team.id,
+                bytes: bytes,
+                extension: extension,
               );
         }
         await ref.read(wizardDraftStoreProvider).clear(_draftKey);

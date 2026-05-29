@@ -5,7 +5,6 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/usecase/usecase.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/app_notification.dart';
@@ -57,9 +56,8 @@ class NotificationsScreen extends ConsumerWidget {
   }
 
   Future<void> _markAllRead(BuildContext context, WidgetRef ref) async {
-    final result = await ref
-        .read(markAllNotificationsReadUseCaseProvider)
-        .call(const NoParams());
+    final result =
+        await ref.read(notificationsRepositoryProvider).markAllRead();
     if (!context.mounted) return;
     result.fold(
       (f) => ScaffoldMessenger.of(context)
@@ -77,7 +75,7 @@ class NotificationsScreen extends ConsumerWidget {
     // confirm. Fire-and-forget so the deep-link is snappy.
     if (!n.isRead) {
       // ignore: unawaited_futures
-      ref.read(markNotificationReadUseCaseProvider).call(n.id);
+      ref.read(notificationsRepositoryProvider).markRead(n.id);
     }
     final route = _routeFor(n);
     if (route != null) context.push(route);

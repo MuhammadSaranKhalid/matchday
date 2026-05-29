@@ -74,7 +74,7 @@ class ComposerController extends _$ComposerController {
   /// on failure (with [ComposerState.error] set).
   Future<Post?> submit(String text) async {
     state = state.copyWith(busy: true);
-    final result = await ref.read(createPostUseCaseProvider).call(
+    final result = await ref.read(postsRepositoryProvider).createPost(
           PostDraft(text: text, photos: state.photos),
         );
     // Composer closed mid-submit → don't touch disposed state/providers.

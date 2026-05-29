@@ -51,10 +51,13 @@ class OnboardingController extends _$OnboardingController {
 
     // A restored username needs re-verifying — availability can change between
     // sessions and we never persist the "available" verdict.
-    if (initial.username.isNotEmpty &&
-        Username.create(initial.username).isRight()) {
-      initial = initial.copyWith(usernameStatus: UsernameStatus.checking);
-      _scheduleAvailabilityCheck(initial.username);
+    if (initial.profile.username.isNotEmpty &&
+        Username.create(initial.profile.username).isRight()) {
+      initial = initial.copyWith(
+        profile: initial.profile
+            .copyWith(usernameStatus: UsernameStatus.checking),
+      );
+      _scheduleAvailabilityCheck(initial.profile.username);
     }
     return initial;
   }
@@ -66,28 +69,33 @@ class OnboardingController extends _$OnboardingController {
     if (persist && !next.completed) _persistDraft(next);
   }
 
-  // ─── Profile step ─────────────────────────────────────────────────────────
-
-  void setDisplayName(String value) {
+  /// Apply a profile-slice update without touching cross-cutting fields.
+  void _setProfile(
+    ProfileSlice Function(ProfileSlice) f, {
+    bool persist = true,
+  }) {
     final s = _s;
     if (s == null) return;
-    _set(s.copyWith(displayName: value));
+    _set(s.copyWith(profile: f(s.profile)), persist: persist);
   }
+
+  // ─── Profile step ─────────────────────────────────────────────────────────
+
+  void setDisplayName(String value) =>
+      _setProfile((p) => p.copyWith(displayName: value));
 
   /// The user typed in the city field. Editing the text invalidates any
   /// previously resolved coordinates (they're now hand-editing → treated as
   /// manual until they pick a suggestion or use GPS), then debounces a search.
   void setCity(String value) {
-    final s = _s;
-    if (s == null) return;
-    _set(s.copyWith(
-      city: value,
-      placeId: null,
-      lat: null,
-      lng: null,
-      countryCode: null,
-      cityError: null,
-    ));
+    _setProfile((p) => p.copyWith(
+          city: value,
+          placeId: null,
+          lat: null,
+          lng: null,
+          countryCode: null,
+          cityError: null,
+        ));
     _scheduleCitySearch(value);
   }
 
@@ -95,13 +103,10 @@ class OnboardingController extends _$OnboardingController {
     _cityDebounce?.cancel();
     final trimmed = query.trim();
     if (trimmed.length < _minAutocompleteLength) {
-      final s = _s;
-      if (s != null) {
-        _set(
-          s.copyWith(citySuggestions: const [], citySearching: false),
-          persist: false,
-        );
-      }
+      _setProfile(
+        (p) => p.copyWith(citySuggestions: const [], citySearching: false),
+        persist: false,
+      );
       return;
     }
 
@@ -109,9 +114,9 @@ class OnboardingController extends _$OnboardingController {
     if (s0 == null) return;
     // One session token spans the keystrokes of a search and the eventual
     // details lookup, so Google bills the whole thing as a single session.
-    final token = s0.citySessionToken ?? _uuid.v4();
-    _set(
-      s0.copyWith(citySearching: true, citySessionToken: token),
+    final token = s0.profile.citySessionToken ?? _uuid.v4();
+    _setProfile(
+      (p) => p.copyWith(citySearching: true, citySessionToken: token),
       persist: false,
     );
 
@@ -126,14 +131,14 @@ class OnboardingController extends _$OnboardingController {
           );
       // Bail if the user kept typing while the request was in flight.
       final s = _s;
-      if (s == null || s.city.trim() != trimmed) return;
+      if (s == null || s.profile.city.trim() != trimmed) return;
       result.fold(
-        (_) => _set(
-          s.copyWith(citySearching: false, citySuggestions: const []),
+        (_) => _setProfile(
+          (p) => p.copyWith(citySearching: false, citySuggestions: const []),
           persist: false,
         ),
-        (list) => _set(
-          s.copyWith(citySearching: false, citySuggestions: list),
+        (list) => _setProfile(
+          (p) => p.copyWith(citySearching: false, citySuggestions: list),
           persist: false,
         ),
       );
@@ -146,35 +151,33 @@ class OnboardingController extends _$OnboardingController {
     final s = _s;
     if (s == null) return;
     _cityDebounce?.cancel();
-    final token = s.citySessionToken ?? _uuid.v4();
+    final token = s.profile.citySessionToken ?? _uuid.v4();
 
     // Optimistically show the label and dismiss the dropdown.
-    _set(s.copyWith(
-      city: suggestion.fullText,
-      citySuggestions: const [],
-      citySearching: false,
-    ));
+    _setProfile((p) => p.copyWith(
+          city: suggestion.fullText,
+          citySuggestions: const [],
+          citySearching: false,
+        ));
 
     final result = await ref.read(locationRepositoryProvider).placeDetails(
           suggestion.placeId,
           sessionToken: token,
         );
-    final cur = _s;
-    if (cur == null) return;
     result.fold(
-      (f) => _set(
-        cur.copyWith(cityError: f.message, citySessionToken: null),
+      (f) => _setProfile(
+        (p) => p.copyWith(cityError: f.message, citySessionToken: null),
         persist: false,
       ),
-      (place) => _set(cur.copyWith(
-        city: place.label.isEmpty ? suggestion.fullText : place.label,
-        placeId: place.placeId,
-        lat: place.latitude,
-        lng: place.longitude,
-        countryCode: place.countryCode,
-        citySessionToken: null, // session consumed
-        cityError: null,
-      )),
+      (place) => _setProfile((p) => p.copyWith(
+            city: place.label.isEmpty ? suggestion.fullText : place.label,
+            placeId: place.placeId,
+            lat: place.latitude,
+            lng: place.longitude,
+            countryCode: place.countryCode,
+            citySessionToken: null, // session consumed
+            cityError: null,
+          )),
     );
   }
 
@@ -182,10 +185,11 @@ class OnboardingController extends _$OnboardingController {
   /// that guarantees coordinates when autocomplete can't find the player's spot.
   Future<void> useMyLocation() async {
     final s = _s;
-    if (s == null || s.locating) return;
+    if (s == null || s.profile.locating) return;
     _cityDebounce?.cancel();
-    _set(
-      s.copyWith(locating: true, cityError: null, citySuggestions: const []),
+    _setProfile(
+      (p) => p.copyWith(
+          locating: true, cityError: null, citySuggestions: const []),
       persist: false,
     );
 
@@ -194,58 +198,54 @@ class OnboardingController extends _$OnboardingController {
           languageCode:
               locale.languageCode.isEmpty ? null : locale.languageCode,
         );
-    final cur = _s;
-    if (cur == null) return;
     result.fold(
-      (f) => _set(
-        cur.copyWith(locating: false, cityError: f.message),
+      (f) => _setProfile(
+        (p) => p.copyWith(locating: false, cityError: f.message),
         persist: false,
       ),
-      (place) => _set(cur.copyWith(
-        locating: false,
-        city: place.label,
-        placeId: place.placeId,
-        lat: place.latitude,
-        lng: place.longitude,
-        countryCode: place.countryCode,
-        cityError: null,
-      )),
+      (place) => _setProfile((p) => p.copyWith(
+            locating: false,
+            city: place.label,
+            placeId: place.placeId,
+            lat: place.latitude,
+            lng: place.longitude,
+            countryCode: place.countryCode,
+            cityError: null,
+          )),
     );
   }
 
   /// Cleans input to the allowed charset, validates format synchronously for
   /// instant feedback, then debounces the network availability check.
   void setUsername(String raw) {
-    final s = _s;
-    if (s == null) return;
     final cleaned =
         raw.toLowerCase().replaceAll(RegExp('[^a-z0-9_]'), '');
 
     if (cleaned.isEmpty) {
       _usernameDebounce?.cancel();
-      _set(s.copyWith(
-        username: '',
-        usernameStatus: UsernameStatus.idle,
-        usernameMessage: null,
-      ));
+      _setProfile((p) => p.copyWith(
+            username: '',
+            usernameStatus: UsernameStatus.idle,
+            usernameMessage: null,
+          ));
       return;
     }
 
     Username.create(cleaned).fold(
       (failure) {
         _usernameDebounce?.cancel();
-        _set(s.copyWith(
-          username: cleaned,
-          usernameStatus: UsernameStatus.invalid,
-          usernameMessage: failure.message,
-        ));
+        _setProfile((p) => p.copyWith(
+              username: cleaned,
+              usernameStatus: UsernameStatus.invalid,
+              usernameMessage: failure.message,
+            ));
       },
       (_) {
-        _set(s.copyWith(
-          username: cleaned,
-          usernameStatus: UsernameStatus.checking,
-          usernameMessage: null,
-        ));
+        _setProfile((p) => p.copyWith(
+              username: cleaned,
+              usernameStatus: UsernameStatus.checking,
+              usernameMessage: null,
+            ));
         _scheduleAvailabilityCheck(cleaned);
       },
     );
@@ -264,28 +264,37 @@ class OnboardingController extends _$OnboardingController {
       );
       // Bail if the user kept typing while we were checking.
       final s = _s;
-      if (s == null || s.username != username) return;
+      if (s == null || s.profile.username != username) return;
 
       result.fold(
         (failure) {
           if (failure is ValidationFailure) {
-            _set(s.copyWith(
-              usernameStatus: UsernameStatus.invalid,
-              usernameMessage: failure.message,
-            ), persist: false);
+            _setProfile(
+              (p) => p.copyWith(
+                usernameStatus: UsernameStatus.invalid,
+                usernameMessage: failure.message,
+              ),
+              persist: false,
+            );
           } else {
             // Couldn't reach the backend — let the user retry by editing.
-            _set(s.copyWith(
-              usernameStatus: UsernameStatus.idle,
-              usernameMessage: "Couldn't check — check your connection",
-            ), persist: false);
+            _setProfile(
+              (p) => p.copyWith(
+                usernameStatus: UsernameStatus.idle,
+                usernameMessage: "Couldn't check — check your connection",
+              ),
+              persist: false,
+            );
           }
         },
-        (available) => _set(s.copyWith(
-          usernameStatus:
-              available ? UsernameStatus.available : UsernameStatus.taken,
-          usernameMessage: available ? null : 'That username is taken',
-        ), persist: false),
+        (available) => _setProfile(
+          (p) => p.copyWith(
+            usernameStatus:
+                available ? UsernameStatus.available : UsernameStatus.taken,
+            usernameMessage: available ? null : 'That username is taken',
+          ),
+          persist: false,
+        ),
       );
     });
   }
@@ -296,17 +305,24 @@ class OnboardingController extends _$OnboardingController {
   /// forward-geocoding the text. An unfindable place blocks with guidance.
   Future<void> continueToPlayer() async {
     final s = _s;
-    if (s == null || !s.canContinueProfile || s.resolvingLocation) return;
+    if (s == null ||
+        !s.canContinueProfile ||
+        s.profile.resolvingLocation) {
+      return;
+    }
 
-    if (s.hasResolvedLocation) {
+    if (s.profile.hasResolvedLocation) {
       _set(s.copyWith(step: OnboardingStep.player));
       return;
     }
 
-    _set(s.copyWith(resolvingLocation: true, cityError: null), persist: false);
+    _setProfile(
+      (p) => p.copyWith(resolvingLocation: true, cityError: null),
+      persist: false,
+    );
     final locale = ui.PlatformDispatcher.instance.locale;
     final result = await ref.read(locationRepositoryProvider).geocode(
-          s.city,
+          s.profile.city,
           languageCode:
               locale.languageCode.isEmpty ? null : locale.languageCode,
           regionCode: locale.countryCode,
@@ -316,41 +332,48 @@ class OnboardingController extends _$OnboardingController {
     result.fold(
       (f) => _set(
         cur.copyWith(
-          resolvingLocation: false,
-          cityError: f is NotFoundFailure
-              ? "We couldn't locate that place — pick a suggestion or use your current location"
-              : f.message,
+          profile: cur.profile.copyWith(
+            resolvingLocation: false,
+            cityError: f is NotFoundFailure
+                ? "We couldn't locate that place — pick a suggestion or use your current location"
+                : f.message,
+          ),
         ),
         persist: false,
       ),
-      (place) => _set(cur.copyWith(
-        resolvingLocation: false,
-        city: place.label.isEmpty ? cur.city : place.label,
-        placeId: place.placeId,
-        lat: place.latitude,
-        lng: place.longitude,
-        countryCode: place.countryCode,
-        step: OnboardingStep.player,
-        cityError: null,
-      )),
+      (place) => _set(
+        cur.copyWith(
+          profile: cur.profile.copyWith(
+            resolvingLocation: false,
+            city: place.label.isEmpty ? cur.profile.city : place.label,
+            placeId: place.placeId,
+            lat: place.latitude,
+            lng: place.longitude,
+            countryCode: place.countryCode,
+            cityError: null,
+          ),
+          step: OnboardingStep.player,
+        ),
+        persist: false,
+      ),
     );
   }
 
   // ─── Player step ──────────────────────────────────────────────────────────
 
-  void setRole(PlayerRole role) =>
-      _toggle((s) => s.copyWith(role: s.role == role ? null : role));
-  void setBatting(BattingStyle b) => _toggle(
-      (s) => s.copyWith(battingStyle: s.battingStyle == b ? null : b));
-  void setBowling(BowlingStyle b) => _toggle(
-      (s) => s.copyWith(bowlingStyle: s.bowlingStyle == b ? null : b));
-  void setPreferredBall(BallType b) => _toggle(
-      (s) => s.copyWith(preferredBall: s.preferredBall == b ? null : b));
+  void setRole(PlayerRole role) => _setPlayer(
+      (pl) => pl.copyWith(role: pl.role == role ? null : role));
+  void setBatting(BattingStyle b) => _setPlayer(
+      (pl) => pl.copyWith(battingStyle: pl.battingStyle == b ? null : b));
+  void setBowling(BowlingStyle b) => _setPlayer(
+      (pl) => pl.copyWith(bowlingStyle: pl.bowlingStyle == b ? null : b));
+  void setPreferredBall(BallType b) => _setPlayer(
+      (pl) => pl.copyWith(preferredBall: pl.preferredBall == b ? null : b));
 
-  void _toggle(OnboardingState Function(OnboardingState) f) {
+  void _setPlayer(PlayerSlice Function(PlayerSlice) f) {
     final s = _s;
     if (s == null) return;
-    _set(f(s));
+    _set(s.copyWith(player: f(s.player)));
   }
 
   void back() {
@@ -368,16 +391,26 @@ class OnboardingController extends _$OnboardingController {
   Future<void> submit({required bool asPlayer}) async {
     final s = _s;
     if (s == null || s.submitting) return;
-    _set(s.copyWith(submitting: true, submitError: null, isPlayer: asPlayer),
-        persist: false);
+    _set(
+      s.copyWith(
+        submitting: true,
+        submitError: null,
+        player: s.player.copyWith(isPlayer: asPlayer),
+      ),
+      persist: false,
+    );
 
     // Validate inputs via value objects; the first failure short-circuits and
     // is surfaced as the submitError so the form can render it.
-    final displayNameRes = DisplayName.create(s.displayName);
-    final usernameRes = Username.create(s.username);
-    final cityRes = City.create(s.city);
+    final displayNameRes = DisplayName.create(s.profile.displayName);
+    final usernameRes = Username.create(s.profile.username);
+    final cityRes = City.create(s.profile.city);
     Failure? failure;
-    for (final e in <Either<Failure, Object>>[displayNameRes, usernameRes, cityRes]) {
+    for (final e in <Either<Failure, Object>>[
+      displayNameRes,
+      usernameRes,
+      cityRes,
+    ]) {
       final f = e.getLeft().toNullable();
       if (f != null) {
         failure = f;
@@ -394,15 +427,16 @@ class OnboardingController extends _$OnboardingController {
       return;
     }
 
-    final player = (s.playerProfile.hasAny && asPlayer) ? s.playerProfile : null;
+    final player =
+        (s.playerProfile.hasAny && asPlayer) ? s.playerProfile : null;
     final result = await ref.read(profileRepositoryProvider).completeOnboarding(
           displayName: displayNameRes.getRight().toNullable()!,
           username: usernameRes.getRight().toNullable()!,
           city: cityRes.getRight().toNullable()!,
-          placeId: s.placeId,
-          latitude: s.lat,
-          longitude: s.lng,
-          countryCode: s.countryCode,
+          placeId: s.profile.placeId,
+          latitude: s.profile.lat,
+          longitude: s.profile.lng,
+          countryCode: s.profile.countryCode,
           playerProfile: player,
         );
 
@@ -434,6 +468,10 @@ class OnboardingController extends _$OnboardingController {
   }
 
   // ─── Draft (de)serialization ──────────────────────────────────────────────
+  //
+  // The on-disk draft schema stays flat (one big map of fields), even though
+  // the in-memory state is sliced. That keeps drafts backward-compatible if we
+  // re-shape the slices later.
 
   void _persistDraft(OnboardingState s) {
     // Fire-and-forget; the store swallows failures.
@@ -442,18 +480,18 @@ class OnboardingController extends _$OnboardingController {
 
   Map<String, dynamic> _toDraft(OnboardingState s) => {
         'step': s.step.name,
-        'displayName': s.displayName,
-        'username': s.username,
-        'city': s.city,
-        'placeId': s.placeId,
-        'lat': s.lat,
-        'lng': s.lng,
-        'countryCode': s.countryCode,
-        'isPlayer': s.isPlayer,
-        'role': s.role?.wire,
-        'battingStyle': s.battingStyle?.wire,
-        'bowlingStyle': s.bowlingStyle?.wire,
-        'preferredBall': s.preferredBall?.wire,
+        'displayName': s.profile.displayName,
+        'username': s.profile.username,
+        'city': s.profile.city,
+        'placeId': s.profile.placeId,
+        'lat': s.profile.lat,
+        'lng': s.profile.lng,
+        'countryCode': s.profile.countryCode,
+        'isPlayer': s.player.isPlayer,
+        'role': s.player.role?.wire,
+        'battingStyle': s.player.battingStyle?.wire,
+        'bowlingStyle': s.player.bowlingStyle?.wire,
+        'preferredBall': s.player.preferredBall?.wire,
       };
 
   OnboardingState _fromDraft(Map<String, dynamic> m) => OnboardingState(
@@ -461,17 +499,21 @@ class OnboardingController extends _$OnboardingController {
           (e) => e.name == m['step'],
           orElse: () => OnboardingStep.profile,
         ),
-        displayName: m['displayName'] as String? ?? '',
-        username: m['username'] as String? ?? '',
-        city: m['city'] as String? ?? '',
-        placeId: m['placeId'] as String?,
-        lat: (m['lat'] as num?)?.toDouble(),
-        lng: (m['lng'] as num?)?.toDouble(),
-        countryCode: m['countryCode'] as String?,
-        isPlayer: m['isPlayer'] as bool? ?? false,
-        role: PlayerRole.fromWire(m['role'] as String?),
-        battingStyle: BattingStyle.fromWire(m['battingStyle'] as String?),
-        bowlingStyle: BowlingStyle.fromWire(m['bowlingStyle'] as String?),
-        preferredBall: BallType.fromWire(m['preferredBall'] as String?),
+        profile: ProfileSlice(
+          displayName: m['displayName'] as String? ?? '',
+          username: m['username'] as String? ?? '',
+          city: m['city'] as String? ?? '',
+          placeId: m['placeId'] as String?,
+          lat: (m['lat'] as num?)?.toDouble(),
+          lng: (m['lng'] as num?)?.toDouble(),
+          countryCode: m['countryCode'] as String?,
+        ),
+        player: PlayerSlice(
+          isPlayer: m['isPlayer'] as bool? ?? false,
+          role: PlayerRole.fromWire(m['role'] as String?),
+          battingStyle: BattingStyle.fromWire(m['battingStyle'] as String?),
+          bowlingStyle: BowlingStyle.fromWire(m['bowlingStyle'] as String?),
+          preferredBall: BallType.fromWire(m['preferredBall'] as String?),
+        ),
       );
 }

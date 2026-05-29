@@ -59,8 +59,8 @@ void main() {
     final container = makeContainer();
     final state = await container.read(onboardingControllerProvider.future);
     expect(state.step, OnboardingStep.profile);
-    expect(state.username, isEmpty);
-    expect(state.usernameStatus, UsernameStatus.idle);
+    expect(state.profile.username, isEmpty);
+    expect(state.profile.usernameStatus, UsernameStatus.idle);
   });
 
   test('a valid username goes checking → available after the debounce',
@@ -74,14 +74,14 @@ void main() {
 
     controller.setUsername('ahmed_k92');
     expect(
-      container.read(onboardingControllerProvider).value!.usernameStatus,
+      container.read(onboardingControllerProvider).value!.profile.usernameStatus,
       UsernameStatus.checking,
     );
 
     await Future<void>.delayed(const Duration(milliseconds: 600));
 
     expect(
-      container.read(onboardingControllerProvider).value!.usernameStatus,
+      container.read(onboardingControllerProvider).value!.profile.usernameStatus,
       UsernameStatus.available,
     );
     verify(() => repo.isUsernameAvailable('ahmed_k92')).called(1);
@@ -95,7 +95,7 @@ void main() {
 
     controller.setUsername('99'); // leading digit
     expect(
-      container.read(onboardingControllerProvider).value!.usernameStatus,
+      container.read(onboardingControllerProvider).value!.profile.usernameStatus,
       UsernameStatus.invalid,
     );
 

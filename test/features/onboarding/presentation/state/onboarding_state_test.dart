@@ -3,15 +3,20 @@ import 'package:novex_clean_arch/features/onboarding/presentation/state/onboardi
 
 void main() {
   const base = OnboardingState(
-    displayName: 'Ahmed Khan',
-    username: 'ahmed_k92',
-    city: 'Mardan, Khyber Pakhtunkhwa',
-    usernameStatus: UsernameStatus.available,
+    profile: ProfileSlice(
+      displayName: 'Ahmed Khan',
+      username: 'ahmed_k92',
+      city: 'Mardan, Khyber Pakhtunkhwa',
+      usernameStatus: UsernameStatus.available,
+    ),
   );
 
   test('hasResolvedLocation tracks whether coordinates are present', () {
-    expect(base.hasResolvedLocation, isFalse);
-    expect(base.copyWith(lat: 34.198, lng: 72.045).hasResolvedLocation, isTrue);
+    expect(base.profile.hasResolvedLocation, isFalse);
+    expect(
+      base.profile.copyWith(lat: 34.198, lng: 72.045).hasResolvedLocation,
+      isTrue,
+    );
   });
 
   test('can continue with a typed city even before coordinates resolve', () {
@@ -21,12 +26,19 @@ void main() {
   });
 
   test('cannot continue with an empty city', () {
-    expect(base.copyWith(city: '   ').canContinueProfile, isFalse);
+    expect(
+      base.copyWith(profile: base.profile.copyWith(city: '   '))
+          .canContinueProfile,
+      isFalse,
+    );
   });
 
   test('cannot continue until the username is available', () {
     expect(
-      base.copyWith(usernameStatus: UsernameStatus.checking).canContinueProfile,
+      base.copyWith(
+        profile:
+            base.profile.copyWith(usernameStatus: UsernameStatus.checking),
+      ).canContinueProfile,
       isFalse,
     );
   });

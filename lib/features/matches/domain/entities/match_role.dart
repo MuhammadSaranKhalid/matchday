@@ -28,20 +28,29 @@ enum MatchRoleKind {
   spectator,
 }
 
-/// Resolve [userId]'s role on [match]. [userTeamIds] is the set of teams the
-/// user belongs to (either side). If userId or both team rosters are empty,
-/// returns [MatchRoleKind.spectator].
+/// Resolve [userId]'s role on [match].
+///
+/// [userTeamIds] is the set of teams the user belongs to (either side).
+/// [xiPlayerRefIds] is the set of `playerRefId`s present in the match's
+/// playing XI — sourced from `matchPlayersProvider` by the caller. It is
+/// optional because not every caller has the XI on hand (the deprecated
+/// uuid[] columns on `matches` are gone; XI now lives in `match_players`).
+/// Callers that omit it skip the XI-role branch and may report a player
+/// as `optional` when they're actually in the XI.
+///
+/// If [userId] is empty, returns [MatchRoleKind.spectator].
 MatchRoleKind roleOnMatch(
   Match match,
   String userId, {
   Set<String> userTeamIds = const {},
+  Set<String> xiPlayerRefIds = const {},
 }) {
   if (userId.isEmpty) return MatchRoleKind.spectator;
 
   if (match.teamACaptain == userId || match.teamBCaptain == userId) {
     return MatchRoleKind.captain;
   }
-  if (match.teamASquad.contains(userId) || match.teamBSquad.contains(userId)) {
+  if (xiPlayerRefIds.contains(userId)) {
     return MatchRoleKind.xi;
   }
   if (userTeamIds.contains(match.teamAId.value) ||

@@ -16,12 +16,8 @@ class Match extends Equatable {
     required this.status,
     required this.createdBy,
     required this.createdAt,
-    this.teamASquad = const [],
-    this.teamBSquad = const [],
     this.teamACaptain,
     this.teamBCaptain,
-    this.teamAKeeper,
-    this.teamBKeeper,
     this.venue,
     this.scheduledStartTime,
     this.actualStartTime,
@@ -30,10 +26,6 @@ class Match extends Equatable {
     this.tossDecision,
     this.tossFace,
     this.startPhase = MatchStartPhase.toss,
-    this.currentInnings,
-    this.currentStrikerId,
-    this.currentNonStrikerId,
-    this.currentBowlerId,
     this.openersSubmittedBy,
     this.openersSubmittedAt,
   });
@@ -46,13 +38,12 @@ class Match extends Equatable {
   final String createdBy;
   final DateTime createdAt;
 
-  /// Player ids (claimed user_ids or unclaimed ids) on each side's XI.
-  final List<String> teamASquad;
-  final List<String> teamBSquad;
+  /// Permanent captain pinned on the matches row. Drives the toss-time
+  /// auth check (`_is_match_captain`) before any match_players rows
+  /// exist. The per-match captain flag for a single fixture lives on
+  /// `MatchPlayer.isCaptain`.
   final String? teamACaptain;
   final String? teamBCaptain;
-  final String? teamAKeeper;
-  final String? teamBKeeper;
   final Venue? venue;
   final DateTime? scheduledStartTime;
   final DateTime? actualStartTime;
@@ -74,20 +65,27 @@ class Match extends Equatable {
   /// Where the match is in the pre-live → live progression.
   final MatchStartPhase startPhase;
 
-  /// Active innings number (1 for innings 1, 2 for the chase, etc.).
-  final int? currentInnings;
-
-  /// Player ids (claimed or unclaimed) currently on strike / off strike /
-  /// bowling. Populated by `submit_match_openers` (openers) and updated by
-  /// every `record_ball` during scoring.
-  final String? currentStrikerId;
-  final String? currentNonStrikerId;
-  final String? currentBowlerId;
-
   /// User_id of the captain who locked the openers. Drives the "Locked by
   /// Imran" caption + the EDIT PICKS affordance (only the locker can edit).
+  /// The actual opener match_player_ids live on `match_innings_state` —
+  /// see `MatchInningsState.strikerId` / `nonStrikerId`.
   final String? openersSubmittedBy;
   final DateTime? openersSubmittedAt;
+
+  // NOTE: the playing XI, the keeper, the live on-field trio
+  // (striker / non-striker / bowler), and the active innings number no
+  // longer live on this row. They moved to:
+  //
+  //   * `MatchPlayer`        (lib/.../entities/match_player.dart) —
+  //                          the per-match XI with profile/unclaimed XOR.
+  //                          Keeper is a flag on each row.
+  //   * `MatchInningsState`  (lib/.../entities/match_innings_state.dart)
+  //                          — on-field trio + denormalised totals +
+  //                          version counter, per (match, innings_number).
+  //
+  // Callers that previously read `match.teamASquad` / `match.currentStrikerId`
+  // / `match.currentInnings` etc. should watch `matchPlayersProvider` and
+  // `liveInningsStateProvider` respectively.
 
   /// True when this match is in a state where participants are expected to
   /// act or observe — open, in-play, or recently concluded. Delegates to
@@ -104,10 +102,6 @@ class Match extends Equatable {
         tossWonBy,
         tossDecision,
         startPhase,
-        currentInnings,
-        currentStrikerId,
-        currentNonStrikerId,
-        currentBowlerId,
       ];
 }
 

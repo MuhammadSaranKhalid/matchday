@@ -10,20 +10,8 @@ _MatchDto _$MatchDtoFromJson(Map<String, dynamic> json) => _MatchDto(
   matchId: json['match_id'] as String,
   teamAId: json['team_a_id'] as String,
   teamBId: json['team_b_id'] as String,
-  teamASquad:
-      (json['team_a_squad'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList() ??
-      const <String>[],
-  teamBSquad:
-      (json['team_b_squad'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList() ??
-      const <String>[],
   teamACaptain: json['team_a_captain'] as String?,
   teamBCaptain: json['team_b_captain'] as String?,
-  teamAKeeper: json['team_a_keeper'] as String?,
-  teamBKeeper: json['team_b_keeper'] as String?,
   format: json['format'] as Map<String, dynamic>,
   venue: json['venue'] as String?,
   scheduledStartTime: json['scheduled_start_time'] as String?,
@@ -34,13 +22,9 @@ _MatchDto _$MatchDtoFromJson(Map<String, dynamic> json) => _MatchDto(
   tossDecision: json['toss_decision'] as String?,
   tossFace: json['toss_face'] as String?,
   startPhase: json['start_phase'] as String? ?? 'toss',
-  currentInnings: (json['current_innings'] as num?)?.toInt(),
-  currentStrikerId: json['current_striker_id'] as String?,
-  currentNonStrikerId: json['current_non_striker_id'] as String?,
-  currentBowlerId: json['current_bowler_id'] as String?,
   openersSubmittedBy: json['openers_submitted_by'] as String?,
   openersSubmittedAt: json['openers_submitted_at'] as String?,
-  createdBy: json['created_by'] as String,
+  createdBy: json['created_by'] as String?,
   createdAt: json['created_at'] as String,
 );
 
@@ -48,12 +32,8 @@ Map<String, dynamic> _$MatchDtoToJson(_MatchDto instance) => <String, dynamic>{
   'match_id': instance.matchId,
   'team_a_id': instance.teamAId,
   'team_b_id': instance.teamBId,
-  'team_a_squad': instance.teamASquad,
-  'team_b_squad': instance.teamBSquad,
   'team_a_captain': instance.teamACaptain,
   'team_b_captain': instance.teamBCaptain,
-  'team_a_keeper': instance.teamAKeeper,
-  'team_b_keeper': instance.teamBKeeper,
   'format': instance.format,
   'venue': instance.venue,
   'scheduled_start_time': instance.scheduledStartTime,
@@ -64,10 +44,6 @@ Map<String, dynamic> _$MatchDtoToJson(_MatchDto instance) => <String, dynamic>{
   'toss_decision': instance.tossDecision,
   'toss_face': instance.tossFace,
   'start_phase': instance.startPhase,
-  'current_innings': instance.currentInnings,
-  'current_striker_id': instance.currentStrikerId,
-  'current_non_striker_id': instance.currentNonStrikerId,
-  'current_bowler_id': instance.currentBowlerId,
   'openers_submitted_by': instance.openersSubmittedBy,
   'openers_submitted_at': instance.openersSubmittedAt,
   'created_by': instance.createdBy,

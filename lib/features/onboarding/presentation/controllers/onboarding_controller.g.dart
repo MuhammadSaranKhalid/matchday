@@ -52,7 +52,7 @@ final class OnboardingControllerProvider
 }
 
 String _$onboardingControllerHash() =>
-    r'ab57554a0f48eef01e1c17b41085d760bc08cfe2';
+    r'c0ad5a6cab64f13942912b134029bb4f15fb7e74';
 
 /// Drives the onboarding wizard: profile → player → welcome.
 ///

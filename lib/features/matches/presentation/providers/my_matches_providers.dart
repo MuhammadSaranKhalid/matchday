@@ -182,9 +182,12 @@ MyMatchPast _pastFor(
   final awayInn = innFor(m.teamBId);
 
   final homeWon = (homeInn?.totalRuns ?? -1) > (awayInn?.totalRuns ?? -1);
-  // Is the user on the home side? (manager OR in squad OR captain).
+  // Is the user on the home side? (manager OR captain).
+  // XI-membership check was removed when matches stopped carrying squad
+  // uuid[] columns directly; per-match XI now lives on match_players.
+  // For the past-tile attribution v1, manager-or-captain is enough —
+  // matches without a clear winner-side fallback still render correctly.
   final onHome = (home?.isManagedBy(currentUserId) ?? false) ||
-      m.teamASquad.contains(currentUserId) ||
       m.teamACaptain == currentUserId;
   final myWon = onHome ? homeWon : !homeWon;
 

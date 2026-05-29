@@ -9,6 +9,8 @@ import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/ball.dart';
 import '../../domain/entities/match.dart';
+import '../../domain/entities/match_innings_state.dart';
+import '../../domain/entities/match_player.dart';
 import '../providers/matches_providers.dart';
 import '../widgets/ball_pill.dart';
 
@@ -44,6 +46,40 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
   bool _busy = false;
   bool _bowlerPromptShown = false;
 
+  /// Which innings the scorer is on. The Match row no longer carries this
+  /// — it lives in match_innings_state, keyed by (match_id, innings_number).
+  /// v1 only handles innings 1; innings-break handover lands later, at
+  /// which point this advances via a transition action.
+  final int _inningsNumber = 1;
+
+  /// Resolve a match_player_id to the underlying player_ref_id (profile
+  /// or unclaimed). Used to look up names in the rosters keyed by
+  /// player_ref_id.
+  String? _refIdOf(String? matchPlayerId, List<MatchPlayer> mps) {
+    if (matchPlayerId == null) return null;
+    for (final mp in mps) {
+      if (mp.id.value == matchPlayerId) return mp.playerRefId;
+    }
+    return null;
+  }
+
+  /// Reverse direction — translate a picker selection (a player_ref_id
+  /// returned by the bowler / batter / fielder sheets) back into the
+  /// match_player_id the scoring RPCs expect.
+  String? _matchPlayerIdFor(String? playerRefId, List<MatchPlayer> mps) {
+    if (playerRefId == null) return null;
+    for (final mp in mps) {
+      if (mp.playerRefId == playerRefId) return mp.id.value;
+    }
+    return null;
+  }
+
+  /// Player_ref_ids on one side of the match — feeds the picker sheets
+  /// (they still take a `List<String>` of player_ref_ids to filter the
+  /// roster).
+  List<String> _squadOf(MatchTeamSide side, List<MatchPlayer> mps) =>
+      mps.where((p) => p.teamSide == side).map((p) => p.playerRefId).toList();
+
   @override
   Widget build(BuildContext context) {
     final liveMatchAsync = ref.watch(liveMatchProvider(widget.matchId));
@@ -54,20 +90,36 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
         body: Center(child: CircularProgressIndicator(color: CkColors.ink)),
       );
     }
-    final inningsNumber = match.currentInnings ?? 1;
+    final inningsNumber = _inningsNumber;
+
+    // Live innings state — striker/non-striker/bowler trio (as match_player
+    // ids) plus the version counter used by record_ball's optimistic lock.
+    final inningsStateAsync = ref.watch(
+      liveInningsStateProvider(widget.matchId, inningsNumber),
+    );
+    final inningsState = inningsStateAsync.value;
+
+    // The match's playing XI — the polymorphism boundary. Sheets show
+    // player_ref_ids; record_ball wants match_player_ids. matchPlayers is
+    // the translation table for both directions.
+    final matchPlayers =
+        ref.watch(matchPlayersProvider(widget.matchId)).value ??
+            const <MatchPlayer>[];
+
     final ballsAsync =
         ref.watch(liveBallsProvider(widget.matchId, inningsNumber));
     final balls = ballsAsync.value ?? const <Ball>[];
 
-    // Need-a-bowler gate: innings is live, but no ball recorded yet and no
-    // current_bowler_id on the match — Match Start handed off without one.
+    // Need-a-bowler gate: innings is live, but no bowler set on the
+    // innings state yet and no ball recorded — Match Start handed off
+    // without one.
     final bowlerMissing = match.startPhase == MatchStartPhase.live &&
-        match.currentBowlerId == null &&
+        inningsState?.bowlerId == null &&
         balls.isEmpty;
     if (bowlerMissing && !_bowlerPromptShown) {
       _bowlerPromptShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _promptOpeningBowler(match);
+        if (mounted) _promptOpeningBowler(match, matchPlayers, inningsState);
       });
     }
 
@@ -79,6 +131,8 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       for (final m in rosterA) m.member.playerId: m.displayName,
       for (final m in rosterB) m.member.playerId: m.displayName,
     };
+    // Sheets and ball-row authoring fields hold player_ref_ids — that's
+    // what the rosters key on, so nameOf takes a ref id.
     String nameOf(String? id) => id == null ? '—' : (names[id] ?? 'Player');
 
     final totals = _aggregate(balls);
@@ -99,11 +153,12 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                 children: [
                   _scoreboard(match, totals),
                   const SizedBox(height: 10),
-                  _players(match, balls, nameOf),
+                  _players(match, balls, nameOf, inningsState, matchPlayers),
                   const SizedBox(height: 10),
                   _lastBallBanner(lastBall, nameOf),
-                  if (_drawer != _Drawer.none) _extraDrawer(match),
-                  _runPad(match, balls),
+                  if (_drawer != _Drawer.none)
+                    _extraDrawer(match, matchPlayers, inningsState),
+                  _runPad(match, balls, matchPlayers, inningsState),
                   _extrasRow(),
                   _ballLog(balls, nameOf),
                   const SizedBox(height: 16),
@@ -116,14 +171,20 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     );
   }
 
-  Future<void> _promptOpeningBowler(Match match) async {
-    final bowlingTeamId = _battingTeamId(match) == match.teamAId
+  Future<void> _promptOpeningBowler(
+    Match match,
+    List<MatchPlayer> matchPlayers,
+    MatchInningsState? inningsState,
+  ) async {
+    final bowlingTeamId = _battingTeamId(match, _inningsNumber) == match.teamAId
         ? match.teamBId
         : match.teamAId;
+    final bowlingSide = bowlingTeamId == match.teamAId
+        ? MatchTeamSide.a
+        : MatchTeamSide.b;
     final roster = ref.read(rosterProvider(bowlingTeamId.value)).value ??
         const <RosterMember>[];
-    final squad =
-        bowlingTeamId == match.teamAId ? match.teamASquad : match.teamBSquad;
+    final squad = _squadOf(bowlingSide, matchPlayers);
     final picked = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: CkColors.paper,
@@ -143,7 +204,19 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       _bowlerPromptShown = false;
       return;
     }
-    await _onPickOpeningBowler(match, match.currentInnings ?? 1, picked);
+    // The sheet returns a player_ref_id; the RPC wants match_player_id.
+    final bowlerMpId = _matchPlayerIdFor(picked, matchPlayers);
+    if (bowlerMpId == null) {
+      _bowlerPromptShown = false;
+      return;
+    }
+    await _onPickOpeningBowler(
+      match,
+      _inningsNumber,
+      bowlerMpId,
+      inningsState,
+      matchPlayers,
+    );
   }
 
   // ─── Top bar + scoreboard ────────────────────────────────────────────────
@@ -258,11 +331,24 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     );
   }
 
-  Widget _players(Match match, List<Ball> balls, String Function(String?) nameOf) {
+  Widget _players(
+    Match match,
+    List<Ball> balls,
+    String Function(String?) nameOf,
+    MatchInningsState? inningsState,
+    List<MatchPlayer> matchPlayers,
+  ) {
     final batStats = _battersStats(balls);
-    final striker = match.currentStrikerId;
-    final nonStriker = match.currentNonStrikerId;
-    final bowler = match.currentBowlerId;
+    // inningsState carries match_player_ids; rosters (and therefore the
+    // batStats map, which is keyed by ball.batsmanId — also a match_player_id
+    // in the new schema) all key on the same. We resolve to player_ref_id
+    // only for the name lookup.
+    final striker = inningsState?.strikerId?.value;
+    final nonStriker = inningsState?.nonStrikerId?.value;
+    final bowler = inningsState?.bowlerId?.value;
+    final strikerRef = _refIdOf(striker, matchPlayers);
+    final nonStrikerRef = _refIdOf(nonStriker, matchPlayers);
+    final bowlerRef = _refIdOf(bowler, matchPlayers);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
@@ -271,7 +357,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
             children: [
               Expanded(
                 child: _BatterCard(
-                  name: nameOf(striker),
+                  name: nameOf(strikerRef),
                   runs: batStats[striker]?.runs ?? 0,
                   balls: batStats[striker]?.balls ?? 0,
                   fours: batStats[striker]?.fours ?? 0,
@@ -282,7 +368,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
               const SizedBox(width: 6),
               Expanded(
                 child: _BatterCard(
-                  name: nameOf(nonStriker),
+                  name: nameOf(nonStrikerRef),
                   runs: batStats[nonStriker]?.runs ?? 0,
                   balls: batStats[nonStriker]?.balls ?? 0,
                   fours: batStats[nonStriker]?.fours ?? 0,
@@ -294,7 +380,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
           ),
           const SizedBox(height: 8),
           _BowlerCard(
-            name: nameOf(bowler),
+            name: nameOf(bowlerRef),
             overStrip: _thisOverStrip(balls),
           ),
         ],
@@ -402,7 +488,12 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     );
   }
 
-  Widget _runPad(Match match, List<Ball> balls) {
+  Widget _runPad(
+    Match match,
+    List<Ball> balls,
+    List<MatchPlayer> matchPlayers,
+    MatchInningsState? inningsState,
+  ) {
     final canTap = !_busy && _drawer == _Drawer.none;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
@@ -414,7 +505,9 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                 Expanded(
                   child: _PadButton(
                     label: r == 0 ? '•' : '$r',
-                    onTap: canTap ? () => _onRun(match, balls, r) : null,
+                    onTap: canTap
+                        ? () => _onRun(match, balls, r, inningsState)
+                        : null,
                   ),
                 ),
                 if (r != 3) const SizedBox(width: 6),
@@ -430,7 +523,9 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                   big: true,
                   bg: CkColors.greenSoft,
                   fg: CkColors.green,
-                  onTap: canTap ? () => _onRun(match, balls, 4) : null,
+                  onTap: canTap
+                      ? () => _onRun(match, balls, 4, inningsState)
+                      : null,
                 ),
               ),
               const SizedBox(width: 6),
@@ -440,7 +535,9 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                   big: true,
                   bg: CkColors.ink,
                   fg: CkColors.paper,
-                  onTap: canTap ? () => _onRun(match, balls, 6) : null,
+                  onTap: canTap
+                      ? () => _onRun(match, balls, 6, inningsState)
+                      : null,
                 ),
               ),
               const SizedBox(width: 6),
@@ -450,7 +547,9 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                   big: true,
                   bg: CkColors.redSoft,
                   fg: CkColors.red,
-                  onTap: canTap ? () => _onWicket(match, balls) : null,
+                  onTap: canTap
+                      ? () => _onWicket(match, balls, matchPlayers, inningsState)
+                      : null,
                 ),
               ),
             ],
@@ -507,7 +606,11 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     );
   }
 
-  Widget _extraDrawer(Match match) {
+  Widget _extraDrawer(
+    Match match,
+    List<MatchPlayer> matchPlayers,
+    MatchInningsState? inningsState,
+  ) {
     final kind = switch (_drawer) {
       _Drawer.wide => BallKind.wide,
       _Drawer.noBall => BallKind.noBall,
@@ -544,7 +647,9 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
           for (final n in const [1, 2, 3, 4, 5]) ...[
             _ExtraRunButton(
               label: '$n',
-              onTap: _busy ? null : () => _onExtra(match, kind, n),
+              onTap: _busy
+                  ? null
+                  : () => _onExtra(match, kind, n, inningsState),
             ),
             if (n != 5) const SizedBox(width: 4),
           ],
@@ -592,20 +697,31 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
 
   // ─── Action handlers ─────────────────────────────────────────────────────
 
-  Future<void> _onRun(Match match, List<Ball> balls, int runs) async {
+  Future<void> _onRun(
+    Match match,
+    List<Ball> balls,
+    int runs,
+    MatchInningsState? inningsState,
+  ) async {
     await _submit(BallDraft(
       matchId: match.id,
-      inningsNumber: match.currentInnings ?? 1,
+      inningsNumber: _inningsNumber,
       isLegalDelivery: true,
       ballKind: BallKind.legal,
       runsScored: runs,
-      batsmanId: match.currentStrikerId,
-      nonStrikerId: match.currentNonStrikerId,
-      bowlerId: match.currentBowlerId,
+      batsmanId: inningsState?.strikerId?.value,
+      nonStrikerId: inningsState?.nonStrikerId?.value,
+      bowlerId: inningsState?.bowlerId?.value,
+      expectedVersion: inningsState?.version,
     ));
   }
 
-  Future<void> _onExtra(Match match, BallKind kind, int n) async {
+  Future<void> _onExtra(
+    Match match,
+    BallKind kind,
+    int n,
+    MatchInningsState? inningsState,
+  ) async {
     // Wide/No-ball: 1 penalty + (n-1) batter runs encoded as runs_scored.
     // Bye/Leg-bye: n runs all in extras, runs_scored stays 0.
     final isWideOrNb = kind == BallKind.wide || kind == BallKind.noBall;
@@ -614,18 +730,24 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     setState(() => _drawer = _Drawer.none);
     await _submit(BallDraft(
       matchId: match.id,
-      inningsNumber: match.currentInnings ?? 1,
+      inningsNumber: _inningsNumber,
       isLegalDelivery: !isWideOrNb,
       ballKind: kind,
       runsScored: runsScored,
       extras: extras,
-      batsmanId: match.currentStrikerId,
-      nonStrikerId: match.currentNonStrikerId,
-      bowlerId: match.currentBowlerId,
+      batsmanId: inningsState?.strikerId?.value,
+      nonStrikerId: inningsState?.nonStrikerId?.value,
+      bowlerId: inningsState?.bowlerId?.value,
+      expectedVersion: inningsState?.version,
     ));
   }
 
-  Future<void> _onWicket(Match match, List<Ball> balls) async {
+  Future<void> _onWicket(
+    Match match,
+    List<Ball> balls,
+    List<MatchPlayer> matchPlayers,
+    MatchInningsState? inningsState,
+  ) async {
     final picked = await showModalBottomSheet<WicketType>(
       context: context,
       backgroundColor: CkColors.paper,
@@ -639,16 +761,25 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
 
     // New batter picker for everything except retired hurt (where the
     // dismissed player isn't replaced immediately).
-    String? newBatterId;
+    String? newBatterRefId;
     if (picked != WicketType.retiredHurt) {
-      final battingTeamId = _battingTeamId(match);
+      final battingTeamId = _battingTeamId(match, _inningsNumber);
+      final battingSide = battingTeamId == match.teamAId
+          ? MatchTeamSide.a
+          : MatchTeamSide.b;
       final battingRoster =
           ref.read(rosterProvider(battingTeamId.value)).value ??
               const <RosterMember>[];
-      final usedIds = balls.map((b) => b.batsmanId).whereType<String>().toSet()
-        ..add(match.currentStrikerId ?? '')
-        ..add(match.currentNonStrikerId ?? '');
-      newBatterId = await showModalBottomSheet<String>(
+      // usedIds is the set of player_ref_ids already in this innings.
+      // ball.batsmanId is now a match_player_id; translate through
+      // matchPlayers to compare against the squad list (player_ref_ids).
+      final usedIds = balls
+          .map((b) => _refIdOf(b.batsmanId, matchPlayers))
+          .whereType<String>()
+          .toSet()
+        ..add(_refIdOf(inningsState?.strikerId?.value, matchPlayers) ?? '')
+        ..add(_refIdOf(inningsState?.nonStrikerId?.value, matchPlayers) ?? '');
+      newBatterRefId = await showModalBottomSheet<String>(
         context: context,
         backgroundColor: CkColors.paper,
         isScrollControlled: true,
@@ -657,37 +788,42 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
         ),
         builder: (_) => _NewBatterSheet(
           roster: battingRoster,
-          squad: battingTeamId == match.teamAId
-              ? match.teamASquad
-              : match.teamBSquad,
+          squad: _squadOf(battingSide, matchPlayers),
           usedIds: usedIds,
         ),
       );
-      if (newBatterId == null || !mounted) return;
+      if (newBatterRefId == null || !mounted) return;
     }
 
     await _submit(BallDraft(
       matchId: match.id,
-      inningsNumber: match.currentInnings ?? 1,
+      inningsNumber: _inningsNumber,
       isLegalDelivery: true,
       ballKind: BallKind.legal,
       isWicket: true,
       wicketType: picked,
-      batsmanId: match.currentStrikerId,
-      nonStrikerId: match.currentNonStrikerId,
-      bowlerId: match.currentBowlerId,
+      batsmanId: inningsState?.strikerId?.value,
+      nonStrikerId: inningsState?.nonStrikerId?.value,
+      bowlerId: inningsState?.bowlerId?.value,
+      expectedVersion: inningsState?.version,
     ));
 
-    // After recording, set the new batter as striker. The RPC doesn't take
-    // it, so we patch the match row directly.
-    if (newBatterId != null) {
-      await ref.read(matchesRepositoryProvider).startInnings(
-            matchId: match.id,
-            inningsNumber: match.currentInnings ?? 1,
-            strikerId: newBatterId,
-            nonStrikerId: match.currentNonStrikerId ?? '',
-            bowlerId: match.currentBowlerId ?? '',
-          );
+    // After recording, set the new batter as striker. The RPC doesn't
+    // take it on the ball insert, so we re-call start_innings with the
+    // updated trio. Translate the picker's player_ref_id back to its
+    // match_player_id.
+    if (newBatterRefId != null) {
+      final newBatterMpId =
+          _matchPlayerIdFor(newBatterRefId, matchPlayers);
+      if (newBatterMpId != null) {
+        await ref.read(matchesRepositoryProvider).startInnings(
+              matchId: match.id,
+              inningsNumber: _inningsNumber,
+              strikerId: newBatterMpId,
+              nonStrikerId: inningsState?.nonStrikerId?.value ?? '',
+              bowlerId: inningsState?.bowlerId?.value ?? '',
+            );
+      }
     }
   }
 
@@ -722,14 +858,24 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
   Future<void> _promptEndOfOverBowler() async {
     final match = ref.read(liveMatchProvider(widget.matchId)).value;
     if (match == null) return;
-    final bowlingTeamId = _battingTeamId(match) == match.teamAId
+    final matchPlayers =
+        ref.read(matchPlayersProvider(widget.matchId)).value ??
+            const <MatchPlayer>[];
+    final inningsState = ref
+        .read(liveInningsStateProvider(widget.matchId, _inningsNumber))
+        .value;
+    final bowlingTeamId = _battingTeamId(match, _inningsNumber) == match.teamAId
         ? match.teamBId
         : match.teamAId;
+    final bowlingSide = bowlingTeamId == match.teamAId
+        ? MatchTeamSide.a
+        : MatchTeamSide.b;
     final roster = ref.read(rosterProvider(bowlingTeamId.value)).value ??
         const <RosterMember>[];
-    final squad =
-        bowlingTeamId == match.teamAId ? match.teamASquad : match.teamBSquad;
-    final newBowlerId = await showModalBottomSheet<String>(
+    final squad = _squadOf(bowlingSide, matchPlayers);
+    final currentBowlerRefId =
+        _refIdOf(inningsState?.bowlerId?.value, matchPlayers);
+    final newBowlerRefId = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: CkColors.paper,
       isScrollControlled: true,
@@ -740,32 +886,36 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
         title: 'Pick next bowler',
         roster: roster,
         squad: squad,
-        excludeId: match.currentBowlerId,
+        excludeId: currentBowlerRefId,
       ),
     );
-    if (newBowlerId == null || !mounted) return;
+    if (newBowlerRefId == null || !mounted) return;
+    final newBowlerMpId = _matchPlayerIdFor(newBowlerRefId, matchPlayers);
+    if (newBowlerMpId == null) return;
     await ref.read(matchesRepositoryProvider).startInnings(
           matchId: match.id,
-          inningsNumber: match.currentInnings ?? 1,
+          inningsNumber: _inningsNumber,
           // Strike rotates at end of over: previous non-striker is on strike.
-          strikerId: match.currentNonStrikerId ?? '',
-          nonStrikerId: match.currentStrikerId ?? '',
-          bowlerId: newBowlerId,
+          strikerId: inningsState?.nonStrikerId?.value ?? '',
+          nonStrikerId: inningsState?.strikerId?.value ?? '',
+          bowlerId: newBowlerMpId,
         );
   }
 
   Future<void> _onPickOpeningBowler(
     Match match,
     int inningsNumber,
-    String bowlerId,
+    String bowlerMatchPlayerId,
+    MatchInningsState? inningsState,
+    List<MatchPlayer> matchPlayers,
   ) async {
     setState(() => _busy = true);
     final result = await ref.read(matchesRepositoryProvider).startInnings(
           matchId: match.id,
           inningsNumber: inningsNumber,
-          strikerId: match.currentStrikerId ?? '',
-          nonStrikerId: match.currentNonStrikerId ?? '',
-          bowlerId: bowlerId,
+          strikerId: inningsState?.strikerId?.value ?? '',
+          nonStrikerId: inningsState?.nonStrikerId?.value ?? '',
+          bowlerId: bowlerMatchPlayerId,
         );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -794,16 +944,17 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-TeamId _battingTeamId(Match match) {
-  // Innings 1: toss decision drives it.
+TeamId _battingTeamId(Match match, int inningsNumber) {
+  // Innings 1: toss decision drives it; innings 2 swaps.
+  // The innings number is passed in (the Match row no longer carries
+  // `current_innings` — that lives in match_innings_state).
   final tossWon = match.tossWonBy;
   final tossDecision = match.tossDecision;
   if (tossWon != null && tossDecision != null) {
-    final inn = match.currentInnings ?? 1;
     final batsFirst = tossDecision == TossDecision.bat
         ? tossWon
         : (tossWon == match.teamAId ? match.teamBId : match.teamAId);
-    return inn == 1
+    return inningsNumber == 1
         ? batsFirst
         : (batsFirst == match.teamAId ? match.teamBId : match.teamAId);
   }

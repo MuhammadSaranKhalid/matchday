@@ -6,6 +6,8 @@ import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/ball.dart';
 import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
+import '../../domain/entities/match_innings_state.dart';
+import '../../domain/entities/match_player.dart';
 import '../../domain/entities/match_request.dart';
 import '../../domain/repositories/matches_repository.dart';
 import '../datasources/matches_remote_datasource.dart';
@@ -226,6 +228,54 @@ class MatchesRepositoryImpl implements MatchesRepository {
   }
 
   @override
+  Future<Either<Failure, List<MatchPlayer>>> listMatchPlayers(
+    MatchId matchId,
+  ) async {
+    try {
+      final dtos = await _remote.listMatchPlayers(matchId.value);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, MatchInningsState?>> getMatchInningsState({
+    required MatchId matchId,
+    required int inningsNumber,
+  }) async {
+    try {
+      final dto = await _remote.getMatchInningsState(
+        matchId: matchId.value,
+        inningsNumber: inningsNumber,
+      );
+      return Right(dto?.toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Stream<MatchInningsState?> watchMatchInningsState({
+    required MatchId matchId,
+    required int inningsNumber,
+  }) =>
+      _remote
+          .watchMatchInningsState(
+            matchId: matchId.value,
+            inningsNumber: inningsNumber,
+          )
+          .map((dto) => dto?.toEntity());
+
+  @override
   Future<Either<Failure, Ball>> recordBall(BallDraft d) async {
     // Cricket invariants the server also checks, but failing fast here gives
     // a clean ValidationFailure rather than a Postgres error.
@@ -258,6 +308,10 @@ class MatchesRepositoryImpl implements MatchesRepository {
         if (d.bowlerId != null) 'p_bowler_id': d.bowlerId,
         if (d.fielderId != null) 'p_fielder_id': d.fielderId,
         if (d.commentary != null) 'p_commentary': d.commentary,
+        // Optimistic-lock guard. Null skips the check (single-scorer mode);
+        // a non-null value asks the RPC to reject with 40001 when the
+        // server's match_innings_state.version has advanced past it.
+        if (d.expectedVersion != null) 'p_expected_version': d.expectedVersion,
       });
       return Right(dto.toEntity());
     } on UnauthorizedException catch (e) {

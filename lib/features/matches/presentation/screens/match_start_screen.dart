@@ -11,7 +11,9 @@ import '../../../teams/domain/entities/roster_member.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/match.dart';
+import '../../domain/entities/match_player.dart';
 import '../controllers/match_start_controller.dart';
+import '../providers/matches_providers.dart';
 import '../state/match_start_state.dart';
 
 /// Two-phone Match Start. Toss → openers → Start. The opening bowler is
@@ -734,12 +736,35 @@ class _Stage2Lineup extends ConsumerWidget {
     if (battingTeam == null) {
       return const Center(child: Text('Toss not yet recorded.'));
     }
-    final xi = battingTeam == m.teamAId ? m.teamASquad : m.teamBSquad;
+    // XI comes from match_players (the new polymorphism boundary), not
+    // from the legacy uuid[] columns on matches.
+    final battingSide =
+        battingTeam == m.teamAId ? MatchTeamSide.a : MatchTeamSide.b;
+    final allMatchPlayers =
+        ref.watch(matchPlayersProvider(m.id.value)).value ??
+            const <MatchPlayer>[];
+    final battingMatchPlayers = allMatchPlayers
+        .where((p) => p.teamSide == battingSide)
+        .toList();
+    final xi =
+        battingMatchPlayers.map((p) => p.playerRefId).toList(growable: false);
     final roster = ref.watch(rosterProvider(battingTeam.value));
 
-    // Snap pending picks to server values if the openers were already locked.
-    final lockedStriker = m.currentStrikerId;
-    final lockedNonStriker = m.currentNonStrikerId;
+    // Openers (once locked) live on match_innings_state for innings 1.
+    // We resolve striker_id / non_striker_id (which are match_player_ids)
+    // back to player_ref_ids so they match the picker's selection space.
+    final inningsState =
+        ref.watch(liveInningsStateProvider(m.id.value, 1)).value;
+    String? refIdOf(String? matchPlayerId) {
+      if (matchPlayerId == null) return null;
+      for (final mp in allMatchPlayers) {
+        if (mp.id.value == matchPlayerId) return mp.playerRefId;
+      }
+      return null;
+    }
+
+    final lockedStriker = refIdOf(inningsState?.strikerId?.value);
+    final lockedNonStriker = refIdOf(inningsState?.nonStrikerId?.value);
     final shownStriker = pendingStriker ?? lockedStriker;
     final shownNonStriker = pendingNonStriker ?? lockedNonStriker;
 
@@ -972,8 +997,25 @@ class _Stage3Ready extends ConsumerWidget {
 
     final battingTeam = teamFor(batting);
     final bowlingTeam = teamFor(bowling);
-    final strikerId = m.currentStrikerId;
-    final nonStrikerId = m.currentNonStrikerId;
+
+    // Openers are persisted on match_innings_state for innings 1.
+    // We resolve striker_id / non_striker_id (match_player_ids) back
+    // to player_ref_ids for display.
+    final inningsState =
+        ref.watch(liveInningsStateProvider(m.id.value, 1)).value;
+    final allMatchPlayers =
+        ref.watch(matchPlayersProvider(m.id.value)).value ??
+            const <MatchPlayer>[];
+    String? refIdOf(String? matchPlayerId) {
+      if (matchPlayerId == null) return null;
+      for (final mp in allMatchPlayers) {
+        if (mp.id.value == matchPlayerId) return mp.playerRefId;
+      }
+      return null;
+    }
+
+    final strikerId = refIdOf(inningsState?.strikerId?.value);
+    final nonStrikerId = refIdOf(inningsState?.nonStrikerId?.value);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),

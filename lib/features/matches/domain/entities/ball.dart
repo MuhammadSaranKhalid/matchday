@@ -165,6 +165,7 @@ class BallDraft {
     this.bowlerId,
     this.fielderId,
     this.commentary,
+    this.expectedVersion,
   });
 
   final MatchId matchId;
@@ -175,9 +176,19 @@ class BallDraft {
   final int extras;
   final bool isWicket;
   final WicketType? wicketType;
+
+  /// Player ids — under the new schema these are `match_player_id`
+  /// values (NOT profile uuids). The scoring screen looks them up from
+  /// the match's [MatchPlayer] list before constructing the draft.
   final String? batsmanId;
   final String? nonStrikerId;
   final String? bowlerId;
   final String? fielderId;
   final String? commentary;
+
+  /// Optimistic-lock guard. When set, the [record_ball] RPC will reject
+  /// the call (40001) if `match_innings_state.version` has advanced
+  /// since the client read it — protecting against two scorers
+  /// committing the same delivery. Pass NULL in single-scorer flows.
+  final int? expectedVersion;
 }

@@ -4,16 +4,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/ball_dto.dart';
 import '../models/match_dto.dart';
+import '../models/match_innings_state_dto.dart';
+import '../models/match_player_dto.dart';
 import '../models/match_request_dto.dart';
 
-/// Talks to Supabase for the `matches`, `balls`, and `match_requests`
-/// tables. Returns DTOs / RPC result types, throws raw exceptions. RLS +
-/// SECURITY DEFINER RPCs scope reads/writes.
+/// Talks to Supabase for the `matches`, `match_players`,
+/// `match_innings_state`, `balls`, and `match_requests` tables. Returns
+/// DTOs / RPC result types, throws raw exceptions. RLS + SECURITY
+/// DEFINER RPCs scope reads/writes.
 class MatchesRemoteDataSource {
   MatchesRemoteDataSource(this._supabase);
   final SupabaseClient _supabase;
 
   static const _matches = 'matches';
+  static const _matchPlayers = 'match_players';
+  static const _matchInningsState = 'match_innings_state';
   static const _balls = 'balls';
 
   String _requireUid() {
@@ -167,6 +172,97 @@ class MatchesRemoteDataSource {
       throw _rpcException(e);
     }
   }
+
+  // ─── match_players ───────────────────────────────────────────────────────
+
+  /// List every match_players row for a match. Powers the Lineup screen,
+  /// the bowler/batter/fielder pickers on the scoring screen, and any
+  /// "who's on the field" UI on the spectator side.
+  ///
+  /// Match_players has no realtime broadcast in v1 — the table changes
+  /// rarely (lineup-lock, mid-match substitutions). Callers that need to
+  /// react to substitutions can re-fetch on the matches `match_state_updated`
+  /// broadcast.
+  Future<List<MatchPlayerDto>> listMatchPlayers(String matchId) async {
+    try {
+      final rows = await _supabase
+          .from(_matchPlayers)
+          .select()
+          .eq('match_id', matchId)
+          .order('team_side', ascending: true)
+          .order('batting_order', ascending: true, nullsFirst: false);
+      return rows.map(MatchPlayerDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // ─── match_innings_state ─────────────────────────────────────────────────
+
+  /// One-shot fetch of the (match, innings) state row. Returns null if
+  /// the innings hasn't been opened yet.
+  Future<MatchInningsStateDto?> getMatchInningsState({
+    required String matchId,
+    required int inningsNumber,
+  }) async {
+    try {
+      final row = await _supabase
+          .from(_matchInningsState)
+          .select()
+          .eq('match_id', matchId)
+          .eq('innings_number', inningsNumber)
+          .maybeSingle();
+      return row == null ? null : MatchInningsStateDto.fromJson(row);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Subscribes to the `match:<id>:state` private broadcast channel for
+  /// `innings_state_updated` events. Shares the channel with [watchMatch]
+  /// but emits a different DTO. The first event is the initial hydration
+  /// fetched via [getMatchInningsState].
+  Stream<MatchInningsStateDto?> watchMatchInningsState({
+    required String matchId,
+    required int inningsNumber,
+  }) async* {
+    yield await getMatchInningsState(
+      matchId: matchId,
+      inningsNumber: inningsNumber,
+    );
+
+    final controller = StreamController<MatchInningsStateDto?>();
+    final channel = _supabase.channel(
+      'match:$matchId:state',
+      opts: const RealtimeChannelConfig(self: true, private: true),
+    );
+
+    channel
+        .onBroadcast(
+          event: 'innings_state_updated',
+          callback: (payload) {
+            final data =
+                (payload['payload'] as Map<String, dynamic>?) ?? payload;
+            try {
+              final dto = MatchInningsStateDto.fromJson(data);
+              if (dto.inningsNumber != inningsNumber) return;
+              controller.add(dto);
+            } catch (e) {
+              controller.addError(ServerException(e.toString()));
+            }
+          },
+        )
+        .subscribe();
+
+    yield* controller.stream.asBroadcastStream(
+      onCancel: (sub) async {
+        await _supabase.removeChannel(channel);
+        await controller.close();
+      },
+    );
+  }
+
+  // ─── Ball recording ──────────────────────────────────────────────────────
 
   /// `record_ball` returns the inserted balls row (the RPC's RETURN type).
   Future<BallDto> recordBall(Map<String, dynamic> params) async {

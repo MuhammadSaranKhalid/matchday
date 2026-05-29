@@ -271,6 +271,216 @@ final class LiveMatchFamily extends $Family
   String toString() => r'liveMatchProvider';
 }
 
+/// The full playing XI for a match (both sides, in batting order where
+/// set). Reads from match_players, the per-match polymorphism boundary.
+/// Powers bowler / batter / fielder pickers and lineup displays. Returns
+/// an empty list if the lineup hasn't been materialised yet.
+
+@ProviderFor(matchPlayers)
+final matchPlayersProvider = MatchPlayersFamily._();
+
+/// The full playing XI for a match (both sides, in batting order where
+/// set). Reads from match_players, the per-match polymorphism boundary.
+/// Powers bowler / batter / fielder pickers and lineup displays. Returns
+/// an empty list if the lineup hasn't been materialised yet.
+
+final class MatchPlayersProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<MatchPlayer>>,
+          List<MatchPlayer>,
+          FutureOr<List<MatchPlayer>>
+        >
+    with
+        $FutureModifier<List<MatchPlayer>>,
+        $FutureProvider<List<MatchPlayer>> {
+  /// The full playing XI for a match (both sides, in batting order where
+  /// set). Reads from match_players, the per-match polymorphism boundary.
+  /// Powers bowler / batter / fielder pickers and lineup displays. Returns
+  /// an empty list if the lineup hasn't been materialised yet.
+  MatchPlayersProvider._({
+    required MatchPlayersFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'matchPlayersProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$matchPlayersHash();
+
+  @override
+  String toString() {
+    return r'matchPlayersProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<MatchPlayer>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<MatchPlayer>> create(Ref ref) {
+    final argument = this.argument as String;
+    return matchPlayers(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MatchPlayersProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$matchPlayersHash() => r'86bb903580185239726a7e67f41bb208c0e97ae9';
+
+/// The full playing XI for a match (both sides, in batting order where
+/// set). Reads from match_players, the per-match polymorphism boundary.
+/// Powers bowler / batter / fielder pickers and lineup displays. Returns
+/// an empty list if the lineup hasn't been materialised yet.
+
+final class MatchPlayersFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<MatchPlayer>>, String> {
+  MatchPlayersFamily._()
+    : super(
+        retry: null,
+        name: r'matchPlayersProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The full playing XI for a match (both sides, in batting order where
+  /// set). Reads from match_players, the per-match polymorphism boundary.
+  /// Powers bowler / batter / fielder pickers and lineup displays. Returns
+  /// an empty list if the lineup hasn't been materialised yet.
+
+  MatchPlayersProvider call(String matchId) =>
+      MatchPlayersProvider._(argument: matchId, from: this);
+
+  @override
+  String toString() => r'matchPlayersProvider';
+}
+
+/// Live (match, innings) state — striker / non-striker / bowler trio +
+/// running totals + optimistic-lock version. Subscribes to the
+/// `match:<id>:state` broadcast channel and emits on every
+/// `innings_state_updated` event. The scoring screen reads the live trio
+/// from here; the spectator scoreboard reads the running totals.
+
+@ProviderFor(liveInningsState)
+final liveInningsStateProvider = LiveInningsStateFamily._();
+
+/// Live (match, innings) state — striker / non-striker / bowler trio +
+/// running totals + optimistic-lock version. Subscribes to the
+/// `match:<id>:state` broadcast channel and emits on every
+/// `innings_state_updated` event. The scoring screen reads the live trio
+/// from here; the spectator scoreboard reads the running totals.
+
+final class LiveInningsStateProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<MatchInningsState?>,
+          MatchInningsState?,
+          Stream<MatchInningsState?>
+        >
+    with
+        $FutureModifier<MatchInningsState?>,
+        $StreamProvider<MatchInningsState?> {
+  /// Live (match, innings) state — striker / non-striker / bowler trio +
+  /// running totals + optimistic-lock version. Subscribes to the
+  /// `match:<id>:state` broadcast channel and emits on every
+  /// `innings_state_updated` event. The scoring screen reads the live trio
+  /// from here; the spectator scoreboard reads the running totals.
+  LiveInningsStateProvider._({
+    required LiveInningsStateFamily super.from,
+    required (String, int) super.argument,
+  }) : super(
+         retry: null,
+         name: r'liveInningsStateProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$liveInningsStateHash();
+
+  @override
+  String toString() {
+    return r'liveInningsStateProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<MatchInningsState?> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<MatchInningsState?> create(Ref ref) {
+    final argument = this.argument as (String, int);
+    return liveInningsState(ref, argument.$1, argument.$2);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is LiveInningsStateProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$liveInningsStateHash() => r'653323eeeda8718df69e245202202c6466a4f665';
+
+/// Live (match, innings) state — striker / non-striker / bowler trio +
+/// running totals + optimistic-lock version. Subscribes to the
+/// `match:<id>:state` broadcast channel and emits on every
+/// `innings_state_updated` event. The scoring screen reads the live trio
+/// from here; the spectator scoreboard reads the running totals.
+
+final class LiveInningsStateFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<MatchInningsState?>, (String, int)> {
+  LiveInningsStateFamily._()
+    : super(
+        retry: null,
+        name: r'liveInningsStateProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Live (match, innings) state — striker / non-striker / bowler trio +
+  /// running totals + optimistic-lock version. Subscribes to the
+  /// `match:<id>:state` broadcast channel and emits on every
+  /// `innings_state_updated` event. The scoring screen reads the live trio
+  /// from here; the spectator scoreboard reads the running totals.
+
+  LiveInningsStateProvider call(String matchId, int inningsNumber) =>
+      LiveInningsStateProvider._(
+        argument: (matchId, inningsNumber),
+        from: this,
+      );
+
+  @override
+  String toString() => r'liveInningsStateProvider';
+}
+
 /// Live deliveries for (matchId, inningsNumber) via the broadcast channel.
 /// `inningsNumber` is read off the match row; spectators + scorers both
 /// subscribe to the same stream.

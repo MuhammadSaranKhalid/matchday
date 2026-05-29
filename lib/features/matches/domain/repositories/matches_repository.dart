@@ -4,6 +4,8 @@ import '../../../teams/domain/entities/team.dart';
 import '../entities/ball.dart';
 import '../entities/innings_summary.dart';
 import '../entities/match.dart';
+import '../entities/match_innings_state.dart';
+import '../entities/match_player.dart';
 import '../entities/match_request.dart';
 
 /// Online-only matches contract. Reads/writes hit Supabase directly; no
@@ -122,13 +124,44 @@ abstract class MatchesRepository {
     required String description,
   });
 
+  // ─── Match players (per-match XI) ────────────────────────────────────────
+
+  /// The full playing XI for a match — both sides, in batting order
+  /// where set. Powers the bowler / batter / fielder pickers on the
+  /// scoring screen and the lineup display on the spectator side.
+  /// Returns an empty list for matches whose lineup has not been
+  /// materialised yet.
+  Future<Either<Failure, List<MatchPlayer>>> listMatchPlayers(MatchId matchId);
+
+  // ─── Live innings state ──────────────────────────────────────────────────
+
+  /// One-shot fetch of the (match, innings) live state. Returns null if
+  /// the innings hasn't been opened yet (start_innings or
+  /// submit_match_openers hasn't run for this innings).
+  Future<Either<Failure, MatchInningsState?>> getMatchInningsState({
+    required MatchId matchId,
+    required int inningsNumber,
+  });
+
+  /// Real-time live-state updates for one innings. Subscribes to the
+  /// `match:<id>:state` broadcast channel and emits on every
+  /// `innings_state_updated` event for [inningsNumber]. First emission
+  /// is the initial-hydration fetch.
+  Stream<MatchInningsState?> watchMatchInningsState({
+    required MatchId matchId,
+    required int inningsNumber,
+  });
+
   // ─── Live scoring ────────────────────────────────────────────────────────
 
-  /// Open innings N — sets matches.current_striker/non_striker/bowler and
-  /// (if scheduled) flips status → live. Idempotent: re-calling overwrites
-  /// the on-strike trio without inserting any balls. Used for the
-  /// "pick opening bowler" prompt at ball 1 of innings 1, and for opening
-  /// the chase at innings 2.
+  /// Open innings N — inserts (or upserts) the (match, innings) row in
+  /// match_innings_state with the on-field trio and flips matches.status
+  /// → live. Idempotent: re-calling overwrites the trio without
+  /// inserting balls. Used for the opener pick at ball 1 of innings 1
+  /// and for opening the chase at innings 2.
+  ///
+  /// IDs are match_player_id values — look them up from
+  /// [listMatchPlayers] before calling.
   Future<Either<Failure, Unit>> startInnings({
     required MatchId matchId,
     required int inningsNumber,

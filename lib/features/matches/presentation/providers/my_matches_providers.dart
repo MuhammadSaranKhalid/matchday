@@ -157,6 +157,7 @@ MyMatchConfirmed _confirmedFor(
     roleKind: role,
     countdown: countdown,
     urgent: urgent,
+    live: m.status.isLive,
     tossReady: tossReady,
     helper: helper,
   );

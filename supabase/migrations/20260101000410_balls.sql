@@ -382,7 +382,11 @@ begin
      and ball_type <> 'wide'
    order by seq desc
    limit 1;
-  v_is_free_hit := (v_prev_kind = 'no_ball');
+  -- coalesce defends against the first ball of an innings, where the
+  -- "most recent prior non-wide ball" lookup returns NULL → the
+  -- expression `NULL = 'no_ball'` is NULL, which would violate the
+  -- NOT NULL constraint on balls.is_free_hit.
+  v_is_free_hit := coalesce(v_prev_kind = 'no_ball', false);
 
   insert into public.balls (
     match_id, innings_number, over_number, ball_in_over,
@@ -411,7 +415,7 @@ begin
   update public.match_innings_state mis
      set legal_ball_count = mis.legal_ball_count + (p_is_legal_delivery)::int,
          total_runs       = mis.total_runs + v_runs + v_extras,
-         total_wickets    = mis.total_wickets + (p_is_wicket)::smallint,
+         total_wickets    = mis.total_wickets + (p_is_wicket)::int::smallint,
          total_extras     = mis.total_extras + v_extras,
          striker_id       = case
            when p_is_wicket then null
@@ -548,7 +552,7 @@ begin
          total_runs       = greatest(0, mis.total_runs
                                        - v_row.runs_scored - v_row.extras),
          total_wickets    = greatest(0::smallint,
-                              mis.total_wickets - (v_row.is_wicket)::smallint),
+                              mis.total_wickets - (v_row.is_wicket)::int::smallint),
          total_extras     = greatest(0, mis.total_extras - v_row.extras),
          striker_id       = v_row.batsman_id,
          non_striker_id   = v_row.non_striker_id,

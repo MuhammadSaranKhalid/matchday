@@ -110,23 +110,28 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
         ref.watch(liveBallsProvider(widget.matchId, inningsNumber));
     final balls = ballsAsync.value ?? const <Ball>[];
 
-    // Need-a-bowler gate: innings is live, but no bowler set on the
-    // innings state yet and no ball recorded — Match Start handed off
-    // without one.
+    final rosterA = ref.watch(rosterProvider(match.teamAId.value)).value ??
+        const <RosterMember>[];
+    final rosterB = ref.watch(rosterProvider(match.teamBId.value)).value ??
+        const <RosterMember>[];
+
+    // Need-a-bowler gate: innings is live, no bowler set, no ball
+    // recorded. ALSO require match_players + both rosters to have
+    // loaded — without them the bowler sheet builds with empty data
+    // and renders blank (`byId` lookup fails on every squad id).
+    final dataReady = matchPlayers.isNotEmpty &&
+        rosterA.isNotEmpty &&
+        rosterB.isNotEmpty;
     final bowlerMissing = match.startPhase == MatchStartPhase.live &&
         inningsState?.bowlerId == null &&
-        balls.isEmpty;
+        balls.isEmpty &&
+        dataReady;
     if (bowlerMissing && !_bowlerPromptShown) {
       _bowlerPromptShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _promptOpeningBowler(match, matchPlayers, inningsState);
       });
     }
-
-    final rosterA = ref.watch(rosterProvider(match.teamAId.value)).value ??
-        const <RosterMember>[];
-    final rosterB = ref.watch(rosterProvider(match.teamBId.value)).value ??
-        const <RosterMember>[];
     final names = {
       for (final m in rosterA) m.member.playerId: m.displayName,
       for (final m in rosterB) m.member.playerId: m.displayName,
@@ -481,6 +486,11 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
               visualDensity: VisualDensity.compact,
               side: const BorderSide(color: CkColors.hairline),
               foregroundColor: CkColors.ink,
+              // The app theme sets minimumSize = Size.fromHeight(52)
+              // (i.e. infinity-width) for the big CTA buttons. This
+              // inline "Undo" wants to be content-sized.
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
         ],
@@ -1175,7 +1185,13 @@ class _BowlerCard extends StatelessWidget {
     final words =
         name.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
     if (words.isEmpty) return '??';
-    if (words.length == 1) return words.first.substring(0, 2).toUpperCase();
+    if (words.length == 1) {
+      final w = words.first;
+      // Clamp — placeholder "—" and single-letter names are valid inputs
+      // (any time the bowler hasn't been picked yet, nameOf returns a
+      // one-char string).
+      return w.substring(0, w.length.clamp(0, 2)).toUpperCase();
+    }
     return (words[0][0] + words[1][0]).toUpperCase();
   }
 }

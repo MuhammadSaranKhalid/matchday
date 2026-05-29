@@ -59,6 +59,7 @@ class MyMatchConfirmed {
     required this.countdown,
     required this.urgent,
     this.tossReady = false,
+    this.live = false,
     this.helper,
   });
 
@@ -82,6 +83,11 @@ class MyMatchConfirmed {
   /// pulsing red dot + big red "Start match → Toss" CTA per the design's
   /// Case 03b ("Toss time").
   final bool tossReady;
+
+  /// True when the match is in-play (status: live / innings_break /
+  /// super_over). Tapping the card routes to the scoring screen instead
+  /// of Match Start.
+  final bool live;
 
   /// Optional helper caption shown below the action buttons in a
   /// `tossReady` card. e.g. "Both captains here. Tap to flip the coin

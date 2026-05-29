@@ -199,12 +199,38 @@ class _MatchStartScreenState extends ConsumerState<MatchStartScreen> {
   }
 
   Future<void> _submitOpeners(MatchStartState state) async {
+    // The picker tracks player_ref_ids (so a locked opener pre-fill from
+    // match_innings_state, which we already convert to ref_id for display,
+    // compares equal). submit_match_openers expects match_player_ids —
+    // translate via the materialised match_players list before the call.
+    final allMatchPlayers =
+        ref.read(matchPlayersProvider(widget.matchId)).value ??
+            const <MatchPlayer>[];
+    String? matchPlayerIdFor(String refId) {
+      for (final mp in allMatchPlayers) {
+        if (mp.playerRefId == refId) return mp.id.value;
+      }
+      return null;
+    }
+
+    final strikerMpId = matchPlayerIdFor(_pendingStriker!);
+    final nonStrikerMpId = matchPlayerIdFor(_pendingNonStriker!);
+    if (strikerMpId == null || nonStrikerMpId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(
+          'Selected player is not in this match\'s lineup. '
+          'Reopen the screen and try again.',
+        )),
+      );
+      return;
+    }
+
     final controller =
         ref.read(matchStartControllerProvider(widget.matchId).notifier);
     setState(() => _busy = true);
     final result = await controller.submitOpeners(
-      strikerId: _pendingStriker!,
-      nonStrikerId: _pendingNonStriker!,
+      strikerId: strikerMpId,
+      nonStrikerId: nonStrikerMpId,
     );
     if (!mounted) return;
     setState(() => _busy = false);

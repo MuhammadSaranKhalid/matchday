@@ -1291,7 +1291,13 @@ class _ConfirmedCard extends StatelessWidget {
     const tossHeaderBg = Color(0xFFFFEEEC);
 
     return InkWell(
-      onTap: tossReady ? () => _openMatchStart(context) : null,
+      // Live → scoring screen. Toss-ready → Match Start.
+      // Scheduled / awaiting toss → not tappable (the card is informational).
+      onTap: v.live
+          ? () => _openScoring(context)
+          : tossReady
+              ? () => _openMatchStart(context)
+              : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         clipBehavior: Clip.antiAlias,
@@ -1495,6 +1501,10 @@ class _ConfirmedCard extends StatelessWidget {
 
   void _openMatchStart(BuildContext context) {
     context.push('/matches/${v.id}/start');
+  }
+
+  void _openScoring(BuildContext context) {
+    context.push('/matches/${v.id}/score');
   }
 }
 

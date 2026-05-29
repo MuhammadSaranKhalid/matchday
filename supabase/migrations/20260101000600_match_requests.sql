@@ -488,35 +488,29 @@ begin
   -- ---------------------------------------------------------------------------
   -- MATERIALISE THE PLAYING XIS INTO match_players
   --
-  -- The request carries two uuid[] columns (`from_team_xi`, `to_team_xi`),
-  -- each one a list of either profile ids or unclaimed_player ids in any
-  -- mix — that polymorphism is the same one team_members handles.
+  -- v1 UX never collects an XI up front — the captain picks openers from
+  -- the full roster on the Lineup screen. So if the supplied XI list is
+  -- empty (most common path: the sender hadn't selected one, or the
+  -- receiver accepted without supplying `p_to_team_xi`), default to
+  -- "the team's full active roster". When the XI is non-empty (a future
+  -- Pick-XI flow), filter to the picked players.
   --
-  -- We resolve every uuid by JOINing against team_members for the
-  -- team-on-this-side and pulling whichever of (user_id, unclaimed_id) is
-  -- set on the matching row. This means:
-  --   * we never have to probe both `profiles` and `unclaimed_players`
-  --     separately and reconcile,
-  --   * any uuid not present in the team's active roster is silently
-  --     dropped (consistent with _validate_team_xi which already rejected
-  --     foreign uuids upstream — this is the belt to that braces),
-  --   * the polymorphism check on match_players (profile_id XOR
-  --     unclaimed_id) is satisfied row-by-row because team_members
-  --     itself already enforces the same XOR.
+  -- The request carries `from_team_xi`; the receiver supplies its XI as
+  -- the `p_to_team_xi` RPC param (held in `v_to_team_xi`). Both are
+  -- uuid[] lists of either profile ids or unclaimed_player ids — the
+  -- polymorphism is resolved by joining against team_members, which
+  -- already enforces the (user_id XOR unclaimed_id) check that
+  -- match_players inherits.
   --
   -- KEEPER FLAG
-  --   `from_team_keeper_id` / `v_to_keeper` are uuids that may resolve to
-  --   either column. We match on either, so an unclaimed wicket-keeper is
-  --   first-class.
+  --   `from_team_keeper_id` / `v_to_keeper` are uuids that may resolve
+  --   to either column. We match on either, so an unclaimed wicket-
+  --   keeper is first-class.
   --
   -- CAPTAIN FLAG
   --   v_a_captain / v_b_captain come from _team_current_captain (0240),
   --   which returns the team's owner or captain — always a real profile.
   --   Matching only on tm.user_id is therefore correct.
-  --
-  -- The countered flow leaves to_team_xi empty; the receiver-side XI is
-  -- locked later by the Pick-XI step (separate RPC). We skip the second
-  -- INSERT in that case to avoid emitting an empty side-B lineup.
   -- ---------------------------------------------------------------------------
   insert into public.match_players (
     match_id, team_side, profile_id, unclaimed_id, is_captain, is_keeper
@@ -529,24 +523,30 @@ begin
     from public.team_members tm
    where tm.team_id = v_req.from_team_id
      and tm.status  = 'active'
-     and (tm.user_id      = any(coalesce(v_req.from_team_xi, '{}'::uuid[]))
-          or tm.unclaimed_id = any(coalesce(v_req.from_team_xi, '{}'::uuid[])));
+     and (
+       -- Empty XI = include the full active roster.
+       coalesce(array_length(v_req.from_team_xi, 1), 0) = 0
+       -- Non-empty XI = filter to the picked players.
+       or tm.user_id      = any(v_req.from_team_xi)
+       or tm.unclaimed_id = any(v_req.from_team_xi)
+     );
 
-  if v_to_team_xi is not null and array_length(v_to_team_xi, 1) > 0 then
-    insert into public.match_players (
-      match_id, team_side, profile_id, unclaimed_id, is_captain, is_keeper
-    )
-    select v_match_id, 'b',
-           tm.user_id, tm.unclaimed_id,
-           coalesce(tm.user_id = v_b_captain, false),
-           coalesce(tm.user_id    = v_to_keeper
-                    or tm.unclaimed_id = v_to_keeper, false)
-      from public.team_members tm
-     where tm.team_id = v_to_team
-       and tm.status  = 'active'
-       and (tm.user_id      = any(v_to_team_xi)
-            or tm.unclaimed_id = any(v_to_team_xi));
-  end if;
+  insert into public.match_players (
+    match_id, team_side, profile_id, unclaimed_id, is_captain, is_keeper
+  )
+  select v_match_id, 'b',
+         tm.user_id, tm.unclaimed_id,
+         coalesce(tm.user_id = v_b_captain, false),
+         coalesce(tm.user_id    = v_to_keeper
+                  or tm.unclaimed_id = v_to_keeper, false)
+    from public.team_members tm
+   where tm.team_id = v_to_team
+     and tm.status  = 'active'
+     and (
+       coalesce(array_length(v_to_team_xi, 1), 0) = 0
+       or tm.user_id      = any(v_to_team_xi)
+       or tm.unclaimed_id = any(v_to_team_xi)
+     );
 
   -- Race guard: the inner UPDATE re-asserts the status we read above. If
   -- another concurrent transaction (counter / cancel / decline) already

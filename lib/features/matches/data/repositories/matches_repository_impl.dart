@@ -314,6 +314,10 @@ class MatchesRepositoryImpl implements MatchesRepository {
         if (d.expectedVersion != null) 'p_expected_version': d.expectedVersion,
       });
       return Right(dto.toEntity());
+    } on ConflictException catch (e) {
+      // Another scorer advanced the version first. Benign: the realtime stream
+      // already carries the fresh state, so the UI can refresh and retry.
+      return Left(ConflictFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {

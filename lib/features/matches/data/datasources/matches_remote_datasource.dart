@@ -265,18 +265,23 @@ class MatchesRemoteDataSource {
   // ─── Ball recording ──────────────────────────────────────────────────────
 
   /// `record_ball` returns the inserted balls row (the RPC's RETURN type).
+  /// Records a delivery through the `record-ball` edge function (the split
+  /// scoring engine). The request body is the same `p_*` shape that fed the
+  /// old `record_ball` RPC — only the transport changed. A `409` means the
+  /// optimistic-lock version moved (another scorer committed first); it is
+  /// surfaced as a [ConflictException] so the repo can map it to a benign
+  /// retry rather than a hard error.
   Future<BallDto> recordBall(Map<String, dynamic> params) async {
     try {
-      final result = await _supabase.rpc<dynamic>('record_ball', params: params);
-      if (result is Map) {
-        return BallDto.fromJson(Map<String, dynamic>.from(result));
+      final res = await _supabase.functions.invoke('record-ball', body: params);
+      final data = res.data;
+      final ball = data is Map ? data['ball'] : null;
+      if (ball is Map) {
+        return BallDto.fromJson(Map<String, dynamic>.from(ball));
       }
-      if (result is List && result.isNotEmpty) {
-        return BallDto.fromJson(Map<String, dynamic>.from(result.first as Map));
-      }
-      throw ServerException('record_ball returned no row');
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
+      throw ServerException('record-ball returned no ball row');
+    } on FunctionException catch (e) {
+      throw _functionException(e);
     }
   }
 
@@ -487,6 +492,28 @@ class MatchesRemoteDataSource {
       return UnauthorizedException(e.message);
     }
     return ServerException(e.message);
+  }
+
+  /// Maps a failed edge-function call to our exception vocabulary. The function
+  /// returns a structured `{ ok:false, error:{ code, message } }` (or
+  /// `{ conflict:true }`) body, surfaced on [FunctionException.details].
+  Exception _functionException(FunctionException e) {
+    String? msg;
+    final d = e.details;
+    if (d is Map && d['error'] is Map) {
+      msg = (d['error'] as Map)['message']?.toString();
+    }
+    switch (e.status) {
+      case 409:
+        return ConflictException(
+          msg ?? 'Another scorer just updated this innings — refresh and retry',
+        );
+      case 401:
+      case 403:
+        return UnauthorizedException(msg ?? 'Not allowed to score this match');
+      default:
+        return ServerException(msg ?? 'record-ball failed', statusCode: e.status);
+    }
   }
 
   /// Tag the auth-required guard on inserts that don't go through an RPC.

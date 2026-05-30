@@ -31,6 +31,17 @@ class NotFoundException implements Exception {
   final String message;
 }
 
+/// An optimistic-lock guard tripped: another writer advanced the row's version
+/// since the client read it (Postgres `40001` / HTTP `409`). The caller should
+/// refresh from the realtime stream and retry — this is benign, not an error.
+class ConflictException implements Exception {
+  ConflictException([this.message = 'Conflicting concurrent update']);
+  final String message;
+
+  @override
+  String toString() => 'ConflictException: $message';
+}
+
 /// An OS permission was refused or the backing service is disabled (e.g. the
 /// user denied location access, or device location services are off).
 class PermissionException implements Exception {

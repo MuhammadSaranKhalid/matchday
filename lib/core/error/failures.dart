@@ -47,6 +47,13 @@ class PermissionFailure extends Failure {
   const PermissionFailure([super.message = 'Permission denied']);
 }
 
+/// Optimistic-lock conflict — a concurrent writer advanced the version
+/// (HTTP 409 / Postgres 40001). Benign: the realtime stream already delivers
+/// the fresh state, so the UI can refresh and retry without alarming the user.
+class ConflictFailure extends Failure {
+  const ConflictFailure([super.message = 'Updated elsewhere — please retry']);
+}
+
 /// Catch-all for anything we genuinely didn't see coming.
 class UnknownFailure extends Failure {
   const UnknownFailure([super.message = 'Unknown error']);

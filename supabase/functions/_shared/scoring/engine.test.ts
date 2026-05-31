@@ -189,3 +189,71 @@ Deno.test("validation: wicket_type without isWicket is rejected", () => {
   assertEquals(r.ok, false);
   assertEquals(r.error!.code, "wicket_type_unexpected");
 });
+
+// ── Innings termination (F1) ──────────────────────────────────────────────
+
+Deno.test("termination: a normal ball does NOT end the innings", () => {
+  const r = applyBall(state(), FORMAT, ball(), NO_CTX);
+  assertEquals(r.events!.inningsEnded, false);
+  assertEquals(r.events!.inningsEndReason, null);
+});
+
+Deno.test("termination: 10th wicket = all out (XI)", () => {
+  const r = applyBall(
+    state({ totalWickets: 9 }),
+    FORMAT,
+    ball({ isWicket: true, wicketType: "bowled" }),
+    NO_CTX,
+  );
+  assertEquals(r.newState!.totalWickets, 10);
+  assertEquals(r.events!.allOut, true);
+  assertEquals(r.events!.inningsEnded, true);
+  assertEquals(r.events!.inningsEndReason, "all_out");
+});
+
+Deno.test("termination: last legal ball of the over limit = overs complete", () => {
+  // 20-over T20 = 120 legal balls. The 120th legal delivery completes the innings.
+  const r = applyBall(state({ legalBallCount: 119 }), FORMAT, ball(), NO_CTX);
+  assertEquals(r.newState!.legalBallCount, 120);
+  assertEquals(r.events!.oversComplete, true);
+  assertEquals(r.events!.inningsEnded, true);
+  assertEquals(r.events!.inningsEndReason, "overs");
+});
+
+Deno.test("termination: reaching the chase target ends the innings", () => {
+  const r = applyBall(
+    state({ target: 50, totalRuns: 48 }),
+    FORMAT,
+    ball({ runsScored: 2 }),
+    NO_CTX,
+  );
+  assertEquals(r.newState!.totalRuns, 50);
+  assertEquals(r.events!.targetReached, true);
+  assertEquals(r.events!.inningsEnded, true);
+  // target wins precedence over any other reason
+  assertEquals(r.events!.inningsEndReason, "target");
+});
+
+Deno.test("termination: all-out scales with team size (6-a-side = 5 wkts)", () => {
+  const sixes = { ...FORMAT, playersPerTeam: 6 }; // wicketsToAllOut defaults to 5
+  const r = applyBall(
+    state({ totalWickets: 4 }),
+    sixes,
+    ball({ isWicket: true, wicketType: "lbw" }),
+    NO_CTX,
+  );
+  assertEquals(r.events!.allOut, true);
+  assertEquals(r.events!.inningsEndReason, "all_out");
+});
+
+Deno.test("termination: 9 down is NOT all out yet (XI)", () => {
+  const r = applyBall(
+    state({ totalWickets: 8 }),
+    FORMAT,
+    ball({ isWicket: true, wicketType: "bowled" }),
+    NO_CTX,
+  );
+  assertEquals(r.newState!.totalWickets, 9);
+  assertEquals(r.events!.allOut, false);
+  assertEquals(r.events!.inningsEnded, false);
+});

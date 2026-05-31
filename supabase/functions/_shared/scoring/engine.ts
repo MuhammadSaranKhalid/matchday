@@ -4,16 +4,17 @@
 // the raw delivery, and minimal context, it returns the computed `balls` row,
 // the new `match_innings_state`, and a set of events. No I/O.
 //
-// ── SLICE A (this file) is a VERBATIM port of the deployed `record_ball`
-//    plpgsql (migration 20260529144952), reproduced in MATCH_ENGINE_DESIGN.md
-//    Appendix A. It deliberately preserves today's behaviour EXACTLY — including
-//    quirks like "running on a wide does not change strike" — so the cutover is
-//    provably behaviour-neutral. Rule corrections and termination land in Slice B.
+// The per-ball maths is a behaviour-preserving port of the deployed `record_ball`
+// plpgsql (MATCH_ENGINE_DESIGN.md Appendix A). On top of that it now computes
+// INNINGS TERMINATION (Slice B / F1): all-out, overs complete, target reached,
+// or declared. The engine only REPORTS these via `events` — the edge
+// orchestrator decides what to do (start the next innings or complete the match).
 
 import type {
   BallInput,
   BallResult,
   EngineContext,
+  InningsEndReason,
   InningsState,
   MatchFormat,
 } from "./types.ts";
@@ -58,6 +59,8 @@ export function applyBall(
   if (overEnded) swap = !swap;
 
   const newLegal = state.legalBallCount + (isLegal ? 1 : 0);
+  const newTotalRuns = state.totalRuns + runs + extras;
+  const newTotalWickets = state.totalWickets + (input.isWicket ? 1 : 0);
   const newStriker = input.isWicket
     ? null
     : swap
@@ -67,6 +70,29 @@ export function applyBall(
     ? state.strikerId
     : state.nonStrikerId;
   const newBowler = overEnded ? null : state.bowlerId;
+
+  // ── Innings termination ──
+  // wicketsToAllOut defaults to (playersPerTeam - 1); a format can override it
+  // (e.g. non-XI sizes). Bespoke models that never go "all out" (indoor pairs)
+  // will set it to 0, which disables the all-out check.
+  const wicketsToAllOut = format.wicketsToAllOut ?? (format.playersPerTeam - 1);
+  const allOut = wicketsToAllOut > 0 && newTotalWickets >= wicketsToAllOut;
+  const oversComplete = format.oversPerInnings > 0 &&
+    newLegal >= format.oversPerInnings * ballsPerOver;
+  const targetReached = state.target != null && newTotalRuns >= state.target;
+  const inningsEnded = allOut || oversComplete || targetReached ||
+    state.isDeclared;
+  // Precedence for the primary reason: a chase won (target) beats all-out beats
+  // overs-exhausted beats a standing declaration.
+  const inningsEndReason: InningsEndReason | null = targetReached
+    ? "target"
+    : allOut
+    ? "all_out"
+    : oversComplete
+    ? "overs"
+    : state.isDeclared
+    ? "declared"
+    : null;
 
   return {
     ok: true,
@@ -88,16 +114,21 @@ export function applyBall(
     },
     newState: {
       legalBallCount: newLegal,
-      totalRuns: state.totalRuns + runs + extras,
-      totalWickets: state.totalWickets + (input.isWicket ? 1 : 0),
+      totalRuns: newTotalRuns,
+      totalWickets: newTotalWickets,
       totalExtras: state.totalExtras + extras,
       strikerId: newStriker,
       nonStrikerId: newNonStriker,
       bowlerId: newBowler,
     },
-    // Slice A reports over-end (needed for the bowler prompt) but never
-    // terminates the innings — that is Slice B.
-    events: { overEnded, allOut: false, inningsEnded: false },
+    events: {
+      overEnded,
+      allOut,
+      oversComplete,
+      targetReached,
+      inningsEnded,
+      inningsEndReason,
+    },
   };
 }
 

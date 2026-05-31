@@ -37,16 +37,18 @@ export interface InningsState {
   version: number;
 }
 
-/** The match format (parsed from `matches.format` jsonb). Slice A only reads
- * `ballsPerOver` (always 6 today); the rest are carried so Slice B/C can
- * enforce limits without changing this contract. */
+/** The match format (parsed from `matches.format` jsonb). The engine reads
+ * every knob here to enforce the rules of any format. */
 export interface MatchFormat {
-  oversPerInnings: number; // 0 = unlimited (Slice B/C); Slice A does not enforce
+  oversPerInnings: number; // 0 = unlimited (Test / first-class)
   playersPerTeam: number;
-  ballsPerOver: number; // Slice A: 6
+  ballsPerOver: number; // 6 standard; 5 (The Hundred / LMS); 8 (indoor)
   maxOversPerBowler: number; // 0 = unlimited
-  inningsPerSide: number; // Slice A/B: 1
+  inningsPerSide: number; // 1 limited-overs; 2 Test / first-class
   ballType: "leather" | "tape" | "tennis";
+  /** Wickets that end the innings. Defaults to `playersPerTeam - 1` when unset;
+   * 0 disables the all-out check (bespoke models like indoor pairs). */
+  wicketsToAllOut?: number;
 }
 
 /** The raw delivery the scorer recorded. */
@@ -99,10 +101,16 @@ export interface NewInningsState {
   bowlerId: string | null;
 }
 
+/** Why an innings ended (the primary reason; see engine precedence). */
+export type InningsEndReason = "all_out" | "overs" | "target" | "declared";
+
 export interface InningsEvents {
   overEnded: boolean;
-  allOut: boolean; // Slice A: always false; activated in Slice B
-  inningsEnded: boolean; // Slice A: always false; activated in Slice B
+  allOut: boolean;
+  oversComplete: boolean;
+  targetReached: boolean;
+  inningsEnded: boolean;
+  inningsEndReason: InningsEndReason | null;
 }
 
 export interface BallResult {

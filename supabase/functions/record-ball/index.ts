@@ -1,34 +1,32 @@
-// record-ball — Slice A edge orchestrator (all-TypeScript write path).
+// record-ball — edge orchestrator (all-TypeScript write path).
 //
-// Replaces the fat `record_ball` RPC on the scoring hot path. Flow:
+// Flow:
 //   1. identify the caller (JWT → actor)
 //   2. authorize with the EXISTING _can_score_match() rule, run AS the user
 //   3. open ONE Postgres transaction over a direct connection:
 //        lock the innings row (FOR UPDATE) → read state/format/prev delivery →
 //        compute the ball with the pure engine → insert balls + update
-//        innings_state → commit
+//        innings_state → and, if the engine says the innings ENDED, transition
+//        the match (innings_break, or completed with a computed result) → commit
 //
 // The lock + transaction live here in TypeScript (a direct Postgres connection),
-// not in a SQL function — PostgREST/supabase-js has no transactions, so this is
-// the only safe all-TS way to write two tables atomically with the version
-// guard. The per-table triggers (broadcast_new_ball, _balls_assign_seq,
-// broadcast_innings_state, set_updated_at) fire on these writes exactly as they
-// did for record_ball, so realtime is unchanged.
+// not in a SQL function — PostgREST/supabase-js has no transactions. The
+// per-table triggers (broadcast_new_ball, broadcast_innings_state,
+// broadcast_match_state, _after_match_complete) fire on these writes, so realtime
+// + standings/bracket advance work unchanged.
 //
-// Request body is the SAME `p_*` shape the Flutter repo already builds for
-// record_ball, so only the transport changed on the client. Responses:
-//   200 { ok:true, ball }            — written
+// Responses:
+//   200 { ok:true, ball, events, transition }  — written (transition tells the
+//          client to go to innings-break / result; kind: none|innings_break|completed)
 //   422 { ok:false, error }          — engine rejected the delivery
 //   409 { ok:false, conflict:true }  — version moved (another scorer); retry
 //   401/403 { ok:false, error }      — not signed in / not allowed to score
-//
-// verify_jwt stays at its default (true): the gateway rejects anonymous calls,
-// and the Flutter client attaches the user's access token automatically.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { db, userClient } from "../_shared/db.ts";
 import { json } from "../_shared/http.ts";
 import { applyBall } from "../_shared/scoring/engine.ts";
+import { computeResult, type InningsLine } from "../_shared/scoring/result.ts";
 import type {
   BallInput,
   BallKind,
@@ -92,9 +90,7 @@ Deno.serve(async (req) => {
     ? Number(body.p_expected_version)
     : null;
 
-  // 3. Authorize via the existing server-side rule, run AS the user. This is a
-  //    read (not a write) and reuses _can_score_match's organiser / scorer /
-  //    friendly-creator branches with the caller's real identity.
+  // 3. Authorize via the existing server-side rule, run AS the user.
   const { data: canScore, error: authzErr } = await asUser.rpc(
     "_can_score_match",
     { p_match_id: matchId },
@@ -117,9 +113,9 @@ Deno.serve(async (req) => {
 
   const sql = db();
 
-  // 4. One atomic transaction: lock → read → compute → write.
+  // 4. One atomic transaction: lock → read → compute → write → maybe transition.
   try {
-    const ballRow = await sql.begin(async (tx) => {
+    const out = await sql.begin(async (tx) => {
       const stateRows = await tx`
         select striker_id, non_striker_id, bowler_id, legal_ball_count,
                total_runs, total_wickets, total_extras, is_all_out,
@@ -136,15 +132,21 @@ Deno.serve(async (req) => {
       }
       const s = stateRows[0];
 
-      // Double-commit guard: the version the client computed against must still
-      // be current. Null (single-scorer flows) relies on the FOR UPDATE lock.
+      // Double-commit guard.
       if (expectedVersion !== null && Number(s.version) !== expectedVersion) {
         throw new ConflictSignal();
       }
 
       const matchRows = await tx`
-        select format from matches where match_id = ${matchId}`;
-      const fmt = (matchRows[0]?.format ?? {}) as Record<string, unknown>;
+        select format, status, toss_won_by, toss_decision, team_a_id, team_b_id
+          from matches where match_id = ${matchId}`;
+      const m = matchRows[0];
+      if (
+        m && ["completed", "abandoned", "walkover"].includes(m.status as string)
+      ) {
+        throw new HttpSignal(409, "match_finalised", "Match is already finished");
+      }
+      const fmt = (m?.format ?? {}) as Record<string, unknown>;
 
       const prevRows = await tx`
         select ball_type from balls
@@ -173,6 +175,9 @@ Deno.serve(async (req) => {
         maxOversPerBowler: num(fmt.max_overs_per_bowler, 0),
         inningsPerSide: num(fmt.innings_per_side, 1),
         ballType: (fmt.ball_type as MatchFormat["ballType"]) ?? "leather",
+        wicketsToAllOut: fmt.wickets_to_all_out != null
+          ? Number(fmt.wickets_to_all_out)
+          : undefined,
       };
       const input: BallInput = {
         isLegalDelivery: body.p_is_legal_delivery === true,
@@ -195,6 +200,7 @@ Deno.serve(async (req) => {
       }
       const b = result.ball!;
       const ns = result.newState!;
+      const events = result.events!;
 
       const inserted = await tx`
         insert into balls (
@@ -220,13 +226,73 @@ Deno.serve(async (req) => {
           striker_id       = ${ns.strikerId},
           non_striker_id   = ${ns.nonStrikerId},
           bowler_id        = ${ns.bowlerId},
+          is_all_out       = ${events.allOut},
           version          = version + 1
         where match_id = ${matchId} and innings_number = ${inningsNumber}`;
 
-      return inserted[0];
+      // ── Innings termination ──
+      let transition: {
+        kind: "none" | "innings_break" | "completed";
+        result?: unknown;
+      } = { kind: "none" };
+
+      if (events.inningsEnded) {
+        const inningsPerSide = format.inningsPerSide > 0
+          ? format.inningsPerSide
+          : 1;
+        const isFinalInnings = inningsNumber >= inningsPerSide * 2;
+
+        if (!isFinalInnings) {
+          await tx`
+            update matches set status = 'innings_break'
+             where match_id = ${matchId}`;
+          transition = { kind: "innings_break" };
+        } else {
+          // Build per-innings lines (current innings already reflects the new
+          // totals because we read within the same transaction).
+          const innRows = await tx`
+            select innings_number, total_runs, total_wickets, legal_ball_count,
+                   is_all_out
+              from match_innings_state
+             where match_id = ${matchId}
+             order by innings_number`;
+          const lines = toInningsLines(innRows, m);
+          const res = computeResult(lines, format);
+          await tx`
+            update matches set
+              status   = 'completed',
+              end_time = now(),
+              result   = ${
+            tx.json({
+              winner_team_id: res.winnerTeamId,
+              win_type: res.winType,
+              win_margin: res.winMargin,
+              // `description` is the key the Flutter MatchDto reads into
+              // Match.resultDescription; keep `summary` too as a friendly alias.
+              description: res.description,
+              summary: res.description,
+              innings: lines.map((l) => ({
+                team_id: l.battingTeamId,
+                runs: l.runs,
+                wickets: l.wickets,
+                overs: l.legalBalls / (format.ballsPerOver || 6),
+              })),
+            })
+          }
+             where match_id = ${matchId}`;
+          transition = { kind: "completed", result: res };
+        }
+      }
+
+      return { ball: inserted[0], events, transition };
     });
 
-    return json(200, { ok: true, ball: ballRow });
+    return json(200, {
+      ok: true,
+      ball: out.ball,
+      events: out.events,
+      transition: out.transition,
+    });
   } catch (e) {
     if (e instanceof ConflictSignal) {
       return json(409, { ok: false, conflict: true });
@@ -248,4 +314,30 @@ Deno.serve(async (req) => {
 function num(v: unknown, fallback: number): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
+}
+
+// Map innings_state rows → result InningsLine[], deriving each innings's batting
+// team from the toss (odd innings = bats-first team). Mirrors the client's
+// _battingTeamId so server and client agree.
+// deno-lint-ignore no-explicit-any
+function toInningsLines(rows: any[], m: any): InningsLine[] {
+  const teamA = (m?.team_a_id ?? null) as string | null;
+  const teamB = (m?.team_b_id ?? null) as string | null;
+  const tossWon = (m?.toss_won_by ?? null) as string | null;
+  const decision = (m?.toss_decision ?? null) as string | null;
+  const batsFirst = tossWon && decision
+    ? (decision === "bat" ? tossWon : (tossWon === teamA ? teamB : teamA))
+    : teamA;
+  const other = batsFirst === teamA ? teamB : teamA;
+  return rows.map((r) => {
+    const n = Number(r.innings_number);
+    return {
+      inningsNumber: n,
+      battingTeamId: (n % 2 === 1 ? batsFirst : other) ?? "",
+      runs: Number(r.total_runs),
+      wickets: Number(r.total_wickets),
+      legalBalls: Number(r.legal_ball_count),
+      isAllOut: r.is_all_out === true,
+    };
+  });
 }

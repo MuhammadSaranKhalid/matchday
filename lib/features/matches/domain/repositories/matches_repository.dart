@@ -168,6 +168,10 @@ abstract class MatchesRepository {
     required String strikerId,
     required String nonStrikerId,
     required String bowlerId,
+
+    /// The chase target for this innings (first-innings runs + 1). Only set when
+    /// opening the second innings; null preserves any existing target.
+    int? target,
   });
 
   /// Persist one delivery via the `record_ball` RPC. The RPC also advances

@@ -42,8 +42,16 @@ const _freeHitBorder = Color(0xFFD9B96B); // oklch(0.85 0.10 80)
 const _freeHitText = Color(0xFF4B3514); // oklch(0.32 0.10 80)
 
 class ScoringScreen extends ConsumerStatefulWidget {
-  const ScoringScreen({super.key, required this.matchId});
+  const ScoringScreen({
+    super.key,
+    required this.matchId,
+    this.inningsNumber = 1,
+  });
   final String matchId;
+
+  /// Which innings this screen is scoring. Innings 1 by default; the
+  /// innings-break flow routes here with `?innings=2` for the chase.
+  final int inningsNumber;
 
   @override
   ConsumerState<ScoringScreen> createState() => _ScoringScreenState();
@@ -55,9 +63,6 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
   bool _undoFlash = false;
   String? _toast;
   Timer? _toastTimer;
-
-  /// v1 only handles innings 1; innings-break handover lands later.
-  final int _inningsNumber = 1;
 
   @override
   void dispose() {
@@ -96,6 +101,21 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Lifecycle navigation: record-ball flips the match to innings_break /
+    // completed and broadcasts it; route to the matching screen.
+    ref.listen(liveMatchProvider(widget.matchId), (prev, next) {
+      switch (next.value?.status) {
+        case MatchStatus.inningsBreak:
+          context.go('/matches/${widget.matchId}/innings-break');
+        case MatchStatus.completed:
+        case MatchStatus.abandoned:
+        case MatchStatus.walkover:
+          context.go('/matches/${widget.matchId}/result');
+        case _:
+          break;
+      }
+    });
+
     final match = ref.watch(liveMatchProvider(widget.matchId)).value;
     if (match == null) {
       return const Scaffold(
@@ -104,13 +124,13 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       );
     }
     final inningsState = ref
-        .watch(liveInningsStateProvider(widget.matchId, _inningsNumber))
+        .watch(liveInningsStateProvider(widget.matchId, widget.inningsNumber))
         .value;
     final matchPlayers =
         ref.watch(matchPlayersProvider(widget.matchId)).value ??
             const <MatchPlayer>[];
     final balls =
-        ref.watch(liveBallsProvider(widget.matchId, _inningsNumber)).value ??
+        ref.watch(liveBallsProvider(widget.matchId, widget.inningsNumber)).value ??
             const <Ball>[];
     final rosterA = ref.watch(rosterProvider(match.teamAId.value)).value ??
         const <RosterMember>[];
@@ -778,7 +798,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
   ) async {
     await _submit(BallDraft(
       matchId: match.id,
-      inningsNumber: _inningsNumber,
+      inningsNumber: widget.inningsNumber,
       isLegalDelivery: true,
       ballKind: BallKind.legal,
       runsScored: runs,
@@ -801,7 +821,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     final extras = isWideOrNb ? 1 : result.runs;
     await _submit(BallDraft(
       matchId: match.id,
-      inningsNumber: _inningsNumber,
+      inningsNumber: widget.inningsNumber,
       isLegalDelivery: !isWideOrNb,
       ballKind: result.kind,
       runsScored: runsScored,
@@ -822,7 +842,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
   ) async {
     await _submit(BallDraft(
       matchId: match.id,
-      inningsNumber: _inningsNumber,
+      inningsNumber: widget.inningsNumber,
       isLegalDelivery: true,
       ballKind: BallKind.legal,
       runsScored: r.runsBefore,
@@ -838,7 +858,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       // Re-open the innings with the new batter on strike.
       await ref.read(matchesRepositoryProvider).startInnings(
             matchId: match.id,
-            inningsNumber: _inningsNumber,
+            inningsNumber: widget.inningsNumber,
             strikerId: r.nextBatterMatchPlayerId!,
             nonStrikerId: inningsState?.nonStrikerId?.value ?? '',
             bowlerId: inningsState?.bowlerId?.value ?? '',
@@ -880,7 +900,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     final result =
         await ref.read(matchesRepositoryProvider).undoLastBall(
               matchId: match.id,
-              inningsNumber: _inningsNumber,
+              inningsNumber: widget.inningsNumber,
             );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -1021,7 +1041,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
         ref.read(matchPlayersProvider(widget.matchId)).value ??
             const <MatchPlayer>[];
     final inningsState = ref
-        .read(liveInningsStateProvider(widget.matchId, _inningsNumber))
+        .read(liveInningsStateProvider(widget.matchId, widget.inningsNumber))
         .value;
     final battingSide = _battingTeamSide(match);
     final bowlingSide = battingSide == MatchTeamSide.a
@@ -1068,7 +1088,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     if (pick == null || !mounted) return;
     await ref.read(matchesRepositoryProvider).startInnings(
           matchId: match.id,
-          inningsNumber: _inningsNumber,
+          inningsNumber: widget.inningsNumber,
           // Strike rotates at end of over: previous non-striker is on strike.
           strikerId: inningsState?.nonStrikerId?.value ?? '',
           nonStrikerId: inningsState?.strikerId?.value ?? '',
@@ -1112,7 +1132,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
         justBowled: null,
         people: bowlerPeople,
         title: 'Pick opening bowler',
-        kicker: 'INNINGS $_inningsNumber',
+        kicker: 'INNINGS ${widget.inningsNumber}',
       ),
     );
     if (pick == null) {
@@ -1120,12 +1140,12 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       return;
     }
     final inningsState = ref
-        .read(liveInningsStateProvider(widget.matchId, _inningsNumber))
+        .read(liveInningsStateProvider(widget.matchId, widget.inningsNumber))
         .value;
     setState(() => _busy = true);
     final result = await ref.read(matchesRepositoryProvider).startInnings(
           matchId: match.id,
-          inningsNumber: _inningsNumber,
+          inningsNumber: widget.inningsNumber,
           strikerId: inningsState?.strikerId?.value ?? '',
           nonStrikerId: inningsState?.nonStrikerId?.value ?? '',
           bowlerId: pick,
@@ -1142,7 +1162,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
   // ─── derived helpers ────────────────────────────────────────────────────
 
   MatchTeamSide _battingTeamSide(Match match) {
-    final t = _battingTeamId(match, _inningsNumber);
+    final t = _battingTeamId(match, widget.inningsNumber);
     return t == match.teamAId ? MatchTeamSide.a : MatchTeamSide.b;
   }
 

@@ -61,6 +61,8 @@ class MatchesRepositoryImpl implements MatchesRepository {
         matchesById[dto.matchId] = _MatchInfo(
           teamAId: dto.teamAId,
           teamBId: dto.teamBId,
+          tossWonBy: dto.tossWonBy,
+          tossDecision: dto.tossDecision,
         );
       }
       final ballDtos = await _remote.listBallsForMatches(
@@ -72,8 +74,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
       for (final b in ballDtos) {
         final info = matchesById[b.matchId];
         if (info == null) continue;
-        final battingTeamId =
-            b.inningsNumber == 1 ? info.teamAId : info.teamBId;
+        final battingTeamId = _battingTeamForInnings(info, b.inningsNumber);
         final key = '${b.matchId}|${b.inningsNumber}';
         final acc = byKey.putIfAbsent(
           key,
@@ -198,6 +199,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
     required String strikerId,
     required String nonStrikerId,
     required String bowlerId,
+    int? target,
   }) async {
     if (strikerId.isEmpty || nonStrikerId.isEmpty || bowlerId.isEmpty) {
       return const Left(
@@ -216,6 +218,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
         strikerId: strikerId,
         nonStrikerId: nonStrikerId,
         bowlerId: bowlerId,
+        target: target,
       );
       return const Right(unit);
     } on UnauthorizedException catch (e) {
@@ -616,9 +619,34 @@ class MatchesRepositoryImpl implements MatchesRepository {
 // ─── Internal helpers (innings aggregation) ───────────────────────────────
 
 class _MatchInfo {
-  const _MatchInfo({required this.teamAId, required this.teamBId});
+  const _MatchInfo({
+    required this.teamAId,
+    required this.teamBId,
+    this.tossWonBy,
+    this.tossDecision,
+  });
   final String teamAId;
   final String teamBId;
+  final String? tossWonBy; // team id that won the toss
+  final String? tossDecision; // 'bat' | 'bowl'
+}
+
+/// Which team bats in [inningsNumber], derived from the toss. Odd innings are
+/// the team that batted first; even innings the other. Mirrors the scoring
+/// screen's `_battingTeamId` and the edge function so all three agree.
+String _battingTeamForInnings(_MatchInfo info, int inningsNumber) {
+  final tossWon = info.tossWonBy;
+  final decision = info.tossDecision;
+  final String batsFirst;
+  if (tossWon != null && decision != null) {
+    batsFirst = decision == 'bat'
+        ? tossWon
+        : (tossWon == info.teamAId ? info.teamBId : info.teamAId);
+  } else {
+    batsFirst = info.teamAId;
+  }
+  final other = batsFirst == info.teamAId ? info.teamBId : info.teamAId;
+  return inningsNumber.isOdd ? batsFirst : other;
 }
 
 class _InningsAcc {

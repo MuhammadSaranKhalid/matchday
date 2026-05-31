@@ -159,6 +159,7 @@ class MatchesRemoteDataSource {
     required String strikerId,
     required String nonStrikerId,
     required String bowlerId,
+    int? target,
   }) async {
     try {
       await _supabase.rpc<void>('start_innings', params: {
@@ -167,6 +168,7 @@ class MatchesRemoteDataSource {
         'p_striker_id': strikerId,
         'p_non_striker_id': nonStrikerId,
         'p_bowler_id': bowlerId,
+        if (target != null) 'p_target': target,
       });
     } on PostgrestException catch (e) {
       throw _rpcException(e);

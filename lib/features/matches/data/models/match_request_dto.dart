@@ -54,6 +54,9 @@ abstract class MatchRequestDto with _$MatchRequestDto {
         ballType: MatchBallType.fromWire(m['ball_type'] as String?),
         maxOversPerBowler:
             (m['max_overs_per_bowler'] as num?)?.toInt() ?? 4,
+        ballsPerOver: (m['balls_per_over'] as num?)?.toInt() ?? 6,
+        inningsPerSide: (m['innings_per_side'] as num?)?.toInt() ?? 1,
+        wicketsToAllOut: (m['wickets_to_all_out'] as num?)?.toInt(),
       );
     }
 
@@ -99,5 +102,8 @@ abstract class MatchRequestDto with _$MatchRequestDto {
         'players_per_team': f.playersPerTeam,
         'ball_type': f.ballType.wire,
         'max_overs_per_bowler': f.maxOversPerBowler,
+        'balls_per_over': f.ballsPerOver,
+        'innings_per_side': f.inningsPerSide,
+        if (f.wicketsToAllOut != null) 'wickets_to_all_out': f.wicketsToAllOut,
       };
 }

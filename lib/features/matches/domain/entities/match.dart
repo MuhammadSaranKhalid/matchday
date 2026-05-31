@@ -114,23 +114,43 @@ class MatchId extends Equatable {
   String toString() => value;
 }
 
-/// Match format: overs, players a side, ball type, bowling cap.
+/// Match format — the rule knobs the scoring engine enforces. See
+/// CRICKET_FORMATS.md for how each format maps onto these fields.
 class MatchFormat extends Equatable {
   const MatchFormat({
     required this.oversPerInnings,
     required this.playersPerTeam,
     required this.ballType,
     required this.maxOversPerBowler,
+    this.ballsPerOver = 6,
+    this.inningsPerSide = 1,
+    this.wicketsToAllOut,
   });
 
-  final int oversPerInnings;
+  final int oversPerInnings; // 0 = unlimited (Test / first-class)
   final int playersPerTeam;
   final MatchBallType ballType;
-  final int maxOversPerBowler;
+  final int maxOversPerBowler; // 0 = unlimited
+
+  /// 6 standard; 5 (The Hundred / LMS); 8 (indoor).
+  final int ballsPerOver;
+
+  /// 1 limited-overs; 2 Test / first-class.
+  final int inningsPerSide;
+
+  /// Wickets that end the innings. Null → derived as playersPerTeam - 1.
+  final int? wicketsToAllOut;
 
   @override
-  List<Object?> get props =>
-      [oversPerInnings, playersPerTeam, ballType, maxOversPerBowler];
+  List<Object?> get props => [
+        oversPerInnings,
+        playersPerTeam,
+        ballType,
+        maxOversPerBowler,
+        ballsPerOver,
+        inningsPerSide,
+        wicketsToAllOut,
+      ];
 }
 
 class Venue extends Equatable {

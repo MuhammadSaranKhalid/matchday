@@ -362,6 +362,36 @@ scorecard/result screen → standings/bracket update fires for tournament matche
 **Goal:** make `format` authoritative and let the engine enforce every format. This slice is
 itself multi-step; ship in sub-phases C1 → C3.
 
+### 6.0 The format catalogue (target formats with real numbers)
+
+Sourced from official rule bodies — see **CRICKET_FORMATS.md** for citations (MCC Laws, ICC
+playing conditions, ECB/The Hundred, WICF indoor, Last Man Stands). Each row is the `format`
+settings the engine reads; the **Phase** column says when it lands.
+
+| Format | Players | Innings/side | Length | Balls/over | Max per bowler | Wkts → all-out | Special engine logic | Phase |
+|---|---|---|---|---|---|---|---|---|
+| **T20 / T20I** | 11 | 1 | 20 overs | 6 | 4 overs | 10 | — (this is the A/B baseline) | A/B done; presets C1 |
+| **T10** | 11 | 1 | 10 overs | 6 | 2 overs | 10 | — | C1 |
+| **ODI / List A** | 11 | 1 | 50 overs | 6 | 10 overs | 10 | powerplay phases | C1 |
+| **The Hundred** | 11 | 1 | **100 balls** | **5** | 20 balls | 10 | balls-based innings; ends change every 10 balls; 5- or 10-ball spells | C1\* |
+| **Sixes** | 6 | 1 | 5–6 overs | 5 / 6 | 1 over each | 5 | every fielder bowls; last-pair rule; retire@N | C1 |
+| **8-a-side** | 8 | 1 | ~20 overs | 6 | 4 overs | 7 | — | C1 |
+| **Test / First-class** | 11 | **2** | unlimited (timed) | 6 | none | 10 | declarations, follow-on, draw; innings 3–4 | C2 |
+| **Super Over** | 11 | +1 (inns 3) | 1 over | 6 | — | **2** | triggered on a tie; repeat-until-winner | C3 |
+| **DLS (rain)** | — | — | — | — | — | — | revised-target recompute on interruption | C3 |
+| **Indoor (WICF)** | 8 | 1 | 16 overs | 8 | 2 overs each | n/a | **bat in pairs; a dismissal is −5 runs, NOT all-out; net-zone scoring** | bespoke |
+| **Last Man Stands** | 8 | 1 | 20 overs | 5 | 4 overs | 8 | **last man bats alone at 7 down; lone batter scores even runs only; last-ball six = 12** | bespoke |
+| **Box / gully / tape-ball** | varies | 1 | varies | varies | varies | varies | no official rules — house-rules, or use post-match scorecard mode | scorecard |
+
+Notes:
+- **C1\*** — The Hundred fits C1's parameterised loop once `ballsPerInnings` and the 5-/10-ball
+  spell concept exist; it just isn't "overs of 6," so it's a small extension, not a rewrite.
+- **bespoke** — Indoor and Last Man Stands change what a *wicket* means (pairs / −5 / last-man-
+  alone), so they need their own dismissal model, not just a config number. They are deliberately
+  *after* C3 (or scored via post-match scorecard) — don't let them block the mainstream formats.
+- **`wicketsToAllOut` = `playersPerTeam − 1`** for every standard format (10/7/5 above); the two
+  bespoke rows are the only exceptions.
+
 ### 6.1 Make `MatchFormat` authoritative
 - Extend the domain `MatchFormat` + `MatchDto`/`MatchRequestDto` with: `ballsPerOver`,
   `inningsPerSide`, and (optional, else derived) `wicketsToAllOut`. Persist new keys in the

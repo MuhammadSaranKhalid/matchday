@@ -43,6 +43,9 @@ export interface MatchFormat {
   oversPerInnings: number; // 0 = unlimited (Test / first-class)
   playersPerTeam: number;
   ballsPerOver: number; // 6 standard; 5 (The Hundred / LMS); 8 (indoor)
+  /** Balls between END changes (strike swaps). Defaults to ballsPerOver; The
+   * Hundred uses 10 — ends change every two 5-ball sets. */
+  endChangeBalls?: number;
   maxOversPerBowler: number; // 0 = unlimited
   inningsPerSide: number; // 1 limited-overs; 2 Test / first-class
   ballType: "leather" | "tape" | "tennis";

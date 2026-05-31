@@ -125,6 +125,7 @@ class MatchFormat extends Equatable {
     this.ballsPerOver = 6,
     this.inningsPerSide = 1,
     this.wicketsToAllOut,
+    this.endChangeBalls,
   });
 
   final int oversPerInnings; // 0 = unlimited (Test / first-class)
@@ -141,6 +142,10 @@ class MatchFormat extends Equatable {
   /// Wickets that end the innings. Null → derived as playersPerTeam - 1.
   final int? wicketsToAllOut;
 
+  /// Balls between end changes (strike swaps). Null → ballsPerOver; The
+  /// Hundred uses 10.
+  final int? endChangeBalls;
+
   @override
   List<Object?> get props => [
         oversPerInnings,
@@ -150,6 +155,7 @@ class MatchFormat extends Equatable {
         ballsPerOver,
         inningsPerSide,
         wicketsToAllOut,
+        endChangeBalls,
       ];
 }
 

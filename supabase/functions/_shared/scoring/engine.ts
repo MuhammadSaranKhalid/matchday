@@ -80,10 +80,18 @@ export function applyBall(
 
   // ── Strike rotation (record_ball parity) ──
   // swap when an odd number of runs was run, XOR an odd number of bye/leg-bye
-  // runs on a legal delivery; then toggle once more if the over just ended.
+  // runs on a legal delivery; then toggle once more if the ENDS just changed.
+  const endChangeBalls = format.endChangeBalls && format.endChangeBalls > 0
+    ? format.endChangeBalls
+    : ballsPerOver;
   let swap = (runs % 2 === 1) !== (isLegal && extras % 2 === 1);
+  // A "set"/over boundary (a new bowler may come on) is every ballsPerOver. The
+  // ENDS change (strike swaps) every endChangeBalls — equal to ballsPerOver for
+  // normal cricket, but 10 for The Hundred (two 5-ball sets per end).
   const overEnded = isLegal && (state.legalBallCount + 1) % ballsPerOver === 0;
-  if (overEnded) swap = !swap;
+  const endChanged = isLegal &&
+    (state.legalBallCount + 1) % endChangeBalls === 0;
+  if (endChanged) swap = !swap;
 
   const newLegal = state.legalBallCount + (isLegal ? 1 : 0);
   const newTotalRuns = state.totalRuns + runs + extras;

@@ -180,6 +180,9 @@ Deno.serve(async (req) => {
         oversPerInnings: num(fmt.overs_per_innings, 0),
         playersPerTeam: num(fmt.players_per_team, 11),
         ballsPerOver: num(fmt.balls_per_over, 6),
+        endChangeBalls: fmt.end_change_balls != null
+          ? Number(fmt.end_change_balls)
+          : undefined,
         maxOversPerBowler: num(fmt.max_overs_per_bowler, 0),
         inningsPerSide: num(fmt.innings_per_side, 1),
         ballType: (fmt.ball_type as MatchFormat["ballType"]) ?? "leather",

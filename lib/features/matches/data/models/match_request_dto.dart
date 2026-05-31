@@ -57,6 +57,7 @@ abstract class MatchRequestDto with _$MatchRequestDto {
         ballsPerOver: (m['balls_per_over'] as num?)?.toInt() ?? 6,
         inningsPerSide: (m['innings_per_side'] as num?)?.toInt() ?? 1,
         wicketsToAllOut: (m['wickets_to_all_out'] as num?)?.toInt(),
+        endChangeBalls: (m['end_change_balls'] as num?)?.toInt(),
       );
     }
 
@@ -105,5 +106,6 @@ abstract class MatchRequestDto with _$MatchRequestDto {
         'balls_per_over': f.ballsPerOver,
         'innings_per_side': f.inningsPerSide,
         if (f.wicketsToAllOut != null) 'wickets_to_all_out': f.wicketsToAllOut,
+        if (f.endChangeBalls != null) 'end_change_balls': f.endChangeBalls,
       };
 }

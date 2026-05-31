@@ -50,6 +50,7 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   int _maxOversPerBowler = 4;
   int _ballsPerOver = 6;
   int _inningsPerSide = 1;
+  int? _endChangeBalls;
   DateTime? _startTime;
   final _venueCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
@@ -191,6 +192,7 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
             maxOversPerBowler: _maxOversPerBowler,
             ballsPerOver: _ballsPerOver,
             inningsPerSide: _inningsPerSide,
+            endChangeBalls: _endChangeBalls,
           ),
           message: _messageCtrl.text.trim().isEmpty
               ? null
@@ -219,6 +221,7 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
       _ballsPerOver = p.ballsPerOver;
       _inningsPerSide = p.inningsPerSide;
       _maxOversPerBowler = p.maxOversPerBowler;
+      _endChangeBalls = p.endChangeBalls;
     });
   }
 
@@ -992,13 +995,13 @@ class _FormatStep extends StatelessWidget {
 /// is modelled as 20 five-ball "overs" (= 100 balls); Test is unlimited overs
 /// across two innings. No preset highlighted = a custom knob combination.
 enum _FormatPreset {
-  t10('T10', 10, 11, 6, 1, 2),
-  t20('T20', 20, 11, 6, 1, 4),
-  odi('ODI', 50, 11, 6, 1, 10),
-  hundred('The Hundred', 20, 11, 5, 1, 4),
-  sixes('Sixes', 5, 6, 5, 1, 1),
-  eightAside('8-a-side', 20, 8, 6, 1, 4),
-  test('Test', 0, 11, 6, 2, 0);
+  t10('T10', 10, 11, 6, 1, 2, null),
+  t20('T20', 20, 11, 6, 1, 4, null),
+  odi('ODI', 50, 11, 6, 1, 10, null),
+  hundred('The Hundred', 20, 11, 5, 1, 4, 10),
+  sixes('Sixes', 5, 6, 5, 1, 1, null),
+  eightAside('8-a-side', 20, 8, 6, 1, 4, null),
+  test('Test', 0, 11, 6, 2, 0, null);
 
   const _FormatPreset(
     this.label,
@@ -1007,6 +1010,7 @@ enum _FormatPreset {
     this.ballsPerOver,
     this.inningsPerSide,
     this.maxOversPerBowler,
+    this.endChangeBalls,
   );
   final String label;
   final int overs;
@@ -1014,6 +1018,7 @@ enum _FormatPreset {
   final int ballsPerOver;
   final int inningsPerSide;
   final int maxOversPerBowler;
+  final int? endChangeBalls;
 }
 
 class _PresetRow extends StatelessWidget {

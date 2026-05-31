@@ -308,3 +308,18 @@ Deno.test("free hit: run out is allowed", () => {
   );
   assertEquals(r.ok, true);
 });
+
+// ── The Hundred (B2): ends change every 10 balls ──────────────────────────
+
+Deno.test("The Hundred: ends change every 10 balls, not every 5", () => {
+  const hundred: MatchFormat = { ...FORMAT, ballsPerOver: 5, endChangeBalls: 10 };
+  // 5th ball = set boundary: a new bowler is prompted, but the ENDS do NOT
+  // change, so the striker stays put.
+  const atFive = applyBall(state({ legalBallCount: 4 }), hundred, ball(), NO_CTX);
+  assertEquals(atFive.events!.overEnded, true); // set boundary → bowler prompt
+  assertEquals(atFive.newState!.bowlerId, null);
+  assertEquals(atFive.newState!.strikerId, "S"); // ends unchanged
+  // 10th ball: ends change → strike swaps to the other end.
+  const atTen = applyBall(state({ legalBallCount: 9 }), hundred, ball(), NO_CTX);
+  assertEquals(atTen.newState!.strikerId, "N");
+});

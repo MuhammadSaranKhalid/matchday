@@ -55,6 +55,7 @@ abstract class MatchDto with _$MatchDto {
           ballsPerOver: (format['balls_per_over'] as num?)?.toInt() ?? 6,
           inningsPerSide: (format['innings_per_side'] as num?)?.toInt() ?? 1,
           wicketsToAllOut: (format['wickets_to_all_out'] as num?)?.toInt(),
+          endChangeBalls: (format['end_change_balls'] as num?)?.toInt(),
         ),
         // Deployed schema: matches.venue is a single text column. Split a
         // "<ground> · <city>" form if present so existing UI binds keep

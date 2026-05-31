@@ -48,6 +48,8 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   int _playersPerSide = 11;
   MatchBallType _ball = MatchBallType.tape;
   int _maxOversPerBowler = 4;
+  int _ballsPerOver = 6;
+  int _inningsPerSide = 1;
   DateTime? _startTime;
   final _venueCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
@@ -187,6 +189,8 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
             playersPerTeam: _playersPerSide,
             ballType: _ball,
             maxOversPerBowler: _maxOversPerBowler,
+            ballsPerOver: _ballsPerOver,
+            inningsPerSide: _inningsPerSide,
           ),
           message: _messageCtrl.text.trim().isEmpty
               ? null
@@ -204,6 +208,18 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
         context.go('/challenges/${id.value}/sent');
       },
     );
+  }
+
+  /// Apply a format preset — fills every knob from the chosen format
+  /// (see CRICKET_FORMATS.md). The detailed controls below stay editable.
+  void _applyPreset(_FormatPreset p) {
+    setState(() {
+      _overs = p.overs;
+      _playersPerSide = p.players;
+      _ballsPerOver = p.ballsPerOver;
+      _inningsPerSide = p.inningsPerSide;
+      _maxOversPerBowler = p.maxOversPerBowler;
+    });
   }
 
   Widget _body() {
@@ -243,6 +259,9 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           playersPerSide: _playersPerSide,
           ball: _ball,
           maxOversPerBowler: _maxOversPerBowler,
+          ballsPerOver: _ballsPerOver,
+          inningsPerSide: _inningsPerSide,
+          onPreset: _applyPreset,
           onChange: ({overs, players, ball, maxOversPerBowler}) {
             setState(() {
               if (overs != null) _overs = overs;
@@ -862,6 +881,9 @@ class _FormatStep extends StatelessWidget {
     required this.playersPerSide,
     required this.ball,
     required this.maxOversPerBowler,
+    required this.ballsPerOver,
+    required this.inningsPerSide,
+    required this.onPreset,
     required this.onChange,
   });
 
@@ -869,6 +891,9 @@ class _FormatStep extends StatelessWidget {
   final int playersPerSide;
   final MatchBallType ball;
   final int maxOversPerBowler;
+  final int ballsPerOver;
+  final int inningsPerSide;
+  final void Function(_FormatPreset) onPreset;
   final void Function({
     int? overs,
     int? players,
@@ -882,14 +907,31 @@ class _FormatStep extends StatelessWidget {
     (v: 15, l: '15 ov', sub: ''),
     (v: 20, l: 'T20', sub: 'standard'),
     (v: 25, l: '25 ov', sub: ''),
-    (v: 40, l: '40 ov', sub: 'ODI lite'),
+    (v: 50, l: 'ODI', sub: '50 ov'),
   ];
+
+  /// Which preset (if any) the current knob values match, for highlighting.
+  _FormatPreset? get _active {
+    for (final p in _FormatPreset.values) {
+      if (p.overs == overs &&
+          p.players == playersPerSide &&
+          p.ballsPerOver == ballsPerOver &&
+          p.inningsPerSide == inningsPerSide &&
+          p.maxOversPerBowler == maxOversPerBowler) {
+        return p;
+      }
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
       children: [
+        const _SectionLabel('Format'),
+        _PresetRow(current: _active, onPick: onPreset),
+        const SizedBox(height: 14),
         const _SectionLabel('Match type'),
         const _MatchTypeGrid(),
         const SizedBox(height: 14),
@@ -916,6 +958,12 @@ class _FormatStep extends StatelessWidget {
           onTap: (v) => onChange(overs: v),
         ),
         const SizedBox(height: 14),
+        const _SectionLabel('Players a side'),
+        _PlayersStepper(
+          value: playersPerSide,
+          onChanged: (v) => onChange(players: v),
+        ),
+        const SizedBox(height: 14),
         const _SectionLabel('Per bowler · max'),
         _MaxOversSlider(
           value: maxOversPerBowler,
@@ -935,6 +983,144 @@ class _FormatStep extends StatelessWidget {
       case MatchBallType.tennis:
         return 'Tennis';
     }
+  }
+}
+
+// ─── Format presets ───────────────────────────────────────────────────────
+
+/// Format presets — each fills every knob from CRICKET_FORMATS.md. The Hundred
+/// is modelled as 20 five-ball "overs" (= 100 balls); Test is unlimited overs
+/// across two innings. No preset highlighted = a custom knob combination.
+enum _FormatPreset {
+  t10('T10', 10, 11, 6, 1, 2),
+  t20('T20', 20, 11, 6, 1, 4),
+  odi('ODI', 50, 11, 6, 1, 10),
+  hundred('The Hundred', 20, 11, 5, 1, 4),
+  sixes('Sixes', 5, 6, 5, 1, 1),
+  eightAside('8-a-side', 20, 8, 6, 1, 4),
+  test('Test', 0, 11, 6, 2, 0);
+
+  const _FormatPreset(
+    this.label,
+    this.overs,
+    this.players,
+    this.ballsPerOver,
+    this.inningsPerSide,
+    this.maxOversPerBowler,
+  );
+  final String label;
+  final int overs;
+  final int players;
+  final int ballsPerOver;
+  final int inningsPerSide;
+  final int maxOversPerBowler;
+}
+
+class _PresetRow extends StatelessWidget {
+  const _PresetRow({required this.current, required this.onPick});
+  final _FormatPreset? current;
+  final void Function(_FormatPreset) onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final p in _FormatPreset.values)
+          _PresetChip(
+            label: p.label,
+            selected: p == current,
+            onTap: () => onPick(p),
+          ),
+      ],
+    );
+  }
+}
+
+class _PresetChip extends StatelessWidget {
+  const _PresetChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? CkColors.ink : CkColors.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: selected ? CkColors.ink : CkColors.line),
+        ),
+        child: Text(
+          label,
+          style: CkType.body(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: selected ? CkColors.paper : CkColors.ink,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayersStepper extends StatelessWidget {
+  const _PlayersStepper({required this.value, required this.onChanged});
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: CkColors.surface,
+        borderRadius: BorderRadius.circular(CkRadii.md),
+        border: Border.all(color: CkColors.line),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _StepBtn(
+            icon: Icons.remove,
+            onTap: value > 5 ? () => onChanged(value - 1) : null,
+          ),
+          Text(
+            '$value a side',
+            style: CkType.body(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          _StepBtn(
+            icon: Icons.add,
+            onTap: value < 15 ? () => onChanged(value + 1) : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepBtn extends StatelessWidget {
+  const _StepBtn({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      icon: Icon(icon, size: 20),
+      color: CkColors.ink,
+      disabledColor: CkColors.soft,
+      visualDensity: VisualDensity.compact,
+    );
   }
 }
 

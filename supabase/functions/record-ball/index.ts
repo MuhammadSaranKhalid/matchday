@@ -155,6 +155,14 @@ Deno.serve(async (req) => {
          order by seq desc limit 1`;
       const prevNonWideKind = (prevRows[0]?.ball_type ?? null) as BallKind | null;
 
+      // Legal balls the current bowler has already bowled this innings — drives
+      // the per-bowler over-cap.
+      const bowlerRows = await tx`
+        select count(*)::int as n from balls
+         where match_id = ${matchId} and innings_number = ${inningsNumber}
+           and bowler_id = ${s.bowler_id} and is_legal_delivery = true`;
+      const bowlerLegalBalls = Number(bowlerRows[0]?.n ?? 0);
+
       const state: InningsState = {
         strikerId: s.striker_id,
         nonStrikerId: s.non_striker_id,
@@ -194,7 +202,10 @@ Deno.serve(async (req) => {
       };
 
       // Compute (pure, authoritative — runs while we hold the row lock).
-      const result = applyBall(state, format, input, { prevNonWideKind });
+      const result = applyBall(state, format, input, {
+        prevNonWideKind,
+        bowlerLegalBalls,
+      });
       if (!result.ok) {
         throw new HttpSignal(422, result.error!.code, result.error!.message);
       }

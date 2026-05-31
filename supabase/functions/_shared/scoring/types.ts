@@ -70,6 +70,11 @@ export interface EngineContext {
   /** `ball_type` of the most recent NON-wide delivery in this innings, or
    * null for the first delivery. Drives free-hit derivation. */
   prevNonWideKind: BallKind | null;
+
+  /** Legal balls the CURRENT bowler (state.bowlerId) has already bowled in this
+   * innings, BEFORE this delivery. Drives the per-bowler over-cap. Defaults to
+   * 0 when omitted. */
+  bowlerLegalBalls?: number;
 }
 
 /** The fully-computed `balls` row to insert (camelCase). */

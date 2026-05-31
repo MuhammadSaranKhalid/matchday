@@ -257,3 +257,54 @@ Deno.test("termination: 9 down is NOT all out yet (XI)", () => {
   assertEquals(r.events!.allOut, false);
   assertEquals(r.events!.inningsEnded, false);
 });
+
+// ── Bowler over-cap (B1) + free-hit dismissals (B5) ───────────────────────
+
+Deno.test("bowler cap: the over-limit-th legal ball is rejected", () => {
+  // FORMAT = 4 overs/bowler * 6 = 24 legal balls; the 25th is blocked.
+  const r = applyBall(state(), FORMAT, ball(), {
+    prevNonWideKind: null,
+    bowlerLegalBalls: 24,
+  });
+  assertEquals(r.ok, false);
+  assertEquals(r.error!.code, "bowler_over_cap");
+});
+
+Deno.test("bowler cap: one legal ball under the limit is fine", () => {
+  const r = applyBall(state(), FORMAT, ball(), {
+    prevNonWideKind: null,
+    bowlerLegalBalls: 23,
+  });
+  assertEquals(r.ok, true);
+});
+
+Deno.test("bowler cap: an illegal ball (wide) does not hit the cap", () => {
+  const r = applyBall(
+    state(),
+    FORMAT,
+    ball({ isLegalDelivery: false, ballKind: "wide", runsScored: 0, extras: 1 }),
+    { prevNonWideKind: null, bowlerLegalBalls: 24 },
+  );
+  assertEquals(r.ok, true);
+});
+
+Deno.test("free hit: bowled is rejected", () => {
+  const r = applyBall(
+    state(),
+    FORMAT,
+    ball({ isWicket: true, wicketType: "bowled" }),
+    { prevNonWideKind: "no_ball" },
+  );
+  assertEquals(r.ok, false);
+  assertEquals(r.error!.code, "free_hit_dismissal");
+});
+
+Deno.test("free hit: run out is allowed", () => {
+  const r = applyBall(
+    state(),
+    FORMAT,
+    ball({ isWicket: true, wicketType: "run_out" }),
+    { prevNonWideKind: "no_ball" },
+  );
+  assertEquals(r.ok, true);
+});

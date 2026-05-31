@@ -44,12 +44,39 @@ export function applyBall(
     return err("negative_runs", "Runs and extras must be non-negative");
   }
 
+  // ── Bowler over-cap (B1): a bowler may bowl at most maxOversPerBowler overs
+  //    = maxOversPerBowler * ballsPerOver legal balls. 0 = no cap. ──
+  if (
+    isLegal &&
+    format.maxOversPerBowler > 0 &&
+    (ctx.bowlerLegalBalls ?? 0) >= format.maxOversPerBowler * ballsPerOver
+  ) {
+    return err(
+      "bowler_over_cap",
+      `Bowler has reached the ${format.maxOversPerBowler}-over limit`,
+    );
+  }
+
   // ── Over / ball position, derived from the count BEFORE this ball ──
   const overNumber = Math.floor(state.legalBallCount / ballsPerOver);
   const ballInOver = isLegal ? (state.legalBallCount % ballsPerOver) + 1 : 0;
 
   // ── Free hit: true iff the most recent non-wide delivery was a no-ball ──
   const isFreeHit = ctx.prevNonWideKind === "no_ball";
+
+  // ── Free-hit dismissals (B5): on a free hit only run out / hit wicket /
+  //    obstructing / handled ball can dismiss the striker (mirrors the DB
+  //    balls_free_hit_dismissal_check constraint). ──
+  if (isFreeHit && input.isWicket) {
+    const allowed = ["run_out", "hit_wicket", "obstructing", "handled_ball"];
+    if (input.wicketType == null || !allowed.includes(input.wicketType)) {
+      return err(
+        "free_hit_dismissal",
+        "On a free hit the batter can only be run out, hit wicket, " +
+          "obstructing, or handled ball",
+      );
+    }
+  }
 
   // ── Strike rotation (record_ball parity) ──
   // swap when an odd number of runs was run, XOR an odd number of bye/leg-bye

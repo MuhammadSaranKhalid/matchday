@@ -2,6 +2,7 @@ import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../entities/ball.dart';
+import '../entities/format_preset.dart';
 import '../entities/innings_summary.dart';
 import '../entities/match.dart';
 import '../entities/match_innings_state.dart';
@@ -13,6 +14,9 @@ import '../entities/match_request.dart';
 /// keyed by `(match_id, innings_number)` on the `balls` table; per-team
 /// totals are aggregated from balls.
 abstract class MatchesRepository {
+  /// The active format presets from the backend catalog (setup picker source).
+  Future<Either<Failure, List<FormatPreset>>> listFormatPresets();
+
   Future<Either<Failure, Match?>> getMatch(MatchId id);
 
   /// Matches involving any team the user owns/manages.

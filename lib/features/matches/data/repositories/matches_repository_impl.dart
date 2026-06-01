@@ -4,6 +4,7 @@ import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/ball.dart';
+import '../../domain/entities/format_preset.dart';
 import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_innings_state.dart';
@@ -19,6 +20,20 @@ class MatchesRepositoryImpl implements MatchesRepository {
   MatchesRepositoryImpl(this._remote);
 
   final MatchesRemoteDataSource _remote;
+
+  @override
+  Future<Either<Failure, List<FormatPreset>>> listFormatPresets() async {
+    try {
+      final dtos = await _remote.listFormatPresets();
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
 
   @override
   Future<Either<Failure, Match?>> getMatch(MatchId id) async {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/ball_dto.dart';
+import '../models/format_preset_dto.dart';
 import '../models/match_dto.dart';
 import '../models/match_innings_state_dto.dart';
 import '../models/match_player_dto.dart';
@@ -20,11 +21,28 @@ class MatchesRemoteDataSource {
   static const _matchPlayers = 'match_players';
   static const _matchInningsState = 'match_innings_state';
   static const _balls = 'balls';
+  static const _formatPresets = 'format_presets';
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
     if (id == null) throw UnauthorizedException('Must be signed in');
     return id;
+  }
+
+  // ─── Format catalog ─────────────────────────────────────────────────────
+
+  /// The active format presets (the setup picker's source of truth).
+  Future<List<FormatPresetDto>> listFormatPresets() async {
+    try {
+      final rows = await _supabase
+          .from(_formatPresets)
+          .select()
+          .eq('is_active', true)
+          .order('sort_order');
+      return rows.map(FormatPresetDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
   }
 
   // ─── Matches ────────────────────────────────────────────────────────────

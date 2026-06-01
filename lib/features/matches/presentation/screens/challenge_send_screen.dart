@@ -7,6 +7,7 @@ import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../domain/entities/format_preset.dart';
 import '../../domain/entities/match.dart';
 import '../providers/matches_providers.dart';
 
@@ -214,14 +215,16 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
 
   /// Apply a format preset — fills every knob from the chosen format
   /// (see CRICKET_FORMATS.md). The detailed controls below stay editable.
-  void _applyPreset(_FormatPreset p) {
+  void _applyPreset(FormatPreset p) {
     setState(() {
-      _overs = p.overs;
-      _playersPerSide = p.players;
-      _ballsPerOver = p.ballsPerOver;
-      _inningsPerSide = p.inningsPerSide;
-      _maxOversPerBowler = p.maxOversPerBowler;
-      _endChangeBalls = p.endChangeBalls;
+      final f = p.format;
+      _overs = f.oversPerInnings;
+      _playersPerSide = f.playersPerTeam;
+      _ball = f.ballType;
+      _ballsPerOver = f.ballsPerOver;
+      _inningsPerSide = f.inningsPerSide;
+      _maxOversPerBowler = f.maxOversPerBowler;
+      _endChangeBalls = f.endChangeBalls;
     });
   }
 
@@ -257,6 +260,8 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           onPick: (t) => setState(() => _opponent = t),
         );
       case _Step.format:
+        final presets =
+            ref.watch(formatPresetsProvider).value ?? const <FormatPreset>[];
         return _FormatStep(
           overs: _overs,
           playersPerSide: _playersPerSide,
@@ -264,6 +269,7 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           maxOversPerBowler: _maxOversPerBowler,
           ballsPerOver: _ballsPerOver,
           inningsPerSide: _inningsPerSide,
+          presets: presets,
           onPreset: _applyPreset,
           onChange: ({overs, players, ball, maxOversPerBowler}) {
             setState(() {
@@ -886,6 +892,7 @@ class _FormatStep extends StatelessWidget {
     required this.maxOversPerBowler,
     required this.ballsPerOver,
     required this.inningsPerSide,
+    required this.presets,
     required this.onPreset,
     required this.onChange,
   });
@@ -896,7 +903,8 @@ class _FormatStep extends StatelessWidget {
   final int maxOversPerBowler;
   final int ballsPerOver;
   final int inningsPerSide;
-  final void Function(_FormatPreset) onPreset;
+  final List<FormatPreset> presets;
+  final void Function(FormatPreset) onPreset;
   final void Function({
     int? overs,
     int? players,
@@ -914,13 +922,14 @@ class _FormatStep extends StatelessWidget {
   ];
 
   /// Which preset (if any) the current knob values match, for highlighting.
-  _FormatPreset? get _active {
-    for (final p in _FormatPreset.values) {
-      if (p.overs == overs &&
-          p.players == playersPerSide &&
-          p.ballsPerOver == ballsPerOver &&
-          p.inningsPerSide == inningsPerSide &&
-          p.maxOversPerBowler == maxOversPerBowler) {
+  FormatPreset? get _active {
+    for (final p in presets) {
+      final f = p.format;
+      if (f.oversPerInnings == overs &&
+          f.playersPerTeam == playersPerSide &&
+          f.ballsPerOver == ballsPerOver &&
+          f.inningsPerSide == inningsPerSide &&
+          f.maxOversPerBowler == maxOversPerBowler) {
         return p;
       }
     }
@@ -933,7 +942,7 @@ class _FormatStep extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
       children: [
         const _SectionLabel('Format'),
-        _PresetRow(current: _active, onPick: onPreset),
+        _PresetRow(presets: presets, current: _active, onPick: onPreset),
         const SizedBox(height: 14),
         const _SectionLabel('Match type'),
         const _MatchTypeGrid(),
@@ -990,41 +999,18 @@ class _FormatStep extends StatelessWidget {
 }
 
 // ─── Format presets ───────────────────────────────────────────────────────
-
-/// Format presets — each fills every knob from CRICKET_FORMATS.md. The Hundred
-/// is modelled as 20 five-ball "overs" (= 100 balls); Test is unlimited overs
-/// across two innings. No preset highlighted = a custom knob combination.
-enum _FormatPreset {
-  t10('T10', 10, 11, 6, 1, 2, null),
-  t20('T20', 20, 11, 6, 1, 4, null),
-  odi('ODI', 50, 11, 6, 1, 10, null),
-  hundred('The Hundred', 20, 11, 5, 1, 4, 10),
-  sixes('Sixes', 5, 6, 5, 1, 1, null),
-  eightAside('8-a-side', 20, 8, 6, 1, 4, null),
-  test('Test', 0, 11, 6, 2, 0, null);
-
-  const _FormatPreset(
-    this.label,
-    this.overs,
-    this.players,
-    this.ballsPerOver,
-    this.inningsPerSide,
-    this.maxOversPerBowler,
-    this.endChangeBalls,
-  );
-  final String label;
-  final int overs;
-  final int players;
-  final int ballsPerOver;
-  final int inningsPerSide;
-  final int maxOversPerBowler;
-  final int? endChangeBalls;
-}
+// Presets now come from the backend `format_presets` catalog (formatPresets
+// provider); the hardcoded enum was removed so a format is data, not code.
 
 class _PresetRow extends StatelessWidget {
-  const _PresetRow({required this.current, required this.onPick});
-  final _FormatPreset? current;
-  final void Function(_FormatPreset) onPick;
+  const _PresetRow({
+    required this.presets,
+    required this.current,
+    required this.onPick,
+  });
+  final List<FormatPreset> presets;
+  final FormatPreset? current;
+  final void Function(FormatPreset) onPick;
 
   @override
   Widget build(BuildContext context) {
@@ -1032,10 +1018,10 @@ class _PresetRow extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final p in _FormatPreset.values)
+        for (final p in presets)
           _PresetChip(
             label: p.label,
-            selected: p == current,
+            selected: p.id == current?.id,
             onTap: () => onPick(p),
           ),
       ],

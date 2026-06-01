@@ -56,6 +56,55 @@ final class MatchesRepositoryProvider
 
 String _$matchesRepositoryHash() => r'a316d956792168308175a04fa059c37a6016b84c';
 
+/// The active format presets from the backend catalog (the setup picker reads
+/// this instead of a hardcoded list).
+
+@ProviderFor(formatPresets)
+final formatPresetsProvider = FormatPresetsProvider._();
+
+/// The active format presets from the backend catalog (the setup picker reads
+/// this instead of a hardcoded list).
+
+final class FormatPresetsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<FormatPreset>>,
+          List<FormatPreset>,
+          FutureOr<List<FormatPreset>>
+        >
+    with
+        $FutureModifier<List<FormatPreset>>,
+        $FutureProvider<List<FormatPreset>> {
+  /// The active format presets from the backend catalog (the setup picker reads
+  /// this instead of a hardcoded list).
+  FormatPresetsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'formatPresetsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$formatPresetsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<FormatPreset>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<FormatPreset>> create(Ref ref) {
+    return formatPresets(ref);
+  }
+}
+
+String _$formatPresetsHash() => r'6855f33bec1e2d342cc476eb7ea94d02996f8ff0';
+
 /// One-shot fetch of a single match (for the request screen). Throws a
 /// [FailureWrapper] on error so the UI can show it via AsyncError.
 

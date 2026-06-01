@@ -3,6 +3,7 @@ import '../../../../core/error/failures.dart';
 import '../../data/datasources/matches_datasource_providers.dart';
 import '../../data/repositories/matches_repository_impl.dart';
 import '../../domain/entities/ball.dart';
+import '../../domain/entities/format_preset.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_innings_state.dart';
 import '../../domain/entities/match_player.dart';
@@ -14,6 +15,15 @@ part 'matches_providers.g.dart';
 @Riverpod(keepAlive: true)
 MatchesRepository matchesRepository(Ref ref) =>
     MatchesRepositoryImpl(ref.watch(matchesRemoteDataSourceProvider));
+
+/// The active format presets from the backend catalog (the setup picker reads
+/// this instead of a hardcoded list).
+@riverpod
+Future<List<FormatPreset>> formatPresets(Ref ref) async {
+  final result =
+      await ref.watch(matchesRepositoryProvider).listFormatPresets();
+  return result.fold((f) => throw FailureWrapper(f), (list) => list);
+}
 
 /// One-shot fetch of a single match (for the request screen). Throws a
 /// [FailureWrapper] on error so the UI can show it via AsyncError.

@@ -3,16 +3,19 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/ball_dto.dart';
-import '../models/format_preset_dto.dart';
 import '../models/match_dto.dart';
 import '../models/match_innings_state_dto.dart';
 import '../models/match_player_dto.dart';
-import '../models/match_request_dto.dart';
 
-/// Talks to Supabase for the `matches`, `match_players`,
-/// `match_innings_state`, `balls`, and `match_requests` tables. Returns
-/// DTOs / RPC result types, throws raw exceptions. RLS + SECURITY
-/// DEFINER RPCs scope reads/writes.
+/// Talks to Supabase for the match-lifecycle tables — `matches`,
+/// `match_players`, `match_innings_state`, and `balls` — plus the match-start
+/// and scoring RPCs / `record-ball` edge function. Returns DTOs / RPC result
+/// types, throws raw exceptions. RLS + SECURITY DEFINER RPCs scope
+/// reads/writes.
+///
+/// The format catalog and the challenge handshake are NOT here — they're
+/// separate concerns with their own data sources:
+/// [FormatPresetsRemoteDataSource] and [MatchRequestsRemoteDataSource].
 class MatchesRemoteDataSource {
   MatchesRemoteDataSource(this._supabase);
   final SupabaseClient _supabase;
@@ -21,28 +24,11 @@ class MatchesRemoteDataSource {
   static const _matchPlayers = 'match_players';
   static const _matchInningsState = 'match_innings_state';
   static const _balls = 'balls';
-  static const _formatPresets = 'format_presets';
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
     if (id == null) throw UnauthorizedException('Must be signed in');
     return id;
-  }
-
-  // ─── Format catalog ─────────────────────────────────────────────────────
-
-  /// The active format presets (the setup picker's source of truth).
-  Future<List<FormatPresetDto>> listFormatPresets() async {
-    try {
-      final rows = await _supabase
-          .from(_formatPresets)
-          .select()
-          .eq('is_active', true)
-          .order('sort_order');
-      return rows.map(FormatPresetDto.fromJson).toList();
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
   }
 
   // ─── Matches ────────────────────────────────────────────────────────────
@@ -423,100 +409,6 @@ class MatchesRemoteDataSource {
           .select()
           .inFilter('match_id', matchIds);
       return rows.map(BallDto.fromJson).toList();
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  // ─── Match Requests (Challenge handshake — migration 0600) ───────────────
-
-  Future<String> sendMatchChallenge(Map<String, dynamic> params) async {
-    try {
-      final result = await _supabase.rpc<dynamic>(
-        'send_match_request',
-        params: params,
-      );
-      if (result is String) return result;
-      if (result is List && result.isNotEmpty) return result.first.toString();
-      throw ServerException('send_match_request returned no id');
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
-    }
-  }
-
-  Future<String?> acceptMatchChallenge(Map<String, dynamic> params) async {
-    try {
-      final result = await _supabase.rpc<dynamic>(
-        'accept_match_request',
-        params: params,
-      );
-      if (result is String) return result;
-      if (result is List && result.isNotEmpty) return result.first.toString();
-      return null;
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
-    }
-  }
-
-  Future<void> counterMatchChallenge(Map<String, dynamic> params) async {
-    try {
-      await _supabase.rpc<void>('counter_match_request', params: params);
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
-    }
-  }
-
-  Future<void> declineMatchChallenge(Map<String, dynamic> params) async {
-    try {
-      await _supabase.rpc<void>('decline_match_request', params: params);
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
-    }
-  }
-
-  Future<void> withdrawMatchChallenge(Map<String, dynamic> params) async {
-    try {
-      await _supabase.rpc<void>('cancel_match_request', params: params);
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
-    }
-  }
-
-  Future<MatchRequestDto?> getMatchChallenge(String requestId) async {
-    try {
-      final row = await _supabase
-          .from('match_requests')
-          .select()
-          .eq('request_id', requestId)
-          .maybeSingle();
-      return row == null ? null : MatchRequestDto.fromJson(row);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  Future<MatchRequestDto?> findMatchChallengeByCode(String code) async {
-    try {
-      final rows = await _supabase.rpc<List<dynamic>>(
-        'find_match_request_by_code',
-        params: {'p_code': code},
-      );
-      if (rows.isEmpty) return null;
-      return MatchRequestDto.fromJson(
-        Map<String, dynamic>.from(rows.first as Map),
-      );
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
-    }
-  }
-
-  Future<List<MatchRequestDto>> listMyMatchChallenges() async {
-    try {
-      final rows = await _supabase
-          .from('match_requests')
-          .select()
-          .order('created_at', ascending: false);
-      return rows.map(MatchRequestDto.fromJson).toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

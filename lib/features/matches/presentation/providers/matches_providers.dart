@@ -13,8 +13,11 @@ import '../../domain/repositories/matches_repository.dart';
 part 'matches_providers.g.dart';
 
 @Riverpod(keepAlive: true)
-MatchesRepository matchesRepository(Ref ref) =>
-    MatchesRepositoryImpl(ref.watch(matchesRemoteDataSourceProvider));
+MatchesRepository matchesRepository(Ref ref) => MatchesRepositoryImpl(
+      ref.watch(matchesRemoteDataSourceProvider),
+      ref.watch(matchRequestsRemoteDataSourceProvider),
+      ref.watch(formatPresetsRemoteDataSourceProvider),
+    );
 
 /// The active format presets from the backend catalog (the setup picker reads
 /// this instead of a hardcoded list).

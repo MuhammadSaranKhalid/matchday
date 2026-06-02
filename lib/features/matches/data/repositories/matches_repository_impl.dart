@@ -11,20 +11,27 @@ import '../../domain/entities/match_innings_state.dart';
 import '../../domain/entities/match_player.dart';
 import '../../domain/entities/match_request.dart';
 import '../../domain/repositories/matches_repository.dart';
+import '../datasources/format_presets_remote_datasource.dart';
+import '../datasources/match_requests_remote_datasource.dart';
 import '../datasources/matches_remote_datasource.dart';
-import '../models/match_request_dto.dart';
 
-/// Online-only matches repository. The only place the remote data source's
-/// raw exceptions become [Failure]s.
+/// Online-only matches repository. The only place the remote data sources'
+/// raw exceptions become [Failure]s. Composes three focused data sources —
+/// one repository per aggregate, several data sources behind it:
+///  • [MatchesRemoteDataSource]        — match lifecycle + live scoring
+///  • [MatchRequestsRemoteDataSource]  — the challenge handshake
+///  • [FormatPresetsRemoteDataSource]  — the format catalog
 class MatchesRepositoryImpl implements MatchesRepository {
-  MatchesRepositoryImpl(this._remote);
+  MatchesRepositoryImpl(this._remote, this._requests, this._presets);
 
   final MatchesRemoteDataSource _remote;
+  final MatchRequestsRemoteDataSource _requests;
+  final FormatPresetsRemoteDataSource _presets;
 
   @override
   Future<Either<Failure, List<FormatPreset>>> listFormatPresets() async {
     try {
-      final dtos = await _remote.listFormatPresets();
+      final dtos = await _presets.listFormatPresets();
       return Right(dtos.map((d) => d.toEntity()).toList());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -402,19 +409,17 @@ class MatchesRepositoryImpl implements MatchesRepository {
     }
     final trimmedMessage = message?.trim();
     try {
-      final id = await _remote.sendMatchChallenge({
-        'p_from_team_id': fromTeamId.value,
-        if (toTeamId != null) 'p_to_team_id': toTeamId.value,
-        if (proposedStartTime != null)
-          'p_proposed_start_time': proposedStartTime.toUtc().toIso8601String(),
-        if (proposedVenue != null) 'p_proposed_venue': proposedVenue,
-        if (proposedFormat != null)
-          'p_proposed_format': MatchRequestDto.formatToJson(proposedFormat),
-        if (trimmedMessage != null) 'p_message': trimmedMessage,
-        'p_players_per_side': playersPerSide,
-        'p_from_team_xi': fromTeamXi,
-        if (fromTeamKeeperId != null) 'p_from_team_keeper_id': fromTeamKeeperId,
-      });
+      final id = await _requests.sendMatchChallenge(
+        fromTeamId: fromTeamId.value,
+        toTeamId: toTeamId?.value,
+        proposedStartTime: proposedStartTime,
+        proposedVenue: proposedVenue,
+        proposedFormat: proposedFormat,
+        message: trimmedMessage,
+        playersPerSide: playersPerSide,
+        fromTeamXi: fromTeamXi,
+        fromTeamKeeperId: fromTeamKeeperId,
+      );
       return Right(MatchRequestId(id));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -437,18 +442,16 @@ class MatchesRepositoryImpl implements MatchesRepository {
     String? toTeamKeeperId,
   }) async {
     try {
-      final id = await _remote.acceptMatchChallenge({
-        'p_request_id': requestId.value,
-        if (scheduledStartTime != null)
-          'p_scheduled_start_time':
-              scheduledStartTime.toUtc().toIso8601String(),
-        if (venue != null) 'p_venue': venue,
-        if (format != null) 'p_format': MatchRequestDto.formatToJson(format),
-        if (decisionNote != null) 'p_decision_note': decisionNote,
-        if (toTeamId != null) 'p_to_team_id': toTeamId.value,
-        'p_to_team_xi': toTeamXi,
-        if (toTeamKeeperId != null) 'p_to_team_keeper_id': toTeamKeeperId,
-      });
+      final id = await _requests.acceptMatchChallenge(
+        requestId: requestId.value,
+        scheduledStartTime: scheduledStartTime,
+        venue: venue,
+        format: format,
+        decisionNote: decisionNote,
+        toTeamId: toTeamId?.value,
+        toTeamXi: toTeamXi,
+        toTeamKeeperId: toTeamKeeperId,
+      );
       if (id == null) {
         return const Left(ServerFailure('Accept returned no match id'));
       }
@@ -488,19 +491,14 @@ class MatchesRepositoryImpl implements MatchesRepository {
     }
     final trimmedNote = decisionNote?.trim();
     try {
-      await _remote.counterMatchChallenge({
-        'p_request_id': requestId.value,
-        if (counteredStartTime != null)
-          'p_countered_start_time':
-              counteredStartTime.toUtc().toIso8601String(),
-        if (counteredVenue != null) 'p_countered_venue': counteredVenue,
-        if (counteredFormat != null)
-          'p_countered_format':
-              MatchRequestDto.formatToJson(counteredFormat),
-        if (counteredPlayersPerSide != null)
-          'p_countered_players_per_side': counteredPlayersPerSide,
-        if (trimmedNote != null) 'p_decision_note': trimmedNote,
-      });
+      await _requests.counterMatchChallenge(
+        requestId: requestId.value,
+        counteredStartTime: counteredStartTime,
+        counteredVenue: counteredVenue,
+        counteredFormat: counteredFormat,
+        counteredPlayersPerSide: counteredPlayersPerSide,
+        decisionNote: trimmedNote,
+      );
       return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -519,11 +517,11 @@ class MatchesRepositoryImpl implements MatchesRepository {
   }) async {
     final trimmedNote = decisionNote?.trim();
     try {
-      await _remote.declineMatchChallenge({
-        'p_request_id': requestId.value,
-        if (trimmedNote != null) 'p_decision_note': trimmedNote,
-        if (decisionReason != null) 'p_decision_reason': decisionReason.wire,
-      });
+      await _requests.declineMatchChallenge(
+        requestId: requestId.value,
+        decisionNote: trimmedNote,
+        decisionReason: decisionReason?.wire,
+      );
       return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -541,10 +539,10 @@ class MatchesRepositoryImpl implements MatchesRepository {
   }) async {
     final trimmedNote = decisionNote?.trim();
     try {
-      await _remote.withdrawMatchChallenge({
-        'p_request_id': requestId.value,
-        if (trimmedNote != null) 'p_decision_note': trimmedNote,
-      });
+      await _requests.withdrawMatchChallenge(
+        requestId: requestId.value,
+        decisionNote: trimmedNote,
+      );
       return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -560,7 +558,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
     MatchRequestId requestId,
   ) async {
     try {
-      final dto = await _remote.getMatchChallenge(requestId.value);
+      final dto = await _requests.getMatchChallenge(requestId.value);
       return Right(dto?.toEntity());
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
@@ -578,7 +576,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
       return const Left(ValidationFailure('Share code must be 6 digits'));
     }
     try {
-      final dto = await _remote.findMatchChallengeByCode(trimmed);
+      final dto = await _requests.findMatchChallengeByCode(trimmed);
       return Right(dto?.toEntity());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -592,7 +590,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
   @override
   Future<Either<Failure, List<MatchRequest>>> listMyMatchChallenges() async {
     try {
-      final dtos = await _remote.listMyMatchChallenges();
+      final dtos = await _requests.listMyMatchChallenges();
       return Right(dtos.map((d) => d.toEntity()).toList());
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));

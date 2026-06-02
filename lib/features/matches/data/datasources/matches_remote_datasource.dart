@@ -77,16 +77,32 @@ class MatchesRemoteDataSource {
     }
   }
 
-  /// All matches visible to the user (RLS-scoped), newest first.
+  /// Matches the signed-in user actually participates in — they created it, a
+  /// team they're a member of is playing, or they're an assigned official —
+  /// newest first.
+  ///
+  /// Scoped server-side by the `list-my-matches` edge function. We can NOT do a
+  /// plain `from('matches').select()` here: the `matches` table is
+  /// world-readable at the RLS layer (`matches_read_public USING (true)`, so
+  /// spectators can browse any match), so an unfiltered select returns the
+  /// entire table — which would surface strangers' matches in "my matches".
+  /// (Dev-phase: the scope lives in an edge function so it can be iterated
+  /// without DB migrations; promote to a SQL function/view once the schema
+  /// settles.)
   Future<List<MatchDto>> list() async {
     try {
-      final rows = await _supabase
-          .from(_matches)
-          .select()
-          .order('created_at', ascending: false);
-      return rows.map(MatchDto.fromJson).toList();
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
+      final res = await _supabase.functions.invoke('list-my-matches');
+      final data = res.data;
+      final rows = data is Map ? data['matches'] : data;
+      if (rows is! List) {
+        throw ServerException('list-my-matches returned an unexpected payload');
+      }
+      return rows
+          .map((row) =>
+              MatchDto.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList();
+    } on FunctionException catch (e) {
+      throw _functionException(e);
     }
   }
 

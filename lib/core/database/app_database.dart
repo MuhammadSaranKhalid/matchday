@@ -57,4 +57,17 @@ class AppDatabase extends _$AppDatabase {
 /// drift_flutter handles native sqlite3 setup, path resolution, and
 /// background isolate creation. The DB file lives in the app's
 /// documents directory.
-QueryExecutor _openConnection() => driftDatabase(name: 'novex_clean_arch');
+///
+/// The [DriftWebOptions] are ignored on native platforms but are REQUIRED on
+/// web (drift_flutter throws `ArgumentError` otherwise). They point at the
+/// `sqlite3.wasm` + `drift_worker.js` assets in `web/`, which drift loads to
+/// run SQLite via WebAssembly (OPFS / IndexedDB) in the browser. This keeps
+/// the wizard-draft store working when the app is run on web; native builds
+/// are unaffected. (App remains mobile-first — web is a convenience target.)
+QueryExecutor _openConnection() => driftDatabase(
+      name: 'novex_clean_arch',
+      web: DriftWebOptions(
+        sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+        driftWorker: Uri.parse('drift_worker.js'),
+      ),
+    );

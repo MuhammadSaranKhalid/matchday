@@ -8,6 +8,7 @@ import '../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../features/home/presentation/screens/home_feed_screen.dart';
 import '../features/matches/presentation/screens/matches_v2_screen.dart';
 import '../features/messages/presentation/screens/messages_screen.dart';
+import '../features/pavilion/presentation/screens/my_matches_screen.dart';
 import '../features/pavilion/presentation/screens/pavilion_v2_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
@@ -132,6 +133,11 @@ GoRouter appRouter(Ref ref) {
             ],
           ),
         ],
+      ),
+      // Pavilion drill-downs (full-screen, pushed over the shell).
+      GoRoute(
+        path: '/pavilion/my-matches',
+        builder: (_, __) => const MyMatchesScreen(),
       ),
       // Teams (full-screen, pushed over the shell). Gated by the redirect.
       GoRoute(

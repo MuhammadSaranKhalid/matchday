@@ -10,7 +10,18 @@
 //   A match is "mine" when:
 //     • I created it (matches.created_by), OR
 //     • a team I'm a member of is playing (team_members.user_id ↔ team_a/team_b), OR
+//     • a team I own / manage is playing (teams.owner_id / teams.managers ↔
+//       team_a/team_b), OR
 //     • I'm an assigned match official (match_officials.user_id).
+//
+//   The owner/manager clause is load-bearing: a team's owner/manager is recorded
+//   in `teams.owner_id` / `teams.managers`, NOT necessarily as a `team_members`
+//   row (creating a team does not enrol the creator in the roster). A friendly's
+//   match row is created by the ACCEPTING manager (matches.created_by = the
+//   accepter), so without this clause the REQUESTING manager — who is neither
+//   created_by nor a team_member — never saw the accepted match, even though
+//   their team is team_a. (They still got the "request accepted" notification,
+//   which is keyed off match_requests.requested_by, hence the mismatch.)
 //
 // DEV-PHASE CHOICE
 //   The scope lives in an edge function rather than a Postgres RPC so it can be
@@ -108,6 +119,11 @@ Deno.serve(async (req) => {
             select 1 from team_members tm
              where tm.team_id in (m.team_a_id, m.team_b_id)
                and tm.user_id = ${actor}
+          )
+          or exists (
+            select 1 from teams t
+             where t.team_id in (m.team_a_id, m.team_b_id)
+               and (t.owner_id = ${actor} or ${actor} = any(t.managers))
           )
           or exists (
             select 1 from match_officials mo

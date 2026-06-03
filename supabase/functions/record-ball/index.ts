@@ -24,7 +24,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { db, userClient } from "../_shared/db.ts";
-import { json } from "../_shared/http.ts";
+import { corsPreflight, json } from "../_shared/http.ts";
 import { applyBall } from "../_shared/scoring/engine.ts";
 import { computeResult, type InningsLine } from "../_shared/scoring/result.ts";
 import type {
@@ -46,6 +46,11 @@ class HttpSignal {
 class ConflictSignal {}
 
 Deno.serve(async (req) => {
+  // CORS preflight: answer BEFORE the auth check. The browser sends OPTIONS
+  // with no Authorization header, so the bearer-token gate below would 401 it
+  // and the real POST would never fire.
+  if (req.method === "OPTIONS") return corsPreflight();
+
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) {
     return json(401, {

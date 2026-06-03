@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../teams/domain/entities/roster_member.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
@@ -137,11 +138,27 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     final rosterB = ref.watch(rosterProvider(match.teamBId.value)).value ??
         const <RosterMember>[];
 
-    // Need-a-bowler gate: live + no bowler + no ball yet + data ready.
+    // ── Scoring permission gate ───────────────────────────────────────────
+    // Live scoring belongs to the team CURRENTLY BATTING; control passes to the
+    // other side at the innings break. Everyone else — the bowling side,
+    // spectators — gets a read-only scoreboard. The server enforces the same
+    // rule (_can_score_innings); this keeps the UI honest so the scorer controls
+    // never appear for someone whose taps the server would reject.
+    final battingTeamId = _battingTeamId(match, widget.inningsNumber);
+    final battingTeam = ref.watch(teamProvider(battingTeamId.value)).value;
+    final currentUserId =
+        ref.watch(currentUserStreamProvider).value?.id.value;
+    final canScore = battingTeam != null &&
+        currentUserId != null &&
+        battingTeam.isManagedBy(currentUserId);
+
+    // Need-a-bowler gate: live + no bowler + no ball yet + data ready. Only the
+    // scoring side is ever prompted to pick the opening bowler.
     final dataReady = matchPlayers.isNotEmpty &&
         rosterA.isNotEmpty &&
         rosterB.isNotEmpty;
-    final bowlerMissing = match.startPhase == MatchStartPhase.live &&
+    final bowlerMissing = canScore &&
+        match.startPhase == MatchStartPhase.live &&
         inningsState?.bowlerId == null &&
         balls.isEmpty &&
         dataReady;
@@ -233,12 +250,17 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                         nameOf: nameOf,
                         matchPlayers: matchPlayers,
                         undoFlash: _undoFlash,
-                        canUndo: balls.isNotEmpty && !_busy,
+                        canUndo: canScore && balls.isNotEmpty && !_busy,
                         onUndo: () => _handleUndo(match),
                       ),
-                      _runPad(
-                          match, balls, matchPlayers, inningsState),
-                      _extrasRow(match, matchPlayers, inningsState),
+                      if (canScore) ...[
+                        _runPad(
+                            match, balls, matchPlayers, inningsState),
+                        _extrasRow(match, matchPlayers, inningsState),
+                      ] else
+                        _ReadOnlyScoringNotice(
+                          battingTeamName: battingTeam?.name,
+                        ),
                     ],
                   ),
                 ),
@@ -2983,6 +3005,50 @@ TeamId _battingTeamId(Match match, int inningsNumber) {
         : (batsFirst == match.teamAId ? match.teamBId : match.teamAId);
   }
   return match.teamAId;
+}
+
+// Shown in place of the run pad / extras when the viewer is NOT on the team
+// currently batting (the bowling side or a spectator). The scoreboard, batters,
+// bowler and ball log above stay visible — only the input controls are hidden.
+class _ReadOnlyScoringNotice extends StatelessWidget {
+  const _ReadOnlyScoringNotice({this.battingTeamName});
+
+  final String? battingTeamName;
+
+  @override
+  Widget build(BuildContext context) {
+    final who = (battingTeamName == null || battingTeamName!.isEmpty)
+        ? 'The batting team'
+        : battingTeamName!;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: CkColors.cream,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: CkColors.line),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.lock_outline, size: 18, color: CkColors.muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '$who is scoring this innings. You have a read-only view.',
+                style: CkType.body(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: CkColors.ink2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _BatStats {

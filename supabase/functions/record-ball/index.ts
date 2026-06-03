@@ -95,10 +95,14 @@ Deno.serve(async (req) => {
     ? Number(body.p_expected_version)
     : null;
 
-  // 3. Authorize via the existing server-side rule, run AS the user.
+  // 3. Authorize via the batting-side rule, run AS the user. Control of live
+  //    scoring belongs to the team CURRENTLY BATTING (plus tournament
+  //    organisers / assigned scorers / a practice match's creator); it passes
+  //    to the other side at the innings break. Hence the innings number is
+  //    part of the check — see _can_score_innings.
   const { data: canScore, error: authzErr } = await asUser.rpc(
-    "_can_score_match",
-    { p_match_id: matchId },
+    "_can_score_innings",
+    { p_match_id: matchId, p_innings_number: inningsNumber },
   );
   if (authzErr) {
     return json(500, {
@@ -111,7 +115,7 @@ Deno.serve(async (req) => {
       ok: false,
       error: {
         code: "forbidden",
-        message: "Only organisers or assigned scorers can score this match",
+        message: "Only the batting team can score this innings",
       },
     });
   }

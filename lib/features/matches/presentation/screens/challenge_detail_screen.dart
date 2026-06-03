@@ -54,7 +54,11 @@ class _ChallengeDetailScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Header(
-          onBack: () => context.pop(),
+          // Deep links (notifications, share URLs, paste-into-browser) land
+          // here with an empty stack; pop would throw "There is nothing to
+          // pop". Fall back to My Matches in that case.
+          onBack: () =>
+              context.canPop() ? context.pop() : context.go('/pavilion/my-matches'),
           kicker: 'INCOMING CHALLENGE',
           title: 'From ${from?.name ?? 'a team'}',
         ),

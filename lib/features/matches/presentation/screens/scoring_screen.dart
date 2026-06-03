@@ -62,6 +62,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
   bool _busy = false;
   bool _bowlerPromptShown = false;
   bool _undoFlash = false;
+  bool _inningsEndRouted = false;
   String? _toast;
   Timer? _toastTimer;
 
@@ -96,6 +97,42 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) setState(() => _undoFlash = false);
     });
+  }
+
+  /// The innings has ended when the batting side is all out or the over limit
+  /// is reached. Mirrors the server engine's limited-overs end conditions so
+  /// the UI agrees with the `innings_break` / `completed` transition.
+  bool _inningsIsOver(Match match, MatchInningsState? s) {
+    if (s == null) return false;
+    final bpo = match.format.ballsPerOver == 0 ? 6 : match.format.ballsPerOver;
+    final wicketsToAllOut =
+        match.format.wicketsToAllOut ?? (match.format.playersPerTeam - 1);
+    final allOut =
+        match.format.playersPerTeam > 0 && s.totalWickets >= wicketsToAllOut;
+    final oversDone = match.format.oversPerInnings > 0 &&
+        s.legalBallCount >= match.format.oversPerInnings * bpo;
+    return allOut || oversDone;
+  }
+
+  /// Where to go once the innings ends. Trusts the match status when the
+  /// transition has already propagated; otherwise derives it from the innings
+  /// count (the last innings ends the match → result, else → innings break).
+  String _postInningsRoute(Match match) {
+    switch (match.status) {
+      case MatchStatus.completed:
+      case MatchStatus.abandoned:
+      case MatchStatus.walkover:
+        return '/matches/${widget.matchId}/result';
+      case MatchStatus.inningsBreak:
+        return '/matches/${widget.matchId}/innings-break';
+      default:
+        final perSide =
+            match.format.inningsPerSide <= 0 ? 1 : match.format.inningsPerSide;
+        final isFinalInnings = widget.inningsNumber >= perSide * 2;
+        return isFinalInnings
+            ? '/matches/${widget.matchId}/result'
+            : '/matches/${widget.matchId}/innings-break';
+    }
   }
 
   // ─── build ──────────────────────────────────────────────────────────────
@@ -169,6 +206,12 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       });
     }
 
+    // A bowler must be set before ANY delivery can be recorded. The server
+    // clears bowler_id at the innings start and after every completed over, so
+    // this is null exactly when a (new) bowler is owed. Gating the run pad on
+    // it makes it impossible to score against a blank bowler.
+    final bowlerSet = (inningsState?.bowlerId?.value ?? '').isNotEmpty;
+
     // Names map keyed by player_ref_id — covers both rosters.
     final names = <String, String>{
       for (final m in rosterA) m.member.playerId: m.displayName,
@@ -196,6 +239,20 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
     final overText = '${legalBalls ~/ 6}.${legalBalls % 6}';
     final totalRuns = inningsState?.totalRuns ?? 0;
     final totalWkts = inningsState?.totalWickets ?? 0;
+
+    // ── Innings-over detection ────────────────────────────────────────────
+    // Derived from the innings state (which streams in reliably via the
+    // innings broadcast) so the screen ends the innings even if the separate
+    // match-status broadcast is delayed or missed. When true we stop offering
+    // scoring controls (incl. the "pick a bowler" gate) and route onward.
+    final inningsOver = _inningsIsOver(match, inningsState);
+
+    if (inningsOver && !_inningsEndRouted) {
+      _inningsEndRouted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go(_postInningsRoute(match));
+      });
+    }
 
     final formatOvers = match.format.oversPerInnings == 0
         ? 20
@@ -254,9 +311,19 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                         onUndo: () => _handleUndo(match),
                       ),
                       if (canScore) ...[
-                        _runPad(
-                            match, balls, matchPlayers, inningsState),
-                        _extrasRow(match, matchPlayers, inningsState),
+                        if (inningsOver)
+                          const _InningsCompleteNotice()
+                        else if (bowlerSet) ...[
+                          _runPad(
+                              match, balls, matchPlayers, inningsState),
+                          _extrasRow(match, matchPlayers, inningsState),
+                        ] else
+                          _SelectBowlerNotice(
+                            isOpening: balls.isEmpty,
+                            onSelect: () => balls.isEmpty
+                                ? _promptOpeningBowler(match, matchPlayers)
+                                : _promptEndOfOverBowler(),
+                          ),
                       ] else
                         _ReadOnlyScoringNotice(
                           battingTeamName: battingTeam?.name,
@@ -877,14 +944,49 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       expectedVersion: inningsState?.version,
     ));
     if (r.nextBatterMatchPlayerId != null && mounted) {
-      // Re-open the innings with the new batter on strike.
-      await ref.read(matchesRepositoryProvider).startInnings(
-            matchId: match.id,
-            inningsNumber: widget.inningsNumber,
-            strikerId: r.nextBatterMatchPlayerId!,
-            nonStrikerId: inningsState?.nonStrikerId?.value ?? '',
-            bowlerId: inningsState?.bowlerId?.value ?? '',
-          );
+      // Put the incoming batter on strike. A (mid-over) wicket leaves the
+      // non-striker and bowler unchanged, so reuse them — preferring the FRESH
+      // post-ball state but falling back to the pre-ball snapshot if the
+      // provider hasn't re-emitted yet. We never forward an EMPTY id:
+      // start_innings requires all three, and a blank one is exactly what
+      // produced the confusing "Striker, non-striker and bowler are all
+      // required" error (e.g. when the bowler was never set on this innings).
+      final fresh = ref
+          .read(liveInningsStateProvider(widget.matchId, widget.inningsNumber))
+          .value;
+      // If this wicket ended the innings (all out), there is no next batter —
+      // the screen routes to the innings break / result instead.
+      if (_inningsIsOver(match, fresh)) {
+        _flashToast('${(inningsState?.totalWickets ?? 0) + 1} down');
+        return;
+      }
+      final nonStriker = _firstNonEmpty(
+          fresh?.nonStrikerId?.value, inningsState?.nonStrikerId?.value);
+      final bowler = _firstNonEmpty(
+          fresh?.bowlerId?.value, inningsState?.bowlerId?.value);
+      if (nonStriker.isEmpty || bowler.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Set the bowler for this over before bringing in the next batter.'),
+          ),
+        );
+      } else {
+        final res = await ref.read(matchesRepositoryProvider).startInnings(
+              matchId: match.id,
+              inningsNumber: widget.inningsNumber,
+              strikerId: r.nextBatterMatchPlayerId!,
+              nonStrikerId: nonStriker,
+              bowlerId: bowler,
+            );
+        if (!mounted) return;
+        res.fold(
+          (f) => ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not set next batter: ${f.message}')),
+          ),
+          (_) {},
+        );
+      }
     }
     _flashToast('${(inningsState?.totalWickets ?? 0) + 1} down');
   }
@@ -900,6 +1002,14 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
           .showSnackBar(SnackBar(content: Text(f.message))),
       (_) {},
     );
+
+    // If this delivery ended the innings (all out / overs done), don't prompt
+    // for the next bowler — the screen routes to the innings break / result.
+    final liveMatch = ref.read(liveMatchProvider(draft.matchId.value)).value;
+    final liveState = ref
+        .read(liveInningsStateProvider(draft.matchId.value, draft.inningsNumber))
+        .value;
+    if (liveMatch != null && _inningsIsOver(liveMatch, liveState)) return;
 
     // End-of-over → prompt for next bowler.
     final updatedBalls = ref
@@ -1108,7 +1218,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       ),
     );
     if (pick == null || !mounted) return;
-    await ref.read(matchesRepositoryProvider).startInnings(
+    final res = await ref.read(matchesRepositoryProvider).startInnings(
           matchId: match.id,
           inningsNumber: widget.inningsNumber,
           // Strike rotates at end of over: previous non-striker is on strike.
@@ -1116,6 +1226,12 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
           nonStrikerId: inningsState?.strikerId?.value ?? '',
           bowlerId: pick,
         );
+    if (!mounted) return;
+    res.fold(
+      (f) => ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(f.message))),
+      (_) {},
+    );
   }
 
   Future<void> _promptOpeningBowler(
@@ -2993,6 +3109,14 @@ class _NewBowlerSheetState extends State<_NewBowlerSheet> {
 // Top-level helpers
 // =============================================================================
 
+/// First of [a], [b] that is a non-empty string; '' if neither is. Used to
+/// pick an on-field player id from the freshest source that actually has one.
+String _firstNonEmpty(String? a, String? b) {
+  if (a != null && a.isNotEmpty) return a;
+  if (b != null && b.isNotEmpty) return b;
+  return '';
+}
+
 TeamId _battingTeamId(Match match, int inningsNumber) {
   final tossWon = match.tossWonBy;
   final tossDecision = match.tossDecision;
@@ -3042,6 +3166,105 @@ class _ReadOnlyScoringNotice extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   color: CkColors.ink2,
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Replaces the run pad / extras whenever no bowler is set for the current over
+// (innings start, or after a completed over). Tapping it opens the bowler
+// picker. This is the hard gate that makes scoring-without-a-bowler impossible.
+class _SelectBowlerNotice extends StatelessWidget {
+  const _SelectBowlerNotice({
+    required this.onSelect,
+    required this.isOpening,
+  });
+
+  final VoidCallback onSelect;
+  final bool isOpening;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onSelect,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+            decoration: BoxDecoration(
+              color: CkColors.amber,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.sports_cricket, size: 18, color: CkColors.ink),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    isOpening
+                        ? 'Select the opening bowler to start'
+                        : 'Select the next bowler to continue',
+                    textAlign: TextAlign.center,
+                    style: CkType.body(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: CkColors.ink,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Shown when the innings has ended (all out / overs done). The screen routes
+// to the innings break or result in the same frame, so this is a brief bridge
+// rather than the run pad / bowler gate — never offer to score a dead innings.
+class _InningsCompleteNotice extends StatelessWidget {
+  const _InningsCompleteNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+        decoration: BoxDecoration(
+          color: CkColors.ink,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: CkColors.paper,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Innings complete',
+              style: CkType.body(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: CkColors.paper,
               ),
             ),
           ],

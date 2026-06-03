@@ -141,6 +141,18 @@ Deno.serve(async (req) => {
       }
       const s = stateRows[0];
 
+      // No-bowler guard. bowler_id is null at the innings start and after every
+      // completed over (start_innings sets the next one). A delivery cannot be
+      // recorded against a blank bowler — reject before any write so runs/wickets
+      // can't be logged with no bowler attached.
+      if (s.bowler_id == null) {
+        throw new HttpSignal(
+          409,
+          "no_bowler",
+          "Select a bowler before recording a delivery",
+        );
+      }
+
       // Double-commit guard.
       if (expectedVersion !== null && Number(s.version) !== expectedVersion) {
         throw new ConflictSignal();

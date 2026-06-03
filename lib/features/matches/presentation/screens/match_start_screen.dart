@@ -15,6 +15,7 @@ import '../../domain/entities/match_player.dart';
 import '../controllers/match_start_controller.dart';
 import '../providers/matches_providers.dart';
 import '../state/match_start_state.dart';
+import '../widgets/lineup_picker.dart';
 
 /// Two-phone Match Start. Toss → openers → Start. The opening bowler is
 /// deferred to ball 1 in the scoring screen (matches the design intent +
@@ -828,7 +829,7 @@ class _Stage2Lineup extends ConsumerWidget {
                 final p = players[i];
                 final isStriker = shownStriker == p.member.playerId;
                 final isNon = shownNonStriker == p.member.playerId;
-                return _RosterRow(
+                return LineupRosterRow(
                   name: p.displayName,
                   jersey: p.member.jerseyNumber,
                   badge: isStriker ? 'STR' : (isNon ? 'NS' : null),
@@ -864,7 +865,7 @@ class _SlotsRow extends StatelessWidget {
       ),
       child: Row(children: [
         Expanded(
-          child: _SlotCard(
+          child: LineupSlotCard(
             label: 'ON STRIKE',
             value: strikerLabel,
             hot: true,
@@ -872,131 +873,12 @@ class _SlotsRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _SlotCard(
+          child: LineupSlotCard(
             label: 'NON-STRIKER',
             value: nonStrikerLabel,
           ),
         ),
       ]),
-    );
-  }
-}
-
-class _SlotCard extends StatelessWidget {
-  const _SlotCard({required this.label, this.value, this.hot = false});
-  final String label;
-  final String? value;
-  final bool hot;
-
-  @override
-  Widget build(BuildContext context) {
-    final filled = value != null;
-    final border = hot && filled
-        ? CkColors.red
-        : filled
-            ? CkColors.ink
-            : CkColors.hairline;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: hot && filled ? CkColors.redSoft : CkColors.paper,
-        border: Border.all(color: border, width: 1.5),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: CkType.mono(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.08,
-                color: hot && filled ? CkColors.red : CkColors.muted,
-              )),
-          const SizedBox(height: 4),
-          Text(
-            value ?? '— tap below —',
-            overflow: TextOverflow.ellipsis,
-            style: CkType.display(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: filled ? CkColors.ink : CkColors.muted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RosterRow extends StatelessWidget {
-  const _RosterRow({
-    required this.name,
-    required this.onTap,
-    this.jersey,
-    this.badge,
-  });
-  final String name;
-  final VoidCallback onTap;
-  final int? jersey;
-  final String? badge;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        decoration: BoxDecoration(
-          color: badge != null ? CkColors.paper2 : CkColors.paper,
-          border: const Border(
-            top: BorderSide(color: CkColors.hairline),
-          ),
-        ),
-        child: Row(children: [
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: badge == 'STR'
-                  ? CkColors.red
-                  : badge == 'NS'
-                      ? CkColors.ink
-                      : CkColors.paper2,
-              borderRadius: BorderRadius.circular(7),
-            ),
-            child: Text(
-              badge ?? '',
-              style: CkType.mono(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.08,
-                color: badge == null ? CkColors.muted : CkColors.paper,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              name,
-              overflow: TextOverflow.ellipsis,
-              style: CkType.display(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          if (jersey != null)
-            Text('#$jersey',
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.04,
-                  color: CkColors.muted,
-                )),
-        ]),
-      ),
     );
   }
 }

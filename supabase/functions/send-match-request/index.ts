@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
     (body.p_proposed_start_time as string | null | undefined) ?? null;
   const proposedVenue =
     (body.p_proposed_venue as string | null | undefined) ?? null;
-  const proposedFormat =
+  const proposedFormatInput =
     (body.p_proposed_format as Record<string, unknown> | null | undefined) ??
     {};
   const message = (body.p_message as string | null | undefined) ?? null;
@@ -234,6 +234,16 @@ Deno.serve(async (req) => {
     });
   }
 
+  // players_per_side is the single source of truth. The match_requests
+  // `players_per_side` column is now a generated projection of
+  // proposed_format->>'players_per_team' (migration
+  // match_requests_pps_single_source), and a CHECK requires the key to be
+  // present (5..15). Fold it in here and never write the generated column.
+  const proposedFormat = {
+    ...proposedFormatInput,
+    players_per_team: playersPerSide,
+  };
+
   // 4. Atomic write — single Postgres transaction over the pooled connection.
   const sql = db();
   try {
@@ -274,7 +284,7 @@ Deno.serve(async (req) => {
             insert into match_requests (
               from_team_id, to_team_id, requested_by,
               proposed_start_time, proposed_venue, proposed_format, message,
-              players_per_side, from_team_xi, from_team_keeper_id,
+              from_team_xi, from_team_keeper_id,
               share_code, code_expires_at, proposal_expires_at
             ) values (
               ${fromTeamId},
@@ -284,7 +294,6 @@ Deno.serve(async (req) => {
               ${proposedVenue},
               ${tx.json(proposedFormat)},
               ${message},
-              ${playersPerSide},
               ${fromTeamXi.length ? fromTeamXi : []}::uuid[],
               ${fromTeamKeeperId},
               ${code},

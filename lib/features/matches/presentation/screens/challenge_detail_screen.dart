@@ -11,7 +11,8 @@ import '../providers/matches_providers.dart';
 import '../providers/my_matches_providers.dart';
 
 /// Receiver-side detail. Shows the sender's proposed terms, the head-to-head
-/// proxy line, and a sticky bottom reply bar with Decline / Counter / Accept.
+/// proxy line, and a sticky bottom reply bar with Decline / Accept.
+/// (Counter flow temporarily disabled — see commented-out blocks below.)
 class ChallengeDetailScreen extends ConsumerStatefulWidget {
   const ChallengeDetailScreen({super.key, required this.requestId});
   final String requestId;

@@ -423,6 +423,8 @@ class MatchesRepositoryImpl implements MatchesRepository {
       return Right(MatchRequestId(id));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on ConflictException catch (e) {
+      return Left(ConflictFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

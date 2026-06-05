@@ -36,7 +36,11 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
           children: [
             _Header(
               title: 'My matches',
-              onBack: () => context.pop(),
+              // Pop back to Pavilion when there's a stack (normal in-app
+              // navigation); fall back to /pavilion on a cold web load / deep
+              // link where nothing is below.
+              onBack: () =>
+                  context.canPop() ? context.pop() : context.go('/pavilion'),
               right: const _ChallengeButton(),
             ),
             Expanded(

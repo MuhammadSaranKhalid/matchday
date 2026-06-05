@@ -31,6 +31,12 @@ import '../features/notifications/presentation/screens/notifications_screen.dart
 
 part 'app_router.g.dart';
 
+/// Root navigator key — lets Pavilion drill-downs (e.g. My matches) render
+/// full-screen over the shell while staying URL-nested under their tab, so the
+/// browser URL updates and a web refresh restores the page (with a working
+/// back) instead of an imperative push the URL never reflects.
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+
 /// Auth-aware router.
 ///
 /// The redirect callback reads the current-user stream's latest value.
@@ -48,6 +54,7 @@ GoRouter appRouter(Ref ref) {
   // on each auth change. Watching here would rebuild a whole new GoRouter on
   // every auth event and leak the previous _StreamListenable.
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: '/home',
     redirect: (context, state) {
       final user = ref.read(currentUserStreamProvider).value;
@@ -111,6 +118,17 @@ GoRouter appRouter(Ref ref) {
                 path: '/pavilion',
                 builder: (context, _) =>
                     PavilionV2Screen(onBell: () => _openBell(context)),
+                routes: [
+                  // My matches — rendered full-screen over the shell (root
+                  // navigator), but URL-nested under /pavilion. Navigated with
+                  // `go`, so the address bar updates and a web refresh restores
+                  // [Pavilion → My matches] with a working back.
+                  GoRoute(
+                    path: 'my-matches',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (_, __) => const MyMatchesScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -134,11 +152,6 @@ GoRouter appRouter(Ref ref) {
             ],
           ),
         ],
-      ),
-      // Pavilion drill-downs (full-screen, pushed over the shell).
-      GoRoute(
-        path: '/pavilion/my-matches',
-        builder: (_, __) => const MyMatchesScreen(),
       ),
       // Teams (full-screen, pushed over the shell). Gated by the redirect.
       GoRoute(

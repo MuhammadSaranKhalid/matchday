@@ -589,7 +589,7 @@ class _PvHome extends StatelessWidget {
                 title: 'My matches',
                 sub: '3 confirmed · 142 past',
                 meta: '3',
-                onTap: () => context.push('/pavilion/my-matches'),
+                onTap: () => context.go('/pavilion/my-matches'),
               ),
               const SizedBox(height: 6),
               _PvRow(

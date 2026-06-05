@@ -13,6 +13,7 @@ import '../../domain/entities/team_member.dart';
 import '../../domain/value_objects/jersey_number.dart';
 import '../../domain/value_objects/player_display_name.dart';
 import '../providers/teams_providers.dart';
+import '../utils/team_display.dart';
 import '../widgets/team_avatar.dart';
 
 /// Manager view — Phase 1 Roster tab only (Requests/Members/Settings are v1.1).

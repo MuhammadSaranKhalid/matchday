@@ -13,7 +13,7 @@ import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
 import '../../domain/entities/team_relationship.dart';
 import '../providers/teams_providers.dart';
-import '../widgets/team_avatar.dart';
+import '../utils/team_display.dart';
 import '../widgets/team_page/tp_atoms.dart';
 import '../widgets/team_page/tp_view.dart';
 

@@ -9,8 +9,8 @@ import '../../domain/entities/team.dart';
 import '../../domain/entities/team_relationship.dart';
 import '../providers/teams_providers.dart';
 import '../state/my_teams_view.dart';
+import '../utils/team_display.dart';
 import '../widgets/my_teams/crest_palette.dart';
-import '../widgets/team_avatar.dart';
 
 part 'teams_list_controller.g.dart';
 

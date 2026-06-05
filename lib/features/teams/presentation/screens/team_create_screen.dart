@@ -11,7 +11,7 @@ import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../domain/entities/team.dart';
 import '../controllers/team_create_controller.dart';
 import '../state/team_create_state.dart';
-import '../widgets/team_avatar.dart';
+import '../utils/team_display.dart';
 import '../widgets/team_create/tc_atoms.dart';
 
 /// "Create a team" — a 5-step wizard (Basics → Identity → Home → Crest →

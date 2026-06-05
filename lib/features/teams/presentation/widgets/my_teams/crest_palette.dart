@@ -145,5 +145,6 @@ abstract final class MyTeamsCrests {
       const CrestStyle(color: CkColors.muted, mono: '??', name: '—');
 }
 
-// teamMonogram lives in `team_avatar.dart` — not duplicated here. Import
-// from there when you need to synthesise a `CrestStyle` from a real `Team`.
+// teamMonogram lives in `../../utils/team_display.dart` — not duplicated
+// here. Import from there when you need to synthesise a `CrestStyle` from a
+// real `Team`.

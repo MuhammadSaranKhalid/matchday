@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../state/team_create_state.dart';
-import '../team_avatar.dart';
+import '../../utils/team_display.dart';
 
 /// 12-swatch curated palette — port of `palette` in design/screens/TeamCreate.jsx.
 /// Mix of dark saturated + accent + neutrals chosen to look right next to

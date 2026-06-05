@@ -56,4 +56,4 @@ final class MyMatchesViewProvider
   }
 }
 
-String _$myMatchesViewHash() => r'6a1f8d4776f0d6305c57ba931c6641de268621e6';
+String _$myMatchesViewHash() => r'b602a38272ffa8df671448e292b0cb25dbc418d9';

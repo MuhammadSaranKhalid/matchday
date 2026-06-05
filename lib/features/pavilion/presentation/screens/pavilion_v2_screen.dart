@@ -19,14 +19,11 @@ import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../matches/presentation/providers/my_matches_providers.dart';
-import '../../../matches/presentation/widgets/withdraw_sheet.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
-import '../controllers/pavilion_controller.dart';
 import '../widgets/pavilion_v2/pv_v2_data.dart';
 import '../widgets/pavilion_v2/pv_v2_kit.dart';
 import '../widgets/pavilion_v2/pv_v2_lanes.dart';
 import '../widgets/pavilion_v2/pv_v2_map.dart';
-import '../widgets/pavilion_v2/pv_v2_match_detail.dart';
 
 class PavilionV2Screen extends ConsumerStatefulWidget {
   const PavilionV2Screen({super.key, this.onBell});
@@ -41,7 +38,6 @@ class PavilionV2Screen extends ConsumerStatefulWidget {
 
 class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
   PvSeg _seg = PvSeg.matches;
-  String? _openMatchId;
   String? _toast;
   int _toastSeq = 0;
 
@@ -68,49 +64,20 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
   }
 
   // ── actions ──
+  // The Today hero carries the one urgent action (resume / start); every other
+  // per-match action lives on the Match Detail route, which a card tap opens.
   void _onMatchAction(String id, String action) {
     switch (action) {
       case 'resume':
         _pushAndRefresh('/matches/$id/score');
       case 'start':
-      case 'lineup':
-      case 'viewlineup':
         _pushAndRefresh('/matches/$id/start');
-      case 'scorecard':
-      case 'view':
-        _pushAndRefresh('/matches/$id/scorecard');
-      case 'withdraw':
-        _onWithdraw(id);
     }
   }
 
   Future<void> _pushAndRefresh(String location) async {
     await context.push(location);
     if (mounted) ref.invalidate(myMatchesViewProvider);
-  }
-
-  Future<void> _onWithdraw(String requestId) async {
-    final result = await showModalBottomSheet<WithdrawResult>(
-      context: context,
-      backgroundColor: CkColors.paper,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const WithdrawSheet(),
-    );
-    if (result == null || !mounted) return;
-    final res = await ref
-        .read(pavilionControllerProvider.notifier)
-        .withdraw(requestId: requestId, note: result.note);
-    if (!mounted) return;
-    res.fold(
-      (f) => _flash(f.message),
-      (_) {
-        setState(() => _openMatchId = null);
-        _flash('Challenge withdrawn');
-      },
-    );
   }
 
   void _onCreate() {
@@ -134,14 +101,6 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
     return null;
   }
 
-  PvMatch? _findOpen(List<PvMatch> ms) {
-    if (_openMatchId == null) return null;
-    for (final m in ms) {
-      if (m.id == _openMatchId) return m;
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
     final userId = ref.watch(currentUserStreamProvider).value?.id.value;
@@ -155,7 +114,6 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
     final matches = view != null
         ? pvMatchesFromView(view, meFallback: meFallback)
         : const <PvMatch>[];
-    final openMatch = _findOpen(matches);
 
     final matchesBadge = view?.sent.length ?? 0;
     final toursBadge = _tours.fold<int>(0, (a, t) => a + t.needs);
@@ -201,17 +159,6 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
 
           if (_toast != null)
             Positioned(left: 16, right: 16, bottom: 74, child: _toastPill(_toast!)),
-
-          if (openMatch != null)
-            Positioned.fill(
-              child: _SlideUp(
-                child: PvMatchDetail(
-                  m: openMatch,
-                  onBack: () => setState(() => _openMatchId = null),
-                  onAction: _onMatchAction,
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -238,7 +185,10 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
           ),
           PvMatchesLane(
             matches: matches,
-            onOpen: (m) => setState(() => _openMatchId = m.id),
+            // `go` (not `push`) so the URL becomes /pavilion/match/:id and a
+            // refresh restores the page with a working back — matching the
+            // my-matches route's pattern.
+            onOpen: (m) => context.go('/pavilion/match/${m.id}'),
             hideIds: hero != null ? {hero.id} : const {},
           ),
         ],
@@ -447,24 +397,6 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Slides a full-screen overlay up from the bottom on mount (`pv-slide`).
-class _SlideUp extends StatelessWidget {
-  const _SlideUp({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 1, end: 0),
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) =>
-          FractionalTranslation(translation: Offset(0, value), child: child),
-      child: child,
     );
   }
 }

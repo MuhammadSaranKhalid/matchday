@@ -9,6 +9,7 @@ import '../features/home/presentation/screens/home_feed_screen.dart';
 import '../features/matches/presentation/screens/matches_v2_screen.dart';
 import '../features/messages/presentation/screens/messages_screen.dart';
 import '../features/pavilion/presentation/screens/my_matches_screen.dart';
+import '../features/pavilion/presentation/screens/pavilion_match_detail_screen.dart';
 import '../features/pavilion/presentation/screens/pavilion_v2_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
@@ -127,6 +128,16 @@ GoRouter appRouter(Ref ref) {
                     path: 'my-matches',
                     parentNavigatorKey: _rootNavigatorKey,
                     builder: (_, __) => const MyMatchesScreen(),
+                  ),
+                  // Match Detail — full-screen over the shell (root navigator),
+                  // URL-nested under /pavilion. Resolves the match by id, so a
+                  // refresh / deep link restores it with a working back.
+                  GoRoute(
+                    path: 'match/:id',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (_, state) => PavilionMatchDetailScreen(
+                      matchId: state.pathParameters['id']!,
+                    ),
                   ),
                 ],
               ),

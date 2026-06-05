@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/match.dart';
+import '../../domain/entities/match_request.dart';
 import '../../domain/entities/match_role.dart';
 
 /// View-model struct for the Pavilion → My Matches screen. A passive
@@ -18,16 +19,23 @@ class MyMatchesView {
     required this.past,
     required this.totalPastCount,
     required this.pendingRequestsCount,
+    required this.sent,
   });
 
   const MyMatchesView.empty()
       : confirmed = const [],
         past = const [],
         totalPastCount = 0,
-        pendingRequestsCount = 0;
+        pendingRequestsCount = 0,
+        sent = const [];
 
   final List<MyMatchConfirmed> confirmed;
   final List<MyMatchPast> past;
+
+  /// Outbound challenges the signed-in user has sent that are still active
+  /// (`pending` / `countered`) — the sender's view of a request before it
+  /// resolves. Rendered as the "Requests" section with a Withdraw action.
+  final List<MyMatchRequest> sent;
 
   /// Total past matches the signed-in user has played, including the ones
   /// outside the visible window. Powers the "SEE ALL N MATCHES →" footer.
@@ -37,7 +45,46 @@ class MyMatchesView {
   /// links to the Notifications inbox.
   final int pendingRequestsCount;
 
-  bool get isEmpty => confirmed.isEmpty && past.isEmpty;
+  bool get isEmpty => confirmed.isEmpty && past.isEmpty && sent.isEmpty;
+}
+
+/// Pre-rendered outbound request row for the "Requests" section. Only
+/// `pending` / `countered` requests reach here; accepted ones graduate to a
+/// [MyMatchConfirmed] and declined/cancelled/expired drop off the list.
+@immutable
+class MyMatchRequest {
+  const MyMatchRequest({
+    required this.requestId,
+    required this.isOpen,
+    required this.opponentName,
+    required this.opponentShort,
+    required this.opponentColor,
+    required this.statusLabel,
+    required this.expiresLabel,
+    required this.status,
+    this.shareCode,
+  });
+
+  final String requestId;
+
+  /// True when this is an open challenge (no target team) — the row shows the
+  /// 6-digit [shareCode] instead of an opponent crest.
+  final bool isOpen;
+
+  final String opponentName;
+  final String opponentShort;
+  final Color opponentColor;
+
+  /// 6-digit share code, present for open challenges.
+  final String? shareCode;
+
+  /// e.g. "Awaiting reply" / "Countered".
+  final String statusLabel;
+
+  /// e.g. "expires 41h". Empty when no expiry is set.
+  final String expiresLabel;
+
+  final MatchRequestStatus status;
 }
 
 /// Pre-rendered Confirmed card data.

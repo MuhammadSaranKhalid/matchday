@@ -9,6 +9,7 @@ import '../../domain/entities/match.dart';
 import '../../domain/entities/match_request.dart';
 import '../providers/matches_providers.dart';
 import '../providers/my_matches_providers.dart';
+import '../widgets/withdraw_sheet.dart';
 
 /// Receiver-side detail. Shows the sender's proposed terms, the head-to-head
 /// proxy line, and a sticky bottom reply bar with Decline / Accept.
@@ -50,6 +51,14 @@ class _ChallengeDetailScreenState
         ? null
         : ref.watch(teamProvider(req.toTeamId!.value)).value;
 
+    // Perspective: am I the sender (I manage the from-team) or the receiver?
+    // Receiver is the default while myTeams is cold — the common deep-link
+    // case (opening from a notification) is a receiver. A sender arriving from
+    // their own My Matches row has myTeams warm. If a user manages both teams,
+    // sender wins (they initiated).
+    final myTeams = ref.watch(myTeamsProvider).value ?? const <Team>[];
+    final viewerIsSender = myTeams.any((t) => t.id == req.fromTeamId);
+
     final actionable = req.isPending;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -60,18 +69,22 @@ class _ChallengeDetailScreenState
           // pop". Fall back to My Matches in that case.
           onBack: () =>
               context.canPop() ? context.pop() : context.go('/pavilion/my-matches'),
-          kicker: 'INCOMING CHALLENGE',
-          title: 'From ${from?.name ?? 'a team'}',
+          kicker: viewerIsSender ? 'CHALLENGE SENT' : 'INCOMING CHALLENGE',
+          title: viewerIsSender
+              ? 'To ${to?.name ?? 'an open challenge'}'
+              : 'From ${from?.name ?? 'a team'}',
         ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
             children: [
-              _Hero(req: req, from: from, to: to),
+              _Hero(req: req, from: from, to: to, viewerIsSender: viewerIsSender),
               const _SectionLabel('Match spec'),
               _Spec(req: req),
               if (req.message != null && req.message!.isNotEmpty) ...[
-                _SectionLabel('Note from ${_firstName(from?.name)}'),
+                _SectionLabel(viewerIsSender
+                    ? 'Your note'
+                    : 'Note from ${_firstName(from?.name)}'),
                 _Note(text: req.message!, sentAt: req.createdAt),
               ],
               if (!actionable) ...[
@@ -81,11 +94,14 @@ class _ChallengeDetailScreenState
             ],
           ),
         ),
-        if (actionable)
+        if (actionable && viewerIsSender)
+          _WithdrawBar(busy: _busy, onWithdraw: () => _onWithdraw(req))
+        else if (actionable)
           _ReplyBar(
             busy: _busy,
             onDecline: () => _onDecline(req),
-            onCounter: () => context.push('/challenges/${req.id.value}/counter'),
+            // Counter flow disabled — keep accept/decline only for now.
+            // onCounter: () => context.push('/challenges/${req.id.value}/counter'),
             onAccept: () => _onAccept(req),
           ),
       ],
@@ -170,6 +186,42 @@ class _ChallengeDetailScreenState
       },
     );
   }
+
+  Future<void> _onWithdraw(MatchRequest req) async {
+    final to = req.toTeamId == null
+        ? null
+        : ref.read(teamProvider(req.toTeamId!.value)).value;
+    final result = await showModalBottomSheet<WithdrawResult>(
+      context: context,
+      backgroundColor: CkColors.paper,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => WithdrawSheet(opponentName: to?.name),
+    );
+    if (result == null || !mounted) return;
+    setState(() => _busy = true);
+    final res = await ref.read(matchesRepositoryProvider).withdrawMatchChallenge(
+          requestId: req.id,
+          decisionNote: result.note,
+        );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    res.fold(
+      (f) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(f.message)),
+      ),
+      (_) {
+        ref.invalidate(myMatchChallengesProvider);
+        ref.invalidate(myMatchesViewProvider);
+        ref.invalidate(matchChallengeProvider(widget.requestId));
+        context.canPop()
+            ? context.pop()
+            : context.go('/pavilion/my-matches');
+      },
+    );
+  }
 }
 
 // ─── Atoms ─────────────────────────────────────────────────────────────────
@@ -244,15 +296,26 @@ class _Header extends StatelessWidget {
 /// with team-name + "captain" caption underneath, and the H2H footnote
 /// row split by a 1px dashed top border.
 class _Hero extends StatelessWidget {
-  const _Hero({required this.req, required this.from, required this.to});
+  const _Hero({
+    required this.req,
+    required this.from,
+    required this.to,
+    this.viewerIsSender = false,
+  });
   final MatchRequest req;
   final Team? from;
   final Team? to;
 
+  /// When true, the "You" label sits on the from-team (left) column and the
+  /// opponent goes right. Receiver view (false) keeps the original layout.
+  final bool viewerIsSender;
+
   @override
   Widget build(BuildContext context) {
     final start = req.effectiveStartTime;
-    final expiry = req.proposalExpiresAt;
+    final expiry = req.status == MatchRequestStatus.countered
+        ? req.counterExpiresAt
+        : req.proposalExpiresAt;
     final expiresLabel = expiry == null
         ? 'CHALLENGE'
         : 'CHALLENGE · EXPIRES ${_humanRemaining(expiry)}';
@@ -323,7 +386,8 @@ class _Hero extends StatelessWidget {
                   child: _CrestColumn(
                     team: from,
                     fallback: 'A',
-                    captain: 'Captain',
+                    overrideName: viewerIsSender ? 'You' : null,
+                    captain: viewerIsSender ? 'You · cap' : 'Captain',
                   ),
                 ),
                 Text(
@@ -339,8 +403,10 @@ class _Hero extends StatelessWidget {
                   child: _CrestColumn(
                     team: to,
                     fallback: 'B',
-                    overrideName: 'You',
-                    captain: 'You · cap',
+                    overrideName: viewerIsSender
+                        ? (req.toTeamId == null ? 'Open' : null)
+                        : 'You',
+                    captain: viewerIsSender ? 'Captain' : 'You · cap',
                   ),
                 ),
               ],
@@ -564,38 +630,42 @@ class _Note extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: CkColors.paper2,
-        borderRadius: BorderRadius.circular(12),
-        border: const Border(
-          left: BorderSide(color: CkColors.red, width: 3),
+    // Non-uniform border (red left stripe) → round via ClipRRect, NOT a
+    // borderRadius on the BoxDecoration (which throws at paint time for a
+    // non-uniform border and blanks the note).
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: const BoxDecoration(
+          color: CkColors.paper2,
+          border: Border(
+            left: BorderSide(color: CkColors.red, width: 3),
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '"$text"',
-            style: CkType.body(
-              fontSize: 13.5,
-              color: CkColors.ink,
-              height: 1.5,
-            ).copyWith(fontStyle: FontStyle.italic),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'SENT ${_hhmm(sentAt)}'.toUpperCase(),
-            style: CkType.mono(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.04,
-              color: CkColors.muted,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '"$text"',
+              style: CkType.body(
+                fontSize: 13.5,
+                color: CkColors.ink,
+                height: 1.5,
+              ).copyWith(fontStyle: FontStyle.italic),
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            Text(
+              'SENT ${_hhmm(sentAt)}'.toUpperCase(),
+              style: CkType.mono(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.04,
+                color: CkColors.muted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -629,19 +699,19 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-/// Sticky 3-button reply bar matching the design — paper outlines for
-/// Decline (red text) + Counter, ink-filled Accept with `flex 1.6` so the
-/// primary action feels bigger.
+/// Sticky reply bar — Decline (red text) + ink-filled Accept.
+/// (Counter button temporarily removed; the original 3-button layout is
+/// preserved as commented-out code so we can restore it without rebuilding.)
 class _ReplyBar extends StatelessWidget {
   const _ReplyBar({
     required this.busy,
     required this.onDecline,
-    required this.onCounter,
+    // required this.onCounter,
     required this.onAccept,
   });
   final bool busy;
   final VoidCallback onDecline;
-  final VoidCallback onCounter;
+  // final VoidCallback onCounter;
   final VoidCallback onAccept;
 
   @override
@@ -663,15 +733,16 @@ class _ReplyBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(
-            flex: 10,
-            child: _ReplyButton(
-              label: 'Counter',
-              onTap: busy ? null : onCounter,
-              foreground: CkColors.ink,
-            ),
-          ),
-          const SizedBox(width: 8),
+          // Counter flow disabled — keep accept/decline only for now.
+          // Expanded(
+          //   flex: 10,
+          //   child: _ReplyButton(
+          //     label: 'Counter',
+          //     onTap: busy ? null : onCounter,
+          //     foreground: CkColors.ink,
+          //   ),
+          // ),
+          // const SizedBox(width: 8),
           Expanded(
             flex: 16,
             child: _ReplyButton(
@@ -682,6 +753,30 @@ class _ReplyBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Sticky sender bar — a single ghost-red "Withdraw challenge" button shown
+/// while the sender's own request is still pending/countered.
+class _WithdrawBar extends StatelessWidget {
+  const _WithdrawBar({required this.busy, required this.onWithdraw});
+  final bool busy;
+  final VoidCallback onWithdraw;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+      decoration: const BoxDecoration(
+        color: CkColors.paper,
+        border: Border(top: BorderSide(color: CkColors.hairline)),
+      ),
+      child: _ReplyButton(
+        label: 'Withdraw challenge',
+        onTap: busy ? null : onWithdraw,
+        foreground: CkColors.red,
       ),
     );
   }

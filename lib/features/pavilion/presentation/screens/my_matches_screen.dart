@@ -9,8 +9,11 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
+import '../../../matches/domain/entities/match_request.dart';
+import '../../../matches/presentation/providers/matches_providers.dart';
 import '../../../matches/presentation/providers/my_matches_providers.dart';
 import '../../../matches/presentation/state/my_matches_view.dart';
+import '../../../matches/presentation/widgets/withdraw_sheet.dart';
 
 class MyMatchesScreen extends ConsumerStatefulWidget {
   const MyMatchesScreen({super.key});
@@ -49,6 +52,15 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
                     padding: EdgeInsets.zero,
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
+                      if (view.sent.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                          child: _RequestsSection(
+                            rows: view.sent,
+                            onOpen: (id) => context.push('/challenges/$id'),
+                            onWithdraw: _onWithdraw,
+                          ),
+                        ),
                       if (view.pendingRequestsCount > 0)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
@@ -146,6 +158,35 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
           _SeeAllButton(label: 'SEE ALL $total MATCHES →'),
         ],
       ],
+    );
+  }
+
+  Future<void> _onWithdraw(MyMatchRequest row) async {
+    final result = await showModalBottomSheet<WithdrawResult>(
+      context: context,
+      backgroundColor: CkColors.paper,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => WithdrawSheet(
+        opponentName: row.isOpen ? null : row.opponentName,
+      ),
+    );
+    if (result == null || !mounted) return;
+    final res = await ref.read(matchesRepositoryProvider).withdrawMatchChallenge(
+          requestId: MatchRequestId(row.requestId),
+          decisionNote: result.note,
+        );
+    if (!mounted) return;
+    res.fold(
+      (f) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(f.message)),
+      ),
+      (_) {
+        ref.invalidate(myMatchChallengesProvider);
+        ref.invalidate(myMatchesViewProvider);
+      },
     );
   }
 }
@@ -412,6 +453,163 @@ class _PendingRequestsBanner extends StatelessWidget {
                   color: CkColors.amber,
                 )),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Requests section (outbound sent challenges)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _RequestsSection extends StatelessWidget {
+  const _RequestsSection({
+    required this.rows,
+    required this.onOpen,
+    required this.onWithdraw,
+  });
+
+  final List<MyMatchRequest> rows;
+  final ValueChanged<String> onOpen;
+  final Future<void> Function(MyMatchRequest) onWithdraw;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+          child: Text(
+            'REQUESTS · ${rows.length}',
+            style: _monoLabel(color: CkColors.ink),
+          ),
+        ),
+        for (var i = 0; i < rows.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          _SentRequestRow(
+            row: rows[i],
+            onOpen: () => onOpen(rows[i].requestId),
+            onWithdraw: () => onWithdraw(rows[i]),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SentRequestRow extends StatelessWidget {
+  const _SentRequestRow({
+    required this.row,
+    required this.onOpen,
+    required this.onWithdraw,
+  });
+
+  final MyMatchRequest row;
+  final VoidCallback onOpen;
+  final VoidCallback onWithdraw;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = row.isOpen
+        ? 'Open · code ${row.shareCode ?? '——'}'
+        : row.opponentName;
+    final sub = [
+      row.statusLabel,
+      if (row.expiresLabel.isNotEmpty) row.expiresLabel,
+    ].join(' · ');
+    return InkWell(
+      onTap: onOpen,
+      borderRadius: BorderRadius.circular(12),
+      // Non-uniform border (amber left stripe) → round via ClipRRect, NOT a
+      // borderRadius on the BoxDecoration. A borderRadius on a non-uniform
+      // border throws at paint time and blanks the whole row.
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: const BoxDecoration(
+            color: CkColors.paper,
+            border: Border(
+              top: BorderSide(color: CkColors.hairline),
+              right: BorderSide(color: CkColors.hairline),
+              bottom: BorderSide(color: CkColors.hairline),
+              left: BorderSide(color: CkColors.amber, width: 3),
+            ),
+          ),
+          child: Row(
+            children: [
+              _MiniCrest(short: row.opponentShort, color: row.opponentColor),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text('→ ',
+                            style: CkType.mono(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0,
+                              color: CkColors.muted,
+                            )),
+                        Flexible(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: CkType.body(
+                                fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        sub,
+                        style: CkType.body(fontSize: 11, color: CkColors.muted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _WithdrawChip(onTap: onWithdraw),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WithdrawChip extends StatelessWidget {
+  const _WithdrawChip({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: CkColors.line),
+        ),
+        child: Text(
+          'Withdraw',
+          style: CkType.body(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: CkColors.red,
+          ),
         ),
       ),
     );

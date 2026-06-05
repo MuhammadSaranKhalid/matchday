@@ -17,7 +17,8 @@ import '../features/teams/presentation/screens/team_create_screen.dart';
 import '../features/teams/presentation/screens/team_page_screen.dart';
 import '../features/teams/presentation/screens/team_manage_screen.dart';
 import '../features/teams/presentation/screens/teams_list_screen.dart';
-import '../features/matches/presentation/screens/challenge_counter_screen.dart';
+// Counter flow temporarily disabled — keep import commented for easy restore.
+// import '../features/matches/presentation/screens/challenge_counter_screen.dart';
 import '../features/matches/presentation/screens/challenge_detail_screen.dart';
 import '../features/matches/presentation/screens/challenge_send_screen.dart';
 import '../features/matches/presentation/screens/challenge_sent_screen.dart';
@@ -216,12 +217,13 @@ GoRouter appRouter(Ref ref) {
           requestId: state.pathParameters['requestId']!,
         ),
       ),
-      GoRoute(
-        path: '/challenges/:requestId/counter',
-        builder: (_, state) => ChallengeCounterScreen(
-          requestId: state.pathParameters['requestId']!,
-        ),
-      ),
+      // Counter flow temporarily disabled — restore route + import above to re-enable.
+      // GoRoute(
+      //   path: '/challenges/:requestId/counter',
+      //   builder: (_, state) => ChallengeCounterScreen(
+      //     requestId: state.pathParameters['requestId']!,
+      //   ),
+      // ),
       GoRoute(
         path: '/notifications',
         builder: (_, __) => const NotificationsScreen(),

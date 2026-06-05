@@ -7,6 +7,7 @@ import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
+import '../../domain/entities/match_request.dart';
 import '../../domain/entities/match_role.dart';
 import '../state/my_matches_view.dart';
 import 'matches_providers.dart';
@@ -27,18 +28,46 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
     (f) => throw FailureWrapper(f),
     (list) => list,
   );
-  if (matches.isEmpty) return const MyMatchesView.empty();
 
-  final teams = ref.watch(myTeamsProvider).value ?? const <Team>[];
+  // Outbound active requests — the sender's view of pending/countered
+  // challenges. Degrade to empty on failure so a requests error never blanks
+  // the matches screen (mirrors the innings fold below).
+  final reqResult =
+      await ref.watch(matchesRepositoryProvider).listMyMatchChallenges();
+  final allRequests =
+      reqResult.fold<List<MatchRequest>>((_) => const [], (list) => list);
+
+  // Await teams so "teams I manage" is reliable even on a cold cache —
+  // otherwise the outbound filter below would see an empty set and hide the
+  // section. Establishes a dependency, so this recomputes when myTeams emits.
+  final teams = await ref.watch(myTeamsProvider.future);
+  final myTeamIds = {for (final t in teams) t.id.value};
+
+  final outbound = allRequests
+      .where((r) =>
+          myTeamIds.contains(r.fromTeamId.value) &&
+          (r.status == MatchRequestStatus.pending ||
+              r.status == MatchRequestStatus.countered))
+      .toList();
+
+  // Nothing at all to show.
+  if (matches.isEmpty && outbound.isEmpty) {
+    return const MyMatchesView.empty();
+  }
+
   final teamsById = <String, Team>{for (final t in teams) t.id.value: t};
 
-  // Fan-out: any team referenced by a match that isn't already in myTeams
-  // (e.g. the opponent). One-shot fetch via getTeam — cheap relative to the
-  // single list-matches roundtrip.
+  // Fan-out: any team referenced by a match OR an outbound request (the
+  // opponent you challenged) that isn't already loaded. One-shot getTeam —
+  // cheap relative to the list roundtrips.
   final missingTeamIds = <String>{};
   for (final m in matches) {
     if (!teamsById.containsKey(m.teamAId.value)) missingTeamIds.add(m.teamAId.value);
     if (!teamsById.containsKey(m.teamBId.value)) missingTeamIds.add(m.teamBId.value);
+  }
+  for (final r in outbound) {
+    final to = r.toTeamId?.value;
+    if (to != null && !teamsById.containsKey(to)) missingTeamIds.add(to);
   }
   for (final id in missingTeamIds) {
     final result =
@@ -75,14 +104,16 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
           innings: inningsByMatch[m.id] ?? const [],
           currentUserId: user.id.value),
   ];
+  final sentRows = [for (final r in outbound) _sentFor(r, teamsById)];
 
   return MyMatchesView(
     confirmed: confirmedRows,
     past: pastRows.take(_pastWindow).toList(),
     totalPastCount: pastRows.length,
-    // v1: match_requests count comes in Slice B. Surface 0 for now so the
-    // banner never renders.
+    // Inbound "needs your reply" count is out of scope (handled in
+    // Notifications); keep 0 so the inbound amber banner stays dormant.
     pendingRequestsCount: 0,
+    sent: sentRows,
   );
 }
 
@@ -214,6 +245,40 @@ MyMatchPast _pastFor(
             : 'ABANDONED',
     mine: '',
   );
+}
+
+MyMatchRequest _sentFor(MatchRequest r, Map<String, Team> teamsById) {
+  final isOpen = r.toTeamId == null;
+  final opp = isOpen ? null : teamsById[r.toTeamId!.value];
+  return MyMatchRequest(
+    requestId: r.id.value,
+    isOpen: isOpen,
+    opponentName: isOpen ? 'Open challenge' : (opp?.name ?? 'A team'),
+    opponentShort: isOpen ? 'OPN' : _short(opp, fallback: '?'),
+    opponentColor: isOpen
+        ? const Color(0xFF7A746A)
+        : _color(opp?.primaryColor, fallback: const Color(0xFF7A746A)),
+    shareCode: r.shareCode,
+    statusLabel: r.status == MatchRequestStatus.countered
+        ? 'Countered'
+        : 'Awaiting reply',
+    expiresLabel: _expiresLabel(r),
+    status: r.status,
+  );
+}
+
+/// "expires 41h" / "expires 12m" / "expires 2d" for an active request. Picks
+/// the timer that governs the current state. Empty when no expiry is set.
+String _expiresLabel(MatchRequest r) {
+  final expiry = r.status == MatchRequestStatus.countered
+      ? r.counterExpiresAt
+      : r.proposalExpiresAt;
+  if (expiry == null) return '';
+  final remaining = expiry.difference(DateTime.now());
+  if (remaining.isNegative) return 'expiring now';
+  if (remaining.inHours < 1) return 'expires ${remaining.inMinutes}m';
+  if (remaining.inHours < 48) return 'expires ${remaining.inHours}h';
+  return 'expires ${remaining.inDays}d';
 }
 
 String _short(Team? t, {required String fallback}) {

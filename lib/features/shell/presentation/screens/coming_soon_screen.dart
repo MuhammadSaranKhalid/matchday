@@ -18,7 +18,7 @@ class ComingSoonScreen extends StatelessWidget {
   /// Display label for the tab (e.g. 'Match'). Ignored when [showWordmark].
   final String tab;
 
-  /// When true the top bar shows the `circk.` wordmark instead of [tab].
+  /// When true the top bar shows the `matchday.` wordmark instead of [tab].
   final bool showWordmark;
 
   /// When true the top bar shows the bell + avatar actions (Home only).

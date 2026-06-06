@@ -182,6 +182,7 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
             tournaments: _tours,
             onAction: _onMatchAction,
             onSegment: _setSeg,
+            onOpenMatch: (id) => context.go('/pavilion/match/$id'),
           ),
           PvMatchesLane(
             matches: matches,
@@ -220,7 +221,7 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
     return _scroller(
       PvTeamsLane(
         teams: teams,
-        onOpen: (t) => _flash('Opening ${t.crest.name}…'),
+        onOpen: (t) => context.push('/teams/${t.id}'),
         onResolve: (t, need) => _flash(need),
       ),
     );

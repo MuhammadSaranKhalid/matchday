@@ -6,7 +6,7 @@ import '../theme/circk_theme.dart';
 /// `CkAppShell` in `design/app/screens/AppShell.jsx`.
 ///
 /// Renders a paper-background [Scaffold] with an optional top bar. When [title]
-/// is null the `circk.` wordmark is shown (red period); otherwise the title is
+/// is null the `matchday.` wordmark is shown (red period); otherwise the title is
 /// rendered in the display face. Optional bell + avatar actions sit on the
 /// right. The bottom navigation bar is supplied by the navigation shell, not
 /// here, so this scaffold is just top bar + body.
@@ -25,7 +25,7 @@ class CkScreenScaffold extends StatelessWidget {
 
   final Widget child;
 
-  /// Null → render the `circk.` wordmark. Otherwise the title text.
+  /// Null → render the `matchday.` wordmark. Otherwise the title text.
   final String? title;
   final bool livePulse;
   final bool showTopBar;
@@ -116,7 +116,7 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// The `circk.` wordmark with the red period, per the designs.
+/// The `matchday.` wordmark with the red period, per the designs.
 class _Wordmark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {

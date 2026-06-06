@@ -45,12 +45,14 @@ class PvOverview extends StatelessWidget {
     required this.tournaments,
     required this.onAction,
     required this.onSegment,
+    required this.onOpenMatch,
   });
 
   final List<PvMatch> matches;
   final List<PvTournament> tournaments;
   final void Function(String id, String action) onAction;
   final void Function(PvSeg seg) onSegment;
+  final void Function(String id) onOpenMatch;
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +80,8 @@ class PvOverview extends StatelessWidget {
         children: [
           const PvSecLabel('TODAY'),
           if (hero != null)
-            _Hero(m: hero, isLive: isLive, onAction: onAction)
+            _Hero(
+                m: hero, isLive: isLive, onAction: onAction, onOpen: onOpenMatch)
           else
             Container(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -113,16 +116,29 @@ class PvOverview extends StatelessWidget {
 }
 
 class _Hero extends StatelessWidget {
-  const _Hero({required this.m, required this.isLive, required this.onAction});
+  const _Hero({
+    required this.m,
+    required this.isLive,
+    required this.onAction,
+    required this.onOpen,
+  });
 
   final PvMatch m;
   final bool isLive;
   final void Function(String id, String action) onAction;
+  final void Function(String id) onOpen;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+    // Tapping the card body opens the Match Detail page (the hero match is
+    // hidden from the list below, so this is its only path to detail). The CTA
+    // button stays the one-tap shortcut to the urgent action (start / resume) —
+    // a nested GestureDetector, so it wins taps on itself.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onOpen(m.id),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       decoration: BoxDecoration(
         color: CkColors.ink,
@@ -187,6 +203,7 @@ class _Hero extends StatelessWidget {
           const SizedBox(height: 14),
           _HeroCta(isLive: isLive, onTap: () => onAction(m.id, isLive ? 'resume' : 'start')),
         ],
+      ),
       ),
     );
   }

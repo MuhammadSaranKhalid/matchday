@@ -1,34 +1,35 @@
 import 'package:flutter/material.dart';
 
-/// Circk / matchday design tokens.
+/// matchday design tokens.
 ///
-/// Ported from the design bundle's `styles.css` (`:root` custom properties).
-/// The source values are authored in oklch; they are converted here to the
-/// nearest sRGB and exposed as [Color]s so the whole app can share one palette.
+/// The neutral ramp + the brand red/cream are the exact values from the
+/// **matchday Brand Sheet** ("One ink · one earned red · warm paper"). The
+/// functional status colors (green/amber and their soft tints) are not part of
+/// the brand palette, so they're kept as-is.
 abstract final class CkColors {
-  // Ink / text ramp
-  static const ink = Color(0xFF161107); // oklch(0.18 0.02 80)
-  static const ink2 = Color(0xFF332D23); // oklch(0.30 0.02 80)
-  static const muted = Color(0xFF6F685C); // oklch(0.52 0.02 80)
-  static const soft = Color(0xFFA8A49E); // oklch(0.72 0.01 80)
+  // Ink / text ramp — matchday brand sheet
+  static const ink = Color(0xFF29251E);
+  static const ink2 = Color(0xFF4A4339);
+  static const muted = Color(0xFF8A8170);
+  static const soft = Color(0xFFB9B1A2);
 
-  // Surfaces
-  static const paper = Color(0xFFFDFAF4); // oklch(0.985 0.008 85)
-  static const paper2 = Color(0xFFF6F3EC); // oklch(0.965 0.010 85)
-  static const surface = Color(0xFFFDFCF8); // oklch(0.99 0.005 85)
+  // Surfaces — warm paper
+  static const paper = Color(0xFFFBFAF6);
+  static const paper2 = Color(0xFFF3F0E9);
+  static const surface = Color(0xFFFFFFFF);
 
   // Lines
-  static const line = Color(0xFFE0DED8); // oklch(0.90 0.008 85)
-  static const hairline = Color(0xFFEAE7E2); // oklch(0.93 0.008 85)
+  static const line = Color(0xFFE6E2D9);
+  static const hairline = Color(0xFFEEEBE3);
 
-  // Accents
-  static const red = Color(0xFFE24A3F); // oklch(0.62 0.19 28)
-  static const redSoft = Color(0xFFFFD9D2); // oklch(0.92 0.05 28)
-  static const green = Color(0xFF338946); // oklch(0.56 0.13 148)
-  static const greenSoft = Color(0xFFCFEED2); // oklch(0.92 0.05 148)
-  static const amber = Color(0xFFE6AC3D); // oklch(0.78 0.14 80)
-  static const cream = Color(0xFFF8EAC6); // oklch(0.94 0.05 90)
-  static const creamBorder = Color(0xFFDED0AC); // oklch(0.86 0.05 90)
+  // Accents — Cricket Red is the one earned accent; Seam Cream is the ball seam
+  static const red = Color(0xFFDC4D32); // Cricket Red
+  static const redSoft = Color(0xFFF7E6E1);
+  static const green = Color(0xFF338946); // status only (not in brand sheet)
+  static const greenSoft = Color(0xFFCFEED2); // status only
+  static const amber = Color(0xFFE6AC3D); // status only
+  static const cream = Color(0xFFF4ECDD); // Seam Cream
+  static const creamBorder = Color(0xFFDED0AC);
 }
 
 /// Radii from styles.css (`--r-*`).

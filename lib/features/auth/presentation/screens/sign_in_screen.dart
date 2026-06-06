@@ -6,9 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/widgets/ck_brand.dart';
 import '../controllers/auth_controller.dart';
 import '../state/auth_state.dart';
-import '../widgets/circk_brand.dart';
+import '../widgets/matchday_brand.dart';
 
 /// Sign-in screen — "matchday." (Variant A: minimal & calm).
 ///
@@ -108,7 +109,7 @@ class _EmailFormState extends ConsumerState<_EmailForm> {
                         children: [
                           const Align(
                             alignment: Alignment.centerLeft,
-                            child: CkWordmark(fontSize: 22),
+                            child: CkBrandLockup(markSize: 30),
                           ),
                           const SizedBox(height: 48),
 

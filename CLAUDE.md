@@ -186,6 +186,12 @@ go_router: ^16.2.0
 flutter_svg: ^2.3.0                  # render brand vector assets (Google "G", pitch motif) faithfully
 intl: ^0.20.2                        # date/number formatting (scorecards, timestamps)
 timeago: ^3.7.1                      # relative timestamps ("3h ago") in feeds/notifications
+# Push notifications (FCM). device_tokens table + send-push edge fn already
+# deployed; the client obtains the token and registers it. See lib/core/push/
+# + features/notifications PushRegistrar. Firebase project: matchday-44ed4.
+firebase_core: ^4.10.0               # Firebase init (firebase_options.dart via flutterfire configure)
+firebase_messaging: ^16.3.0          # FCM token + foreground/background/tap messages
+flutter_local_notifications: ^18.0.1 # display FOREGROUND push as a heads-up (OS only auto-shows background/killed)
 # Posts / photo pipeline (feature: posts). See §15.
 image_picker: ^1.2.2                 # pick photos from gallery/camera (composer)
 image_cropper: ^12.2.1               # crop/adjust step (ratio presets + zoom) before upload

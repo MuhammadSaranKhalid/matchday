@@ -1,0 +1,74 @@
+{
+  "project_info": {
+    "project_number": "45146159151",
+    "project_id": "matchday-44ed4",
+    "storage_bucket": "matchday-44ed4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:45146159151:android:d4db27908bc830d40a6eda",
+        "android_client_info": {
+          "package_name": "app.circk"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "45146159151-r7p1gg5cpk8mefnb466sh758tga5fddh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAcvWLiZmbO1OZ2tJBFmxvFYP_TX4rS28"
+        },
+        {
+          "current_key": "AIzaSyAY9Eb2mA0v-LVtup8fYJ0oIO2-SprWRZU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "45146159151-r7p1gg5cpk8mefnb466sh758tga5fddh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:45146159151:android:7c09684764d0a6070a6eda",
+        "android_client_info": {
+          "package_name": "com.matchday.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "45146159151-r7p1gg5cpk8mefnb466sh758tga5fddh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAcvWLiZmbO1OZ2tJBFmxvFYP_TX4rS28"
+        },
+        {
+          "current_key": "AIzaSyAY9Eb2mA0v-LVtup8fYJ0oIO2-SprWRZU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "45146159151-r7p1gg5cpk8mefnb466sh758tga5fddh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,6 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
+import '../../../notifications/presentation/controllers/push_registrar.dart';
 import '../../domain/value_objects/email.dart';
 import '../../domain/value_objects/otp_code.dart';
 import '../providers/auth_providers.dart';
@@ -96,6 +97,13 @@ class AuthController extends _$AuthController {
   // ─── Sign out ───────────────────────────────────────────────────────────
 
   Future<void> signOut() async {
+    // Revoke this device's push token while still authenticated (the RLS
+    // delete on device_tokens needs auth.uid()). Best-effort — never block
+    // sign-out on it.
+    try {
+      await ref.read(pushRegistrarProvider.notifier).unregister();
+    } catch (_) {/* ignore — stale tokens self-heal on next sign-in */}
+
     final result = await ref.read(authRepositoryProvider).signOut();
     state = result.fold(
       AuthFailed.new,

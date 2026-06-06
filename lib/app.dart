@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/database/database_provider.dart';
 import 'core/theme/circk_theme.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
+import 'features/notifications/presentation/controllers/push_registrar.dart';
 import 'router/app_router.dart';
 
 class NovexApp extends ConsumerWidget {
@@ -19,6 +20,10 @@ class NovexApp extends ConsumerWidget {
         ref.read(appDatabaseProvider).clear();
       }
     });
+
+    // Activate the FCM token registrar for the session (registers on sign-in,
+    // re-registers on token refresh, deep-links notification taps).
+    ref.watch(pushRegistrarProvider);
 
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(

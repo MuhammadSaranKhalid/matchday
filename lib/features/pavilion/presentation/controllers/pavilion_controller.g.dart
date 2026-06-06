@@ -75,7 +75,7 @@ final class PavilionControllerProvider
 }
 
 String _$pavilionControllerHash() =>
-    r'e6f9a538f7857ee46052eda4579ee17e66235542';
+    r'fd20b05e6ce6929ee385e8dba0cb877e171c8abb';
 
 /// Action coordinator for the Pavilion v2 workspace.
 ///

@@ -63,6 +63,9 @@ dependencies:
   flutter_blurhash: ^0.9.1
   photo_view: ^0.15.0
   equatable: ^2.0.8
+  firebase_core: ^4.10.0
+  firebase_messaging: ^16.3.0
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:
@@ -85,6 +88,18 @@ dev_dependencies:
 
   # Testing
   mocktail: ^1.0.4
+  flutter_launcher_icons: ^0.14.4
+
+# matchday launcher icon (the Seam ball on warm paper). Sources rasterized
+# from assets/brand/*.svg via rsvg-convert. Regenerate: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/brand/appicon_1024.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  min_sdk_android: 24
+  adaptive_icon_background: "#FBFAF6"
+  adaptive_icon_foreground: "assets/brand/appicon_fg_1024.png"
 
 flutter:
   uses-material-design: true

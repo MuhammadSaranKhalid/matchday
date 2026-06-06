@@ -124,7 +124,19 @@ interface PushContent {
   route: string;
 }
 
-function pushContentFor(n: NotifRow): PushContent {
+// deno-lint-ignore no-explicit-any
+async function teamName(supabase: any, id: unknown): Promise<string | null> {
+  if (typeof id !== "string") return null;
+  const { data } = await supabase
+    .from("teams")
+    .select("team_name")
+    .eq("team_id", id)
+    .maybeSingle();
+  return (data as { team_name?: string } | null)?.team_name ?? null;
+}
+
+// deno-lint-ignore no-explicit-any
+async function pushContentFor(supabase: any, n: NotifRow): Promise<PushContent> {
   switch (n.type) {
     case "team_invitation":
       return {
@@ -174,6 +186,32 @@ function pushContentFor(n: NotifRow): PushContent {
         body: "Your claim request was updated",
         route: "/notifications",
       };
+    case "match_request": {
+      const from = await teamName(supabase, n.payload.from_team_id);
+      const requestId = n.payload.request_id;
+      return {
+        title: from ? `${from} challenged you` : "New match challenge",
+        body: "Tap to accept, counter or decline",
+        route: typeof requestId === "string"
+          ? `/challenges/${requestId}`
+          : "/notifications",
+      };
+    }
+    case "match_request_decision": {
+      const status = String(n.payload.status ?? "");
+      const other = (await teamName(supabase, n.payload.to_team_id)) ??
+        "The other team";
+      const byStatus: Record<string, { title: string; body: string }> = {
+        accepted: { title: "Challenge accepted", body: `${other} accepted your match` },
+        declined: { title: "Challenge declined", body: `${other} declined your challenge` },
+        countered: { title: "Counter-offer", body: `${other} proposed new terms — tap to review` },
+        cancelled: { title: "Match cancelled", body: "Your match was cancelled" },
+        expired: { title: "Challenge expired", body: "Your challenge expired with no reply" },
+      };
+      const c = byStatus[status] ??
+        { title: "Challenge update", body: "Your match challenge was updated" };
+      return { ...c, route: "/notifications" };
+    }
     default:
       return {
         title: "Circk",
@@ -237,7 +275,7 @@ Deno.serve(async (req) => {
   }
 
   // 3. Build the message and fan out.
-  const content = pushContentFor(notif);
+  const content = await pushContentFor(supabase, notif);
   const accessToken = await getAccessToken();
   const fcmUrl =
     `https://fcm.googleapis.com/v1/projects/${FCM_PROJECT_ID}/messages:send`;
@@ -274,6 +312,11 @@ Deno.serve(async (req) => {
       return;
     }
 
+    // Surface the exact FCM rejection (status + body) so delivery failures are
+    // diagnosable from the function logs.
+    const errText = await res.text().catch(() => "");
+    console.error(`send-push FCM reject status=${res.status} body=${errText}`);
+
     // FCM v1 returns 404 with error code UNREGISTERED for dead tokens; 400
     // with INVALID_ARGUMENT can also mean a malformed/stale token. Either
     // way the right move is to drop the row so we stop targeting it.
@@ -284,6 +327,11 @@ Deno.serve(async (req) => {
       // Transient — fine to leave the token, FCM is having a bad day.
     }
   }));
+
+  console.log(
+    `send-push result notif=${notificationId} type=${notif.type} ` +
+      `tokens=${tokens.length} sent=${sent} dead=${deadTokens.length}`,
+  );
 
   if (deadTokens.length > 0) {
     await supabase.from("device_tokens").delete().in("fcm_token", deadTokens);

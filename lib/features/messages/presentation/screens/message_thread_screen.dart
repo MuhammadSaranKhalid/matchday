@@ -1,79 +1,144 @@
-// Faithful Flutter port of the matchday v2 prototype's `V2MessagesThread`
-// screen (screens/v2-IA.jsx). Presentation-only, mock conversation, inert
-// composer.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
+import 'package:novex_clean_arch/core/error/failures.dart';
 import 'package:novex_clean_arch/core/theme/circk_theme.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
+import 'package:novex_clean_arch/features/messages/domain/entities/chat.dart';
+import 'package:novex_clean_arch/features/messages/domain/entities/message.dart';
+import 'package:novex_clean_arch/features/messages/presentation/controllers/message_thread_controller.dart';
+import 'package:novex_clean_arch/features/messages/presentation/providers/messages_providers.dart';
 
-class MessageThreadScreen extends StatelessWidget {
-  const MessageThreadScreen({super.key});
+class MessageThreadScreen extends ConsumerStatefulWidget {
+  const MessageThreadScreen({super.key, required this.chatId});
+
+  final String chatId;
+
+  @override
+  ConsumerState<MessageThreadScreen> createState() =>
+      _MessageThreadScreenState();
+}
+
+class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
+  final _textController = TextEditingController();
+  final _scrollController = ScrollController();
+  final _composerFocus = FocusNode();
+  bool _sending = false;
+  String? _composerError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Stamp last_read_at once the controller is built. Post-frame so the
+    // provider has had a chance to materialise.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
+    });
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    _scrollController.dispose();
+    _composerFocus.dispose();
+    super.dispose();
+  }
+
+  /// Find this chat in the inbox so the header has a name + crest. Falls
+  /// back to a generic header while the inbox is still loading.
+  Chat? _findChat() {
+    final chatsAsync = ref.watch(myChatsProvider);
+    return chatsAsync.maybeWhen(
+      data: (chats) => chats
+          .where((c) => c.id.value == widget.chatId)
+          .cast<Chat?>()
+          .firstOrNull,
+      orElse: () => null,
+    );
+  }
+
+  Future<void> _send() async {
+    final text = _textController.text;
+    if (text.trim().isEmpty || _sending) return;
+    setState(() {
+      _sending = true;
+      _composerError = null;
+    });
+    final result =
+        await ref.read(messageThreadProvider(widget.chatId).notifier).send(text);
+    if (!mounted) return;
+    result.fold(
+      (failure) => setState(() {
+        _sending = false;
+        _composerError = failure.message;
+      }),
+      (_) {
+        _textController.clear();
+        setState(() {
+          _sending = false;
+          _composerError = null;
+        });
+        _composerFocus.requestFocus();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final chat = _findChat();
+    final threadAsync = ref.watch(messageThreadProvider(widget.chatId));
+
     return Scaffold(
       backgroundColor: CkColors.paper,
       body: SafeArea(
         child: Column(
           children: [
-            _ThreadHeader(onBack: () => Navigator.of(context).pop()),
+            _ThreadHeader(
+              chat: chat,
+              onBack: () => Navigator.of(context).pop(),
+            ),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(14),
-                children: const [
-                  _DayDivider('Today'),
-                  SizedBox(height: 10),
-                  _Msg(
-                    from: 'IS',
-                    name: 'Imran Saeed',
-                    body: 'XI confirmed for tomorrow. '
-                        'Faraz at 3, Bilal opens with me.',
-                    time: '9:14 AM',
+              child: threadAsync.when(
+                loading: () => const Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  SizedBox(height: 10),
-                  _Msg(
-                    from: 'IS',
-                    name: 'Imran Saeed',
-                    body: 'Toss at 3:45. Be at the ground by 3:30.',
-                    time: '9:14 AM',
-                  ),
-                  SizedBox(height: 10),
-                  _SystemMsg(
-                    [
-                      _SysSpan('Imran added a match: '),
-                      _SysSpan('Lions vs Cobras', bold: true),
-                      _SysSpan(' · Sat 25 · 4 PM'),
-                    ],
-                  ),
-                  SizedBox(height: 10),
-                  _Msg(
-                    from: 'FK',
-                    name: 'Faraz Khan',
-                    body: 'On it. Bringing two extra balls.',
-                    time: '9:31 AM',
-                  ),
-                  SizedBox(height: 10),
-                  _Msg(
-                    body: 'Booking the practice net for Wed 7 PM 🏏',
-                    time: '11:22 AM',
-                    me: true,
-                  ),
-                  SizedBox(height: 10),
-                  _DayDivider('Now'),
-                  SizedBox(height: 10),
-                  _Msg(
-                    from: 'IS',
-                    name: 'Imran Saeed',
-                    body: 'Anyone got a spare pair of pads for Adeel? '
-                        'His are torn.',
-                    time: 'just now',
-                  ),
-                  SizedBox(height: 14),
-                  _TypingIndicator(),
-                ],
+                ),
+                error: (e, _) => _ErrorBody(
+                  message:
+                      e is FailureWrapper ? e.failure.message : e.toString(),
+                  onRetry: () =>
+                      ref.invalidate(messageThreadProvider(widget.chatId)),
+                ),
+                data: (messages) => messages.isEmpty
+                    ? const _EmptyBody()
+                    : _Conversation(
+                        messages: messages,
+                        scroll: _scrollController,
+                      ),
               ),
             ),
-            const _Composer(),
+            _Composer(
+              textController: _textController,
+              focusNode: _composerFocus,
+              onSend: _send,
+              sending: _sending,
+              error: _composerError,
+            ),
           ],
         ),
       ),
@@ -81,13 +146,19 @@ class MessageThreadScreen extends StatelessWidget {
   }
 }
 
-class _ThreadHeader extends StatelessWidget {
-  const _ThreadHeader({required this.onBack});
+// ─── Header ──────────────────────────────────────────────────────────────────
 
+class _ThreadHeader extends StatelessWidget {
+  const _ThreadHeader({required this.chat, required this.onBack});
+
+  final Chat? chat;
   final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
+    final name = chat?.name ?? '…';
+    final mono = chat?.teamLogoMonogram?.toUpperCase() ?? '?';
+    final color = _parseHexColor(chat?.teamPrimaryColorHex, CkColors.ink);
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
       decoration: const BoxDecoration(
@@ -109,249 +180,92 @@ class _ThreadHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          const Crest(short: 'LL', color: CkColors.red, size: 32, radius: 8),
+          Crest(short: mono, color: color, size: 32, radius: 8),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Lahore Lions',
-                  style: CkType.display(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.01,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 1),
-                  child: Text(
-                    '14 members · 4 online',
-                    style: CkType.body(fontSize: 11, color: CkColors.muted),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Padding(
-            padding: EdgeInsets.all(4),
-            child: V2Svg(
-              V2Icons.dotsV,
-              size: 22,
-              color: CkColors.ink,
-              filled: true,
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.display(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.01,
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+// ─── Conversation list ───────────────────────────────────────────────────────
+
+class _Conversation extends StatelessWidget {
+  const _Conversation({required this.messages, required this.scroll});
+
+  final List<Message> messages;
+  final ScrollController scroll;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _buildItems(messages);
+    return ListView.builder(
+      controller: scroll,
+      padding: const EdgeInsets.all(14),
+      itemCount: items.length,
+      itemBuilder: (context, i) => items[i],
+    );
+  }
+
+  /// Group messages by date — a `_DayDivider` separates each group.
+  List<Widget> _buildItems(List<Message> msgs) {
+    final out = <Widget>[];
+    DateTime? lastDay;
+    for (final m in msgs) {
+      final day = DateTime(m.createdAt.year, m.createdAt.month, m.createdAt.day);
+      if (lastDay == null || day != lastDay) {
+        out.add(_DayDivider(_formatDay(day)));
+        out.add(const SizedBox(height: 10));
+        lastDay = day;
+      }
+      out.add(_Bubble(m));
+      out.add(const SizedBox(height: 10));
+    }
+    return out;
+  }
+
+  String _formatDay(DateTime day) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (day == today) return 'Today';
+    if (day == yesterday) return 'Yesterday';
+    return DateFormat('EEE, MMM d').format(day);
   }
 }
 
 class _DayDivider extends StatelessWidget {
   const _DayDivider(this.label);
-
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Expanded(
-          child: SizedBox(height: 1, child: ColoredBox(color: CkColors.hairline)),
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          color: CkColors.paper2,
+          borderRadius: BorderRadius.circular(999),
         ),
-        const SizedBox(width: 10),
-        Text(
-          label.toUpperCase(),
-          style: CkType.mono(fontSize: 9, color: CkColors.muted),
-        ),
-        const SizedBox(width: 10),
-        const Expanded(
-          child: SizedBox(height: 1, child: ColoredBox(color: CkColors.hairline)),
-        ),
-      ],
-    );
-  }
-}
-
-class _Msg extends StatelessWidget {
-  const _Msg({
-    this.from,
-    this.name,
-    required this.body,
-    required this.time,
-    this.me = false,
-  });
-
-  final String? from;
-  final String? name;
-  final String body;
-  final String time;
-  final bool me;
-
-  @override
-  Widget build(BuildContext context) {
-    if (me) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Flexible(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: const BoxDecoration(
-                      color: CkColors.ink,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(14),
-                        topRight: Radius.circular(14),
-                        bottomRight: Radius.circular(4),
-                        bottomLeft: Radius.circular(14),
-                      ),
-                    ),
-                    child: Text(
-                      body,
-                      style: CkType.body(
-                        fontSize: 13.5,
-                        height: 1.4,
-                        color: CkColors.paper,
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Text(
-                      time,
-                      style: CkType.mono(fontSize: 9, color: CkColors.muted),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Avatar(mono: from ?? '', size: 26, tone: AvatarTone.ink),
-        const SizedBox(width: 8),
-        Flexible(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (name != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: Text(
-                      name!,
-                      style: CkType.display(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: CkColors.ink2,
-                      ),
-                    ),
-                  ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: const BoxDecoration(
-                    color: CkColors.paper2,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(4),
-                      topRight: Radius.circular(14),
-                      bottomRight: Radius.circular(14),
-                      bottomLeft: Radius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    body,
-                    style: CkType.body(
-                      fontSize: 13.5,
-                      height: 1.4,
-                      color: CkColors.ink,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: Text(
-                    time,
-                    style: CkType.mono(fontSize: 9, color: CkColors.muted),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SysSpan {
-  const _SysSpan(this.text, {this.bold = false});
-  final String text;
-  final bool bold;
-}
-
-class _SystemMsg extends StatelessWidget {
-  const _SystemMsg(this.spans);
-
-  final List<_SysSpan> spans;
-
-  @override
-  Widget build(BuildContext context) {
-    final base = CkType.body(
-      fontSize: 11,
-      height: 1.4,
-      color: CkInk.amber, // on cream — oklch(0.42 0.12 80)
-    );
-    return Align(
-      alignment: Alignment.center,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.85,
-        ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: CkColors.cream,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text.rich(
-            TextSpan(
-              style: base,
-              children: [
-                for (final s in spans)
-                  TextSpan(
-                    text: s.text,
-                    style: s.bold
-                        ? base.copyWith(fontWeight: FontWeight.w700)
-                        : null,
-                  ),
-              ],
-            ),
-            textAlign: TextAlign.center,
+        child: Text(
+          label,
+          style: CkType.mono(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.10,
+            color: CkColors.muted,
           ),
         ),
       ),
@@ -359,105 +273,261 @@ class _SystemMsg extends StatelessWidget {
   }
 }
 
-class _TypingIndicator extends StatelessWidget {
-  const _TypingIndicator();
+// ─── Bubble ──────────────────────────────────────────────────────────────────
+
+class _Bubble extends StatelessWidget {
+  const _Bubble(this.message);
+  final Message message;
+
+  static final _timeFmt = DateFormat('h:mm a');
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Avatar(mono: 'IS', size: 26, tone: AvatarTone.ink),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: CkColors.paper2,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(
-              3,
-              (i) => Padding(
-                padding: EdgeInsets.only(right: i == 2 ? 0 : 4),
-                child: Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: CkColors.muted.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(999),
+    final me = message.fromMe;
+    final isDeleted = message.isDeleted;
+    final senderName = message.senderDisplayName ?? 'Deleted user';
+    final time = _timeFmt.format(message.createdAt.toLocal()).toLowerCase();
+
+    final bg = me ? CkColors.ink : CkColors.paper2;
+    final fg = me ? CkColors.paper : CkColors.ink;
+
+    final bodyStyle = CkType.body(
+      fontSize: 13,
+      height: 1.4,
+      color: fg,
+    ).copyWith(fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal);
+
+    return Align(
+      alignment: me ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.76,
+        ),
+        child: Column(
+          crossAxisAlignment:
+              me ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            if (!me)
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 2),
+                child: Text(
+                  senderName,
+                  style: CkType.mono(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.06,
+                    color: CkColors.muted,
                   ),
                 ),
               ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                isDeleted ? 'Message deleted' : message.body,
+                style: bodyStyle,
+              ),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
+              child: Text(
+                message.isEdited ? '$time · edited' : time,
+                style: CkType.mono(fontSize: 8.5, color: CkColors.muted),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
 
+// ─── Composer ────────────────────────────────────────────────────────────────
+
 class _Composer extends StatelessWidget {
-  const _Composer();
+  const _Composer({
+    required this.textController,
+    required this.focusNode,
+    required this.onSend,
+    required this.sending,
+    required this.error,
+  });
+
+  final TextEditingController textController;
+  final FocusNode focusNode;
+  final Future<void> Function() onSend;
+  final bool sending;
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
       decoration: const BoxDecoration(
+        color: CkColors.paper,
         border: Border(top: BorderSide(color: CkColors.hairline)),
       ),
-      child: Row(
+      padding: EdgeInsets.fromLTRB(
+        14,
+        8,
+        14,
+        MediaQuery.of(context).viewPadding.bottom + 8,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: CkColors.paper2,
-              shape: BoxShape.circle,
-            ),
-            child: const V2Svg(
-              V2Icons.plus,
-              size: 18,
-              color: CkColors.ink,
-              strokeWidth: 2,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: CkColors.paper,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: CkColors.hairline),
-              ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
               child: Text(
-                'Message Lahore Lions…',
-                style: CkType.body(fontSize: 14, color: CkColors.soft),
+                error!,
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.05,
+                  color: CkColors.red,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: CkColors.ink,
-              shape: BoxShape.circle,
-            ),
-            child: const V2Svg(
-              V2Icons.share,
-              size: 16,
-              color: CkColors.paper,
-              strokeWidth: 2.4,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: textController,
+                  focusNode: focusNode,
+                  enabled: !sending,
+                  maxLines: 5,
+                  minLines: 1,
+                  textInputAction: TextInputAction.newline,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(2000),
+                  ],
+                  decoration: InputDecoration(
+                    hintText: 'Message…',
+                    hintStyle: CkType.body(fontSize: 13, color: CkColors.muted),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: CkColors.hairline),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: CkColors.hairline),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: CkColors.ink),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    isDense: true,
+                  ),
+                  style: CkType.body(fontSize: 13, color: CkColors.ink),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: GestureDetector(
+                  onTap: sending ? null : onSend,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: CkColors.ink,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: sending
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: CkColors.paper,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.send,
+                            color: CkColors.paper,
+                            size: 18,
+                          ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+}
+
+// ─── States ──────────────────────────────────────────────────────────────────
+
+class _EmptyBody extends StatelessWidget {
+  const _EmptyBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Text(
+          'No messages yet.\nSay hi.',
+          textAlign: TextAlign.center,
+          style: CkType.body(
+            fontSize: 13,
+            color: CkColors.muted,
+            height: 1.5,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorBody extends StatelessWidget {
+  const _ErrorBody({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: CkType.body(fontSize: 13, color: CkColors.ink, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+Color _parseHexColor(String? hex, Color fallback) {
+  if (hex == null || hex.isEmpty) return fallback;
+  var s = hex.trim();
+  if (s.startsWith('#')) s = s.substring(1);
+  if (s.length == 6) s = 'FF$s';
+  if (s.length != 8) return fallback;
+  final v = int.tryParse(s, radix: 16);
+  return v == null ? fallback : Color(v);
 }

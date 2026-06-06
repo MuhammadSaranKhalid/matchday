@@ -1,17 +1,33 @@
-import '../entities/chat.dart';
+import 'package:fpdart/fpdart.dart';
 
-/// Online-only read contract for the chat inbox.
+import '../../../../core/error/failures.dart';
+import '../entities/chat.dart';
+import '../entities/message.dart';
+import '../value_objects/message_body.dart';
+
+/// Online-only contract for the messages feature.
 ///
-/// Write paths and per-thread message streams live in part 2 of the rollout
-/// (ticket #7); this contract intentionally exposes only the list view.
+/// Reads (`watchMyChats`, `watchMessages`) return live streams backed by
+/// Supabase broadcast channels; errors propagate as stream errors wrapped in
+/// [FailureWrapper] per CLAUDE.md Rule 2.
+///
+/// Writes (`sendMessage`, `markRead`) return `Either<Failure, T>` directly.
 abstract class MessagesRepository {
-  /// Streams the current user's chats, sorted by `last_message_at` desc,
-  /// nulls last. Backed by an initial fetch + a Supabase broadcast
-  /// subscription on `user:<my_user_id>:notifications` (the `chat_updated`
-  /// event fires from the `broadcast_new_message` trigger on every message
-  /// insert, see migration 0802).
-  ///
-  /// Errors propagate as stream errors per CLAUDE.md Rule 2; consumers let
-  /// AsyncValue / AsyncError handle them.
+  /// Streams the current user's chats, sorted by `last_message_at` desc.
   Stream<List<Chat>> watchMyChats();
+
+  /// Streams the messages in a chat, sorted by `created_at` asc. Backed by
+  /// an initial fetch + a Supabase broadcast subscription on
+  /// `chat:<chat_id>:messages` (event `new_message`, fired by the
+  /// `broadcast_new_message` trigger in migration 0802 on every insert).
+  Stream<List<Message>> watchMessages(ChatId chatId);
+
+  /// Inserts a new message authored by the current user. Server-side
+  /// triggers handle the realtime broadcast and the push fan-out — this
+  /// returns once the row is committed.
+  Future<Either<Failure, Message>> sendMessage(ChatId chatId, MessageBody body);
+
+  /// Stamps `chat_members.last_read_at = now()` for the current user in this
+  /// chat, so unread counts re-emit as 0.
+  Future<Either<Failure, Unit>> markRead(ChatId chatId);
 }

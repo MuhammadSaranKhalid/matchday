@@ -221,6 +221,169 @@ async function pushContentFor(supabase: any, n: NotifRow): Promise<PushContent> 
   }
 }
 
+// ── Chat-message push (path B for migration 0802 trigger) ────────────────
+// The `messages_invoke_send_push` trigger in migration 0802 calls this
+// function with `{message_id}` (not `{notification_id}` like the rest of
+// the app). We branch on which key is present and dispatch separately.
+//
+// We don't insert into the `notifications` table on every chat message —
+// chats already have their own unread bookkeeping (`chat_members
+// .last_read_at`), so the notifications-row path would just duplicate
+// state. The trade-off: chat messages don't show up in the in-app
+// Notifications screen, but the chat list IS the notifications screen
+// for messaging.
+
+interface ChatMessageRow {
+  message_id: string;
+  chat_id: string;
+  sender_id: string | null;
+  body: string;
+  sender: { display_name: string | null } | null;
+  chat: { team: { team_name: string | null } | null } | null;
+}
+
+function chatMessagePushContent(m: ChatMessageRow): PushContent {
+  const senderName = m.sender?.display_name ?? "Someone";
+  const teamName = m.chat?.team?.team_name ?? "Chat";
+  const trimmed = m.body.length > 140 ? m.body.slice(0, 140) + "…" : m.body;
+  return {
+    title: teamName,
+    body: `${senderName}: ${trimmed}`,
+    route: `/messages/${m.chat_id}`,
+  };
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleMessagePush(supabase: any, messageId: string): Promise<Response> {
+  // 1. Load the message + sender display name + chat → team_name.
+  const { data: msg, error: msgErr } = await supabase
+    .from("messages")
+    .select(
+      "message_id, chat_id, sender_id, body, " +
+        "sender:profiles(display_name), " +
+        "chat:chats(team:teams(team_name))",
+    )
+    .eq("message_id", messageId)
+    .single<ChatMessageRow>();
+  if (msgErr || !msg) {
+    return new Response(`message not found: ${msgErr?.message}`, { status: 404 });
+  }
+
+  // 2. Recipient user_ids — every active chat member except the sender.
+  // Mirrors the loop in `broadcast_new_message` (migration 0802).
+  const { data: members, error: membersErr } = await supabase
+    .from("chat_members")
+    .select("user_id")
+    .eq("chat_id", msg.chat_id)
+    .is("left_at", null)
+    .not("user_id", "is", null);
+  if (membersErr) {
+    return new Response(`members lookup failed: ${membersErr.message}`, {
+      status: 500,
+    });
+  }
+  const recipients = (members ?? [])
+    .map((m: { user_id: string }) => m.user_id)
+    .filter((id: string) => id !== msg.sender_id);
+  if (recipients.length === 0) {
+    return new Response(JSON.stringify({ sent: 0, skipped: "no_recipients" }), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  // 3. Device tokens for all recipients in one query.
+  const { data: tokens, error: tokenErr } = await supabase
+    .from("device_tokens")
+    .select("token_id, fcm_token, platform")
+    .in("user_id", recipients);
+  if (tokenErr) {
+    return new Response(`tokens lookup failed: ${tokenErr.message}`, { status: 500 });
+  }
+  if (!tokens || tokens.length === 0) {
+    return new Response(JSON.stringify({ sent: 0, skipped: "no_devices" }), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  // 4. Dispatch.
+  const content = chatMessagePushContent(msg);
+  const result = await dispatchPush({
+    supabase,
+    tokens,
+    content,
+    data: {
+      message_id: msg.message_id,
+      chat_id: msg.chat_id,
+      type: "chat_message",
+      route: content.route,
+    },
+    logTag: `msg=${msg.message_id} chat=${msg.chat_id}`,
+  });
+  return new Response(JSON.stringify(result), {
+    headers: { "content-type": "application/json" },
+  });
+}
+
+// ── Shared FCM dispatch ───────────────────────────────────────────────────
+// Used by both push paths. Fans the content + data payload out to every
+// supplied token; drops `device_tokens` rows for any token FCM reports as
+// dead (404 / 400 / INVALID_ARGUMENT).
+
+// deno-lint-ignore no-explicit-any
+async function dispatchPush(opts: {
+  supabase: any;
+  tokens: Array<{ token_id: string; fcm_token: string; platform: string }>;
+  content: PushContent;
+  data: Record<string, string>;
+  logTag: string;
+}): Promise<{ sent: number; deadCount: number }> {
+  const accessToken = await getAccessToken();
+  const fcmUrl =
+    `https://fcm.googleapis.com/v1/projects/${FCM_PROJECT_ID}/messages:send`;
+  let sent = 0;
+  const deadTokens: string[] = [];
+
+  await Promise.all(opts.tokens.map(async (t) => {
+    const message = {
+      message: {
+        token: t.fcm_token,
+        notification: { title: opts.content.title, body: opts.content.body },
+        data: opts.data,
+        android: { priority: "HIGH" },
+        apns: { headers: { "apns-priority": "10" } },
+      },
+    };
+    const res = await fetch(fcmUrl, {
+      method: "POST",
+      headers: {
+        "authorization": `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(message),
+    });
+    if (res.ok) {
+      sent++;
+      return;
+    }
+    const errText = await res.text().catch(() => "");
+    console.error(`send-push FCM reject status=${res.status} body=${errText}`);
+    if (res.status === 404 || res.status === 400) {
+      deadTokens.push(t.fcm_token);
+    }
+  }));
+
+  console.log(
+    `send-push result ${opts.logTag} tokens=${opts.tokens.length} ` +
+      `sent=${sent} dead=${deadTokens.length}`,
+  );
+
+  if (deadTokens.length > 0) {
+    await opts.supabase.from("device_tokens").delete().in("fcm_token", deadTokens);
+  }
+
+  return { sent, deadCount: deadTokens.length };
+}
+
 // ── HTTP handler ──────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -232,18 +395,25 @@ Deno.serve(async (req) => {
     return new Response("unauthorized", { status: 401 });
   }
 
-  let body: { notification_id?: string };
+  let body: { notification_id?: string; message_id?: string };
   try {
     body = await req.json();
   } catch {
     return new Response("bad json", { status: 400 });
   }
-  const notificationId = body.notification_id;
-  if (!notificationId) {
-    return new Response("missing notification_id", { status: 400 });
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  // Path B: chat-message push (from messages_invoke_send_push trigger).
+  if (body.message_id) {
+    return handleMessagePush(supabase, body.message_id);
   }
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const notificationId = body.notification_id;
+  if (!notificationId) {
+    return new Response("missing notification_id or message_id", {
+      status: 400,
+    });
+  }
 
   // 1. Load the notification row.
   const { data: notif, error: notifErr } = await supabase
@@ -274,71 +444,20 @@ Deno.serve(async (req) => {
     );
   }
 
-  // 3. Build the message and fan out.
+  // 3. Build the message and fan out via the shared helper.
   const content = await pushContentFor(supabase, notif);
-  const accessToken = await getAccessToken();
-  const fcmUrl =
-    `https://fcm.googleapis.com/v1/projects/${FCM_PROJECT_ID}/messages:send`;
-
-  let sent = 0;
-  const deadTokens: string[] = [];
-
-  await Promise.all(tokens.map(async (t) => {
-    const message = {
-      message: {
-        token: t.fcm_token,
-        notification: { title: content.title, body: content.body },
-        data: {
-          notification_id: notif.notification_id,
-          type: notif.type,
-          route: content.route,
-        },
-        android: { priority: "HIGH" },
-        apns: { headers: { "apns-priority": "10" } },
-      },
-    };
-
-    const res = await fetch(fcmUrl, {
-      method: "POST",
-      headers: {
-        "authorization": `Bearer ${accessToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(message),
-    });
-
-    if (res.ok) {
-      sent++;
-      return;
-    }
-
-    // Surface the exact FCM rejection (status + body) so delivery failures are
-    // diagnosable from the function logs.
-    const errText = await res.text().catch(() => "");
-    console.error(`send-push FCM reject status=${res.status} body=${errText}`);
-
-    // FCM v1 returns 404 with error code UNREGISTERED for dead tokens; 400
-    // with INVALID_ARGUMENT can also mean a malformed/stale token. Either
-    // way the right move is to drop the row so we stop targeting it.
-    if (res.status === 404 || res.status === 400) {
-      deadTokens.push(t.fcm_token);
-    }
-    if (res.status >= 500) {
-      // Transient — fine to leave the token, FCM is having a bad day.
-    }
-  }));
-
-  console.log(
-    `send-push result notif=${notificationId} type=${notif.type} ` +
-      `tokens=${tokens.length} sent=${sent} dead=${deadTokens.length}`,
-  );
-
-  if (deadTokens.length > 0) {
-    await supabase.from("device_tokens").delete().in("fcm_token", deadTokens);
-  }
-
-  return new Response(
-    JSON.stringify({ sent, deadCount: deadTokens.length }),
-    { headers: { "content-type": "application/json" } },
-  );
+  const result = await dispatchPush({
+    supabase,
+    tokens,
+    content,
+    data: {
+      notification_id: notif.notification_id,
+      type: notif.type,
+      route: content.route,
+    },
+    logTag: `notif=${notificationId} type=${notif.type}`,
+  });
+  return new Response(JSON.stringify(result), {
+    headers: { "content-type": "application/json" },
+  });
 });

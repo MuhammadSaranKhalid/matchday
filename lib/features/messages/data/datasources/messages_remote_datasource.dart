@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../models/chat_dto.dart';
+import '../models/message_dto.dart';
 
 /// Talks to Supabase for the chat inbox (list-my-chats edge function +
 /// broadcast subscription for live unread updates). Returns DTOs / throws
@@ -82,6 +83,144 @@ class MessagesRemoteDataSource {
       },
     );
   }
+
+  // ─── Thread / messages ────────────────────────────────────────────────
+
+  static const _messages = 'messages';
+  static const _chatMembers = 'chat_members';
+
+  /// Selects the message columns plus an embedded sender profile for the
+  /// display-name join. Used by every read path (list, broadcast re-fetch,
+  /// send-and-return) so the shape going into [_dtoFromRow] is consistent.
+  static const _messageSelect =
+      'message_id, chat_id, sender_id, body, created_at, edited_at, deleted_at, '
+      'sender:profiles(display_name)';
+
+  /// Flatten the nested `sender.display_name` into a top-level
+  /// `sender_display_name` field and stamp `from_me` against the current
+  /// user — both expected by [MessageDto].
+  MessageDto _dtoFromRow(Map<String, dynamic> row, String uid) {
+    final flat = Map<String, dynamic>.from(row);
+    final sender = flat['sender'];
+    if (sender is Map) {
+      flat['sender_display_name'] = sender['display_name'];
+    }
+    flat['from_me'] = flat['sender_id'] == uid;
+    return MessageDto.fromJson(flat);
+  }
+
+  /// One-shot list of all non-deleted messages in a chat, oldest first.
+  Future<List<MessageDto>> listMessages(String chatId) async {
+    final uid = _requireUid();
+    try {
+      final rows = await _supabase
+          .from(_messages)
+          .select(_messageSelect)
+          .eq('chat_id', chatId)
+          .filter('deleted_at', 'is', null)
+          .order('created_at', ascending: true);
+      return rows
+          .map((row) => _dtoFromRow(Map<String, dynamic>.from(row), uid))
+          .toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Streams messages in a chat. Yields the initial list, then re-emits with
+  /// each broadcast `new_message` event on `chat:<chat_id>:messages`. The
+  /// broadcast payload only carries the message row (no sender join), so
+  /// each event re-fetches the inserted row with the embedded profile — one
+  /// extra round-trip per incoming message in exchange for clean dedup +
+  /// consistent display-name handling.
+  Stream<List<MessageDto>> watchMessages(String chatId) async* {
+    final uid = _requireUid();
+
+    var current = await listMessages(chatId);
+    yield current;
+
+    final controller = StreamController<List<MessageDto>>();
+    final channel = _supabase.channel(
+      'chat:$chatId:messages',
+      opts: const RealtimeChannelConfig(self: true, private: true),
+    );
+
+    channel
+        .onBroadcast(
+          event: 'new_message',
+          callback: (payload) async {
+            final data =
+                (payload['payload'] as Map<String, dynamic>?) ?? payload;
+            final id = data['message_id'] as String?;
+            if (id == null) return;
+            if (current.any((m) => m.messageId == id)) return; // dedup
+            try {
+              final row = await _supabase
+                  .from(_messages)
+                  .select(_messageSelect)
+                  .eq('message_id', id)
+                  .single();
+              final dto = _dtoFromRow(Map<String, dynamic>.from(row), uid);
+              current = [...current, dto];
+              if (!controller.isClosed) {
+                controller.add(List.unmodifiable(current));
+              }
+            } catch (e) {
+              if (!controller.isClosed) {
+                controller.addError(ServerException(e.toString()));
+              }
+            }
+          },
+        )
+        .subscribe();
+
+    yield* controller.stream.asBroadcastStream(
+      onCancel: (_) async {
+        await _supabase.removeChannel(channel);
+        await controller.close();
+      },
+    );
+  }
+
+  /// Insert a message authored by the current user, returning the row with
+  /// sender_display_name resolved + from_me=true.
+  Future<MessageDto> sendMessage({
+    required String chatId,
+    required String body,
+  }) async {
+    final uid = _requireUid();
+    try {
+      final row = await _supabase
+          .from(_messages)
+          .insert({
+            'chat_id': chatId,
+            'sender_id': uid,
+            'body': body,
+          })
+          .select(_messageSelect)
+          .single();
+      return _dtoFromRow(Map<String, dynamic>.from(row), uid);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Stamp `chat_members.last_read_at = now()` for (chat, me). Allowed by
+  /// the `chat_members_update_self_or_admin` policy.
+  Future<void> markRead(String chatId) async {
+    final uid = _requireUid();
+    try {
+      await _supabase
+          .from(_chatMembers)
+          .update({'last_read_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('chat_id', chatId)
+          .eq('user_id', uid);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────
 
   /// Translate a [FunctionException] from the edge function into the
   /// appropriate raw exception. Mirrors the pattern in matches_remote_datasource.

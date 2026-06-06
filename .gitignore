@@ -42,6 +42,12 @@ dart_define.*.json
 .env.*
 !.env.example
 
+# direnv / per-repo gh account selection (machine-specific; pulls the personal
+# token from gh's keyring at runtime — never commit it). See .claude/skills/ticket.
+.envrc
+.direnv/
+.ticket.conf
+
 # Symbolication related
 app.*.symbols
 

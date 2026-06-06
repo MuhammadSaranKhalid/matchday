@@ -7,6 +7,7 @@ import '../features/onboarding/presentation/providers/onboarding_providers.dart'
 import '../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../features/home/presentation/screens/home_feed_screen.dart';
 import '../features/matches/presentation/screens/matches_v2_screen.dart';
+import '../features/messages/presentation/screens/message_thread_screen.dart';
 import '../features/messages/presentation/screens/messages_screen.dart';
 import '../features/pavilion/presentation/screens/my_matches_screen.dart';
 import '../features/pavilion/presentation/screens/pavilion_match_detail_screen.dart';
@@ -150,6 +151,19 @@ GoRouter appRouter(Ref ref) {
                 path: '/messages',
                 builder: (context, _) =>
                     MessagesScreen(onBell: () => _openBell(context)),
+                routes: [
+                  // Message thread — rendered full-screen over the shell
+                  // (root navigator), URL-nested under /messages so a refresh
+                  // or push deep-link restores [Messages → thread] with a
+                  // working back. Mirrors the /pavilion/match/:id pattern.
+                  GoRoute(
+                    path: ':chatId',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (_, state) => MessageThreadScreen(
+                      chatId: state.pathParameters['chatId']!,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

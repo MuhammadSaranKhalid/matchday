@@ -100,8 +100,6 @@ lib/
 │   ├── error/
 │   │   ├── failures.dart                 # sealed Failure hierarchy
 │   │   └── exceptions.dart               # raw exception types thrown by data sources
-│   ├── usecase/
-│   │   └── usecase.dart                  # base UseCase + StreamUseCase contracts + NoParams
 │   ├── supabase/
 │   │   └── supabase_client_provider.dart # SupabaseClient as a keepAlive provider
 │   ├── database/
@@ -111,51 +109,62 @@ lib/
 │   │   └── database_provider.dart        # appDatabase + wizardDraftStore keepAlive providers
 │   ├── connectivity/
 │   │   └── connectivity_provider.dart    # Stream<bool> isOnline provider (informational only)
+│   ├── push/
+│   │   ├── push_messaging_service.dart   # FCM: token, foreground heads-up, tap deep-link
+│   │   └── push_provider.dart            # keepAlive provider for the messaging service
 │   ├── theme/
 │   │   └── circk_theme.dart              # CkColors / CkType / CkRadii tokens + buildCirckTheme()
+│   ├── util/                             # small pure-Dart helpers
 │   └── widgets/                          # shared, feature-agnostic UI (no Riverpod, no domain)
 │       ├── ck_button.dart                # CkButton: primary / secondary / ghost (+ busy spinner)
 │       ├── ck_text_field.dart            # labelled themed input with inline error/helper
-│       ├── ck_bottom_nav.dart            # 3-tab HOME · MATCH · PAVILION bar (presentational)
-│       └── ck_screen_scaffold.dart       # paper Scaffold + top bar (circk. wordmark / title / bell / avatar)
+│       ├── ck_bottom_nav.dart            # 5-tab HOME · MATCH · PAVILION · MESSAGES · PROFILE bar
+│       ├── ck_screen_scaffold.dart       # paper Scaffold + top bar (matchday wordmark / title / bell / avatar)
+│       └── v2/                           # v2 IA kit — feed/profile/composer widgets, CkFeedImage, shimmer
 ├── router/
-│   └── app_router.dart                   # go_router; auth redirect + StatefulShellRoute (3-tab shell)
-├── app.dart                              # MaterialApp.router + bootstraps sync + DB clear on sign-out
+│   └── app_router.dart                   # go_router; auth redirect + StatefulShellRoute (5-tab shell)
+├── app.dart                              # MaterialApp.router + DB clear on sign-out + push registrar
 ├── main.dart                             # Supabase.initialize + GoogleSignIn.initialize + ProviderScope
 └── features/
-    ├── auth/                             # PERMANENT — every product needs auth
-    ├── onboarding/                       # PERMANENT — first-run profile (username/display name/city/player)
-    ├── shell/                            # PERMANENT — authenticated 5-tab shell (AppShell + tabs)
-    ├── teams/                            # PRODUCT — online-only teams (create/hub/manage)
-    ├── matches/                          # PRODUCT — online-only match setup/lifecycle (F4+)
-    ├── posts/                            # PRODUCT — online-only feed + photo composer (F10)
-    ├── pavilion/                         # PRODUCT — PAVILION profile hub (composes auth/onboarding/teams/matches/posts)
-    └── <your_feature>/                   # online-only by default
+    ├── auth/                             # PERMANENT — email OTP + native Google OAuth (full layered)
+    ├── onboarding/                       # PERMANENT — first-run profile wizard (full layered)
+    ├── shell/                            # PERMANENT — authenticated 5-tab shell (presentation-only)
+    ├── home/                             # PRESENTATION-ONLY — feed tab (composes posts providers)
+    ├── pavilion/                         # PRESENTATION-ONLY — profile workspace hub
+    ├── profile/                          # PRESENTATION-ONLY — profile detail view
+    ├── messages/                         # PRESENTATION-ONLY — messages tab
+    ├── location/                         # FULL — Places autocomplete + GPS for profile geo
+    ├── notifications/                    # FULL — match-event feed + bell badge
+    ├── teams/                            # FULL — online-only teams (create/hub/manage)
+    ├── matches/                          # FULL — online-only match setup + live scoring
+    ├── posts/                            # FULL — online-only feed + photo composer
+    └── <your_feature>/                   # online-only by default; see §7
+
+# Per-feature layout (for full-layered features):
+lib/features/<feature>/
+├── domain/
+│   ├── entities/                         # plain Dart classes extending Equatable
+│   ├── value_objects/                    # Email-like wrappers with Either<ValidationFailure, T>.create
+│   └── repositories/                     # abstract classes returning Either<Failure, T> / Stream<T>
+├── data/
+│   ├── models/                           # freezed DTOs with toEntity()
+│   ├── datasources/
+│   │   ├── <feature>_remote_datasource.dart
+│   │   └── <feature>_datasource_providers.dart   # @Riverpod providers for the above
+│   └── repositories/
+│       └── <feature>_repository_impl.dart        # only place that catches raw exceptions + business validation
+└── presentation/
+    ├── state/                            # sealed UI state union (only if controller needs sub-states)
+    ├── controllers/                      # Notifier / AsyncNotifier / StreamNotifier — call repos directly via ref.read(<feature>RepositoryProvider)
+    ├── screens/                          # ConsumerWidget / ConsumerStatefulWidget
+    ├── widgets/                          # feature-local extracted widgets (flat; promote to subdir at ~3 files)
+    └── providers/                        # @riverpod repository provider + intermediate stream/future views
 
 supabase/
-└── migrations/                          # ordered SQL (001_profiles.sql, 002_username_index.sql, ...)
-        ├── domain/
-        │   ├── entities/                 # plain Dart classes; manual equality
-        │   ├── value_objects/            # Email-like wrappers with Either<Failure, T>.create
-        │   ├── repositories/             # abstract classes returning Either<Failure, T> / Stream<T>
-        │   └── usecases/                 # one verb per file, implements UseCase or StreamUseCase
-        ├── data/
-        │   ├── models/                   # freezed DTOs with toEntity()
-        │   ├── datasources/
-        │   │   ├── <feature>_remote_datasource.dart
-        │   │   ├── <feature>_local_datasource.dart       # if offline support
-        │   │   └── <feature>_datasource_providers.dart   # @Riverpod providers for the above
-        │   └── repositories/
-        │       └── <feature>_repository_impl.dart        # only place that catches raw exceptions
-        └── presentation/
-            ├── state/                    # sealed UI state union (one file per controller, only if needed)
-            ├── controllers/              # Notifier / AsyncNotifier / StreamNotifier with @riverpod
-            ├── screens/                  # ConsumerWidget / ConsumerStatefulWidget
-            └── providers/                # @riverpod providers for repo + use cases
+└── migrations/                           # timestamp-epoch SQL (e.g. 20260101000100_profiles.sql)
 
 test/
 └── features/<feature>/
-    ├── domain/usecases/<name>_test.dart            # pure use case tests, no Flutter binding
     └── presentation/controllers/<name>_test.dart   # Notifier tests with ProviderContainer.test() + overrideWithValue
 ```
 
@@ -1021,11 +1030,11 @@ Features compose. When feature A genuinely builds on feature B (e.g. `matches` b
 - **Presentation → Presentation providers.** A's *screen* may `ref.watch` B's *providers* to read B's data (e.g. the match-setup Pick-XI step watches `rosterProvider`; the opponent step watches `allTeamsProvider`). Read B through its `presentation/providers`, never B's data sources/DTOs/repository impls.
 - **FORBIDDEN:** importing another feature's `data/` layer (data sources, DTOs, repository impls) or its `domain/repositories` abstract. If you need B's behaviour, go through a B use-case provider.
 
-These are the only sanctioned cross-feature seams. The `todos` reference feature is exempt — never import it from a product feature (§10).
+These are the only sanctioned cross-feature seams.
 
 **Presentation-only features.** A feature may have only a `presentation/` folder (no `domain/`/`data/`) when it is purely an aggregation view that derives everything by watching other features' providers through the seam above — e.g. `pavilion` (profile hub) and `notifications` (a match-event feed derived from `myMatches`). Don't invent a domain entity that just duplicates another feature's (`Notification` would duplicate `Match`+`MatchStatus`). The moment such a feature gains its OWN backend (push tokens, unread state, settings), promote it to a full feature with domain + data layers.
 
-**Computed-draft objects in the Domain.** A use case sometimes needs to hand the repository a structured *computed* value (not a persisted entity yet) — e.g. `BallDraft` (matches): `RecordBall` computes the delivery's numbers + resulting strike rotation, and `MatchesRepository.recordBall(BallDraft)` persists it. Place such drafts in the **entity layer** (alongside the entity they relate to), so both the use case (output) and the repository contract (input) can reference them without a use-case↔repository import cycle. They're pure Dart like any entity.
+**Computed-draft objects in the Domain.** A controller sometimes needs to hand the repository a structured *computed* value (not a persisted entity yet) — e.g. `BallDraft` (matches): the controller assembles the inputs and `MatchesRepository.recordBall(BallDraft)` computes the delivery's numbers + resulting strike rotation, validates, and persists in one call. Place such drafts in the **entity layer** (alongside the entity they relate to), so both the controller (input) and the repository contract (input) can reference them without a cross-layer import cycle. They're pure Dart like any entity.
 
 Player IDs are intentionally raw `String` across `teams` (`TeamMember.playerId`) and `matches` (`Match.teamASquad`/`teamACaptain`) because they are polymorphic (a `profiles.user_id` OR an `unclaimed_id`); a single wrapper can't express that without a union. This is a deliberate, documented exception to the "wrap all IDs" rule (§5.1).
 
@@ -1047,7 +1056,7 @@ Then execute the recipe.
 ### Step 1 — Create the folder structure
 
 ```bash
-mkdir -p lib/features/<feature>/{domain/{entities,value_objects,repositories,usecases},data/{models,datasources,repositories},presentation/{state,controllers,screens,providers}}
+mkdir -p lib/features/<feature>/{domain/{entities,value_objects,repositories},data/{models,datasources,repositories},presentation/{state,controllers,screens,widgets,providers}}
 ```
 
 Omit `presentation/state` if you decided in question (2) above not to use a sealed state.
@@ -1351,10 +1360,9 @@ flutter analyze
 
 # Tests
 flutter test
-
-# Lint with riverpod_lint rules
-dart run custom_lint
 ```
+
+> Note: `dart run custom_lint` (riverpod_lint rules) is currently NOT runnable — riverpod_lint + custom_lint are removed from pubspec due to the analyzer constraint conflict documented in §4. The watch/read/listen and provider-DAG rules are enforced by review and by the patterns in this file until the lint packages can be re-enabled.
 
 After ANY change to a `@riverpod`, `@freezed`, `@JsonSerializable`, or drift table: run `dart run build_runner build --delete-conflicting-outputs`. The `*.g.dart` and `*.freezed.dart` files are gitignored and regenerated locally.
 
@@ -1433,13 +1441,11 @@ If you (Claude Code or future agent) encounter a situation that doesn't fit any 
 This is how the architecture stays consistent over many features and many sessions. The cost of one slightly-forced fit is much lower than the cost of architectural drift.
 
 Patterns that are intentionally NOT yet covered here (because they haven't shipped):
-- File upload / Supabase Storage
-- Push notifications
+- File upload / Supabase Storage (beyond the `post-media` bucket described in §15)
 - Background sync (workmanager)
 - Multi-tenant data sharing (RLS policies sketched in Section 12 but no full feature reference)
 - Profile editing with separate `profiles` table
-- Pagination for large lists
-- Image caching
+- Pagination for large lists (beyond posts' keyset pagination)
 - Internationalization (i18n)
 - Analytics / event tracking
 
@@ -1466,7 +1472,7 @@ The `todos` reference feature and all offline-first wiring were removed on 2026-
 
 The `posts` feature (`lib/features/posts/`) is the feed. It is **online-only** (no offline-first — same posture as `matches`, Rule 7): the repository talks to Supabase directly; there is no drift table, pending-ops queue, or SyncService involvement.
 
-**Backend (already deployed).** `posts` (migration `0510`), plus `0511_post_media_metadata` which ADDS a `media jsonb` column (`[{url, blurhash, width, height}]`, ≤4) and widens `post_has_content`. The `post-media` storage bucket is public; **insert the row before uploading media** (storage RLS `is_post_author`). Paths are deterministic (`<post_id>/<i>.jpg`) so public URLs are computed up front and written to `media`/`media_urls` at insert.
+**Backend (already deployed).** The `posts` table lives in `supabase/migrations/` under the timestamp-epoch convention (look for the `*_posts*.sql` files). The schema includes a `media jsonb` column (`[{url, blurhash, width, height}]`, ≤4) alongside `post_has_content`. The `post-media` storage bucket is public; **insert the row before uploading media** (storage RLS `is_post_author`). Paths are deterministic (`<post_id>/<i>.jpg`) so public URLs are computed up front and written to `media`/`media_urls` at insert.
 
 **Per-image storage (resize-before-upload → ONE file per image).** On device: crop → resize to **≤1080px long edge, JPEG q75**; compute BlurHash + width/height. Then 1 file at `post-media/<post_id>/<i>.jpg` + 1 metadata object `{url, blurhash, width, height}` in `posts.media` (≤4). 1080 is the display max (Instagram-style); the same file serves feed + zoom. There is no separate thumbnail file.
 
@@ -1475,3 +1481,21 @@ The `posts` feature (`lib/features/posts/`) is the feed. It is **online-only** (
 **Composer.** `lib/features/posts/presentation/screens/composer_screen.dart` (launched from the Profile FAB + Pavilion Create→Post). Photo pipeline: `data/datasources/photo_processor.dart` (image_picker → image_cropper → flutter_image_compress → blurhash_dart/image). `CreatePost` validates text-or-≥1-photo, ≤2000 chars, ≤4 photos. MVP composes `author_context='personal'` only.
 
 **Deferred (not yet built):** likes/comments/bookmarks persistence (schema + mock UI exist), drafts/scheduling/visibility-sheet/preview/Success (post-flow design), team/tournament authoring, auto post types, realtime feed, a `blurhash`-per-row already covered by `media`, avatar uploads.
+
+---
+
+## 16. Push notifications (FCM)
+
+Push is wired end-to-end as of 2026-06-06. Firebase project: `matchday-44ed4`. Android app id: `com.matchday.app` (ready). iOS requires the Push Notifications capability + APNs key in Xcode before tokens will issue.
+
+**Where things live:**
+- `lib/core/push/push_messaging_service.dart` — wraps `FirebaseMessaging`: token retrieval, foreground / background / terminated message handlers, tap → deep-link.
+- `lib/core/push/push_provider.dart` — `@Riverpod(keepAlive: true)` for the service. Initialized via `Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)` in `main.dart` (the `firebase_options.dart` file is produced by `flutterfire configure`).
+- `features/notifications/.../push_registrar.dart` — the **registrar**. On every sign-in, requests the FCM token from the service and upserts it into the `device_tokens` Supabase table. On sign-out the token row is deleted.
+- `flutter_local_notifications` displays foreground pushes as heads-up notifications (the OS auto-shows background/killed pushes).
+
+**Backend:** the `device_tokens` table + a `send-push` edge function are already deployed. Notifications (match events, etc.) call `send-push` server-side with the target `user_id`; the edge function looks up that user's tokens and dispatches via FCM.
+
+**Tap handling:** Push payloads include a `route` field. `PushMessagingService` listens for tap events and forwards the route to the router; the router validates and navigates. Don't navigate from the service directly — go through go_router so the auth-redirect logic still applies.
+
+**Routing requests through push.** Anything that would have wanted a real-time subscription on a request-shaped table (e.g. `match_requests`) should instead piggyback on the existing notifications broadcast — the state-change signal is already there. Do not add request tables to `supabase_realtime`.

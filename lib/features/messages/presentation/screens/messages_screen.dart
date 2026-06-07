@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,9 +34,33 @@ class MessagesScreen extends ConsumerStatefulWidget {
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   _InboxTab _tab = _InboxTab.all;
 
+  /// Cold-start refresh affordance. Indicator below the title while a
+  /// network refresh may be in flight after the cache emit. Bounded by a
+  /// fixed timeout so a slow network never leaves it stuck — the indicator
+  /// is a visual hint, not a strict signal.
+  bool _refreshing = true;
+  Timer? _refreshTimeout;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimeout = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _refreshing = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimeout?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatsAsync = ref.watch(myChatsProvider);
+    // Show the chip only while we already have something to show AND the
+    // timeout hasn't elapsed; never on top of the initial loading skeleton.
+    final showRefreshChip = _refreshing && chatsAsync.hasValue;
     return ColoredBox(
       color: CkColors.paper,
       child: SafeArea(
@@ -57,6 +83,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             tab: _tab,
             onTabChanged: (t) => setState(() => _tab = t),
             onBell: widget.onBell,
+            refreshing: showRefreshChip,
           ),
         ),
       ),
@@ -77,12 +104,14 @@ class _Loaded extends StatelessWidget {
     required this.tab,
     required this.onTabChanged,
     required this.onBell,
+    this.refreshing = false,
   });
 
   final List<Chat> chats;
   final _InboxTab tab;
   final ValueChanged<_InboxTab> onTabChanged;
   final VoidCallback? onBell;
+  final bool refreshing;
 
   @override
   Widget build(BuildContext context) {
@@ -114,6 +143,7 @@ class _Loaded extends StatelessWidget {
         V2Header(
           title: 'Messages',
           onBell: onBell,
+          refreshing: refreshing,
         ),
         if (_kShowInboxTabs)
           _TabRow(

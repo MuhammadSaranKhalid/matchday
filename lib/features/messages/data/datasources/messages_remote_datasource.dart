@@ -3,21 +3,41 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/supabase/current_user_x.dart';
 import '../models/chat_dto.dart';
 import '../models/message_dto.dart';
+import 'messages_local_datasource.dart';
 
-/// Talks to Supabase for the chat inbox (list-my-chats edge function +
-/// broadcast subscription for live unread updates). Returns DTOs / throws
-/// raw exceptions per CLAUDE.md Rule 2.
+/// Talks to Supabase for the chat inbox + threads, AND writes through to the
+/// local cache after every in-memory mutation (patch on broadcast / own-send
+/// / reconnect resync). Per CLAUDE.md Rule 2 returns DTOs / throws raw
+/// exceptions.
+///
+/// Cache writes are fire-and-forget — failures stay inside the data layer
+/// and are not propagated to the UI. The cache is a cold-start optimisation,
+/// not a source of truth; a failed cache write means the next cold-start
+/// renders the previous cached value until the network fetch overlays.
+///
+/// Per-stream state lives on the class (`_inboxController` + `_inboxCurrent`
+/// for the inbox; `_threads[chatId]` for per-chat threads). Riverpod's
+/// keepAlive on the inbox + thread family providers means each `watch*`
+/// method is called at most once per session per scope, so the state model
+/// is single-owner. The `onCancel` callback clears state defensively.
 class MessagesRemoteDataSource {
-  MessagesRemoteDataSource(this._supabase);
+  MessagesRemoteDataSource(this._supabase, this._local);
   final SupabaseClient _supabase;
+  final MessagesLocalDataSource _local;
 
-  String _requireUid() {
-    final id = _supabase.auth.currentUser?.id;
-    if (id == null) throw UnauthorizedException('Must be signed in');
-    return id;
-  }
+  // ─── Inbox state ──────────────────────────────────────────────────────
+  StreamController<List<ChatDto>>? _inboxController;
+  List<ChatDto>? _inboxCurrent;
+
+  // ─── Per-thread state (keyed by chatId) ───────────────────────────────
+  final Map<String, _ThreadState> _threads = {};
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Inbox
+  // ═══════════════════════════════════════════════════════════════════════
 
   /// One-shot inbox fetch via the `list-my-chats` edge function.
   Future<List<ChatDto>> listMyChats() async {
@@ -37,61 +57,184 @@ class MessagesRemoteDataSource {
     }
   }
 
-  /// Streams the chat inbox. Yields an initial fetch, then re-fetches and
-  /// re-yields on each `chat_updated` broadcast on `user:<uid>:notifications`
-  /// (fired by the `broadcast_new_message` trigger in migration 0802 on every
-  /// message insert).
+  /// Streams the inbox. Yields the initial fetch, then patches in-memory on
+  /// each `chat_updated` broadcast from `user:<uid>:notifications` (fired by
+  /// migration 0802's `broadcast_new_message` trigger; the sender is
+  /// excluded by that trigger, so own-sends go via `_patchInboxForOwnSend`).
   ///
-  /// Re-fetching the full inbox per event is wasteful but simple — the trigger
-  /// payload carries enough to patch in-memory, but for v1 chat counts the
-  /// round-trip is cheap and the code is straightforward. Revisit when inboxes
-  /// grow.
+  /// On reconnect (channel re-subscribes after a network drop), do a full
+  /// re-fetch + bulk cache replace as a sync point — Supabase realtime is
+  /// at-most-once, so events fired during disconnect would otherwise be lost.
   Stream<List<ChatDto>> watchMyChats() async* {
-    final uid = _requireUid();
+    final uid = _supabase.requireUid();
 
-    var current = await listMyChats();
-    yield current;
+    final initial = await listMyChats();
+    _inboxCurrent = initial;
+    yield initial;
+
+    // Initial bulk cache replace (covers users who just signed in or whose
+    // cache went stale).
+    _writeCacheBulkChats(initial);
 
     final controller = StreamController<List<ChatDto>>();
+    _inboxController = controller;
+
     final channel = _supabase.channel(
       'user:$uid:notifications',
       opts: const RealtimeChannelConfig(self: true, private: true),
     );
 
+    var subscribedOnce = false;
     channel
         .onBroadcast(
           event: 'chat_updated',
-          callback: (_) async {
-            try {
-              current = await listMyChats();
-              if (!controller.isClosed) {
-                controller.add(List.unmodifiable(current));
-              }
-            } catch (e) {
-              if (!controller.isClosed) {
-                controller.addError(ServerException(e.toString()));
-              }
-            }
-          },
+          callback: (payload) => _onChatUpdated(payload, uid),
         )
-        .subscribe();
+        .subscribe((status, [error]) async {
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        if (subscribedOnce) {
+          // Reconnect — full re-fetch as sync point.
+          await _resyncInbox(uid);
+        }
+        subscribedOnce = true;
+      }
+    });
 
     yield* controller.stream.asBroadcastStream(
       onCancel: (_) async {
+        if (identical(_inboxController, controller)) {
+          _inboxController = null;
+          _inboxCurrent = null;
+        }
         await _supabase.removeChannel(channel);
         await controller.close();
       },
     );
   }
 
-  // ─── Thread / messages ────────────────────────────────────────────────
+  void _onChatUpdated(Map<String, dynamic> payload, String uid) {
+    final data =
+        (payload['payload'] as Map<String, dynamic>?) ?? payload;
+    final chatId = data['chat_id'] as String?;
+    if (chatId == null) return;
+
+    final current = _inboxCurrent;
+    final controller = _inboxController;
+    if (current == null || controller == null || controller.isClosed) return;
+
+    final idx = current.indexWhere((c) => c.chatId == chatId);
+    if (idx == -1) {
+      // Unknown chat — likely a new team I just got added to. Fall back to
+      // a full re-fetch which will surface the new chat AND any I haven't
+      // seen yet.
+      unawaited(_resyncInbox(uid));
+      return;
+    }
+
+    final old = current[idx];
+    final patched = old.copyWith(
+      lastMessageAt: data['created_at'] as String?,
+      lastMessageBody: data['body_preview'] as String?,
+      lastMessageSenderId: data['sender_id'] as String?,
+      // Trigger excludes the sender, so any chat_updated we receive is from
+      // someone else — increment unread.
+      lastMessageFromMe: false,
+      unreadCount: old.unreadCount + 1,
+    );
+
+    final next = [...current.take(idx), patched, ...current.skip(idx + 1)]
+      ..sort(_byLastMessageDesc);
+    _inboxCurrent = next;
+    controller.add(List.unmodifiable(next));
+
+    _writeCacheChat(patched);
+  }
+
+  Future<void> _resyncInbox(String uid) async {
+    try {
+      final fresh = await listMyChats();
+      _inboxCurrent = fresh;
+      final controller = _inboxController;
+      if (controller != null && !controller.isClosed) {
+        controller.add(List.unmodifiable(fresh));
+      }
+      _writeCacheBulkChats(fresh);
+    } catch (e) {
+      final controller = _inboxController;
+      if (controller != null && !controller.isClosed) {
+        controller.addError(ServerException(e.toString()));
+      }
+    }
+  }
+
+  /// After my own `sendMessage` succeeds, patch the inbox locally. The
+  /// `chat_updated` trigger excludes the sender so no broadcast arrives;
+  /// without this the sender's inbox would not bump until someone else
+  /// posts in the same chat.
+  void _patchInboxForOwnSend(MessageDto sent) {
+    final current = _inboxCurrent;
+    final controller = _inboxController;
+    if (current == null || controller == null || controller.isClosed) return;
+
+    final idx = current.indexWhere((c) => c.chatId == sent.chatId);
+    if (idx == -1) return;
+
+    // Truncate to 160 chars to match the trigger's `body_preview` shape.
+    final preview = sent.body.length > 160
+        ? sent.body.substring(0, 160)
+        : sent.body;
+    final old = current[idx];
+    final patched = old.copyWith(
+      lastMessageAt: sent.createdAt,
+      lastMessageBody: preview,
+      lastMessageSenderId: sent.senderId,
+      lastMessageFromMe: true,
+      // unreadCount unchanged — sender doesn't generate unread for self.
+    );
+
+    final next = [...current.take(idx), patched, ...current.skip(idx + 1)]
+      ..sort(_byLastMessageDesc);
+    _inboxCurrent = next;
+    controller.add(List.unmodifiable(next));
+
+    _writeCacheChat(patched);
+  }
+
+  /// markRead patches both stores: clears the unread badge locally without
+  /// waiting for the next broadcast.
+  void _patchInboxForMarkRead(String chatId) {
+    final current = _inboxCurrent;
+    final controller = _inboxController;
+    if (current == null || controller == null || controller.isClosed) return;
+
+    final idx = current.indexWhere((c) => c.chatId == chatId);
+    if (idx == -1 || current[idx].unreadCount == 0) return;
+
+    final patched = current[idx].copyWith(unreadCount: 0);
+    // last_message_at unchanged, so sort order is preserved.
+    final next = [...current.take(idx), patched, ...current.skip(idx + 1)];
+    _inboxCurrent = next;
+    controller.add(List.unmodifiable(next));
+
+    _writeCacheChat(patched);
+  }
+
+  static int _byLastMessageDesc(ChatDto a, ChatDto b) {
+    final ta = a.lastMessageAt;
+    final tb = b.lastMessageAt;
+    if (ta == null && tb == null) return 0;
+    if (ta == null) return 1;
+    if (tb == null) return -1;
+    return tb.compareTo(ta);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Thread
+  // ═══════════════════════════════════════════════════════════════════════
 
   static const _messages = 'messages';
   static const _chatMembers = 'chat_members';
 
-  /// Selects the message columns plus an embedded sender profile for the
-  /// display-name join. Used by every read path (list, broadcast re-fetch,
-  /// send-and-return) so the shape going into [_dtoFromRow] is consistent.
   static const _messageSelect =
       'message_id, chat_id, sender_id, body, created_at, edited_at, deleted_at, '
       'sender:profiles(display_name)';
@@ -111,7 +254,7 @@ class MessagesRemoteDataSource {
 
   /// One-shot list of all non-deleted messages in a chat, oldest first.
   Future<List<MessageDto>> listMessages(String chatId) async {
-    final uid = _requireUid();
+    final uid = _supabase.requireUid();
     try {
       final rows = await _supabase
           .from(_messages)
@@ -127,74 +270,164 @@ class MessagesRemoteDataSource {
     }
   }
 
-  /// Streams messages in a chat. Yields the initial list, then re-emits with
-  /// each broadcast `new_message` event on `chat:<chat_id>:messages`. The
-  /// broadcast payload only carries the message row (no sender join), so
-  /// each event re-fetches the inserted row with the embedded profile — one
-  /// extra round-trip per incoming message in exchange for clean dedup +
-  /// consistent display-name handling.
+  /// Streams messages in a chat. Yields the initial list, then patches
+  /// in-memory on each `new_message` broadcast. The broadcast payload
+  /// includes the full body + sender_id but NOT the sender's display name —
+  /// we cache display names from the initial fetch and look up on broadcast;
+  /// unknown senders fall back to a single-row fetch with the profile embed.
+  ///
+  /// On reconnect, full re-fetch + bulk cache replace as a sync point.
   Stream<List<MessageDto>> watchMessages(String chatId) async* {
-    final uid = _requireUid();
+    final uid = _supabase.requireUid();
 
-    var current = await listMessages(chatId);
-    yield current;
+    final initial = await listMessages(chatId);
+
+    // Build sender-name cache from the initial fetch.
+    final senderNames = <String, String?>{};
+    for (final m in initial) {
+      if (m.senderId != null) {
+        senderNames[m.senderId!] = m.senderDisplayName;
+      }
+    }
+
+    yield initial;
+    _writeCacheBulkMessages(chatId, initial);
 
     final controller = StreamController<List<MessageDto>>();
+    final state = _ThreadState(
+      controller: controller,
+      current: initial,
+      senderNames: senderNames,
+    );
+    _threads[chatId] = state;
+
     final channel = _supabase.channel(
       'chat:$chatId:messages',
       opts: const RealtimeChannelConfig(self: true, private: true),
     );
 
+    var subscribedOnce = false;
     channel
         .onBroadcast(
           event: 'new_message',
-          callback: (payload) async {
-            final data =
-                (payload['payload'] as Map<String, dynamic>?) ?? payload;
-            final id = data['message_id'] as String?;
-            if (id == null) return;
-            if (current.any((m) => m.messageId == id)) return; // dedup
-            try {
-              // `deleted_at IS NULL` guards against the race where the
-              // broadcast fires for a message that's soft-deleted between
-              // the insert and our re-fetch. Without this filter the
-              // deleted row appends to `current` and shows in the UI.
-              final row = await _supabase
-                  .from(_messages)
-                  .select(_messageSelect)
-                  .eq('message_id', id)
-                  .filter('deleted_at', 'is', null)
-                  .maybeSingle();
-              if (row == null) return;
-              final dto = _dtoFromRow(Map<String, dynamic>.from(row), uid);
-              current = [...current, dto];
-              if (!controller.isClosed) {
-                controller.add(List.unmodifiable(current));
-              }
-            } catch (e) {
-              if (!controller.isClosed) {
-                controller.addError(ServerException(e.toString()));
-              }
-            }
-          },
+          callback: (payload) => _onNewMessage(chatId, payload, uid),
         )
-        .subscribe();
+        .subscribe((status, [error]) async {
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        if (subscribedOnce) {
+          await _resyncThread(chatId, uid);
+        }
+        subscribedOnce = true;
+      }
+    });
 
     yield* controller.stream.asBroadcastStream(
       onCancel: (_) async {
+        if (identical(_threads[chatId]?.controller, controller)) {
+          _threads.remove(chatId);
+        }
         await _supabase.removeChannel(channel);
         await controller.close();
       },
     );
   }
 
+  Future<void> _onNewMessage(
+    String chatId,
+    Map<String, dynamic> payload,
+    String uid,
+  ) async {
+    final state = _threads[chatId];
+    if (state == null || state.controller.isClosed) return;
+
+    final data =
+        (payload['payload'] as Map<String, dynamic>?) ?? payload;
+    final messageId = data['message_id'] as String?;
+    if (messageId == null) return;
+
+    // Dedup — covers the own-send case where `sendMessage` already appended
+    // the row before the broadcast echoes back.
+    if (state.current.any((m) => m.messageId == messageId)) return;
+
+    final senderId = data['sender_id'] as String?;
+    final body = data['body'] as String?;
+    final createdAt = data['created_at'] as String?;
+    if (body == null || createdAt == null) return;
+
+    MessageDto dto;
+    if (senderId != null && state.senderNames.containsKey(senderId)) {
+      // Cache hit — build directly from broadcast payload, zero round-trips.
+      dto = MessageDto(
+        messageId: messageId,
+        chatId: chatId,
+        senderId: senderId,
+        senderDisplayName: state.senderNames[senderId],
+        body: body,
+        createdAt: createdAt,
+        fromMe: senderId == uid,
+      );
+    } else {
+      // Cache miss (new sender — someone just joined the team) — fall back
+      // to a single-row fetch with the profile embed.
+      try {
+        final row = await _supabase
+            .from(_messages)
+            .select(_messageSelect)
+            .eq('message_id', messageId)
+            .filter('deleted_at', 'is', null)
+            .maybeSingle();
+        if (row == null) return;
+        dto = _dtoFromRow(Map<String, dynamic>.from(row), uid);
+        if (dto.senderId != null) {
+          state.senderNames[dto.senderId!] = dto.senderDisplayName;
+        }
+      } catch (e) {
+        if (!state.controller.isClosed) {
+          state.controller.addError(ServerException(e.toString()));
+        }
+        return;
+      }
+    }
+
+    state.current = [...state.current, dto];
+    if (!state.controller.isClosed) {
+      state.controller.add(List.unmodifiable(state.current));
+    }
+    _writeCacheMessage(dto);
+  }
+
+  Future<void> _resyncThread(String chatId, String uid) async {
+    final state = _threads[chatId];
+    if (state == null) return;
+    try {
+      final fresh = await listMessages(chatId);
+      state.current = fresh;
+      state.senderNames.clear();
+      for (final m in fresh) {
+        if (m.senderId != null) {
+          state.senderNames[m.senderId!] = m.senderDisplayName;
+        }
+      }
+      if (!state.controller.isClosed) {
+        state.controller.add(List.unmodifiable(fresh));
+      }
+      _writeCacheBulkMessages(chatId, fresh);
+    } catch (e) {
+      if (!state.controller.isClosed) {
+        state.controller.addError(ServerException(e.toString()));
+      }
+    }
+  }
+
   /// Insert a message authored by the current user, returning the row with
-  /// sender_display_name resolved + from_me=true.
+  /// sender_display_name resolved + from_me=true. Patches the inbox + cache
+  /// AND appends to the open thread + cache (the broadcast echo for our own
+  /// message arrives shortly after and is deduped by message_id).
   Future<MessageDto> sendMessage({
     required String chatId,
     required String body,
   }) async {
-    final uid = _requireUid();
+    final uid = _supabase.requireUid();
     try {
       final row = await _supabase
           .from(_messages)
@@ -205,31 +438,85 @@ class MessagesRemoteDataSource {
           })
           .select(_messageSelect)
           .single();
-      return _dtoFromRow(Map<String, dynamic>.from(row), uid);
+      final dto = _dtoFromRow(Map<String, dynamic>.from(row), uid);
+
+      // (1) Append to the open thread immediately so the user sees their
+      // own message without waiting for the broadcast echo.
+      final thread = _threads[chatId];
+      if (thread != null &&
+          !thread.controller.isClosed &&
+          !thread.current.any((m) => m.messageId == dto.messageId)) {
+        thread.current = [...thread.current, dto];
+        thread.controller.add(List.unmodifiable(thread.current));
+        if (dto.senderId != null) {
+          thread.senderNames[dto.senderId!] = dto.senderDisplayName;
+        }
+      }
+      _writeCacheMessage(dto);
+
+      // (2) Patch the inbox (trigger excludes the sender from chat_updated).
+      _patchInboxForOwnSend(dto);
+
+      return dto;
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
   }
 
   /// Stamp `chat_members.last_read_at = now()` for (chat, me). Allowed by
-  /// the `chat_members_update_self_or_admin` policy.
+  /// the `chat_members_update_self_or_admin` policy. Patches the inbox +
+  /// cache locally so the unread badge clears without waiting for any
+  /// broadcast (there isn't one for read-marker changes).
   Future<void> markRead(String chatId) async {
-    final uid = _requireUid();
+    final uid = _supabase.requireUid();
     try {
       await _supabase
           .from(_chatMembers)
           .update({'last_read_at': DateTime.now().toUtc().toIso8601String()})
+          // Composite-PK row targeting — NOT a redundant auth filter; the
+          // chat_members PK is (chat_id, user_id) and we need both to hit
+          // exactly the one row.
           .eq('chat_id', chatId)
           .eq('user_id', uid);
+      _patchInboxForMarkRead(chatId);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // Cache write helpers — fire-and-forget; failures stay inside the data
+  // layer so a transient cache issue never breaks the UI.
+  // ═══════════════════════════════════════════════════════════════════════
 
-  /// Translate a [FunctionException] from the edge function into the
-  /// appropriate raw exception. Mirrors the pattern in matches_remote_datasource.
+  void _writeCacheChat(ChatDto dto) {
+    unawaited(_local.upsertChat(dto.toEntity()).catchError((Object _) {}));
+  }
+
+  void _writeCacheBulkChats(List<ChatDto> dtos) {
+    unawaited(
+      _local
+          .replaceChats(dtos.map((d) => d.toEntity()).toList())
+          .catchError((Object _) {}),
+    );
+  }
+
+  void _writeCacheMessage(MessageDto dto) {
+    unawaited(_local.upsertMessage(dto.toEntity()).catchError((Object _) {}));
+  }
+
+  void _writeCacheBulkMessages(String chatId, List<MessageDto> dtos) {
+    unawaited(
+      _local
+          .replaceMessages(chatId, dtos.map((d) => d.toEntity()).toList())
+          .catchError((Object _) {}),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Misc
+  // ═══════════════════════════════════════════════════════════════════════
+
   Exception _functionException(FunctionException e) {
     String? msg;
     final d = e.details;
@@ -244,4 +531,19 @@ class MessagesRemoteDataSource {
         return ServerException(msg ?? 'list-my-chats failed');
     }
   }
+}
+
+class _ThreadState {
+  _ThreadState({
+    required this.controller,
+    required this.current,
+    required this.senderNames,
+  });
+
+  final StreamController<List<MessageDto>> controller;
+  List<MessageDto> current;
+
+  /// sender_id → display_name (or null when the profile is deleted).
+  /// Populated on initial fetch and updated on cache-miss fetches.
+  final Map<String, String?> senderNames;
 }

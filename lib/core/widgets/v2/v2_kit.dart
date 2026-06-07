@@ -265,12 +265,19 @@ class V2Header extends ConsumerWidget {
     this.sub,
     this.notifCount,
     this.onBell,
+    this.refreshing = false,
   });
 
   final String title;
   final String? sub;
   final int? notifCount;
   final VoidCallback? onBell;
+
+  /// When true AND [sub] is null, a subtle inline spinner renders below the
+  /// title in the sub's slot. Used by screens that paint from a local cache
+  /// while a network refresh is in flight (ticket #23). Ignored when [sub]
+  /// is non-null — the explicit subtitle takes precedence.
+  final bool refreshing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -293,6 +300,18 @@ class V2Header extends ConsumerWidget {
                     child: Text(
                       sub!,
                       style: CkType.body(fontSize: 12, color: CkColors.muted),
+                    ),
+                  )
+                else if (refreshing)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.2,
+                        color: CkColors.muted,
+                      ),
                     ),
                   ),
               ],

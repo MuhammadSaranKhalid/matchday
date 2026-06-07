@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,6 +31,12 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
   bool _sending = false;
   String? _composerError;
 
+  /// Trailing debounce for draft autosave — fired 250ms after the last
+  /// keystroke. Trade-off: the last ~250ms of typing is at risk if the OS
+  /// kills the app inside that window. Acceptable for v1; a draft loss is
+  /// minor compared to the perf cost of writing per keystroke.
+  Timer? _draftSaveDebounce;
+
   @override
   void initState() {
     super.initState();
@@ -38,10 +46,40 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
       if (!mounted) return;
       ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
     });
+    // Restore composer text from a persisted draft, if any.
+    _restoreDraft();
+    // Autosave the composer text as the user types (debounced).
+    _textController.addListener(_onComposerChanged);
+  }
+
+  Future<void> _restoreDraft() async {
+    final draft = await ref
+        .read(messagesRepositoryProvider)
+        .readDraft(ChatId(widget.chatId));
+    if (!mounted || draft == null || draft.isEmpty) return;
+    _textController.text = draft;
+    _textController.selection =
+        TextSelection.collapsed(offset: draft.length);
+  }
+
+  void _onComposerChanged() {
+    _draftSaveDebounce?.cancel();
+    final snapshot = _textController.text;
+    _draftSaveDebounce = Timer(const Duration(milliseconds: 250), () async {
+      if (!mounted) return;
+      final repo = ref.read(messagesRepositoryProvider);
+      if (snapshot.trim().isEmpty) {
+        await repo.deleteDraft(ChatId(widget.chatId));
+      } else {
+        await repo.saveDraft(ChatId(widget.chatId), snapshot);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _draftSaveDebounce?.cancel();
+    _textController.removeListener(_onComposerChanged);
     _textController.dispose();
     _scrollController.dispose();
     _composerFocus.dispose();

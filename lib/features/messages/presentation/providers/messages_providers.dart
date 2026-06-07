@@ -8,8 +8,10 @@ import '../../domain/repositories/messages_repository.dart';
 part 'messages_providers.g.dart';
 
 @Riverpod(keepAlive: true)
-MessagesRepository messagesRepository(Ref ref) =>
-    MessagesRepositoryImpl(ref.watch(messagesRemoteDataSourceProvider));
+MessagesRepository messagesRepository(Ref ref) => MessagesRepositoryImpl(
+      ref.watch(messagesRemoteDataSourceProvider),
+      ref.watch(messagesLocalDataSourceProvider),
+    );
 
 /// The chat inbox as a fan-out stream: one upstream subscription, many UI
 /// consumers. Per CLAUDE.md §5.3, intermediate `@riverpod Stream` providers

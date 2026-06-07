@@ -1,11 +1,13 @@
 # Novex Clean Architecture — Project Guide
 
-> **🟥 ARCHITECTURAL CONSTRAINT (2026-05-26): This codebase is ONLINE-ONLY.**
-> The offline-first patterns described in some sections below (Rule 7, §6.4 Offline-First Sync, the offline variant of §5.2 / §7) are **NOT currently in use**. The `todos` reference feature, `lib/core/sync/` infrastructure, `pending_operations` queue, `TeamsLocalDataSource`, and all LWW machinery have been removed.
+> **🟥 ARCHITECTURAL CONSTRAINT (2026-05-26, AMENDED 2026-06-07): This codebase is ONLINE-ONLY with one narrow exemption.**
+> The offline-first patterns described in some sections below (Rule 7, §6.4 Offline-First Sync, the offline variant of §5.2 / §7) are **NOT in use**. The `todos` reference feature, `lib/core/sync/` infrastructure, `pending_operations` queue, `TeamsLocalDataSource`, and all LWW machinery have been removed.
 >
-> When adding any new feature: follow the **online-only** variant only. Repositories talk to Supabase directly via a remote data source; reads return `Future<Either<Failure, T>>` or wrap a Supabase real-time stream; writes call the remote and translate exceptions. No drift table (except `WizardDrafts`), no pending ops, no SyncService.
+> **EXEMPTION (2026-06-07, ticket #23) — `messages` feature only.** Messages has a drift-backed **read-through cache** for the inbox (`messages_chats`) and threads (`messages_messages`), plus a tiny **composer drafts** table (`messages_drafts`). Writes still go to Supabase first; the cache is a cold-start / instant-paint optimisation. There is **still** NO pending-ops queue, NO sync service, NO LWW. Sign-out wipes everything via `AppDatabase.clear()`. The exemption is scoped to messages; other features (teams / posts / matches / pavilion / profile) remain online-only.
 >
-> Do NOT propose offline-first patterns "for resilience" or "for faster reads." This restriction holds until explicitly lifted.
+> When adding ANY OTHER feature: follow the **online-only** variant. Repositories talk to Supabase directly via a remote data source; reads return `Future<Either<Failure, T>>` or wrap a Supabase real-time stream; writes call the remote and translate exceptions. No drift table (except `WizardDrafts` + the messages cache tables above), no pending ops, no SyncService.
+>
+> Do NOT generalise the messages cache to other features without explicit user agreement. Do NOT propose offline-first patterns "for resilience" or "for faster reads" in any other feature. This restriction holds until explicitly lifted.
 
 > **🟥 ARCHITECTURAL CONSTRAINT (2026-05-29): NO USE-CASE LAYER.**
 > The Use Case / Interactor layer described in §5.1 (`domain/usecases/<verb>.dart`), §7 Step 2.4, §8, and §9, plus `lib/core/usecase/usecase.dart` (the `UseCase` / `StreamUseCase` / `NoParams` contracts), have been **removed from this codebase**. Controllers and presentation providers depend on **repositories directly** via `ref.read(<feature>RepositoryProvider).method(...)`. Business rules and value-object validation live inside the repository implementation (so the controller hands raw inputs to the repo, which returns `Either<ValidationFailure, T>` or `Either<DomainFailure, T>`). Form-level input validation may still happen in the controller before the repo call (e.g. `Username.create(...)`).

@@ -4,18 +4,22 @@ import 'tables.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [WizardDrafts])
+@DriftDatabase(
+  tables: [WizardDrafts, MessagesChats, MessagesMessages, MessagesDrafts],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
-  /// v5 is the online-only reset: previous versions (1–4) carried offline-first
-  /// tables (`todos`, `pending_operations`, `teams`, `team_members`,
-  /// `unclaimed_players`) that have since been removed. v5 keeps only
-  /// `wizard_drafts`. The version was bumped (not reset) so devices coming
-  /// from an earlier build go through [migration] instead of failing to open
-  /// the DB as a downgrade.
+  /// Schema history:
+  /// - v1–v4 carried offline-first tables (`todos`, `pending_operations`,
+  ///   `teams`, `team_members`, `unclaimed_players`) that have since been
+  ///   removed.
+  /// - v5: online-only reset; keeps only `wizard_drafts`.
+  /// - v6: messages read-through cache + drafts (ticket #23). Adds
+  ///   `messages_chats`, `messages_messages`, `messages_drafts`. Scoped to
+  ///   the messages feature only — other features remain online-only.
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -41,15 +45,32 @@ class AppDatabase extends _$AppDatabase {
               await m.createTable(wizardDrafts);
             }
           }
+          if (from < 6) {
+            // Messages cache + drafts (ticket #23).
+            await m.createTable(messagesChats);
+            await m.createTable(messagesMessages);
+            await m.createTable(messagesDrafts);
+            await m.database.customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_messages_chats_last_message_at '
+              'ON messages_chats (last_message_at DESC)',
+            );
+            await m.database.customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_messages_messages_chat_created '
+              'ON messages_messages (chat_id, created_at DESC)',
+            );
+          }
         },
       );
 
-  /// Wipe local drift state on sign-out (currently only wizard drafts) so a
-  /// different user on the same device never sees the previous user's
-  /// in-progress forms.
+  /// Wipe local drift state on sign-out so a different user on the same
+  /// device never sees the previous user's data. Covers all messages cache
+  /// tables in addition to wizard drafts.
   Future<void> clear() async {
     await batch((b) {
       b.deleteAll(wizardDrafts);
+      b.deleteAll(messagesChats);
+      b.deleteAll(messagesMessages);
+      b.deleteAll(messagesDrafts);
     });
   }
 }

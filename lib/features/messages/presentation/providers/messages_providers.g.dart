@@ -55,7 +55,7 @@ final class MessagesRepositoryProvider
 }
 
 String _$messagesRepositoryHash() =>
-    r'ef7d27ea2acef487f4bb31f3deaa894e8ccc960d';
+    r'53befdbb609313134ef711a751f46abe7d5822ff';
 
 /// The chat inbox as a fan-out stream: one upstream subscription, many UI
 /// consumers. Per CLAUDE.md §5.3, intermediate `@riverpod Stream` providers

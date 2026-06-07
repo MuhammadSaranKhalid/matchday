@@ -30,4 +30,21 @@ abstract class MessagesRepository {
   /// Stamps `chat_members.last_read_at = now()` for the current user in this
   /// chat, so unread counts re-emit as 0.
   Future<Either<Failure, Unit>> markRead(ChatId chatId);
+
+  // ─── Drafts (local-only; ticket #23) ──────────────────────────────────
+  //
+  // Compose-state persistence so a killed app can restore a half-typed
+  // message. Backed by drift (`messages_drafts`); never touches the
+  // network. No `Either` wrapping — drafts are best-effort and a lost
+  // draft is a minor annoyance, not an error to surface.
+
+  /// Read the persisted composer text for a chat, or null when none exists.
+  Future<String?> readDraft(ChatId chatId);
+
+  /// Persist the composer text for a chat. Caller debounces writes so a
+  /// burst of keystrokes doesn't hammer the disk.
+  Future<void> saveDraft(ChatId chatId, String body);
+
+  /// Drop the draft for a chat — typically after a successful send.
+  Future<void> deleteDraft(ChatId chatId);
 }

@@ -370,7 +370,12 @@ class _ThreadRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  '${chat.unreadCount}',
+                  // The `list-my-chats` edge fn caps its unread count at 100
+                  // (LIMIT 100 in the inner subquery — bounded scan even for
+                  // heavy chats with thousands of unread). Render the cap as
+                  // "99+" so the badge isn't misread as an exact count
+                  // (ticket #37).
+                  chat.unreadCount >= 100 ? '99+' : '${chat.unreadCount}',
                   style: CkType.display(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,

@@ -61,6 +61,14 @@ String _$messagesRepositoryHash() =>
 /// consumers. Per CLAUDE.md §5.3, intermediate `@riverpod Stream` providers
 /// belong here rather than in a controller — the inbox screen has no write
 /// path in part 1 of the rollout.
+///
+/// `keepAlive: true` is load-bearing: `MessageThreadController.markRead()`
+/// invalidates this provider after a successful read-receipt stamp so the
+/// inbox's unread badges re-emit reactively. If this provider were
+/// autodispose and the user was only on the thread screen (inbox unmounted),
+/// the provider would have already disposed by the time `markRead` runs —
+/// `invalidate` against a disposed provider is a no-op, the badges would
+/// stay stale. Mirrors the repository provider's posture.
 
 @ProviderFor(myChats)
 final myChatsProvider = MyChatsProvider._();
@@ -69,6 +77,14 @@ final myChatsProvider = MyChatsProvider._();
 /// consumers. Per CLAUDE.md §5.3, intermediate `@riverpod Stream` providers
 /// belong here rather than in a controller — the inbox screen has no write
 /// path in part 1 of the rollout.
+///
+/// `keepAlive: true` is load-bearing: `MessageThreadController.markRead()`
+/// invalidates this provider after a successful read-receipt stamp so the
+/// inbox's unread badges re-emit reactively. If this provider were
+/// autodispose and the user was only on the thread screen (inbox unmounted),
+/// the provider would have already disposed by the time `markRead` runs —
+/// `invalidate` against a disposed provider is a no-op, the badges would
+/// stay stale. Mirrors the repository provider's posture.
 
 final class MyChatsProvider
     extends
@@ -82,13 +98,21 @@ final class MyChatsProvider
   /// consumers. Per CLAUDE.md §5.3, intermediate `@riverpod Stream` providers
   /// belong here rather than in a controller — the inbox screen has no write
   /// path in part 1 of the rollout.
+  ///
+  /// `keepAlive: true` is load-bearing: `MessageThreadController.markRead()`
+  /// invalidates this provider after a successful read-receipt stamp so the
+  /// inbox's unread badges re-emit reactively. If this provider were
+  /// autodispose and the user was only on the thread screen (inbox unmounted),
+  /// the provider would have already disposed by the time `markRead` runs —
+  /// `invalidate` against a disposed provider is a no-op, the badges would
+  /// stay stale. Mirrors the repository provider's posture.
   MyChatsProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
         name: r'myChatsProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -107,4 +131,4 @@ final class MyChatsProvider
   }
 }
 
-String _$myChatsHash() => r'64705df418e5974228836f9c8cd5d5c47482f3fe';
+String _$myChatsHash() => r'68a811b37eb30ae02d6d9f89c48717aebeb231a0';

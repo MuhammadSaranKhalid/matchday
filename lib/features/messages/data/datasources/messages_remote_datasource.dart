@@ -155,11 +155,17 @@ class MessagesRemoteDataSource {
             if (id == null) return;
             if (current.any((m) => m.messageId == id)) return; // dedup
             try {
+              // `deleted_at IS NULL` guards against the race where the
+              // broadcast fires for a message that's soft-deleted between
+              // the insert and our re-fetch. Without this filter the
+              // deleted row appends to `current` and shows in the UI.
               final row = await _supabase
                   .from(_messages)
                   .select(_messageSelect)
                   .eq('message_id', id)
-                  .single();
+                  .filter('deleted_at', 'is', null)
+                  .maybeSingle();
+              if (row == null) return;
               final dto = _dtoFromRow(Map<String, dynamic>.from(row), uid);
               current = [...current, dto];
               if (!controller.isClosed) {

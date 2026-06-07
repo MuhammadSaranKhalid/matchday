@@ -15,6 +15,14 @@ MessagesRepository messagesRepository(Ref ref) =>
 /// consumers. Per CLAUDE.md §5.3, intermediate `@riverpod Stream` providers
 /// belong here rather than in a controller — the inbox screen has no write
 /// path in part 1 of the rollout.
-@riverpod
+///
+/// `keepAlive: true` is load-bearing: `MessageThreadController.markRead()`
+/// invalidates this provider after a successful read-receipt stamp so the
+/// inbox's unread badges re-emit reactively. If this provider were
+/// autodispose and the user was only on the thread screen (inbox unmounted),
+/// the provider would have already disposed by the time `markRead` runs —
+/// `invalidate` against a disposed provider is a no-op, the badges would
+/// stay stale. Mirrors the repository provider's posture.
+@Riverpod(keepAlive: true)
 Stream<List<Chat>> myChats(Ref ref) =>
     ref.watch(messagesRepositoryProvider).watchMyChats();

@@ -89,6 +89,22 @@ class MessagesRepositoryImpl implements MessagesRepository {
   }
 
   @override
+  Future<Either<Failure, int>> loadOlderMessages(ChatId chatId) async {
+    try {
+      final count = await _remote.loadOlderMessages(chatId.value);
+      return Right(count);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, Unit>> markRead(ChatId chatId) async {
     try {
       await _remote.markRead(chatId.value);

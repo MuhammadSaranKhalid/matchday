@@ -37,6 +37,15 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
   /// minor compared to the perf cost of writing per keystroke.
   Timer? _draftSaveDebounce;
 
+  // ─── Pagination state (ticket #35) ──────────────────────────────────────
+  // The data source owns authoritative `hasMore` (it knows whether the
+  // initial page came back full); the widget mirrors it locally so the
+  // scroll trigger can short-circuit without an unnecessary method call on
+  // every itemBuilder callback. Worst case on a stale local flag is one
+  // no-op call that the data source rejects immediately.
+  bool _hasMoreOlder = true;
+  bool _isLoadingOlder = false;
+
   @override
   void initState() {
     super.initState();
@@ -108,6 +117,34 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
     }));
   }
 
+  /// Fire-and-forget load-older trigger. Re-entrancy guarded by
+  /// `_isLoadingOlder`; end-of-thread guarded by `_hasMoreOlder`. Failures
+  /// keep `_hasMoreOlder = true` so the next scroll attempt naturally
+  /// retries — no inline error UI for v1 (a banner during back-scroll would
+  /// be more disruptive than helpful).
+  Future<void> _onLoadOlder() async {
+    if (!_hasMoreOlder || _isLoadingOlder || !mounted) return;
+    setState(() => _isLoadingOlder = true);
+    final result = await ref
+        .read(messageThreadProvider(widget.chatId).notifier)
+        .loadOlder();
+    if (!mounted) return;
+    setState(() {
+      _isLoadingOlder = false;
+      result.fold(
+        (_) {
+          // Transient failure — leave hasMore true so the user can retry
+          // by scrolling.
+        },
+        (count) {
+          // Page size = 50 on the data source side; a smaller return means
+          // we've reached the start of the thread.
+          if (count < 50) _hasMoreOlder = false;
+        },
+      );
+    });
+  }
+
   Future<void> _send() async {
     final text = _textController.text;
     // UX shortcut — when the field is visually blank or a send is already
@@ -172,6 +209,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
                     : _Conversation(
                         messages: value,
                         scroll: _scrollController,
+                        isLoadingOlder: _isLoadingOlder,
+                        hasMoreOlder: _hasMoreOlder,
+                        onLoadOlder: _onLoadOlder,
                       ),
                 AsyncError(:final error) => _ErrorBody(
                     message: error is FailureWrapper
@@ -260,10 +300,25 @@ class _ThreadHeader extends StatelessWidget {
 // ─── Conversation list ───────────────────────────────────────────────────────
 
 class _Conversation extends StatelessWidget {
-  const _Conversation({required this.messages, required this.scroll});
+  const _Conversation({
+    required this.messages,
+    required this.scroll,
+    required this.isLoadingOlder,
+    required this.hasMoreOlder,
+    required this.onLoadOlder,
+  });
 
   final List<Message> messages;
   final ScrollController scroll;
+  final bool isLoadingOlder;
+  final bool hasMoreOlder;
+  final VoidCallback onLoadOlder;
+
+  /// How many items from the top (in reverse-scroll terms, the highest
+  /// itemBuilder index) before we kick off a load-more. Tuned so the
+  /// network round-trip overlaps with the user's continued scroll instead
+  /// of stalling at the boundary.
+  static const _loadOlderThreshold = 5;
 
   @override
   Widget build(BuildContext context) {
@@ -276,12 +331,33 @@ class _Conversation extends StatelessWidget {
     // We keep `items` in chronological order (oldest first) so the day-
     // divider logic stays simple, and translate the index at access time:
     // i=0 (rendered at the bottom) reads the LAST chronological item.
+    //
+    // The load-older spinner renders as a virtual item at `i ==
+    // items.length` (highest index = topmost in reverse mode). We bump
+    // itemCount by 1 when loading so the spinner has somewhere to render
+    // (ticket #35).
+    final itemCount = items.length + (isLoadingOlder ? 1 : 0);
     return ListView.builder(
       controller: scroll,
       reverse: true,
       padding: const EdgeInsets.all(14),
-      itemCount: items.length,
-      itemBuilder: (context, i) => items[items.length - 1 - i],
+      itemCount: itemCount,
+      itemBuilder: (context, i) {
+        // Top-of-list spinner — present only while a load is in flight.
+        if (isLoadingOlder && i == items.length) {
+          return const _LoadOlderSpinner();
+        }
+        // Fire load-older when itemBuilder approaches the top
+        // (`items.length - _loadOlderThreshold`). `addPostFrameCallback`
+        // defers the setState out of the build phase; the state flags in
+        // `_onLoadOlder` already debounce repeat triggers.
+        if (hasMoreOlder &&
+            !isLoadingOlder &&
+            i >= items.length - _loadOlderThreshold) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => onLoadOlder());
+        }
+        return items[items.length - 1 - i];
+      },
     );
   }
 
@@ -527,6 +603,30 @@ class _Composer extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Top-of-list spinner shown while older messages are loading
+/// (ticket #35). Small, centered, low visual weight — the user shouldn't
+/// be distracted by a heavy banner during back-scroll.
+class _LoadOlderSpinner extends StatelessWidget {
+  const _LoadOlderSpinner();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 12),
+      child: Center(
+        child: SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: CkColors.muted,
+          ),
+        ),
       ),
     );
   }

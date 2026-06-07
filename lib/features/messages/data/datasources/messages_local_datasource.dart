@@ -74,17 +74,26 @@ class MessagesLocalDataSource {
 
   // ─── Messages ───────────────────────────────────────────────────────────
 
-  /// Cached non-deleted messages in a chat, oldest first. Soft-deleted rows
-  /// stay in the table (the column tracks them) but are filtered here so the
-  /// repository never sees them.
+  /// Cached non-deleted messages in a chat, oldest first. Returns AT MOST
+  /// the latest [_cacheReadPageSize] messages — the cache is sized for
+  /// cold-start of the latest page only; paginated history is network-only
+  /// (ticket #35). Soft-deleted rows stay in the table (the column tracks
+  /// them) but are filtered here so the repository never sees them.
   Future<List<Message>> listMessages(String chatId) async {
     final rows = await (_db.select(_db.messages)
           ..where((t) =>
               t.chatId.equals(chatId) & t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(_cacheReadPageSize))
         .get();
-    return rows.map(_messageFromRow).toList(growable: false);
+    // DB returned newest-first; reverse so the repository sees chronological
+    // (asc) order, matching the network path's contract.
+    return rows.reversed.map(_messageFromRow).toList(growable: false);
   }
+
+  /// Must match the remote data source's page size — otherwise cold start
+  /// would paint fewer (or more) messages than the network re-fetch.
+  static const _cacheReadPageSize = 50;
 
   Future<void> upsertMessage(Message msg) async {
     await _db

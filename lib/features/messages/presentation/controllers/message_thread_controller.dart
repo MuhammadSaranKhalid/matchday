@@ -42,6 +42,12 @@ class MessageThread extends _$MessageThread {
     );
   }
 
+  /// Load the next page of older messages (ticket #35). Returns the number
+  /// loaded — `0` or `< 50` means we hit the end of the thread; callers
+  /// use this to stop firing the scroll trigger.
+  Future<Either<Failure, int>> loadOlder() =>
+      ref.read(messagesRepositoryProvider).loadOlderMessages(ChatId(chatId));
+
   /// Stamp `chat_members.last_read_at`. On success, invalidate the inbox
   /// list so its unread badges re-emit reactively (server doesn't broadcast
   /// `chat_updated` for read-marker changes — they only fire on message

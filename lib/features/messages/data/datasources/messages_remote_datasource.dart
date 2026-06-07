@@ -258,6 +258,11 @@ class MessagesRemoteDataSource {
       'message_id, chat_id, sender_id, body, created_at, edited_at, deleted_at, '
       'sender:profiles(display_name)';
 
+  /// Initial-load + load-more page size for thread pagination (ticket #35).
+  /// Matches WhatsApp/Slack — fast first paint without too many round-trips
+  /// when the user scrolls back through history.
+  static const _pageSize = 50;
+
   /// Flatten the nested `sender.display_name` into a top-level
   /// `sender_display_name` field and stamp `from_me` against the current
   /// user — both expected by [MessageDto].
@@ -271,21 +276,117 @@ class MessagesRemoteDataSource {
     return MessageDto.fromJson(flat);
   }
 
-  /// One-shot list of all non-deleted messages in a chat, oldest first.
-  Future<List<MessageDto>> listMessages(String chatId) async {
+  /// One-shot list of the LATEST [_pageSize] non-deleted messages in a chat,
+  /// oldest first. Used by [watchMessages] for the initial fetch and by
+  /// [_resyncThread] on reconnect. Older messages load on demand via
+  /// [loadOlderMessages].
+  Future<List<MessageDto>> listMessages(String chatId) =>
+      _listMessagesPage(chatId, limit: _pageSize);
+
+  /// Internal: fetch one keyset page of messages, returning them in
+  /// chronological (asc) order. When [beforeCreatedAt] + [beforeMessageId]
+  /// are null, returns the LATEST page; when provided, returns the page
+  /// older than the cursor `(created_at, message_id)`.
+  ///
+  /// The DB query orders DESC + LIMIT so we get the latest-of-the-older
+  /// rows; we then reverse before returning so callers always see
+  /// chronological order regardless of cursor direction.
+  Future<List<MessageDto>> _listMessagesPage(
+    String chatId, {
+    required int limit,
+    String? beforeCreatedAt,
+    String? beforeMessageId,
+  }) async {
     final uid = _supabase.requireUid();
     try {
-      final rows = await _supabase
+      var q = _supabase
           .from(_messages)
           .select(_messageSelect)
           .eq('chat_id', chatId)
-          .filter('deleted_at', 'is', null)
-          .order('created_at', ascending: true);
-      return rows
+          .filter('deleted_at', 'is', null);
+
+      if (beforeCreatedAt != null && beforeMessageId != null) {
+        // Compound keyset: (created_at, message_id) < (cursor_at, cursor_id).
+        // The nested `and(...)` is PostgREST syntax for tie-breaking on the
+        // boundary instant — without it, two messages sharing a microsecond
+        // could overlap or be skipped across page boundaries (ticket #35).
+        q = q.or(
+          'created_at.lt.$beforeCreatedAt,'
+          'and(created_at.eq.$beforeCreatedAt,message_id.lt.$beforeMessageId)',
+        );
+      }
+
+      final rows = await q
+          .order('created_at', ascending: false)
+          .order('message_id', ascending: false)
+          .limit(limit);
+      // Reverse so the caller sees chronological (asc) order — keeps the
+      // day-divider logic in `_Conversation._buildItems` simple.
+      return rows.reversed
           .map((row) => _dtoFromRow(Map<String, dynamic>.from(row), uid))
           .toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
+    }
+  }
+
+  /// Load the next page of older messages for [chatId] and prepend to the
+  /// in-memory list. Returns the number of messages loaded; `0` means
+  /// end-of-thread, a value `< _pageSize` also means end-of-thread (no
+  /// more pages exist after this one). Ticket #35.
+  Future<int> loadOlderMessages(String chatId) async {
+    final state = _threads[chatId];
+    if (state == null || state.controller.isClosed) return 0;
+    if (state.loadingOlder || !state.hasMore) return 0;
+    if (state.current.isEmpty) return 0;
+
+    state.loadingOlder = true;
+    try {
+      // Oldest currently-loaded message is the keyset cursor.
+      final oldest = state.current.first;
+      final older = await _listMessagesPage(
+        chatId,
+        limit: _pageSize,
+        beforeCreatedAt: oldest.createdAt,
+        beforeMessageId: oldest.messageId,
+      );
+
+      if (older.isEmpty) {
+        state.hasMore = false;
+        return 0;
+      }
+
+      // If the page came back smaller than asked, this was the last page.
+      if (older.length < _pageSize) {
+        state.hasMore = false;
+      }
+
+      // Prepend to the in-memory list. Dedup on message_id — the new page
+      // shouldn't overlap (keyset cursor is strict <), but if a realtime
+      // insert raced in during the await we don't want a duplicate.
+      final existing = state.current.map((m) => m.messageId).toSet();
+      final toPrepend = older.where((m) => !existing.contains(m.messageId));
+      state.current = [...toPrepend, ...state.current];
+
+      // Also keep the sender-names cache fresh — older pages may include
+      // members who haven't messaged in the latest 50.
+      for (final m in older) {
+        if (m.senderId != null) {
+          state.senderNames[m.senderId!] = m.senderDisplayName;
+        }
+      }
+
+      if (!state.controller.isClosed) {
+        state.controller.add(List.unmodifiable(state.current));
+      }
+      // NOTE: older messages are NOT written to the cache. Cache is sized
+      // for cold-start of the LATEST page only; paginated history is
+      // network-only (ticket #35 design decision).
+      return older.length;
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    } finally {
+      state.loadingOlder = false;
     }
   }
 
@@ -317,6 +418,9 @@ class MessagesRemoteDataSource {
       controller: controller,
       current: initial,
       senderNames: senderNames,
+      // Initial page that came back full implies older history may exist;
+      // a partial first page means we already have everything (ticket #35).
+      hasMore: initial.length == _pageSize,
     );
     _threads[chatId] = state;
 
@@ -437,8 +541,15 @@ class MessagesRemoteDataSource {
     final state = _threads[chatId];
     if (state == null) return;
     try {
+      // Reconnect = reset to the latest page. Any older messages the user
+      // had paginated in are dropped from the in-memory view; they can
+      // re-load them by scrolling up again. Pragmatic — preserving deep
+      // pagination across reconnect would require a more invasive refetch
+      // and the user is unlikely to be deep in history right after a drop.
       final fresh = await listMessages(chatId);
       state.current = fresh;
+      state.hasMore = fresh.length == _pageSize;
+      state.loadingOlder = false;
       state.senderNames.clear();
       for (final m in fresh) {
         if (m.senderId != null) {
@@ -579,6 +690,7 @@ class _ThreadState {
     required this.controller,
     required this.current,
     required this.senderNames,
+    required this.hasMore,
   });
 
   final StreamController<List<MessageDto>> controller;
@@ -587,4 +699,13 @@ class _ThreadState {
   /// sender_id → display_name (or null when the profile is deleted).
   /// Populated on initial fetch and updated on cache-miss fetches.
   final Map<String, String?> senderNames;
+
+  /// Whether older messages MAY exist server-side. Starts based on whether
+  /// the initial page filled to `_pageSize`; flipped to false when a
+  /// `loadOlderMessages` call returns < `_pageSize` rows. Ticket #35.
+  bool hasMore;
+
+  /// In-flight guard for `loadOlderMessages` — concurrent triggers from
+  /// the scroll listener are coalesced to a single network round-trip.
+  bool loadingOlder = false;
 }

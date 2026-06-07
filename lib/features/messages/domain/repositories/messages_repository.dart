@@ -17,10 +17,27 @@ abstract class MessagesRepository {
   Stream<List<Chat>> watchMyChats();
 
   /// Streams the messages in a chat, sorted by `created_at` asc. Backed by
-  /// an initial fetch + a Supabase broadcast subscription on
-  /// `chat:<chat_id>:messages` (event `new_message`, fired by the
-  /// `broadcast_new_message` trigger in migration 0802 on every insert).
+  /// an initial fetch of the LATEST 50 messages + a Supabase broadcast
+  /// subscription on `chat:<chat_id>:messages` (event `new_message`, fired
+  /// by the `broadcast_new_message` trigger in migration 0802 on every
+  /// insert). Older messages are loaded on demand via [loadOlderMessages]
+  /// (ticket #35).
   Stream<List<Message>> watchMessages(ChatId chatId);
+
+  /// Fetch the next page of older messages for [chatId] (keyset pagination
+  /// on `(created_at, message_id)` against the oldest currently loaded
+  /// message). The new messages are prepended to the in-memory list and
+  /// emitted through the [watchMessages] stream — no separate return value
+  /// for the list itself.
+  ///
+  /// Returns the number of older messages loaded:
+  ///   - `0` means no more history to load (end-of-thread).
+  ///   - A value `< 50` (the page size) also means end-of-thread reached.
+  ///   - A value `== 50` means another page may exist.
+  ///
+  /// Safe to call without checking state — the implementation no-ops when
+  /// a load is already in flight or `hasMore` is exhausted.
+  Future<Either<Failure, int>> loadOlderMessages(ChatId chatId);
 
   /// Inserts a new message authored by the current user. Server-side
   /// triggers handle the realtime broadcast and the push fan-out — this

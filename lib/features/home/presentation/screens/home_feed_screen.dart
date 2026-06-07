@@ -15,6 +15,23 @@ import 'package:novex_clean_arch/features/posts/domain/entities/post_media.dart'
 import 'package:novex_clean_arch/features/posts/presentation/controllers/feed_controller.dart';
 import 'package:novex_clean_arch/features/posts/presentation/screens/photo_viewer_screen.dart';
 
+// ─── Temporary visibility flags ──────────────────────────────────────────
+//
+// Both the live-match cards rail and the feed-filter chip row are hidden
+// temporarily — neither has its underlying data/behaviour wired yet, and
+// they were taking up visual space without serving the user. Flip either
+// flag to `true` to re-enable.
+//
+//   • _kShowLiveCards   — ticket #1 (Hide live match cards from home page)
+//   • _kShowFeedFilters — ticket #2 (Hide feed filter chip row from home page)
+//
+// The widget classes (`_LiveRail`, `_LiveCard`, `FeedFilters`) stay defined
+// below so re-enabling is a one-line change. They are referenced from the
+// const-false branches below, which keeps the analyzer's unused-element
+// check happy.
+const bool _kShowLiveCards = false;
+const bool _kShowFeedFilters = false;
+
 class HomeFeedScreen extends ConsumerStatefulWidget {
   const HomeFeedScreen({super.key, this.onBell, this.onOpenProfile});
 
@@ -62,7 +79,7 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
               sub: 'Karachi · Captains you follow',
               onBell: widget.onBell,
             ),
-            const FeedFilters(),
+            if (_kShowFeedFilters) const FeedFilters(),
             Expanded(
               child: RefreshIndicator(
                 color: CkColors.ink,
@@ -70,9 +87,14 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
                     ref.read(feedControllerProvider.notifier).refresh(),
                 child: switch (feed) {
                   AsyncData(:final value) => _dataList(value),
-                  AsyncError(:final error) =>
-                      _scrollable([const _LiveRail(), _ErrorState(error: error)]),
-                  _ => _scrollable([const _LiveRail(), const _Loader()]),
+                  AsyncError(:final error) => _scrollable([
+                      if (_kShowLiveCards) const _LiveRail(),
+                      _ErrorState(error: error),
+                    ]),
+                  _ => _scrollable([
+                      if (_kShowLiveCards) const _LiveRail(),
+                      const _Loader(),
+                    ]),
                 },
               ),
             ),
@@ -91,14 +113,18 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
 
   Widget _dataList(List<Post> posts) {
     final hasMore = ref.read(feedControllerProvider.notifier).hasMore;
-    // [LiveRail] + posts + [footer].
+    // [LiveRail] + posts + [footer]. LiveRail collapses to SizedBox.shrink
+    // while _kShowLiveCards is false so itemCount + indexing stay constant —
+    // re-enabling is a one-line flag flip with no surrounding changes.
     return ListView.builder(
       controller: _scroll,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 12),
       itemCount: posts.length + 2,
       itemBuilder: (context, i) {
-        if (i == 0) return const _LiveRail();
+        if (i == 0) {
+          return _kShowLiveCards ? const _LiveRail() : const SizedBox.shrink();
+        }
         if (i == posts.length + 1) {
           if (posts.isEmpty) return const _EmptyState();
           return hasMore ? const _Loader() : const _FeedFooter();

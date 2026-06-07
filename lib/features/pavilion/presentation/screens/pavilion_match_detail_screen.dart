@@ -88,7 +88,25 @@ class PavilionMatchDetailScreen extends ConsumerWidget {
         _pushAndRefresh(context, ref, '/matches/$id/scorecard');
       case 'withdraw':
         _withdraw(context, ref, id);
+      // Design-fidelity actions without a real backend yet — render the
+      // button per the design and surface "Coming soon" so the user knows
+      // the affordance exists but isn't wired. Replace each handler when
+      // the underlying flow lands.
+      case 'message':
+        _comingSoon(context, 'Messaging the opponent is coming soon.');
+      case 'reschedule':
+        _comingSoon(context, 'Rescheduling is coming soon.');
+      case 'cancel':
+        _comingSoon(context, 'Cancelling a match is coming soon.');
+      case 'share':
+        _comingSoon(context, 'Sharing match results is coming soon.');
     }
+  }
+
+  void _comingSoon(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
   }
 
   Future<void> _pushAndRefresh(

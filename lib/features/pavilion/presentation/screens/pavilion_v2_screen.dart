@@ -190,6 +190,7 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
             // refresh restores the page with a working back — matching the
             // my-matches route's pattern.
             onOpen: (m) => context.go('/pavilion/match/${m.id}'),
+            onCreate: _onCreate,
             hideIds: hero != null ? {hero.id} : const {},
           ),
         ],

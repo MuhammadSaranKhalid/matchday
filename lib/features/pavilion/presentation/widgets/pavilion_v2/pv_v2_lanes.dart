@@ -281,15 +281,36 @@ class PvMatchesLane extends StatelessWidget {
     super.key,
     required this.matches,
     required this.onOpen,
+    required this.onCreate,
     this.hideIds = const {},
   });
 
   final List<PvMatch> matches;
   final void Function(PvMatch) onOpen;
+
+  /// Tapped from the empty-state CTA when there are no matches yet. Wires the
+  /// "Schedule a match" button on the matches surface to the same flow as the
+  /// workspace's create FAB.
+  final VoidCallback onCreate;
   final Set<String> hideIds;
 
   @override
   Widget build(BuildContext context) {
+    // Empty state — design `pavilion-matches-v2.jsx:113-118`.
+    if (matches.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: PvEmptyState(
+          icon: PvIcons.swords,
+          title: 'No matches yet',
+          body:
+              'Challenge another team to set up your first match — you pick the day, ground and format.',
+          cta: 'Schedule a match',
+          onCta: onCreate,
+          hint: 'Got a 6-digit code? Tap ＋ to claim an open challenge.',
+        ),
+      );
+    }
     const up = {PvPhase.live, PvPhase.startsSoon, PvPhase.scheduled, PvPhase.awaitingReply};
     final upcoming =
         matches.where((m) => up.contains(m.phase) && !hideIds.contains(m.id)).toList();
@@ -325,7 +346,18 @@ class PvMatchesLane extends StatelessWidget {
   }
 }
 
-/// Status-only match card — no buttons, clear chevron + press state.
+
+/// Phase-adaptive match card. Faithful port of the design's `MatchCard` in
+/// `pavilion-matches-v2.jsx:51-107`:
+///
+///   • live / completed → status strip + two-row scoreboard (one row per team,
+///     win row gets a green fill + check icon, missing scores render dim) +
+///     venue/sub footer with a chevron.
+///   • upcoming         → status strip + compact dual-crest row (overlapping
+///     crests, headline, sub, chevron).
+///
+/// Cards have NO action buttons — they're tappable rows that open the match
+/// detail page (`PvMatchDetail`) where every action lives.
 class PvMatchCard extends StatefulWidget {
   const PvMatchCard({super.key, required this.m, required this.onOpen});
   final PvMatch m;
@@ -342,9 +374,13 @@ class _PvMatchCardState extends State<PvMatchCard> {
   Widget build(BuildContext context) {
     final m = widget.m;
     final (label, tone, live) = pvPhaseConf(m.phase);
-    final showScore = m.phase == PvPhase.live || m.phase == PvPhase.completed;
+    final scored = m.phase == PvPhase.live || m.phase == PvPhase.completed;
     final lineupGap = m.lineupSet == false &&
         (m.phase == PvPhase.scheduled || m.phase == PvPhase.startsSoon);
+    final aWin = m.phase == PvPhase.completed && m.result == 'W';
+    final bWin = m.phase == PvPhase.completed &&
+        m.result != null &&
+        m.result != 'W';
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -355,92 +391,107 @@ class _PvMatchCardState extends State<PvMatchCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: _press ? CkColors.paper2 : CkColors.paper,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: CkColors.hairline),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                PvPill(label, tone: tone, live: live),
-                if (lineupGap) ...[
-                  const SizedBox(width: 8),
-                  Text('LINEUP NOT SET', style: pvMono(9, color: CkInk.amber)),
+            // ── Status strip (Pill + optional "LINEUP NOT SET" + when) ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 11, 12, 0),
+              child: Row(
+                children: [
+                  PvPill(label, tone: tone, live: live),
+                  if (lineupGap) ...[
+                    const SizedBox(width: 8),
+                    Text('LINEUP NOT SET',
+                        style: pvMono(9, color: CkInk.amber)),
+                  ],
+                  const Spacer(),
+                  Text(m.when, style: pvMono(9, color: CkColors.muted)),
                 ],
-                const Spacer(),
-                Text(m.when, style: pvMono(9, color: CkColors.muted)),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Crest(
-                    short: m.them.short,
-                    color: m.them.color,
-                    logoUrl: m.them.logoUrl,
-                    size: 40,
-                    radius: 11),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Flexible(
-                            child: Text('${m.me.short} vs ${m.them.short}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: CkType.display(
-                                    fontSize: 15, fontWeight: FontWeight.w700)),
-                          ),
-                          if (m.result != null) ...[
-                            const SizedBox(width: 6),
-                            _ResultTag(won: m.result == 'W'),
-                          ],
-                        ],
+
+            if (scored) ...[
+              // ── Two-row scoreboard ─────────────────────────────────────
+              const SizedBox(height: 8),
+              _PvScoreRow(c: m.me, score: m.scoreA, win: aWin, top: true),
+              _PvScoreRow(c: m.them, score: m.scoreB, win: bWin),
+              // Footer row: sub · venue + chevron.
+              Container(
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: CkColors.hairline)),
+                ),
+                padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        [m.sub, m.venue]
+                            .where((s) => s.isNotEmpty)
+                            .join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: CkType.body(
+                            fontSize: 11.5, color: CkColors.muted),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                            [m.sub, m.venue].where((s) => s.isNotEmpty).join(' · '),
+                    ),
+                    const SizedBox(width: 8),
+                    const PvIcon(PvIcons.next,
+                        size: 15, color: CkColors.soft, sw: 2),
+                  ],
+                ),
+              ),
+            ] else ...[
+              // ── Upcoming: compact dual-crest row ───────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 13),
+                child: Row(
+                  children: [
+                    _PvCrestStack(me: m.me, them: m.them),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${m.me.short} vs ${m.them.short}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: CkType.body(fontSize: 11.5, color: CkColors.muted)),
+                            style: CkType.display(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.02,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              [m.sub, m.venue]
+                                  .where((s) => s.isNotEmpty)
+                                  .join(' · '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: CkType.body(
+                                  fontSize: 11.5, color: CkColors.muted),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const PvIcon(PvIcons.next,
+                        size: 16, color: CkColors.soft, sw: 2),
+                  ],
                 ),
-                if (showScore) ...[
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(m.scoreA ?? '',
-                          style: CkType.mono(
-                              fontSize: 14, fontWeight: FontWeight.w700, color: CkColors.ink)),
-                      if (m.scoreB != null && m.scoreB != '—')
-                        Padding(
-                          padding: const EdgeInsets.only(top: 1),
-                          child: Text(m.scoreB!,
-                              style: CkType.mono(fontSize: 11, color: CkColors.muted)),
-                        ),
-                    ],
-                  ),
-                ],
-                SizedBox(width: showScore ? 4 : 0),
-                const PvIcon(PvIcons.next, size: 16, color: CkColors.soft, sw: 2),
-              ],
-            ),
+              ),
+            ],
           ],
         ),
       ),
@@ -448,20 +499,291 @@ class _PvMatchCardState extends State<PvMatchCard> {
   }
 }
 
-class _ResultTag extends StatelessWidget {
-  const _ResultTag({required this.won});
-  final bool won;
+/// One row of the two-row scoreboard. Win row gets a `greenSoft` background
+/// + a check icon next to the score. Missing scores render dim (`—`).
+class _PvScoreRow extends StatelessWidget {
+  const _PvScoreRow({
+    required this.c,
+    required this.score,
+    this.win = false,
+    this.top = false,
+  });
+
+  final PvCrest c;
+  final String? score;
+  final bool win;
+  final bool top;
 
   @override
   Widget build(BuildContext context) {
+    final hasScore =
+        score != null && score!.isNotEmpty && score != '—';
+    final display = hasScore ? score! : '—';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: won ? CkColors.greenSoft : CkColors.paper2,
-        borderRadius: BorderRadius.circular(4),
+        color: win ? CkColors.greenSoft : Colors.transparent,
+        border: top
+            ? null
+            : const Border(top: BorderSide(color: CkColors.hairline)),
       ),
-      child: Text(won ? 'WON' : 'LOST',
-          style: pvMono(9, color: won ? CkInk.green : CkColors.muted)),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+      child: Row(
+        children: [
+          Crest(
+            short: c.short,
+            color: c.color,
+            logoUrl: c.logoUrl,
+            size: 28,
+            radius: 8,
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              c.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.display(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.01,
+                color: CkColors.ink,
+              ),
+            ),
+          ),
+          if (win) ...[
+            const PvIcon(PvIcons.check,
+                size: 15, color: CkInk.green, sw: 2.6),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            display,
+            style: CkType.mono(
+              fontSize: hasScore ? 15 : 12,
+              fontWeight: hasScore ? FontWeight.w700 : FontWeight.w600,
+              color: hasScore ? CkColors.ink : CkColors.muted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Two overlapping crests for the upcoming-card layout. The second crest sits
+/// 9px to the left of the first (overlap) and carries a 2px `paper` ring so it
+/// punches through visually.
+class _PvCrestStack extends StatelessWidget {
+  const _PvCrestStack({required this.me, required this.them});
+  final PvCrest me;
+  final PvCrest them;
+
+  @override
+  Widget build(BuildContext context) {
+    // First crest is 38px; second crest with 2px ring is 42px visible.
+    // Second crest left = 38 - 9 = 29; total width = 29 + 42 = 71.
+    return SizedBox(
+      width: 71,
+      height: 42,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            top: 2,
+            child: Crest(
+              short: me.short,
+              color: me.color,
+              logoUrl: me.logoUrl,
+              size: 38,
+              radius: 10,
+            ),
+          ),
+          Positioned(
+            left: 29,
+            top: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: CkColors.paper, width: 2),
+              ),
+              child: Crest(
+                short: them.short,
+                color: them.color,
+                logoUrl: them.logoUrl,
+                size: 38,
+                radius: 10,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Empty state — design `pavilion-matches-v2.jsx:325-347`
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Generic empty-state surface used by any lane that has nothing to show.
+///
+/// Layout (top to bottom):
+///   • 68×68 paper2 tile with a 28px line icon + a paper plus-badge anchored
+///     to the bottom-right corner of the tile
+///   • Title — `CkType.display(20)`
+///   • Body — 13px ink2 with 1.55 line-height, max width 280
+///   • Optional primary CTA — ink-filled button with a plus prefix
+///   • Optional outlined secondary button
+///   • Optional mono hint — 9.5px muted, max width 260
+class PvEmptyState extends StatelessWidget {
+  const PvEmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.cta,
+    this.onCta,
+    this.secondary,
+    this.onSecondary,
+    this.hint,
+  });
+
+  final String icon;
+  final String title;
+  final String body;
+  final String? cta;
+  final VoidCallback? onCta;
+  final String? secondary;
+  final VoidCallback? onSecondary;
+  final String? hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(30, 40, 30, 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Tile + plus-badge corner.
+          SizedBox(
+            width: 78, // 68 tile + 5px badge overhang either side
+            height: 78,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: CkColors.paper2,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: CkColors.hairline),
+                  ),
+                  child: PvIcon(icon,
+                      size: 28, color: CkColors.ink2, sw: 1.7),
+                ),
+                Positioned(
+                  right: -5,
+                  bottom: -5,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: CkColors.paper,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: CkColors.hairline),
+                    ),
+                    child: const PvIcon(PvIcons.plus,
+                        size: 13, color: CkColors.ink, sw: 2.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: CkType.display(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 280),
+            child: Text(
+              body,
+              textAlign: TextAlign.center,
+              style: CkType.body(
+                  fontSize: 13, color: CkColors.ink2, height: 1.55),
+            ),
+          ),
+          if (cta != null) ...[
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: onCta,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 22, vertical: 13),
+                decoration: BoxDecoration(
+                  color: CkColors.ink,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const PvIcon(PvIcons.plus,
+                        size: 17, color: CkColors.paper, sw: 2.4),
+                    const SizedBox(width: 8),
+                    Text(
+                      cta!,
+                      style: CkType.display(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: CkColors.paper),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (secondary != null) ...[
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: onSecondary,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 18, vertical: 11),
+                decoration: BoxDecoration(
+                  color: CkColors.paper,
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(color: CkColors.hairline),
+                ),
+                child: Text(
+                  secondary!,
+                  style: CkType.display(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: CkColors.ink),
+                ),
+              ),
+            ),
+          ],
+          if (hint != null) ...[
+            const SizedBox(height: 18),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 260),
+              child: Text(
+                hint!,
+                textAlign: TextAlign.center,
+                style: pvMono(9.5, color: CkColors.muted),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -34,10 +34,19 @@ class MessagesScreen extends ConsumerStatefulWidget {
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   _InboxTab _tab = _InboxTab.all;
 
-  /// Cold-start refresh affordance. Indicator below the title while a
-  /// network refresh may be in flight after the cache emit. Bounded by a
-  /// fixed timeout so a slow network never leaves it stuck — the indicator
-  /// is a visual hint, not a strict signal.
+  /// Cold-start refresh affordance. Time-bounded visual hint, NOT a
+  /// strict "fetch is in flight" signal:
+  ///
+  ///   • Network faster than the 2-second timeout (common) → chip lingers
+  ///     a beat after the data has actually painted. Mild but harmless.
+  ///   • Network slower than the timeout (slow connection) → chip
+  ///     DISAPPEARS while the refresh is still in flight. Trade-off
+  ///     accepted: a stuck-looking spinner is worse than a brief one that
+  ///     stops early. The cache renders immediately regardless.
+  ///
+  /// A precise version would `ref.listen(myChatsProvider, ...)` and clear
+  /// on the second emission, but the time-bounded version is intentional
+  /// for v1 — re-evaluate if real-user data shows the trade-off bites.
   bool _refreshing = true;
   Timer? _refreshTimeout;
 
@@ -65,27 +74,27 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       color: CkColors.paper,
       child: SafeArea(
         bottom: false,
-        child: chatsAsync.when(
-          loading: () => _Skeleton(
-            title: 'Messages',
-            onBell: widget.onBell,
-            tab: _tab,
-            onTabChanged: (t) => setState(() => _tab = t),
-          ),
-          error: (e, _) => _ErrorView(
-            title: 'Messages',
-            onBell: widget.onBell,
-            message: _messageFor(e),
-            onRetry: () => ref.invalidate(myChatsProvider),
-          ),
-          data: (chats) => _Loaded(
-            chats: chats,
-            tab: _tab,
-            onTabChanged: (t) => setState(() => _tab = t),
-            onBell: widget.onBell,
-            refreshing: showRefreshChip,
-          ),
-        ),
+        child: switch (chatsAsync) {
+          AsyncData(:final value) => _Loaded(
+              chats: value,
+              tab: _tab,
+              onTabChanged: (t) => setState(() => _tab = t),
+              onBell: widget.onBell,
+              refreshing: showRefreshChip,
+            ),
+          AsyncError(:final error) => _ErrorView(
+              title: 'Messages',
+              onBell: widget.onBell,
+              message: _messageFor(error),
+              onRetry: () => ref.invalidate(myChatsProvider),
+            ),
+          _ => _Skeleton(
+              title: 'Messages',
+              onBell: widget.onBell,
+              tab: _tab,
+              onTabChanged: (t) => setState(() => _tab = t),
+            ),
+        },
       ),
     );
   }

@@ -13,6 +13,19 @@ class ServerException implements Exception {
   String toString() => 'ServerException($statusCode): $message';
 }
 
+/// Network is unreachable — DNS lookup failed, socket connect failed, or the
+/// device is offline entirely. Distinct from [ServerException] (the backend
+/// responded but with an unexpected payload / 5xx). The repository translates
+/// this to `NetworkFailure` so the UI can show "no internet" copy rather than
+/// the (incorrect) "server error."
+class NetworkException implements Exception {
+  NetworkException([this.message = 'No internet connection']);
+  final String message;
+
+  @override
+  String toString() => 'NetworkException: $message';
+}
+
 class CacheException implements Exception {
   CacheException(this.message);
   final String message;

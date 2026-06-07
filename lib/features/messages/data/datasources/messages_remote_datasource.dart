@@ -32,6 +32,12 @@ class MessagesRemoteDataSource {
   StreamController<List<ChatDto>>? _inboxController;
   List<ChatDto>? _inboxCurrent;
 
+  /// Guard against a thundering herd of `_resyncInbox` calls when a burst of
+  /// `chat_updated` broadcasts arrives for one or more unknown chats in the
+  /// same microtask batch. Without this, N broadcasts in flight = N
+  /// concurrent edge-fn round-trips (ticket #28).
+  bool _inboxResyncing = false;
+
   // ─── Per-thread state (keyed by chatId) ───────────────────────────────
   final Map<String, _ThreadState> _threads = {};
 
@@ -126,8 +132,14 @@ class MessagesRemoteDataSource {
     if (idx == -1) {
       // Unknown chat — likely a new team I just got added to. Fall back to
       // a full re-fetch which will surface the new chat AND any I haven't
-      // seen yet.
-      unawaited(_resyncInbox(uid));
+      // seen yet. Guarded so a burst of broadcasts for the same unknown
+      // chat triggers at most one re-fetch (ticket #28).
+      if (!_inboxResyncing) {
+        _inboxResyncing = true;
+        unawaited(
+          _resyncInbox(uid).whenComplete(() => _inboxResyncing = false),
+        );
+      }
       return;
     }
 
@@ -310,7 +322,12 @@ class MessagesRemoteDataSource {
     channel
         .onBroadcast(
           event: 'new_message',
-          callback: (payload) => _onNewMessage(chatId, payload, uid),
+          // `unawaited` makes the fire-and-forget dispatch explicit —
+          // `_onNewMessage` is async and may await a cache-miss row fetch.
+          // Errors inside `_onNewMessage` are caught and surfaced via the
+          // controller; nothing escapes here (ticket #28).
+          callback: (payload) =>
+              unawaited(_onNewMessage(chatId, payload, uid)),
         )
         .subscribe((status, [error]) async {
       if (status == RealtimeSubscribeStatus.subscribed) {
@@ -388,6 +405,14 @@ class MessagesRemoteDataSource {
         return;
       }
     }
+
+    // Re-check dedup AFTER the await — two concurrent broadcasts for the
+    // same message_id could both have passed the initial dedup check
+    // because `state.current` hadn't been mutated yet. Also re-check that
+    // the state + controller are still alive (the screen may have been
+    // closed while we awaited the cache-miss fetch). Ticket #28.
+    if (state.controller.isClosed) return;
+    if (state.current.any((m) => m.messageId == messageId)) return;
 
     state.current = [...state.current, dto];
     if (!state.controller.isClosed) {

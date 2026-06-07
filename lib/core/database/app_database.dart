@@ -24,7 +24,16 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) => m.createAll(),
+        onCreate: (m) async {
+          // Fresh install — drift creates all tables declared on
+          // @DriftDatabase. createAll() does NOT process raw
+          // `CREATE INDEX` statements, so the hot-path indexes must be
+          // created explicitly here too (ticket #28). Without this call,
+          // every new install runs the inbox sort + thread paging without
+          // an index — every fresh user pays the full-scan cost forever.
+          await m.createAll();
+          await _createMessagesIndexes(m);
+        },
         onUpgrade: (m, from, to) async {
           if (from < 5) {
             // Drop every offline-first table that may still exist on devices
@@ -60,21 +69,40 @@ class AppDatabase extends _$AppDatabase {
             await m.database
                 .customStatement('DROP TABLE IF EXISTS messages_drafts');
 
+            // Partial-rerun safety (ticket #28). The createTable calls
+            // below are not wrapped in an explicit transaction; if the
+            // process is killed mid-migration `schemaVersion` stays at 5
+            // and this block re-runs on next launch. Dropping the new
+            // names here too means any orphan half-created table from a
+            // prior partial run gets cleared. No-op on a clean upgrade.
+            await m.database.customStatement('DROP TABLE IF EXISTS chats');
+            await m.database.customStatement('DROP TABLE IF EXISTS messages');
+            await m.database
+                .customStatement('DROP TABLE IF EXISTS message_drafts');
+
             // Messages cache + drafts (ticket #23).
             await m.createTable(chats);
             await m.createTable(messages);
             await m.createTable(messageDrafts);
-            await m.database.customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_chats_last_message_at '
-              'ON chats (last_message_at DESC)',
-            );
-            await m.database.customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_messages_chat_created '
-              'ON messages (chat_id, created_at DESC)',
-            );
+            await _createMessagesIndexes(m);
           }
         },
       );
+
+  /// Hot-path indexes for the messages cache. Called from BOTH `onCreate`
+  /// (fresh install) and `onUpgrade(from < 6)` because `m.createAll()` does
+  /// not process raw index statements — fresh installs would otherwise miss
+  /// them and pay full-scan cost on every inbox / thread query (ticket #28).
+  Future<void> _createMessagesIndexes(Migrator m) async {
+    await m.database.customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_chats_last_message_at '
+      'ON chats (last_message_at DESC)',
+    );
+    await m.database.customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_messages_chat_created '
+      'ON messages (chat_id, created_at DESC)',
+    );
+  }
 
   /// Wipe local drift state on sign-out so a different user on the same
   /// device never sees the previous user's data. Covers all messages cache

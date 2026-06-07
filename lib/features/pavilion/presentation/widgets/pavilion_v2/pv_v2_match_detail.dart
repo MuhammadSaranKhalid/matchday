@@ -46,8 +46,11 @@ class PvMatchDetail extends StatelessWidget {
             ? (m.sub, '${m.when} · ${m.venue}')
             : (m.when, m.venue);
 
-    // Only actions with a real backend/route survive (message / reschedule /
-    // cancel / share are dropped — no backend).
+    // Sticky footer — phase-aware. Mirrors the design's `footer` array
+    // (`pavilion-matches-v2.jsx:169-182`). Actions without a real
+    // backend (message / reschedule / cancel / share) are still rendered for
+    // design fidelity; their handlers in `pavilion_match_detail_screen.dart`
+    // surface a "Coming soon" SnackBar.
     final footer = <_FooterAction>[
       if (live)
         const _FooterAction('resume', 'Resume scoring',
@@ -55,20 +58,24 @@ class PvMatchDetail extends StatelessWidget {
       else if (m.phase == PvPhase.startsSoon) ...[
         if (m.lineupSet == false)
           const _FooterAction('lineup', 'Set lineup', icon: PvIcons.users),
-        const _FooterAction('start', 'Start match', primary: true, icon: PvIcons.play),
-      ] else if (m.phase == PvPhase.scheduled)
+        const _FooterAction('start', 'Start match',
+            primary: true, icon: PvIcons.play),
+      ] else if (m.phase == PvPhase.scheduled) ...[
+        const _FooterAction('reschedule', 'Reschedule', icon: PvIcons.cal),
         _FooterAction(
           m.lineupSet == false ? 'lineup' : 'viewlineup',
           m.lineupSet == false ? 'Set lineup' : 'View lineup',
           primary: true,
           icon: PvIcons.users,
-        )
-      else if (awaiting)
+        ),
+      ] else if (awaiting)
         const _FooterAction('withdraw', 'Withdraw challenge',
             primary: true, icon: PvIcons.close, danger: true)
-      else if (done)
+      else if (done) ...[
+        const _FooterAction('share', 'Share', icon: PvIcons.share),
         const _FooterAction('scorecard', 'View scorecard',
             primary: true, icon: PvIcons.ticket),
+      ],
     ];
 
     return ColoredBox(
@@ -101,6 +108,9 @@ class PvMatchDetail extends StatelessWidget {
                     const _DetailSectionH('Head to head'),
                     _headToHead(),
                   ],
+                  // Manage rows — design `pavilion-matches-v2.jsx:184-190`.
+                  // Hidden for completed / awaiting-reply.
+                  if (!done && !awaiting) ..._manageSection(),
                   const SizedBox(height: 8),
                 ],
               ),
@@ -158,57 +168,87 @@ class PvMatchDetail extends StatelessWidget {
     final (label, tone, isLive) = pvPhaseConf(m.phase);
     return Container(
       margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: live ? CkColors.ink : CkColors.paper2,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: Column(
+      child: Stack(
         children: [
-          Center(child: PvPill(label, tone: tone, live: isLive)),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _heroSide(m.me, 'you · ${m.role}', live: live, fg: fg, mutedFg: mutedFg),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: PvIcon(PvIcons.swords,
-                    size: 20,
-                    color: live ? Colors.white.withValues(alpha: 0.5) : CkColors.muted,
-                    sw: 2),
-              ),
-              _heroSide(m.them, 'opponent', live: live, fg: fg, mutedFg: mutedFg),
-            ],
-          ),
-          Container(
-            margin: const EdgeInsets.only(top: 16),
-            padding: const EdgeInsets.only(top: 14),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                    color: live ? Colors.white.withValues(alpha: 0.14) : CkColors.hairline),
+          // Decorative cricket-ground ellipses, live state only.
+          // Design `pavilion-matches-v2.jsx:208`.
+          if (live)
+            const Positioned(
+              right: -80,
+              top: -70,
+              width: 200,
+              height: 200,
+              child: IgnorePointer(
+                child: CustomPaint(painter: _HeroEllipsePainter()),
               ),
             ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
             child: Column(
               children: [
-                Text(
-                  headline,
-                  textAlign: TextAlign.center,
-                  style: (live || done)
-                      ? CkType.mono(
-                          fontSize: live ? 26 : 18,
-                          fontWeight: FontWeight.w700,
-                          color: fg)
-                      : CkType.display(
-                          fontSize: 18, fontWeight: FontWeight.w700, color: fg),
+                Center(child: PvPill(label, tone: tone, live: isLive)),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _heroSide(m.me, 'you · ${m.role}',
+                        live: live, fg: fg, mutedFg: mutedFg),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: PvIcon(PvIcons.swords,
+                          size: 20,
+                          color: live
+                              ? Colors.white.withValues(alpha: 0.5)
+                              : CkColors.muted,
+                          sw: 2),
+                    ),
+                    _heroSide(m.them, 'opponent',
+                        live: live, fg: fg, mutedFg: mutedFg),
+                  ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: Text(subline,
-                      textAlign: TextAlign.center,
-                      style: CkType.body(
-                          fontSize: 12,
-                          color: live ? Colors.white.withValues(alpha: 0.7) : CkColors.muted)),
+                Container(
+                  margin: const EdgeInsets.only(top: 16),
+                  padding: const EdgeInsets.only(top: 14),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                          color: live
+                              ? Colors.white.withValues(alpha: 0.14)
+                              : CkColors.hairline),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        headline,
+                        textAlign: TextAlign.center,
+                        style: (live || done)
+                            ? CkType.mono(
+                                fontSize: live ? 26 : 18,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.01,
+                                color: fg)
+                            : CkType.display(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: fg),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text(subline,
+                            textAlign: TextAlign.center,
+                            style: CkType.body(
+                                fontSize: 12,
+                                color: live
+                                    ? Colors.white.withValues(alpha: 0.7)
+                                    : CkColors.muted)),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -419,6 +459,73 @@ class PvMatchDetail extends StatelessWidget {
         ),
       );
 
+  // ── manage rows — design `pavilion-matches-v2.jsx:283-297` ──
+  // Tappable card of stacked rows. Row visibility depends on phase + role.
+  List<Widget> _manageSection() {
+    final captain = m.role == 'captain' || m.role == 'owner';
+    final live = m.phase == PvPhase.live;
+    final rows = <(String action, String label, String icon, bool danger)>[
+      ('message', 'Message opponent', PvIcons.msg, false),
+      if (!live) ('reschedule', 'Propose a new time', PvIcons.cal, false),
+      if (!live && captain)
+        ('cancel', 'Cancel match', PvIcons.close, true),
+    ];
+    if (rows.isEmpty) return const [];
+    return [
+      const _DetailSectionH('Manage'),
+      Container(
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: CkColors.hairline),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < rows.length; i++)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onAction(m.id, rows[i].$1),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: i == 0
+                          ? BorderSide.none
+                          : const BorderSide(color: CkColors.hairline),
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      PvIcon(rows[i].$3,
+                          size: 16,
+                          color: rows[i].$4 ? CkColors.red : CkColors.ink2,
+                          sw: 1.8),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          rows[i].$2,
+                          style: CkType.body(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                              color:
+                                  rows[i].$4 ? CkColors.red : CkColors.ink),
+                        ),
+                      ),
+                      const PvIcon(PvIcons.next,
+                          size: 14, color: CkColors.soft, sw: 2),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ];
+  }
+
   Widget _footerButton(_FooterAction f) {
     final fg = f.primary ? CkColors.paper : (f.danger ? CkColors.red : CkColors.ink);
     final bg = f.primary ? (f.danger ? CkColors.red : CkColors.ink) : CkColors.paper;
@@ -476,6 +583,34 @@ class _DetailSectionH extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Decorative cricket-ground motif drawn behind the live-match hero. Two
+/// concentric ellipses (boundary + inner ring) in white at 8% opacity.
+/// Design `pavilion-matches-v2.jsx:208` — an inline SVG, ported here as
+/// CustomPaint so it costs nothing at runtime.
+class _HeroEllipsePainter extends CustomPainter {
+  const _HeroEllipsePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.08)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    final center = Offset(size.width / 2, size.height / 2);
+    canvas.drawOval(
+      Rect.fromCenter(center: center, width: 180, height: 112),
+      paint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(center: center, width: 100, height: 60),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
 class _KvCard extends StatelessWidget {

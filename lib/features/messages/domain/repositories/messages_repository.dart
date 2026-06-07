@@ -34,7 +34,7 @@ abstract class MessagesRepository {
   // ─── Drafts (local-only; ticket #23) ──────────────────────────────────
   //
   // Compose-state persistence so a killed app can restore a half-typed
-  // message. Backed by drift (`messages_drafts`); never touches the
+  // message. Backed by drift (`message_drafts`); never touches the
   // network. No `Either` wrapping — drafts are best-effort and a lost
   // draft is a minor annoyance, not an error to surface.
 

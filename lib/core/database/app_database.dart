@@ -5,7 +5,7 @@ import 'tables.dart';
 part 'app_database.g.dart';
 
 @DriftDatabase(
-  tables: [WizardDrafts, MessagesChats, MessagesMessages, MessagesDrafts],
+  tables: [WizardDrafts, Chats, Messages, MessageDrafts],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -15,9 +15,10 @@ class AppDatabase extends _$AppDatabase {
   ///   `teams`, `team_members`, `unclaimed_players`) that have since been
   ///   removed.
   /// - v5: online-only reset; keeps only `wizard_drafts`.
-  /// - v6: messages read-through cache + drafts (ticket #23). Adds
-  ///   `messages_chats`, `messages_messages`, `messages_drafts`. Scoped to
-  ///   the messages feature only — other features remain online-only.
+  /// - v6: messages read-through cache + drafts (ticket #23). Adds `chats`,
+  ///   `messages`, `message_drafts`. Names mirror the Supabase schema 1:1.
+  ///   Scoped to the messages feature only — other features remain
+  ///   online-only.
   @override
   int get schemaVersion => 6;
 
@@ -46,17 +47,30 @@ class AppDatabase extends _$AppDatabase {
             }
           }
           if (from < 6) {
+            // The first iteration of v6 (PR #26 pre-rename) used
+            // `messages_chats` / `messages_messages` / `messages_drafts`.
+            // Drop them if they exist so a tester device that pulled the
+            // earlier commit gets the new names cleanly. Production users
+            // coming from v5 don't have these — DROP IF EXISTS is a no-op
+            // for them.
+            await m.database
+                .customStatement('DROP TABLE IF EXISTS messages_chats');
+            await m.database
+                .customStatement('DROP TABLE IF EXISTS messages_messages');
+            await m.database
+                .customStatement('DROP TABLE IF EXISTS messages_drafts');
+
             // Messages cache + drafts (ticket #23).
-            await m.createTable(messagesChats);
-            await m.createTable(messagesMessages);
-            await m.createTable(messagesDrafts);
+            await m.createTable(chats);
+            await m.createTable(messages);
+            await m.createTable(messageDrafts);
             await m.database.customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_messages_chats_last_message_at '
-              'ON messages_chats (last_message_at DESC)',
+              'CREATE INDEX IF NOT EXISTS idx_chats_last_message_at '
+              'ON chats (last_message_at DESC)',
             );
             await m.database.customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_messages_messages_chat_created '
-              'ON messages_messages (chat_id, created_at DESC)',
+              'CREATE INDEX IF NOT EXISTS idx_messages_chat_created '
+              'ON messages (chat_id, created_at DESC)',
             );
           }
         },
@@ -68,9 +82,9 @@ class AppDatabase extends _$AppDatabase {
   Future<void> clear() async {
     await batch((b) {
       b.deleteAll(wizardDrafts);
-      b.deleteAll(messagesChats);
-      b.deleteAll(messagesMessages);
-      b.deleteAll(messagesDrafts);
+      b.deleteAll(chats);
+      b.deleteAll(messages);
+      b.deleteAll(messageDrafts);
     });
   }
 }

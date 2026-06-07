@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/supabase/current_user_x.dart';
 import '../models/chat_dto.dart';
 import '../models/message_dto.dart';
 import 'messages_local_datasource.dart';
@@ -33,12 +34,6 @@ class MessagesRemoteDataSource {
 
   // ─── Per-thread state (keyed by chatId) ───────────────────────────────
   final Map<String, _ThreadState> _threads = {};
-
-  String _requireUid() {
-    final id = _supabase.auth.currentUser?.id;
-    if (id == null) throw UnauthorizedException('Must be signed in');
-    return id;
-  }
 
   // ═══════════════════════════════════════════════════════════════════════
   // Inbox
@@ -71,7 +66,7 @@ class MessagesRemoteDataSource {
   /// re-fetch + bulk cache replace as a sync point — Supabase realtime is
   /// at-most-once, so events fired during disconnect would otherwise be lost.
   Stream<List<ChatDto>> watchMyChats() async* {
-    final uid = _requireUid();
+    final uid = _supabase.requireUid();
 
     final initial = await listMyChats();
     _inboxCurrent = initial;
@@ -259,7 +254,7 @@ class MessagesRemoteDataSource {
 
   /// One-shot list of all non-deleted messages in a chat, oldest first.
   Future<List<MessageDto>> listMessages(String chatId) async {
-    final uid = _requireUid();
+    final uid = _supabase.requireUid();
     try {
       final rows = await _supabase
           .from(_messages)
@@ -283,7 +278,7 @@ class MessagesRemoteDataSource {
   ///
   /// On reconnect, full re-fetch + bulk cache replace as a sync point.
   Stream<List<MessageDto>> watchMessages(String chatId) async* {
-    final uid = _requireUid();
+    final uid = _supabase.requireUid();
 
     final initial = await listMessages(chatId);
 
@@ -432,7 +427,7 @@ class MessagesRemoteDataSource {
     required String chatId,
     required String body,
   }) async {
-    final uid = _requireUid();
+    final uid = _supabase.requireUid();
     try {
       final row = await _supabase
           .from(_messages)
@@ -473,7 +468,7 @@ class MessagesRemoteDataSource {
   /// cache locally so the unread badge clears without waiting for any
   /// broadcast (there isn't one for read-marker changes).
   Future<void> markRead(String chatId) async {
-    final uid = _requireUid();
+    final uid = _supabase.requireUid();
     try {
       await _supabase
           .from(_chatMembers)

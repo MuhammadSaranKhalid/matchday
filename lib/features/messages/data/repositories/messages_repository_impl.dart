@@ -37,7 +37,11 @@ class MessagesRepositoryImpl implements MessagesRepository {
     yield* _remote
         .watchMyChats()
         .map((dtos) => dtos.map((d) => d.toEntity()).toList(growable: false))
-        .handleError(_throwAsFailure);
+        .handleError((Object e) => throw FailureWrapper(switch (e) {
+              UnauthorizedException() => AuthFailure(e.message),
+              ServerException() => ServerFailure(e.message),
+              _ => UnknownFailure(e.toString()),
+            }));
   }
 
   @override
@@ -48,7 +52,11 @@ class MessagesRepositoryImpl implements MessagesRepository {
     yield* _remote
         .watchMessages(chatId.value)
         .map((dtos) => dtos.map((d) => d.toEntity()).toList(growable: false))
-        .handleError(_throwAsFailure);
+        .handleError((Object e) => throw FailureWrapper(switch (e) {
+              UnauthorizedException() => AuthFailure(e.message),
+              ServerException() => ServerFailure(e.message),
+              _ => UnknownFailure(e.toString()),
+            }));
   }
 
   // ─── Writes ───────────────────────────────────────────────────────────
@@ -103,16 +111,4 @@ class MessagesRepositoryImpl implements MessagesRepository {
   @override
   Future<void> deleteDraft(ChatId chatId) =>
       _local.deleteDraft(chatId.value);
-
-  // ─── Helpers ──────────────────────────────────────────────────────────
-
-  static Never _throwAsFailure(Object e) {
-    if (e is UnauthorizedException) {
-      throw FailureWrapper(AuthFailure(e.message));
-    }
-    if (e is ServerException) {
-      throw FailureWrapper(ServerFailure(e.message));
-    }
-    throw FailureWrapper(UnknownFailure(e.toString()));
-  }
 }

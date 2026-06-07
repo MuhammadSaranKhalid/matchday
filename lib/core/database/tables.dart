@@ -26,14 +26,16 @@ class WizardDrafts extends Table {
 // pending-ops queue, NO sync service, NO LWW. Sign-out wipes everything via
 // AppDatabase.clear().
 //
-// Other features (teams / posts / matches / pavilion / profile) remain
-// online-only. Promote this pattern only if a feature genuinely benefits.
+// Naming mirrors the Supabase schema 1:1 (`chats`, `messages`,
+// `message_drafts`) so the mental model "local row N is the cached counterpart
+// of remote row N" is immediate. Other features (teams / posts / matches /
+// pavilion / profile) remain online-only.
 
 /// Inbox row mirror. Denormalised — the columns track the shape returned by
 /// the `list-my-chats` edge function so a single SELECT can paint the inbox
 /// without joins.
-@DataClassName('MessagesChatRow')
-class MessagesChats extends Table {
+@DataClassName('ChatRow')
+class Chats extends Table {
   TextColumn get chatId => text()();
   TextColumn get type => text()();
   TextColumn get teamId => text().nullable()();
@@ -58,8 +60,8 @@ class MessagesChats extends Table {
 /// Thread message mirror. `senderDisplayName` is the joined value from the
 /// `profiles` table at the time the message was cached; rare display-name
 /// updates may go stale until the next thread re-fetch.
-@DataClassName('MessagesMessageRow')
-class MessagesMessages extends Table {
+@DataClassName('MessageRow')
+class Messages extends Table {
   TextColumn get messageId => text()();
   TextColumn get chatId => text()();
   TextColumn get senderId => text().nullable()();
@@ -76,8 +78,8 @@ class MessagesMessages extends Table {
 
 /// One draft per chat. Persists the composer's current text so a killed app
 /// can resume mid-message.
-@DataClassName('MessagesDraftRow')
-class MessagesDrafts extends Table {
+@DataClassName('MessageDraftRow')
+class MessageDrafts extends Table {
   TextColumn get chatId => text()();
   TextColumn get body => text()();
   DateTimeColumn get updatedAt => dateTime()();

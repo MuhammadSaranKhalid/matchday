@@ -24,7 +24,7 @@ class MessagesLocalDataSource {
   /// All cached chats, sorted by `last_message_at` desc nulls last to match
   /// the inbox query in the `list-my-chats` edge function.
   Future<List<Chat>> listChats() async {
-    final rows = await (_db.select(_db.messagesChats)
+    final rows = await (_db.select(_db.chats)
           ..orderBy([
             (t) => OrderingTerm(
                   expression: t.lastMessageAt,
@@ -38,7 +38,7 @@ class MessagesLocalDataSource {
 
   /// Upsert a single chat. Used by the realtime `chat_updated` patcher.
   Future<void> upsertChat(Chat chat) async {
-    await _db.into(_db.messagesChats).insertOnConflictUpdate(_chatRow(chat));
+    await _db.into(_db.chats).insertOnConflictUpdate(_chatRow(chat));
   }
 
   /// Bulk upsert. Used after a full network fetch returns the inbox.
@@ -47,7 +47,7 @@ class MessagesLocalDataSource {
     await _db.batch((b) {
       for (final c in chats) {
         b.insert(
-          _db.messagesChats,
+          _db.chats,
           _chatRow(c),
           mode: InsertMode.insertOrReplace,
         );
@@ -59,11 +59,11 @@ class MessagesLocalDataSource {
   /// point) so chats that no longer apply to the user are dropped cleanly.
   Future<void> replaceChats(List<Chat> chats) async {
     await _db.transaction(() async {
-      await _db.delete(_db.messagesChats).go();
+      await _db.delete(_db.chats).go();
       if (chats.isEmpty) return;
       await _db.batch((b) {
         for (final c in chats) {
-          b.insert(_db.messagesChats, _chatRow(c));
+          b.insert(_db.chats, _chatRow(c));
         }
       });
     });
@@ -75,7 +75,7 @@ class MessagesLocalDataSource {
   /// stay in the table (the column tracks them) but are filtered here so the
   /// repository never sees them.
   Future<List<Message>> listMessages(String chatId) async {
-    final rows = await (_db.select(_db.messagesMessages)
+    final rows = await (_db.select(_db.messages)
           ..where((t) =>
               t.chatId.equals(chatId) & t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
@@ -85,7 +85,7 @@ class MessagesLocalDataSource {
 
   Future<void> upsertMessage(Message msg) async {
     await _db
-        .into(_db.messagesMessages)
+        .into(_db.messages)
         .insertOnConflictUpdate(_messageRow(msg));
   }
 
@@ -94,7 +94,7 @@ class MessagesLocalDataSource {
     await _db.batch((b) {
       for (final m in msgs) {
         b.insert(
-          _db.messagesMessages,
+          _db.messages,
           _messageRow(m),
           mode: InsertMode.insertOrReplace,
         );
@@ -105,13 +105,13 @@ class MessagesLocalDataSource {
   /// Wipe and bulk-insert for one chat. Used on per-thread reconnect.
   Future<void> replaceMessages(String chatId, List<Message> msgs) async {
     await _db.transaction(() async {
-      await (_db.delete(_db.messagesMessages)
+      await (_db.delete(_db.messages)
             ..where((t) => t.chatId.equals(chatId)))
           .go();
       if (msgs.isEmpty) return;
       await _db.batch((b) {
         for (final m in msgs) {
-          b.insert(_db.messagesMessages, _messageRow(m));
+          b.insert(_db.messages, _messageRow(m));
         }
       });
     });
@@ -121,15 +121,15 @@ class MessagesLocalDataSource {
 
   /// Read the persisted composer text for a chat, or null when no draft.
   Future<String?> readDraft(String chatId) async {
-    final row = await (_db.select(_db.messagesDrafts)
+    final row = await (_db.select(_db.messageDrafts)
           ..where((t) => t.chatId.equals(chatId)))
         .getSingleOrNull();
     return row?.body;
   }
 
   Future<void> saveDraft(String chatId, String body) async {
-    await _db.into(_db.messagesDrafts).insertOnConflictUpdate(
-          MessagesDraftsCompanion.insert(
+    await _db.into(_db.messageDrafts).insertOnConflictUpdate(
+          MessageDraftsCompanion.insert(
             chatId: chatId,
             body: body,
             updatedAt: DateTime.now().toUtc(),
@@ -138,14 +138,14 @@ class MessagesLocalDataSource {
   }
 
   Future<void> deleteDraft(String chatId) async {
-    await (_db.delete(_db.messagesDrafts)
+    await (_db.delete(_db.messageDrafts)
           ..where((t) => t.chatId.equals(chatId)))
         .go();
   }
 
   // ─── Mappers (drift row ↔ entity) ───────────────────────────────────────
 
-  Chat _chatFromRow(MessagesChatRow r) => Chat(
+  Chat _chatFromRow(ChatRow r) => Chat(
         id: ChatId(r.chatId),
         kind: ChatKind.fromWire(r.type),
         name: r.teamName ?? '',
@@ -162,7 +162,7 @@ class MessagesLocalDataSource {
         teamPrimaryColorHex: r.teamPrimaryColorHex,
       );
 
-  MessagesChatsCompanion _chatRow(Chat c) => MessagesChatsCompanion.insert(
+  ChatsCompanion _chatRow(Chat c) => ChatsCompanion.insert(
         chatId: c.id.value,
         type: c.kind.wire,
         teamId: Value(c.teamId?.value),
@@ -180,7 +180,7 @@ class MessagesLocalDataSource {
         cachedAt: DateTime.now().toUtc(),
       );
 
-  Message _messageFromRow(MessagesMessageRow r) => Message(
+  Message _messageFromRow(MessageRow r) => Message(
         id: MessageId(r.messageId),
         chatId: ChatId(r.chatId),
         senderId: r.senderId,
@@ -192,8 +192,8 @@ class MessagesLocalDataSource {
         fromMe: r.fromMe,
       );
 
-  MessagesMessagesCompanion _messageRow(Message m) =>
-      MessagesMessagesCompanion.insert(
+  MessagesCompanion _messageRow(Message m) =>
+      MessagesCompanion.insert(
         messageId: m.id.value,
         chatId: m.chatId.value,
         senderId: Value(m.senderId),

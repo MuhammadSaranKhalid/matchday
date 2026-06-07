@@ -39,10 +39,14 @@ abstract class MessagesRepository {
   // draft is a minor annoyance, not an error to surface.
 
   /// Read the persisted composer text for a chat, or null when none exists.
+  /// Raw `String` — drafts ARE partial-by-definition; `MessageBody` would
+  /// reject valid draft states (empty / mid-word).
   Future<String?> readDraft(ChatId chatId);
 
   /// Persist the composer text for a chat. Caller debounces writes so a
-  /// burst of keystrokes doesn't hammer the disk.
+  /// burst of keystrokes doesn't hammer the disk. Raw `String` is
+  /// INTENTIONAL — drafts may be partial/invalid; this is not an oversight.
+  /// Do NOT apply `MessageBody.create` here or draft restore breaks.
   Future<void> saveDraft(ChatId chatId, String body);
 
   /// Drop the draft for a chat — typically after a successful send.

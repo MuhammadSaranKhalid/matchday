@@ -57,6 +57,10 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
         .read(messagesRepositoryProvider)
         .readDraft(ChatId(widget.chatId));
     if (!mounted || draft == null || draft.isEmpty) return;
+    // Don't clobber input the user typed between initState returning and
+    // this async resuming. Their fresh keystrokes always win over a
+    // restored draft.
+    if (_textController.text.isNotEmpty) return;
     _textController.text = draft;
     _textController.selection =
         TextSelection.collapsed(offset: draft.length);
@@ -160,27 +164,28 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
               onBack: () => Navigator.of(context).pop(),
             ),
             Expanded(
-              child: threadAsync.when(
-                loading: () => const Center(
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-                error: (e, _) => _ErrorBody(
-                  message:
-                      e is FailureWrapper ? e.failure.message : e.toString(),
-                  onRetry: () =>
-                      ref.invalidate(messageThreadProvider(widget.chatId)),
-                ),
-                data: (messages) => messages.isEmpty
+              child: switch (threadAsync) {
+                AsyncData(:final value) => value.isEmpty
                     ? const _EmptyBody()
                     : _Conversation(
-                        messages: messages,
+                        messages: value,
                         scroll: _scrollController,
                       ),
-              ),
+                AsyncError(:final error) => _ErrorBody(
+                    message: error is FailureWrapper
+                        ? error.failure.message
+                        : error.toString(),
+                    onRetry: () =>
+                        ref.invalidate(messageThreadProvider(widget.chatId)),
+                  ),
+                _ => const Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+              },
             ),
             _Composer(
               textController: _textController,

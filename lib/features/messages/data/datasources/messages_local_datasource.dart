@@ -57,15 +57,18 @@ class MessagesLocalDataSource {
 
   /// Wipe and bulk-insert. Used on channel re-subscribe (reconnect sync
   /// point) so chats that no longer apply to the user are dropped cleanly.
+  ///
+  /// Per-row inserts inside an explicit `transaction` — NOT a nested
+  /// `batch` inside the transaction. Drift's docs are ambiguous on
+  /// nested-batch semantics in 2.31; the per-row form is unambiguous and
+  /// still fast for ~50–100 chat inboxes (drift batches them under the
+  /// hood once the transaction commits).
   Future<void> replaceChats(List<Chat> chats) async {
     await _db.transaction(() async {
       await _db.delete(_db.chats).go();
-      if (chats.isEmpty) return;
-      await _db.batch((b) {
-        for (final c in chats) {
-          b.insert(_db.chats, _chatRow(c));
-        }
-      });
+      for (final c in chats) {
+        await _db.into(_db.chats).insertOnConflictUpdate(_chatRow(c));
+      }
     });
   }
 
@@ -103,17 +106,16 @@ class MessagesLocalDataSource {
   }
 
   /// Wipe and bulk-insert for one chat. Used on per-thread reconnect.
+  /// Per-row inserts inside the transaction — see `replaceChats` for the
+  /// rationale.
   Future<void> replaceMessages(String chatId, List<Message> msgs) async {
     await _db.transaction(() async {
       await (_db.delete(_db.messages)
             ..where((t) => t.chatId.equals(chatId)))
           .go();
-      if (msgs.isEmpty) return;
-      await _db.batch((b) {
-        for (final m in msgs) {
-          b.insert(_db.messages, _messageRow(m));
-        }
-      });
+      for (final m in msgs) {
+        await _db.into(_db.messages).insertOnConflictUpdate(_messageRow(m));
+      }
     });
   }
 

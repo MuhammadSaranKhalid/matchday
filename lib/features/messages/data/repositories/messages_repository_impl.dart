@@ -39,6 +39,7 @@ class MessagesRepositoryImpl implements MessagesRepository {
         .map((dtos) => dtos.map((d) => d.toEntity()).toList(growable: false))
         .handleError((Object e) => throw FailureWrapper(switch (e) {
               UnauthorizedException() => AuthFailure(e.message),
+              NetworkException() => NetworkFailure(e.message),
               ServerException() => ServerFailure(e.message),
               _ => UnknownFailure(e.toString()),
             }));
@@ -54,6 +55,7 @@ class MessagesRepositoryImpl implements MessagesRepository {
         .map((dtos) => dtos.map((d) => d.toEntity()).toList(growable: false))
         .handleError((Object e) => throw FailureWrapper(switch (e) {
               UnauthorizedException() => AuthFailure(e.message),
+              NetworkException() => NetworkFailure(e.message),
               ServerException() => ServerFailure(e.message),
               _ => UnknownFailure(e.toString()),
             }));
@@ -77,6 +79,8 @@ class MessagesRepositoryImpl implements MessagesRepository {
       return Right(dto.toEntity());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -91,6 +95,8 @@ class MessagesRepositoryImpl implements MessagesRepository {
       return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

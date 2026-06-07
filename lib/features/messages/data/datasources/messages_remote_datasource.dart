@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show SocketException;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -171,11 +172,17 @@ class MessagesRemoteDataSource {
         controller.add(List.unmodifiable(fresh));
       }
       _writeCacheBulkChats(fresh);
+    } on SocketException catch (e) {
+      _surfaceInboxError(NetworkException(e.message));
     } catch (e) {
-      final controller = _inboxController;
-      if (controller != null && !controller.isClosed) {
-        controller.addError(ServerException(e.toString()));
-      }
+      _surfaceInboxError(ServerException(e.toString()));
+    }
+  }
+
+  void _surfaceInboxError(Exception ex) {
+    final controller = _inboxController;
+    if (controller != null && !controller.isClosed) {
+      controller.addError(ex);
     }
   }
 
@@ -398,6 +405,11 @@ class MessagesRemoteDataSource {
         if (dto.senderId != null) {
           state.senderNames[dto.senderId!] = dto.senderDisplayName;
         }
+      } on SocketException catch (e) {
+        if (!state.controller.isClosed) {
+          state.controller.addError(NetworkException(e.message));
+        }
+        return;
       } catch (e) {
         if (!state.controller.isClosed) {
           state.controller.addError(ServerException(e.toString()));
@@ -437,6 +449,10 @@ class MessagesRemoteDataSource {
         state.controller.add(List.unmodifiable(fresh));
       }
       _writeCacheBulkMessages(chatId, fresh);
+    } on SocketException catch (e) {
+      if (!state.controller.isClosed) {
+        state.controller.addError(NetworkException(e.message));
+      }
     } catch (e) {
       if (!state.controller.isClosed) {
         state.controller.addError(ServerException(e.toString()));

@@ -18,6 +18,12 @@ part of 'message_thread_controller.dart';
 /// Family argument is a plain `String chatId` (Riverpod serialises args for
 /// the provider key; raw strings stringify cleanly). Internally we wrap in
 /// `ChatId(...)` before crossing the repository boundary.
+///
+/// `keepAlive: true`: backgrounding the app (or briefly removing the thread
+/// widget from the tree during a navigation) shouldn't drop the broadcast
+/// subscription. The family auto-disposes per chatId when no listener is
+/// ever attached for that id, so memory stays bounded — only chats the user
+/// actually opens hold a subscription, and they hold it for the session.
 
 @ProviderFor(MessageThread)
 final messageThreadProvider = MessageThreadFamily._();
@@ -32,6 +38,12 @@ final messageThreadProvider = MessageThreadFamily._();
 /// Family argument is a plain `String chatId` (Riverpod serialises args for
 /// the provider key; raw strings stringify cleanly). Internally we wrap in
 /// `ChatId(...)` before crossing the repository boundary.
+///
+/// `keepAlive: true`: backgrounding the app (or briefly removing the thread
+/// widget from the tree during a navigation) shouldn't drop the broadcast
+/// subscription. The family auto-disposes per chatId when no listener is
+/// ever attached for that id, so memory stays bounded — only chats the user
+/// actually opens hold a subscription, and they hold it for the session.
 final class MessageThreadProvider
     extends $StreamNotifierProvider<MessageThread, List<Message>> {
   /// Streams the messages in a chat and exposes the write actions.
@@ -44,13 +56,19 @@ final class MessageThreadProvider
   /// Family argument is a plain `String chatId` (Riverpod serialises args for
   /// the provider key; raw strings stringify cleanly). Internally we wrap in
   /// `ChatId(...)` before crossing the repository boundary.
+  ///
+  /// `keepAlive: true`: backgrounding the app (or briefly removing the thread
+  /// widget from the tree during a navigation) shouldn't drop the broadcast
+  /// subscription. The family auto-disposes per chatId when no listener is
+  /// ever attached for that id, so memory stays bounded — only chats the user
+  /// actually opens hold a subscription, and they hold it for the session.
   MessageThreadProvider._({
     required MessageThreadFamily super.from,
     required String super.argument,
   }) : super(
          retry: null,
          name: r'messageThreadProvider',
-         isAutoDispose: true,
+         isAutoDispose: false,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -80,7 +98,7 @@ final class MessageThreadProvider
   }
 }
 
-String _$messageThreadHash() => r'9e1cae77cd2430d2dcde0216fe4d4de89707898b';
+String _$messageThreadHash() => r'd44f8e072d629fd2560aa63e5fd5482aed0ea4e3';
 
 /// Streams the messages in a chat and exposes the write actions.
 ///
@@ -92,6 +110,12 @@ String _$messageThreadHash() => r'9e1cae77cd2430d2dcde0216fe4d4de89707898b';
 /// Family argument is a plain `String chatId` (Riverpod serialises args for
 /// the provider key; raw strings stringify cleanly). Internally we wrap in
 /// `ChatId(...)` before crossing the repository boundary.
+///
+/// `keepAlive: true`: backgrounding the app (or briefly removing the thread
+/// widget from the tree during a navigation) shouldn't drop the broadcast
+/// subscription. The family auto-disposes per chatId when no listener is
+/// ever attached for that id, so memory stays bounded — only chats the user
+/// actually opens hold a subscription, and they hold it for the session.
 
 final class MessageThreadFamily extends $Family
     with
@@ -108,7 +132,7 @@ final class MessageThreadFamily extends $Family
         name: r'messageThreadProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: true,
+        isAutoDispose: false,
       );
 
   /// Streams the messages in a chat and exposes the write actions.
@@ -121,6 +145,12 @@ final class MessageThreadFamily extends $Family
   /// Family argument is a plain `String chatId` (Riverpod serialises args for
   /// the provider key; raw strings stringify cleanly). Internally we wrap in
   /// `ChatId(...)` before crossing the repository boundary.
+  ///
+  /// `keepAlive: true`: backgrounding the app (or briefly removing the thread
+  /// widget from the tree during a navigation) shouldn't drop the broadcast
+  /// subscription. The family auto-disposes per chatId when no listener is
+  /// ever attached for that id, so memory stays bounded — only chats the user
+  /// actually opens hold a subscription, and they hold it for the session.
 
   MessageThreadProvider call(String chatId) =>
       MessageThreadProvider._(argument: chatId, from: this);
@@ -139,6 +169,12 @@ final class MessageThreadFamily extends $Family
 /// Family argument is a plain `String chatId` (Riverpod serialises args for
 /// the provider key; raw strings stringify cleanly). Internally we wrap in
 /// `ChatId(...)` before crossing the repository boundary.
+///
+/// `keepAlive: true`: backgrounding the app (or briefly removing the thread
+/// widget from the tree during a navigation) shouldn't drop the broadcast
+/// subscription. The family auto-disposes per chatId when no listener is
+/// ever attached for that id, so memory stays bounded — only chats the user
+/// actually opens hold a subscription, and they hold it for the session.
 
 abstract class _$MessageThread extends $StreamNotifier<List<Message>> {
   late final _$args = ref.$arg as String;

@@ -86,14 +86,11 @@ class _Loaded extends StatelessWidget {
       _InboxTab.teams => teamChats,
       _InboxTab.dms => dmChats,
     };
-    final activeCount = chats.where((c) => !c.isEmpty).length;
-    final unreadCount = chats.fold<int>(0, (a, c) => a + c.unreadCount);
 
     return Column(
       children: [
         V2Header(
           title: 'Messages',
-          sub: '$activeCount active · $unreadCount unread',
           onBell: onBell,
         ),
         _TabRow(
@@ -374,7 +371,7 @@ class _Skeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        V2Header(title: title, sub: '…', onBell: onBell),
+        V2Header(title: title, onBell: onBell),
         _TabRow(
           tab: tab,
           onChanged: onTabChanged,

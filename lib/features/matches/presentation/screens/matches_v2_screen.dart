@@ -53,13 +53,6 @@ enum _MatchTab { live, upcoming, recent, browse }
 class _MatchesV2ScreenState extends State<MatchesV2Screen> {
   _MatchTab _tab = _MatchTab.live;
 
-  String get _sub => switch (_tab) {
-    _MatchTab.live => '2 live · 5 today · across 1 tournament',
-    _MatchTab.upcoming => 'Next 14 days · 5 fixtures',
-    _MatchTab.recent => 'Last 30 days · 7 results',
-    _MatchTab.browse => 'Tournaments you can follow, play, or organize',
-  };
-
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
@@ -70,7 +63,6 @@ class _MatchesV2ScreenState extends State<MatchesV2Screen> {
           children: [
             V2Header(
               title: 'Matches',
-              sub: _sub,
               onBell: widget.onBell,
             ),
             _MatchTabs(

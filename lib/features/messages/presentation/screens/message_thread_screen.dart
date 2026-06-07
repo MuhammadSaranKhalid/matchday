@@ -31,6 +31,12 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
   bool _sending = false;
   String? _composerError;
 
+  /// One-shot guard so the initial scroll-to-bottom (ticket #33) only fires
+  /// on the first non-empty data emission for this screen mount. Realtime
+  /// updates after that point are NOT force-scrolled — a user reading
+  /// older messages shouldn't get yanked to the bottom on every broadcast.
+  bool _initialScrolled = false;
+
   /// Trailing debounce for draft autosave — fired 250ms after the last
   /// keystroke. Trade-off: the last ~250ms of typing is at risk if the OS
   /// kills the app inside that window. Acceptable for v1; a draft loss is
@@ -153,6 +159,21 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
   Widget build(BuildContext context) {
     final chat = _findChat();
     final threadAsync = ref.watch(messageThreadProvider(widget.chatId));
+
+    // First-paint scroll-to-bottom (ticket #33). Fires once per screen mount
+    // as soon as the thread has data — works whether the first emission is
+    // the local cache or the network value. `jumpTo` (not `animateTo`) so
+    // the user lands on the most recent message before they see anything;
+    // an animated scroll on initial open feels sluggish in chat UIs.
+    if (!_initialScrolled &&
+        threadAsync.hasValue &&
+        threadAsync.value!.isNotEmpty) {
+      _initialScrolled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      });
+    }
 
     return Scaffold(
       backgroundColor: CkColors.paper,

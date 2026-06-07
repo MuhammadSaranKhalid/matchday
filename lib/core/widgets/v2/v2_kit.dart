@@ -45,13 +45,25 @@ abstract final class CkInk {
 
 /// Inner SVG path data lifted verbatim from `v2-IA.jsx` (`ic` map + inline use).
 abstract final class V2Icons {
+  // Bottom-nav icons — match `matchday-challenge/Bottom Nav Options.html`.
+  // home  : roof + walls + door (cleaner than the old single-path house).
+  // matches: bat + ball (was a globe; the brief was explicit about a sport-
+  //          coded glyph for a cricket app).
+  // pavilion: shield with an inner star, on-brand for the "club" frame.
+  // messages: speech bubble with right-edge tail.
   static const home =
-      '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1v-9z"/>';
+      '<path d="M4 11l8-7 8 7"/>'
+      '<path d="M6 9.5V20h12V9.5"/>'
+      '<path d="M10 20v-5h4v5"/>';
   static const matches =
-      '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/>';
+      '<path d="M14.5 4.5a2 2 0 0 1 2.9 2.9l-8 8-2.9-2.9z"/>'
+      '<path d="M6.5 12.5 4 15l1.5 1.5L8 14"/>'
+      '<circle cx="17.5" cy="17.5" r="2.5"/>';
   static const pavilion =
-      '<path d="M3 9l9-5 9 5v2H3z"/><path d="M5 11v9M9 11v9M15 11v9M19 11v9M3 20h18"/>';
-  static const messages = '<path d="M4 5h16v11H8l-4 4z"/>';
+      '<path d="M12 3l7 3v5c0 4.2-3 7.4-7 8.5C8 18.4 5 15.2 5 11V6z"/>'
+      '<path d="M12 8.4l1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z" stroke-width="1.4"/>';
+  static const messages =
+      '<path d="M20 14a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>';
   static const bell =
       '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>';
   static const plus = '<path d="M12 5v14M5 12h14"/>';
@@ -364,8 +376,20 @@ class _Badge extends StatelessWidget {
 enum V2Tab { home, matches, pavilion, messages, profile }
 
 /// 5-tab bottom navigation — Home · Matches · Pavilion · Messages · You.
-/// Equal-weight tabs (Apple HIG): filled icon + ink when active, stroked +
-/// muted otherwise. The "You" tab is the avatar; Messages carries a count.
+///
+/// Implements the "Option B · Filled square tile" direction from
+/// `matchday-challenge/Bottom Nav Options.html` (the designer's recommended
+/// variant): inactive = soft outline glyph, active = white glyph reversed
+/// inside a red rounded-square tile. The "You" tab never gets a tile — it
+/// shows the user's avatar monogram with a double red ring when active.
+///
+/// Tokens taken verbatim from the design CSS:
+///   bar bg          surface (#fff)            hairline border top
+///   tile (active)   40×32  radius 11  red bg  21px white glyph
+///   tile (inactive) 40×32  transparent        23px soft glyph
+///   avatar         23×23 round  paper2 bg     active = 1.5px red border + 1.5px red spread shadow
+///   label          9.5px Inter  600 → 700     muted → ink on active
+///   tab gap (glyph→label) 5px   tab vertical padding 4px
 class V2BottomNav extends StatelessWidget {
   const V2BottomNav({
     super.key,
@@ -384,15 +408,15 @@ class V2BottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: CkColors.paper,
+        color: CkColors.surface,
         border: Border(top: BorderSide(color: CkColors.hairline)),
       ),
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+      padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
       child: SafeArea(
         top: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _navItem(V2Tab.home, 'Home', V2Icons.home),
             _navItem(V2Tab.matches, 'Matches', V2Icons.matches),
@@ -408,71 +432,96 @@ class V2BottomNav extends StatelessWidget {
 
   Widget _navItem(V2Tab id, String label, String? icon, {int? badge}) {
     final isActive = id == active;
-    final color = isActive ? CkColors.ink : CkColors.muted;
+
+    // The glyph area is one of two shapes:
+    //   • Avatar tab ("You"): 23×23 round avatar; active = double red ring.
+    //     Never wrapped in a tile (matches the design's special-case JS).
+    //   • Icon tabs: 40×32 rounded tile. Tile fill swaps transparent → red on
+    //     active; SVG inside resizes 23 → 21 and swaps soft → white.
+    final Widget glyph;
+    if (icon == null) {
+      glyph = AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 23,
+        height: 23,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: CkColors.paper2,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isActive ? CkColors.red : Colors.transparent,
+            width: 1.5,
+          ),
+          boxShadow: isActive
+              ? const [
+                  BoxShadow(
+                    color: CkColors.red,
+                    spreadRadius: 1.5,
+                    blurRadius: 0,
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          avatarMono,
+          style: CkType.display(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            color: CkColors.ink2,
+          ),
+        ),
+      );
+    } else {
+      glyph = AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 40,
+        height: 32,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isActive ? CkColors.red : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: V2Svg(
+          icon,
+          size: isActive ? 21 : 23,
+          color: isActive ? CkColors.surface : CkColors.soft,
+          strokeWidth: 2.0,
+        ),
+      );
+    }
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onSelect(id),
-      child: Container(
-        constraints: const BoxConstraints(minWidth: 56),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              height: 24,
+              height: 32,
               child: Stack(
                 clipBehavior: Clip.none,
                 alignment: Alignment.center,
                 children: [
-                  if (icon == null)
-                    Container(
-                      width: 22,
-                      height: 22,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: CkColors.ink,
-                        shape: BoxShape.circle,
-                        border: isActive
-                            ? Border.all(color: CkColors.ink, width: 2)
-                            : null,
-                      ),
-                      foregroundDecoration: isActive
-                          ? BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: CkColors.paper,
-                                width: 2,
-                              ),
-                            )
-                          : null,
-                      child: Text(
-                        avatarMono,
-                        style: CkType.display(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: CkColors.paper,
-                        ),
-                      ),
-                    )
-                  else
-                    V2Svg(icon, size: 24, color: color, filled: isActive),
+                  glyph,
                   if (badge != null && badge > 0)
                     Positioned(
-                      top: -3,
-                      right: -8,
+                      top: -2,
+                      right: 0,
                       child: _Badge(text: '$badge'),
                     ),
                 ],
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
             Text(
               label,
               style: CkType.body(
-                fontSize: 10.5,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                letterSpacing: -0.05,
-                color: color,
+                fontSize: 9.5,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                letterSpacing: 0.01,
+                color: isActive ? CkColors.ink : CkColors.muted,
               ),
             ),
           ],

@@ -8,6 +8,7 @@ import 'package:novex_clean_arch/core/theme/circk_theme.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
 import 'package:novex_clean_arch/features/messages/domain/entities/chat.dart';
 import 'package:novex_clean_arch/features/messages/presentation/providers/messages_providers.dart';
+import 'package:novex_clean_arch/features/messages/presentation/widgets/color_utils.dart';
 
 /// V1 inbox tabs. The schema only has team chats — DMs is permanently 0
 /// until `chat_type` grows a `'dm'` value (tracked in ticket #7's follow-ups).
@@ -252,7 +253,7 @@ class _ThreadRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final unread = chat.unreadCount > 0;
     final mono = chat.teamLogoMonogram?.toUpperCase() ?? _deriveMono(chat.name);
-    final color = _parseHexColor(chat.teamPrimaryColorHex, CkColors.ink);
+    final color = parseHexColor(chat.teamPrimaryColorHex, CkColors.ink);
     final time = chat.lastMessageAt == null
         ? ''
         : timeago.format(chat.lastMessageAt!, locale: 'en_short');
@@ -488,19 +489,6 @@ class _ErrorView extends StatelessWidget {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/// Hex string ("#RRGGBB", "RRGGBB", "RRGGBBAA") → Color, with [fallback]
-/// returned for any null/empty/malformed input. The teams schema stores
-/// `team_colors->>'primary'` as a free-text hex so input is untrusted.
-Color _parseHexColor(String? hex, Color fallback) {
-  if (hex == null || hex.isEmpty) return fallback;
-  var s = hex.trim();
-  if (s.startsWith('#')) s = s.substring(1);
-  if (s.length == 6) s = 'FF$s';
-  if (s.length != 8) return fallback;
-  final v = int.tryParse(s, radix: 16);
-  return v == null ? fallback : Color(v);
-}
 
 /// Derive a 1–2 letter monogram from a team name when `logo_monogram` is
 /// null. Mirrors the "AB" convention used elsewhere in the kit: first letter

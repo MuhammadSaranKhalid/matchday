@@ -10,6 +10,7 @@ import 'package:novex_clean_arch/features/messages/domain/entities/chat.dart';
 import 'package:novex_clean_arch/features/messages/domain/entities/message.dart';
 import 'package:novex_clean_arch/features/messages/presentation/controllers/message_thread_controller.dart';
 import 'package:novex_clean_arch/features/messages/presentation/providers/messages_providers.dart';
+import 'package:novex_clean_arch/features/messages/presentation/widgets/color_utils.dart';
 
 class MessageThreadScreen extends ConsumerStatefulWidget {
   const MessageThreadScreen({super.key, required this.chatId});
@@ -49,19 +50,30 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
 
   /// Find this chat in the inbox so the header has a name + crest. Falls
   /// back to a generic header while the inbox is still loading.
+  ///
+  /// `.select` narrows the watch to a single chat — the thread only
+  /// rebuilds when its own header fields change, not when ANY chat in the
+  /// inbox emits (e.g. an unread tick in some other chat). Dart 3 `switch`
+  /// pattern matching on `AsyncValue` matches the convention used in every
+  /// other screen (CLAUDE.md §6.2).
   Chat? _findChat() {
-    final chatsAsync = ref.watch(myChatsProvider);
-    return chatsAsync.maybeWhen(
-      data: (chats) => chats
-          .where((c) => c.id.value == widget.chatId)
-          .cast<Chat?>()
-          .firstOrNull,
-      orElse: () => null,
-    );
+    return ref.watch(myChatsProvider.select((async) {
+      return switch (async) {
+        AsyncData(:final value) =>
+          value.where((c) => c.id.value == widget.chatId).firstOrNull,
+        _ => null,
+      };
+    }));
   }
 
   Future<void> _send() async {
     final text = _textController.text;
+    // UX shortcut — when the field is visually blank or a send is already
+    // in flight, skip the controller call entirely. `MessageBody.create`
+    // also rejects empty strings (the canonical validation lives there) —
+    // this guard just keeps us from issuing a no-op network round-trip
+    // and from racing two sends. Don't add a length check here; that
+    // belongs in MessageBody so the rule stays in one place.
     if (text.trim().isEmpty || _sending) return;
     setState(() {
       _sending = true;
@@ -158,7 +170,7 @@ class _ThreadHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = chat?.name ?? '…';
     final mono = chat?.teamLogoMonogram?.toUpperCase() ?? '?';
-    final color = _parseHexColor(chat?.teamPrimaryColorHex, CkColors.ink);
+    final color = parseHexColor(chat?.teamPrimaryColorHex, CkColors.ink);
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
       decoration: const BoxDecoration(
@@ -520,14 +532,3 @@ class _ErrorBody extends StatelessWidget {
   }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-Color _parseHexColor(String? hex, Color fallback) {
-  if (hex == null || hex.isEmpty) return fallback;
-  var s = hex.trim();
-  if (s.startsWith('#')) s = s.substring(1);
-  if (s.length == 6) s = 'FF$s';
-  if (s.length != 8) return fallback;
-  final v = int.tryParse(s, radix: 16);
-  return v == null ? fallback : Color(v);
-}

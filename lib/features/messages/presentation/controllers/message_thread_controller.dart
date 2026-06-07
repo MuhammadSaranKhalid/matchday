@@ -19,7 +19,13 @@ part 'message_thread_controller.g.dart';
 /// Family argument is a plain `String chatId` (Riverpod serialises args for
 /// the provider key; raw strings stringify cleanly). Internally we wrap in
 /// `ChatId(...)` before crossing the repository boundary.
-@riverpod
+///
+/// `keepAlive: true`: backgrounding the app (or briefly removing the thread
+/// widget from the tree during a navigation) shouldn't drop the broadcast
+/// subscription. The family auto-disposes per chatId when no listener is
+/// ever attached for that id, so memory stays bounded — only chats the user
+/// actually opens hold a subscription, and they hold it for the session.
+@Riverpod(keepAlive: true)
 class MessageThread extends _$MessageThread {
   @override
   Stream<List<Message>> build(String chatId) =>

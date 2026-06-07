@@ -119,12 +119,19 @@ Deno.serve(async (req) => {
         lm.body as last_message_body,
         lm.sender_id as last_message_sender_id,
         (lm.sender_id is not distinct from ${actor})::boolean as last_message_from_me,
+        -- Bounded scan via inner LIMIT 100 — when a user hasn't opened a
+        -- busy chat the unread count would otherwise scan thousands of
+        -- rows. Capping at 100 + the outer client treating 100 as "99+"
+        -- keeps the worst case O(1) per chat.
         (
-          select count(*)::int from messages m
-           where m.chat_id = c.chat_id
-             and m.created_at > coalesce(cm.last_read_at, 'epoch'::timestamptz)
-             and m.sender_id is distinct from ${actor}
-             and m.deleted_at is null
+          select count(*)::int from (
+            select 1 from messages m
+             where m.chat_id = c.chat_id
+               and m.created_at > coalesce(cm.last_read_at, 'epoch'::timestamptz)
+               and m.sender_id is distinct from ${actor}
+               and m.deleted_at is null
+             limit 100
+          ) capped
         ) as unread_count
       from chats c
       join chat_members cm
@@ -133,7 +140,7 @@ Deno.serve(async (req) => {
        and cm.left_at is null
       left join teams t on t.team_id = c.team_id
       left join lateral (
-        select m.body, m.sender_id, m.created_at
+        select m.body, m.sender_id
           from messages m
          where m.chat_id = c.chat_id
            and m.deleted_at is null

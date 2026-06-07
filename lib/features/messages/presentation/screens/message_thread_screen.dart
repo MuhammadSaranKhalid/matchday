@@ -31,12 +31,6 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
   bool _sending = false;
   String? _composerError;
 
-  /// One-shot guard so the initial scroll-to-bottom (ticket #33) only fires
-  /// on the first non-empty data emission for this screen mount. Realtime
-  /// updates after that point are NOT force-scrolled — a user reading
-  /// older messages shouldn't get yanked to the bottom on every broadcast.
-  bool _initialScrolled = false;
-
   /// Trailing debounce for draft autosave — fired 250ms after the last
   /// keystroke. Trade-off: the last ~250ms of typing is at risk if the OS
   /// kills the app inside that window. Acceptable for v1; a draft loss is
@@ -144,8 +138,10 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
         _composerFocus.requestFocus();
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scrollController.hasClients) {
+            // In reverse: true mode the bottom is offset 0, not
+            // maxScrollExtent.
             _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
+              0,
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
             );
@@ -159,21 +155,6 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
   Widget build(BuildContext context) {
     final chat = _findChat();
     final threadAsync = ref.watch(messageThreadProvider(widget.chatId));
-
-    // First-paint scroll-to-bottom (ticket #33). Fires once per screen mount
-    // as soon as the thread has data — works whether the first emission is
-    // the local cache or the network value. `jumpTo` (not `animateTo`) so
-    // the user lands on the most recent message before they see anything;
-    // an animated scroll on initial open feels sluggish in chat UIs.
-    if (!_initialScrolled &&
-        threadAsync.hasValue &&
-        threadAsync.value!.isNotEmpty) {
-      _initialScrolled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_scrollController.hasClients) return;
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-      });
-    }
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -287,11 +268,20 @@ class _Conversation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = _buildItems(messages);
+    // `reverse: true` is the canonical chat-app trick: the scroll axis is
+    // reversed, so scrollOffset 0 IS the bottom. The user lands on the
+    // newest message in the very first paint — no post-frame jumpTo and
+    // therefore no flash of the oldest message (ticket #33).
+    //
+    // We keep `items` in chronological order (oldest first) so the day-
+    // divider logic stays simple, and translate the index at access time:
+    // i=0 (rendered at the bottom) reads the LAST chronological item.
     return ListView.builder(
       controller: scroll,
+      reverse: true,
       padding: const EdgeInsets.all(14),
       itemCount: items.length,
-      itemBuilder: (context, i) => items[i],
+      itemBuilder: (context, i) => items[items.length - 1 - i],
     );
   }
 

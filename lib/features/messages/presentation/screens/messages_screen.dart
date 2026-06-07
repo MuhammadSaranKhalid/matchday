@@ -13,6 +13,12 @@ import 'package:novex_clean_arch/features/messages/presentation/providers/messag
 /// until `chat_type` grows a `'dm'` value (tracked in ticket #7's follow-ups).
 enum _InboxTab { all, teams, dms }
 
+/// Temporary hide (ticket #15). The schema only carries one chat kind
+/// today (team), so filtering by All / Teams / DMs is visual noise. Flip
+/// this to `true` to restore the tab row — `_TabRow`, `_MTab`, and
+/// `_InboxTab` stay defined for a one-line re-enable.
+const bool _kShowInboxTabs = false;
+
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key, this.onBell});
 
@@ -79,13 +85,28 @@ class _Loaded extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final teamChats = chats.where((c) => c.kind == ChatKind.team).toList();
-    final dmChats = const <Chat>[]; // v1: no DMs in schema yet
-    final visible = switch (tab) {
-      _InboxTab.all => chats,
-      _InboxTab.teams => teamChats,
-      _InboxTab.dms => dmChats,
-    };
+    // Tab filtering only kicks in when the tab row is visible. With it
+    // hidden (`_kShowInboxTabs = false`), the inbox surfaces every chat
+    // regardless of `tab`.
+    final List<Chat> visible;
+    final int teamsCount;
+    final int dmsCount;
+    if (_kShowInboxTabs) {
+      final teamChats =
+          chats.where((c) => c.kind == ChatKind.team).toList();
+      const dmChats = <Chat>[]; // v1: no DMs in schema yet
+      visible = switch (tab) {
+        _InboxTab.all => chats,
+        _InboxTab.teams => teamChats,
+        _InboxTab.dms => dmChats,
+      };
+      teamsCount = teamChats.length;
+      dmsCount = dmChats.length;
+    } else {
+      visible = chats;
+      teamsCount = 0;
+      dmsCount = 0;
+    }
 
     return Column(
       children: [
@@ -93,13 +114,14 @@ class _Loaded extends StatelessWidget {
           title: 'Messages',
           onBell: onBell,
         ),
-        _TabRow(
-          tab: tab,
-          onChanged: onTabChanged,
-          allCount: chats.length,
-          teamsCount: teamChats.length,
-          dmsCount: dmChats.length,
-        ),
+        if (_kShowInboxTabs)
+          _TabRow(
+            tab: tab,
+            onChanged: onTabChanged,
+            allCount: chats.length,
+            teamsCount: teamsCount,
+            dmsCount: dmsCount,
+          ),
         Expanded(
           child: visible.isEmpty
               ? const _EmptyList()
@@ -372,13 +394,14 @@ class _Skeleton extends StatelessWidget {
     return Column(
       children: [
         V2Header(title: title, onBell: onBell),
-        _TabRow(
-          tab: tab,
-          onChanged: onTabChanged,
-          allCount: 0,
-          teamsCount: 0,
-          dmsCount: 0,
-        ),
+        if (_kShowInboxTabs)
+          _TabRow(
+            tab: tab,
+            onChanged: onTabChanged,
+            allCount: 0,
+            teamsCount: 0,
+            dmsCount: 0,
+          ),
         const Expanded(
           child: Center(
             child: SizedBox(

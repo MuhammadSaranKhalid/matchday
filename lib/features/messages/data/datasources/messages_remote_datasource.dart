@@ -252,7 +252,6 @@ class MessagesRemoteDataSource {
   // ═══════════════════════════════════════════════════════════════════════
 
   static const _messages = 'messages';
-  static const _chatMembers = 'chat_members';
 
   static const _messageSelect =
       'message_id, chat_id, sender_id, body, created_at, edited_at, deleted_at, '
@@ -615,21 +614,35 @@ class MessagesRemoteDataSource {
     }
   }
 
-  /// Stamp `chat_members.last_read_at = now()` for (chat, me). Allowed by
-  /// the `chat_members_update_self_or_admin` policy. Patches the inbox +
-  /// cache locally so the unread badge clears without waiting for any
-  /// broadcast (there isn't one for read-marker changes).
+  /// Stamp `chat_members.last_read_at = now()` for (chat, me) via the
+  /// `mark_chat_read` RPC (migration 20260608120000, ticket #39).
+  ///
+  /// History: this used to be a direct PostgREST UPDATE. The WITH CHECK
+  /// clause added in migration 20260607120000 intermittently rejected the
+  /// row via a fragile self-referential subselect, and PostgREST silently
+  /// returns 200 for 0-rows-affected — so `last_read_at` stayed NULL
+  /// across all chats and the unread badge never cleared. The RPC is
+  /// `SECURITY DEFINER` so it bypasses the buggy RLS check, uses
+  /// server-side `now()` (no device-clock skew), and `RETURNING` gives us
+  /// a positive success signal (NULL → not-a-member).
+  ///
+  /// Patches the inbox + cache locally after success so the badge clears
+  /// without waiting for any broadcast (there isn't one for read-marker
+  /// changes).
   Future<void> markRead(String chatId) async {
-    final uid = _supabase.requireUid();
     try {
-      await _supabase
-          .from(_chatMembers)
-          .update({'last_read_at': DateTime.now().toUtc().toIso8601String()})
-          // Composite-PK row targeting — NOT a redundant auth filter; the
-          // chat_members PK is (chat_id, user_id) and we need both to hit
-          // exactly the one row.
-          .eq('chat_id', chatId)
-          .eq('user_id', uid);
+      // RPC returns timestamptz (ISO 8601 string over the wire) or NULL.
+      final stamped = await _supabase.rpc<String?>(
+        'mark_chat_read',
+        params: {'p_chat_id': chatId},
+      );
+      // RPC returns the new last_read_at, or NULL if the caller wasn't an
+      // active member of the chat. NULL is treated as a no-op — calling
+      // markRead on a chat we can't actually read is a programming error,
+      // not a recoverable runtime condition, so we skip the inbox patch
+      // and return cleanly instead of inventing a "fake-success" badge
+      // clear that would diverge from the server state.
+      if (stamped == null) return;
       _patchInboxForMarkRead(chatId);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);

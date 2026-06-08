@@ -22,16 +22,16 @@ enum _InboxTab { all, teams, dms }
 /// `_InboxTab` stay defined for a one-line re-enable.
 const bool _kShowInboxTabs = false;
 
-class MessagesScreen extends ConsumerStatefulWidget {
-  const MessagesScreen({super.key, this.onBell});
+class InboxScreen extends ConsumerStatefulWidget {
+  const InboxScreen({super.key, this.onBell});
 
   final VoidCallback? onBell;
 
   @override
-  ConsumerState<MessagesScreen> createState() => _MessagesScreenState();
+  ConsumerState<InboxScreen> createState() => _InboxScreenState();
 }
 
-class _MessagesScreenState extends ConsumerState<MessagesScreen> {
+class _InboxScreenState extends ConsumerState<InboxScreen> {
   _InboxTab _tab = _InboxTab.all;
 
   /// Cold-start refresh affordance. Time-bounded visual hint, NOT a

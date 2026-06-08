@@ -20,12 +20,18 @@ part 'message_thread_controller.g.dart';
 /// the provider key; raw strings stringify cleanly). Internally we wrap in
 /// `ChatId(...)` before crossing the repository boundary.
 ///
-/// `keepAlive: true`: backgrounding the app (or briefly removing the thread
-/// widget from the tree during a navigation) shouldn't drop the broadcast
-/// subscription. The family auto-disposes per chatId when no listener is
-/// ever attached for that id, so memory stays bounded — only chats the user
-/// actually opens hold a subscription, and they hold it for the session.
-@Riverpod(keepAlive: true)
+/// Autodispose (bare `@riverpod`), matching every other family-based
+/// controller/provider in the codebase (`liveMatch`, `team`, `roster`,
+/// `authorPosts`, etc.). When the user leaves a thread the subscription
+/// drops; on re-entry the cache emits instantly so first paint is unchanged
+/// and the realtime channel reconnects in the background.
+///
+/// Why not `keepAlive`: the previous keepAlive posture made this the only
+/// family in the codebase that retained per-key state for the session — a
+/// user who opened 40 chats would hold 40 buffered message lists + 40 live
+/// `StreamSubscription`s simultaneously. The brief realtime re-handshake on
+/// re-entry is cheap; the memory savings are not (#47).
+@riverpod
 class MessageThread extends _$MessageThread {
   @override
   Stream<List<Message>> build(String chatId) =>

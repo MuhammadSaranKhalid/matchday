@@ -1,7 +1,11 @@
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failures.dart';
+import '../../../auth/domain/entities/user.dart';
 import '../entities/follow.dart';
+import '../entities/follow_counts.dart';
+import '../entities/follow_direction.dart';
+import '../entities/follow_list_entry.dart';
 
 /// Contract for the follows feature. Online-only per CLAUDE.md §1 constraint.
 ///
@@ -20,4 +24,29 @@ abstract class FollowsRepository {
 
   /// Returns true if the signed-in user currently follows [target].
   Future<Either<Failure, bool>> isFollowing(FollowTarget target);
+
+  /// Returns a paginated list of a user's followers or following accounts.
+  ///
+  /// [userId]    — the profile being inspected (NOT necessarily the signed-in
+  ///               user; the list is public per the follows RLS policy).
+  /// [direction] — [FollowDirection.followers] to list people who follow
+  ///               [userId]; [FollowDirection.following] for accounts [userId]
+  ///               follows.
+  /// [limit]     — max entries per page (default 100).
+  /// [offset]    — zero-based page offset for pagination.
+  ///
+  /// The `you_follow` / `they_follow_you` flags in each entry are relative to
+  /// the SIGNED-IN user (computed server-side by the edge function).
+  Future<Either<Failure, List<FollowListEntry>>> getFollowList(
+    UserId userId,
+    FollowDirection direction, {
+    int limit = 100,
+    int offset = 0,
+  });
+
+  /// Returns the followers and following counts for [userId].
+  ///
+  /// Counts only user-to-user follows (target_type = 'user'), matching what
+  /// the profile header displays. Team / tournament follows are excluded.
+  Future<Either<Failure, FollowCounts>> getFollowCounts(UserId userId);
 }

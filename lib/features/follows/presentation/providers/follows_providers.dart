@@ -6,6 +6,9 @@ import '../../../teams/domain/entities/team.dart';
 import '../../data/datasources/follows_datasource_providers.dart';
 import '../../data/repositories/follows_repository_impl.dart';
 import '../../domain/entities/follow.dart';
+import '../../domain/entities/follow_counts.dart';
+import '../../domain/entities/follow_direction.dart';
+import '../../domain/entities/follow_list_entry.dart';
 import '../../domain/repositories/follows_repository.dart';
 
 part 'follows_providers.g.dart';
@@ -37,6 +40,50 @@ Future<bool> isFollowing(
   final repo = ref.watch(followsRepositoryProvider);
   final target = _targetFromWire(targetTypeWire, targetId);
   final result = await repo.isFollowing(target);
+  return result.fold((f) => throw FailureWrapper(f), (v) => v);
+}
+
+/// Autodispose family that fetches a user's followers or following list.
+///
+/// Parameters are raw strings so Riverpod can serialise the family cache key
+/// cleanly (no custom wrapper types in the key).
+///
+/// [userId]    — UUID of the profile to inspect.
+/// [direction] — wire string, either 'followers' or 'following'.
+///
+/// Defaults to 100 entries with offset 0. For pagination, call
+/// [FollowsRepository.getFollowList] directly through the repository provider.
+///
+/// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+/// [AsyncError] it can display without extra boilerplate.
+@riverpod
+Future<List<FollowListEntry>> followList(
+  Ref ref,
+  String userId,
+  String direction,
+) async {
+  final repo = ref.watch(followsRepositoryProvider);
+  final result = await repo.getFollowList(
+    UserId(userId),
+    FollowDirection.values.firstWhere(
+      (d) => d.wire == direction,
+      orElse: () => FollowDirection.followers,
+    ),
+  );
+  return result.fold((f) => throw FailureWrapper(f), (v) => v);
+}
+
+/// Autodispose family that fetches the followers and following counts for a
+/// user profile.
+///
+/// [userId] — UUID of the profile to inspect.
+///
+/// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+/// [AsyncError] it can display without extra boilerplate.
+@riverpod
+Future<FollowCounts> followCounts(Ref ref, String userId) async {
+  final repo = ref.watch(followsRepositoryProvider);
+  final result = await repo.getFollowCounts(UserId(userId));
   return result.fold((f) => throw FailureWrapper(f), (v) => v);
 }
 

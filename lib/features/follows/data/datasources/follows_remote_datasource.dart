@@ -2,7 +2,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../../domain/entities/follow.dart';
+import '../../domain/entities/follow_counts.dart';
 import '../models/follow_dto.dart';
+import '../models/follow_list_entry_dto.dart';
 
 /// Talks to Supabase for the `public.follows` table.
 ///
@@ -81,6 +83,117 @@ class FollowsRemoteDataSource {
       return row != null;
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Follow list
+  // -------------------------------------------------------------------------
+
+  /// Fetches a paginated followers or following list by invoking the
+  /// `list-follow-list` edge function.
+  ///
+  /// The function is public (no auth token required to view someone else's
+  /// list), but an authenticated session is still passed through so the
+  /// edge function can populate the `you_follow` / `they_follow_you` flags
+  /// relative to the caller. The data source does NOT assert `_requireUid()`
+  /// here — unauthenticated callers simply get false for both flags.
+  ///
+  /// Error-handling shape mirrors [MessagesRemoteDataSource.listMyChats]:
+  /// [FunctionException] → [UnauthorizedException] (401/403) or
+  ///                       [ServerException] (other status).
+  Future<List<FollowListEntryDto>> listFollowList(
+    String userId,
+    String direction, {
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    try {
+      final res = await _supabase.functions.invoke(
+        'list-follow-list',
+        body: {
+          'user_id': userId,
+          'direction': direction,
+          'limit': limit,
+          'offset': offset,
+        },
+      );
+      final data = res.data;
+      final rows = data is Map ? data['entries'] : data;
+      if (rows is! List) {
+        throw ServerException(
+          'list-follow-list returned an unexpected payload',
+        );
+      }
+      return rows
+          .map(
+            (row) => FollowListEntryDto.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
+          .toList();
+    } on FunctionException catch (e) {
+      throw _functionException(e);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Follow counts
+  // -------------------------------------------------------------------------
+
+  /// Returns the number of user-to-user followers and following accounts for
+  /// [userId] via two PostgREST HEAD count queries.
+  ///
+  /// Only counts rows where `target_type = 'user'`, so team/tournament follows
+  /// are excluded — matching what the profile header displays.
+  ///
+  /// The `count()` call in postgrest-dart 2.5.x returns a
+  /// `PostgrestFilterBuilder<int>` which resolves directly to an [int]; the
+  /// Prefer: count=exact header is set automatically.
+  Future<FollowCounts> countFollows(String userId) async {
+    try {
+      final followersCount = await _supabase
+          .from(_table)
+          .count()
+          .eq('target_type', 'user')
+          .eq('target_id', userId);
+
+      final followingCount = await _supabase
+          .from(_table)
+          .count()
+          .eq('target_type', 'user')
+          .eq('follower_id', userId);
+
+      return FollowCounts(
+        followers: followersCount,
+        following: followingCount,
+      );
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Private helpers
+  // -------------------------------------------------------------------------
+
+  /// Translates a [FunctionException] to either an [UnauthorizedException] or
+  /// a [ServerException], extracting the server-side error message when the
+  /// response body carries `{ ok: false, error: { message: "..." } }`.
+  ///
+  /// Mirrors [MessagesRemoteDataSource._functionException].
+  Exception _functionException(FunctionException e) {
+    String? msg;
+    final d = e.details;
+    if (d is Map && d['error'] is Map) {
+      msg = (d['error'] as Map)['message']?.toString();
+    }
+    switch (e.status) {
+      case 401:
+      case 403:
+        return UnauthorizedException(msg ?? 'Not authorised');
+      default:
+        return ServerException(msg ?? 'list-follow-list failed');
     }
   }
 }

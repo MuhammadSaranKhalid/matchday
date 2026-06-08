@@ -15,6 +15,9 @@ import 'package:novex_clean_arch/core/widgets/v2/ck_shimmer.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
 import 'package:novex_clean_arch/core/widgets/v2/v2_modals.dart';
 import 'package:novex_clean_arch/features/auth/presentation/providers/auth_providers.dart';
+import 'package:novex_clean_arch/features/follows/domain/entities/follow_direction.dart';
+import 'package:novex_clean_arch/features/follows/presentation/providers/follows_providers.dart';
+import 'package:novex_clean_arch/features/follows/presentation/screens/followers_list_screen.dart';
 import 'package:novex_clean_arch/features/onboarding/domain/entities/profile.dart';
 import 'package:novex_clean_arch/features/onboarding/presentation/providers/onboarding_providers.dart';
 import 'package:novex_clean_arch/features/posts/presentation/providers/posts_providers.dart';
@@ -193,7 +196,7 @@ class _IconButton extends StatelessWidget {
 }
 
 // ── Identity hero: avatar, name, handle, location, bio, signals, actions. ──
-class _IdentityHero extends StatelessWidget {
+class _IdentityHero extends ConsumerWidget {
   const _IdentityHero({
     required this.spectator,
     this.profile,
@@ -262,7 +265,7 @@ class _IdentityHero extends StatelessWidget {
       );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (loading) return const _IdentityHeroSkeleton();
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 14, 22, 8),
@@ -376,15 +379,17 @@ class _IdentityHero extends StatelessWidget {
               ),
             ),
 
-          // Social signals — followers / following (+ mutual on spectator).
-          Padding(
-            padding: const EdgeInsets.only(top: 14),
-            child: Row(
-              children: [
-                const _Signal(value: '284', label: 'Followers'),
-                const SizedBox(width: 16),
-                const _Signal(value: '92', label: 'Following'),
-                if (spectator) ...[
+          // Social signals — followers / following. Real-data path
+          // depends on a signed-in user; spectator's fictional profile
+          // keeps its placeholder counts.
+          if (spectator)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Row(
+                children: [
+                  const _Signal(value: '284', label: 'Followers'),
+                  const SizedBox(width: 16),
+                  const _Signal(value: '92', label: 'Following'),
                   const Spacer(),
                   Text(
                     '2 mutual',
@@ -396,9 +401,10 @@ class _IdentityHero extends StatelessWidget {
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
+              ),
+            )
+          else
+            _RealSignals(name: _name, handle: _handle),
 
           // Actions.
           Padding(
@@ -496,6 +502,103 @@ class _IdentityHeroSkeleton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Followers / following signals for the self view. Reads the live
+/// counts from `followCountsProvider` keyed on the current user, falls
+/// back to a `0 / 0` row while loading, and pushes [FollowersListScreen]
+/// on tap.
+class _RealSignals extends ConsumerWidget {
+  const _RealSignals({required this.name, required this.handle});
+
+  /// Display name + `@handle` to send to the followers screen header.
+  final String name;
+  final String handle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserStreamProvider).value;
+    final userId = user?.id.value;
+    final countsAsync = userId == null
+        ? null
+        : ref.watch(followCountsProvider(userId));
+
+    final followers = countsAsync?.value?.followers ?? 0;
+    final following = countsAsync?.value?.following ?? 0;
+
+    // Strip the leading '@' if present — followers screen header adds its own.
+    final username = handle.startsWith('@') ? handle.substring(1) : handle;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Row(
+        children: [
+          _SignalTap(
+            value: followers,
+            label: 'Followers',
+            enabled: userId != null,
+            onTap: userId == null
+                ? null
+                : () => _open(context, userId, username, FollowDirection.followers),
+          ),
+          const SizedBox(width: 16),
+          _SignalTap(
+            value: following,
+            label: 'Following',
+            enabled: userId != null,
+            onTap: userId == null
+                ? null
+                : () => _open(context, userId, username, FollowDirection.following),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _open(
+    BuildContext context,
+    String userId,
+    String username,
+    FollowDirection initialTab,
+  ) {
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FollowersListScreen(
+          userId: userId,
+          profileName: name,
+          profileUsername: username,
+          initialTab: initialTab,
+        ),
+      ),
+    );
+  }
+}
+
+/// Tappable variant of [_Signal] — same visual, plus a GestureDetector.
+/// Kept here (not in v2_kit) because this is profile-specific behavior.
+class _SignalTap extends StatelessWidget {
+  const _SignalTap({
+    required this.value,
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final int value;
+  final String label;
+  final bool enabled;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = _Signal(value: '$value', label: label);
+    if (!enabled) return child;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: child,
     );
   }
 }

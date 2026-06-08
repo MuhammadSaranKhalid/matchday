@@ -191,3 +191,267 @@ final class IsFollowingFamily extends $Family
   @override
   String toString() => r'isFollowingProvider';
 }
+
+/// Autodispose family that fetches a user's followers or following list.
+///
+/// Parameters are raw strings so Riverpod can serialise the family cache key
+/// cleanly (no custom wrapper types in the key).
+///
+/// [userId]    — UUID of the profile to inspect.
+/// [direction] — wire string, either 'followers' or 'following'.
+///
+/// Defaults to 100 entries with offset 0. For pagination, call
+/// [FollowsRepository.getFollowList] directly through the repository provider.
+///
+/// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+/// [AsyncError] it can display without extra boilerplate.
+
+@ProviderFor(followList)
+final followListProvider = FollowListFamily._();
+
+/// Autodispose family that fetches a user's followers or following list.
+///
+/// Parameters are raw strings so Riverpod can serialise the family cache key
+/// cleanly (no custom wrapper types in the key).
+///
+/// [userId]    — UUID of the profile to inspect.
+/// [direction] — wire string, either 'followers' or 'following'.
+///
+/// Defaults to 100 entries with offset 0. For pagination, call
+/// [FollowsRepository.getFollowList] directly through the repository provider.
+///
+/// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+/// [AsyncError] it can display without extra boilerplate.
+
+final class FollowListProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<FollowListEntry>>,
+          List<FollowListEntry>,
+          FutureOr<List<FollowListEntry>>
+        >
+    with
+        $FutureModifier<List<FollowListEntry>>,
+        $FutureProvider<List<FollowListEntry>> {
+  /// Autodispose family that fetches a user's followers or following list.
+  ///
+  /// Parameters are raw strings so Riverpod can serialise the family cache key
+  /// cleanly (no custom wrapper types in the key).
+  ///
+  /// [userId]    — UUID of the profile to inspect.
+  /// [direction] — wire string, either 'followers' or 'following'.
+  ///
+  /// Defaults to 100 entries with offset 0. For pagination, call
+  /// [FollowsRepository.getFollowList] directly through the repository provider.
+  ///
+  /// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+  /// [AsyncError] it can display without extra boilerplate.
+  FollowListProvider._({
+    required FollowListFamily super.from,
+    required (String, String) super.argument,
+  }) : super(
+         retry: null,
+         name: r'followListProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$followListHash();
+
+  @override
+  String toString() {
+    return r'followListProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<FollowListEntry>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<FollowListEntry>> create(Ref ref) {
+    final argument = this.argument as (String, String);
+    return followList(ref, argument.$1, argument.$2);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is FollowListProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$followListHash() => r'e2a21357a5ef4e87649099ecfcce42c231b867c4';
+
+/// Autodispose family that fetches a user's followers or following list.
+///
+/// Parameters are raw strings so Riverpod can serialise the family cache key
+/// cleanly (no custom wrapper types in the key).
+///
+/// [userId]    — UUID of the profile to inspect.
+/// [direction] — wire string, either 'followers' or 'following'.
+///
+/// Defaults to 100 entries with offset 0. For pagination, call
+/// [FollowsRepository.getFollowList] directly through the repository provider.
+///
+/// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+/// [AsyncError] it can display without extra boilerplate.
+
+final class FollowListFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          FutureOr<List<FollowListEntry>>,
+          (String, String)
+        > {
+  FollowListFamily._()
+    : super(
+        retry: null,
+        name: r'followListProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Autodispose family that fetches a user's followers or following list.
+  ///
+  /// Parameters are raw strings so Riverpod can serialise the family cache key
+  /// cleanly (no custom wrapper types in the key).
+  ///
+  /// [userId]    — UUID of the profile to inspect.
+  /// [direction] — wire string, either 'followers' or 'following'.
+  ///
+  /// Defaults to 100 entries with offset 0. For pagination, call
+  /// [FollowsRepository.getFollowList] directly through the repository provider.
+  ///
+  /// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+  /// [AsyncError] it can display without extra boilerplate.
+
+  FollowListProvider call(String userId, String direction) =>
+      FollowListProvider._(argument: (userId, direction), from: this);
+
+  @override
+  String toString() => r'followListProvider';
+}
+
+/// Autodispose family that fetches the followers and following counts for a
+/// user profile.
+///
+/// [userId] — UUID of the profile to inspect.
+///
+/// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+/// [AsyncError] it can display without extra boilerplate.
+
+@ProviderFor(followCounts)
+final followCountsProvider = FollowCountsFamily._();
+
+/// Autodispose family that fetches the followers and following counts for a
+/// user profile.
+///
+/// [userId] — UUID of the profile to inspect.
+///
+/// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+/// [AsyncError] it can display without extra boilerplate.
+
+final class FollowCountsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<FollowCounts>,
+          FollowCounts,
+          FutureOr<FollowCounts>
+        >
+    with $FutureModifier<FollowCounts>, $FutureProvider<FollowCounts> {
+  /// Autodispose family that fetches the followers and following counts for a
+  /// user profile.
+  ///
+  /// [userId] — UUID of the profile to inspect.
+  ///
+  /// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+  /// [AsyncError] it can display without extra boilerplate.
+  FollowCountsProvider._({
+    required FollowCountsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'followCountsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$followCountsHash();
+
+  @override
+  String toString() {
+    return r'followCountsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<FollowCounts> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<FollowCounts> create(Ref ref) {
+    final argument = this.argument as String;
+    return followCounts(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is FollowCountsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$followCountsHash() => r'63cb71fbb5d388e70ab3cc20f42e9b6ab5576b61';
+
+/// Autodispose family that fetches the followers and following counts for a
+/// user profile.
+///
+/// [userId] — UUID of the profile to inspect.
+///
+/// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+/// [AsyncError] it can display without extra boilerplate.
+
+final class FollowCountsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<FollowCounts>, String> {
+  FollowCountsFamily._()
+    : super(
+        retry: null,
+        name: r'followCountsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Autodispose family that fetches the followers and following counts for a
+  /// user profile.
+  ///
+  /// [userId] — UUID of the profile to inspect.
+  ///
+  /// Throws [FailureWrapper] on [Left] so the consuming widget receives an
+  /// [AsyncError] it can display without extra boilerplate.
+
+  FollowCountsProvider call(String userId) =>
+      FollowCountsProvider._(argument: userId, from: this);
+
+  @override
+  String toString() => r'followCountsProvider';
+}

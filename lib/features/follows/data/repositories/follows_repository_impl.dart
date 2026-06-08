@@ -2,7 +2,11 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
+import '../../../auth/domain/entities/user.dart';
 import '../../domain/entities/follow.dart';
+import '../../domain/entities/follow_counts.dart';
+import '../../domain/entities/follow_direction.dart';
+import '../../domain/entities/follow_list_entry.dart';
 import '../../domain/repositories/follows_repository.dart';
 import '../datasources/follows_remote_datasource.dart';
 
@@ -52,6 +56,44 @@ class FollowsRepositoryImpl implements FollowsRepository {
     try {
       final result = await _remote.isFollowing(target);
       return Right(result);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<FollowListEntry>>> getFollowList(
+    UserId userId,
+    FollowDirection direction, {
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    try {
+      final dtos = await _remote.listFollowList(
+        userId.value,
+        direction.wire,
+        limit: limit,
+        offset: offset,
+      );
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, FollowCounts>> getFollowCounts(UserId userId) async {
+    try {
+      final counts = await _remote.countFollows(userId.value);
+      return Right(counts);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {

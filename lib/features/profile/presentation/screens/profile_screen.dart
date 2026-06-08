@@ -8,6 +8,7 @@
 // the profile shows the feed-style LIST view only.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:novex_clean_arch/core/theme/circk_theme.dart';
 import 'package:novex_clean_arch/features/posts/presentation/widgets/post_card.dart';
@@ -18,6 +19,7 @@ import 'package:novex_clean_arch/features/auth/presentation/providers/auth_provi
 import 'package:novex_clean_arch/features/follows/domain/entities/follow_direction.dart';
 import 'package:novex_clean_arch/features/follows/presentation/providers/follows_providers.dart';
 import 'package:novex_clean_arch/features/follows/presentation/screens/followers_list_screen.dart';
+import 'package:novex_clean_arch/features/onboarding/domain/entities/player_profile.dart';
 import 'package:novex_clean_arch/features/onboarding/domain/entities/profile.dart';
 import 'package:novex_clean_arch/features/onboarding/presentation/providers/onboarding_providers.dart';
 import 'package:novex_clean_arch/features/posts/presentation/providers/posts_providers.dart';
@@ -30,6 +32,35 @@ import 'profile_edit_screen.dart';
 const Color _hueRed = Color(0xFFC2362B); // oklch(0.62 0.19 28) — "SIX" highlight
 const Color _hueIndigo = Color(0xFF2E3E63); // oklch(0.42 0.10 260)
 const Color _hueGold = Color(0xFFB98A2E); // oklch(0.55 0.13 80)
+
+/// Canonical web base for a shared profile link. Deep-link handling for this
+/// URL is a separate task (no app-links infra yet) — kept as a single constant
+/// so the domain is trivial to change once it lands.
+const String _profileShareBase = 'https://joinmatchday.com/u';
+
+/// Opens the OS share sheet with a link to [handle]'s matchday profile.
+/// [name]/[handle] are already resolved to real-or-mock values by the hero,
+/// so this works for both the self view and the spectator demo. [originContext]
+/// anchors the share-sheet popover on iPad (ignored on phones).
+Future<void> _shareProfile(
+  BuildContext originContext, {
+  required String name,
+  required String handle,
+}) {
+  final slug = handle.startsWith('@') ? handle.substring(1) : handle;
+  final link = '$_profileShareBase/$slug';
+  final box = originContext.findRenderObject() as RenderBox?;
+  final origin = (box != null && box.hasSize)
+      ? box.localToGlobal(Offset.zero) & box.size
+      : null;
+  return SharePlus.instance.share(
+    ShareParams(
+      text: 'Check out $name ($handle) on matchday 🏏\n$link',
+      subject: '$name on matchday',
+      sharePositionOrigin: origin,
+    ),
+  );
+}
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key, this.isTab = false, this.spectator = false});
@@ -138,7 +169,10 @@ class _CompactNav extends StatelessWidget {
               onTap: () => Navigator.maybePop(context),
             )
           else
-            const SizedBox(width: 28),
+            // Self view: empty 30px left spacer so the title is visually
+            // centered against the right-side gear button (matches the
+            // matchday-challenge profile-you design).
+            const SizedBox(width: 30),
           Expanded(
             child: Center(
               child: Text(
@@ -152,12 +186,35 @@ class _CompactNav extends StatelessWidget {
               ),
             ),
           ),
-          _IconButton(
-            icon: V2Icons.dotsV,
-            size: 18,
-            strokeWidth: 2,
-            onTap: () {},
-          ),
+          if (spectator)
+            _IconButton(
+              icon: V2Icons.dotsV,
+              size: 18,
+              strokeWidth: 2,
+              onTap: () {},
+            )
+          else
+            // Self view: gear icon (settings affordance). Material's
+            // `Icons.settings_outlined` is close enough to the design's
+            // 1.7px-stroke gear without inlining a custom SVG path.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                // Settings entry — future Pavilion settings push.
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  duration: Duration(milliseconds: 1400),
+                  content: Text('Settings coming soon'),
+                ));
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(
+                  Icons.settings_outlined,
+                  size: 22,
+                  color: CkColors.ink,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -227,6 +284,18 @@ class _IdentityHero extends ConsumerWidget {
   String get _city {
     final c = profile?.city?.trim();
     return (c != null && c.isNotEmpty) ? c : (spectator ? 'Karachi' : '—');
+  }
+
+  /// True when the role/style row has anything to render — used to skip
+  /// the whole `Padding` block when the player profile is null or both
+  /// the role and bowling/batting styles are unset.
+  bool get _roleLineHasContent {
+    final pp = profile?.playerProfile;
+    if (spectator) return true; // spectator's mock always has content
+    if (pp == null) return false;
+    return pp.role != null ||
+        pp.battingStyle != null ||
+        (pp.bowlingStyle != null && pp.bowlingStyle != BowlingStyle.doesntBowl);
   }
 
   String get _monogram {
@@ -330,7 +399,21 @@ class _IdentityHero extends ConsumerWidget {
             ],
           ),
 
-          // Bio — real text for the self view; the styled sample for spectator.
+          // Role pill + batting/bowling style line — single horizontal row,
+          // never wraps (the matchday-challenge spec is explicit: "ALL-/
+          // ROUNDER" splitting mid-word was a bug). Rendered only when at
+          // least the role OR a style is available; collapsed otherwise.
+          if (_roleLineHasContent)
+            Padding(
+              padding: const EdgeInsets.only(top: 9),
+              child: _RoleStyleLine(playerProfile: profile?.playerProfile),
+            ),
+
+          // Bio — three states per the matchday-challenge design:
+          //   1. Self + has bio    → render body text
+          //   2. Self + empty bio  → dashed "+ Add a bio" pill (toasts;
+          //                          the real editor is its own ticket)
+          //   3. Spectator         → mock structured fallback (italic)
           if (profile != null && (profile!.bio?.trim() ?? '').isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 14),
@@ -342,6 +425,18 @@ class _IdentityHero extends ConsumerWidget {
                     fontSize: 13.5,
                     color: CkColors.ink,
                     height: 1.5,
+                  ),
+                ),
+              ),
+            )
+          else if (profile != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: _AddBioPill(
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    duration: Duration(milliseconds: 1400),
+                    content: Text('Edit bio coming soon'),
                   ),
                 ),
               ),
@@ -410,25 +505,34 @@ class _IdentityHero extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(top: 16),
             child: spectator
-                ? const Row(
+                ? Row(
                     children: [
-                      _PrimaryBtn(label: 'Follow'),
-                      SizedBox(width: 8),
-                      _GhostBtn(label: 'Message'),
-                      SizedBox(width: 8),
-                      _IconSquareBtn(icon: V2Icons.share),
+                      const _PrimaryBtn(label: 'Follow'),
+                      const SizedBox(width: 8),
+                      const _GhostBtn(label: 'Message'),
+                      const SizedBox(width: 8),
+                      _IconSquareBtn(
+                        icon: V2Icons.share,
+                        onTap: () => _shareProfile(
+                          context,
+                          name: _name,
+                          handle: _handle,
+                        ),
+                      ),
                     ],
                   )
                 : Row(
                     children: [
-                      _GhostBtn(label: 'Edit profile', onTap: onEdit),
+                      // Edit profile — solid ink CTA per the design.
+                      _PrimaryBtn(label: 'Edit profile', onTap: onEdit),
                       const SizedBox(width: 8),
-                      const _GhostBtn(label: 'Share profile'),
-                      const SizedBox(width: 8),
-                      // Pencil icon button.
-                      const _IconSquareBtn(
-                        icon:
-                            '<path d="M12 20h9M4 20l4-1 11-11-3-3L5 16l-1 4z"/>',
+                      _GhostBtn(
+                        label: 'Share',
+                        onTap: () => _shareProfile(
+                          context,
+                          name: _name,
+                          handle: _handle,
+                        ),
                       ),
                     ],
                   ),
@@ -506,14 +610,16 @@ class _IdentityHeroSkeleton extends StatelessWidget {
   }
 }
 
-/// Followers / following signals for the self view. Reads the live
-/// counts from `followCountsProvider` keyed on the current user, falls
-/// back to a `0 / 0` row while loading, and pushes [FollowersListScreen]
-/// on tap.
+/// Followers / following signals for the self view. Reads live counts
+/// from `followCountsProvider` keyed on the current user and renders a
+/// single muted sentence of the form `**284** followers · **92** following`
+/// per the matchday-challenge profile design. Each count is an inline
+/// tappable target that pushes [FollowersListScreen] with the matching
+/// initial tab.
 class _RealSignals extends ConsumerWidget {
   const _RealSignals({required this.name, required this.handle});
 
-  /// Display name + `@handle` to send to the followers screen header.
+  /// Display name + `@handle` for the followers screen header.
   final String name;
   final String handle;
 
@@ -527,30 +633,49 @@ class _RealSignals extends ConsumerWidget {
 
     final followers = countsAsync?.value?.followers ?? 0;
     final following = countsAsync?.value?.following ?? 0;
-
-    // Strip the leading '@' if present — followers screen header adds its own.
     final username = handle.startsWith('@') ? handle.substring(1) : handle;
 
+    // Single muted sentence with two inline tappable bold counts. We use
+    // a Row of three widgets (count · label · separator · count · label)
+    // instead of a RichText with GestureDetector spans — the tap targets
+    // need to ignore the trailing word so "284 followers" only triggers
+    // for tapping on "284", and Flutter's TapGestureRecognizer-in-span
+    // doesn't compose cleanly with a parent ConstrainedBox.
     return Padding(
       padding: const EdgeInsets.only(top: 14),
       child: Row(
         children: [
-          _SignalTap(
+          _MetricCount(
             value: followers,
-            label: 'Followers',
-            enabled: userId != null,
+            label: 'followers',
             onTap: userId == null
                 ? null
-                : () => _open(context, userId, username, FollowDirection.followers),
+                : () => _open(
+                      context,
+                      userId,
+                      username,
+                      FollowDirection.followers,
+                    ),
           ),
-          const SizedBox(width: 16),
-          _SignalTap(
+          // Centred separator dot — fontSize 12.5 / muted.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '·',
+              style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+            ),
+          ),
+          _MetricCount(
             value: following,
-            label: 'Following',
-            enabled: userId != null,
+            label: 'following',
             onTap: userId == null
                 ? null
-                : () => _open(context, userId, username, FollowDirection.following),
+                : () => _open(
+                      context,
+                      userId,
+                      username,
+                      FollowDirection.following,
+                    ),
           ),
         ],
       ),
@@ -576,29 +701,197 @@ class _RealSignals extends ConsumerWidget {
   }
 }
 
-/// Tappable variant of [_Signal] — same visual, plus a GestureDetector.
-/// Kept here (not in v2_kit) because this is profile-specific behavior.
-class _SignalTap extends StatelessWidget {
-  const _SignalTap({
+/// Inline tappable metric — bold count followed by a muted noun, like
+/// `**284** followers`. Used by [_RealSignals]; no public callers.
+class _MetricCount extends StatelessWidget {
+  const _MetricCount({
     required this.value,
     required this.label,
-    required this.enabled,
     required this.onTap,
   });
 
   final int value;
   final String label;
-  final bool enabled;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final child = _Signal(value: '$value', label: label);
-    if (!enabled) return child;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: child,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(
+            '$value',
+            style: CkType.display(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.01,
+              color: CkColors.ink,
+            ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Self-view empty-bio pill — dashed border, leading `+` icon, muted
+/// label. Matches the `+ Add a bio` affordance in the matchday-challenge
+/// profile-you design. Tapping fires a toast (the real editor lands in
+/// its own ticket).
+class _AddBioPill extends StatelessWidget {
+  const _AddBioPill({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: ShapeDecoration(
+          // DashedBorder isn't in Flutter core; an OutlinedBorder with a
+          // dashed PaintingStyle is a heavier add. The closest in-tree
+          // approximation is `BorderRadius` + a custom-painted outline.
+          // For v1 we use a solid 1px line — visually close enough at
+          // the small size; upgrade to a true dashed border if/when this
+          // becomes the canonical "add" pattern elsewhere.
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(color: CkColors.line, width: 1),
+            borderRadius: BorderRadius.circular(9),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '+',
+              style: CkType.body(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: CkColors.muted,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Add a bio',
+              style: CkType.body(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: CkColors.muted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Role pill + batting/bowling style line. Single horizontal row that
+/// never wraps — the matchday-challenge design is explicit that breaking
+/// "ALL-ROUNDER" across two lines is a bug.
+///
+/// When [playerProfile] is null the spectator's sample copy is rendered;
+/// otherwise the real role + styles drive both halves.
+class _RoleStyleLine extends StatelessWidget {
+  const _RoleStyleLine({required this.playerProfile});
+  final PlayerProfile? playerProfile;
+
+  String? get _roleLabel {
+    final r = playerProfile?.role;
+    if (r != null) {
+      return switch (r) {
+        PlayerRole.batter => 'BATTER',
+        PlayerRole.bowler => 'BOWLER',
+        PlayerRole.allRounder => 'ALL-ROUNDER',
+        PlayerRole.wicketKeeper => 'WICKET-KEEPER',
+      };
+    }
+    // Spectator: no playerProfile is passed; default to the design's
+    // sample copy.
+    return playerProfile == null ? 'ALL-ROUNDER' : null;
+  }
+
+  String? get _styleLine {
+    final pp = playerProfile;
+    if (pp == null) return 'Right-hand bat · Off-spin';
+    final parts = <String>[];
+    final b = pp.battingStyle;
+    if (b != null) {
+      parts.add(switch (b) {
+        BattingStyle.rightHand => 'Right-hand bat',
+        BattingStyle.leftHand => 'Left-hand bat',
+      });
+    }
+    final bo = pp.bowlingStyle;
+    if (bo != null && bo != BowlingStyle.doesntBowl) {
+      parts.add(switch (bo) {
+        BowlingStyle.rightArmFast => 'Right-arm fast',
+        BowlingStyle.rightArmMedium => 'Right-arm medium',
+        BowlingStyle.rightArmSpin => 'Right-arm spin',
+        BowlingStyle.leftArmFast => 'Left-arm fast',
+        BowlingStyle.leftArmSpin => 'Left-arm spin',
+        BowlingStyle.doesntBowl => '',
+      });
+    }
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final role = _roleLabel;
+    final style = _styleLine;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (role != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Text(
+              role,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.clip,
+              style: CkType.mono(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.10,
+                color: CkColors.ink2,
+              ),
+            ),
+          ),
+          if (style != null) const SizedBox(width: 7),
+        ],
+        if (style != null)
+          Flexible(
+            child: Text(
+              style,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.body(
+                fontSize: 11.5,
+                color: CkColors.ink2,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -684,15 +977,16 @@ class _GhostBtn extends StatelessWidget {
 }
 
 class _PrimaryBtn extends StatelessWidget {
-  const _PrimaryBtn({required this.label});
+  const _PrimaryBtn({required this.label, this.onTap});
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () {},
+        onTap: onTap ?? () {},
         child: Container(
           height: 38,
           alignment: Alignment.center,
@@ -715,14 +1009,15 @@ class _PrimaryBtn extends StatelessWidget {
 }
 
 class _IconSquareBtn extends StatelessWidget {
-  const _IconSquareBtn({required this.icon});
+  const _IconSquareBtn({required this.icon, this.onTap});
   final String icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () {},
+      onTap: onTap,
       child: Container(
         width: 38,
         height: 38,
@@ -739,47 +1034,127 @@ class _IconSquareBtn extends StatelessWidget {
 }
 
 // ── "Plays for" section: section label + horizontal TeamChip scroll. ──
+/// CAPTAINS + PLAYS FOR — two distinct horizontal-scroll strips per the
+/// matchday-challenge profile-you design. Currently driven by mock data
+/// (one captain chip + two regular chips); real-data integration with
+/// the teams feature is its own ticket.
+///
+/// The CAPTAINS strip uses ink-filled chips with paper text; PLAYS FOR
+/// uses paper-filled chips with ink text. The chip definition itself
+/// already supports both visual styles via `main` — only the data
+/// partition changes here.
 class _PlaysForSection extends StatelessWidget {
   const _PlaysForSection();
 
+  // Mock-data partition: a single captain entry + the rest. Real data
+  // would derive `cap` from the user's role on each team (owner /
+  // captain vs anything else).
+  static const _captainTeams = <_TeamChipData>[
+    _TeamChipData(
+      crest: CkCrest.ll,
+      short: 'LL',
+      name: 'Lahore Lions',
+      role: 'CAPTAIN',
+    ),
+  ];
+
+  static const _playsForTeams = <_TeamChipData>[
+    _TeamChipData(
+      crest: CkCrest.ob,
+      short: 'OB',
+      name: 'Old Boys',
+      role: 'ALL-ROUNDER',
+    ),
+    _TeamChipData(
+      crest: CkCrest.mk,
+      short: 'MK',
+      name: 'Mohalla Kings',
+      role: 'BATTER',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(18, 16, 18, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionLabel('Plays for'),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _TeamChip(
-                  crest: CkCrest.ll,
-                  short: 'LL',
-                  name: 'Lahore Lions',
-                  role: 'CAPTAIN',
-                  main: true,
-                ),
-                SizedBox(width: 8),
-                _TeamChip(
-                  crest: CkCrest.ob,
-                  short: 'OB',
-                  name: 'Old Boys',
-                  role: 'ALL-ROUNDER',
-                ),
-                SizedBox(width: 8),
-                _TeamChip(
-                  crest: CkCrest.mk,
-                  short: 'MK',
-                  name: 'Mohalla Kings',
-                  role: 'BATTER',
-                ),
-              ],
+    // Lists are mock-static today so the strips are always populated; the
+    // future real-data path will swap these for live providers and guard
+    // each strip on emptiness.
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ChipStrip(label: 'Captains', teams: _captainTeams, main: true),
+        SizedBox(height: 14),
+        _ChipStrip(label: 'Plays for', teams: _playsForTeams, main: false),
+        SizedBox(height: 6),
+      ],
+    );
+  }
+}
+
+/// Data record for a team-chip row entry. Kept private — the moment
+/// real data arrives this becomes a thin adapter over the teams entity.
+class _TeamChipData {
+  const _TeamChipData({
+    required this.crest,
+    required this.short,
+    required this.name,
+    required this.role,
+  });
+  final Color crest;
+  final String short;
+  final String name;
+  final String role;
+}
+
+class _ChipStrip extends StatelessWidget {
+  const _ChipStrip({
+    required this.label,
+    required this.teams,
+    required this.main,
+  });
+
+  final String label;
+  final List<_TeamChipData> teams;
+
+  /// Ink-filled chip variant (CAPTAINS) when true; paper-filled (PLAYS
+  /// FOR) when false.
+  final bool main;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 9),
+          child: Text(
+            label.toUpperCase(),
+            style: CkType.mono(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.10,
+              color: CkColors.muted,
             ),
           ),
-        ],
-      ),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: Row(
+            children: [
+              for (var i = 0; i < teams.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                _TeamChip(
+                  crest: teams[i].crest,
+                  short: teams[i].short,
+                  name: teams[i].name,
+                  role: teams[i].role,
+                  main: main,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1034,27 +1409,6 @@ class _PostCardSkeleton extends StatelessWidget {
           const SizedBox(height: 16),
           const Divider(height: 1, color: CkColors.hairline),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text.toUpperCase(),
-        style: CkType.mono(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.10,
-          color: CkColors.muted,
-        ),
       ),
     );
   }

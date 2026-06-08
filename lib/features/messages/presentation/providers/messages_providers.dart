@@ -16,15 +16,15 @@ MessagesRepository messagesRepository(Ref ref) => MessagesRepositoryImpl(
 /// The chat inbox as a fan-out stream: one upstream subscription, many UI
 /// consumers. Per CLAUDE.md §5.3, intermediate `@riverpod Stream` providers
 /// belong here rather than in a controller — the inbox screen has no write
-/// path in part 1 of the rollout.
+/// path on the inbox itself; writes happen in the thread.
 ///
-/// `keepAlive: true` is load-bearing: `MessageThreadController.markRead()`
-/// invalidates this provider after a successful read-receipt stamp so the
-/// inbox's unread badges re-emit reactively. If this provider were
-/// autodispose and the user was only on the thread screen (inbox unmounted),
-/// the provider would have already disposed by the time `markRead` runs —
-/// `invalidate` against a disposed provider is a no-op, the badges would
-/// stay stale. Mirrors the repository provider's posture.
-@Riverpod(keepAlive: true)
+/// Autodispose (bare `@riverpod`), matching the codebase-wide convention for
+/// free-function `Stream` providers (compare `liveMatch`, `myTeams`,
+/// `roster`, etc.). The inbox tab is the parent screen and stays mounted
+/// throughout the session via `StatefulShellRoute`, so listeners are always
+/// present and the provider is never actually disposed in practice. The
+/// `markRead` → `ref.invalidate(myChatsProvider)` cascade therefore always
+/// finds a live provider to re-trigger.
+@riverpod
 Stream<List<Chat>> myChats(Ref ref) =>
     ref.watch(messagesRepositoryProvider).watchMyChats();

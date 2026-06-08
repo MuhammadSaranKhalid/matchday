@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../follows/presentation/controllers/follow_toggle_controller.dart';
 import '../../../matches/domain/entities/match.dart';
 import '../../../matches/presentation/providers/matches_providers.dart';
 import '../../domain/entities/roster_member.dart';
@@ -497,6 +498,7 @@ class _TeamPageBodyState extends State<_TeamPageBody> {
       child: Column(
         children: [
           _Hero(
+            teamId: widget.teamId,
             team: v.team,
             viewer: v.viewer,
             badges: v.badges,
@@ -525,12 +527,14 @@ class _TeamPageBodyState extends State<_TeamPageBody> {
 
 class _Hero extends StatelessWidget {
   const _Hero({
+    required this.teamId,
     required this.team,
     required this.viewer,
     required this.badges,
     this.onBack,
   });
 
+  final String teamId;
   final TpTeam team;
   final TeamPageViewer viewer;
   final List<TpHeroBadge> badges;
@@ -602,6 +606,7 @@ class _Hero extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
                   child: _ActionRow(
+                    teamId: teamId,
                     viewer: viewer,
                     team: team,
                     heroColor: color,
@@ -901,18 +906,20 @@ class _PitchMotif extends CustomPainter {
 // single "Read-only archive" + share button row.
 // ---------------------------------------------------------------------------
 
-class _ActionRow extends StatelessWidget {
+class _ActionRow extends ConsumerWidget {
   const _ActionRow({
+    required this.teamId,
     required this.viewer,
     required this.team,
     required this.heroColor,
   });
 
+  final String teamId;
   final TeamPageViewer viewer;
   final TpTeam team;
   final Color heroColor;
 
-  List<_Action> _actionsFor() {
+  List<_Action> _actionsFor(WidgetRef ref) {
     if (team.archived != null) {
       return const [
         _Action(label: 'Read-only archive', icon: Icons.access_time),
@@ -950,25 +957,49 @@ class _ActionRow extends StatelessWidget {
           _Action(label: 'My stats', icon: Icons.bar_chart),
         ];
       case TeamPageViewer.following:
-        return const [
-          _Action(label: 'Following', icon: Icons.check, primary: true),
-          _Action(label: 'Notify', icon: Icons.notifications_none),
+        // Reachable today via the same path as `stranger` once the user
+        // taps Follow — kept distinct so the right-hand action differs
+        // ("Notify" instead of "Request to join"). The primary button
+        // still flips Follow ↔ Following based on the live state.
+        return [
+          _followAction(ref),
+          const _Action(label: 'Notify', icon: Icons.notifications_none),
         ];
       case TeamPageViewer.strangerPrivate:
         return const [
           _Action(label: 'Request to join', icon: Icons.add, primary: true),
         ];
       case TeamPageViewer.stranger:
-        return const [
-          _Action(label: 'Follow', icon: Icons.add, primary: true),
-          _Action(label: 'Request to join'),
+        return [
+          _followAction(ref),
+          const _Action(label: 'Request to join'),
         ];
     }
   }
 
+  /// The primary Follow / Following button driven by the toggle controller.
+  /// Watches the live follow status for this team; on tap fires the
+  /// optimistic toggle in the controller. The action.onTap closure goes
+  /// through to `_ActionButton`'s GestureDetector.
+  _Action _followAction(WidgetRef ref) {
+    final following = ref.watch(
+      followToggleProvider('team', teamId),
+    );
+    final isFollowing = following.value ?? false;
+    return _Action(
+      label: isFollowing ? 'Following' : 'Follow',
+      icon: isFollowing ? Icons.check : Icons.add,
+      primary: true,
+      onTap: () => ref
+          .read(followToggleProvider('team', teamId)
+              .notifier)
+          .toggle(),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
-    final actions = _actionsFor();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final actions = _actionsFor(ref);
     return Row(
       children: [
         for (var i = 0; i < actions.length; i++) ...[
@@ -987,12 +1018,14 @@ class _Action {
     this.primary = false,
     this.iconOnly = false,
     this.badge,
+    this.onTap,
   });
   final String? label;
   final IconData? icon;
   final bool primary;
   final bool iconOnly;
   final int? badge;
+  final VoidCallback? onTap;
 }
 
 class _ActionButton extends StatelessWidget {
@@ -1044,10 +1077,17 @@ class _ActionButton extends StatelessWidget {
         ],
       ),
     );
+    final tapped = action.onTap == null
+        ? body
+        : GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: action.onTap,
+            child: body,
+          );
     if (primary || (!action.iconOnly && action.label != null)) {
-      return Expanded(child: body);
+      return Expanded(child: tapped);
     }
-    return body;
+    return tapped;
   }
 }
 

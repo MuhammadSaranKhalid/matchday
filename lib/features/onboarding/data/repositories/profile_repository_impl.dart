@@ -33,6 +33,20 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
+  Future<Either<Failure, Profile?>> getByUsername(String username) async {
+    try {
+      final dto = await _remote.fetchProfileByUsername(username);
+      return Right(dto?.toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, bool>> isUsernameAvailable(String username) async {
     try {
       final available = await _remote.isUsernameAvailable(username);

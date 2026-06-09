@@ -23,7 +23,12 @@ class FeedPostCard extends StatelessWidget {
   final Post post;
   final VoidCallback onComment;
   final void Function(int index) onOpenPhoto;
-  final VoidCallback? onAuthorTap;
+
+  /// Fires when the author avatar is tapped, passing the author's @handle.
+  /// The host route pushes `/u/<username>` to open the public profile.
+  /// Null is allowed for posts whose author was deleted (the avatar tap
+  /// is then inert).
+  final ValueChanged<String>? onAuthorTap;
 
   /// Hide the author avatar/name on a profile (where every post is the owner's).
   final bool showAuthor;
@@ -68,7 +73,10 @@ class FeedPostCard extends StatelessWidget {
                 children: [
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: onAuthorTap,
+                    onTap: () {
+                      final u = post.authorUsername;
+                      if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
+                    },
                     child:
                         Avatar(mono: post.authorMonogram, tone: AvatarTone.ink),
                   ),

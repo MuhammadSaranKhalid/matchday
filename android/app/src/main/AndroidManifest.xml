@@ -28,9 +28,30 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Route incoming http(s) deep links to the Flutter framework so
+                 go_router resolves them (e.g. /u/<username>). Without this the
+                 engine ignores App Links. -->
+            <meta-data
+              android:name="flutter_deeplinking_enabled"
+              android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Android App Links: open https://joinmatchday.com/u/* in-app
+                 (shared profile links land on /u/:username). autoVerify makes
+                 Android fetch https://joinmatchday.com/.well-known/assetlinks.json
+                 and verify it lists this app's release signing SHA-256
+                 fingerprint — until that file is hosted, links open in the
+                 browser instead of the app. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="joinmatchday.com"
+                    android:pathPrefix="/u/" />
             </intent-filter>
         </activity>
         <!-- image_cropper (uCrop). Required manual registration; uCrop needs an

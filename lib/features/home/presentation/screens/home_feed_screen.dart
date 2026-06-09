@@ -35,8 +35,12 @@ const bool _kShowFeedFilters = false;
 class HomeFeedScreen extends ConsumerStatefulWidget {
   const HomeFeedScreen({super.key, this.onBell, this.onOpenProfile});
 
+  // ─────────────────────────────────────────────────────────────────────
+  // onOpenProfile is fired with the tapped author's @username — the host
+  // route should push `/u/<username>` to open their public profile.
+
   final VoidCallback? onBell;
-  final VoidCallback? onOpenProfile;
+  final ValueChanged<String>? onOpenProfile;
 
   @override
   ConsumerState<HomeFeedScreen> createState() => _HomeFeedScreenState();
@@ -133,7 +137,7 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
           child: FeedPostCard(
             post: post,
             onComment: () => showCommentsSheet(context),
-            onAuthorTap: () => widget.onOpenProfile?.call(),
+            onAuthorTap: (username) => widget.onOpenProfile?.call(username),
             onOpenPhoto: (index) => _openPhoto(post.media, index),
           ),
         );

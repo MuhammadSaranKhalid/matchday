@@ -59,4 +59,4 @@ final class PushMessagingServiceProvider
 }
 
 String _$pushMessagingServiceHash() =>
-    r'de1e3b02e9a4845a20ecdde96b195c51a6fd864b';
+    r'769f511042d52ffede874d24b89996564c898aa7';

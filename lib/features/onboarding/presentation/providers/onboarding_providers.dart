@@ -47,3 +47,16 @@ Future<Profile?> myProfile(Ref ref) async {
   final result = await ref.read(profileRepositoryProvider).getMyProfile();
   return result.fold((f) => throw FailureWrapper(f), (p) => p);
 }
+
+/// Any user's public profile by [username] — backs the `/u/:username` route
+/// and shared-link landing (a tapped `joinmatchday.com/u/<username>` opens
+/// here). Resolves to null when the username isn't found, so the screen can
+/// render a "not found" state. Throws a [FailureWrapper] on a fetch error
+/// (rendered via AsyncError). Autodispose: a viewed profile shouldn't pin
+/// memory once the screen is gone.
+@riverpod
+Future<Profile?> profileByUsername(Ref ref, String username) async {
+  final result =
+      await ref.read(profileRepositoryProvider).getByUsername(username);
+  return result.fold((f) => throw FailureWrapper(f), (p) => p);
+}

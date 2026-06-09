@@ -212,6 +212,11 @@ blurhash_dart: ^1.2.1                # encode BlurHash on-device from the resize
 image: ^4.8.0                        # decode pixels for BlurHash encoding
 flutter_blurhash: ^0.9.1             # render the BlurHash placeholder (blur → sharp fade)
 photo_view: ^0.15.0                  # full-screen pinch-zoom photo viewer
+# Native share sheet (profile share button → OS share sheet). Text-only
+# sharing; no Android FileProvider / iOS Info.plist config needed. API:
+# SharePlus.instance.share(ShareParams(...)) — the static Share.share is
+# deprecated. Used by features/profile profile_screen.dart.
+share_plus: ^13.1.0
 # NOTE: google_fonts was removed in favour of bundled variable fonts. The
 # Inter / Inter Tight / JetBrains Mono TTFs live in assets/fonts/ and are
 # declared under `flutter: fonts:` in pubspec.yaml. This keeps the app
@@ -1501,3 +1506,24 @@ Push is wired end-to-end as of 2026-06-06. Firebase project: `matchday-44ed4`. A
 **Tap handling:** Push payloads include a `route` field. `PushMessagingService` listens for tap events and forwards the route to the router; the router validates and navigates. Don't navigate from the service directly — go through go_router so the auth-redirect logic still applies.
 
 **Routing requests through push.** Anything that would have wanted a real-time subscription on a request-shaped table (e.g. `match_requests`) should instead piggyback on the existing notifications broadcast — the state-change signal is already there. Do not add request tables to `supabase_realtime`.
+
+---
+
+## 17. Deep links (App / Universal Links) + shareable profiles
+
+Wired 2026-06-08 for the profile **share** button. Host: `joinmatchday.com`.
+
+**Share → link.** The profile Share button (`features/profile/.../profile_screen.dart`, `_shareProfile`) opens the OS share sheet (`share_plus`) with `https://joinmatchday.com/u/<username>`. The host lives in one constant (`_profileShareBase`).
+
+**Link → screen (in-app).** A `/u/:username` route in `app_router.dart` renders `ProfileScreen(username:)`. That screen now has **three modes**: self (`myProfileProvider`), by-username (`profileByUsernameProvider` — a **real** public profile), and the legacy spectator mock. Unknown/inactive handle → a not-found state.
+
+**Reading another user's profile.** `ProfileRepository.getByUsername` is a plain online-only direct read — `profiles` (and `player_profiles`) SELECT is public (`profiles_read_public` RLS, `account_status = 'active'`), so **no edge function / migration** is needed. `profileByUsernameProvider` is autodispose (a viewed profile shouldn't pin memory). `followCountsProvider` / `authorPostsProvider` are already keyed by user id, so real counts + posts come for free.
+
+**Native config (in-repo).** Android: an `autoVerify` App Links `<intent-filter>` for `https://joinmatchday.com/u/*` + `flutter_deeplinking_enabled` meta-data (`AndroidManifest.xml`). iOS: `FlutterDeepLinkingEnabled` in `Info.plist` + `Runner.entitlements` with `applinks:joinmatchday.com` (the empty `FlutterSceneDelegate` forwards Universal Links to the engine automatically; go_router then resolves the path).
+
+**External steps (NOT in-repo — required before links auto-open the app):**
+- Host `https://joinmatchday.com/.well-known/assetlinks.json` with the **release** signing SHA-256 fingerprint (`keytool -list -v -keystore <release.keystore>`).
+- Host `https://joinmatchday.com/.well-known/apple-app-site-association` (JSON, **no** extension, `Content-Type: application/json`) with the Apple **Team ID** + bundle id.
+- In Xcode, add the **Associated Domains** capability to the Runner target (wires `CODE_SIGN_ENTITLEMENTS` to `Runner.entitlements` and registers the capability on the provisioning profile).
+
+Until both files are hosted, `share_plus` still works and the in-app route resolves — the link just opens the browser instead of the app. **Follow / Message** on a by-username profile are still inert (their own ticket).

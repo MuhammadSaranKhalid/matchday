@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Universal Links: open https://joinmatchday.com/* in-app (shared profile
+	     links land on /u/:username). This file is wired into the build by adding
+	     the "Associated Domains" capability in Xcode (Runner target → Signing &
+	     Capabilities), which also registers the capability on the provisioning
+	     profile. Apple must be able to fetch
+	     https://joinmatchday.com/.well-known/apple-app-site-association for
+	     verification. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:joinmatchday.com</string>
+	</array>
+</dict>
+</plist>

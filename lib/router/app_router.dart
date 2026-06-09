@@ -98,7 +98,11 @@ GoRouter appRouter(Ref ref) {
                 path: '/home',
                 builder: (context, _) => HomeFeedScreen(
                   onBell: () => _openBell(context),
-                  onOpenProfile: () => _openSpectatorProfile(context),
+                  // Tap an author in the feed → push their public profile
+                  // by @username. Defined as `/u/:username` (root-level
+                  // route, full-screen over the shell — see below).
+                  onOpenProfile: (username) =>
+                      context.push('/u/$username'),
                 ),
               ),
             ],
@@ -266,6 +270,15 @@ GoRouter appRouter(Ref ref) {
         path: '/notifications',
         builder: (_, __) => const NotificationsScreen(),
       ),
+      // Public profile by @username — the landing for a shared
+      // `joinmatchday.com/u/<username>` link (universal/app link) and for
+      // tapping a user elsewhere. Full-screen over the shell; gated by the
+      // auth redirect like every other route.
+      GoRoute(
+        path: '/u/:username',
+        builder: (_, state) =>
+            ProfileScreen(username: state.pathParameters['username']!),
+      ),
     ],
   );
 }
@@ -275,13 +288,6 @@ GoRouter appRouter(Ref ref) {
 void _openBell(BuildContext context) {
   Navigator.of(context, rootNavigator: true).push(
     MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
-  );
-}
-
-/// Tapping another user in the feed opens their profile (spectator view).
-void _openSpectatorProfile(BuildContext context) {
-  Navigator.of(context, rootNavigator: true).push(
-    MaterialPageRoute<void>(builder: (_) => const ProfileScreen(spectator: true)),
   );
 }
 

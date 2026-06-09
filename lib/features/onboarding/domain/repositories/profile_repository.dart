@@ -16,6 +16,11 @@ abstract class ProfileRepository {
   /// router's onboarding gate (`profile.isComplete`).
   Future<Either<Failure, Profile?>> getMyProfile();
 
+  /// Any user's public profile by [username], or null when no active profile
+  /// holds it. Online-only direct read (profiles are publicly readable).
+  /// Backs the public `/u/:username` profile route + shared-link landing.
+  Future<Either<Failure, Profile?>> getByUsername(String username);
+
   /// Whether [username] is free to claim. Format is assumed already valid.
   Future<Either<Failure, bool>> isUsernameAvailable(String username);
 

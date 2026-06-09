@@ -1,13 +1,19 @@
 // Faithful Flutter port of the matchday v2 prototype's identity-first profile
 // (`V21Profile` in design/app/screens/v2-IA.jsx).
 //
-// PRESENTATION-ONLY, MOCK DATA. No Riverpod / backend / repositories — plain
-// Stateless/Stateful widgets. Buttons are inert except the FAB (→ ComposerScreen)
-// and Edit profile (→ ProfileEditScreen); the comment action opens the shared
-// comments sheet. Cricket stats and the posts grid are intentionally removed —
-// the profile shows the feed-style LIST view only.
+// Three modes:
+//   • Self ("You" tab)        → real signed-in profile (myProfileProvider),
+//                               Edit profile + Share, compose FAB.
+//   • By username (/u/:user)  → real public profile (profileByUsernameProvider)
+//                               for a shared link; Follow/Message/Share, back
+//                               chevron, no FAB. Unknown handle → not-found.
+//   • Spectator demo          → a fictional other user from hard-coded mock
+//                               copy (legacy; reached only from the feed demo).
+// Cricket stats and the posts grid are intentionally removed — the profile
+// shows the feed-style LIST view only. Follow/Message remain to-be-wired.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:novex_clean_arch/core/theme/circk_theme.dart';
 import 'package:novex_clean_arch/features/posts/presentation/widgets/post_card.dart';
@@ -18,6 +24,7 @@ import 'package:novex_clean_arch/features/auth/presentation/providers/auth_provi
 import 'package:novex_clean_arch/features/follows/domain/entities/follow_direction.dart';
 import 'package:novex_clean_arch/features/follows/presentation/providers/follows_providers.dart';
 import 'package:novex_clean_arch/features/follows/presentation/screens/followers_list_screen.dart';
+import 'package:novex_clean_arch/features/onboarding/domain/entities/player_profile.dart';
 import 'package:novex_clean_arch/features/onboarding/domain/entities/profile.dart';
 import 'package:novex_clean_arch/features/onboarding/presentation/providers/onboarding_providers.dart';
 import 'package:novex_clean_arch/features/posts/presentation/providers/posts_providers.dart';
@@ -31,34 +38,105 @@ const Color _hueRed = Color(0xFFC2362B); // oklch(0.62 0.19 28) — "SIX" highli
 const Color _hueIndigo = Color(0xFF2E3E63); // oklch(0.42 0.10 260)
 const Color _hueGold = Color(0xFFB98A2E); // oklch(0.55 0.13 80)
 
+/// Canonical web base for a shared profile link. The app resolves
+/// `joinmatchday.com/u/<username>` in-app via the `/u/:username` route + the
+/// App/Universal Links config; the OS only hands the link over once the
+/// verification files (`assetlinks.json` / `apple-app-site-association`) are
+/// hosted on the domain. Kept as a single constant so the host is easy to swap.
+const String _profileShareBase = 'https://joinmatchday.com/u';
+
+/// Opens the OS share sheet with a link to [handle]'s matchday profile.
+/// [name]/[handle] are already resolved to real-or-mock values by the hero,
+/// so this works for both the self view and the spectator demo. [originContext]
+/// anchors the share-sheet popover on iPad (ignored on phones).
+Future<void> _shareProfile(
+  BuildContext originContext, {
+  required String name,
+  required String handle,
+}) {
+  final slug = handle.startsWith('@') ? handle.substring(1) : handle;
+  final link = '$_profileShareBase/$slug';
+  final box = originContext.findRenderObject() as RenderBox?;
+  final origin = (box != null && box.hasSize)
+      ? box.localToGlobal(Offset.zero) & box.size
+      : null;
+  return SharePlus.instance.share(
+    ShareParams(
+      text: 'Check out $name ($handle) on matchday 🏏\n$link',
+      subject: '$name on matchday',
+      sharePositionOrigin: origin,
+    ),
+  );
+}
+
 class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key, this.isTab = false, this.spectator = false});
+  const ProfileScreen({
+    super.key,
+    this.isTab = false,
+    this.spectator = false,
+    this.username,
+  });
 
   /// True when shown as the authenticated "You" tab (shell owns the bottom nav,
   /// so this screen renders none).
   final bool isTab;
 
-  /// True when viewing someone else's profile (back chevron, Follow/Message,
-  /// mutual count, no compose FAB).
+  /// True for the legacy spectator DEMO — a fictional other user rendered from
+  /// hard-coded mock data (back chevron, Follow/Message, mutual count, no FAB).
+  /// For viewing a *real* other user, pass [username] instead.
   final bool spectator;
+
+  /// When set, render the REAL public profile for this `@username`
+  /// (the `/u/:username` route + shared-link landing). Chrome matches the
+  /// spectator layout, but every field is live data.
+  final String? username;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Self view shows the signed-in user's real posts; the spectator demo keeps
-    // its mock list (it's a fictional other user).
-    // Stream-backed auth entity (same source as the router/app), not a raw
-    // Supabase SDK snapshot; UserId.value is the uid that matches posts.author_id.
-    final authorId = spectator
-        ? null
-        : ref.watch(currentUserStreamProvider).value?.id.value;
-    // Real profile for the self view; spectator keeps the mock identity.
-    // Watch the full AsyncValue so the hero can render a shimmer while the
-    // first fetch is in-flight, not just a placeholder string.
-    final profileAsync = spectator
-        ? const AsyncValue<Profile?>.data(null)
-        : ref.watch(myProfileProvider);
+    final byUsername = username != null;
+    // Self = the signed-in "You" tab. Everything else is an "other" view
+    // (back chevron, Follow/Message/Share, no compose FAB).
+    final isSelf = !spectator && !byUsername;
+    // Only the legacy demo renders hard-coded mock copy.
+    final mock = spectator && !byUsername;
+
+    // Profile source per mode. Watch the full AsyncValue so the hero can show a
+    // shimmer while the first fetch is in-flight.
+    final profileAsync = byUsername
+        ? ref.watch(profileByUsernameProvider(username!))
+        : mock
+            ? const AsyncValue<Profile?>.data(null)
+            : ref.watch(myProfileProvider);
     final profile = profileAsync.value;
-    final profileLoading = !spectator && profileAsync.isLoading && profile == null;
+    final loading = profileAsync.isLoading && profile == null;
+    // A resolved-but-absent real profile (unknown / inactive username) — or a
+    // fetch error — lands here. Only meaningful in the by-username mode.
+    final notFound = byUsername && !loading && profile == null;
+
+    // Whose posts + follow counts to show. Self → signed-in uid; by-username →
+    // the resolved profile's uid; mock → null (keeps the mock posts list).
+    // Stream-backed auth entity (same source as the router/app); UserId.value
+    // is the uid that matches posts.author_id.
+    final subjectUserId = byUsername
+        ? profile?.userId.value
+        : mock
+            ? null
+            : ref.watch(currentUserStreamProvider).value?.id.value;
+
+    if (notFound) {
+      return const ColoredBox(
+        color: CkColors.paper,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _CompactNav(spectator: true),
+              Expanded(child: _ProfileNotFound()),
+            ],
+          ),
+        ),
+      );
+    }
 
     final scroll = SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 12),
@@ -66,15 +144,17 @@ class ProfileScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _IdentityHero(
-            spectator: spectator,
+            isSelf: isSelf,
+            mock: mock,
             profile: profile,
-            loading: profileLoading,
+            loading: loading,
+            subjectUserId: subjectUserId,
             onEdit: () => _openEdit(context),
           ),
           const _PlaysForSection(),
           _PostsSection(
             onOpenComments: () => showCommentsSheet(context),
-            authorId: authorId,
+            authorId: subjectUserId,
           ),
         ],
       ),
@@ -86,7 +166,7 @@ class ProfileScreen extends ConsumerWidget {
         bottom: false,
         child: Column(
           children: [
-            _CompactNav(spectator: spectator),
+            _CompactNav(spectator: !isSelf),
             Expanded(child: scroll),
           ],
         ),
@@ -94,7 +174,7 @@ class ProfileScreen extends ConsumerWidget {
     );
 
     // Compose FAB overlays only on the self view.
-    if (spectator) return content;
+    if (!isSelf) return content;
 
     return Stack(
       children: [
@@ -119,6 +199,40 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
+/// Empty state for `/u/:username` when the handle resolves to no active
+/// profile (or the fetch failed). Keeps the back-chevron nav so the user can
+/// retreat.
+class _ProfileNotFound extends StatelessWidget {
+  const _ProfileNotFound();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const V2Svg(V2Icons.pin, size: 28, color: CkColors.muted),
+            const SizedBox(height: 12),
+            Text(
+              "We couldn't find that profile.",
+              textAlign: TextAlign.center,
+              style: CkType.body(fontSize: 14, color: CkColors.ink),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'The link may be broken or the account is no longer active.',
+              textAlign: TextAlign.center,
+              style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Compact nav: padding 6/14/4, label centred, optional back + 3-dot. ──
 class _CompactNav extends StatelessWidget {
   const _CompactNav({required this.spectator});
@@ -138,7 +252,10 @@ class _CompactNav extends StatelessWidget {
               onTap: () => Navigator.maybePop(context),
             )
           else
-            const SizedBox(width: 28),
+            // Self view: empty 30px left spacer so the title is visually
+            // centered against the right-side gear button (matches the
+            // matchday-challenge profile-you design).
+            const SizedBox(width: 30),
           Expanded(
             child: Center(
               child: Text(
@@ -152,12 +269,35 @@ class _CompactNav extends StatelessWidget {
               ),
             ),
           ),
-          _IconButton(
-            icon: V2Icons.dotsV,
-            size: 18,
-            strokeWidth: 2,
-            onTap: () {},
-          ),
+          if (spectator)
+            _IconButton(
+              icon: V2Icons.dotsV,
+              size: 18,
+              strokeWidth: 2,
+              onTap: () {},
+            )
+          else
+            // Self view: gear icon (settings affordance). Material's
+            // `Icons.settings_outlined` is close enough to the design's
+            // 1.7px-stroke gear without inlining a custom SVG path.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                // Settings entry — future Pavilion settings push.
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  duration: Duration(milliseconds: 1400),
+                  content: Text('Settings coming soon'),
+                ));
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(
+                  Icons.settings_outlined,
+                  size: 22,
+                  color: CkColors.ink,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -198,35 +338,62 @@ class _IconButton extends StatelessWidget {
 // ── Identity hero: avatar, name, handle, location, bio, signals, actions. ──
 class _IdentityHero extends ConsumerWidget {
   const _IdentityHero({
-    required this.spectator,
+    required this.isSelf,
+    required this.mock,
     this.profile,
     this.loading = false,
+    this.subjectUserId,
     required this.onEdit,
   });
-  final bool spectator;
 
-  /// Real profile for the self view; null for the spectator mock.
+  /// True for the signed-in "You" tab (Edit profile + Share, compose FAB).
+  /// False for any "other" view (Follow/Message/Share).
+  final bool isSelf;
+
+  /// Legacy spectator DEMO — render hard-coded mock copy (name, bio, counts).
+  /// Mutually exclusive with a real [profile].
+  final bool mock;
+
+  /// Real profile for the self view and the by-username view; null for the
+  /// spectator mock (and transiently while a real fetch is in flight).
   final Profile? profile;
 
-  /// True while the self-view profile is being fetched for the first time
-  /// — render a shimmer skeleton instead of the placeholder strings.
+  /// True while the profile is being fetched for the first time — render a
+  /// shimmer skeleton instead of the placeholder strings.
   final bool loading;
+
+  /// The viewed subject's uid — drives the real follower/following counts.
+  /// Null for the mock demo.
+  final String? subjectUserId;
+
   final VoidCallback onEdit;
 
   String get _name {
     final dn = profile?.displayName?.trim();
     if (dn != null && dn.isNotEmpty) return dn;
-    return spectator ? 'Bilal Ahmed' : 'matchday player';
+    return mock ? 'Bilal Ahmed' : 'matchday player';
   }
 
   String get _handle {
     final u = profile?.username;
-    return (u != null && u.isNotEmpty) ? '@$u' : (spectator ? '@bilala' : '@you');
+    return (u != null && u.isNotEmpty) ? '@$u' : (mock ? '@bilala' : '@you');
   }
 
   String get _city {
     final c = profile?.city?.trim();
-    return (c != null && c.isNotEmpty) ? c : (spectator ? 'Karachi' : '—');
+    return (c != null && c.isNotEmpty) ? c : (mock ? 'Karachi' : '—');
+  }
+
+  /// True when the role/style row has anything to render — used to skip
+  /// the whole `Padding` block when the player profile is null or both
+  /// the role and bowling/batting styles are unset.
+  bool get _roleLineHasContent {
+    final pp = profile?.playerProfile;
+    if (mock) return true; // the mock demo always has content
+    if (pp == null) return false;
+    return pp.role != null ||
+        pp.battingStyle != null ||
+        (pp.bowlingStyle != null && pp.bowlingStyle != BowlingStyle.doesntBowl);
   }
 
   String get _monogram {
@@ -330,7 +497,22 @@ class _IdentityHero extends ConsumerWidget {
             ],
           ),
 
-          // Bio — real text for the self view; the styled sample for spectator.
+          // Role pill + batting/bowling style line — single horizontal row,
+          // never wraps (the matchday-challenge spec is explicit: "ALL-/
+          // ROUNDER" splitting mid-word was a bug). Rendered only when at
+          // least the role OR a style is available; collapsed otherwise.
+          if (_roleLineHasContent)
+            Padding(
+              padding: const EdgeInsets.only(top: 9),
+              child: _RoleStyleLine(playerProfile: profile?.playerProfile),
+            ),
+
+          // Bio — four states:
+          //   1. Has a bio                → render body text (self or other)
+          //   2. Self + empty bio         → dashed "+ Add a bio" pill (toasts;
+          //                                 the real editor is its own ticket)
+          //   3. Mock demo                → mock structured fallback
+          //   4. Other real + empty bio   → render nothing (can't edit theirs)
           if (profile != null && (profile!.bio?.trim() ?? '').isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 14),
@@ -346,7 +528,19 @@ class _IdentityHero extends ConsumerWidget {
                 ),
               ),
             )
-          else if (profile == null)
+          else if (isSelf && profile != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: _AddBioPill(
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    duration: Duration(milliseconds: 1400),
+                    content: Text('Edit bio coming soon'),
+                  ),
+                ),
+              ),
+            )
+          else if (mock)
             Padding(
               padding: const EdgeInsets.only(top: 14),
               child: ConstrainedBox(
@@ -379,10 +573,10 @@ class _IdentityHero extends ConsumerWidget {
               ),
             ),
 
-          // Social signals — followers / following. Real-data path
-          // depends on a signed-in user; spectator's fictional profile
-          // keeps its placeholder counts.
-          if (spectator)
+          // Social signals — followers / following. The mock demo keeps its
+          // placeholder counts; self + by-username views read live counts for
+          // [subjectUserId].
+          if (mock)
             Padding(
               padding: const EdgeInsets.only(top: 14),
               child: Row(
@@ -404,31 +598,44 @@ class _IdentityHero extends ConsumerWidget {
               ),
             )
           else
-            _RealSignals(name: _name, handle: _handle),
+            _RealSignals(
+              userId: subjectUserId,
+              name: _name,
+              handle: _handle,
+            ),
 
           // Actions.
           Padding(
             padding: const EdgeInsets.only(top: 16),
-            child: spectator
-                ? const Row(
+            child: !isSelf
+                ? Row(
                     children: [
-                      _PrimaryBtn(label: 'Follow'),
-                      SizedBox(width: 8),
-                      _GhostBtn(label: 'Message'),
-                      SizedBox(width: 8),
-                      _IconSquareBtn(icon: V2Icons.share),
+                      const _PrimaryBtn(label: 'Follow'),
+                      const SizedBox(width: 8),
+                      const _GhostBtn(label: 'Message'),
+                      const SizedBox(width: 8),
+                      _IconSquareBtn(
+                        icon: V2Icons.share,
+                        onTap: () => _shareProfile(
+                          context,
+                          name: _name,
+                          handle: _handle,
+                        ),
+                      ),
                     ],
                   )
                 : Row(
                     children: [
-                      _GhostBtn(label: 'Edit profile', onTap: onEdit),
+                      // Edit profile — solid ink CTA per the design.
+                      _PrimaryBtn(label: 'Edit profile', onTap: onEdit),
                       const SizedBox(width: 8),
-                      const _GhostBtn(label: 'Share profile'),
-                      const SizedBox(width: 8),
-                      // Pencil icon button.
-                      const _IconSquareBtn(
-                        icon:
-                            '<path d="M12 20h9M4 20l4-1 11-11-3-3L5 16l-1 4z"/>',
+                      _GhostBtn(
+                        label: 'Share',
+                        onTap: () => _shareProfile(
+                          context,
+                          name: _name,
+                          handle: _handle,
+                        ),
                       ),
                     ],
                   ),
@@ -506,51 +713,80 @@ class _IdentityHeroSkeleton extends StatelessWidget {
   }
 }
 
-/// Followers / following signals for the self view. Reads the live
-/// counts from `followCountsProvider` keyed on the current user, falls
-/// back to a `0 / 0` row while loading, and pushes [FollowersListScreen]
-/// on tap.
+/// Followers / following signals for the self view. Reads live counts
+/// from `followCountsProvider` keyed on the current user and renders a
+/// single muted sentence of the form `**284** followers · **92** following`
+/// per the matchday-challenge profile design. Each count is an inline
+/// tappable target that pushes [FollowersListScreen] with the matching
+/// initial tab.
 class _RealSignals extends ConsumerWidget {
-  const _RealSignals({required this.name, required this.handle});
+  const _RealSignals({
+    required this.userId,
+    required this.name,
+    required this.handle,
+  });
 
-  /// Display name + `@handle` to send to the followers screen header.
+  /// The viewed subject's uid (signed-in user for the self view, the resolved
+  /// profile's uid for a by-username view). Null → counts render as 0 and the
+  /// taps are inert.
+  final String? userId;
+
+  /// Display name + `@handle` for the followers screen header.
   final String name;
   final String handle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserStreamProvider).value;
-    final userId = user?.id.value;
-    final countsAsync = userId == null
-        ? null
-        : ref.watch(followCountsProvider(userId));
+    // Local capture so the tap closures promote to non-null.
+    final uid = userId;
+    final countsAsync =
+        uid == null ? null : ref.watch(followCountsProvider(uid));
 
     final followers = countsAsync?.value?.followers ?? 0;
     final following = countsAsync?.value?.following ?? 0;
-
-    // Strip the leading '@' if present — followers screen header adds its own.
     final username = handle.startsWith('@') ? handle.substring(1) : handle;
 
+    // Single muted sentence with two inline tappable bold counts. We use
+    // a Row of three widgets (count · label · separator · count · label)
+    // instead of a RichText with GestureDetector spans — the tap targets
+    // need to ignore the trailing word so "284 followers" only triggers
+    // for tapping on "284", and Flutter's TapGestureRecognizer-in-span
+    // doesn't compose cleanly with a parent ConstrainedBox.
     return Padding(
       padding: const EdgeInsets.only(top: 14),
       child: Row(
         children: [
-          _SignalTap(
+          _MetricCount(
             value: followers,
-            label: 'Followers',
-            enabled: userId != null,
-            onTap: userId == null
+            label: 'followers',
+            onTap: uid == null
                 ? null
-                : () => _open(context, userId, username, FollowDirection.followers),
+                : () => _open(
+                      context,
+                      uid,
+                      username,
+                      FollowDirection.followers,
+                    ),
           ),
-          const SizedBox(width: 16),
-          _SignalTap(
+          // Centred separator dot — fontSize 12.5 / muted.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '·',
+              style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+            ),
+          ),
+          _MetricCount(
             value: following,
-            label: 'Following',
-            enabled: userId != null,
-            onTap: userId == null
+            label: 'following',
+            onTap: uid == null
                 ? null
-                : () => _open(context, userId, username, FollowDirection.following),
+                : () => _open(
+                      context,
+                      uid,
+                      username,
+                      FollowDirection.following,
+                    ),
           ),
         ],
       ),
@@ -576,29 +812,197 @@ class _RealSignals extends ConsumerWidget {
   }
 }
 
-/// Tappable variant of [_Signal] — same visual, plus a GestureDetector.
-/// Kept here (not in v2_kit) because this is profile-specific behavior.
-class _SignalTap extends StatelessWidget {
-  const _SignalTap({
+/// Inline tappable metric — bold count followed by a muted noun, like
+/// `**284** followers`. Used by [_RealSignals]; no public callers.
+class _MetricCount extends StatelessWidget {
+  const _MetricCount({
     required this.value,
     required this.label,
-    required this.enabled,
     required this.onTap,
   });
 
   final int value;
   final String label;
-  final bool enabled;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final child = _Signal(value: '$value', label: label);
-    if (!enabled) return child;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: child,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(
+            '$value',
+            style: CkType.display(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.01,
+              color: CkColors.ink,
+            ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Self-view empty-bio pill — dashed border, leading `+` icon, muted
+/// label. Matches the `+ Add a bio` affordance in the matchday-challenge
+/// profile-you design. Tapping fires a toast (the real editor lands in
+/// its own ticket).
+class _AddBioPill extends StatelessWidget {
+  const _AddBioPill({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: ShapeDecoration(
+          // DashedBorder isn't in Flutter core; an OutlinedBorder with a
+          // dashed PaintingStyle is a heavier add. The closest in-tree
+          // approximation is `BorderRadius` + a custom-painted outline.
+          // For v1 we use a solid 1px line — visually close enough at
+          // the small size; upgrade to a true dashed border if/when this
+          // becomes the canonical "add" pattern elsewhere.
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(color: CkColors.line, width: 1),
+            borderRadius: BorderRadius.circular(9),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '+',
+              style: CkType.body(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: CkColors.muted,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Add a bio',
+              style: CkType.body(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: CkColors.muted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Role pill + batting/bowling style line. Single horizontal row that
+/// never wraps — the matchday-challenge design is explicit that breaking
+/// "ALL-ROUNDER" across two lines is a bug.
+///
+/// When [playerProfile] is null the spectator's sample copy is rendered;
+/// otherwise the real role + styles drive both halves.
+class _RoleStyleLine extends StatelessWidget {
+  const _RoleStyleLine({required this.playerProfile});
+  final PlayerProfile? playerProfile;
+
+  String? get _roleLabel {
+    final r = playerProfile?.role;
+    if (r != null) {
+      return switch (r) {
+        PlayerRole.batter => 'BATTER',
+        PlayerRole.bowler => 'BOWLER',
+        PlayerRole.allRounder => 'ALL-ROUNDER',
+        PlayerRole.wicketKeeper => 'WICKET-KEEPER',
+      };
+    }
+    // Spectator: no playerProfile is passed; default to the design's
+    // sample copy.
+    return playerProfile == null ? 'ALL-ROUNDER' : null;
+  }
+
+  String? get _styleLine {
+    final pp = playerProfile;
+    if (pp == null) return 'Right-hand bat · Off-spin';
+    final parts = <String>[];
+    final b = pp.battingStyle;
+    if (b != null) {
+      parts.add(switch (b) {
+        BattingStyle.rightHand => 'Right-hand bat',
+        BattingStyle.leftHand => 'Left-hand bat',
+      });
+    }
+    final bo = pp.bowlingStyle;
+    if (bo != null && bo != BowlingStyle.doesntBowl) {
+      parts.add(switch (bo) {
+        BowlingStyle.rightArmFast => 'Right-arm fast',
+        BowlingStyle.rightArmMedium => 'Right-arm medium',
+        BowlingStyle.rightArmSpin => 'Right-arm spin',
+        BowlingStyle.leftArmFast => 'Left-arm fast',
+        BowlingStyle.leftArmSpin => 'Left-arm spin',
+        BowlingStyle.doesntBowl => '',
+      });
+    }
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final role = _roleLabel;
+    final style = _styleLine;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (role != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Text(
+              role,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.clip,
+              style: CkType.mono(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.10,
+                color: CkColors.ink2,
+              ),
+            ),
+          ),
+          if (style != null) const SizedBox(width: 7),
+        ],
+        if (style != null)
+          Flexible(
+            child: Text(
+              style,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.body(
+                fontSize: 11.5,
+                color: CkColors.ink2,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -684,15 +1088,16 @@ class _GhostBtn extends StatelessWidget {
 }
 
 class _PrimaryBtn extends StatelessWidget {
-  const _PrimaryBtn({required this.label});
+  const _PrimaryBtn({required this.label, this.onTap});
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () {},
+        onTap: onTap ?? () {},
         child: Container(
           height: 38,
           alignment: Alignment.center,
@@ -715,14 +1120,15 @@ class _PrimaryBtn extends StatelessWidget {
 }
 
 class _IconSquareBtn extends StatelessWidget {
-  const _IconSquareBtn({required this.icon});
+  const _IconSquareBtn({required this.icon, this.onTap});
   final String icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () {},
+      onTap: onTap,
       child: Container(
         width: 38,
         height: 38,
@@ -739,47 +1145,127 @@ class _IconSquareBtn extends StatelessWidget {
 }
 
 // ── "Plays for" section: section label + horizontal TeamChip scroll. ──
+/// CAPTAINS + PLAYS FOR — two distinct horizontal-scroll strips per the
+/// matchday-challenge profile-you design. Currently driven by mock data
+/// (one captain chip + two regular chips); real-data integration with
+/// the teams feature is its own ticket.
+///
+/// The CAPTAINS strip uses ink-filled chips with paper text; PLAYS FOR
+/// uses paper-filled chips with ink text. The chip definition itself
+/// already supports both visual styles via `main` — only the data
+/// partition changes here.
 class _PlaysForSection extends StatelessWidget {
   const _PlaysForSection();
 
+  // Mock-data partition: a single captain entry + the rest. Real data
+  // would derive `cap` from the user's role on each team (owner /
+  // captain vs anything else).
+  static const _captainTeams = <_TeamChipData>[
+    _TeamChipData(
+      crest: CkCrest.ll,
+      short: 'LL',
+      name: 'Lahore Lions',
+      role: 'CAPTAIN',
+    ),
+  ];
+
+  static const _playsForTeams = <_TeamChipData>[
+    _TeamChipData(
+      crest: CkCrest.ob,
+      short: 'OB',
+      name: 'Old Boys',
+      role: 'ALL-ROUNDER',
+    ),
+    _TeamChipData(
+      crest: CkCrest.mk,
+      short: 'MK',
+      name: 'Mohalla Kings',
+      role: 'BATTER',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(18, 16, 18, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionLabel('Plays for'),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _TeamChip(
-                  crest: CkCrest.ll,
-                  short: 'LL',
-                  name: 'Lahore Lions',
-                  role: 'CAPTAIN',
-                  main: true,
-                ),
-                SizedBox(width: 8),
-                _TeamChip(
-                  crest: CkCrest.ob,
-                  short: 'OB',
-                  name: 'Old Boys',
-                  role: 'ALL-ROUNDER',
-                ),
-                SizedBox(width: 8),
-                _TeamChip(
-                  crest: CkCrest.mk,
-                  short: 'MK',
-                  name: 'Mohalla Kings',
-                  role: 'BATTER',
-                ),
-              ],
+    // Lists are mock-static today so the strips are always populated; the
+    // future real-data path will swap these for live providers and guard
+    // each strip on emptiness.
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ChipStrip(label: 'Captains', teams: _captainTeams, main: true),
+        SizedBox(height: 14),
+        _ChipStrip(label: 'Plays for', teams: _playsForTeams, main: false),
+        SizedBox(height: 6),
+      ],
+    );
+  }
+}
+
+/// Data record for a team-chip row entry. Kept private — the moment
+/// real data arrives this becomes a thin adapter over the teams entity.
+class _TeamChipData {
+  const _TeamChipData({
+    required this.crest,
+    required this.short,
+    required this.name,
+    required this.role,
+  });
+  final Color crest;
+  final String short;
+  final String name;
+  final String role;
+}
+
+class _ChipStrip extends StatelessWidget {
+  const _ChipStrip({
+    required this.label,
+    required this.teams,
+    required this.main,
+  });
+
+  final String label;
+  final List<_TeamChipData> teams;
+
+  /// Ink-filled chip variant (CAPTAINS) when true; paper-filled (PLAYS
+  /// FOR) when false.
+  final bool main;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 9),
+          child: Text(
+            label.toUpperCase(),
+            style: CkType.mono(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.10,
+              color: CkColors.muted,
             ),
           ),
-        ],
-      ),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: Row(
+            children: [
+              for (var i = 0; i < teams.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                _TeamChip(
+                  crest: teams[i].crest,
+                  short: teams[i].short,
+                  name: teams[i].name,
+                  role: teams[i].role,
+                  main: main,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1034,27 +1520,6 @@ class _PostCardSkeleton extends StatelessWidget {
           const SizedBox(height: 16),
           const Divider(height: 1, color: CkColors.hairline),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text.toUpperCase(),
-        style: CkType.mono(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.10,
-          color: CkColors.muted,
-        ),
       ),
     );
   }

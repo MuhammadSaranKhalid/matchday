@@ -47,6 +47,32 @@ class OnboardingRemoteDataSource {
     }
   }
 
+  /// Fetch any user's public profile by [username] (the `profiles` table is
+  /// publicly readable for active accounts — see the `profiles_read_public`
+  /// RLS policy). Returns null when no active profile holds that username.
+  /// Folds the 1:1 `player_profiles` row in under the key [ProfileDto] expects,
+  /// mirroring [fetchMyProfile].
+  Future<ProfileDto?> fetchProfileByUsername(String username) async {
+    try {
+      final row = await _supabase
+          .from(_profiles)
+          .select()
+          .eq('username', username)
+          .maybeSingle();
+      if (row == null) return null;
+
+      final player = await _supabase
+          .from(_playerProfiles)
+          .select()
+          .eq('user_id', row['user_id'] as Object)
+          .maybeSingle();
+      row['player_profile'] = player;
+      return ProfileDto.fromJson(row);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
   /// `profiles` is publicly readable; a username is free when no row holds it
   /// (excluding the caller's own row). The DB also guards uniqueness + cooldown
   /// via constraint/trigger — this is just the pre-flight UX check.

@@ -194,3 +194,107 @@ final class MyProfileProvider
 }
 
 String _$myProfileHash() => r'2ee4065620f7d001fa0647ccdd6a52f358b3246a';
+
+/// Any user's public profile by [username] — backs the `/u/:username` route
+/// and shared-link landing (a tapped `joinmatchday.com/u/<username>` opens
+/// here). Resolves to null when the username isn't found, so the screen can
+/// render a "not found" state. Throws a [FailureWrapper] on a fetch error
+/// (rendered via AsyncError). Autodispose: a viewed profile shouldn't pin
+/// memory once the screen is gone.
+
+@ProviderFor(profileByUsername)
+final profileByUsernameProvider = ProfileByUsernameFamily._();
+
+/// Any user's public profile by [username] — backs the `/u/:username` route
+/// and shared-link landing (a tapped `joinmatchday.com/u/<username>` opens
+/// here). Resolves to null when the username isn't found, so the screen can
+/// render a "not found" state. Throws a [FailureWrapper] on a fetch error
+/// (rendered via AsyncError). Autodispose: a viewed profile shouldn't pin
+/// memory once the screen is gone.
+
+final class ProfileByUsernameProvider
+    extends
+        $FunctionalProvider<AsyncValue<Profile?>, Profile?, FutureOr<Profile?>>
+    with $FutureModifier<Profile?>, $FutureProvider<Profile?> {
+  /// Any user's public profile by [username] — backs the `/u/:username` route
+  /// and shared-link landing (a tapped `joinmatchday.com/u/<username>` opens
+  /// here). Resolves to null when the username isn't found, so the screen can
+  /// render a "not found" state. Throws a [FailureWrapper] on a fetch error
+  /// (rendered via AsyncError). Autodispose: a viewed profile shouldn't pin
+  /// memory once the screen is gone.
+  ProfileByUsernameProvider._({
+    required ProfileByUsernameFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'profileByUsernameProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$profileByUsernameHash();
+
+  @override
+  String toString() {
+    return r'profileByUsernameProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<Profile?> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<Profile?> create(Ref ref) {
+    final argument = this.argument as String;
+    return profileByUsername(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ProfileByUsernameProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$profileByUsernameHash() => r'd49aca415bc4d3fa96d535cc4c7b7aa425d9e493';
+
+/// Any user's public profile by [username] — backs the `/u/:username` route
+/// and shared-link landing (a tapped `joinmatchday.com/u/<username>` opens
+/// here). Resolves to null when the username isn't found, so the screen can
+/// render a "not found" state. Throws a [FailureWrapper] on a fetch error
+/// (rendered via AsyncError). Autodispose: a viewed profile shouldn't pin
+/// memory once the screen is gone.
+
+final class ProfileByUsernameFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<Profile?>, String> {
+  ProfileByUsernameFamily._()
+    : super(
+        retry: null,
+        name: r'profileByUsernameProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Any user's public profile by [username] — backs the `/u/:username` route
+  /// and shared-link landing (a tapped `joinmatchday.com/u/<username>` opens
+  /// here). Resolves to null when the username isn't found, so the screen can
+  /// render a "not found" state. Throws a [FailureWrapper] on a fetch error
+  /// (rendered via AsyncError). Autodispose: a viewed profile shouldn't pin
+  /// memory once the screen is gone.
+
+  ProfileByUsernameProvider call(String username) =>
+      ProfileByUsernameProvider._(argument: username, from: this);
+
+  @override
+  String toString() => r'profileByUsernameProvider';
+}

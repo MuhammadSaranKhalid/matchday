@@ -1,0 +1,561 @@
+-- =============================================================================
+-- seed.sql — chats/messages test data anchored to YOUR existing account
+-- =============================================================================
+-- YOUR account (`muhammadsarankhalid@gmail.com`) is resolved at runtime and
+-- becomes the "me" user — owner of some teams, member of many chats, sender
+-- of some messages. The other 9 users are seeded as cricket-themed
+-- teammates so you have someone to chat with.
+--
+-- Safe to run against:
+--   • Your production Supabase project — your account already exists.
+--   • Local Supabase (after you sign up muhammadsarankhalid@gmail.com locally
+--     first; this file does NOT create your account).
+--
+-- The seed FAILS LOUDLY if your account is not found, so it can't silently
+-- run against the wrong project.
+--
+-- What you get:
+--   • 9 fake teammates: Bilal Ahmed, Faraz Khan, Hassan Tariq, Adeel Saeed,
+--     Karim Anwar, Saad Iqbal, Usman Ali, Yousaf Khan, Zaid Malik.
+--     Credentials: `<firstname>@local.test` / `pass1234`.
+--   • 15 teams: you own 3 (Lahore Lions, Islamabad United, Hyderabad Hawks);
+--     teammates own 12.
+--   • You're a member of 5 other team chats → 8 chats total in your inbox.
+--   • Lahore Lions: a hand-curated 30-message coordination thread where YOU
+--     are the captain doing the coordinating. Your own messages are
+--     attributed to you (sender_id = your uid).
+--   • Karachi Eagles: 250-message pagination/perf stress thread.
+--   • Hyderabad Hawks: zero messages (empty-thread state, owner-only chat).
+--   • Other chats you're in: 30–100 randomised messages each.
+--
+-- Cleanup later (production safety): everything seeded here is tagged via
+-- emails ending in `@local.test`. To remove:
+--   delete from auth.users where email like '%@local.test';
+--   -- cascade deletes profiles + team_members → triggers clean up chats
+--   delete from public.teams where team_id in (
+--     '11111111-1111-1111-1111-111111111101', ...  -- all 15 pinned ids
+--   );
+-- (See full delete script at the bottom of this file.)
+-- =============================================================================
+
+-- =============================================================================
+-- 0) Resolve "me" — fail loudly if your account isn't here
+-- =============================================================================
+
+do $$
+declare
+  v_me uuid;
+begin
+  select id into v_me
+    from auth.users
+   where email = 'muhammadsarankhalid@gmail.com';
+  if v_me is null then
+    raise exception 'Account muhammadsarankhalid@gmail.com not found in auth.users. '
+      'Sign up first (in the app or via the dashboard), then re-run the seed.';
+  end if;
+  if not exists (select 1 from public.profiles where user_id = v_me) then
+    raise exception 'Profile for muhammadsarankhalid@gmail.com not found. '
+      'Complete onboarding in the app first so a profile row exists.';
+  end if;
+  raise notice 'Seeding for user: %', v_me;
+end $$;
+
+-- Note: the dashboard SQL editor and `psql` autocommit each statement, which
+-- would drop a `temp table … on commit drop` between blocks. Instead, every
+-- subsequent block that needs your uid resolves it inline via the same
+-- SELECT. If you ever change the seed account, find-and-replace
+-- `muhammadsarankhalid@gmail.com` in all four blocks below.
+
+-- =============================================================================
+-- 1) Teammates — 9 fake users (auth.users + auth.identities + profiles)
+-- =============================================================================
+-- Direct INSERT into auth.users bypasses the signup flow. Acceptable here
+-- because every seeded teammate has an `@local.test` email — easy to filter
+-- out and delete later.
+-- =============================================================================
+
+do $seed_teammates$
+declare
+  v record;
+begin
+  for v in
+    select * from (values
+      ('00000000-0000-0000-0000-000000000002'::uuid, 'bilal',  'bilal@local.test',  'Bilal Ahmed',   'Opening bat. Right-arm medium.'),
+      ('00000000-0000-0000-0000-000000000003'::uuid, 'faraz',  'faraz@local.test',  'Faraz Khan',    'All-rounder. Loves spin.'),
+      ('00000000-0000-0000-0000-000000000004'::uuid, 'hassan', 'hassan@local.test', 'Hassan Tariq',  'Wicket-keeper.'),
+      ('00000000-0000-0000-0000-000000000005'::uuid, 'adeel',  'adeel@local.test',  'Adeel Saeed',   'Middle-order. Right-arm off-spin.'),
+      ('00000000-0000-0000-0000-000000000006'::uuid, 'karim',  'karim@local.test',  'Karim Anwar',   'Left-arm fast.'),
+      ('00000000-0000-0000-0000-000000000007'::uuid, 'saad',   'saad@local.test',   'Saad Iqbal',    'All-rounder.'),
+      ('00000000-0000-0000-0000-000000000008'::uuid, 'usman',  'usman@local.test',  'Usman Ali',     'Right-arm medium-fast.'),
+      ('00000000-0000-0000-0000-000000000009'::uuid, 'yousaf', 'yousaf@local.test', 'Yousaf Khan',   'Lower-order. Left-arm spin.'),
+      ('0000000a-0000-0000-0000-00000000000a'::uuid, 'zaid',   'zaid@local.test',   'Zaid Malik',    'All-rounder. Switch-hit specialist.')
+    ) as t(id, username, email, display_name, bio)
+  loop
+    -- ON CONFLICT DO NOTHING — if this teammate uid already exists from a
+    -- prior seed run, leave their credentials alone.
+    insert into auth.users (
+      instance_id, id, aud, role, email, encrypted_password,
+      email_confirmed_at, raw_user_meta_data, raw_app_meta_data,
+      created_at, updated_at
+    )
+    values (
+      '00000000-0000-0000-0000-000000000000',
+      v.id, 'authenticated', 'authenticated', v.email,
+      crypt('pass1234', gen_salt('bf')),
+      now(),
+      jsonb_build_object('display_name', v.display_name),
+      jsonb_build_object('provider', 'email', 'providers', array['email']),
+      now(), now()
+    )
+    on conflict (id) do nothing;
+
+    -- ON CONFLICT on (provider, provider_id) — the unique index Supabase
+    -- maintains on identity lookups. Skip if the email identity already
+    -- exists for this user.
+    insert into auth.identities (
+      id, user_id, identity_data, provider, provider_id,
+      last_sign_in_at, created_at, updated_at
+    )
+    values (
+      gen_random_uuid(),
+      v.id,
+      jsonb_build_object(
+        'sub', v.id::text,
+        'email', v.email,
+        'email_verified', true
+      ),
+      'email',
+      v.id::text,
+      now(), now(), now()
+    )
+    on conflict (provider, provider_id) do nothing;
+
+    -- ON CONFLICT DO UPDATE — Supabase apps commonly install a trigger on
+    -- auth.users INSERT that auto-creates a profile row with defaults from
+    -- raw_user_meta_data. Our explicit profile row overrides those
+    -- defaults with the seed values (notably `username` and `bio`).
+    insert into public.profiles (
+      user_id, username, display_name, bio,
+      created_at, updated_at, onboarded_at, last_active_at
+    )
+    values (
+      v.id, v.username, v.display_name, v.bio,
+      now(), now(), now(), now()
+    )
+    on conflict (user_id) do update set
+      username       = excluded.username,
+      display_name   = excluded.display_name,
+      bio            = excluded.bio,
+      onboarded_at   = excluded.onboarded_at,
+      last_active_at = excluded.last_active_at,
+      updated_at     = now();
+  end loop;
+end $seed_teammates$;
+
+-- =============================================================================
+-- 2) Teams
+-- =============================================================================
+-- You own 3 teams (your own team chats appear in your inbox as owner).
+-- Teammates own the other 12. Inserting a team fires `create_team_chat`
+-- which creates the chat row and adds the owner to chat_members as admin.
+-- =============================================================================
+
+-- Your teams (3). Resolved at runtime so the owner_id is YOUR uid.
+do $seed_my_teams$
+declare
+  v_me uuid;
+begin
+  select id into v_me from auth.users
+    where email = 'muhammadsarankhalid@gmail.com';
+
+  insert into public.teams (team_id, owner_id, team_name, team_type, team_colors, logo_monogram, home_ground, founded_year)
+  values
+    ('11111111-1111-1111-1111-111111111101', v_me, 'Lahore Lions',     'club',    '{"primary":"#DC4D32","secondary":"#26221B"}'::jsonb, 'LL', 'Model Town Sports Complex',  2018),
+    ('11111111-1111-1111-1111-111111111102', v_me, 'Islamabad United', 'club',    '{"primary":"#1E40AF","secondary":"#FFFFFF"}'::jsonb, 'IU', 'Islamabad Sports Complex',   2020),
+    ('1111111e-1111-1111-1111-11111111110e', v_me, 'Hyderabad Hawks',  'casual',  '{"primary":"#0EA5E9","secondary":"#F0F9FF"}'::jsonb, 'HH', 'Niaz Stadium Hyderabad',     2023);
+end $seed_my_teams$;
+
+-- Teammates' teams (12). Owners are pinned-uuid teammates from §1.
+insert into public.teams (team_id, owner_id, team_name, team_type, team_colors, logo_monogram, home_ground, founded_year)
+values
+  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000002', 'Karachi Eagles',    'club',     '{"primary":"#15803D","secondary":"#FAF8E8"}'::jsonb, 'KE', 'KGA Ground',                 2017),
+  ('11111111-1111-1111-1111-111111111104', '00000000-0000-0000-0000-000000000002', 'Karachi Knights',   'casual',   '{"primary":"#7C2D12","secondary":"#FED7AA"}'::jsonb, 'KK', 'Defence Cricket Club',       2021),
+  ('11111111-1111-1111-1111-111111111105', '00000000-0000-0000-0000-000000000003', 'Multan Sultans',    'club',     '{"primary":"#B45309","secondary":"#FFFFFF"}'::jsonb, 'MS', 'Multan Cricket Stadium',     2019),
+  ('11111111-1111-1111-1111-111111111106', '00000000-0000-0000-0000-000000000003', 'Multan Mavericks',  'casual',   '{"primary":"#A21CAF","secondary":"#FDF4FF"}'::jsonb, 'MM', 'Town Hall Ground',           2022),
+  ('11111111-1111-1111-1111-111111111107', '00000000-0000-0000-0000-000000000004', 'Quetta Cobras',     'club',     '{"primary":"#7E22CE","secondary":"#FAFAF9"}'::jsonb, 'QC', 'Ayub Stadium',               2018),
+  ('11111111-1111-1111-1111-111111111108', '00000000-0000-0000-0000-000000000004', 'Quetta Gladiators', 'corporate','{"primary":"#0F766E","secondary":"#F0FDFA"}'::jsonb, 'QG', 'Sariab Road Ground',         2016),
+  ('11111111-1111-1111-1111-111111111109', '00000000-0000-0000-0000-000000000005', 'Sialkot Stallions', 'club',     '{"primary":"#E11D48","secondary":"#FFE4E6"}'::jsonb, 'SS', 'Jinnah Stadium Sialkot',     2019),
+  ('1111111a-1111-1111-1111-11111111110a', '00000000-0000-0000-0000-000000000005', 'Sialkot Strikers',  'casual',   '{"primary":"#0369A1","secondary":"#E0F2FE"}'::jsonb, 'SK', 'PNS Sangar Ground',          2021),
+  ('1111111b-1111-1111-1111-11111111110b', '00000000-0000-0000-0000-000000000006', 'Peshawar Tigers',   'club',     '{"primary":"#F59E0B","secondary":"#26221B"}'::jsonb, 'PT', 'Arbab Niaz Stadium',         2018),
+  ('1111111c-1111-1111-1111-11111111110c', '00000000-0000-0000-0000-000000000007', 'Faisalabad Falcons','casual',   '{"primary":"#16A34A","secondary":"#FFFFFF"}'::jsonb, 'FF', 'Iqbal Stadium',              2020),
+  ('1111111d-1111-1111-1111-11111111110d', '00000000-0000-0000-0000-000000000008', 'Rawalpindi Rams',   'corporate','{"primary":"#7C3AED","secondary":"#FAFAF9"}'::jsonb, 'RR', 'Rawalpindi Cricket Stadium', 2017),
+  ('1111111f-1111-1111-1111-11111111110f', '0000000a-0000-0000-0000-00000000000a', 'Bahawalpur Bears',  'village',  '{"primary":"#65A30D","secondary":"#FFFFFF"}'::jsonb, 'BB', 'Bahawalpur Stadium',         2023);
+
+-- =============================================================================
+-- 3) Team membership
+-- =============================================================================
+-- Inserting a team_members row fires `add_team_member_to_chat`, which adds
+-- the user to that team's chat. Owners are already added to chat_members by
+-- the create_team_chat trigger, so we don't re-add them here.
+--
+-- YOU as member of 5 teammate-owned teams (so your inbox shows 8 chats:
+-- the 3 you own + these 5). Hyderabad Hawks stays owner-only (empty-thread
+-- test surface).
+-- =============================================================================
+
+-- YOU joining 5 teammate teams.
+do $seed_my_memberships$
+declare
+  v_me uuid;
+begin
+  select id into v_me from auth.users
+    where email = 'muhammadsarankhalid@gmail.com';
+
+  insert into public.team_members (team_id, user_id, role, status, joined_at)
+  values
+    ('11111111-1111-1111-1111-111111111103', v_me, 'player', 'active', now() - interval '60 days'),  -- Karachi Eagles
+    ('11111111-1111-1111-1111-111111111105', v_me, 'player', 'active', now() - interval '70 days'),  -- Multan Sultans
+    ('11111111-1111-1111-1111-111111111107', v_me, 'player', 'active', now() - interval '55 days'),  -- Quetta Cobras
+    ('11111111-1111-1111-1111-111111111109', v_me, 'player', 'active', now() - interval '50 days'),  -- Sialkot Stallions
+    ('1111111b-1111-1111-1111-11111111110b', v_me, 'player', 'active', now() - interval '45 days');  -- Peshawar Tigers
+end $seed_my_memberships$;
+
+-- Teammates joining each other's teams + your teams (so messages have
+-- varied senders in every active chat).
+insert into public.team_members (team_id, user_id, role, status, joined_at)
+values
+  -- Lahore Lions (yours) — rich roster for the curated thread
+  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000002', 'player', 'active', now() - interval '120 days'),
+  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000003', 'player', 'active', now() - interval '110 days'),
+  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000004', 'wicket_keeper', 'active', now() - interval '100 days'),
+  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000005', 'player', 'active', now() - interval '95 days'),
+  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000006', 'player', 'active', now() - interval '90 days'),
+  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000007', 'player', 'active', now() - interval '85 days'),
+  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000008', 'player', 'active', now() - interval '80 days'),
+  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000009', 'player', 'active', now() - interval '75 days'),
+  ('11111111-1111-1111-1111-111111111101', '0000000a-0000-0000-0000-00000000000a', 'player', 'active', now() - interval '70 days'),
+  -- Islamabad United (yours) — moderate activity
+  ('11111111-1111-1111-1111-111111111102', '00000000-0000-0000-0000-000000000006', 'player', 'active', now() - interval '50 days'),
+  ('11111111-1111-1111-1111-111111111102', '00000000-0000-0000-0000-000000000007', 'player', 'active', now() - interval '45 days'),
+  ('11111111-1111-1111-1111-111111111102', '00000000-0000-0000-0000-000000000003', 'player', 'active', now() - interval '40 days'),
+  -- Hyderabad Hawks (yours, empty) — intentionally no extra members
+  -- Karachi Eagles (Bilal owns) — pagination stress; multiple senders
+  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000004', 'player', 'active', now() - interval '55 days'),
+  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000005', 'player', 'active', now() - interval '50 days'),
+  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000003', 'player', 'active', now() - interval '45 days'),
+  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000007', 'player', 'active', now() - interval '40 days'),
+  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000008', 'player', 'active', now() - interval '35 days'),
+  -- Karachi Knights (Bilal)
+  ('11111111-1111-1111-1111-111111111104', '00000000-0000-0000-0000-000000000008', 'player', 'active', now() - interval '40 days'),
+  ('11111111-1111-1111-1111-111111111104', '00000000-0000-0000-0000-000000000009', 'player', 'active', now() - interval '35 days'),
+  -- Multan Sultans (Faraz)
+  ('11111111-1111-1111-1111-111111111105', '00000000-0000-0000-0000-000000000006', 'player', 'active', now() - interval '65 days'),
+  ('11111111-1111-1111-1111-111111111105', '00000000-0000-0000-0000-000000000009', 'player', 'active', now() - interval '60 days'),
+  ('11111111-1111-1111-1111-111111111105', '00000000-0000-0000-0000-000000000005', 'player', 'active', now() - interval '55 days'),
+  -- Multan Mavericks (Faraz)
+  ('11111111-1111-1111-1111-111111111106', '00000000-0000-0000-0000-000000000004', 'player', 'active', now() - interval '30 days'),
+  -- Quetta Cobras (Hassan)
+  ('11111111-1111-1111-1111-111111111107', '00000000-0000-0000-0000-000000000009', 'player', 'active', now() - interval '55 days'),
+  ('11111111-1111-1111-1111-111111111107', '00000000-0000-0000-0000-000000000002', 'player', 'active', now() - interval '50 days'),
+  ('11111111-1111-1111-1111-111111111107', '00000000-0000-0000-0000-000000000007', 'player', 'active', now() - interval '45 days'),
+  -- Quetta Gladiators (Hassan)
+  ('11111111-1111-1111-1111-111111111108', '0000000a-0000-0000-0000-00000000000a', 'player', 'active', now() - interval '25 days'),
+  -- Sialkot Stallions (Adeel)
+  ('11111111-1111-1111-1111-111111111109', '0000000a-0000-0000-0000-00000000000a', 'player', 'active', now() - interval '50 days'),
+  ('11111111-1111-1111-1111-111111111109', '00000000-0000-0000-0000-000000000008', 'player', 'active', now() - interval '45 days'),
+  -- Sialkot Strikers (Adeel)
+  ('1111111a-1111-1111-1111-11111111110a', '00000000-0000-0000-0000-000000000009', 'player', 'active', now() - interval '30 days'),
+  ('1111111a-1111-1111-1111-11111111110a', '00000000-0000-0000-0000-000000000006', 'player', 'active', now() - interval '25 days'),
+  -- Peshawar Tigers (Karim)
+  ('1111111b-1111-1111-1111-11111111110b', '00000000-0000-0000-0000-000000000003', 'player', 'active', now() - interval '40 days'),
+  -- Faisalabad Falcons (Saad)
+  ('1111111c-1111-1111-1111-11111111110c', '00000000-0000-0000-0000-000000000002', 'player', 'active', now() - interval '40 days'),
+  ('1111111c-1111-1111-1111-11111111110c', '00000000-0000-0000-0000-000000000004', 'player', 'active', now() - interval '35 days'),
+  -- Rawalpindi Rams (Usman)
+  ('1111111d-1111-1111-1111-11111111110d', '00000000-0000-0000-0000-000000000003', 'player', 'active', now() - interval '40 days'),
+  ('1111111d-1111-1111-1111-11111111110d', '00000000-0000-0000-0000-000000000005', 'player', 'active', now() - interval '35 days');
+-- Bahawalpur Bears (Zaid) — owner only, no extra members → another empty
+-- chat path, but Zaid sees it and you don't (you're not a member).
+
+-- The inserts above omit added_by (it's the owner who adds members in the
+-- seed narrative). team_members.added_by is NOT NULL, so set it from the
+-- owning team in one pass rather than per-row.
+update public.team_members m
+set added_by = t.owner_id
+from public.teams t
+where t.team_id = m.team_id
+  and m.added_by is null;
+
+-- =============================================================================
+-- 4) Lahore Lions — curated 30-message coordination thread
+-- =============================================================================
+-- YOU are the captain doing the coordinating. The thread reads as a
+-- realistic match-day flow over 4 days. Messages where the captain speaks
+-- are attributed to your account; others are from teammates.
+--
+-- Note: in the rendered thread your display_name is whatever's on your
+-- profile (likely your real name). The conversation reads as you organising
+-- a friendly with the Eagles.
+-- =============================================================================
+
+do $seed_lions$
+declare
+  v_chat   uuid;
+  v_me     uuid;
+  v_bilal  uuid := '00000000-0000-0000-0000-000000000002';
+  v_faraz  uuid := '00000000-0000-0000-0000-000000000003';
+  v_hassan uuid := '00000000-0000-0000-0000-000000000004';
+  v_adeel  uuid := '00000000-0000-0000-0000-000000000005';
+  v_karim  uuid := '00000000-0000-0000-0000-000000000006';
+  v_saad   uuid := '00000000-0000-0000-0000-000000000007';
+  v_usman  uuid := '00000000-0000-0000-0000-000000000008';
+  v_yousaf uuid := '00000000-0000-0000-0000-000000000009';
+begin
+  select id into v_me from auth.users
+    where email = 'muhammadsarankhalid@gmail.com';
+  select chat_id into v_chat
+    from public.chats
+   where team_id = '11111111-1111-1111-1111-111111111101';
+
+  insert into public.messages (chat_id, sender_id, body, created_at) values
+    -- Day -3 (you announce the friendly)
+    (v_chat, v_me,     'Alright everyone, we''ve locked in a friendly with Karachi Eagles for Saturday. Toss at 3:45pm, match starts 4pm sharp.', now() - interval '3 days' + interval '10 hours'),
+    (v_chat, v_bilal,  'Ground?',                                                                                                                  now() - interval '3 days' + interval '10 hours' + interval '2 minutes'),
+    (v_chat, v_me,     'Model Town Sports Complex, Pitch 2.',                                                                                       now() - interval '3 days' + interval '10 hours' + interval '3 minutes'),
+    (v_chat, v_faraz,  'I can do Saturday. Will bring two extra balls.',                                                                            now() - interval '3 days' + interval '10 hours' + interval '15 minutes'),
+    (v_chat, v_karim,  'Count me in.',                                                                                                              now() - interval '3 days' + interval '10 hours' + interval '32 minutes'),
+    (v_chat, v_me,     'Need confirmations from everyone by tomorrow EOD. We need at least 13 for a proper XI + 2 subs.',                           now() - interval '3 days' + interval '11 hours'),
+    (v_chat, v_bilal,  'I''ll spread the word in WhatsApp too.',                                                                                    now() - interval '3 days' + interval '11 hours' + interval '5 minutes'),
+    -- Day -2 (roster fills up)
+    (v_chat, v_me,     'RSVP count so far: Bilal, Faraz, Karim, me. Need at least 9 more.',                                                         now() - interval '2 days' + interval '9 hours'),
+    (v_chat, v_bilal,  'What about Adeel? He was asking yesterday.',                                                                                now() - interval '2 days' + interval '9 hours' + interval '15 minutes'),
+    (v_chat, v_adeel,  'Yeah I''m in. Just confirming.',                                                                                            now() - interval '2 days' + interval '9 hours' + interval '30 minutes'),
+    (v_chat, v_faraz,  'Hassan said he''s flying in Saturday morning, will play.',                                                                  now() - interval '2 days' + interval '10 hours'),
+    (v_chat, v_hassan, 'Confirmed.',                                                                                                                now() - interval '2 days' + interval '10 hours' + interval '5 minutes'),
+    (v_chat, v_me,     'Great, 6 so far. Yousaf you in?',                                                                                           now() - interval '2 days' + interval '11 hours'),
+    (v_chat, v_yousaf, 'In.',                                                                                                                       now() - interval '2 days' + interval '11 hours' + interval '30 minutes'),
+    (v_chat, v_saad,   'I''ll be there. Can someone send the ground location?',                                                                     now() - interval '2 days' + interval '12 hours'),
+    (v_chat, v_me,     'Pinned the ground location above.',                                                                                         now() - interval '2 days' + interval '12 hours' + interval '5 minutes'),
+    (v_chat, v_saad,   'Got it. Thanks.',                                                                                                           now() - interval '2 days' + interval '12 hours' + interval '6 minutes'),
+    (v_chat, v_bilal,  'Faisal Khan is in town this weekend, maybe pull him in as a sub?',                                                          now() - interval '2 days' + interval '14 hours'),
+    (v_chat, v_me,     'Faisal as sub, noted.',                                                                                                     now() - interval '2 days' + interval '14 hours' + interval '5 minutes'),
+    (v_chat, v_karim,  'How about Usman?',                                                                                                          now() - interval '2 days' + interval '15 hours'),
+    (v_chat, v_usman,  'I''m in.',                                                                                                                  now() - interval '2 days' + interval '15 hours' + interval '30 minutes'),
+    (v_chat, v_me,     '9 confirmed so far. Need 2 more for XI + 2 subs.',                                                                          now() - interval '2 days' + interval '16 hours'),
+    -- Day -1 (final XI locked)
+    (v_chat, v_me,     'Final XI locked. Bilal opens with me. Faraz 3, Hassan 4, Yousaf 5, Karim 6, Adeel 7, Saad 8, Zaid 9, Usman 10, me 11. Captain me.', now() - interval '1 day' + interval '8 hours'),
+    (v_chat, v_bilal,  'What about subs?',                                                                                                           now() - interval '1 day' + interval '8 hours' + interval '15 minutes'),
+    (v_chat, v_me,     'Subs: Faisal and one TBD.',                                                                                                  now() - interval '1 day' + interval '8 hours' + interval '20 minutes'),
+    (v_chat, v_me,     'Toss at 3:45 sharp. Be at the ground 3:15 latest.',                                                                          now() - interval '1 day' + interval '8 hours' + interval '30 minutes'),
+    (v_chat, v_faraz,  'On it.',                                                                                                                     now() - interval '1 day' + interval '8 hours' + interval '35 minutes'),
+    -- Day 0 (today — match in progress)
+    (v_chat, v_me,     'Won the toss. Bowling first.',                                                                                              now() - interval '3 hours'),
+    (v_chat, v_faraz,  'Crushing it 👍',                                                                                                             now() - interval '2 hours' - interval '30 minutes'),
+    (v_chat, v_bilal,  '85-2 in 11 overs. They''re cooked.',                                                                                         now() - interval '1 hour' - interval '45 minutes');
+end $seed_lions$;
+
+-- =============================================================================
+-- 5) Karachi Eagles — 250-message pagination/perf stress
+-- =============================================================================
+-- You're a member here (joined in §3), so your inbox shows this chat with
+-- whatever the latest message + unread count is. Senders rotate through all
+-- active members INCLUDING you, so some messages will show as "from me."
+-- =============================================================================
+
+do $seed_eagles$
+declare
+  v_chat uuid;
+  v_members uuid[];
+  v_sender uuid;
+  v_bodies text[] := array[
+    'Practice tomorrow?',
+    'Anyone got a spare pair of pads?',
+    'GG everyone.',
+    'What time is the match?',
+    'Bringing extra balls.',
+    'Net session at 6pm Wed.',
+    'Need 4 to win.',
+    'Toss won.',
+    'Lost the toss, bowling first.',
+    'Ground confirmed.',
+    'Lineup posted.',
+    'Adeel out, sub needed.',
+    'Be there by 3.',
+    'Anyone driving to the ground?',
+    'Bringing the cooler.',
+    'Photos uploaded to the group.',
+    'WhatsApp message about the schedule, check it.',
+    'Will be late — traffic.',
+    'What a catch by Karim 🏏',
+    'Match cancelled — rain.',
+    'Reschedule to Sunday?',
+    'Score: 142/3 in 16 overs.',
+    'Karachi 156/8, all out.',
+    'Won by 12 runs!',
+    'Captain announced: Bilal.',
+    'RSVP by tonight please.',
+    'Anyone seen the umpire?',
+    'Boundary is short on the southern side.',
+    'Pitch is dry.',
+    'Power play strategy?'
+  ];
+  v_count int := 250;
+  i int;
+begin
+  select chat_id into v_chat
+    from public.chats
+   where team_id = '11111111-1111-1111-1111-111111111103';
+
+  select array_agg(user_id) into v_members
+    from public.chat_members
+   where chat_id = v_chat
+     and user_id is not null
+     and left_at is null;
+
+  for i in 1..v_count loop
+    v_sender := v_members[1 + floor(random() * array_length(v_members, 1))::int];
+    insert into public.messages (chat_id, sender_id, body, created_at)
+    values (
+      v_chat,
+      v_sender,
+      v_bodies[1 + floor(random() * array_length(v_bodies, 1))::int],
+      now() - (random() * interval '60 days')
+    );
+  end loop;
+end $seed_eagles$;
+
+-- =============================================================================
+-- 6) Randomised messages — remaining active chats
+-- =============================================================================
+-- Skips:
+--   • Lahore Lions       (curated above)
+--   • Karachi Eagles     (pagination stress above)
+--   • Hyderabad Hawks    (yours, intentionally empty)
+--   • Bahawalpur Bears   (Zaid's, only-owner → no varied senders)
+--
+-- Other chats: 30–100 messages each, varied senders, spread over 30 days.
+-- =============================================================================
+
+do $seed_random$
+declare
+  v_chat record;
+  v_members uuid[];
+  v_sender uuid;
+  v_bodies text[] := array[
+    'Practice tomorrow?',
+    'Anyone got a spare pair of pads?',
+    'GG everyone.',
+    'What time is the match?',
+    'Bringing extra balls.',
+    'Net session at 6pm Wed.',
+    'Need 4 to win.',
+    'Toss won.',
+    'Ground confirmed.',
+    'Lineup posted.',
+    'Adeel out, sub needed.',
+    'Be there by 3.',
+    'Anyone driving?',
+    'Bringing the cooler.',
+    'Match this weekend confirmed.',
+    'Won by 12 runs!',
+    'Captain announced.',
+    'RSVP by tonight please.',
+    'Pitch looks great.',
+    'Power play strategy?',
+    'Need a wicket-keeper for Sunday.',
+    'Bilal MOM 🎉',
+    'Anyone got the scorecard?',
+    'Tournament fixture out.',
+    'Practice cancelled — rain.',
+    'Net booked for Tuesday.',
+    'New jerseys in.',
+    'Anyone want to bowl in the nets?'
+  ];
+  v_count int;
+  i int;
+begin
+  for v_chat in
+    select c.chat_id, t.team_name
+      from public.chats c
+      join public.teams t on t.team_id = c.team_id
+     where t.team_name not in (
+       'Lahore Lions', 'Karachi Eagles', 'Hyderabad Hawks', 'Bahawalpur Bears'
+     )
+  loop
+    select array_agg(user_id) into v_members
+      from public.chat_members
+     where chat_id = v_chat.chat_id
+       and user_id is not null
+       and left_at is null;
+
+    if v_members is null or array_length(v_members, 1) < 1 then
+      continue;
+    end if;
+
+    v_count := 30 + (random() * 70)::int;
+    for i in 1..v_count loop
+      v_sender := v_members[1 + floor(random() * array_length(v_members, 1))::int];
+      insert into public.messages (chat_id, sender_id, body, created_at)
+      values (
+        v_chat.chat_id,
+        v_sender,
+        v_bodies[1 + floor(random() * array_length(v_bodies, 1))::int],
+        now() - (random() * interval '30 days')
+      );
+    end loop;
+  end loop;
+end $seed_random$;
+
+-- =============================================================================
+-- Summary — what your inbox looks like when you sign in
+-- =============================================================================
+--   1. Lahore Lions       owner    curated 30 messages, captain you, very recent
+--   2. Islamabad United   owner    ~30–100 random messages
+--   3. Hyderabad Hawks    owner    EMPTY (zero messages, empty-thread state)
+--   4. Karachi Eagles     member   250 messages, pagination stress
+--   5. Multan Sultans     member   ~30–100 random
+--   6. Quetta Cobras      member   ~30–100 random
+--   7. Sialkot Stallions  member   ~30–100 random
+--   8. Peshawar Tigers    member   ~30–100 random
+--
+-- Teammate sign-in credentials (all `pass1234`):
+--   bilal@local.test    Bilal Ahmed
+--   faraz@local.test    Faraz Khan
+--   hassan@local.test   Hassan Tariq
+--   adeel@local.test    Adeel Saeed
+--   karim@local.test    Karim Anwar
+--   saad@local.test     Saad Iqbal
+--   usman@local.test    Usman Ali
+--   yousaf@local.test   Yousaf Khan
+--   zaid@local.test     Zaid Malik
+--
+-- Sign in as a teammate (e.g. bilal@local.test) to see the same chats from
+-- a different perspective. Useful for testing realtime: have your real
+-- account open in the app, then send a message from Bilal's account in
+-- another window → your inbox + open thread should patch in-memory.
+-- =============================================================================
+
+-- =============================================================================
+-- CLEANUP — paste into the SQL editor when you want to remove the seed
+-- =============================================================================
+-- Drops everything seeded above. Your own account + profile + any teams you
+-- created OUTSIDE the seed remain untouched (the seed only deletes by
+-- email-domain match for teammates and by pinned uuid for teams).
+-- =============================================================================
+--
+-- begin;
+-- delete from public.teams where team_id in (
+--   '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111102',
+--   '11111111-1111-1111-1111-111111111103', '11111111-1111-1111-1111-111111111104',
+--   '11111111-1111-1111-1111-111111111105', '11111111-1111-1111-1111-111111111106',
+--   '11111111-1111-1111-1111-111111111107', '11111111-1111-1111-1111-111111111108',
+--   '11111111-1111-1111-1111-111111111109', '1111111a-1111-1111-1111-11111111110a',
+--   '1111111b-1111-1111-1111-11111111110b', '1111111c-1111-1111-1111-11111111110c',
+--   '1111111d-1111-1111-1111-11111111110d', '1111111e-1111-1111-1111-11111111110e',
+--   '1111111f-1111-1111-1111-11111111110f'
+-- );
+-- -- ON DELETE CASCADE on teams flows to chats / chat_members / messages /
+-- -- team_members. So team deletion is sufficient for cleanup of the chat
+-- -- and messaging layer. Only the auth users remain:
+-- delete from auth.users where email like '%@local.test';
+-- commit;

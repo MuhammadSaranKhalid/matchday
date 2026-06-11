@@ -66,11 +66,18 @@ class LocationRepositoryImpl implements LocationRepository {
         languageCode: languageCode,
       );
       return Right(GeoPlace(
-        label: rg.label,
+        label: rg?.label ?? '',
         source: PlaceSource.gps,
+        city: rg?.city,
+        district: rg?.district,
+        province: rg?.province,
+        postcode: rg?.postcode,
+        placeId: rg?.placeId,
+        // Keep the device's own coordinates — more precise than the geocode's
+        // snapped result point.
         latitude: pos.latitude,
         longitude: pos.longitude,
-        countryCode: rg.countryCode,
+        countryCode: rg?.countryCode,
       ));
     } catch (e) {
       return Left(_toFailure(e));

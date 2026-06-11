@@ -17,6 +17,9 @@ class UnclaimedPlayer {
 
   final UnclaimedPlayerId id;
   final String displayName;
+
+  /// Guaranteed non-null — enforced by the `unclaimed_players.added_by NOT
+  /// NULL` constraint.
   final String addedBy;
   final DateTime createdAt;
   final DateTime updatedAt;

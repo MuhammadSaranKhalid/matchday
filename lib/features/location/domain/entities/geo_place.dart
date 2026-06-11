@@ -25,6 +25,10 @@ class GeoPlace {
   const GeoPlace({
     required this.label,
     required this.source,
+    this.city,
+    this.district,
+    this.province,
+    this.postcode,
     this.placeId,
     this.latitude,
     this.longitude,
@@ -37,6 +41,22 @@ class GeoPlace {
 
   final String label;
   final PlaceSource source;
+
+  /// Locality (city/town), extracted from the place's address components with a
+  /// fallback chain (locality → postal_town → sublocality → admin_3 → admin_2).
+  /// Null for [PlaceSource.manual] or the rare place with no resolvable locality.
+  /// This — NOT [label] — is what gets persisted as `location.city`.
+  final String? city;
+
+  /// administrative_area_level_2 (≈ district). Best-effort, country-dependent.
+  final String? district;
+
+  /// administrative_area_level_1 (≈ province/state). Best-effort.
+  final String? province;
+
+  /// postal_code (≈ PIN). Often absent on region picks; present on precise geocodes.
+  final String? postcode;
+
   final String? placeId;
   final double? latitude;
   final double? longitude;
@@ -52,12 +72,16 @@ class GeoPlace {
       other is GeoPlace &&
           other.label == label &&
           other.source == source &&
+          other.city == city &&
+          other.district == district &&
+          other.province == province &&
+          other.postcode == postcode &&
           other.placeId == placeId &&
           other.latitude == latitude &&
           other.longitude == longitude &&
           other.countryCode == countryCode;
 
   @override
-  int get hashCode =>
-      Object.hash(label, source, placeId, latitude, longitude, countryCode);
+  int get hashCode => Object.hash(label, source, city, district, province,
+      postcode, placeId, latitude, longitude, countryCode);
 }

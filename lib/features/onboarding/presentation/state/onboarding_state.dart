@@ -56,6 +56,11 @@ abstract class ProfileSlice with _$ProfileSlice {
     @Default('') String city,
     // Structured geo for the chosen location. Null when the user hand-typed a
     // place that couldn't be resolved (the rare uncovered-village case).
+    // [city] holds the locality only; [label] is the full display string.
+    String? label,
+    String? district,
+    String? province,
+    String? postcode,
     String? placeId,
     double? lat,
     double? lng,

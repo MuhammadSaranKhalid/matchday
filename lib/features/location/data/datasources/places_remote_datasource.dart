@@ -104,8 +104,12 @@ class PlacesRemoteDataSource {
     return GeoPlaceDto.fromGeocodeResult(results.first as Map<String, dynamic>);
   }
 
-  /// Reverse-geocodes coordinates to a human label + ISO country code.
-  Future<({String label, String? countryCode})> reverseGeocode(
+  /// Reverse-geocodes coordinates to a structured place — label + locality +
+  /// district/province + postcode + ISO country. Returns null when the
+  /// coordinates resolve to no named place (the caller still has the GPS
+  /// lat/lng). `results` are ordered most-specific → least-specific; the first
+  /// (street-level) result carries the richest components.
+  Future<GeoPlaceDto?> reverseGeocode(
     double latitude,
     double longitude, {
     String? languageCode,
@@ -120,23 +124,8 @@ class PlacesRemoteDataSource {
     final json = _decode(res);
 
     final results = (json['results'] as List<dynamic>?) ?? const [];
-    if (results.isEmpty) {
-      // Coordinates with no named place — caller still has the GPS lat/lng.
-      return (label: '', countryCode: null);
-    }
-    final first = results.first as Map<String, dynamic>;
-    final label = first['formatted_address'] as String? ?? '';
-    final components =
-        (first['address_components'] as List<dynamic>?) ?? const [];
-    String? country;
-    for (final c in components.cast<Map<String, dynamic>>()) {
-      final types = (c['types'] as List<dynamic>?)?.cast<String>() ?? const [];
-      if (types.contains('country')) {
-        country = c['short_name'] as String?;
-        break;
-      }
-    }
-    return (label: label, countryCode: country);
+    if (results.isEmpty) return null;
+    return GeoPlaceDto.fromGeocodeResult(results.first as Map<String, dynamic>);
   }
 
   void _requireKey() {

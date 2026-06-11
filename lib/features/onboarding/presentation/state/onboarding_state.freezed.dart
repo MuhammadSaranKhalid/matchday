@@ -324,7 +324,8 @@ mixin _$ProfileSlice {
 
  String get displayName; String get username; String get city;// Structured geo for the chosen location. Null when the user hand-typed a
 // place that couldn't be resolved (the rare uncovered-village case).
- String? get placeId; double? get lat; double? get lng; String? get countryCode;// Transient autocomplete UI state (not persisted in the draft).
+// [city] holds the locality only; [label] is the full display string.
+ String? get label; String? get district; String? get province; String? get postcode; String? get placeId; double? get lat; double? get lng; String? get countryCode;// Transient autocomplete UI state (not persisted in the draft).
  List<PlaceSuggestion> get citySuggestions; bool get citySearching; bool get locating; bool get resolvingLocation; String? get cityError; String? get citySessionToken; UsernameStatus get usernameStatus; String? get usernameMessage;
 /// Create a copy of ProfileSlice
 /// with the given fields replaced by the non-null parameter values.
@@ -336,16 +337,16 @@ $ProfileSliceCopyWith<ProfileSlice> get copyWith => _$ProfileSliceCopyWithImpl<P
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileSlice&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.username, username) || other.username == username)&&(identical(other.city, city) || other.city == city)&&(identical(other.placeId, placeId) || other.placeId == placeId)&&(identical(other.lat, lat) || other.lat == lat)&&(identical(other.lng, lng) || other.lng == lng)&&(identical(other.countryCode, countryCode) || other.countryCode == countryCode)&&const DeepCollectionEquality().equals(other.citySuggestions, citySuggestions)&&(identical(other.citySearching, citySearching) || other.citySearching == citySearching)&&(identical(other.locating, locating) || other.locating == locating)&&(identical(other.resolvingLocation, resolvingLocation) || other.resolvingLocation == resolvingLocation)&&(identical(other.cityError, cityError) || other.cityError == cityError)&&(identical(other.citySessionToken, citySessionToken) || other.citySessionToken == citySessionToken)&&(identical(other.usernameStatus, usernameStatus) || other.usernameStatus == usernameStatus)&&(identical(other.usernameMessage, usernameMessage) || other.usernameMessage == usernameMessage));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileSlice&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.username, username) || other.username == username)&&(identical(other.city, city) || other.city == city)&&(identical(other.label, label) || other.label == label)&&(identical(other.district, district) || other.district == district)&&(identical(other.province, province) || other.province == province)&&(identical(other.postcode, postcode) || other.postcode == postcode)&&(identical(other.placeId, placeId) || other.placeId == placeId)&&(identical(other.lat, lat) || other.lat == lat)&&(identical(other.lng, lng) || other.lng == lng)&&(identical(other.countryCode, countryCode) || other.countryCode == countryCode)&&const DeepCollectionEquality().equals(other.citySuggestions, citySuggestions)&&(identical(other.citySearching, citySearching) || other.citySearching == citySearching)&&(identical(other.locating, locating) || other.locating == locating)&&(identical(other.resolvingLocation, resolvingLocation) || other.resolvingLocation == resolvingLocation)&&(identical(other.cityError, cityError) || other.cityError == cityError)&&(identical(other.citySessionToken, citySessionToken) || other.citySessionToken == citySessionToken)&&(identical(other.usernameStatus, usernameStatus) || other.usernameStatus == usernameStatus)&&(identical(other.usernameMessage, usernameMessage) || other.usernameMessage == usernameMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,displayName,username,city,placeId,lat,lng,countryCode,const DeepCollectionEquality().hash(citySuggestions),citySearching,locating,resolvingLocation,cityError,citySessionToken,usernameStatus,usernameMessage);
+int get hashCode => Object.hashAll([runtimeType,displayName,username,city,label,district,province,postcode,placeId,lat,lng,countryCode,const DeepCollectionEquality().hash(citySuggestions),citySearching,locating,resolvingLocation,cityError,citySessionToken,usernameStatus,usernameMessage]);
 
 @override
 String toString() {
-  return 'ProfileSlice(displayName: $displayName, username: $username, city: $city, placeId: $placeId, lat: $lat, lng: $lng, countryCode: $countryCode, citySuggestions: $citySuggestions, citySearching: $citySearching, locating: $locating, resolvingLocation: $resolvingLocation, cityError: $cityError, citySessionToken: $citySessionToken, usernameStatus: $usernameStatus, usernameMessage: $usernameMessage)';
+  return 'ProfileSlice(displayName: $displayName, username: $username, city: $city, label: $label, district: $district, province: $province, postcode: $postcode, placeId: $placeId, lat: $lat, lng: $lng, countryCode: $countryCode, citySuggestions: $citySuggestions, citySearching: $citySearching, locating: $locating, resolvingLocation: $resolvingLocation, cityError: $cityError, citySessionToken: $citySessionToken, usernameStatus: $usernameStatus, usernameMessage: $usernameMessage)';
 }
 
 
@@ -356,7 +357,7 @@ abstract mixin class $ProfileSliceCopyWith<$Res>  {
   factory $ProfileSliceCopyWith(ProfileSlice value, $Res Function(ProfileSlice) _then) = _$ProfileSliceCopyWithImpl;
 @useResult
 $Res call({
- String displayName, String username, String city, String? placeId, double? lat, double? lng, String? countryCode, List<PlaceSuggestion> citySuggestions, bool citySearching, bool locating, bool resolvingLocation, String? cityError, String? citySessionToken, UsernameStatus usernameStatus, String? usernameMessage
+ String displayName, String username, String city, String? label, String? district, String? province, String? postcode, String? placeId, double? lat, double? lng, String? countryCode, List<PlaceSuggestion> citySuggestions, bool citySearching, bool locating, bool resolvingLocation, String? cityError, String? citySessionToken, UsernameStatus usernameStatus, String? usernameMessage
 });
 
 
@@ -373,12 +374,16 @@ class _$ProfileSliceCopyWithImpl<$Res>
 
 /// Create a copy of ProfileSlice
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? displayName = null,Object? username = null,Object? city = null,Object? placeId = freezed,Object? lat = freezed,Object? lng = freezed,Object? countryCode = freezed,Object? citySuggestions = null,Object? citySearching = null,Object? locating = null,Object? resolvingLocation = null,Object? cityError = freezed,Object? citySessionToken = freezed,Object? usernameStatus = null,Object? usernameMessage = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? displayName = null,Object? username = null,Object? city = null,Object? label = freezed,Object? district = freezed,Object? province = freezed,Object? postcode = freezed,Object? placeId = freezed,Object? lat = freezed,Object? lng = freezed,Object? countryCode = freezed,Object? citySuggestions = null,Object? citySearching = null,Object? locating = null,Object? resolvingLocation = null,Object? cityError = freezed,Object? citySessionToken = freezed,Object? usernameStatus = null,Object? usernameMessage = freezed,}) {
   return _then(_self.copyWith(
 displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
 as String,username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String,city: null == city ? _self.city : city // ignore: cast_nullable_to_non_nullable
-as String,placeId: freezed == placeId ? _self.placeId : placeId // ignore: cast_nullable_to_non_nullable
+as String,label: freezed == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
+as String?,district: freezed == district ? _self.district : district // ignore: cast_nullable_to_non_nullable
+as String?,province: freezed == province ? _self.province : province // ignore: cast_nullable_to_non_nullable
+as String?,postcode: freezed == postcode ? _self.postcode : postcode // ignore: cast_nullable_to_non_nullable
+as String?,placeId: freezed == placeId ? _self.placeId : placeId // ignore: cast_nullable_to_non_nullable
 as String?,lat: freezed == lat ? _self.lat : lat // ignore: cast_nullable_to_non_nullable
 as double?,lng: freezed == lng ? _self.lng : lng // ignore: cast_nullable_to_non_nullable
 as double?,countryCode: freezed == countryCode ? _self.countryCode : countryCode // ignore: cast_nullable_to_non_nullable
@@ -475,10 +480,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String displayName,  String username,  String city,  String? placeId,  double? lat,  double? lng,  String? countryCode,  List<PlaceSuggestion> citySuggestions,  bool citySearching,  bool locating,  bool resolvingLocation,  String? cityError,  String? citySessionToken,  UsernameStatus usernameStatus,  String? usernameMessage)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String displayName,  String username,  String city,  String? label,  String? district,  String? province,  String? postcode,  String? placeId,  double? lat,  double? lng,  String? countryCode,  List<PlaceSuggestion> citySuggestions,  bool citySearching,  bool locating,  bool resolvingLocation,  String? cityError,  String? citySessionToken,  UsernameStatus usernameStatus,  String? usernameMessage)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ProfileSlice() when $default != null:
-return $default(_that.displayName,_that.username,_that.city,_that.placeId,_that.lat,_that.lng,_that.countryCode,_that.citySuggestions,_that.citySearching,_that.locating,_that.resolvingLocation,_that.cityError,_that.citySessionToken,_that.usernameStatus,_that.usernameMessage);case _:
+return $default(_that.displayName,_that.username,_that.city,_that.label,_that.district,_that.province,_that.postcode,_that.placeId,_that.lat,_that.lng,_that.countryCode,_that.citySuggestions,_that.citySearching,_that.locating,_that.resolvingLocation,_that.cityError,_that.citySessionToken,_that.usernameStatus,_that.usernameMessage);case _:
   return orElse();
 
 }
@@ -496,10 +501,10 @@ return $default(_that.displayName,_that.username,_that.city,_that.placeId,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String displayName,  String username,  String city,  String? placeId,  double? lat,  double? lng,  String? countryCode,  List<PlaceSuggestion> citySuggestions,  bool citySearching,  bool locating,  bool resolvingLocation,  String? cityError,  String? citySessionToken,  UsernameStatus usernameStatus,  String? usernameMessage)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String displayName,  String username,  String city,  String? label,  String? district,  String? province,  String? postcode,  String? placeId,  double? lat,  double? lng,  String? countryCode,  List<PlaceSuggestion> citySuggestions,  bool citySearching,  bool locating,  bool resolvingLocation,  String? cityError,  String? citySessionToken,  UsernameStatus usernameStatus,  String? usernameMessage)  $default,) {final _that = this;
 switch (_that) {
 case _ProfileSlice():
-return $default(_that.displayName,_that.username,_that.city,_that.placeId,_that.lat,_that.lng,_that.countryCode,_that.citySuggestions,_that.citySearching,_that.locating,_that.resolvingLocation,_that.cityError,_that.citySessionToken,_that.usernameStatus,_that.usernameMessage);case _:
+return $default(_that.displayName,_that.username,_that.city,_that.label,_that.district,_that.province,_that.postcode,_that.placeId,_that.lat,_that.lng,_that.countryCode,_that.citySuggestions,_that.citySearching,_that.locating,_that.resolvingLocation,_that.cityError,_that.citySessionToken,_that.usernameStatus,_that.usernameMessage);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -516,10 +521,10 @@ return $default(_that.displayName,_that.username,_that.city,_that.placeId,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String displayName,  String username,  String city,  String? placeId,  double? lat,  double? lng,  String? countryCode,  List<PlaceSuggestion> citySuggestions,  bool citySearching,  bool locating,  bool resolvingLocation,  String? cityError,  String? citySessionToken,  UsernameStatus usernameStatus,  String? usernameMessage)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String displayName,  String username,  String city,  String? label,  String? district,  String? province,  String? postcode,  String? placeId,  double? lat,  double? lng,  String? countryCode,  List<PlaceSuggestion> citySuggestions,  bool citySearching,  bool locating,  bool resolvingLocation,  String? cityError,  String? citySessionToken,  UsernameStatus usernameStatus,  String? usernameMessage)?  $default,) {final _that = this;
 switch (_that) {
 case _ProfileSlice() when $default != null:
-return $default(_that.displayName,_that.username,_that.city,_that.placeId,_that.lat,_that.lng,_that.countryCode,_that.citySuggestions,_that.citySearching,_that.locating,_that.resolvingLocation,_that.cityError,_that.citySessionToken,_that.usernameStatus,_that.usernameMessage);case _:
+return $default(_that.displayName,_that.username,_that.city,_that.label,_that.district,_that.province,_that.postcode,_that.placeId,_that.lat,_that.lng,_that.countryCode,_that.citySuggestions,_that.citySearching,_that.locating,_that.resolvingLocation,_that.cityError,_that.citySessionToken,_that.usernameStatus,_that.usernameMessage);case _:
   return null;
 
 }
@@ -531,7 +536,7 @@ return $default(_that.displayName,_that.username,_that.city,_that.placeId,_that.
 
 
 class _ProfileSlice extends ProfileSlice {
-  const _ProfileSlice({this.displayName = '', this.username = '', this.city = '', this.placeId, this.lat, this.lng, this.countryCode, final  List<PlaceSuggestion> citySuggestions = const <PlaceSuggestion>[], this.citySearching = false, this.locating = false, this.resolvingLocation = false, this.cityError, this.citySessionToken, this.usernameStatus = UsernameStatus.idle, this.usernameMessage}): _citySuggestions = citySuggestions,super._();
+  const _ProfileSlice({this.displayName = '', this.username = '', this.city = '', this.label, this.district, this.province, this.postcode, this.placeId, this.lat, this.lng, this.countryCode, final  List<PlaceSuggestion> citySuggestions = const <PlaceSuggestion>[], this.citySearching = false, this.locating = false, this.resolvingLocation = false, this.cityError, this.citySessionToken, this.usernameStatus = UsernameStatus.idle, this.usernameMessage}): _citySuggestions = citySuggestions,super._();
   
 
 @override@JsonKey() final  String displayName;
@@ -539,6 +544,11 @@ class _ProfileSlice extends ProfileSlice {
 @override@JsonKey() final  String city;
 // Structured geo for the chosen location. Null when the user hand-typed a
 // place that couldn't be resolved (the rare uncovered-village case).
+// [city] holds the locality only; [label] is the full display string.
+@override final  String? label;
+@override final  String? district;
+@override final  String? province;
+@override final  String? postcode;
 @override final  String? placeId;
 @override final  double? lat;
 @override final  double? lng;
@@ -570,16 +580,16 @@ _$ProfileSliceCopyWith<_ProfileSlice> get copyWith => __$ProfileSliceCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileSlice&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.username, username) || other.username == username)&&(identical(other.city, city) || other.city == city)&&(identical(other.placeId, placeId) || other.placeId == placeId)&&(identical(other.lat, lat) || other.lat == lat)&&(identical(other.lng, lng) || other.lng == lng)&&(identical(other.countryCode, countryCode) || other.countryCode == countryCode)&&const DeepCollectionEquality().equals(other._citySuggestions, _citySuggestions)&&(identical(other.citySearching, citySearching) || other.citySearching == citySearching)&&(identical(other.locating, locating) || other.locating == locating)&&(identical(other.resolvingLocation, resolvingLocation) || other.resolvingLocation == resolvingLocation)&&(identical(other.cityError, cityError) || other.cityError == cityError)&&(identical(other.citySessionToken, citySessionToken) || other.citySessionToken == citySessionToken)&&(identical(other.usernameStatus, usernameStatus) || other.usernameStatus == usernameStatus)&&(identical(other.usernameMessage, usernameMessage) || other.usernameMessage == usernameMessage));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileSlice&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.username, username) || other.username == username)&&(identical(other.city, city) || other.city == city)&&(identical(other.label, label) || other.label == label)&&(identical(other.district, district) || other.district == district)&&(identical(other.province, province) || other.province == province)&&(identical(other.postcode, postcode) || other.postcode == postcode)&&(identical(other.placeId, placeId) || other.placeId == placeId)&&(identical(other.lat, lat) || other.lat == lat)&&(identical(other.lng, lng) || other.lng == lng)&&(identical(other.countryCode, countryCode) || other.countryCode == countryCode)&&const DeepCollectionEquality().equals(other._citySuggestions, _citySuggestions)&&(identical(other.citySearching, citySearching) || other.citySearching == citySearching)&&(identical(other.locating, locating) || other.locating == locating)&&(identical(other.resolvingLocation, resolvingLocation) || other.resolvingLocation == resolvingLocation)&&(identical(other.cityError, cityError) || other.cityError == cityError)&&(identical(other.citySessionToken, citySessionToken) || other.citySessionToken == citySessionToken)&&(identical(other.usernameStatus, usernameStatus) || other.usernameStatus == usernameStatus)&&(identical(other.usernameMessage, usernameMessage) || other.usernameMessage == usernameMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,displayName,username,city,placeId,lat,lng,countryCode,const DeepCollectionEquality().hash(_citySuggestions),citySearching,locating,resolvingLocation,cityError,citySessionToken,usernameStatus,usernameMessage);
+int get hashCode => Object.hashAll([runtimeType,displayName,username,city,label,district,province,postcode,placeId,lat,lng,countryCode,const DeepCollectionEquality().hash(_citySuggestions),citySearching,locating,resolvingLocation,cityError,citySessionToken,usernameStatus,usernameMessage]);
 
 @override
 String toString() {
-  return 'ProfileSlice(displayName: $displayName, username: $username, city: $city, placeId: $placeId, lat: $lat, lng: $lng, countryCode: $countryCode, citySuggestions: $citySuggestions, citySearching: $citySearching, locating: $locating, resolvingLocation: $resolvingLocation, cityError: $cityError, citySessionToken: $citySessionToken, usernameStatus: $usernameStatus, usernameMessage: $usernameMessage)';
+  return 'ProfileSlice(displayName: $displayName, username: $username, city: $city, label: $label, district: $district, province: $province, postcode: $postcode, placeId: $placeId, lat: $lat, lng: $lng, countryCode: $countryCode, citySuggestions: $citySuggestions, citySearching: $citySearching, locating: $locating, resolvingLocation: $resolvingLocation, cityError: $cityError, citySessionToken: $citySessionToken, usernameStatus: $usernameStatus, usernameMessage: $usernameMessage)';
 }
 
 
@@ -590,7 +600,7 @@ abstract mixin class _$ProfileSliceCopyWith<$Res> implements $ProfileSliceCopyWi
   factory _$ProfileSliceCopyWith(_ProfileSlice value, $Res Function(_ProfileSlice) _then) = __$ProfileSliceCopyWithImpl;
 @override @useResult
 $Res call({
- String displayName, String username, String city, String? placeId, double? lat, double? lng, String? countryCode, List<PlaceSuggestion> citySuggestions, bool citySearching, bool locating, bool resolvingLocation, String? cityError, String? citySessionToken, UsernameStatus usernameStatus, String? usernameMessage
+ String displayName, String username, String city, String? label, String? district, String? province, String? postcode, String? placeId, double? lat, double? lng, String? countryCode, List<PlaceSuggestion> citySuggestions, bool citySearching, bool locating, bool resolvingLocation, String? cityError, String? citySessionToken, UsernameStatus usernameStatus, String? usernameMessage
 });
 
 
@@ -607,12 +617,16 @@ class __$ProfileSliceCopyWithImpl<$Res>
 
 /// Create a copy of ProfileSlice
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? displayName = null,Object? username = null,Object? city = null,Object? placeId = freezed,Object? lat = freezed,Object? lng = freezed,Object? countryCode = freezed,Object? citySuggestions = null,Object? citySearching = null,Object? locating = null,Object? resolvingLocation = null,Object? cityError = freezed,Object? citySessionToken = freezed,Object? usernameStatus = null,Object? usernameMessage = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? displayName = null,Object? username = null,Object? city = null,Object? label = freezed,Object? district = freezed,Object? province = freezed,Object? postcode = freezed,Object? placeId = freezed,Object? lat = freezed,Object? lng = freezed,Object? countryCode = freezed,Object? citySuggestions = null,Object? citySearching = null,Object? locating = null,Object? resolvingLocation = null,Object? cityError = freezed,Object? citySessionToken = freezed,Object? usernameStatus = null,Object? usernameMessage = freezed,}) {
   return _then(_ProfileSlice(
 displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
 as String,username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String,city: null == city ? _self.city : city // ignore: cast_nullable_to_non_nullable
-as String,placeId: freezed == placeId ? _self.placeId : placeId // ignore: cast_nullable_to_non_nullable
+as String,label: freezed == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
+as String?,district: freezed == district ? _self.district : district // ignore: cast_nullable_to_non_nullable
+as String?,province: freezed == province ? _self.province : province // ignore: cast_nullable_to_non_nullable
+as String?,postcode: freezed == postcode ? _self.postcode : postcode // ignore: cast_nullable_to_non_nullable
+as String?,placeId: freezed == placeId ? _self.placeId : placeId // ignore: cast_nullable_to_non_nullable
 as String?,lat: freezed == lat ? _self.lat : lat // ignore: cast_nullable_to_non_nullable
 as double?,lng: freezed == lng ? _self.lng : lng // ignore: cast_nullable_to_non_nullable
 as double?,countryCode: freezed == countryCode ? _self.countryCode : countryCode // ignore: cast_nullable_to_non_nullable

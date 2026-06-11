@@ -14,9 +14,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../theme/circk_theme.dart';
 import '../../../features/notifications/presentation/providers/notifications_providers.dart';
+import '../../../features/onboarding/presentation/providers/onboarding_providers.dart';
 
 /// `Color` → `#RRGGBB` for embedding in raw SVG markup.
 String ckHex(Color c) {
@@ -253,7 +255,12 @@ class Pill extends StatelessWidget {
   }
 }
 
-/// Universal top header: large title on the left, bell (→ notifications) right.
+/// Universal top header: large title on the left; bell (→ notifications) and
+/// the signed-in user's avatar (→ `/profile`) on the right.
+///
+/// The avatar replaces the removed Profile tab (D9 in
+/// docs/search-feature-design.md — nav is Home · Search · Matches · Messages ·
+/// Pavilion). Pass [showAvatar] = false for headers where it doesn't belong.
 ///
 /// The bell badge auto-reads the unread notifications count via the
 /// `unreadNotificationsCountProvider` if no explicit [notifCount] is passed.
@@ -266,12 +273,16 @@ class V2Header extends ConsumerWidget {
     this.notifCount,
     this.onBell,
     this.refreshing = false,
+    this.showAvatar = true,
   });
 
   final String title;
   final String? sub;
   final int? notifCount;
   final VoidCallback? onBell;
+
+  /// Whether to render the own-profile avatar button on the right.
+  final bool showAvatar;
 
   /// When true AND [sub] is null, a subtle inline spinner renders below the
   /// title in the sub's slot. Used by screens that paint from a local cache
@@ -319,10 +330,57 @@ class V2Header extends ConsumerWidget {
           ),
           const SizedBox(width: 12),
           _BellButton(count: count, onTap: onBell),
+          if (showAvatar) ...[
+            const SizedBox(width: 8),
+            const _HeaderAvatar(),
+          ],
         ],
       ),
     );
   }
+}
+
+/// Header avatar — the signed-in user's photo (or initials fallback); tapping
+/// opens the own-profile screen, full-screen over the shell. Replaces the
+/// removed Profile tab (D9, docs/search-feature-design.md).
+class _HeaderAvatar extends ConsumerWidget {
+  const _HeaderAvatar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(myProfileProvider).value;
+    final name = profile?.displayName ?? profile?.username ?? '';
+    final url = profile?.avatarUrl;
+    final mono = _initialsOf(name);
+    final Widget face = (url == null || url.isEmpty)
+        ? Avatar(mono: mono, size: 36)
+        : ClipOval(
+            child: Container(
+              width: 36,
+              height: 36,
+              color: CkColors.paper2,
+              child: Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Avatar(mono: mono, size: 36),
+              ),
+            ),
+          );
+    return GestureDetector(
+      onTap: () => context.push('/profile'),
+      child: face,
+    );
+  }
+}
+
+/// "Muhammad Saran" → "MS"; single word → first letter; empty → "·".
+String _initialsOf(String name) {
+  final t = name.trim();
+  if (t.isEmpty) return '·';
+  final parts = t.split(RegExp(r'\s+'));
+  final b = StringBuffer(parts.first[0]);
+  if (parts.length > 1) b.write(parts[1][0]);
+  return b.toString().toUpperCase();
 }
 
 class _BellButton extends StatelessWidget {
@@ -391,22 +449,23 @@ class _Badge extends StatelessWidget {
   }
 }
 
-/// The five v2 bottom-nav destinations.
-enum V2Tab { home, matches, pavilion, messages, profile }
+/// The five v2 bottom-nav destinations. Order = bar order (D9 in
+/// docs/search-feature-design.md): Home · Search · Matches · Messages ·
+/// Pavilion. Own profile lives behind the header avatar, not a tab.
+enum V2Tab { home, search, matches, messages, pavilion }
 
-/// 5-tab bottom navigation — Home · Matches · Pavilion · Messages · You.
+/// 5-tab bottom navigation — Home · Search · Matches · Messages · Pavilion.
 ///
 /// Implements the "Option B · Filled square tile" direction from
 /// `matchday-challenge/Bottom Nav Options.html` (the designer's recommended
 /// variant): inactive = soft outline glyph, active = white glyph reversed
-/// inside a red rounded-square tile. The "You" tab never gets a tile — it
-/// shows the user's avatar monogram with a double red ring when active.
+/// inside a red rounded-square tile. (The former "You"/avatar tab was replaced
+/// by Search per D9; the avatar moved to [V2Header].)
 ///
 /// Tokens taken verbatim from the design CSS:
 ///   bar bg          surface (#fff)            hairline border top
 ///   tile (active)   40×32  radius 11  red bg  21px white glyph
 ///   tile (inactive) 40×32  transparent        23px soft glyph
-///   avatar         23×23 round  paper2 bg     active = 1.5px red border + 1.5px red spread shadow
 ///   label          9.5px Inter  600 → 700     muted → ink on active
 ///   tab gap (glyph→label) 5px   tab vertical padding 4px
 class V2BottomNav extends StatelessWidget {
@@ -414,13 +473,11 @@ class V2BottomNav extends StatelessWidget {
     super.key,
     required this.active,
     required this.onSelect,
-    this.avatarMono = 'BA',
     this.messagesBadge = 2,
   });
 
   final V2Tab active;
   final ValueChanged<V2Tab> onSelect;
-  final String avatarMono;
   final int messagesBadge;
 
   @override
@@ -438,76 +495,38 @@ class V2BottomNav extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _navItem(V2Tab.home, 'Home', V2Icons.home),
+            _navItem(V2Tab.search, 'Search', V2Icons.search),
             _navItem(V2Tab.matches, 'Matches', V2Icons.matches),
-            _navItem(V2Tab.pavilion, 'Pavilion', V2Icons.pavilion),
             _navItem(V2Tab.messages, 'Messages', V2Icons.messages,
                 badge: messagesBadge),
-            _navItem(V2Tab.profile, 'You', null),
+            _navItem(V2Tab.pavilion, 'Pavilion', V2Icons.pavilion),
           ],
         ),
       ),
     );
   }
 
-  Widget _navItem(V2Tab id, String label, String? icon, {int? badge}) {
+  Widget _navItem(V2Tab id, String label, String icon, {int? badge}) {
     final isActive = id == active;
 
-    // The glyph area is one of two shapes:
-    //   • Avatar tab ("You"): 23×23 round avatar; active = double red ring.
-    //     Never wrapped in a tile (matches the design's special-case JS).
-    //   • Icon tabs: 40×32 rounded tile. Tile fill swaps transparent → red on
-    //     active; SVG inside resizes 23 → 21 and swaps soft → white.
-    final Widget glyph;
-    if (icon == null) {
-      glyph = AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: 23,
-        height: 23,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: CkColors.paper2,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isActive ? CkColors.red : Colors.transparent,
-            width: 1.5,
-          ),
-          boxShadow: isActive
-              ? const [
-                  BoxShadow(
-                    color: CkColors.red,
-                    spreadRadius: 1.5,
-                    blurRadius: 0,
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          avatarMono,
-          style: CkType.display(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            color: CkColors.ink2,
-          ),
-        ),
-      );
-    } else {
-      glyph = AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: 40,
-        height: 32,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isActive ? CkColors.red : Colors.transparent,
-          borderRadius: BorderRadius.circular(11),
-        ),
-        child: V2Svg(
-          icon,
-          size: isActive ? 21 : 23,
-          color: isActive ? CkColors.surface : CkColors.soft,
-          strokeWidth: 2.0,
-        ),
-      );
-    }
+    // Icon tabs: 40×32 rounded tile. Tile fill swaps transparent → red on
+    // active; SVG inside resizes 23 → 21 and swaps soft → white.
+    final Widget glyph = AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      width: 40,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isActive ? CkColors.red : Colors.transparent,
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: V2Svg(
+        icon,
+        size: isActive ? 21 : 23,
+        color: isActive ? CkColors.surface : CkColors.soft,
+        strokeWidth: 2.0,
+      ),
+    );
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

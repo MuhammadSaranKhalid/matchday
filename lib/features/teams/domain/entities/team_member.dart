@@ -21,6 +21,9 @@ class TeamMember {
   final String playerId;
   final PlayerType playerType;
   final MemberRole role;
+
+  /// The user who added this member. Guaranteed non-null — enforced by the
+  /// `team_members.added_by NOT NULL` constraint.
   final String addedBy;
   final DateTime joinedAt;
   final DateTime updatedAt;

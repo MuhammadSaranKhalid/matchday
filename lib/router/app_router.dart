@@ -14,10 +14,12 @@ import '../features/pavilion/presentation/screens/pavilion_match_detail_screen.d
 import '../features/pavilion/presentation/screens/pavilion_v2_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
+import '../features/shell/presentation/widgets/swipeable_branch_view.dart';
 import '../features/teams/presentation/screens/add_unclaimed_player_screen.dart';
 import '../features/teams/presentation/screens/team_create_screen.dart';
 import '../features/teams/presentation/screens/team_page_screen.dart';
 import '../features/teams/presentation/screens/team_manage_screen.dart';
+import '../features/teams/presentation/screens/team_search_screen.dart';
 import '../features/teams/presentation/screens/teams_list_screen.dart';
 // Counter flow temporarily disabled — keep import commented for easy restore.
 // import '../features/matches/presentation/screens/challenge_counter_screen.dart';
@@ -45,8 +47,10 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
 ///
-/// Authenticated users land in the three-tab shell (HOME · MATCH · PAVILION)
-/// via a [StatefulShellRoute] so each tab keeps its own navigation stack.
+/// Authenticated users land in the five-tab shell (Home · Search · Matches ·
+/// Messages · Pavilion — D9 in docs/search-feature-design.md) via a
+/// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
+/// profile is a root-level route reached from the header avatar.
 /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
 /// added in Feature 2 alongside the `profiles` table.
 @Riverpod(keepAlive: true)
@@ -87,12 +91,24 @@ GoRouter appRouter(Ref ref) {
         path: '/onboarding',
         builder: (_, __) => const OnboardingScreen(),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
+        // Lay the five branch navigators out in a PageView so the tabs can be
+        // swiped through with a smooth, finger-tracking transition (the
+        // default .indexedStack snaps instantly). See SwipeableBranchView.
+        navigatorContainerBuilder: (context, navigationShell, children) =>
+            SwipeableBranchView(
+              navigationShell: navigationShell,
+              children: children,
+            ),
         branches: [
           // 0 · Home — feed
+          // `preload: true` on every branch so a swipe lands on real content
+          // immediately instead of a blank page that builds mid-gesture. Each
+          // branch's Navigator state is still kept alive across swipes.
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: '/home',
@@ -107,8 +123,23 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 1 · Matches — Live · Upcoming · Recent · Browse
+          // 1 · Search — team search & discovery (placeholder until search
+          // Slice 3 ships the real screen; see docs/search-feature-design.md).
           StatefulShellBranch(
+            preload: true,
+            routes: [
+              GoRoute(
+                path: '/search',
+                builder: (context, _) =>
+                    TeamSearchScreen(onBell: () => _openBell(context)),
+              ),
+            ],
+          ),
+          // 2 · Matches — Live · Upcoming · Recent · Browse (the open match
+          // pool lands here as the primary sub-tab; see
+          // docs/match-pool-feature-design.md D10).
+          StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: '/matches',
@@ -117,8 +148,33 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 2 · Pavilion — workspace (calendar + yours + create)
+          // 3 · Messages — threads aggregator
           StatefulShellBranch(
+            preload: true,
+            routes: [
+              GoRoute(
+                path: '/messages',
+                builder: (context, _) =>
+                    InboxScreen(onBell: () => _openBell(context)),
+                routes: [
+                  // Message thread — rendered full-screen over the shell
+                  // (root navigator), URL-nested under /messages so a refresh
+                  // or push deep-link restores [Messages → thread] with a
+                  // working back. Mirrors the /pavilion/match/:id pattern.
+                  GoRoute(
+                    path: ':chatId',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (_, state) => MessageThreadScreen(
+                      chatId: state.pathParameters['chatId']!,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // 4 · Pavilion — workspace (calendar + yours + create)
+          StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: '/pavilion',
@@ -145,38 +201,6 @@ GoRouter appRouter(Ref ref) {
                     ),
                   ),
                 ],
-              ),
-            ],
-          ),
-          // 3 · Messages — threads aggregator
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/messages',
-                builder: (context, _) =>
-                    InboxScreen(onBell: () => _openBell(context)),
-                routes: [
-                  // Message thread — rendered full-screen over the shell
-                  // (root navigator), URL-nested under /messages so a refresh
-                  // or push deep-link restores [Messages → thread] with a
-                  // working back. Mirrors the /pavilion/match/:id pattern.
-                  GoRoute(
-                    path: ':chatId',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    builder: (_, state) => MessageThreadScreen(
-                      chatId: state.pathParameters['chatId']!,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          // 4 · You — profile (self)
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/profile',
-                builder: (_, __) => const ProfileScreen(isTab: true),
               ),
             ],
           ),
@@ -269,6 +293,13 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/notifications',
         builder: (_, __) => const NotificationsScreen(),
+      ),
+      // Own profile — full-screen over the shell, opened from the header
+      // avatar in [V2Header]. (The dedicated Profile tab was replaced by the
+      // Search tab — D9 in docs/search-feature-design.md.)
+      GoRoute(
+        path: '/profile',
+        builder: (_, __) => const ProfileScreen(),
       ),
       // Public profile by @username — the landing for a shared
       // `joinmatchday.com/u/<username>` link (universal/app link) and for

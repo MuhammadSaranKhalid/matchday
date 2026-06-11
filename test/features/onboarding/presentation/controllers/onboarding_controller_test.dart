@@ -12,16 +12,23 @@ import 'package:novex_clean_arch/features/onboarding/domain/value_objects/userna
 import 'package:novex_clean_arch/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:novex_clean_arch/features/onboarding/presentation/providers/onboarding_providers.dart';
 import 'package:novex_clean_arch/features/onboarding/presentation/state/onboarding_state.dart';
+import 'package:novex_clean_arch/features/location/domain/entities/geo_place.dart';
+import 'package:novex_clean_arch/features/location/domain/repositories/location_repository.dart';
+import 'package:novex_clean_arch/features/location/presentation/providers/location_providers.dart';
 
 class _MockProfileRepo extends Mock implements ProfileRepository {}
 
 class _MockDraftStore extends Mock implements WizardDraftStore {}
 
+class _MockLocationRepo extends Mock implements LocationRepository {}
+
 void main() {
   late _MockProfileRepo repo;
   late _MockDraftStore store;
+  late _MockLocationRepo locationRepo;
 
   setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
     registerFallbackValue(
       DisplayName.create('Test User').getOrElse((_) => throw ''),
     );
@@ -36,6 +43,7 @@ void main() {
   setUp(() {
     repo = _MockProfileRepo();
     store = _MockDraftStore();
+    locationRepo = _MockLocationRepo();
     when(() => store.load(any())).thenAnswer((_) async => null);
     when(() => store.save(any(), any())).thenAnswer((_) async {});
     when(() => store.clear(any())).thenAnswer((_) async {});
@@ -46,6 +54,7 @@ void main() {
       overrides: [
         profileRepositoryProvider.overrideWithValue(repo),
         wizardDraftStoreProvider.overrideWithValue(store),
+        locationRepositoryProvider.overrideWithValue(locationRepo),
       ],
     );
     addTearDown(container.dispose);
@@ -143,5 +152,43 @@ void main() {
           countryCode: any(named: 'countryCode'),
           playerProfile: any(named: 'playerProfile'),
         )).called(1);
+  });
+
+  test('useMyLocation stores the locality in city, not the full address',
+      () async {
+    when(() => locationRepo.currentLocation(
+          languageCode: any(named: 'languageCode'),
+        )).thenAnswer(
+      (_) async => const Right(
+        GeoPlace(
+          label:
+              '12-A Street 1, Block-E-II, Gulberg III, Lahore, 54000, Pakistan',
+          source: PlaceSource.gps,
+          city: 'Lahore',
+          district: 'Lahore',
+          province: 'Punjab',
+          postcode: '54000',
+          latitude: 31.5204,
+          longitude: 74.3587,
+          countryCode: 'PK',
+        ),
+      ),
+    );
+
+    final container = makeContainer();
+    await container.read(onboardingControllerProvider.future);
+    final controller = container.read(onboardingControllerProvider.notifier);
+
+    await controller.useMyLocation();
+
+    final p = container.read(onboardingControllerProvider).value!.profile;
+    expect(p.city, 'Lahore',
+        reason: 'city must be the locality, not the formatted address');
+    expect(p.label, contains('Gulberg III'));
+    expect(p.district, 'Lahore');
+    expect(p.province, 'Punjab');
+    expect(p.postcode, '54000');
+    expect(p.lat, 31.5204);
+    expect(p.countryCode, 'PK');
   });
 }

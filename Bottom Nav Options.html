@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>matchday — bottom nav directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#26221B; --ink-2:#4a4339; --muted:#8a8170; --soft:#bcb4a5;
+    --paper:#FBFAF6; --paper-2:#F2EFE8; --surface:#fff;
+    --line:#E6E2D9; --hairline:#EEEBE3;
+    --red:#DC4D32; --red-soft:#F7E6E1;
+    --stage:#E7E3DB;
+    --display:'Inter Tight',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--stage);color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1180px;margin:0 auto;padding:44px 32px 100px;}
+  .kicker{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);}
+  h1{font-family:var(--display);font-weight:800;letter-spacing:-0.035em;font-size:34px;margin:10px 0 0;}
+  .lede{font-size:14.5px;color:var(--ink-2);line-height:1.6;max-width:700px;margin:12px 0 0;}
+
+  .controls{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;}
+  .controls .lbl{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-right:2px;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+  .seg button{font-family:var(--body);font-size:12.5px;font-weight:600;padding:7px 13px;background:var(--paper);color:var(--ink-2);border:none;cursor:pointer;white-space:nowrap;}
+  .seg button+button{border-left:1px solid var(--line);}
+  .seg button.on{background:var(--ink);color:var(--paper);}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;margin-top:30px;}
+  @media(max-width:880px){.grid{grid-template-columns:1fr;}}
+  .opt{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px 22px 8px;}
+  .opt.rec{border-color:var(--red);box-shadow:0 0 0 3px var(--red-soft);}
+  .opt-h{display:flex;align-items:baseline;gap:10px;}
+  .opt-h .tag{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--red);}
+  .opt-h h2{font-family:var(--display);font-weight:700;letter-spacing:-0.02em;font-size:18px;margin:0;}
+  .opt-h .rec-badge{margin-left:auto;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:0.08em;padding:3px 8px;border-radius:5px;background:var(--red-soft);color:var(--red);}
+  .opt p{font-size:12.5px;color:var(--muted);line-height:1.5;margin:8px 0 0;}
+
+  .device{margin:18px auto 14px;width:344px;border-radius:30px;background:var(--paper);border:1px solid var(--line);box-shadow:0 14px 34px -18px rgba(40,30,15,0.32);overflow:hidden;}
+  .device .scrim{height:120px;background:radial-gradient(120% 80% at 50% 0%, var(--paper) 40%, var(--paper-2) 100%);display:flex;align-items:center;justify-content:center;}
+  .device .scrim .ph{font-family:var(--mono);font-size:9px;letter-spacing:0.14em;color:var(--soft);text-transform:uppercase;}
+
+  .nav{display:grid;grid-template-columns:repeat(5,1fr);align-items:end;border-top:1px solid var(--hairline);background:var(--surface);padding:8px 6px 16px;}
+  .tab{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;font-family:var(--body);padding:4px 0;}
+  .tab .glyph{width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--soft);transition:color .15s;}
+  .tab .lab{font-size:9.5px;font-weight:600;letter-spacing:0.01em;color:var(--muted);transition:color .15s;}
+  .tab svg{width:23px;height:23px;display:block;}
+
+  /* avatar (You) */
+  .ava{width:23px;height:23px;border-radius:999px;background:var(--paper-2);color:var(--ink-2);font-family:var(--display);font-weight:700;font-size:9px;display:flex;align-items:center;justify-content:center;border:1.5px solid transparent;transition:border-color .15s,box-shadow .15s;}
+
+  /* A — line→fill */
+  .navA .tab.on .glyph{color:var(--red);}
+  .navA .tab.on .lab{color:var(--ink);font-weight:700;}
+  .navA .tab.on .ava{border-color:var(--red);box-shadow:0 0 0 1.5px var(--red);}
+
+  /* B — filled square tile */
+  .navB .tab .tile{width:40px;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+  .navB .tab.on .tile{background:var(--red);}
+  .navB .tab.on .glyph{color:#fff;}
+  .navB .tab.on svg{width:21px;height:21px;}
+  .navB .tab.on .lab{color:var(--ink);font-weight:700;}
+  .navB .tab.on .ava{border-color:var(--red);box-shadow:0 0 0 1.5px var(--red);}
+
+  /* C — pill behind */
+  .navC .tab{gap:0;}
+  .navC .row{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;transition:background .15s;}
+  .navC .tab.on .row{background:var(--red-soft);}
+  .navC .tab.on .glyph{color:var(--red);}
+  .navC .tab.on .ava{border-color:var(--red);}
+  .navC .tab .lab{font-size:0;width:0;overflow:hidden;}
+  .navC .tab.on .lab{font-size:11px;color:var(--red);font-weight:700;width:auto;}
+  .navC .tab:not(.on) .lab{display:none;}
+
+  /* D — accent dot above */
+  .navD .tab{position:relative;}
+  .navD .tab .pip{width:5px;height:5px;border-radius:999px;background:transparent;margin-bottom:3px;transition:background .15s;}
+  .navD .tab.on .pip{background:var(--red);}
+  .navD .tab.on .glyph{color:var(--ink);}
+  .navD .tab.on .lab{color:var(--ink);font-weight:700;}
+  .navD .tab.on .ava{border-color:var(--ink);}
+
+  .opt .hint{font-size:11px;color:var(--muted);text-align:center;padding:0 0 14px;}
+  .opt .hint b{color:var(--ink-2);}
+
+  .note{margin-top:40px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 22px;font-size:13px;color:var(--ink-2);line-height:1.6;}
+  .note .mono{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:0.04em;text-transform:uppercase;}
+  .note b{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">matchday · bottom nav</div>
+  <h1>Bottom nav — selected-state directions</h1>
+  <p class="lede">Five tabs — <b>Home · Matches · Pavilion · Messages · You</b> — four ways the <i>selected</i> tab can read. <b>You</b> is your profile, shown as your avatar (active = ring). Tap any tab to feel its active state; use the controls to swap the Matches glyph, active color and Pavilion glyph, then tell me which option + settings to wire in.</p>
+
+  <div class="controls">
+    <span class="lbl">Matches icon</span>
+    <div class="seg" id="ballSeg">
+      <button data-ball="bat" class="on">Bat &amp; ball</button>
+      <button data-ball="seam">Seam ball (logo)</button>
+    </div>
+    <span class="lbl" style="margin-left:14px">Active color</span>
+    <div class="seg" id="colSeg">
+      <button data-col="red" class="on">Red</button>
+      <button data-col="ink">Ink</button>
+    </div>
+    <span class="lbl" style="margin-left:14px">Pavilion icon</span>
+    <div class="seg" id="pavSeg">
+      <button data-pav="shield" class="on">Crest</button>
+      <button data-pav="grid">Dashboard</button>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="note">
+    <div class="mono">How to choose</div>
+    <p style="margin:8px 0 0;">Pick a letter — <b>A</b>, <b>B</b>, <b>C</b> or <b>D</b> — plus your control settings (Matches glyph, active color, Pavilion glyph). My recommendation is <b>B · filled square · red active · bat-and-ball · crest</b>, with <b>You</b> as your avatar (ringed when active). I’ll then wire the chosen bar into the app shell across every screen.</p>
+  </div>
+</div>
+
+<script>
+const S = { ball:'bat', col:'red', pav:'shield' };
+
+const I = {
+  home:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>`,
+  shield:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.2-3 7.4-7 8.5C8 18.4 5 15.2 5 11V6z"/><path d="M12 8.4l1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z" stroke-width="1.4"/></svg>`,
+  grid:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg>`,
+  bat:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5a2 2 0 0 1 2.9 2.9l-8 8-2.9-2.9z"/><path d="M6.5 12.5 4 15l1.5 1.5L8 14"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>`,
+  seam:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.6c2.2 2.4 2.2 14.4 0 16.8"/><path d="M9.6 6.2l.7.8M9 9l.8.6M8.8 12h1M9 15l.8-.6M9.6 17.8l.7-.8"/></svg>`,
+  msgs:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg>`,
+};
+
+function glyph(t){
+  if(t.avatar) return `<span class="ava">BA</span>`;
+  return `<span class="glyph">${t.icon}</span>`;
+}
+
+const TABS = ()=>[
+  { id:'home',  lab:'Home',  icon:I.home },
+  { id:'match', lab:'Matches', icon:S.ball==='seam'?I.seam:I.bat },
+  { id:'pav',   lab:'Pavilion', icon:S.pav==='grid'?I.grid:I.shield },
+  { id:'msgs',  lab:'Messages', icon:I.msgs },
+  { id:'you',   lab:'You', avatar:true },
+];
+
+const OPTS = [
+  { k:'A', cls:'navA', name:'Line → solid fill', desc:'Inactive line icon; active icon recolors + label bolds. Avatar gets a ring. Classic iOS, lightest touch.', hint:'Active = <b>colored glyph + bold label</b>', rec:false },
+  { k:'B', cls:'navB', name:'Filled square tile', desc:'Active glyph sits reversed in a filled rounded-square; avatar gets a ring. Matches your “square solid active” house style.', hint:'Active = <b>reversed glyph in a filled tile</b>', rec:true },
+  { k:'C', cls:'navC', name:'Pill behind active', desc:'Active icon + label tuck into a soft pill; inactive shows icon only. Friendly, a touch Android.', hint:'Active = <b>icon + label in a blush pill</b>', rec:false },
+  { k:'D', cls:'navD', name:'Accent dot above', desc:'A tiny dot above the active icon + color shift, no fill change. The subtlest option.', hint:'Active = <b>dot above + darkened glyph</b>', rec:false },
+];
+
+const sel = { A:'pav', B:'pav', C:'pav', D:'pav' };
+
+function renderBar(o){
+  const active = sel[o.k];
+  const tabs = TABS().map(t=>{
+    const on = t.id===active;
+    if(o.cls==='navB'){
+      // avatar tab keeps a ring rather than a filled tile (looks better)
+      const inner = t.avatar ? glyph(t) : `<div class="tile">${glyph(t)}</div>`;
+      return `<button class="tab ${on?'on':''}" data-opt="${o.k}" data-id="${t.id}">${inner}<span class="lab">${t.lab}</span></button>`;
+    }
+    if(o.cls==='navC'){
+      return `<button class="tab ${on?'on':''}" data-opt="${o.k}" data-id="${t.id}"><div class="row">${glyph(t)}<span class="lab">${t.lab}</span></div></button>`;
+    }
+    if(o.cls==='navD'){
+      return `<button class="tab ${on?'on':''}" data-opt="${o.k}" data-id="${t.id}"><span class="pip"></span>${glyph(t)}<span class="lab">${t.lab}</span></button>`;
+    }
+    return `<button class="tab ${on?'on':''}" data-opt="${o.k}" data-id="${t.id}">${glyph(t)}<span class="lab">${t.lab}</span></button>`;
+  }).join('');
+  return `<div class="nav ${o.cls}">${tabs}</div>`;
+}
+
+function render(){
+  const root=document.getElementById('grid');
+  root.style.setProperty('--red', S.col==='ink' ? '#26221B' : '#DC4D32');
+  root.style.setProperty('--red-soft', S.col==='ink' ? '#ECE8DF' : '#F7E6E1');
+  root.innerHTML = OPTS.map(o=>`
+    <div class="opt ${o.rec?'rec':''}">
+      <div class="opt-h"><span class="tag">Option ${o.k}</span><h2>${o.name}</h2>${o.rec?'<span class="rec-badge">Recommended</span>':''}</div>
+      <p>${o.desc}</p>
+      <div class="device">
+        <div class="scrim"><span class="ph">tap a tab ↓</span></div>
+        ${renderBar(o)}
+      </div>
+      <div class="hint">${o.hint}</div>
+    </div>`).join('');
+  root.querySelectorAll('.tab').forEach(b=>{
+    b.addEventListener('click',()=>{ sel[b.dataset.opt]=b.dataset.id; render(); });
+  });
+}
+
+function wireSeg(id, key){
+  document.getElementById(id).addEventListener('click',e=>{
+    const btn=e.target.closest('button'); if(!btn) return;
+    S[key]=btn.dataset[key];
+    [...btn.parentNode.children].forEach(c=>c.classList.toggle('on', c===btn));
+    render();
+  });
+}
+wireSeg('ballSeg','ball');
+wireSeg('colSeg','col');
+wireSeg('pavSeg','pav');
+render();
+</script>
+</body>
+</html>

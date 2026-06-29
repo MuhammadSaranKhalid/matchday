@@ -1,4 +1,10 @@
 include: package:flutter_lints/flutter.yaml
+# OPT-IN UPGRADE: swap the include above for the stricter very_good_analysis
+# ruleset (already in dev_dependencies; it's a plain include, NOT an analyzer
+# plugin, so it's unaffected by the custom_lint conflict). Expect a wave of
+# info-level lints on first switch — do it in a dedicated cleanup pass, not
+# mid-feature, because pre-flight-qa requires `flutter analyze` to be clean.
+# include: package:very_good_analysis/analysis_options.yaml
 
 analyzer:
   # custom_lint plugin removed alongside riverpod_lint (see pubspec.yaml note).

@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "//": "DB tooling allowlist — connection-string + CLI workflow (replaces MCP permission prompts). psql:* runs any SQL incl. DDL without prompting; narrow it if you want review-before-apply. `supabase db push` and `db reset` are intentionally NOT listed so they still prompt.",
+    "allow": [
+      "Bash(psql:*)",
+      "Bash(supabase migration:*)",
+      "Bash(supabase functions:*)",
+      "Bash(supabase db dump:*)",
+      "Bash(supabase db diff:*)",
+      "Bash(supabase link:*)",
+      "Bash(supabase gen:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && v=$(grep -rlE 'package:(flutter|flutter_riverpod|riverpod_annotation|supabase_flutter|supabase|drift|go_router|dio|http)/' lib/features/*/domain 2>/dev/null); if [ -n \"$v\" ]; then echo \"ARCHITECTURE VIOLATION - framework import in a pure-Dart domain layer (CLAUDE.md Rule 1). Offending files: $v\" >&2; exit 2; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

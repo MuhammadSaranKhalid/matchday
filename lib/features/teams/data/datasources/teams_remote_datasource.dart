@@ -2,8 +2,10 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
+import '../models/place_facet_dto.dart';
 import '../models/team_dto.dart';
 import '../models/team_member_dto.dart';
+import '../models/team_search_result_dto.dart';
 import '../models/unclaimed_player_dto.dart';
 
 /// Talks to Supabase for the three teams tables. Returns DTOs, throws raw
@@ -71,7 +73,23 @@ class TeamsRemoteDataSource {
               'description': payload['description'],
             if (payload['home_ground'] != null)
               'home_ground': payload['home_ground'],
-            'location': {if (payload['city'] != null) 'city': payload['city']},
+            // Location jsonb: forward every structured geo field the caller
+            // provides. Each is optional; null fields are omitted so the row
+            // matches the §7 contract shape (docs/search-feature-design.md).
+            // When lat/lng land, the generated `location_point` column auto-
+            // populates and the GiST index picks the team up for proximity.
+            'location': {
+              if (payload['label'] != null) 'label': payload['label'],
+              if (payload['city'] != null) 'city': payload['city'],
+              if (payload['district'] != null) 'district': payload['district'],
+              if (payload['province'] != null) 'province': payload['province'],
+              if (payload['postcode'] != null) 'postcode': payload['postcode'],
+              if (payload['place_id'] != null) 'place_id': payload['place_id'],
+              if (payload['lat'] != null) 'lat': payload['lat'],
+              if (payload['lng'] != null) 'lng': payload['lng'],
+              if (payload['country_code'] != null)
+                'country_code': payload['country_code'],
+            },
             if (payload['founded_year'] != null)
               'founded_year': payload['founded_year'],
             'team_colors': {
@@ -224,6 +242,71 @@ class TeamsRemoteDataSource {
   Future<void> deleteMember(String id) async {
     try {
       await _supabase.from(_members).delete().eq('membership_id', id);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // ─── Search (edge functions) ───────────────────────────────────────────────
+
+  /// Calls `search-teams`. The function selects a behavioural mode from which
+  /// inputs are non-null — see docs/search-feature-design.md §9.1.
+  /// `radiusKm`/`scaleKm`/`countryCode`/`limit` are all server-defaulted; pass
+  /// null to use the server defaults.
+  Future<List<TeamSearchResultDto>> searchTeams({
+    String? query,
+    double? lat,
+    double? lng,
+    double? radiusKm,
+    double? scaleKm,
+    String? countryCode,
+    int? limit,
+  }) async {
+    try {
+      final res = await _supabase.functions.invoke(
+        'search-teams',
+        body: {
+          if (query != null && query.isNotEmpty) 'q': query,
+          if (lat != null) 'lat': lat,
+          if (lng != null) 'lng': lng,
+          if (radiusKm != null) 'radiusKm': radiusKm,
+          if (scaleKm != null) 'scaleKm': scaleKm,
+          if (countryCode != null) 'countryCode': countryCode,
+          if (limit != null) 'limit': limit,
+        },
+      );
+      final data = res.data;
+      if (data is! Map || data['results'] is! List) {
+        throw ServerException('Unexpected search-teams payload');
+      }
+      final rows = (data['results'] as List).cast<Map<String, dynamic>>();
+      return rows.map(TeamSearchResultDto.fromJson).toList();
+    } on FunctionException catch (e) {
+      throw ServerException('search-teams failed: ${e.details ?? e.reasonPhrase ?? ''}');
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Calls `team-place-facets`. Returns the top cities by team count for the
+  /// current country (defaulted to the caller's profile country when
+  /// [countryCode] is null).
+  Future<List<PlaceFacetDto>> teamPlaceFacets({String? countryCode}) async {
+    try {
+      final res = await _supabase.functions.invoke(
+        'team-place-facets',
+        body: {
+          if (countryCode != null) 'countryCode': countryCode,
+        },
+      );
+      final data = res.data;
+      if (data is! Map || data['facets'] is! List) {
+        throw ServerException('Unexpected team-place-facets payload');
+      }
+      final rows = (data['facets'] as List).cast<Map<String, dynamic>>();
+      return rows.map(PlaceFacetDto.fromJson).toList();
+    } on FunctionException catch (e) {
+      throw ServerException('team-place-facets failed: ${e.details ?? e.reasonPhrase ?? ''}');
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

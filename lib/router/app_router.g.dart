@@ -14,8 +14,10 @@ part of 'app_router.dart';
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
 ///
-/// Authenticated users land in the three-tab shell (HOME · MATCH · PAVILION)
-/// via a [StatefulShellRoute] so each tab keeps its own navigation stack.
+/// Authenticated users land in the five-tab shell (Home · Search · Matches ·
+/// Messages · Pavilion — D9 in docs/search-feature-design.md) via a
+/// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
+/// profile is a root-level route reached from the header avatar.
 /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
 /// added in Feature 2 alongside the `profiles` table.
 
@@ -28,8 +30,10 @@ final appRouterProvider = AppRouterProvider._();
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
 ///
-/// Authenticated users land in the three-tab shell (HOME · MATCH · PAVILION)
-/// via a [StatefulShellRoute] so each tab keeps its own navigation stack.
+/// Authenticated users land in the five-tab shell (Home · Search · Matches ·
+/// Messages · Pavilion — D9 in docs/search-feature-design.md) via a
+/// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
+/// profile is a root-level route reached from the header avatar.
 /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
 /// added in Feature 2 alongside the `profiles` table.
 
@@ -42,8 +46,10 @@ final class AppRouterProvider
   /// When it flips (sign in / sign out), the router re-evaluates and moves
   /// the user accordingly.
   ///
-  /// Authenticated users land in the three-tab shell (HOME · MATCH · PAVILION)
-  /// via a [StatefulShellRoute] so each tab keeps its own navigation stack.
+  /// Authenticated users land in the five-tab shell (Home · Search · Matches ·
+  /// Messages · Pavilion — D9 in docs/search-feature-design.md) via a
+  /// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
+  /// profile is a root-level route reached from the header avatar.
   /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
   /// added in Feature 2 alongside the `profiles` table.
   AppRouterProvider._()
@@ -79,4 +85,4 @@ final class AppRouterProvider
   }
 }
 
-String _$appRouterHash() => r'16eb8330fd380bab41fcaf96b94b24ff3796474c';
+String _$appRouterHash() => r'342256fab8f8d7bb5d0cde62c86e41ce1242fc84';

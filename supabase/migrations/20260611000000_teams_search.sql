@@ -1,0 +1,82 @@
+-- =============================================================================
+-- 0611 · teams search
+-- =============================================================================
+-- Search & discovery foundation. Adds the columns/indexes the `search-teams`
+-- and `team-place-facets` edge functions read.
+--
+-- See docs/search-feature-design.md §7 (data model) and §8.2 (backfill) for
+-- the rationale; this file is the schema artefact those sections describe.
+--
+-- What we add
+--   1. unaccent extension + f_unaccent(text)  — an IMMUTABLE wrapper around
+--      the two-arg unaccent('dict', text) form so it is legal in a generated
+--      column / index expression. (Single-arg unaccent() is only STABLE.)
+--   2. teams.search_name  — generated, stored: lower(f_unaccent(team_name)).
+--      Normalises case + diacritics so query/text match through pg_trgm
+--      regardless of how either side was typed.
+--   3. teams_search_trgm   — partial GIN trigram index on search_name, scoped
+--      to the discoverable hot set (status='active' AND privacy='public').
+--      The partial predicate MUST match the edge function's WHERE byte-for-byte
+--      for the planner to pick this index — see docs §17.
+--   4. One-off backfill: copy lat/lng/place_id/country_code from each team
+--      owner's profile into the team's location jsonb, where the team has no
+--      coordinate yet. Per D8 (fix-forward) this seeds proximity for existing
+--      teams without waiting for owners to re-save. Coordinates only — `city`
+--      strings stay as-is and self-clean when owners next edit (D8).
+--
+-- What we deliberately leave alone
+--   - `teams_name_trgm` (the legacy GIN on raw team_name) is retained for now
+--     to avoid a "missing index" window. A follow-up migration drops it once
+--     `EXPLAIN` confirms search-teams uses `teams_search_trgm`.
+--   - `location_point` and `teams_location_point` already exist in 0200; the
+--     edge function's near-me / blend SQL reads them directly.
+-- =============================================================================
+
+-- 1. unaccent + IMMUTABLE wrapper.
+create extension if not exists unaccent;
+
+create or replace function public.f_unaccent(text)
+returns text
+language sql
+immutable
+parallel safe
+strict
+set search_path = public, pg_temp
+as $$
+  -- Two-arg form is IMMUTABLE (single-arg is only STABLE). Bind the
+  -- dictionary explicitly so the planner can constant-fold inside the
+  -- generated column / index expression.
+  select public.unaccent('public.unaccent', $1)
+$$;
+
+-- 2. Generated normalised search column on teams.
+alter table public.teams
+  add column search_name text
+  generated always as (lower(public.f_unaccent(team_name))) stored;
+
+-- 3. Partial trigram index on the discoverable hot set.
+-- The predicate must match the edge function's WHERE clause exactly so the
+-- planner picks this index. Changing either side without the other quietly
+-- drops index usage.
+create index teams_search_trgm
+  on public.teams using gin (search_name gin_trgm_ops)
+  where status = 'active' and privacy = 'public';
+
+-- 4. Backfill coordinates from each team owner's profile.
+-- Run inside a transaction (each migration is wrapped). Idempotent thanks to
+-- the `not (location ? 'lat')` guard — repeated runs are a no-op once a team
+-- has been seeded once.
+update public.teams t
+set location = coalesce(t.location, '{}'::jsonb)
+  || jsonb_strip_nulls(
+       jsonb_build_object(
+         'lat',          p.location->'lat',
+         'lng',          p.location->'lng',
+         'place_id',     p.location->'place_id',
+         'country_code', p.location->'country_code'
+       )
+     )
+from public.profiles p
+where t.owner_id = p.user_id
+  and not (coalesce(t.location, '{}'::jsonb) ? 'lat')
+  and (p.location ? 'lat');

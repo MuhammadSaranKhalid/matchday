@@ -9,12 +9,21 @@ These subagents are version-controlled. The team inherits them via `git clone` �
 | Agent | Routes to it when... | Read-only? |
 |---|---|---|
 | `architecture-reviewer` | Code changed in `lib/` (any layer) | Yes |
-| `feature-builder` | New feature requested ("add bookmarks", "build messaging") | No |
+| `match-engine-specialist` | ANY change touching ball-by-ball scoring — record-ball, scoring RPCs/SQL, balls/innings-state tables, undo, free-hits, formats | No |
+| `feature-builder` | New feature requested ("add bookmarks", "build tournaments") | No |
+| `db-reviewer` | New migration in `supabase/migrations/` or RLS/RPC/schema change proposed | Yes |
+| `code-simplifier` | After a feature works and passes review — reuse, dead code, over-abstraction | Yes |
+| `security-auditor` | Periodic / pre-release sweep — secrets, RLS coverage across all migrations, edge-fn auth, deps | Yes |
+| `docs-keeper` | A decision was made or code merged — design-doc decision logs, CLAUDE.md, README upkeep | Docs only |
 | `test-writer` | After a feature is built, or when coverage is requested | No |
 | `riverpod-specialist` | Provider DI questions, controller design, ref misuse bugs | No |
 | `supabase-specialist` | RLS policies, auth flows, real-time, schema design | No |
-| `drift-specialist` | Local DB schema, migrations, offline-first repos | No |
-| `version-auditor` | Periodic dependency maintenance | Mostly |
+| `drift-specialist` | ⚠️ LEGACY — app is online-only since 2026-05-26; drift survives only for WizardDrafts + the messages read-through cache. Use only for those. | No |
+| `version-auditor` | Periodic dependency maintenance (NOTE: drift pinned 2.31, riverpod_lint/custom_lint disabled — do not "fix") | Mostly |
+
+> **2026-06-12:** `feature-builder`, `architecture-reviewer`, `riverpod-specialist`, `test-writer`, and `supabase-specialist` have all been updated for the current architecture (NO use-case layer per 2026-05-29 amendment; ONLINE-ONLY per 2026-05-26). Project skills live in `.claude/skills/` (`ticket`, `supabase-migration`, `design-port`, `geo-discovery`, `pre-flight-qa`, `edge-functions`, `release-readiness`, `push-notifications`).
+>
+> **Deterministic enforcement** (beyond agents): `.claude/settings.json` has a PostToolUse hook that greps for framework imports in domain layers after every edit, and `test/architecture_test.dart` (dart_arch_test) encodes the layer rules as CI-runnable tests with a frozen cross-feature baseline.
 
 ## How Claude Code uses these
 

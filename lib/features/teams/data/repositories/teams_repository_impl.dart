@@ -2,10 +2,12 @@ import 'package:fpdart/fpdart.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
+import '../../domain/entities/place_facet.dart';
 import '../../domain/entities/player_skills.dart';
 import '../../domain/entities/roster_member.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
+import '../../domain/entities/team_search_result.dart';
 import '../../domain/repositories/teams_repository.dart';
 import '../../domain/value_objects/jersey_number.dart';
 import '../../domain/value_objects/player_display_name.dart';
@@ -108,6 +110,14 @@ class TeamsRepositoryImpl implements TeamsRepository {
     String? secondaryColor,
     String? tagline,
     String? logoMonogram,
+    String? label,
+    String? district,
+    String? province,
+    String? postcode,
+    String? placeId,
+    double? latitude,
+    double? longitude,
+    String? countryCode,
   }) async {
     try {
       final dto = await _remote.createTeam({
@@ -123,6 +133,14 @@ class TeamsRepositoryImpl implements TeamsRepository {
         'secondary_color': secondaryColor,
         'tagline': tagline,
         'logo_monogram': logoMonogram,
+        'label': label,
+        'district': district,
+        'province': province,
+        'postcode': postcode,
+        'place_id': placeId,
+        'lat': latitude,
+        'lng': longitude,
+        'country_code': countryCode,
       });
       return Right(dto.toEntity());
     } on UnauthorizedException catch (e) {
@@ -271,5 +289,53 @@ class TeamsRepositoryImpl implements TeamsRepository {
       if (m.membershipId == id.value) return m.toEntity();
     }
     return null;
+  }
+
+  // ─── Search & discovery ────────────────────────────────────────────────
+
+  @override
+  Future<Either<Failure, List<TeamSearchResult>>> searchTeams({
+    String? query,
+    double? lat,
+    double? lng,
+    double? radiusKm,
+    double? scaleKm,
+    String? countryCode,
+    int? limit,
+  }) async {
+    try {
+      final dtos = await _remote.searchTeams(
+        query: query,
+        lat: lat,
+        lng: lng,
+        radiusKm: radiusKm,
+        scaleKm: scaleKm,
+        countryCode: countryCode,
+        limit: limit,
+      );
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<PlaceFacet>>> teamPlaceFacets({
+    String? countryCode,
+  }) async {
+    try {
+      final dtos = await _remote.teamPlaceFacets(countryCode: countryCode);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
   }
 }

@@ -89,6 +89,16 @@ dev_dependencies:
 
   # Testing
   mocktail: ^1.0.4
+  # Architecture rules as plain tests (test/architecture_test.dart) - layer
+  # boundaries, cycle detection, violation freeze. Chosen BECAUSE it needs no
+  # analyzer plugin (custom_lint is blocked by the analyzer conflict above).
+  # If pub get ever fails on an analyzer constraint from this package, pin an
+  # older dart_arch_test version rather than touching drift/riverpod pins.
+  dart_arch_test: ^0.3.1
+  # Strict lint ruleset applied via plain analysis_options include (NOT an
+  # analyzer plugin, so unaffected by the custom_lint conflict). Currently
+  # opt-in: see the commented include in analysis_options.yaml.
+  very_good_analysis: ^7.0.0
   flutter_launcher_icons: ^0.14.4
 
 # matchday launcher icon (the Seam ball on warm paper). Sources rasterized

@@ -1,0 +1,44 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import '../../domain/entities/team.dart';
+import '../../domain/entities/team_search_result.dart';
+
+part 'team_search_result_dto.freezed.dart';
+part 'team_search_result_dto.g.dart';
+
+/// One row from the `search-teams` edge function. The function returns flat
+/// team columns (not a nested team) so this DTO is a different wire shape
+/// from [TeamDto] — same `teams` table, narrower selection, plus
+/// distance/score.
+@freezed
+abstract class TeamSearchResultDto with _$TeamSearchResultDto {
+  const factory TeamSearchResultDto({
+    @JsonKey(name: 'team_id') required String teamId,
+    @JsonKey(name: 'team_name') required String teamName,
+    @JsonKey(name: 'logo_url') String? logoUrl,
+    @JsonKey(name: 'logo_monogram') String? logoMonogram,
+    @JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors,
+    Map<String, dynamic>? location,
+    @JsonKey(name: 'is_verified') @Default(false) bool isVerified,
+    @JsonKey(name: 'distance_km') double? distanceKm,
+    @Default(0.0) double score,
+  }) = _TeamSearchResultDto;
+
+  const TeamSearchResultDto._();
+
+  factory TeamSearchResultDto.fromJson(Map<String, dynamic> json) =>
+      _$TeamSearchResultDtoFromJson(json);
+
+  TeamSearchResult toEntity() => TeamSearchResult(
+        teamId: TeamId(teamId),
+        name: teamName,
+        score: score,
+        logoUrl: logoUrl,
+        logoMonogram: logoMonogram,
+        primaryColor: teamColors?['primary'] as String?,
+        secondaryColor: teamColors?['secondary'] as String?,
+        city: location?['city'] as String?,
+        isVerified: isVerified,
+        distanceKm: distanceKm,
+      );
+}

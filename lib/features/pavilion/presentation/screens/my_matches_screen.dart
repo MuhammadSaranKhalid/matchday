@@ -30,6 +30,30 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
     final async = ref.watch(myMatchesViewProvider);
     return Scaffold(
       backgroundColor: CkColors.paper,
+      // "+ Schedule match" FAB — the primary CTA for this screen per the
+      // matchday IA (`design_handoff_matchday/README.md` §10). Pushes the
+      // existing /challenge flow. The smaller in-header "+ Challenge"
+      // button was removed when this FAB landed to avoid two CTAs that do
+      // the same thing.
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/challenge'),
+        backgroundColor: CkColors.ink,
+        foregroundColor: CkColors.paper,
+        icon: const V2Svg(
+          V2Icons.plus,
+          size: 18,
+          color: CkColors.paper,
+          strokeWidth: 2,
+        ),
+        label: Text(
+          'Schedule match',
+          style: CkType.body(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: CkColors.paper,
+          ),
+        ),
+      ),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -41,7 +65,6 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
               // link where nothing is below.
               onBack: () =>
                   context.canPop() ? context.pop() : context.go('/pavilion'),
-              right: const _ChallengeButton(),
             ),
             Expanded(
               child: async.when(
@@ -92,7 +115,7 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+                        padding: const EdgeInsets.fromLTRB(18, 4, 18, 96),
                         child: _tab == 'confirmed'
                             ? _confirmedBody(view)
                             : _pastBody(view),
@@ -199,15 +222,16 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
 // Header
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Back chevron + title + optional right widget. Matches the in-Pavilion
-/// `_PvHeader` look so the visual transition from Pavilion → this screen is
-/// invisible.
+/// Back chevron + title. Matches the in-Pavilion `_PvHeader` look so the
+/// visual transition from Pavilion → this screen is invisible. The bottom-
+/// right "+ Schedule match" FAB on the parent Scaffold is now the screen's
+/// primary CTA — the in-header "+ Challenge" button it used to host was
+/// removed to avoid two CTAs that route to the same flow.
 class _Header extends StatelessWidget {
-  const _Header({required this.title, this.onBack, this.right});
+  const _Header({required this.title, this.onBack});
 
   final String title;
   final VoidCallback? onBack;
-  final Widget? right;
 
   @override
   Widget build(BuildContext context) {
@@ -237,30 +261,7 @@ class _Header extends StatelessWidget {
               ),
             ),
           Expanded(child: Text(title, style: _display(22))),
-          if (right != null) ...[const SizedBox(width: 12), right!],
         ],
-      ),
-    );
-  }
-}
-
-class _ChallengeButton extends StatelessWidget {
-  const _ChallengeButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => context.push('/challenge'),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: CkColors.hairline),
-        ),
-        child: Text('+ Challenge',
-            style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600)),
       ),
     );
   }

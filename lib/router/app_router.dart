@@ -7,6 +7,7 @@ import '../features/onboarding/presentation/providers/onboarding_providers.dart'
 import '../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../features/home/presentation/screens/home_feed_screen.dart';
 import '../features/matches/presentation/screens/matches_v2_screen.dart';
+import '../features/menu/presentation/screens/menu_screen.dart';
 import '../features/messages/presentation/screens/message_thread_screen.dart';
 import '../features/messages/presentation/screens/inbox_screen.dart';
 import '../features/pavilion/presentation/screens/my_matches_screen.dart';
@@ -21,6 +22,7 @@ import '../features/teams/presentation/screens/team_page_screen.dart';
 import '../features/teams/presentation/screens/team_manage_screen.dart';
 import '../features/teams/presentation/screens/team_search_screen.dart';
 import '../features/teams/presentation/screens/teams_list_screen.dart';
+import '../features/tournaments/presentation/screens/my_tournaments_screen.dart';
 // Counter flow temporarily disabled — keep import commented for easy restore.
 // import '../features/matches/presentation/screens/challenge_counter_screen.dart';
 import '../features/matches/presentation/screens/challenge_detail_screen.dart';
@@ -47,10 +49,12 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
 ///
-/// Authenticated users land in the five-tab shell (Home · Search · Matches ·
-/// Messages · Pavilion — D9 in docs/search-feature-design.md) via a
-/// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
-/// profile is a root-level route reached from the header avatar.
+/// Authenticated users land in the three-tab matchday shell (Home · Matches ·
+/// Alerts — see `design_handoff_matchday/README.md`) via a
+/// [StatefulShellRoute] so each tab keeps its own navigation stack. Search,
+/// Messages and Pavilion are full-screen overlays pushed from the
+/// [GlobalHeader] (search pill / messages bubble / avatar → Menu drawer).
+/// Own profile is reached via the Menu drawer.
 /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
 /// added in Feature 2 alongside the `profiles` table.
 @Riverpod(keepAlive: true)
@@ -94,7 +98,7 @@ GoRouter appRouter(Ref ref) {
       StatefulShellRoute(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
-        // Lay the five branch navigators out in a PageView so the tabs can be
+        // Lay the three branch navigators out in a PageView so the tabs can be
         // swiped through with a smooth, finger-tracking transition (the
         // default .indexedStack snaps instantly). See SwipeableBranchView.
         navigatorContainerBuilder: (context, navigationShell, children) =>
@@ -113,96 +117,91 @@ GoRouter appRouter(Ref ref) {
               GoRoute(
                 path: '/home',
                 builder: (context, _) => HomeFeedScreen(
-                  onBell: () => _openBell(context),
                   // Tap an author in the feed → push their public profile
                   // by @username. Defined as `/u/:username` (root-level
                   // route, full-screen over the shell — see below).
+                  // (No `onBell`: Alerts has its own bottom-nav tab now,
+                  // and the universal GlobalHeader carries messages instead.)
                   onOpenProfile: (username) =>
                       context.push('/u/$username'),
                 ),
               ),
             ],
           ),
-          // 1 · Search — team search & discovery (placeholder until search
-          // Slice 3 ships the real screen; see docs/search-feature-design.md).
-          StatefulShellBranch(
-            preload: true,
-            routes: [
-              GoRoute(
-                path: '/search',
-                builder: (context, _) =>
-                    TeamSearchScreen(onBell: () => _openBell(context)),
-              ),
-            ],
-          ),
-          // 2 · Matches — Live · Upcoming · Recent · Browse (the open match
+          // 1 · Matches — Live · Upcoming · Recent · Browse (the open match
           // pool lands here as the primary sub-tab; see
-          // docs/match-pool-feature-design.md D10).
+          // docs/match-pool-feature-design.md D10). No header here — the
+          // shared GlobalHeader is rendered once by AppShell above the
+          // swipeable branches.
           StatefulShellBranch(
             preload: true,
             routes: [
               GoRoute(
                 path: '/matches',
-                builder: (context, _) =>
-                    MatchesV2Screen(onBell: () => _openBell(context)),
+                builder: (_, __) => const MatchesV2Screen(),
               ),
             ],
           ),
-          // 3 · Messages — threads aggregator
+          // 2 · Alerts — notifications inbox in tab-mode (GlobalHeader on
+          // top, no close button). The same NotificationsScreen still pushes
+          // full-screen from the bell in other screens' V2Header — that path
+          // uses asTab: false (default) and renders the close-arrow header.
           StatefulShellBranch(
             preload: true,
             routes: [
               GoRoute(
-                path: '/messages',
-                builder: (context, _) =>
-                    InboxScreen(onBell: () => _openBell(context)),
-                routes: [
-                  // Message thread — rendered full-screen over the shell
-                  // (root navigator), URL-nested under /messages so a refresh
-                  // or push deep-link restores [Messages → thread] with a
-                  // working back. Mirrors the /pavilion/match/:id pattern.
-                  GoRoute(
-                    path: ':chatId',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    builder: (_, state) => MessageThreadScreen(
-                      chatId: state.pathParameters['chatId']!,
-                    ),
-                  ),
-                ],
+                path: '/alerts',
+                builder: (_, __) =>
+                    const NotificationsScreen(asTab: true),
               ),
             ],
           ),
-          // 4 · Pavilion — workspace (calendar + yours + create)
-          StatefulShellBranch(
-            preload: true,
-            routes: [
-              GoRoute(
-                path: '/pavilion',
-                builder: (context, _) =>
-                    PavilionV2Screen(onBell: () => _openBell(context)),
-                routes: [
-                  // My matches — rendered full-screen over the shell (root
-                  // navigator), but URL-nested under /pavilion. Navigated with
-                  // `go`, so the address bar updates and a web refresh restores
-                  // [Pavilion → My matches] with a working back.
-                  GoRoute(
-                    path: 'my-matches',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    builder: (_, __) => const MyMatchesScreen(),
-                  ),
-                  // Match Detail — full-screen over the shell (root navigator),
-                  // URL-nested under /pavilion. Resolves the match by id, so a
-                  // refresh / deep link restores it with a working back.
-                  GoRoute(
-                    path: 'match/:id',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    builder: (_, state) => PavilionMatchDetailScreen(
-                      matchId: state.pathParameters['id']!,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+        ],
+      ),
+      // Menu drawer — opened from the GlobalHeader avatar. Full-screen over
+      // the shell, gated by the auth redirect.
+      GoRoute(
+        path: '/menu',
+        builder: (_, __) => const MenuScreen(),
+      ),
+      // Search — opened from the GlobalHeader search pill. Was a shell tab in
+      // the v2 IA; now a pushed full-screen overlay in the matchday IA.
+      GoRoute(
+        path: '/search',
+        builder: (_, __) => const TeamSearchScreen(),
+      ),
+      // Messages — opened from the GlobalHeader messages bubble. Was a shell
+      // tab in the v2 IA; now a pushed full-screen overlay.
+      GoRoute(
+        path: '/messages',
+        builder: (_, __) => const InboxScreen(),
+        routes: [
+          GoRoute(
+            path: ':chatId',
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (_, state) => MessageThreadScreen(
+              chatId: state.pathParameters['chatId']!,
+            ),
+          ),
+        ],
+      ),
+      // Pavilion — was a shell tab in the v2 IA; now a Menu sub-page,
+      // reached from the Menu drawer ("My matches" / etc. → Pavilion hub).
+      GoRoute(
+        path: '/pavilion',
+        builder: (_, __) => const PavilionV2Screen(),
+        routes: [
+          GoRoute(
+            path: 'my-matches',
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (_, __) => const MyMatchesScreen(),
+          ),
+          GoRoute(
+            path: 'match/:id',
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (_, state) => PavilionMatchDetailScreen(
+              matchId: state.pathParameters['id']!,
+            ),
           ),
         ],
       ),
@@ -232,6 +231,13 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) => AddUnclaimedPlayerScreen(
           teamId: state.pathParameters['teamId']!,
         ),
+      ),
+      // Tournaments — Menu drawer destination (My tournaments). Create flow
+      // (tournament-create.jsx wizard) is a follow-up; today this is a
+      // SubPage placeholder with a coming-soon empty state + FAB.
+      GoRoute(
+        path: '/tournaments',
+        builder: (_, __) => const MyTournamentsScreen(),
       ),
       GoRoute(
         path: '/matches/:matchId/start',
@@ -311,14 +317,6 @@ GoRouter appRouter(Ref ref) {
             ProfileScreen(username: state.pathParameters['username']!),
       ),
     ],
-  );
-}
-
-/// The header bell (every primary tab) opens the Notifications inbox over the
-/// whole shell, including the bottom nav (root navigator).
-void _openBell(BuildContext context) {
-  Navigator.of(context, rootNavigator: true).push(
-    MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
   );
 }
 

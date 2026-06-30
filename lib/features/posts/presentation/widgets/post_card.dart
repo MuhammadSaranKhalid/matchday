@@ -1,14 +1,27 @@
 // Post UI for the feed/profile — renders a real [Post] (author header + text +
 // 1–4 photo mosaic via CkFeedImage + action bar). Lives in the posts feature
 // (it's coupled to the Post entity), not in the feature-agnostic core kit.
+//
+// Layout follows the prototype's `Post` in home-messages.jsx: the avatar sits
+// inline at the start of the header row (not as a separate left column), so
+// the body flows full-width below the header. Recruitment posts (type ==
+// recruitment) get a full-width "Offer to play" CTA above the action bar.
 import 'package:flutter/material.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/ck_feed_image.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
+import '../../../../core/widgets/v2/v2_modals.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_media.dart';
+
+/// Canonical web base for a shared post link. There is no per-post route yet
+/// (a `/p/:postId` deep link is a follow-up ticket), so the share sheet
+/// currently falls back to the AUTHOR'S profile link — that route is fully
+/// wired (universal/app links + `/u/:username`). Once the post route exists,
+/// flip the URL constructor here.
+const String _profileLinkBase = 'https://joinmatchday.com/u';
 
 class FeedPostCard extends StatelessWidget {
   const FeedPostCard({
@@ -33,102 +46,182 @@ class FeedPostCard extends StatelessWidget {
   /// Hide the author avatar/name on a profile (where every post is the owner's).
   final bool showAuthor;
 
+  void _openAuthor() {
+    final u = post.authorUsername;
+    if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
+  }
+
+  void _openShare(BuildContext context) {
+    final handle = post.authorUsername;
+    final name = post.authorName ?? 'A matchday player';
+    final link = (handle != null && handle.isNotEmpty)
+        ? '$_profileLinkBase/$handle'
+        : 'https://joinmatchday.com';
+    final message = 'Check out this post by $name on matchday 🏏';
+    showPostShareSheet(context, link: link, message: message);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _header(),
-        if ((post.text ?? '').isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(
-            post.text!,
-            style: CkType.body(fontSize: 14, height: 1.45, color: CkColors.ink),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+      decoration: const BoxDecoration(
+        color: CkColors.paper,
+        border: Border(bottom: BorderSide(color: CkColors.hairline)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showAuthor) ...[
+            _Header(post: post, onAuthorTap: _openAuthor),
+            const SizedBox(height: 6),
+          ],
+          if ((post.text ?? '').isNotEmpty)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onComment,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  post.text!,
+                  style: CkType.body(
+                      fontSize: 14, height: 1.5, color: CkColors.ink),
+                ),
+              ),
+            ),
+          if (post.hasMedia) ...[
+            const SizedBox(height: 10),
+            PostMediaGrid(media: post.media, onOpen: onOpenPhoto),
+          ],
+          if (post.type == PostType.recruitment) ...[
+            const SizedBox(height: 10),
+            _OfferToPlayButton(onTap: _openAuthor),
+          ],
+          PostActions(
+            likes: post.likesCount,
+            comments: post.commentsCount,
+            onComment: onComment,
+            onShare: () => _openShare(context),
           ),
         ],
-        if (post.hasMedia) ...[
-          const SizedBox(height: 10),
-          PostMediaGrid(media: post.media, onOpen: onOpenPhoto),
-        ],
-        PostActions(
-          likes: post.likesCount,
-          comments: post.commentsCount,
-          onComment: onComment,
-        ),
-      ],
-    );
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onComment,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: const BoxDecoration(
-          color: CkColors.paper,
-          border: Border(top: BorderSide(color: CkColors.hairline)),
-        ),
-        child: showAuthor
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      final u = post.authorUsername;
-                      if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
-                    },
-                    child:
-                        Avatar(mono: post.authorMonogram, tone: AvatarTone.ink),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: content),
-                ],
-              )
-            : content,
       ),
     );
   }
+}
 
-  Widget _header() {
+/// Header row — inline avatar + author name (Inter Tight 700) · `@handle` ·
+/// timeago, with the `★ AUTO` chip when the post was auto-generated. The
+/// dots-button on the right is reserved for the overflow popover (next PR);
+/// for now it's a no-op visual placeholder so the layout matches the spec.
+class _Header extends StatelessWidget {
+  const _Header({required this.post, required this.onAuthorTap});
+
+  final Post post;
+  final VoidCallback onAuthorTap;
+
+  @override
+  Widget build(BuildContext context) {
     final time = timeago.format(post.createdAt, locale: 'en_short');
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        if (showAuthor) ...[
-          Flexible(
-            child: Text(
-              post.authorName ?? 'matchday player',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: CkType.display(fontSize: 13.5, letterSpacing: -0.01),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onAuthorTap,
+          child: Avatar(
+            mono: post.authorMonogram,
+            size: 40,
+            tone: AvatarTone.ink,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onAuthorTap,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        post.authorName ?? 'matchday player',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: CkType.display(
+                            fontSize: 14, letterSpacing: -0.01),
+                      ),
+                    ),
+                    if (post.autoGenerated) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: CkColors.cream,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text('★ AUTO',
+                            style: CkType.mono(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.08,
+                                color: CkColors.amber)),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  post.authorUsername != null
+                      ? '@${post.authorUsername} · $time'
+                      : time,
+                  style: CkType.mono(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0,
+                      color: CkColors.muted),
+                ),
+              ],
             ),
           ),
-          if (post.authorUsername != null) ...[
-            const SizedBox(width: 6),
-            Text('@${post.authorUsername}',
-                style: CkType.body(fontSize: 11, color: CkColors.muted)),
-          ],
-        ],
-        if (post.autoGenerated) ...[
-          if (showAuthor) const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            decoration: BoxDecoration(
-              color: CkColors.cream,
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: Text('★ AUTO',
-                style: CkType.mono(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: CkColors.amber)),
-          ),
-        ],
-        const Spacer(),
-        Text(time, style: CkType.mono(fontSize: 9, letterSpacing: 0.10)),
+        ),
       ],
+    );
+  }
+}
+
+class _OfferToPlayButton extends StatelessWidget {
+  const _OfferToPlayButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: CkColors.ink,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            'Offer to play',
+            style: CkType.body(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: CkColors.paper,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

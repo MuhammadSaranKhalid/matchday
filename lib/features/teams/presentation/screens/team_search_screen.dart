@@ -17,9 +17,7 @@ import '../providers/team_search_providers.dart';
 import '../state/team_search_state.dart';
 
 class TeamSearchScreen extends ConsumerStatefulWidget {
-  const TeamSearchScreen({super.key, this.onBell});
-
-  final VoidCallback? onBell;
+  const TeamSearchScreen({super.key});
 
   @override
   ConsumerState<TeamSearchScreen> createState() => _TeamSearchScreenState();
@@ -68,22 +66,45 @@ class _TeamSearchScreenState extends ConsumerState<TeamSearchScreen> {
     final hasQuery = state.query.trim().isNotEmpty;
     final isPermDenied = state.error is PermissionFailure && !state.hasCenter;
 
-    return ColoredBox(
-      color: CkColors.paper,
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: CkColors.paper,
+      body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            V2Header(title: 'Search', onBell: widget.onBell),
-            // ====== SEARCH INPUT (sticky) ======
-            _SearchField(
-              controller: _queryCtrl,
-              focusNode: _focus,
-              onChanged: notifier.setQuery,
-              onClear: () {
-                _queryCtrl.clear();
-                notifier.setQuery('');
-              },
+            // ====== SEARCH HEADER ======
+            // Faithful port of design_handoff_matchday §5 — back arrow next
+            // to the search field, no separate "Search" title bar.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 4, 14, 8),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.of(context).maybePop(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: V2Svg(
+                        V2Icons.chevronLeft,
+                        size: 20,
+                        color: CkColors.ink,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _SearchField(
+                      controller: _queryCtrl,
+                      focusNode: _focus,
+                      onChanged: notifier.setQuery,
+                      onClear: () {
+                        _queryCtrl.clear();
+                        notifier.setQuery('');
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
             Expanded(
               child: ListView(
@@ -171,20 +192,18 @@ class _SearchFieldState extends State<_SearchField> {
     final focused = widget.focusNode.hasFocus;
     final hasText = widget.controller.text.isNotEmpty;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
-      child: Container(
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: focused ? CkColors.surface : CkColors.paper2,
-          border: Border.all(
-            color: focused ? CkColors.ink : CkColors.hairline,
-            width: focused ? 1.5 : 1,
-          ),
-          borderRadius: BorderRadius.circular(12),
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: focused ? CkColors.surface : CkColors.paper2,
+        border: Border.all(
+          color: focused ? CkColors.ink : CkColors.hairline,
+          width: focused ? 1.5 : 1,
         ),
-        child: Row(
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
           children: [
             const V2Svg(V2Icons.search, size: 18, color: CkColors.muted),
             const SizedBox(width: 10),
@@ -217,7 +236,6 @@ class _SearchFieldState extends State<_SearchField> {
               ),
           ],
         ),
-      ),
     );
   }
 }

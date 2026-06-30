@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>matchday — design system</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#29251E; --ink2:#4A4339; --muted:#8A8170; --soft:#B9B1A2;
+    --paper:#FBFAF6; --paper2:#F3F0E9; --surface:#FFFFFF;
+    --line:#E6E2D9; --hairline:#EEEBE3;
+    --red:#DC4D32; --red-soft:#F7E6E1;
+    --green:#338946; --green-soft:#CFEED2; --green-ink:#235038;
+    --amber:#C98A2B; --cream:#F4ECDD; --amber-ink:#7a5a1e;
+    --display:'Inter Tight',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+    --stage:#EAE6DE;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--stage);color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1160px;margin:0 auto;padding:46px 32px 120px;}
+  .pg-eyebrow{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);}
+  h1{font-family:var(--display);font-weight:800;letter-spacing:-0.035em;font-size:36px;margin:10px 0 0;}
+  .lede{font-size:14.5px;color:var(--ink2);line-height:1.6;max-width:680px;margin:12px 0 0;}
+
+  .sec{margin-top:52px;}
+  .sec-h{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:26px;}
+  .sec-h .n{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--red);}
+  .sec-h h2{font-family:var(--display);font-weight:700;letter-spacing:-0.02em;font-size:22px;margin:0;}
+  .sec-h p{font-size:12.5px;color:var(--muted);margin:0 0 0 auto;}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px 26px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+  @media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+  /* type ladder */
+  .typerow{display:flex;align-items:baseline;gap:20px;padding:14px 0;border-bottom:1px solid var(--hairline);}
+  .typerow:last-child{border-bottom:none;}
+  .typerow .spec{flex:0 0 190px;font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:0.04em;line-height:1.5;}
+  .typerow .spec b{color:var(--ink);display:block;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2px;}
+  .typerow .demo{flex:1;min-width:0;}
+
+  .t-title{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-0.02em;}
+  .t-h2{font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:-0.01em;}
+  .t-card{font-family:var(--display);font-weight:600;font-size:14px;letter-spacing:-0.01em;}
+  .t-body{font-family:var(--body);font-size:13px;line-height:1.5;}
+  .t-meta{font-family:var(--body);font-size:11px;color:var(--muted);}
+  .t-eyebrow{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+  .t-num{font-family:var(--mono);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;}
+
+  /* swatches */
+  .swatches{display:flex;flex-wrap:wrap;gap:14px;}
+  .sw{width:128px;}
+  .sw .chip{height:64px;border-radius:12px;border:1px solid rgba(0,0,0,0.06);}
+  .sw .nm{font-size:12px;font-weight:600;margin-top:8px;}
+  .sw .hex{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:1px;}
+
+  /* spacing */
+  .spacing{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;}
+  .sp{text-align:center;}
+  .sp .bar{background:var(--red);border-radius:3px;width:34px;}
+  .sp .lab{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:7px;}
+  .sp .lab b{color:var(--ink);display:block;font-size:12px;}
+
+  /* radii */
+  .radii{display:flex;gap:18px;flex-wrap:wrap;}
+  .rad{text-align:center;}
+  .rad .box{width:80px;height:64px;background:var(--paper2);border:1.5px solid var(--ink);}
+  .rad .lab{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;}
+  .rad .lab b{color:var(--ink);display:block;}
+
+  /* icons */
+  .iconrow{display:flex;align-items:flex-end;gap:26px;flex-wrap:wrap;}
+  .ic{display:flex;flex-direction:column;align-items:center;gap:9px;color:var(--ink);}
+  .ic .lab{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;}
+  .ic .lab b{display:block;color:var(--ink);}
+
+  /* component specimens */
+  .specimen-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+  @media(max-width:820px){.specimen-grid{grid-template-columns:1fr;}}
+  .demo-card{background:var(--surface);border:1px solid var(--hairline);border-radius:16px;padding:14px;}
+  .crest{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:-0.02em;flex-shrink:0;}
+  .crest.round{border-radius:999px;}
+  .row{display:flex;align-items:center;gap:12px;}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:0.06em;padding:4px 8px;border-radius:6px;}
+  .dot{width:5px;height:5px;border-radius:999px;}
+  .btn{height:44px;border-radius:12px;border:none;font-family:var(--body);font-weight:700;font-size:14px;cursor:pointer;padding:0 18px;display:inline-flex;align-items:center;justify-content:center;gap:8px;}
+  .btn.primary{background:var(--ink);color:var(--paper);}
+  .btn.accent{background:var(--red);color:#fff;}
+  .btn.ghost{background:var(--paper);color:var(--ink);border:1px solid var(--line);}
+  .btn.sm{height:32px;border-radius:10px;font-size:12px;padding:0 14px;}
+  .chiprow{display:flex;gap:8px;flex-wrap:wrap;}
+  .uichip{height:36px;border-radius:999px;padding:0 13px;display:inline-flex;align-items:center;gap:7px;background:var(--paper2);border:1px solid var(--hairline);font-size:13px;color:var(--ink);}
+  .uichip.sel{background:var(--red-soft);border-color:var(--red);color:var(--red);}
+
+  .label-tag{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:9px;}
+
+  .note{margin-top:14px;font-size:12px;color:var(--muted);line-height:1.55;}
+  .rule{font-family:var(--body);font-size:13px;color:var(--ink2);line-height:1.6;}
+  .rule b{color:var(--ink);}
+  ul.rules{margin:6px 0 0;padding-left:18px;}
+  ul.rules li{font-size:13px;color:var(--ink2);line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="pg-eyebrow">matchday · foundations</div>
+  <h1>Design system</h1>
+  <p class="lede">One restrained ladder for type, spacing, icons, radii and components — so every screen reads as the same calm, intuitive app. Hierarchy comes from <b>weight and whitespace</b>, not big type. This is the ruler; approve it and I measure every surface to it.</p>
+
+  <!-- TYPE -->
+  <div class="sec">
+    <div class="sec-h"><span class="n">01</span><h2>Type scale</h2><p>Inter Tight · Inter · JetBrains Mono</p></div>
+    <div class="card">
+      <div class="typerow"><div class="spec"><b>Screen title</b>Inter Tight 700 · 20 / -0.02em</div><div class="demo"><span class="t-title">Matches</span></div></div>
+      <div class="typerow"><div class="spec"><b>Section title</b>Inter Tight 700 · 15 / -0.01em</div><div class="demo"><span class="t-h2">My teams</span></div></div>
+      <div class="typerow"><div class="spec"><b>Card title</b>Inter Tight 600 · 14 / -0.01em</div><div class="demo"><span class="t-card">Lahore Lions vs Karachi Eagles</span></div></div>
+      <div class="typerow"><div class="spec"><b>Body</b>Inter 400 · 13 / 1.5</div><div class="demo"><span class="t-body">Friendly · starts in 22 minutes at Model Town Ground.</span></div></div>
+      <div class="typerow"><div class="spec"><b>Meta</b>Inter 400 · 11 · muted</div><div class="demo"><span class="t-meta">9 of 11 RSVP’d · Gulberg</span></div></div>
+      <div class="typerow"><div class="spec"><b>Eyebrow / label</b>JetBrains Mono 700 · 10 · 0.12em · UPPER</div><div class="demo"><span class="t-eyebrow">Upcoming · 5</span></div></div>
+      <div class="typerow"><div class="spec"><b>Number / score</b>JetBrains Mono 700 · 15 · tabular</div><div class="demo"><span class="t-num">142/6</span> &nbsp; <span class="t-num">~15 KM</span></div></div>
+    </div>
+    <p class="note">One screen title (H1) per screen — <b>20px, weight 700</b>, never bigger. Hierarchy below it comes from weight and spacing, not size jumps. Mono labels always uppercase with wide tracking. Never set body below 11px.</p>
+  </div>
+
+  <!-- COLOR -->
+  <div class="sec">
+    <div class="sec-h"><span class="n">02</span><h2>Color</h2><p>warm paper · ink · one earned red</p></div>
+    <div class="card">
+      <div class="label-tag">Ink &amp; surfaces</div>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#29251E"></div><div class="nm">Ink</div><div class="hex">#29251E</div></div>
+        <div class="sw"><div class="chip" style="background:#4A4339"></div><div class="nm">Ink 2</div><div class="hex">#4A4339</div></div>
+        <div class="sw"><div class="chip" style="background:#8A8170"></div><div class="nm">Muted</div><div class="hex">#8A8170</div></div>
+        <div class="sw"><div class="chip" style="background:#B9B1A2"></div><div class="nm">Soft</div><div class="hex">#B9B1A2</div></div>
+        <div class="sw"><div class="chip" style="background:#FBFAF6"></div><div class="nm">Paper</div><div class="hex">#FBFAF6</div></div>
+        <div class="sw"><div class="chip" style="background:#F3F0E9"></div><div class="nm">Paper 2</div><div class="hex">#F3F0E9</div></div>
+        <div class="sw"><div class="chip" style="background:#FFFFFF"></div><div class="nm">Surface</div><div class="hex">#FFFFFF</div></div>
+        <div class="sw"><div class="chip" style="background:#E6E2D9"></div><div class="nm">Line</div><div class="hex">#E6E2D9</div></div>
+      </div>
+      <div class="label-tag" style="margin-top:22px">Accent &amp; status</div>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#DC4D32"></div><div class="nm">Red · accent</div><div class="hex">#DC4D32</div></div>
+        <div class="sw"><div class="chip" style="background:#F7E6E1"></div><div class="nm">Red soft</div><div class="hex">#F7E6E1</div></div>
+        <div class="sw"><div class="chip" style="background:#338946"></div><div class="nm">Green · won</div><div class="hex">#338946</div></div>
+        <div class="sw"><div class="chip" style="background:#C98A2B"></div><div class="nm">Amber · pending</div><div class="hex">#C98A2B</div></div>
+        <div class="sw"><div class="chip" style="background:#F4ECDD"></div><div class="nm">Cream</div><div class="hex">#F4ECDD</div></div>
+      </div>
+      <p class="note">Red is earned — one accent action or live signal per view. Status colors only appear as a tinted bg + colored dot, never as large fills.</p>
+    </div>
+  </div>
+
+  <!-- SPACING -->
+  <div class="sec">
+    <div class="sec-h"><span class="n">03</span><h2>Spacing &amp; layout</h2><p>4px base grid</p></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="label-tag">Scale (multiples of 4)</div>
+        <div class="spacing">
+          <div class="sp"><div class="bar" style="height:4px"></div><div class="lab"><b>4</b>hairline</div></div>
+          <div class="sp"><div class="bar" style="height:8px"></div><div class="lab"><b>8</b>tight</div></div>
+          <div class="sp"><div class="bar" style="height:12px"></div><div class="lab"><b>12</b>between</div></div>
+          <div class="sp"><div class="bar" style="height:14px"></div><div class="lab"><b>14</b>card pad</div></div>
+          <div class="sp"><div class="bar" style="height:18px"></div><div class="lab"><b>18</b>gutter</div></div>
+          <div class="sp"><div class="bar" style="height:24px"></div><div class="lab"><b>24</b>section</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="label-tag">Rules</div>
+        <ul class="rules">
+          <li><b>18px</b> side gutter on every screen — edges line up tab to tab.</li>
+          <li><b>12px</b> gap between stacked cards.</li>
+          <li><b>14px</b> padding inside cards; <b>11–13px</b> inside list rows.</li>
+          <li>Screen content starts <b>24px</b> below the header.</li>
+          <li>Bottom nav <b>62px</b>; leave <b>84px</b> bottom padding so content clears it.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- RADII -->
+  <div class="sec">
+    <div class="sec-h"><span class="n">04</span><h2>Radii</h2><p>three steps, no in-betweens</p></div>
+    <div class="card">
+      <div class="radii">
+        <div class="rad"><div class="box" style="border-radius:12px"></div><div class="lab"><b>12</b>controls · inputs · buttons</div></div>
+        <div class="rad"><div class="box" style="border-radius:16px"></div><div class="lab"><b>16</b>cards · sheets · panels</div></div>
+        <div class="rad"><div class="box" style="border-radius:999px;width:64px"></div><div class="lab"><b>999</b>pills · avatars · crests*</div></div>
+      </div>
+      <p class="note">*Team crests use 12px (rounded square); player avatars use 999 (round) — that shape difference is how you tell a team from a person at a glance. Drop the old 14 / 20 radii.</p>
+    </div>
+  </div>
+
+  <!-- ICONS -->
+  <div class="sec">
+    <div class="sec-h"><span class="n">05</span><h2>Icons</h2><p>line · 1.9 stroke · round caps</p></div>
+    <div class="card">
+      <div class="iconrow" id="iconrow"></div>
+      <p class="note">Three sizes only: <b>16</b> in chips/dense rows · <b>18</b> inline &amp; list rows · <b>20</b> in the bottom nav. One stroke weight (1.9). No filled icons except the active nav tile glyph.</p>
+    </div>
+  </div>
+
+  <!-- COMPONENTS -->
+  <div class="sec">
+    <div class="sec-h"><span class="n">06</span><h2>Components</h2><p>built to the ladder above</p></div>
+    <div class="specimen-grid">
+      <div class="card">
+        <div class="label-tag">Buttons</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+          <button class="btn primary">Primary</button>
+          <button class="btn accent">Accent</button>
+          <button class="btn ghost">Ghost</button>
+          <button class="btn accent sm">Follow</button>
+          <button class="btn ghost sm">Following</button>
+        </div>
+        <p class="note">44px primary height · 12px radius · 32px for inline follow/segment buttons.</p>
+      </div>
+
+      <div class="card">
+        <div class="label-tag">Status pills</div>
+        <div class="chiprow">
+          <span class="pill" style="background:var(--red-soft);color:var(--red)"><span class="dot" style="background:var(--red)"></span>LIVE</span>
+          <span class="pill" style="background:var(--cream);color:var(--amber-ink)"><span class="dot" style="background:var(--amber)"></span>SCHEDULED</span>
+          <span class="pill" style="background:var(--green-soft);color:var(--green-ink)"><span class="dot" style="background:var(--green)"></span>WON</span>
+          <span class="pill" style="background:var(--paper2);color:var(--muted)"><span class="dot" style="background:var(--soft)"></span>FINAL</span>
+        </div>
+        <p class="note">Mono 9px · 6px radius · tinted bg + dot. Never a loud solid fill.</p>
+      </div>
+
+      <div class="card">
+        <div class="label-tag">Team card (crest = rounded square)</div>
+        <div class="demo-card">
+          <div class="row">
+            <span class="crest" style="background:#DC4D32">LL</span>
+            <div style="flex:1;min-width:0">
+              <div class="t-card">Lahore Lions</div>
+              <div class="t-meta" style="margin-top:2px">Lahore · 18 players</div>
+            </div>
+            <span style="color:var(--soft)" id="chev1"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="label-tag">Player card (avatar = round)</div>
+        <div class="demo-card">
+          <div class="row">
+            <span class="crest round" style="background:#3563B6">AS</span>
+            <div style="flex:1;min-width:0">
+              <div class="t-card">Adeel Sheikh</div>
+              <div class="t-meta" style="margin-top:2px"><span style="font-family:var(--mono);font-size:11px">@adeel_wk</span> · Keeper · Lahore Lions</div>
+            </div>
+            <button class="btn accent sm">Follow</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="label-tag">Chips / facets</div>
+        <div class="chiprow">
+          <span class="uichip sel">Lahore <span id="x1"></span></span>
+          <span class="uichip">Karachi <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">(28)</span></span>
+          <span class="uichip">Multan <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">(16)</span></span>
+        </div>
+        <p class="note">36px tall · 999 radius · selected = red-soft bg + red text.</p>
+      </div>
+
+      <div class="card">
+        <div class="label-tag">Header &amp; nav heights</div>
+        <ul class="rules">
+          <li>Global header: avatar 38 · search pill 40 · messages 38, in a 60px bar.</li>
+          <li>Bottom nav: 62px, active = filled red 40×32 tile, 20px white glyph.</li>
+          <li>Deep pages: 32px back button + 18px section title.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="n">07</span><h2>Apply it</h2></div>
+    <p class="rule">If this ladder looks right, say go and I’ll run the <b>consistency pass</b> across the prototype — header, Matches, Alerts, Menu, Profile, Search and all cards normalized to these exact values. The whole app calms down: <b>20px titles</b>, even <b>18px gutters</b>, three radii, three icon sizes. Want any number nudged first? Tell me and I’ll adjust the ruler before applying.</p>
+  </div>
+</div>
+
+<script>
+const ICONS = {
+  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>',
+  bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+  bat:'<path d="M14.5 4.5a2 2 0 0 1 2.9 2.9l-8 8-2.9-2.9z"/><path d="M6.5 12.5 4 15l1.5 1.5L8 14"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  chev:'<path d="M9 6l6 6-6 6"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
+};
+function svg(n,s){return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]}</svg>`;}
+document.getElementById('iconrow').innerHTML = [
+  ['search',16,'16','chips'],['bat',18,'18','inline'],['bell',20,'20','nav'],
+].map(([n,s,big,lab])=>`<div class="ic">${svg(n,s)}<div class="lab"><b>${big}px</b>${lab}</div></div>`).join('');
+document.getElementById('chev1').innerHTML = svg('chev',18);
+document.getElementById('x1').innerHTML = '<span style="color:var(--red);display:inline-flex;vertical-align:middle">'+svg('close',14)+'</span>';
+</script>
+</body>
+</html>

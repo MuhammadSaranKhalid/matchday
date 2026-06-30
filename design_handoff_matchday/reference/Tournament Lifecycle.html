@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>matchday — tournament lifecycle</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#29251E; --ink2:#4A4339; --muted:#8A8170; --soft:#B9B1A2;
+    --paper:#FBFAF6; --paper2:#F3F0E9; --surface:#FFFFFF; --line:#E6E2D9; --hairline:#EEEBE3;
+    --red:#DC4D32; --red-soft:#F7E6E1; --green:#338946; --green-soft:#CFEED2; --green-ink:#235038;
+    --amber:#C98A2B; --amber-ink:#7a5a1e; --cream:#F4ECDD;
+    --display:'Inter Tight',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',monospace; --stage:#E8E4DC;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--stage);color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1700px;margin:0 auto;padding:44px 30px 100px;}
+  .eyebrow{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);}
+  h1{font-family:var(--display);font-weight:800;letter-spacing:-0.035em;font-size:32px;margin:10px 0 0;}
+  .lede{font-size:14.5px;color:var(--ink2);line-height:1.6;max-width:820px;margin:12px 0 0;}
+
+  .machine{display:flex;align-items:center;gap:8px;margin:30px 0 8px;flex-wrap:wrap;}
+  .ph-chip{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;}
+  .ph-chip .n{width:22px;height:22px;border-radius:999px;background:var(--ink);color:#fff;font-family:var(--mono);font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;}
+  .ph-chip .t{font-family:var(--display);font-weight:700;font-size:13.5px;}
+  .ph-chip .s{font-size:11px;color:var(--muted);}
+  .arrow{color:var(--soft);font-size:18px;}
+
+  .frames{display:flex;gap:26px;margin-top:36px;overflow-x:auto;padding-bottom:20px;}
+  .col{flex:0 0 auto;width:330px;}
+  .cap{margin-bottom:14px;min-height:96px;}
+  .cap .tag{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--red);}
+  .cap h2{font-family:var(--display);font-weight:700;letter-spacing:-0.02em;font-size:18px;margin:6px 0 0;}
+  .cap p{font-size:12.5px;color:var(--muted);line-height:1.5;margin:6px 0 0;}
+
+  .phone{width:330px;height:752px;border-radius:34px;background:#000;padding:7px;box-shadow:0 22px 48px -22px rgba(40,30,15,.45);}
+  .screen{width:100%;height:100%;border-radius:28px;overflow:hidden;background:var(--paper);display:flex;flex-direction:column;position:relative;}
+  .sb{height:34px;flex-shrink:0;display:flex;align-items:flex-end;justify-content:space-between;padding:0 22px 4px;}
+  .sb .t{font-family:var(--mono);font-weight:700;font-size:11px;}
+  .hd{display:flex;align-items:center;gap:8px;padding:6px 12px 10px;border-bottom:1px solid var(--hairline);}
+  .ico{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--ink);}
+  .ico svg{width:19px;height:19px;}
+  .hd .lbl{flex:1;text-align:center;font-family:var(--mono);font-size:9px;letter-spacing:0.16em;color:var(--muted);}
+  .body{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+
+  .hero{margin:12px 14px 0;padding:14px;border-radius:16px;background:var(--paper2);}
+  .hero .top{display:flex;align-items:center;gap:11px;}
+  .crest{border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--display);font-weight:800;letter-spacing:-0.03em;flex-shrink:0;}
+  .nm{font-family:var(--display);font-weight:700;letter-spacing:-0.02em;font-size:17px;line-height:1.1;}
+  .sub{font-size:11px;color:var(--muted);margin-top:3px;}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:0.06em;padding:4px 8px;border-radius:999px;}
+  .dot{width:5px;height:5px;border-radius:999px;}
+  .pill.draft{background:var(--paper2);color:var(--ink2);border:1px solid var(--line);}
+  .pill.reg{background:var(--cream);color:var(--amber-ink);}
+  .pill.seed{background:var(--cream);color:var(--amber-ink);}
+  .pill.ready{background:var(--green-soft);color:var(--green-ink);}
+  .pill.live{background:var(--green-soft);color:var(--green-ink);}
+  .hero .row2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:13px;padding-top:12px;border-top:1px solid var(--hairline);}
+  .hero .row2 .st{font-family:var(--mono);font-size:9.5px;color:var(--ink2);font-weight:600;white-space:nowrap;}
+
+  .tabs{display:flex;gap:4px;padding:13px 14px 0;}
+  .tab{flex:1;text-align:center;padding:8px 2px;border-radius:9px;font-size:11.5px;font-weight:600;background:var(--paper2);color:var(--ink2);}
+  .tab.on{background:var(--ink);color:#fff;}
+
+  .sec{font-family:var(--mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);padding:14px 16px 8px;display:flex;justify-content:space-between;}
+  .card{margin:0 14px 8px;border:1px solid var(--hairline);border-radius:13px;background:var(--paper);overflow:hidden;}
+  .rrow{display:flex;align-items:center;gap:10px;padding:11px 12px;}
+  .rrow+.rrow{border-top:1px solid var(--hairline);}
+  .rrow .mid{flex:1;min-width:0;}
+  .rrow .tn{font-family:var(--display);font-weight:700;font-size:13px;}
+  .rrow .ts{font-size:10.5px;color:var(--muted);margin-top:1px;}
+  .mini{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--display);font-weight:800;font-size:11px;flex-shrink:0;}
+  .seedno{width:20px;text-align:center;font-family:var(--mono);font-weight:700;font-size:12px;color:var(--muted);flex-shrink:0;}
+  .grip{color:var(--soft);font-family:var(--mono);flex-shrink:0;}
+  .btn{border:none;border-radius:9px;font-family:var(--body);font-weight:700;font-size:11.5px;cursor:default;padding:7px 12px;}
+  .btn.dark{background:var(--ink);color:#fff;}
+  .btn.ghost{background:var(--paper);color:var(--ink);border:1px solid var(--line);}
+  .btn.amber{background:var(--cream);color:var(--amber-ink);}
+  .btn.green{background:var(--green-soft);color:var(--green-ink);display:inline-flex;align-items:center;gap:4px;}
+  .accept-row{display:flex;gap:7px;padding:0 12px 12px;}
+  .accept-row .btn{flex:1;text-align:center;}
+  .accept-row .btn.dark{flex:1.4;}
+  .statetag{font-family:var(--mono);font-size:8px;font-weight:700;padding:3px 7px;border-radius:6px;white-space:nowrap;}
+  .statetag.in{background:var(--green-soft);color:var(--green-ink);}
+  .statetag.unpaid{background:var(--cream);color:var(--amber-ink);}
+
+  .cta{margin:auto 14px 0;padding:0 0 14px;}
+  .cta-cap{font-size:10px;color:var(--muted);text-align:center;margin-bottom:8px;line-height:1.4;}
+  .cta-btn{width:100%;padding:13px 0;border-radius:12px;border:none;background:var(--ink);color:#fff;font-family:var(--body);font-weight:700;font-size:13.5px;text-align:center;}
+  .cta-btn.disabled{background:var(--paper2);color:var(--muted);}
+  .checklist{margin:12px 14px 0;}
+  .ck{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--hairline);border-radius:12px;margin-bottom:8px;background:var(--paper);}
+  .ck .bx{width:22px;height:22px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+  .ck .bx.done{background:var(--green);color:#fff;}
+  .ck .bx.now{background:var(--ink);color:#fff;}
+  .ck .bx.wait{border:2px solid var(--line);}
+  .ck .lt{flex:1;}
+  .ck .lt b{font-family:var(--display);font-weight:700;font-size:13px;}
+  .ck .lt span{display:block;font-size:10.5px;color:var(--muted);margin-top:1px;}
+  .progress{height:6px;border-radius:3px;background:var(--paper2);overflow:hidden;margin:12px 14px 0;}
+  .progress div{height:100%;background:var(--ink);}
+  .banner{margin:12px 14px 0;padding:9px 12px;border-radius:10px;background:var(--cream);font-size:10.5px;color:var(--amber-ink);line-height:1.45;display:flex;gap:7px;}
+
+  .note{margin-top:40px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px 24px;}
+  .note h3{font-family:var(--display);font-weight:700;font-size:16px;margin:0 0 10px;}
+  .note ul{margin:0;padding-left:18px;}
+  .note li{font-size:13px;color:var(--ink2);line-height:1.7;}
+  .note li b{color:var(--ink);}
+  .note .lab{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--red);margin:16px 0 6px;}
+  .q{margin-top:18px;padding:14px 16px;border-radius:12px;background:var(--cream);font-size:13px;color:var(--amber-ink);line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">matchday · tournament · organizer lifecycle (v2)</div>
+  <h1>From draft to live — corrected flow</h1>
+  <p class="lede">The hub <b>progressively unlocks</b>. It opens as a <b>registration desk</b>, then a dedicated <b>seed &amp; schedule</b> step turns accepted teams into a real fixture list — and only then does the public competition hub go live. Fixes from the last review: a missing seed/schedule step, precise status words (<b>Requested → Accepted → In</b>), track-only money, and a closing/failure path.</p>
+
+  <div class="machine">
+    <div class="ph-chip"><span class="n">1</span><div><div class="t">Draft</div><div class="s">Created · needs teams</div></div></div>
+    <span class="arrow">→</span>
+    <div class="ph-chip"><span class="n">2</span><div><div class="t">Registration</div><div class="s">Requests · accept · mark paid</div></div></div>
+    <span class="arrow">→</span>
+    <div class="ph-chip"><span class="n">3</span><div><div class="t">Seed &amp; schedule</div><div class="s">Close · seed the draw · set fixtures</div></div></div>
+    <span class="arrow">→</span>
+    <div class="ph-chip"><span class="n">4</span><div><div class="t">Live</div><div class="s">Public hub unlocks</div></div></div>
+  </div>
+
+  <div class="frames" id="frames"></div>
+
+  <div class="note">
+    <h3>What changed from v1</h3>
+    <ul>
+      <li><b>New step 3 — Seed &amp; schedule.</b> Generating the draw no longer also publishes it. The organizer first <b>closes registration</b>, then <b>reviews/reorders seeds</b> (drag), then <b>sets each fixture’s time &amp; venue</b>. “Go live” is the last tap — so the bracket is never public before it’s ready.</li>
+      <li><b>Precise status words.</b> A team moves <b>Requested → Accepted → In</b>. “Accepted” means approved but unpaid; <b>“In”</b> = approved <i>and</i> paid (= counts toward the draw). No more contradictory “Confirmed · Unpaid”.</li>
+      <li><b>Track-only money.</b> matchday never processes payments — it <b>tracks cash you collect</b>. “Mark paid” just records that money changed hands. Stated on the desk so there’s no false expectation.</li>
+      <li><b>Closing &amp; failure paths.</b> Registration closes automatically at the cap <i>or</i> by tapping <b>Close registration</b>. If fewer than the minimum joined by the deadline, the desk shows a <b>“not enough teams”</b> banner with Extend / Lower size / Cancel — not a dead end.</li>
+      <li><b>Byes for odd counts.</b> 5–7 teams in a knockout auto-assign <b>byes</b> to top seeds; the seed list shows them, so non-power-of-2 cups just work.</li>
+      <li><b>Phase 4 hub</b> is unchanged from what you built — Bracket/Table · Fixtures · Teams · Manage — it simply <i>starts</i> populated because seeding &amp; scheduling already happened.</li>
+    </ul>
+    <div class="lab">Still your call</div>
+    <div class="q"><b>Two open decisions:</b> &nbsp;(1) <b>Generate draw</b> gated on the <i>minimum team count</i> only, or on <i>every entrant marked paid</i>? &nbsp;(2) Entry fee &amp; prize pool — set during <b>creation</b> (locked before teams join) or editable on the desk until you go live? &nbsp;Confirm these and I’ll rebuild the live hub to open as this desk and unlock the tabs at “Go live”.</div>
+  </div>
+</div>
+
+<script>
+const I = {
+  back:'<path d="M19 12H5M12 19l-7-7 7-7"/>', dots:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
+  check:'<polyline points="20 6 9 17 4 12"/>', grip:'<circle cx="9" cy="6" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/>',
+  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>', pin:'<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+};
+const svg=(n,s=18,sw=2,st='currentColor')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${st}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
+const crest=(c,l,s=46,r=13)=>`<div class="crest" style="width:${s}px;height:${s}px;border-radius:${r}px;background:${c};font-size:${s*0.36}px">${l}</div>`;
+const mini=(c,l,s=30,r=8)=>`<div class="mini" style="background:${c};width:${s}px;height:${s}px;border-radius:${r}px;font-size:${s*0.36}px">${l}</div>`;
+const CL={LL:'oklch(0.62 0.19 28)',KE:'oklch(0.55 0.13 250)',MB:'oklch(0.56 0.13 148)',NN:'oklch(0.55 0.17 305)',SC:'oklch(0.62 0.14 55)',GG:'oklch(0.52 0.10 200)',DC:'oklch(0.46 0.13 18)',KT:'oklch(0.42 0.07 285)'};
+
+function shell(inner){
+  return `<div class="phone"><div class="screen">
+    <div class="sb"><div class="t">9:41</div><div style="display:flex;gap:4px"><span style="width:16px;height:8px;background:var(--ink);border-radius:2px;opacity:.85"></span><span style="width:20px;height:8px;background:var(--ink);border-radius:2px;opacity:.85"></span></div></div>
+    <div class="hd"><span class="ico">${svg('back',19)}</span><span class="lbl">TOURNAMENT</span><span class="ico">${svg('dots',18)}</span></div>
+    <div class="body">${inner}</div>
+  </div></div>`;
+}
+function hero(pillClass, pillDot, pillText, stage){
+  return `<div class="hero"><div class="top">${crest(CL.NN,'RNC')}<div style="flex:1;min-width:0"><div class="nm">Ramzan Night Cup</div><div class="sub">Knockout · 8 teams · Tape-ball T10</div></div></div>
+    <div class="row2"><span class="pill ${pillClass}"><span class="dot" style="background:${pillDot}"></span>${pillText}</span><span class="st">${stage}</span></div></div>`;
+}
+function ck(state, t, s){
+  const bx = state==='done'?`<span class="bx done">${svg('check',12,3,'#fff')}</span>`:state==='now'?`<span class="bx now" style="font-family:var(--mono);font-weight:700;font-size:11px">›</span>`:`<span class="bx wait"></span>`;
+  return `<div class="ck">${bx}<div class="lt"><b>${t}</b><span>${s}</span></div></div>`;
+}
+
+// Phase 1 — Draft
+const p1 = shell(
+  hero('draft','var(--muted)','DRAFT','NOT STARTED') +
+  `<div class="checklist">
+    ${ck('done','Tournament created','Format, dates &amp; fee set')}
+    ${ck('now','Add teams','Share your code — teams request to join')}
+    ${ck('wait','Seed, schedule &amp; go live','Set the draw and fixtures, then publish')}
+  </div>
+  <div class="sec"><span>Your join code</span></div>
+  <div class="card"><div class="rrow"><div class="mid"><div class="tn" style="font-family:var(--mono);letter-spacing:0.14em">RNC-4821</div><div class="ts">0 of 8 teams · min 4 to start</div></div><button class="btn ghost">Share</button></div></div>`+
+  `<div class="cta"><div class="cta-cap">Needs at least 4 teams to start</div><button class="cta-btn disabled">Add teams to continue</button></div>`
+);
+
+// Phase 2 — Registration (track-only, precise states)
+const p2 = shell(
+  hero('reg','var(--amber)','REGISTRATION','6/8 IN · 2 REQUESTS') +
+  `<div class="progress"><div style="width:75%"></div></div>
+  <div class="banner">${svg('check',13,2.2,'var(--amber-ink)')}<span>matchday <b>tracks</b> the cash you collect — it doesn’t process payments.</span></div>
+  <div class="sec"><span>Requests · 2</span></div>
+  <div class="card">
+    <div class="rrow">${mini(CL.DC,'DC')}<div class="mid"><div class="tn">Defence Chargers</div><div class="ts">Capt. Wajahat · 13 players · 2h</div></div></div>
+    <div class="accept-row"><button class="btn ghost">Decline</button><button class="btn dark">Accept</button></div>
+  </div>
+  <div class="sec"><span>Entrants · 6</span><span style="color:var(--soft)">4 IN · 2 UNPAID</span></div>
+  <div class="card">
+    <div class="rrow">${mini(CL.LL,'LL')}<div class="mid"><div class="tn">Lyari Lions</div><div class="ts">Accepted &amp; paid</div></div><span class="statetag in">IN</span></div>
+    <div class="rrow">${mini(CL.KE,'KE')}<div class="mid"><div class="tn">Karsaz Eagles</div><div class="ts">Accepted · awaiting cash</div></div><button class="btn amber">Mark paid</button></div>
+    <div class="rrow">${mini(CL.MB,'MB')}<div class="mid"><div class="tn">Malir Blasters</div><div class="ts">Accepted &amp; paid</div></div><span class="statetag in">IN</span></div>
+  </div>`
+);
+
+// Phase 3 — Seed & schedule (the new step)
+const p3 = shell(
+  hero('seed','var(--amber)','SEEDING','8/8 IN · NOT PUBLIC') +
+  `<div class="tabs"><div class="tab on">Seed</div><div class="tab">Schedule</div></div>
+  <div class="sec"><span>Drag to seed · QF draw</span><span style="color:var(--soft)">auto-byes if &lt;8</span></div>
+  <div class="card">
+    ${[['1','LL'],['2','MB'],['3','KE'],['4','NN']].map(([n,k])=>`<div class="rrow"><span class="seedno">${n}</span>${mini(CL[k],k,26,7)}<div class="mid"><div class="tn">${({LL:'Lyari Lions',MB:'Malir Blasters',KE:'Karsaz Eagles',NN:'Nazimabad XI'})[k]}</div></div><span class="grip">${svg('grip',16,2,'var(--soft)')}</span></div>`).join('')}
+  </div>
+  <div class="card"><div class="rrow"><div style="display:flex">${mini(CL.SC,'SC',24,6)}<span style="margin-left:-6px">${mini(CL.GG,'GG',24,6)}</span><span style="margin-left:-6px">${mini(CL.DC,'DC',24,6)}</span><span style="margin-left:-6px">${mini(CL.KT,'KT',24,6)}</span></div><div class="mid"><div class="ts">Seeds 5–8 · drag any to reorder</div></div></div></div>
+  <div class="cta"><div class="cta-cap">Preview the bracket, then set fixture times</div><button class="cta-btn">Next · schedule fixtures</button></div>`
+);
+
+// Phase 4 — Schedule fixtures
+const p4 = shell(
+  hero('seed','var(--amber)','SCHEDULING','4 OF 4 QF SET') +
+  `<div class="tabs"><div class="tab">Seed</div><div class="tab on">Schedule</div></div>
+  <div class="sec"><span>Quarter-finals</span></div>
+  <div class="card">
+    <div class="rrow"><div style="display:flex">${mini(CL.LL,'LL',24,6)}<span style="margin-left:-6px">${mini(CL.KT,'KT',24,6)}</span></div><div class="mid"><div class="tn">LL vs KT</div><div class="ts">${svg('cal',10,2,'var(--muted)')} Fri 21:00 · ${svg('pin',10,2,'var(--muted)')} Liaquatabad</div></div><span class="statetag in">SET</span></div>
+    <div class="rrow"><div style="display:flex">${mini(CL.MB,'MB',24,6)}<span style="margin-left:-6px">${mini(CL.SC,'SC',24,6)}</span></div><div class="mid"><div class="tn">MB vs SC</div><div class="ts">${svg('cal',10,2,'var(--muted)')} Fri 22:30 · ${svg('pin',10,2,'var(--muted)')} Liaquatabad</div></div><span class="statetag in">SET</span></div>
+    <div class="rrow"><div style="display:flex">${mini(CL.KE,'KE',24,6)}<span style="margin-left:-6px">${mini(CL.GG,'GG',24,6)}</span></div><div class="mid"><div class="tn">KE vs GG</div><div class="ts">${svg('cal',10,2,'var(--muted)')} Sat 21:00 · ${svg('pin',10,2,'var(--muted)')} KMC Ground</div></div><span class="statetag in">SET</span></div>
+  </div>
+  <div class="cta"><div class="cta-cap">Going live publishes the bracket &amp; notifies all 8 captains</div><button class="cta-btn">Go live</button></div>`
+);
+
+// Phase 5 — Live
+const p5 = shell(
+  hero('live','var(--green)','IN PROGRESS','SEMI-FINALS') +
+  `<div class="tabs"><div class="tab on">Bracket</div><div class="tab">Fixtures</div><div class="tab">Teams</div><div class="tab">Manage</div></div>
+  <div class="sec"><span>Semi-finals · Sat</span></div>
+  <div class="card">
+    <div class="rrow">${mini(CL.LL,'LL')}<div class="mid"><div class="tn">Lyari Lions</div></div><span style="font-family:var(--mono);font-weight:700;font-size:13px">96/5</span></div>
+    <div class="rrow" style="background:var(--paper2)">${mini(CL.MB,'MB')}<div class="mid"><div class="tn">Malir Blasters</div></div><span style="font-family:var(--mono);font-weight:700;font-size:13px;color:var(--muted)">90</span></div>
+  </div>
+  <div class="card"><div class="rrow"><div style="display:flex">${mini(CL.KE,'KE')}<span style="margin-left:-6px">${mini(CL.DC,'DC')}</span></div><div class="mid"><div class="tn">KE vs DC</div><div class="ts">Sat 21:30 · Liaquatabad</div></div><span class="btn green">${svg('check',11,2.6,'var(--green-ink)')} set</span></div></div>
+  <div class="sec"><span>Manage now offers</span></div>
+  <div class="card"><div class="rrow"><div class="mid"><div class="ts" style="line-height:1.5">Enter result · Reschedule · Post update · Edit teams. (Add-teams / Seed are gone — registration is closed.)</div></div></div></div>`
+);
+
+document.getElementById('frames').innerHTML = [
+  ['Phase 1','Draft — needs teams','Opens as a setup checklist + your join code. No bracket, no tabs. One job: get teams in.', p1],
+  ['Phase 2','Registration — requests &amp; cash','Requests → Accept. Accepted-but-unpaid shows “Mark paid”; only paid teams read “IN”. Track-only money.', p2],
+  ['Phase 3','Seed the draw','Registration closed. Drag to set seeds (auto-byes for odd counts) and preview the bracket before anyone sees it.', p3],
+  ['Phase 4','Schedule fixtures','Give every generated match a time &amp; venue. “Go live” is the final tap — it publishes and notifies captains.', p4],
+  ['Phase 5','Live — the full hub','Now Bracket / Fixtures / Teams / Manage appear, already populated. Manage swaps setup actions for in-play ones.', p5],
+].map(([tag,h,p,frame])=>`<div class="col"><div class="cap"><span class="tag">${tag}</span><h2>${h}</h2><p>${p}</p></div>${frame}</div>`).join('');
+</script>
+</body>
+</html>

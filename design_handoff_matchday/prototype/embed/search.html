@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>matchday — Search (working prototype)</title>
+<style>
+  :root{
+    --ink:#29251E; --ink2:#4A4339; --muted:#8A8170; --soft:#B9B1A2;
+    --paper:#FBFAF6; --paper2:#F3F0E9; --surface:#FFFFFF;
+    --line:#E6E2D9; --hairline:#EEEBE3;
+    --red:#DC4D32; --red-soft:#F7E6E1;
+    --green:#338946; --green-soft:#CFEED2; --amber:#E6AC3D; --cream:#F4ECDD;
+    --r-sm:8px; --r-md:14px; --r-lg:20px; --r-xl:28px;
+    --display:'Inter Tight','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --body:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+    --stage:#E7E3DB;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;background:var(--paper);font-family:var(--body);color:var(--ink);-webkit-font-smoothing:antialiased;overflow:hidden;}
+  button{font-family:inherit;}
+
+  /* bare: fill the embed viewport, no bezel */
+  .screen{width:100%;height:100%;overflow:hidden;background:var(--paper);position:relative;display:flex;flex-direction:column;}
+  .statusbar{height:46px;flex-shrink:0;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 6px;}
+  .statusbar .t{font-family:var(--mono);font-weight:700;font-size:13px;}
+  .statusbar .r{display:flex;gap:5px;align-items:center;}
+  .statusbar .r i{width:16px;height:9px;border-radius:2px;background:var(--ink);display:inline-block;opacity:.85;}
+
+  .app{flex:1;display:flex;flex-direction:column;min-height:0;}
+  .scroll{flex:1;overflow-y:auto;overflow-x:hidden;}
+  .scroll::-webkit-scrollbar{width:0;}
+
+  /* header */
+  .hdr{display:flex;align-items:center;gap:12px;padding:8px 18px 12px;background:var(--paper);}
+  .hdr .title{flex:1;font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-0.02em;}
+  .circ{width:36px;height:36px;border-radius:999px;background:var(--paper);border:1px solid var(--hairline);
+    display:flex;align-items:center;justify-content:center;color:var(--ink);position:relative;flex-shrink:0;cursor:pointer;}
+  .circ.avatar{background:var(--ink);color:var(--paper);border:none;font-family:var(--display);font-weight:700;font-size:13px;}
+  .circ .badge{position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:999px;background:var(--red);border:2px solid var(--paper);}
+
+  /* search field (sticky) */
+  .backbtn{flex-shrink:0;width:34px;height:40px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:var(--ink);padding:0;margin-left:-6px;}
+  .search-sticky{position:sticky;top:0;z-index:20;background:var(--paper);padding:2px 18px 10px;}
+  .search-field{display:flex;align-items:center;gap:10px;height:46px;border-radius:13px;background:var(--paper2);
+    border:1px solid var(--hairline);padding:0 12px;transition:border .12s,background .12s;}
+  .search-field.focus{border:1.5px solid var(--ink);background:var(--surface);}
+  .search-field input{flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:var(--body);font-size:15px;color:var(--ink);}
+  .search-field input::placeholder{color:var(--muted);}
+  .search-field .ico{display:flex;color:var(--muted);}
+  .search-field .clear{display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;width:22px;height:22px;border-radius:999px;}
+  .search-field .clear:hover{background:var(--paper2);}
+
+  .gut{padding:0 18px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+
+  /* near me */
+  .nearme{display:inline-flex;align-items:center;gap:7px;height:38px;border-radius:999px;padding:0 15px;cursor:pointer;
+    font-size:13px;font-weight:600;background:var(--paper2);border:1px solid var(--hairline);color:var(--ink);}
+  .nearme.on{background:var(--ink);border-color:var(--ink);color:var(--paper);}
+
+  /* facets */
+  .facets{display:flex;gap:8px;overflow-x:auto;padding:0 18px 2px;}
+  .facets::-webkit-scrollbar{height:0;}
+  .chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;height:36px;border-radius:999px;padding:0 13px;cursor:pointer;
+    background:var(--paper2);border:1px solid var(--hairline);font-size:13px;color:var(--ink);white-space:nowrap;}
+  .chip .ct{font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .chip.sel{background:var(--red-soft);border-color:var(--red);color:var(--red);}
+  .chip.sel .ct{color:var(--red);}
+  .chip.sel .x{display:flex;color:var(--red);}
+
+  /* section header */
+  .sec-h{display:flex;align-items:center;gap:8px;padding:18px 18px 10px;}
+  .sec-h .spinner{width:12px;height:12px;border-radius:999px;border:2px solid var(--soft);border-top-color:var(--ink);animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .seeall{margin-left:auto;font-family:var(--body);font-size:11.5px;font-weight:600;color:var(--ink2);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:3px;}
+
+  /* cards */
+  .card{display:flex;align-items:center;gap:12px;width:calc(100% - 36px);margin:0 18px 10px;background:var(--surface);border:1px solid var(--hairline);
+    border-radius:var(--r-lg);padding:13px 14px;cursor:pointer;text-align:left;}
+  .card:active{background:var(--paper2);}
+  .crest{width:44px;height:44px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:-0.02em;}
+  .crest.round{border-radius:999px;}
+  .mid{flex:1;min-width:0;}
+  .nm{display:flex;align-items:center;gap:5px;font-family:var(--display);font-weight:700;font-size:15.5px;color:var(--ink);}
+  .nm .tname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .nm .tick{flex-shrink:0;display:flex;color:var(--red);}
+  .sub{font-size:12.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sub .km{font-family:var(--mono);font-size:11px;}
+  .sub .handle{font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .chev{flex-shrink:0;color:var(--soft);display:flex;}
+  .followbtn{flex-shrink:0;height:32px;padding:0 14px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:700;
+    background:var(--red);color:#fff;white-space:nowrap;}
+  .followbtn.following{background:var(--paper);color:var(--ink);border:1px solid var(--line);}
+
+  /* empty */
+  .empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;padding:60px 34px;}
+  .empty .ico{color:var(--soft);}
+  .empty h4{font-family:var(--display);font-weight:700;font-size:16px;margin:6px 0 0;}
+  .empty p{font-size:13px;color:var(--muted);margin:0;line-height:1.5;}
+
+  /* toast */
+  .toast{position:absolute;left:50%;bottom:88px;transform:translateX(-50%) translateY(8px);opacity:0;pointer-events:none;
+    background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:11px;font-size:12.5px;font-weight:600;white-space:nowrap;
+    transition:opacity .2s,transform .2s;z-index:60;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* bottom nav */
+  .nav{height:64px;flex-shrink:0;border-top:1px solid var(--hairline);background:var(--surface);
+    display:grid;grid-template-columns:repeat(5,1fr);align-items:center;padding:0 4px;}
+  .nt{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--soft);cursor:pointer;background:none;border:none;}
+  .nt .l{font-size:8.5px;font-weight:600;color:var(--muted);}
+  .nt .tile{width:40px;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center;}
+  .nt.on .tile{background:var(--red);color:#fff;}
+  .nt.on .l{color:var(--ink);font-weight:700;}
+
+  .pad{height:18px;}
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="app">
+    <div style="height:44px;flex-shrink:0"></div>
+    <div class="search-sticky">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="backbtn" class="backbtn" aria-label="Back"><span data-i="arrowleft"></span></button>
+        <div class="search-field" id="field" style="flex:1;min-width:0">
+          <span class="ico" data-i="search"></span>
+          <input id="q" placeholder="Search teams &amp; players" autocomplete="off" />
+          <span class="clear" id="clear" style="display:none" data-i="close"></span>
+        </div>
+      </div>
+    </div>
+    <div class="scroll" id="scroll"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ---------- icons ---------- */
+const ICON = {
+  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>',
+  arrowleft:'<path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>',
+  pin:'<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/>',
+  bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+  chev:'<path d="M9 6l6 6-6 6"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  check:'<path d="M5 12l4 4 10-10"/>',
+  home:'<path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/>',
+  bat:'<path d="M14.5 4.5a2 2 0 0 1 2.9 2.9l-8 8-2.9-2.9z"/><path d="M6.5 12.5 4 15l1.5 1.5L8 14"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  msg:'<path d="M20 14a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
+  shield:'<path d="M12 3l7 3v5c0 4.2-3 7.4-7 8.5C8 18.4 5 15.2 5 11V6z"/>',
+  arrowr:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+};
+function svg(name, size, opts){
+  opts = opts || {};
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${opts.fill||'none'}" stroke="${opts.stroke||'currentColor'}" stroke-width="${opts.sw||1.8}" stroke-linecap="round" stroke-linejoin="round">${ICON[name]}</svg>`;
+}
+// paint static icons
+document.querySelectorAll('[data-i]').forEach(el=>{
+  const n=el.getAttribute('data-i'); const w=el.hasAttribute('data-w');
+  const size = el.classList.contains('tile') ? (w?21:20) : (n==='close'?16:18);
+  el.innerHTML = svg(n, size, {stroke: w?'#fff':'currentColor'});
+});
+
+/* ---------- data ---------- */
+const CENTRE_CITY='Lahore';
+const TEAMS=[
+  {id:'t1',name:'Lahore Lions',mono:'LL',color:'#DC4D32',city:'Lahore',verified:true, members:18,recent:true},
+  {id:'t2',name:'DHA United',mono:'DU',color:'#2F7D54',city:'Lahore',verified:true, members:16,recent:true},
+  {id:'t3',name:'Karachi Eagles',mono:'KE',color:'#3563B6',city:'Karachi',verified:true, members:18,recent:true},
+  {id:'t4',name:'Multan Tigers',mono:'MT',color:'#C98A2B',city:'Multan',verified:false,members:14,dist:42},
+  {id:'t5',name:'Gujranwala Sultans',mono:'GS',color:'#6A6F2A',city:'Gujranwala',verified:true,members:15,dist:78},
+  {id:'t6',name:'Mohalla Kings',mono:'MK',color:'#A8552E',city:'Lahore',verified:false,members:12,dist:4},
+  {id:'t7',name:'Old Boys XI',mono:'OB',color:'#5B4A3A',city:'Lahore',verified:false,members:22,dist:6},
+  {id:'t8',name:'Sherwani CC',mono:'SC',color:'#3A8F8F',city:'Lahore',verified:false,members:14,dist:9},
+];
+const PLAYERS=[
+  {id:'p1',name:'Bilal Ahmed',  user:'bilal_ar', mono:'BA',color:'#DC4D32',role:'AR', team:'Lahore Lions', city:'Lahore', verified:true, follow:false,recent:true},
+  {id:'p2',name:'Adeel Sheikh',  user:'adeel_wk',mono:'AS',color:'#3563B6',role:'WK', team:'Lahore Lions', city:'Lahore', verified:false,follow:false,recent:true},
+  {id:'p3',name:'Khalid Mahmood',user:'khalid_x',mono:'KM',color:'#2F7D54',role:'BAT',team:'Karachi Eagles',city:'Karachi',verified:true, follow:false},
+  {id:'p4',name:'Imran Khan',    user:'imran_rfm',mono:'IK',color:'#C98A2B',role:'BOW',team:'Multan Tigers', city:'Multan', verified:false,follow:false},
+  {id:'p5',name:'Usman Riaz',    user:'usman',   mono:'UR',color:'#6A6F2A',role:'BOW',team:'Gulberg Greens',city:'Lahore', verified:false,follow:false},
+  {id:'p6',name:'Kashif Bhatti', user:'kashif',  mono:'KB',color:'#A8552E',role:'WK', team:'Sherwani CC',  city:'Lahore', verified:false,follow:true},
+  {id:'p7',name:'Junaid Ali',    user:'junaid',  mono:'JA',color:'#3A8F8F',role:'AR', team:'Lahore Lions', city:'Lahore', verified:false,follow:false},
+];
+const ROLE={BAT:'Batter',BOW:'Bowler',AR:'All-rounder',WK:'Keeper'};
+const CITY_COUNTS=[['Lahore',42],['Karachi',28],['Multan',16],['Gujranwala',11],['Faisalabad',9],['Rawalpindi',7]];
+
+/* ---------- state ---------- */
+const S={ q:'', near:false, city:null, typing:false, follows:{}, seeAllTeams:false, seeAllPlayers:false };
+PLAYERS.forEach(p=>S.follows[p.id]=p.follow);
+
+/* ---------- helpers ---------- */
+function band(o){
+  if(o.city===CENTRE_CITY) return {t:'in '+o.city,mono:false};
+  if(o.dist==null) return null;
+  return {t:'~'+(Math.round(o.dist/5)*5)+' KM',mono:true};
+}
+function teamSub(t){
+  const b=band(t);
+  if(S.near && b) return b.mono?`${t.city} · <span class="km">${b.t}</span>`:b.t;
+  return `${t.city} · ${t.members} players`;
+}
+function teamCard(t){
+  return `<button class="card" data-toast="Open ${t.name}">
+    <span class="crest" style="background:${t.color}">${t.mono}</span>
+    <span class="mid">
+      <span class="nm"><span class="tname">${t.name}</span>${t.verified?`<span class="tick">${svg('check',14,{sw:2.4,stroke:'var(--red)'})}</span>`:''}</span>
+      <span class="sub">${teamSub(t)}</span>
+    </span>
+    <span class="chev">${svg('chev',18)}</span>
+  </button>`;
+}
+function playerCard(p){
+  const fol=S.follows[p.id];
+  return `<button class="card" data-toast="Open @${p.user}">
+    <span class="crest round" style="background:${p.color}">${p.mono}</span>
+    <span class="mid">
+      <span class="nm"><span class="tname">${p.name}</span>${p.verified?`<span class="tick">${svg('check',14,{sw:2.4,stroke:'var(--red)'})}</span>`:''}</span>
+      <span class="sub"><span class="handle">@${p.user}</span> · ${ROLE[p.role]} · ${p.team}</span>
+    </span>
+    <span class="followbtn ${fol?'following':''}" data-follow="${p.id}">${fol?'Following':'Follow'}</span>
+  </button>`;
+}
+
+/* ---------- filtering ---------- */
+function matchTeams(){
+  let list=TEAMS.slice();
+  if(S.city) list=list.filter(t=>t.city===S.city);
+  if(S.near) list=list.filter(t=>t.city===CENTRE_CITY || (t.dist!=null && t.dist<=25)).sort((a,b)=>(a.dist||0)-(b.dist||0));
+  if(S.q) list=list.filter(t=>(t.name+' '+t.city).toLowerCase().includes(S.q));
+  return list;
+}
+function matchPlayers(){
+  let list=PLAYERS.slice();
+  if(S.near) list=list.filter(p=>p.city===CENTRE_CITY);
+  if(S.q) list=list.filter(p=>(p.name+' '+p.user+' '+p.team).toLowerCase().includes(S.q));
+  return list;
+}
+
+/* ---------- render ---------- */
+function browseControls(){
+  let html=`<div class="gut" style="padding-top:4px;padding-bottom:12px">
+    <button class="nearme ${S.near?'on':''}" id="near">${svg('pin',16,{fill:S.near?'#fff':'none',sw:S.near?0:1.8,stroke:S.near?'#fff':'currentColor'})} Near me</button>
+  </div>`;
+  if(!S.near){
+    html+=`<div class="eyebrow gut" style="padding-bottom:9px">Browse by city</div>
+    <div class="facets">${CITY_COUNTS.map(([c,n])=>{
+      const sel=S.city===c;
+      return `<button class="chip ${sel?'sel':''}" data-city="${c}">${c}${sel?`<span class="x">${svg('close',14)}</span>`:`<span class="ct">(${n})</span>`}</button>`;
+    }).join('')}</div>`;
+  }else{
+    html+=`<div class="facets"><button class="chip sel" data-near-clear><span>Within 25 km</span><span class="x">${svg('close',14)}</span></button></div>`;
+  }
+  return html;
+}
+function section(label, items, renderer, seeAllKey, total){
+  if(!items.length) return '';
+  const capped = (!S.q && !S.city) ? items : (this&&this.cap ? items : items);
+  let head=`<div class="sec-h"><span class="eyebrow">${label}</span>${S.typing?'<span class="spinner"></span>':''}`;
+  if(total>items.length) head+=`<button class="seeall" data-toast="See all ${label.toLowerCase()}">See all ${total} ${svg('arrowr',13)}</button>`;
+  head+='</div>';
+  return head + items.map(renderer).join('');
+}
+function render(){
+  const scroll=document.getElementById('scroll');
+  const teams=matchTeams(), players=matchPlayers();
+  let html='';
+
+  if(!S.q){
+    // browse mode
+    html+=browseControls();
+    if(S.city){
+      // city facet → teams only in that city
+      html+= teams.length ? section('Teams in '+S.city, teams, teamCard, null, teams.length)
+        : emptyBlock('No teams in '+S.city, 'Try another city or search by name.');
+    }else{
+      const tShow=teams.slice(0,4), pShow=players.filter(p=>p.recent||true).slice(0,3);
+      html+=section(S.near?'Teams near you':'Recent teams', tShow, teamCard, null, S.near?teams.length:tShow.length);
+      if(!S.near) html+=section('Suggested players', pShow, playerCard, null, pShow.length);
+      else if(players.length) html+=section('Players near you', players.slice(0,3), playerCard, null, players.length);
+    }
+  }else{
+    // search mode — unified, sectioned
+    if(!teams.length && !players.length){
+      html+=emptyBlock('No matches for “'+document.getElementById('q').value+'”','Check the spelling, or try a team or player name.');
+    }else{
+      const tShow=teams.slice(0,4), pShow=players.slice(0,4);
+      html+=section('Teams', tShow, teamCard, null, teams.length);
+      html+=section('Players', pShow, playerCard, null, players.length);
+    }
+  }
+  html+='<div class="pad"></div>';
+  scroll.innerHTML=html;
+  bindDynamic();
+}
+function emptyBlock(h,p){
+  return `<div class="empty"><span class="ico">${svg('search',30)}</span><h4>${h}</h4><p>${p}</p></div>`;
+}
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),1400);
+}
+
+/* ---------- bind ---------- */
+function bindDynamic(){
+  document.querySelectorAll('[data-toast]').forEach(el=>el.onclick=(e)=>{
+    if(e.target.closest('[data-follow]')) return;
+    toast(el.getAttribute('data-toast'));
+  });
+  document.querySelectorAll('[data-follow]').forEach(el=>el.onclick=(e)=>{
+    e.stopPropagation();
+    const id=el.getAttribute('data-follow');
+    S.follows[id]=!S.follows[id];
+    el.textContent=S.follows[id]?'Following':'Follow';
+    el.classList.toggle('following',S.follows[id]);
+  });
+  const near=document.getElementById('near');
+  if(near) near.onclick=()=>{ S.near=!S.near; S.city=null; render(); };
+  document.querySelectorAll('[data-city]').forEach(el=>el.onclick=()=>{
+    const c=el.getAttribute('data-city'); S.city = (S.city===c)?null:c; render();
+  });
+  const nc=document.querySelector('[data-near-clear]'); if(nc) nc.onclick=()=>{ S.near=false; render(); };
+}
+
+/* ---------- input ---------- */
+const input=document.getElementById('q'), clear=document.getElementById('clear'), field=document.getElementById('field');
+let typeT;
+input.addEventListener('focus',()=>field.classList.add('focus'));
+input.addEventListener('blur',()=>field.classList.remove('focus'));
+input.addEventListener('input',()=>{
+  S.q=input.value.trim().toLowerCase();
+  clear.style.display=input.value?'flex':'none';
+  S.typing=true; render();
+  clearTimeout(typeT); typeT=setTimeout(()=>{ S.typing=false; render(); },550);
+});
+clear.onclick=()=>{ input.value=''; S.q=''; clear.style.display='none'; S.typing=false; input.focus(); render(); };
+document.querySelectorAll('.nav .nt:not(.on),[data-toast]').forEach(el=>{ if(el.dataset.toast) el.onclick=()=>toast(el.dataset.toast); });
+
+/* ---------- fill embed (no scaling) ---------- */
+var _bk=document.getElementById('backbtn'); if(_bk) _bk.onclick=function(){ try{ window.parent.postMessage({mdCloseSearch:true},'*'); }catch(e){} };
+render();
+</script>
+</body>
+</html>

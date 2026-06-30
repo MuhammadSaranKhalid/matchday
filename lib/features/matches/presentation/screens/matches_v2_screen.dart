@@ -3,11 +3,15 @@
 //
 // PRESENTATION-ONLY, MOCK DATA. No Riverpod / backend / repositories — this is
 // a 1:1 visual rebuild with inert affordances, mirroring the prototype. The
-// only live interaction is the header bell (→ [onBell]) and the segmented
-// sub-tab switcher.
+// only live interaction is the segmented sub-tab switcher.
+//
+// The matchday [GlobalHeader] is rendered once by [AppShell] above us — this
+// screen MUST NOT declare its own header (the prototype's `PublicMatches`
+// receives `{header}` from the parent Shell so the header stays identical
+// across Home · Matches · Alerts).
 //
 // Colours / radii / type come from [CkColors] / [CkRadii] / [CkType]; shared
-// atoms (Crest, Pill, V2Header, V2Svg, CkCrest, CkInk) come from the v2 kit.
+// atoms (Crest, Pill, V2Svg, CkCrest, CkInk) come from the v2 kit.
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/circk_theme.dart';
@@ -40,9 +44,7 @@ TextStyle _monoPlain({required double fontSize, Color color = CkColors.muted}) =
     );
 
 class MatchesV2Screen extends StatefulWidget {
-  const MatchesV2Screen({super.key, this.onBell});
-
-  final VoidCallback? onBell;
+  const MatchesV2Screen({super.key});
 
   @override
   State<MatchesV2Screen> createState() => _MatchesV2ScreenState();
@@ -57,21 +59,14 @@ class _MatchesV2ScreenState extends State<MatchesV2Screen> {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: CkColors.paper,
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            V2Header(
-              title: 'Matches',
-              onBell: widget.onBell,
-            ),
-            _MatchTabs(
-              active: _tab,
-              onChange: (t) => setState(() => _tab = t),
-            ),
-            Expanded(child: _body()),
-          ],
-        ),
+      child: Column(
+        children: [
+          _MatchTabs(
+            active: _tab,
+            onChange: (t) => setState(() => _tab = t),
+          ),
+          Expanded(child: _body()),
+        ],
       ),
     );
   }

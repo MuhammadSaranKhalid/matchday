@@ -11,47 +11,74 @@ import '../../domain/entities/app_notification.dart';
 import '../providers/notifications_providers.dart';
 import '../state/notifications_view.dart';
 
-/// Notifications inbox — bell-tap destination. Live feed via the
-/// `user:<id>:notifications` broadcast channel, tier-grouped into REPLY NOW
-/// / THIS WEEK / FYI per the design.
+/// Notifications inbox — Alerts tab destination AND bell-tap target from other
+/// screens. Live feed via the `user:<id>:notifications` broadcast channel,
+/// tier-grouped into REPLY NOW / THIS WEEK / FYI per the design.
+///
+/// When [asTab] is true the screen renders as the Alerts tab body — no
+/// header (the shared matchday GlobalHeader is owned by [AppShell] above us)
+/// and no SafeArea (also handled by the shell), just the "Notifications · N
+/// needs you" subtitle row and the list. When false (default, pushed-mode),
+/// the original close-arrow header is used and the screen is its own
+/// standalone overlay.
 class NotificationsScreen extends ConsumerWidget {
-  const NotificationsScreen({super.key});
+  const NotificationsScreen({super.key, this.asTab = false});
+
+  /// When true, render as the Alerts tab content (no header, no SafeArea —
+  /// the shell provides both). When false, render as a pushed full-screen
+  /// overlay with the close-arrow header.
+  final bool asTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(liveNotificationsProvider);
     final view = ref.watch(notificationsViewProvider);
 
+    final body = Column(
+      children: [
+        if (asTab)
+          _TabSubtitle(
+            unreadCount: view.unreadCount,
+            total: view.total,
+            onMarkAllRead: view.unreadCount == 0
+                ? null
+                : () => _markAllRead(context, ref),
+          )
+        else
+          _Header(
+            unreadCount: view.unreadCount,
+            total: view.total,
+            onClose: () => Navigator.of(context).maybePop(),
+            onMarkAllRead: view.unreadCount == 0
+                ? null
+                : () => _markAllRead(context, ref),
+          ),
+        Expanded(
+          child: async.when(
+            loading: () => const Center(
+              child: CircularProgressIndicator(color: CkColors.ink),
+            ),
+            error: (e, _) => _Error(
+              message: e is FailureWrapper ? e.failure.message : e.toString(),
+              onRetry: () => ref.invalidate(liveNotificationsProvider),
+            ),
+            data: (_) => view.isEmpty
+                ? const _Empty()
+                : _Body(view: view, onTap: (n) => _onTap(context, ref, n)),
+          ),
+        ),
+      ],
+    );
+
+    // In tab mode the shell's Scaffold + SafeArea already wraps us, so the
+    // body slots straight into the tab branch as a plain ColoredBox. In
+    // pushed mode we own the chrome.
+    if (asTab) {
+      return ColoredBox(color: CkColors.paper, child: body);
+    }
     return Scaffold(
       backgroundColor: CkColors.paper,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _Header(
-              unreadCount: view.unreadCount,
-              total: view.total,
-              onClose: () => Navigator.of(context).maybePop(),
-              onMarkAllRead: view.unreadCount == 0
-                  ? null
-                  : () => _markAllRead(context, ref),
-            ),
-            Expanded(
-              child: async.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: CkColors.ink),
-                ),
-                error: (e, _) => _Error(
-                  message: e is FailureWrapper ? e.failure.message : e.toString(),
-                  onRetry: () => ref.invalidate(liveNotificationsProvider),
-                ),
-                data: (_) => view.isEmpty
-                    ? const _Empty()
-                    : _Body(view: view, onTap: (n) => _onTap(context, ref, n)),
-              ),
-            ),
-          ],
-        ),
-      ),
+      body: SafeArea(child: body),
     );
   }
 
@@ -160,6 +187,67 @@ class _Header extends StatelessWidget {
                         : '$unreadCount needs you · $total total',
                     style: CkType.body(fontSize: 12, color: CkColors.muted),
                   ),
+                ),
+              ],
+            ),
+          ),
+          if (onMarkAllRead != null)
+            TextButton(
+              onPressed: onMarkAllRead,
+              child: Text(
+                'Mark all read',
+                style: CkType.body(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: CkColors.ink,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tab-mode subtitle row — sits under [GlobalHeader] when the screen is
+/// rendered as the Alerts tab (replaces the close-arrow header's stacked
+/// title + meta line).
+class _TabSubtitle extends StatelessWidget {
+  const _TabSubtitle({
+    required this.unreadCount,
+    required this.total,
+    this.onMarkAllRead,
+  });
+  final int unreadCount;
+  final int total;
+  final VoidCallback? onMarkAllRead;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 4, 14, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Notifications',
+                  style: CkType.display(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.025,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  unreadCount == 0
+                      ? 'All caught up · $total total'
+                      : '$unreadCount needs you · $total total',
+                  style: CkType.body(fontSize: 12, color: CkColors.muted),
                 ),
               ],
             ),

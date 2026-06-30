@@ -3,6 +3,8 @@
 // (opened by tapping a team crest), and the post Composer (opened by the
 // Profile FAB).
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:share_plus/share_plus.dart';
 
 import '../../theme/circk_theme.dart';
 import 'v2_kit.dart';
@@ -439,6 +441,287 @@ class TeamPage extends StatelessWidget {
           const SizedBox(height: 8),
           child,
         ],
+      ),
+    );
+  }
+}
+
+// ─── Post share + report sheets ─────────────────────────────────────────
+// Faithful ports of the `ShareSheet` / `ReportSheet` bottom sheets from
+// home-messages.jsx. Both follow the same chrome: rounded-top white sheet,
+// 36×4 grabber, eyebrow or title, then a stack of borderless rows.
+
+/// Opens the WhatsApp-led post share sheet. Three rows mirror the prototype:
+/// WhatsApp (green) · Copy link · More…
+///
+/// [link] is the canonical post URL. Until a per-post deep link exists,
+/// callers should pass the author's profile link (`/u/<username>`) — the
+/// universal-link infrastructure already opens that in-app. [message] is the
+/// body text the share intent prefills.
+Future<void> showPostShareSheet(
+  BuildContext context, {
+  required String link,
+  required String message,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    barrierColor: const Color(0x59281E0F),
+    builder: (_) => _ShareSheet(link: link, message: message),
+  );
+}
+
+class _ShareSheet extends StatelessWidget {
+  const _ShareSheet({required this.link, required this.message});
+  final String link;
+  final String message;
+
+  String get _fullText => '$message\n$link';
+
+  Future<void> _shareSystem(BuildContext context) async {
+    Navigator.of(context).pop();
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = (box != null && box.hasSize)
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+    await SharePlus.instance.share(
+      ShareParams(text: _fullText, sharePositionOrigin: origin),
+    );
+  }
+
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Link copied')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: CkColors.paper,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              decoration: BoxDecoration(
+                color: CkColors.hairline,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'SHARE TO',
+                  style: CkType.mono(fontSize: 10, color: CkColors.muted),
+                ),
+              ),
+            ),
+            _ShareRow(
+              icon: V2Icons.whatsapp,
+              label: 'WhatsApp',
+              sub: 'Send to a team group',
+              accent: const Color(0xFF25923A),
+              onTap: () => _shareSystem(context),
+            ),
+            _ShareRow(
+              icon: V2Icons.link,
+              label: 'Copy link',
+              onTap: () => _copy(context),
+            ),
+            _ShareRow(
+              icon: V2Icons.share,
+              label: 'More…',
+              sub: 'Other apps',
+              onTap: () => _shareSystem(context),
+            ),
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShareRow extends StatelessWidget {
+  const _ShareRow({
+    required this.icon,
+    required this.label,
+    this.sub,
+    this.accent,
+    required this.onTap,
+  });
+
+  final String icon;
+  final String label;
+  final String? sub;
+  final Color? accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tinted = accent != null;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: CkColors.hairline)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: accent ?? CkColors.paper2,
+                shape: BoxShape.circle,
+              ),
+              child: V2Svg(
+                icon,
+                size: 19,
+                color: tinted ? Colors.white : CkColors.ink,
+              ),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(label,
+                      style: CkType.body(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
+                  if (sub != null) ...[
+                    const SizedBox(height: 1),
+                    Text(sub!,
+                        style:
+                            CkType.body(fontSize: 11.5, color: CkColors.muted)),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens the post-report bottom sheet — the five-reason picker from
+/// home-messages.jsx's `ReportSheet`. The backend reporting endpoint is not
+/// wired yet, so picking a reason currently just confirms via SnackBar.
+Future<void> showPostReportSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    barrierColor: const Color(0x59281E0F),
+    builder: (_) => const _ReportSheet(),
+  );
+}
+
+class _ReportSheet extends StatelessWidget {
+  const _ReportSheet();
+
+  static const _reasons = <String>[
+    'Spam or scam',
+    'Abuse or harassment',
+    'Wrong / misleading info',
+    'Nudity or violence',
+    'Other',
+  ];
+
+  void _pick(BuildContext context, String _) {
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Thanks — we'll review this post.")),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: CkColors.paper,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 10),
+              decoration: BoxDecoration(
+                color: CkColors.hairline,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 2, 18, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Report post',
+                  style: CkType.display(fontSize: 16, letterSpacing: -0.01),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Why are you reporting this?',
+                  style: CkType.body(fontSize: 12, color: CkColors.muted),
+                ),
+              ),
+            ),
+            for (final r in _reasons)
+              InkWell(
+                onTap: () => _pick(context, r),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: CkColors.hairline)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          r,
+                          style:
+                              CkType.body(fontSize: 14, color: CkColors.ink),
+                        ),
+                      ),
+                      const V2Svg(
+                        V2Icons.chevronRight,
+                        size: 16,
+                        color: CkColors.soft,
+                        strokeWidth: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 6),
+          ],
+        ),
       ),
     );
   }

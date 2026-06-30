@@ -17,6 +17,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/circk_theme.dart';
+import '../../../features/messages/presentation/providers/messages_providers.dart';
 import '../../../features/notifications/presentation/providers/notifications_providers.dart';
 import '../../../features/onboarding/presentation/providers/onboarding_providers.dart';
 
@@ -75,7 +76,29 @@ abstract final class V2Icons {
   static const heart =
       '<path d="M20.8 8.3a5.5 5.5 0 0 0-9.3-3 5.5 5.5 0 0 0-9.3 6.3l8.4 8.7a1.3 1.3 0 0 0 1.8 0l8.4-8.7c1-1 1-2 0-3.3z"/>';
   static const comment = '<path d="M21 12a9 9 0 0 1-13 8L3 21l1-5A9 9 0 1 1 21 12z"/>';
-  static const share = '<path d="M4 12l16-8-6 16-2-6-8-2z"/>';
+  // The recognisable 3-node share glyph from the prototype (`P.share` in
+  // home-messages.jsx). Replaces the prior paper-plane "send" path — the
+  // design handoff README explicitly calls for the 3-node graph.
+  static const share =
+      '<circle cx="18" cy="5" r="3"/>'
+      '<circle cx="6" cy="12" r="3"/>'
+      '<circle cx="18" cy="19" r="3"/>'
+      '<path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>';
+  // Horizontal three-dots — used by post-card overflow `···` buttons.
+  static const dotsH =
+      '<circle cx="5" cy="12" r="1.5"/>'
+      '<circle cx="12" cy="12" r="1.5"/>'
+      '<circle cx="19" cy="12" r="1.5"/>';
+  // Chain-link, used by Copy link rows in share / overflow sheets.
+  static const link =
+      '<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/>'
+      '<path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>';
+  // Flag, used for Report rows.
+  static const flag = '<path d="M4 22V4M4 4h13l-2 4 2 4H4"/>';
+  // WhatsApp speech bubble (used as the WhatsApp-first share row).
+  static const whatsapp =
+      '<path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3z"/>'
+      '<path d="M8.5 8.5c-.3 1.2.3 2.6 1.4 3.7s2.5 1.7 3.7 1.4c.5-.1.7-.7.5-1.1l-.5-.9a.7.7 0 0 0-.8-.3l-.8.3-1.8-1.8.3-.8a.7.7 0 0 0-.3-.8l-.9-.5c-.4-.2-1 0-1.1.5z"/>';
   static const bookmark = '<path d="M6 4h12v17l-6-4-6 4z"/>';
   static const check = '<path d="M5 12l4 4 10-10"/>';
   static const pin =
@@ -85,6 +108,33 @@ abstract final class V2Icons {
   static const close = '<path d="M6 6l12 12M18 6L6 18"/>';
   static const camera =
       '<rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="3"/>';
+  // Menu drawer icons — ported verbatim from the design prototype's PATHS map
+  // (matchday Prototype.html). Used by features/menu/.../menu_screen.dart so
+  // each row gets its intended glyph instead of re-using the pavilion shield.
+  static const trophy =
+      '<path d="M7 4h10v4a5 5 0 0 1-10 0z"/>'
+      '<path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3"/>'
+      '<path d="M12 13v4M9 21h6M10 17h4"/>';
+  static const rankings = '<path d="M5 21V10M12 21V4M19 21v-7"/>';
+  static const lock =
+      '<rect x="4" y="10" width="16" height="11" rx="2"/>'
+      '<path d="M8 10V7a4 4 0 0 1 8 0v3"/>';
+  static const theme =
+      '<circle cx="12" cy="12" r="4"/>'
+      '<path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4'
+      'M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  static const globe =
+      '<circle cx="12" cy="12" r="9"/>'
+      '<path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/>';
+  static const follow =
+      '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>'
+      '<circle cx="9" cy="7" r="4"/>'
+      '<path d="M19 8v6M22 11h-6"/>';
+  static const logout =
+      '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>';
+  static const user =
+      '<circle cx="12" cy="8" r="4"/>'
+      '<path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>';
 }
 
 /// Renders an inline 24-viewBox SVG icon, either stroked (outline) or filled.
@@ -449,18 +499,20 @@ class _Badge extends StatelessWidget {
   }
 }
 
-/// The five v2 bottom-nav destinations. Order = bar order (D9 in
-/// docs/search-feature-design.md): Home · Search · Matches · Messages ·
-/// Pavilion. Own profile lives behind the header avatar, not a tab.
-enum V2Tab { home, search, matches, messages, pavilion }
+/// The three matchday bottom-nav destinations. Order = bar order from the
+/// design handoff prototype (`design_handoff_matchday/`): Home · Matches ·
+/// Alerts. Search, Messages and Profile/Pavilion are reached via the
+/// [GlobalHeader] (search pill, messages bubble, avatar → Menu drawer) — not
+/// from the bottom bar.
+enum V2Tab { home, matches, alerts }
 
-/// 5-tab bottom navigation — Home · Search · Matches · Messages · Pavilion.
+/// 3-tab bottom navigation — Home · Matches · Alerts.
 ///
-/// Implements the "Option B · Filled square tile" direction from
-/// `matchday-challenge/Bottom Nav Options.html` (the designer's recommended
-/// variant): inactive = soft outline glyph, active = white glyph reversed
-/// inside a red rounded-square tile. (The former "You"/avatar tab was replaced
-/// by Search per D9; the avatar moved to [V2Header].)
+/// Same "Option B · Filled square tile" treatment as before (inactive = soft
+/// outline glyph, active = white glyph reversed inside a red rounded-square
+/// tile). The Alerts tab carries a numeric red unread badge driven by
+/// [unreadNotificationsCountProvider]; an explicit [alertsBadge] override is
+/// available for tests / mocks.
 ///
 /// Tokens taken verbatim from the design CSS:
 ///   bar bg          surface (#fff)            hairline border top
@@ -468,20 +520,25 @@ enum V2Tab { home, search, matches, messages, pavilion }
 ///   tile (inactive) 40×32  transparent        23px soft glyph
 ///   label          9.5px Inter  600 → 700     muted → ink on active
 ///   tab gap (glyph→label) 5px   tab vertical padding 4px
-class V2BottomNav extends StatelessWidget {
+class V2BottomNav extends ConsumerWidget {
   const V2BottomNav({
     super.key,
     required this.active,
     required this.onSelect,
-    this.messagesBadge = 2,
+    this.alertsBadge,
   });
 
   final V2Tab active;
   final ValueChanged<V2Tab> onSelect;
-  final int messagesBadge;
+
+  /// Override the unread count rendered on the Alerts tab. When null, the
+  /// widget reads it from [unreadNotificationsCountProvider].
+  final int? alertsBadge;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int badge =
+        alertsBadge ?? ref.watch(unreadNotificationsCountProvider);
     return Container(
       decoration: const BoxDecoration(
         color: CkColors.surface,
@@ -495,11 +552,9 @@ class V2BottomNav extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _navItem(V2Tab.home, 'Home', V2Icons.home),
-            _navItem(V2Tab.search, 'Search', V2Icons.search),
             _navItem(V2Tab.matches, 'Matches', V2Icons.matches),
-            _navItem(V2Tab.messages, 'Messages', V2Icons.messages,
-                badge: messagesBadge),
-            _navItem(V2Tab.pavilion, 'Pavilion', V2Icons.pavilion),
+            _navItem(V2Tab.alerts, 'Alerts', V2Icons.bell,
+                badge: badge > 0 ? badge : null),
           ],
         ),
       ),
@@ -569,22 +624,25 @@ class V2BottomNav extends StatelessWidget {
   }
 }
 
-/// Per-post action bar — Like · Comment · Share, optional RSVP text, Save.
+/// Per-post action bar — Like (count) · Comment · Share. Mirrors the
+/// prototype's `PostActions` in home-messages.jsx: three actions, no top
+/// border, no save/bookmark, no repost; share is the 3-node graph glyph and
+/// is right-aligned with no label.
 class PostActions extends StatefulWidget {
   const PostActions({
     super.key,
     required this.likes,
     required this.comments,
     this.liked = false,
-    this.rsvp,
     this.onComment,
+    this.onShare,
   });
 
   final int likes;
   final int comments;
   final bool liked;
-  final String? rsvp;
   final VoidCallback? onComment;
+  final VoidCallback? onShare;
 
   @override
   State<PostActions> createState() => _PostActionsState();
@@ -593,26 +651,27 @@ class PostActions extends StatefulWidget {
 class _PostActionsState extends State<PostActions> {
   late bool _liked = widget.liked;
   late int _likes = widget.likes;
-  bool _saved = false;
+
+  @override
+  void didUpdateWidget(covariant PostActions old) {
+    super.didUpdateWidget(old);
+    if (old.likes != widget.likes) _likes = widget.likes;
+    if (old.liked != widget.liked) _liked = widget.liked;
+  }
 
   @override
   Widget build(BuildContext context) {
-    // The JSX nudges the bar out by -4px to align the first icon's internal
-    // padding to the edge; Container margins can't be negative, so we just pad
-    // the top (the 6px of icon left-padding is a negligible inset).
-    return Container(
-      margin: const EdgeInsets.only(top: 10),
+    // Prototype offsets the bar by -8px to line the first glyph's internal
+    // padding up with the card edge; Padding handles the same effect here.
+    return Padding(
       padding: const EdgeInsets.only(top: 6),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: CkColors.hairline)),
-      ),
       child: Row(
         children: [
           _action(
             icon: V2Icons.heart,
             label: '$_likes',
             filled: _liked,
-            color: _liked ? CkColors.red : CkColors.ink2,
+            color: _liked ? CkColors.red : CkColors.muted,
             onTap: () => setState(() {
               _liked = !_liked;
               _likes += _liked ? 1 : -1;
@@ -620,39 +679,16 @@ class _PostActionsState extends State<PostActions> {
           ),
           _action(
             icon: V2Icons.comment,
-            label: '${widget.comments}',
-            color: CkColors.ink2,
+            label: null,
+            color: CkColors.muted,
             onTap: widget.onComment,
           ),
+          const Spacer(),
           _action(
             icon: V2Icons.share,
-            label: 'Share',
-            color: CkColors.ink2,
-            onTap: () {},
-          ),
-          // The RSVP text takes the remaining space and right-aligns next to
-          // Save, ellipsizing on narrow screens rather than overflowing.
-          if (widget.rsvp != null)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8, right: 6),
-                child: Text(
-                  widget.rsvp!,
-                  textAlign: TextAlign.right,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: CkType.body(fontSize: 11.5, color: CkColors.muted),
-                ),
-              ),
-            )
-          else
-            const Spacer(),
-          _action(
-            icon: V2Icons.bookmark,
             label: null,
-            filled: _saved,
-            color: _saved ? CkColors.ink : CkColors.ink2,
-            onTap: () => setState(() => _saved = !_saved),
+            color: CkColors.muted,
+            onTap: widget.onShare,
           ),
         ],
       ),
@@ -670,18 +706,19 @@ class _PostActionsState extends State<PostActions> {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(6, 6, 10, 6),
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            V2Svg(icon, size: 19, color: color, filled: filled),
+            V2Svg(icon, size: 18, color: color, filled: filled),
             if (label != null) ...[
-              const SizedBox(width: 6),
+              const SizedBox(width: 7),
               Text(
                 label,
-                style: CkType.body(
-                  fontSize: 12.5,
+                style: CkType.mono(
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
                   color: color,
                 ),
               ),
@@ -695,3 +732,493 @@ class _PostActionsState extends State<PostActions> {
 
 /// Standard scrolling screen body padding token used across v2 feeds.
 const kFeedHairline = BorderSide(color: CkColors.hairline);
+
+// ─── matchday IA additions ───────────────────────────────────────────────
+// New atoms + GlobalHeader added for the design_handoff_matchday pivot.
+// Existing V2Header / V2BottomNav above are still used by screens that
+// haven't been restyled yet.
+
+/// Ports the prototype's `.ck-ball` log-pill variants — one circle per ball
+/// in the live commentary strip.
+enum BallKind { dot, runs, four, six, wkt, extra }
+
+class BallPill extends StatelessWidget {
+  const BallPill({super.key, required this.kind, this.label});
+
+  final BallKind kind;
+
+  /// Centre label. Optional for [BallKind.dot] (defaults to "·") and
+  /// [BallKind.wkt] (defaults to "W"); required for [BallKind.runs] /
+  /// [BallKind.extra].
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final (bg, fg, border) = switch (kind) {
+      BallKind.dot => (CkColors.paper2, CkColors.muted, CkColors.hairline),
+      BallKind.runs => (CkColors.paper2, CkColors.ink, CkColors.hairline),
+      BallKind.four =>
+        (CkColors.greenSoft, const Color(0xFF1E5A2C), Colors.transparent),
+      BallKind.six => (CkColors.ink, CkColors.paper, Colors.transparent),
+      BallKind.wkt => (CkColors.red, Colors.white, Colors.transparent),
+      BallKind.extra => (CkColors.cream, CkColors.ink2, Colors.transparent),
+    };
+    final text = label ??
+        switch (kind) {
+          BallKind.dot => '·',
+          BallKind.wkt => 'W',
+          _ => '',
+        };
+    return Container(
+      width: 28,
+      height: 28,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: bg,
+        shape: BoxShape.circle,
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Text(
+        text,
+        style: CkType.display(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+      ),
+    );
+  }
+}
+
+/// Ports the prototype's `.ck-chip.live` — red pill with a pulsing white dot.
+/// Used on live-match cards and the watch screen's LIVE hero.
+class LiveChip extends StatefulWidget {
+  const LiveChip({super.key, this.label = 'LIVE', this.compact = false});
+
+  final String label;
+
+  /// Tighter padding for use inside dense cards.
+  final bool compact;
+
+  @override
+  State<LiveChip> createState() => _LiveChipState();
+}
+
+class _LiveChipState extends State<LiveChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat(reverse: true);
+  late final Animation<double> _opacity =
+      Tween<double>(begin: 1.0, end: 0.35).animate(_c);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final padH = widget.compact ? 7.0 : 9.0;
+    final padV = widget.compact ? 3.0 : 5.0;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: padH, vertical: padV),
+      decoration: const BoxDecoration(
+        color: CkColors.red,
+        borderRadius: BorderRadius.all(Radius.circular(999)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FadeTransition(
+            opacity: _opacity,
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            widget.label,
+            style: CkType.body(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.06 * 11,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Ports the prototype's `.ck-section-h` — uppercase muted small caps used as
+/// section dividers ("MY TEAMS", "FRIENDLIES", etc.).
+class SectionHeader extends StatelessWidget {
+  const SectionHeader(this.label, {super.key});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: CkType.body(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.10 * 11,
+        color: CkColors.muted,
+      ),
+    );
+  }
+}
+
+/// Ports the prototype's `.ck-placeholder` — 135° diagonal stripe pattern for
+/// empty slots (unclaimed player tiles, etc.).
+class StripePlaceholder extends StatelessWidget {
+  const StripePlaceholder({
+    super.key,
+    this.borderRadius,
+    this.child,
+  });
+
+  final BorderRadius? borderRadius;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: borderRadius ?? BorderRadius.zero,
+      child: CustomPaint(
+        painter: const _StripePainter(),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _StripePainter extends CustomPainter {
+  const _StripePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final base = Paint()..color = CkColors.paper;
+    canvas.drawRect(Offset.zero & size, base);
+    final stripe = Paint()..color = CkColors.paper2;
+    const step = 16.0;
+    const w = 8.0;
+    final diag = size.width + size.height;
+    for (double i = -diag; i < diag; i += step) {
+      final p = Path()
+        ..moveTo(i, 0)
+        ..lineTo(i + w, 0)
+        ..lineTo(i + w + size.height, size.height)
+        ..lineTo(i + size.height, size.height)
+        ..close();
+      canvas.drawPath(p, stripe);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Universal top header from the design handoff prototype: 38px round ink
+/// avatar on the left (taps → Menu drawer at `/menu`), full-width Search pill
+/// in the middle (taps → `/search`), Messages bubble on the right with a red
+/// unread badge (taps → `/messages`). Rendered at the top of every primary
+/// tab in the matchday IA shell.
+///
+/// Initials are read from [myProfileProvider]; the messages badge is the sum
+/// of unread counts across the inbox. Both can be overridden for tests via
+/// [overrideInitials] / [overrideMessagesBadge].
+class GlobalHeader extends ConsumerWidget {
+  const GlobalHeader({
+    super.key,
+    this.onMenu,
+    this.onSearch,
+    this.onMessages,
+    this.overrideInitials,
+    this.overrideMessagesBadge,
+  });
+
+  /// Overrides the default `context.push('/menu')` behaviour.
+  final VoidCallback? onMenu;
+
+  /// Overrides the default `context.push('/search')` behaviour.
+  final VoidCallback? onSearch;
+
+  /// Overrides the default `context.push('/messages')` behaviour.
+  final VoidCallback? onMessages;
+
+  final String? overrideInitials;
+  final int? overrideMessagesBadge;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(myProfileProvider).value;
+    final name = profile?.displayName ?? profile?.username ?? '';
+    final initials = overrideInitials ?? _initialsOf(name);
+    final chats = ref.watch(myChatsProvider).value ?? const [];
+    final badge = overrideMessagesBadge ??
+        chats.fold<int>(0, (sum, c) => sum + c.unreadCount);
+
+    return Padding(
+      // Spec from prototype: 6/14/10 padding under the 44px safe-area spacer
+      // (SafeArea handles the top inset for us, so we drop the static 44).
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+      child: Row(
+        children: [
+          _AvatarButton(
+            initials: initials,
+            onTap: onMenu ?? () => context.push('/menu'),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _SearchPill(
+              onTap: onSearch ?? () => context.push('/search'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          _MessagesButton(
+            badge: badge,
+            onTap: onMessages ?? () => context.push('/messages'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AvatarButton extends StatelessWidget {
+  const _AvatarButton({required this.initials, required this.onTap});
+  final String initials;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          color: CkColors.ink,
+          shape: BoxShape.circle,
+        ),
+        child: Text(
+          initials,
+          style: CkType.display(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: CkColors.paper,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchPill extends StatelessWidget {
+  const _SearchPill({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: CkColors.paper2,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: CkColors.hairline),
+        ),
+        child: Row(
+          children: [
+            const V2Svg(
+              V2Icons.search,
+              size: 17,
+              color: CkColors.muted,
+              strokeWidth: 2,
+            ),
+            const SizedBox(width: 9),
+            Text(
+              'Search',
+              style: CkType.body(fontSize: 15, color: CkColors.muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessagesButton extends StatelessWidget {
+  const _MessagesButton({required this.badge, required this.onTap});
+  final int badge;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 38,
+        height: 38,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: CkColors.paper,
+                shape: BoxShape.circle,
+                border: Border.all(color: CkColors.hairline),
+              ),
+              child: const V2Svg(
+                V2Icons.messages,
+                size: 19,
+                color: CkColors.ink,
+                strokeWidth: 1.9,
+              ),
+            ),
+            if (badge > 0)
+              Positioned(
+                top: -2,
+                right: -2,
+                child: _Badge(text: badge > 9 ? '9+' : '$badge'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shared chrome for full-screen sub-pages reached from the Menu drawer
+/// (My matches, My teams, My tournaments, …). Mirrors the prototype's
+/// inline `SubPage`: back arrow + left-aligned title + optional eyebrow +
+/// bottom hairline + optional bottom-right FAB.
+class SubPage extends StatelessWidget {
+  const SubPage({
+    super.key,
+    required this.title,
+    required this.child,
+    this.eyebrow,
+    this.onBack,
+    this.fabLabel,
+    this.onFab,
+  });
+
+  final String title;
+  final Widget child;
+  final String? eyebrow;
+  final VoidCallback? onBack;
+
+  /// When non-null, renders a circular-plus FAB pinned bottom-right with
+  /// [fabLabel] as the accessibility label.
+  final String? fabLabel;
+  final VoidCallback? onFab;
+
+  @override
+  Widget build(BuildContext context) {
+    final back = onBack ?? () => Navigator.of(context).maybePop();
+    return Scaffold(
+      backgroundColor: CkColors.paper,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 14, 12),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: CkColors.hairline)),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: back,
+                        icon: const V2Svg(
+                          V2Icons.chevronLeft,
+                          size: 20,
+                          color: CkColors.ink,
+                          strokeWidth: 2,
+                        ),
+                        splashRadius: 22,
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (eyebrow != null)
+                              Text(
+                                eyebrow!,
+                                style: CkType.mono(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.12,
+                                  color: CkColors.muted,
+                                ),
+                              ),
+                            Text(
+                              title,
+                              style: CkType.display(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(child: child),
+              ],
+            ),
+            if (fabLabel != null && onFab != null)
+              Positioned(
+                right: 16,
+                bottom: 20,
+                child: FloatingActionButton.extended(
+                  onPressed: onFab,
+                  backgroundColor: CkColors.ink,
+                  foregroundColor: CkColors.paper,
+                  icon: const V2Svg(
+                    V2Icons.plus,
+                    size: 18,
+                    color: CkColors.paper,
+                    strokeWidth: 2,
+                  ),
+                  label: Text(
+                    fabLabel!,
+                    style: CkType.body(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: CkColors.paper,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

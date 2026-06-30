@@ -23,9 +23,7 @@ enum _InboxTab { all, teams, dms }
 const bool _kShowInboxTabs = false;
 
 class InboxScreen extends ConsumerStatefulWidget {
-  const InboxScreen({super.key, this.onBell});
-
-  final VoidCallback? onBell;
+  const InboxScreen({super.key});
 
   @override
   ConsumerState<InboxScreen> createState() => _InboxScreenState();
@@ -70,31 +68,32 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     // Show the chip only while we already have something to show AND the
     // timeout hasn't elapsed; never on top of the initial loading skeleton.
     final showRefreshChip = _refreshing && chatsAsync.hasValue;
-    return ColoredBox(
-      color: CkColors.paper,
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: CkColors.paper,
+      body: SafeArea(
         bottom: false,
-        child: switch (chatsAsync) {
-          AsyncData(:final value) => _Loaded(
-              chats: value,
-              tab: _tab,
-              onTabChanged: (t) => setState(() => _tab = t),
-              onBell: widget.onBell,
+        child: Column(
+          children: [
+            _MessagesHeader(
+              onBack: () => Navigator.of(context).maybePop(),
               refreshing: showRefreshChip,
             ),
-          AsyncError(:final error) => _ErrorView(
-              title: 'Messages',
-              onBell: widget.onBell,
-              message: _messageFor(error),
-              onRetry: () => ref.invalidate(myChatsProvider),
+            Expanded(
+              child: switch (chatsAsync) {
+                AsyncData(:final value) => _Loaded(
+                    chats: value,
+                    tab: _tab,
+                    onTabChanged: (t) => setState(() => _tab = t),
+                  ),
+                AsyncError(:final error) => _ErrorView(
+                    message: _messageFor(error),
+                    onRetry: () => ref.invalidate(myChatsProvider),
+                  ),
+                _ => const _Skeleton(),
+              },
             ),
-          _ => _Skeleton(
-              title: 'Messages',
-              onBell: widget.onBell,
-              tab: _tab,
-              onTabChanged: (t) => setState(() => _tab = t),
-            ),
-        },
+          ],
+        ),
       ),
     );
   }
@@ -105,6 +104,75 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   }
 }
 
+// ─── Header ──────────────────────────────────────────────────────────────────
+
+/// Inbox header — back arrow + left-aligned "Messages" + bottom hairline.
+/// Faithful port of `MessagesScreen`'s top row from the design prototype
+/// (home-messages.jsx:461–464). No bell — Alerts is its own tab now, and
+/// notifications are reached from the bottom nav.
+///
+/// When [refreshing] is true and there is no explicit subtitle, a small
+/// spinner renders under the title to signal the cold-start fetch is in
+/// flight (mirrors the chip semantics from the previous header).
+class _MessagesHeader extends StatelessWidget {
+  const _MessagesHeader({required this.onBack, this.refreshing = false});
+
+  final VoidCallback onBack;
+  final bool refreshing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      // Prototype: padding '4px 12px 12px' under the 44px safe-area spacer
+      // (SafeArea covers the top inset for us).
+      padding: const EdgeInsets.fromLTRB(8, 4, 14, 12),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: CkColors.hairline)),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onBack,
+            child: const Padding(
+              padding: EdgeInsets.all(6),
+              child: V2Svg(
+                V2Icons.chevronLeft,
+                size: 20,
+                color: CkColors.ink,
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              'Messages',
+              style: CkType.display(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.02,
+              ),
+            ),
+          ),
+          if (refreshing)
+            const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.4,
+                  color: CkColors.muted,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Loaded body ─────────────────────────────────────────────────────────────
 
 class _Loaded extends StatelessWidget {
@@ -112,15 +180,11 @@ class _Loaded extends StatelessWidget {
     required this.chats,
     required this.tab,
     required this.onTabChanged,
-    required this.onBell,
-    this.refreshing = false,
   });
 
   final List<Chat> chats;
   final _InboxTab tab;
   final ValueChanged<_InboxTab> onTabChanged;
-  final VoidCallback? onBell;
-  final bool refreshing;
 
   @override
   Widget build(BuildContext context) {
@@ -149,11 +213,6 @@ class _Loaded extends StatelessWidget {
 
     return Column(
       children: [
-        V2Header(
-          title: 'Messages',
-          onBell: onBell,
-          refreshing: refreshing,
-        ),
         if (_kShowInboxTabs)
           _TabRow(
             tab: tab,
@@ -422,41 +481,16 @@ class _ThreadRow extends StatelessWidget {
 // ─── States ──────────────────────────────────────────────────────────────────
 
 class _Skeleton extends StatelessWidget {
-  const _Skeleton({
-    required this.title,
-    required this.onBell,
-    required this.tab,
-    required this.onTabChanged,
-  });
-
-  final String title;
-  final VoidCallback? onBell;
-  final _InboxTab tab;
-  final ValueChanged<_InboxTab> onTabChanged;
+  const _Skeleton();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        V2Header(title: title, onBell: onBell),
-        if (_kShowInboxTabs)
-          _TabRow(
-            tab: tab,
-            onChanged: onTabChanged,
-            allCount: 0,
-            teamsCount: 0,
-            dmsCount: 0,
-          ),
-        const Expanded(
-          child: Center(
-            child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        ),
-      ],
+    return const Center(
+      child: SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
     );
   }
 }
@@ -484,50 +518,36 @@ class _EmptyList extends StatelessWidget {
 }
 
 class _ErrorView extends StatelessWidget {
-  const _ErrorView({
-    required this.title,
-    required this.onBell,
-    required this.message,
-    required this.onRetry,
-  });
+  const _ErrorView({required this.message, required this.onRetry});
 
-  final String title;
-  final VoidCallback? onBell;
   final String message;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        V2Header(title: title, sub: 'something went wrong', onBell: onBell),
-        Expanded(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: CkType.body(
-                      fontSize: 13,
-                      color: CkColors.ink,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: onRetry,
-                    child: const Text('Retry'),
-                  ),
-                ],
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: CkType.body(
+                fontSize: 13,
+                color: CkColors.ink,
+                height: 1.5,
               ),
             ),
-          ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

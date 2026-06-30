@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>matchday — prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  :root { --stage-bg: oklch(0.93 0.008 85); }
+  html, body { height:100%; }
+  body { margin:0; background:var(--stage-bg); overscroll-behavior:none; }
+  #root { height:100%; }
+  @keyframes ch-pop { 0% { transform: scale(0.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes ck-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes ch-spin { to { transform: rotate(360deg); } }
+  input::placeholder, textarea::placeholder { color: var(--soft); }
+  /* tournament bracket */
+  .bkt{ display:flex; overflow-x:auto; padding:6px 2px 10px; scrollbar-width:none; }
+  .bkt::-webkit-scrollbar{ height:0; }
+  .bkt-round{ display:flex; flex-direction:column; justify-content:space-around; min-width:158px; padding:0 9px; }
+  .bkt-round-label{ font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); text-align:center; margin-bottom:6px; }
+  .bkt-match{ position:relative; margin:9px 0; }
+  .bkt-round:not(:last-child) .bkt-match::after{ content:''; position:absolute; right:-9px; top:50%; width:9px; height:1.5px; background:var(--line); }
+  .bkt-round:not(:first-child) .bkt-match::before{ content:''; position:absolute; left:-9px; top:50%; width:9px; height:1.5px; background:var(--line); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="challenge-shared.jsx"></script>
+<script type="text/babel" src="challenge-data.jsx"></script>
+<script type="text/babel" src="challenge-send.jsx"></script>
+<script type="text/babel" src="pavilion-data.jsx"></script>
+<script type="text/babel" src="pavilion-parts.jsx"></script>
+<script type="text/babel" src="pavilion-matches-v2.jsx"></script>
+<script type="text/babel" src="pavilion-app-v2.jsx"></script>
+<script type="text/babel" src="followers-screen.jsx"></script>
+<script type="text/babel" src="home-messages.jsx"></script>
+<script type="text/babel" src="public-matches.jsx"></script>
+<script type="text/babel" src="team-create.jsx"></script>
+<script type="text/babel" src="tournament-create.jsx"></script>
+<script type="text/babel" src="tournament-hub.jsx"></script>
+<script type="text/babel" src="team-invite.jsx"></script>
+<script type="text/babel" src="profile-you.jsx"></script>
+<script type="text/babel" src="screens/tp-atoms.jsx"></script>
+<script type="text/babel" src="screens/tp-tabs.jsx"></script>
+<script type="text/babel" src="screens/tp-data.jsx"></script>
+<script type="text/babel" src="screens/TeamPage.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+const C = window.Ch;
+const D = window.PavData;
+const V = window.PavV2;
+const ink='var(--ink)', ink2='var(--ink-2)', muted='var(--muted)', soft='var(--soft)',
+      paper='var(--paper)', paper2='var(--paper-2)', surface='var(--surface)',
+      hair='var(--hairline)', red='var(--red)';
+
+// ---- icons (matchday line set) ----
+const PATHS = {
+  home:'<path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>',
+  bat:'<path d="M14.5 4.5a2 2 0 0 1 2.9 2.9l-8 8-2.9-2.9z"/><path d="M6.5 12.5 4 15l1.5 1.5L8 14"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  shield:'<path d="M12 3l7 3v5c0 4.2-3 7.4-7 8.5C8 18.4 5 15.2 5 11V6z"/><path d="M12 8.4l1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z" stroke-width="1.2"/>',
+  msg:'<path d="M20 14a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
+  back:'<path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>',
+  next:'<path d="M9 6l6 6-6 6"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
+  trophy:'<path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3"/><path d="M12 13v4M9 21h6M10 17h4"/>',
+  follow:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+  bookmark:'<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+  rankings:'<path d="M5 21V10M12 21V4M19 21v-7"/>',
+  bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+  theme:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/>',
+  lock:'<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.2 9a2.8 2.8 0 0 1 5.4 1c0 1.8-2.6 2.4-2.6 4M12 17h.01"/>',
+  logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  pin:'<path d="M12 21s7-6.4 7-11a7 7 0 0 0-14 0c0 4.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+};
+function Ico({n, size=20, stroke='currentColor', sw=1.9}) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={sw}
+    strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{__html: PATHS[n]}} />;
+}
+
+// ---- global header: avatar(menu) + search pill + messages (Threads-style) ----
+function GlobalHeader({ onMenu, onSearch, onMessages, msgBadge }) {
+  return (
+    <>
+      <div style={{ height:44, flexShrink:0 }} />
+      <div style={{ padding:'6px 14px 10px', flexShrink:0, display:'flex', alignItems:'center', gap:12 }}>
+        <button onClick={onMenu} aria-label="Menu" style={{ width:38, height:38, borderRadius:999, background:ink, color:paper,
+          border:'none', cursor:'pointer', fontFamily:'Inter Tight', fontWeight:700, fontSize:13, flexShrink:0 }}>MS</button>
+        <button onClick={onSearch} aria-label="Search" style={{ flex:1, minWidth:0, height:40, borderRadius:999, background:paper2, border:'1px solid '+hair,
+          cursor:'pointer', display:'flex', alignItems:'center', gap:9, padding:'0 16px', fontFamily:'inherit' }}>
+          <Ico n="search" size={17} stroke={muted} sw={2} />
+          <span style={{ fontSize:15, color:muted }}>Search</span>
+        </button>
+        <button onClick={onMessages} aria-label="Messages" style={{ width:38, height:38, borderRadius:999, background:paper, border:'1px solid '+hair,
+          cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, position:'relative', color:ink }}>
+          <Ico n="msg" size={19} sw={1.9} />
+          {msgBadge ? <span style={{ position:'absolute', top:-2, right:-2, minWidth:15, height:15, padding:'0 3px', borderRadius:999, background:red, color:'#fff', fontFamily:'Inter Tight', fontWeight:700, fontSize:9, display:'flex', alignItems:'center', justifyContent:'center', border:'1.5px solid '+paper }}>{msgBadge}</span> : null}
+        </button>
+      </div>
+    </>
+  );
+}
+
+// ---- shared bottom nav (Option B: filled red tile for active) ----
+const TABS = [
+  { id:'home',   label:'Home',   icon:'home' },
+  { id:'matches', label:'Matches', icon:'bat' },
+  { id:'notifications', label:'Alerts', icon:'bell', badge:3 },
+];
+function AppNav({ active, onNav }) {
+  return (
+    <div style={{ height:62, flexShrink:0, borderTop:'1px solid '+hair, background:surface,
+      display:'grid', gridTemplateColumns:'repeat(3,1fr)', alignItems:'center', paddingBottom:4 }}>
+      {TABS.map(t => {
+        const on = active === t.id;
+        return (
+          <button key={t.id} onClick={()=>onNav(t.id)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+            background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', padding:0 }}>
+            <span style={{ width:40, height:32, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center',
+              background:on?red:'transparent', color:on?'#fff':soft, position:'relative' }}>
+              <Ico n={t.icon} size={on?21:20} />
+              {t.badge && <span style={{ position:'absolute', top:0, right:4, minWidth:14, height:14, padding:'0 3px', borderRadius:999,
+                background:red, color:'#fff', fontFamily:'Inter Tight', fontWeight:700, fontSize:8.5, display:'flex', alignItems:'center', justifyContent:'center',
+                border:'1.5px solid '+surface }}>{t.badge}</span>}
+            </span>
+            <span style={{ fontSize:8.5, fontWeight:on?700:600, color:on?ink:muted }}>{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---- empty "coming soon" states (honest placeholders) ----
+function ComingSoon({ icon, title, sub }) {
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:'0 40px', gap:8, background:paper }}>
+      <div style={{ width:64, height:64, borderRadius:18, background:paper2, border:'1px solid '+hair, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:6 }}>
+        <Ico n={icon} size={28} stroke={ink2} sw={1.8} />
+      </div>
+      <div style={{ fontFamily:'Inter Tight', fontWeight:700, fontSize:18, letterSpacing:'-0.02em', color:ink }}>{title}</div>
+      <div style={{ fontSize:13, color:muted, lineHeight:1.55 }}>{sub}</div>
+      <div style={{ fontFamily:'JetBrains Mono', fontSize:9.5, letterSpacing:'0.12em', textTransform:'uppercase', color:soft, marginTop:6 }}>Coming soon</div>
+    </div>
+  );
+}
+
+function HomeTab({ header }) {
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:paper, minHeight:0 }}>
+      {header}
+      <ComingSoon icon="home" title="Your feed lives here" sub="Posts, match results and milestones from teams and players you follow." />
+    </div>
+  );
+}
+function NotificationsTab({ header }) {
+  const items = [
+    { who:'Mohalla Kings', t:'challenged you to a friendly · T20 Sat 16:00', when:'2m', kind:'challenge', unread:true },
+    { who:'Karachi Eagles', t:'accepted — match confirmed for Sat 16:00', when:'1h', kind:'accept', unread:true },
+    { who:'Adeel Sheikh', t:'started following you', when:'3h', kind:'follow', unread:true },
+    { who:'Old Boys XI', t:'proposed new terms on your challenge', when:'1d', kind:'counter' },
+    { who:'Sherwani CC', t:'declined: Wrong format', when:'2d', kind:'decline' },
+  ];
+  const tone = { challenge:red, accept:'var(--green)', follow:ink, counter:'var(--amber)', decline:muted };
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:paper, minHeight:0 }}>
+      {header}
+      <div style={{ flex:1, overflowY:'auto', minHeight:0 }}>
+        {items.map((n,i)=>(
+          <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'13px 18px', borderTop:'1px solid '+hair, background:n.unread?'var(--paper-2)':paper }}>
+            <div style={{ width:38, height:38, borderRadius:999, background:paper2, border:'1px solid '+hair, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, color:tone[n.kind]||ink2 }}>
+              <Ico n={n.kind==='follow'?'follow':n.kind==='accept'?'bat':n.kind==='decline'?'msg':'bat'} size={17} sw={1.9} />
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13.5, color:ink, lineHeight:1.45 }}><b style={{ fontFamily:'Inter Tight', fontWeight:700 }}>{n.who}</b> {n.t}</div>
+              <div style={{ fontFamily:'JetBrains Mono', fontSize:9.5, color:muted, marginTop:3, letterSpacing:'0.04em' }}>{n.when.toUpperCase()} AGO</div>
+            </div>
+            {n.unread && <span style={{ width:7, height:7, borderRadius:999, background:red, flexShrink:0, marginTop:6 }} />}
+          </div>
+        ))}
+        <div style={{ height:84 }} />
+      </div>
+    </div>
+  );
+}
+function MessagesOverlay({ onClose }) {
+  return (
+    <div style={{ position:'absolute', inset:0, zIndex:88, background:paper, display:'flex', flexDirection:'column' }}>
+      <div style={{ height:44, flexShrink:0 }} />
+      <div style={{ padding:'4px 12px 12px', flexShrink:0, display:'flex', alignItems:'center', gap:8, borderBottom:'1px solid '+hair }}>
+        <button onClick={onClose} style={{ width:32, height:32, border:'none', background:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0, marginLeft:-4, flexShrink:0, color:ink }}>
+          <Ico n="back" size={20} stroke={ink} sw={2} />
+        </button>
+        <div style={{ fontFamily:'Inter Tight', fontWeight:700, fontSize:18, letterSpacing:'-0.02em' }}>Messages</div>
+      </div>
+      <ComingSoon icon="msg" title="Chats with captains" sub="Match talk, challenge replies and team coordination — one thread per conversation." />
+    </div>
+  );
+}
+
+// ---- My-matches card (polished, mirrors Matches-tab aesthetic) ----
+function MyCrest({ k, size=30 }) {
+  const c = (D.CRESTS||{})[k] || { short:k, color:'var(--ink)' };
+  return <div style={{ width:size, height:size, borderRadius:size*0.26, background:c.color, color:'#fff', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'JetBrains Mono', fontWeight:700, fontSize:size*0.34, letterSpacing:'-0.01em' }}>{(c.short||k).slice(0,2)}</div>;
+}
+const PHASE_CHIP = {
+  live:        { l:'LIVE',          bg:'var(--red)',        fg:'#fff',  dot:true },
+  startsSoon:  { l:'STARTS SOON',   bg:'var(--cream)',      fg:'var(--amber-ink)' },
+  scheduled:   { l:'SCHEDULED',     bg:'var(--paper-2)',    fg:'var(--ink-2)' },
+  awaitingReply:{ l:'AWAITING REPLY',bg:'var(--paper-2)',   fg:'var(--muted)' },
+};
+function MyMatchCard({ m, onOpen, top }) {
+  const ca = (D.CRESTS||{})[m.team] || { short:m.team, name:m.team };
+  const cb = (D.CRESTS||{})[m.opp]  || { short:m.opp,  name:m.opp };
+  const done = m.phase==='completed';
+  const won = m.result==='W';
+  const chip = done
+    ? { l: won?'WON':'LOST', bg: won?'var(--green-soft)':'var(--red-soft)', fg: won?'var(--green-ink)':'var(--red)' }
+    : (PHASE_CHIP[m.phase] || PHASE_CHIP.scheduled);
+  const TeamRow = ({ k, name, score, dim }) => (
+    <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
+      <MyCrest k={k} size={30} />
+      <span style={{ flex:1, minWidth:0, fontFamily:'Inter Tight', fontWeight:700, fontSize:14.5, letterSpacing:'-0.01em', color: dim?'var(--ink-2)':'var(--ink)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{name}</span>
+      {score && score!=='—' && <span style={{ fontFamily:'JetBrains Mono', fontWeight:700, fontSize:13.5, color: dim?'var(--muted)':'var(--ink)', flexShrink:0 }}>{score}</span>}
+    </div>
+  );
+  return (
+    <button onClick={()=>onOpen(m)} style={{ width:'100%', textAlign:'left', cursor:'pointer', fontFamily:'inherit', display:'block', background:'var(--paper)', border:'1px solid var(--hairline)', borderRadius:16, padding:'13px 14px', marginTop: top?0:10 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:11 }}>
+        <span style={{ fontFamily:'JetBrains Mono', fontSize:8.5, fontWeight:700, letterSpacing:'0.04em', padding:'3px 7px', borderRadius:5, background:chip.bg, color:chip.fg, display:'inline-flex', alignItems:'center', gap:4, flexShrink:0 }}>
+          {chip.dot && <span style={{ width:4, height:4, borderRadius:999, background:'#fff', animation:'ck-pulse 1.4s ease-in-out infinite' }} />}{chip.l}
+        </span>
+        <span style={{ flex:1, minWidth:0, fontFamily:'JetBrains Mono', fontSize:9.5, color:'var(--muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', textAlign:'right' }}>{m.sub}</span>
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        <TeamRow k={m.team} name={ca.name||m.team} score={done||m.phase==='live'?m.scoreA:''} />
+        <TeamRow k={m.opp}  name={cb.name||m.opp}  score={done||m.phase==='live'?m.scoreB:''} dim />
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:11, paddingTop:10, borderTop:'1px solid var(--hairline)' }}>
+        <Ico n="pin" size={12} stroke="var(--muted)" sw={1.8} />
+        <span style={{ fontSize:11.5, color:'var(--muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.venue}</span>
+        <span style={{ marginLeft:'auto', fontSize:11.5, fontWeight:600, color:'var(--ink-2)', flexShrink:0 }}>{m.when}</span>
+      </div>
+    </button>
+  );
+}
+
+// ---- Matches tab (matches-focused; reuses Pavilion v2 lane + detail) ----
+function MatchesTab({ header, onBack }) {
+  const [matches, setMatches] = useState(D.seedMatches);
+  const [openId, setOpenId] = useState(null);
+  const [send, setSend] = useState(false);
+  const [toast, setToast] = useState(null);
+  const flash = (m) => { setToast(m); setTimeout(()=>setToast(null), 2400); };
+  const onMatchAction = (id, action) => {
+    if (action === 'lineup') { setMatches(ms => ms.map(x => x.id===id?{...x,lineupSet:true}:x)); flash('Lineup set'); return; }
+    if (action === 'start') { setMatches(ms => ms.map(x => x.id===id?{...x,phase:'live',scoreA:'0/0',when:'Now · 0.0 ov'}:x)); flash('Match started — you’re live'); return; }
+    if (action === 'withdraw' || action === 'cancel') { setMatches(ms => ms.filter(x => x.id!==id)); setOpenId(null); flash(action==='cancel'?'Match cancelled':'Challenge withdrawn'); return; }
+    flash('Opening…');
+  };
+  const onSent = (p) => {
+    setSend(false);
+    const opp = p.open ? 'MK' : (p.opp && p.opp.mono) || 'KE';
+    setMatches(ms => [{ id:'m_new_'+Date.now(), phase:'scheduled', opp:opp.slice(0,2).toUpperCase(), team:'LL', role:'captain',
+      when: p.when&&p.when.dateLabel ? p.when.dateLabel.split(' · ').slice(-1)[0]+' · '+(p.when.time||'') : 'Scheduled', venue:p.venue||'TBD', sub:p.open?'Open challenge':'Friendly', lineupSet:true }, ...ms]);
+    flash(p.open?'Open challenge created':'Challenge sent');
+  };
+  const open = openId ? matches.find(m=>m.id===openId) : null;
+  const [tab, setTab] = useState('upcoming');
+  const isUpcoming = (m)=> m.phase!=='completed';
+  const upcoming = matches.filter(isUpcoming);
+  const completed = matches.filter(m=>m.phase==='completed');
+  const list = tab==='upcoming' ? upcoming : completed;
+  // group: friendlies vs by-competition
+  const friendlies = list.filter(m=> /friendly|open challenge/i.test(m.sub||''));
+  const compMatches = list.filter(m=> !/friendly|open challenge/i.test(m.sub||''));
+  const TABS = [ { k:'upcoming', l: upcoming.length? `Upcoming · ${upcoming.length}`:'Upcoming' }, { k:'completed', l:'Completed' } ];
+  const liveN = upcoming.filter(m=>m.phase==='live').length;
+  const Section = ({ label, items }) => items.length ? (
+    <div style={{ marginBottom:8 }}>
+      <div style={{ fontFamily:'JetBrains Mono', fontSize:10, letterSpacing:'0.05em', color:'var(--muted)', padding:'4px 18px 8px' }}>{label}</div>
+      <div style={{ padding:'0 16px' }}>{items.map((m,i)=><MyMatchCard key={m.id} m={m} onOpen={(mm)=>setOpenId(mm.id)} top={i===0} />)}</div>
+    </div>
+  ) : null;
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:paper, minHeight:0, position:'relative', overflow:'hidden' }}>
+      {header || (onBack && (
+        <React.Fragment>
+          <div style={{ height:44, flexShrink:0 }} />
+          <div style={{ padding:'4px 12px 12px', flexShrink:0, display:'flex', alignItems:'center', gap:8, borderBottom:'1px solid '+hair }}>
+            <button onClick={onBack} style={{ width:32, height:32, border:'none', background:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0, marginLeft:-4, color:ink }}><Ico n="back" size={20} stroke={ink} sw={2} /></button>
+            <div style={{ fontFamily:'Inter Tight', fontWeight:700, fontSize:18, letterSpacing:'-0.02em' }}>My matches</div>
+          </div>
+        </React.Fragment>
+      ))}
+      <div style={{ flexShrink:0, background:paper }}>
+        <div style={{ display:'flex', gap:7, padding:'12px 18px 10px', borderBottom:'1px solid '+hair }}>
+          {TABS.map(tb=>{ const on=tab===tb.k; const showDot = tb.k==='upcoming' && liveN>0;
+            return <button key={tb.k} onClick={()=>setTab(tb.k)} style={{ display:'inline-flex', alignItems:'center', gap:6, height:32, padding:'0 14px', borderRadius:999, cursor:'pointer', fontFamily:'inherit', fontSize:12.5, fontWeight:on?700:600, border:'1px solid '+(on?ink:hair), background:on?ink:paper, color:on?paper:ink2 }}>
+              {showDot && <span style={{ width:5, height:5, borderRadius:999, background:on?'#fff':red, animation:'ck-pulse 1.4s ease-in-out infinite' }} />}{tb.l}
+            </button>;
+          })}
+        </div>
+      </div>
+      <div style={{ flex:1, overflowY:'auto', minHeight:0, paddingTop:12 }}>
+        {list.length===0 ? (
+          <div style={{ padding:'56px 30px', textAlign:'center' }}>
+            <div style={{ fontFamily:'Inter Tight', fontWeight:700, fontSize:16, color:ink }}>{tab==='upcoming'?'No matches scheduled':'No completed matches'}</div>
+            <div style={{ fontSize:13, color:muted, marginTop:6, lineHeight:1.5 }}>{tab==='upcoming'?'Schedule a friendly or league fixture to get started.':'Your finished games will appear here.'}</div>
+          </div>
+        ) : (<>
+          <Section label="FRIENDLIES" items={friendlies} />
+          <Section label={tab==='upcoming'?'TOURNAMENT & LEAGUE':'TOURNAMENT'} items={compMatches} />
+        </>)}
+        <div style={{ height:84 }} />
+      </div>
+      <div style={{ position:'absolute', right:16, bottom:18, zIndex:30 }}>
+        <button onClick={()=>setSend(true)} style={{ height:44, padding:'0 18px 0 16px', borderRadius:999, border:'none', background:ink, color:paper, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:8, fontFamily:'inherit', fontWeight:700, fontSize:14, boxShadow:'0 8px 22px -6px rgba(20,18,14,0.45)' }}>
+          <Ico n="search" size={0} /><span style={{ fontSize:18, marginRight:2 }}>+</span> Schedule match
+        </button>
+      </div>
+      {toast && (
+        <div style={{ position:'absolute', left:16, right:16, bottom:74, padding:'13px 16px', borderRadius:14, background:ink, color:paper, display:'flex', alignItems:'center', gap:10, zIndex:35, animation:'ch-pop 0.3s cubic-bezier(0.22,1,0.36,1)' }}>
+          <span style={{ fontSize:13, fontWeight:600 }}>{toast}</span>
+        </div>
+      )}
+      {open && (
+        <div style={{ position:'absolute', inset:0, zIndex:70, background:paper }}>
+          <V.MatchDetail m={open} onBack={()=>setOpenId(null)} onAction={onMatchAction} />
+        </div>
+      )}
+      {send && (
+        <div style={{ position:'absolute', inset:0, zIndex:80, background:paper }}>
+          <window.SendChallenge teamsCount={3} squadSize={18} preTeamId="t_ll" onExit={()=>setSend(false)} onSent={onSent} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- profile overlay ----
+function ProfileOverlay({ onClose }) {
+  return (
+    <div style={{ position:'absolute', inset:0, zIndex:95, background:paper }}>
+      <window.ProfileYou embedded={true} viewer="self" bioState="written" onBack={onClose} />
+    </div>
+  );
+}
+
+// ---- menu sub-page chrome (back header + scroll) ----
+function SubPage({ title, eyebrow, onBack, children, fab, onFab }) {
+  return (
+    <div style={{ position:'absolute', inset:0, zIndex:92, background:paper, display:'flex', flexDirection:'column' }}>
+      <div style={{ height:44, flexShrink:0 }} />
+      <div style={{ padding:'4px 12px 12px', flexShrink:0, display:'flex', alignItems:'center', gap:8, borderBottom:'1px solid '+hair }}>
+        <button onClick={onBack} style={{ width:32, height:32, border:'none', background:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0, marginLeft:-4, flexShrink:0, color:ink }}>
+          <Ico n="back" size={20} stroke={ink} sw={2} />
+        </button>
+        <div style={{ minWidth:0 }}>
+          <div style={{ fontFamily:'Inter Tight', fontWeight:700, fontSize:18, letterSpacing:'-0.02em', color:ink }}>{title}</div>
+        </div>
+      </div>
+      <div style={{ flex:1, overflowY:'auto', minHeight:0, paddingTop:8 }}>{children}<div style={{ height:90 }} /></div>
+      {fab && (
+        <button onClick={onFab} aria-label={fab} style={{ position:'absolute', right:18, bottom:22, width:54, height:54, borderRadius:999, border:'none', background:ink, color:paper, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 22px -6px rgba(20,18,14,0.45)', zIndex:5 }}>
+          <Ico n="plus" size={24} sw={2.4} stroke={paper} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MenuRow({ icon, title, sub, count, onClick, danger }) {
+  return (
+    <button onClick={onClick} style={{ width:'100%', display:'flex', alignItems:'center', gap:13, padding:'13px 18px', background:paper, border:'none', borderTop:'1px solid '+hair, cursor:'pointer', textAlign:'left', fontFamily:'inherit' }}>
+      <div style={{ width:34, height:34, borderRadius:10, background:danger?'var(--red-soft)':paper2, border:'1px solid '+(danger?'transparent':hair), display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+        <Ico n={icon} size={16} stroke={danger?red:ink2} sw={1.8} />
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontWeight:600, fontSize:14, color:danger?red:ink }}>{title}</div>
+        {sub && <div style={{ fontSize:11.5, color:muted, marginTop:1 }}>{sub}</div>}
+      </div>
+      {count!=null && <span style={{ fontFamily:'JetBrains Mono', fontSize:11, color:muted }}>{count}</span>}
+      {!danger && <Ico n="next" size={15} stroke={soft} sw={2} />}
+    </button>
+  );
+}
+function MenuGroup({ label }) {
+  return <div style={{ fontFamily:'JetBrains Mono', fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:muted, padding:'18px 18px 6px' }}>{label}</div>;
+}
+
+// ---- the account / menu drawer (opened from the header avatar) ----
+function MenuOverlay({ onClose, flash }) {
+  const [route, setRoute] = useState('root');   // root | teams | tournaments | profile
+  const [teams] = useState(D.seedTeams);
+  const [tours] = useState(D.seedTournaments);
+  const [teamView, setTeamView] = useState(null);
+  const [tourView, setTourView] = useState(null); // null | { sample, role }
+  const [createFlow, setCreateFlow] = useState(null); // null | 'creating' | {created team}
+  const [tourCreate, setTourCreate] = useState(null); // null | 'creating' | {created tournament draft}
+  const [invite, setInvite] = useState(null); // null | {team}
+
+  // create-tournament flow
+  if (tourCreate === 'creating') {
+    return <window.TournamentCreate onExit={()=>setTourCreate(null)} onCreated={(d)=>setTourCreate(d)} />;
+  }
+  if (tourCreate && typeof tourCreate === 'object') {
+    const d = tourCreate;
+    const sample = d.structure==='hybrid' ? 'hybrid' : d.structure==='league' ? 'league' : 'knockout';
+    const structLabel = d.structure==='hybrid' ? 'Groups → KO' : d.structure==='league' ? 'League' : 'Knockout';
+    const openHub = () => { setTourCreate(null); setTourView({ sample, role:'organizer', override:{ name:d.name, mono:(d.name.match(/\S+/g)||['T']).map(w=>w[0]).join('').slice(0,2).toUpperCase(), color:d.color, structureLabel:structLabel, stage:'Draft', draft:true, entry:d.entry } }); };
+    return <window.TournamentCreated d={d} onAddTeams={()=>{ flash('Add teams — flow'); openHub(); }} onHub={openHub} />;
+  }
+
+  if (invite) return <window.TeamInvite team={invite} onClose={()=>setInvite(null)} />;
+  if (tourView) return <window.TournamentHub sample={tourView.sample} role={tourView.role} override={tourView.override} onBack={()=>setTourView(null)} flash={flash} />;
+
+  // create-team flow
+  if (createFlow === 'creating') {
+    return <window.TeamCreate onExit={()=>setCreateFlow(null)} onCreated={(t)=>setCreateFlow(t)} />;
+  }
+  if (createFlow && typeof createFlow === 'object') {
+    const t = createFlow;
+    const openCreated = () => { setCreateFlow(null); setTeamView({ crest:t.mono, role:'owner', _adhoc:{ name:t.name, short:t.mono, color:t.color } }); };
+    return <window.TeamCreated team={t} onOpen={openCreated} onInvite={()=>setInvite({ name:t.name, mono:t.mono, color:t.color })} />;
+  }
+
+  // tapped team → faithful Team Page, carrying its crest identity + viewer role
+  if (teamView) {
+    const C = window.tpCases || {};
+    const roleCase = { owner:'owner-active', captain:'captain', player:'player' };
+    const base = C[roleCase[teamView.role] || 'player'] || C['player'] || {};
+    const src = (base && base.team) || {};
+    const cr = (D.CRESTS||{})[teamView.crest] || teamView._adhoc || { name:'Team', short:teamView.crest, color:'var(--ink)' };
+    const team = { ...src, name:cr.name, mono:cr.short, primary:cr.color };
+    const caseData = { ...base, viewer: base.viewer || teamView.role || 'player', team, initial:'Squad' };
+    return (
+      <div style={{ position:'absolute', inset:0, zIndex:96, background:paper }}>
+        <window.CkTeamPage caseData={caseData} onBack={()=>setTeamView(null)} onAction={(act)=>{
+          if (act === 'invite') setInvite({ name:team.name, mono:team.mono, color:team.primary });
+          else if (act === 'post') flash('Post as '+team.name);
+          else if (act === 'inbox') flash('Captain inbox');
+          else if (act === 'lineup') flash('Set lineup');
+          else if (act === 'chat') flash('Team chat');
+          else if (act === 'stats') flash('Your stats');
+          else flash('Done');
+        }} />
+      </div>
+    );
+  }
+
+  if (route === 'profile') return <ProfileOverlay onClose={()=>setRoute('root')} />;
+  if (route === 'teams') return (
+    <SubPage title="My teams" eyebrow="MENU" onBack={()=>setRoute('root')} fab="New team" onFab={()=>setCreateFlow('creating')}>
+      <window.PavParts.TeamsLane teams={teams}
+        onOpen={(tm)=>setTeamView(tm)}
+        onAction={(id,a,n)=>flash(n||'Resolving…')}
+        onCreate={()=>setCreateFlow('creating')} />
+    </SubPage>
+  );
+  if (route === 'tournaments') return (
+    <SubPage title="My tournaments" eyebrow="MENU" onBack={()=>setRoute('root')} fab="New tournament" onFab={()=>setTourCreate('creating')}>
+      <window.PavParts.ToursLane tournaments={tours}
+        onOpen={(tr)=>{
+          const st = tr.state || 'live';
+          const sample = st==='completed' ? 'done' : (tr.sample || (/knockout/i.test(tr.format) ? 'knockout' : /group/i.test(tr.format) ? 'hybrid' : 'league'));
+          const draft = (st==='draft'||st==='registration'||st==='ready');
+          setTourView({ sample, role: tr.kind === 'playing' ? 'participant' : 'organizer', override:{ name:tr.name, mono:tr.short, color:tr.color, structureLabel:tr.format, stage:tr.stage, state:st, draft, entry: st==='registration'?'open':undefined, ready: st==='ready', completed: st==='completed' } });
+        }}
+        onAction={(tr)=>{
+          const sample = tr && /knockout/i.test(tr.format||'') ? 'knockout' : tr && /group/i.test(tr.format||'') ? 'hybrid' : 'league';
+          setTourView({ sample, role:'organizer', override: tr ? { name:tr.name, mono:tr.short, color:tr.color, structureLabel:tr.format, stage:tr.stage } : null });
+        }}
+        onCreate={()=>setTourCreate('creating')} />
+    </SubPage>
+  );
+  if (route === 'mymatches') return (
+    <div style={{ position:'absolute', inset:0, zIndex:92, background:paper }}>
+      <MatchesTab onBack={()=>setRoute('root')} />
+    </div>
+  );
+
+  // root menu
+  return (
+    <div style={{ position:'absolute', inset:0, zIndex:90, background:paper, display:'flex', flexDirection:'column' }}>
+      <div style={{ height:44, flexShrink:0 }} />
+      <div style={{ padding:'4px 12px 12px', flexShrink:0, display:'flex', alignItems:'center', gap:8, borderBottom:'1px solid '+hair }}>
+        <button onClick={onClose} style={{ width:32, height:32, border:'none', background:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0, marginLeft:-4, flexShrink:0, color:ink }}>
+          <Ico n="back" size={20} stroke={ink} sw={2} />
+        </button>
+        <div style={{ fontFamily:'Inter Tight', fontWeight:700, fontSize:18, letterSpacing:'-0.02em' }}>Menu</div>
+      </div>
+      <div style={{ flex:1, overflowY:'auto', minHeight:0 }}>
+        {/* profile header row */}
+        <button onClick={()=>setRoute('profile')} style={{ width:'100%', display:'flex', alignItems:'center', gap:14, padding:'10px 18px 18px', background:paper, border:'none', cursor:'pointer', textAlign:'left', fontFamily:'inherit' }}>
+          <div style={{ width:56, height:56, borderRadius:999, background:ink, color:paper, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Inter Tight', fontWeight:800, fontSize:20, flexShrink:0 }}>MS</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontFamily:'Inter Tight', fontWeight:700, fontSize:18, letterSpacing:'-0.02em', color:ink }}>Muhammad Saran</div>
+            <div style={{ fontFamily:'JetBrains Mono', fontSize:11, color:muted, marginTop:2 }}>@saran · View profile</div>
+          </div>
+          <Ico n="next" size={17} stroke={soft} sw={2} />
+        </button>
+
+        <MenuGroup label="My stuff" />
+        <MenuRow icon="bat" title="My matches" sub="Your games & challenges" onClick={()=>setRoute('mymatches')} />
+        <MenuRow icon="shield" title="My teams" sub="Squads you play for or manage" count={D.seedTeams().length} onClick={()=>setRoute('teams')} />
+        <MenuRow icon="trophy" title="My tournaments" sub="Organising and playing" count={D.seedTournaments().length} onClick={()=>setRoute('tournaments')} />
+
+        <MenuGroup label="Activity" />
+        <MenuRow icon="follow" title="Following" sub="Teams & players you follow" onClick={()=>flash('Following')} />
+        <MenuRow icon="bookmark" title="Saved" sub="Bookmarked posts & matches" onClick={()=>flash('Saved')} />
+        <MenuRow icon="rankings" title="Rankings" sub="City & format leaderboards" onClick={()=>flash('Rankings')} />
+
+        <MenuGroup label="App settings" />
+        <MenuRow icon="bell" title="Notifications" onClick={()=>flash('Notifications')} />
+        <MenuRow icon="theme" title="App theme" sub="Light" onClick={()=>flash('App theme')} />
+        <MenuRow icon="globe" title="Language" sub="English" onClick={()=>flash('Language')} />
+        <MenuRow icon="lock" title="Account & privacy" onClick={()=>flash('Account & privacy')} />
+        <MenuRow icon="help" title="Help & report a problem" onClick={()=>flash('Help')} />
+
+        <div style={{ height:14 }} />
+        <MenuRow icon="logout" title="Log out" onClick={()=>flash('Logged out')} danger />
+        <div style={{ fontFamily:'JetBrains Mono', fontSize:9, color:soft, textAlign:'center', padding:'18px 0 28px', letterSpacing:'0.1em' }}>MATCHDAY · v2.0</div>
+      </div>
+    </div>
+  );
+}
+
+// ---- shell ----
+function Shell() {
+  const [tab, setTab] = useState('matches');
+  const [menu, setMenu] = useState(false);
+  const [search, setSearch] = useState(false);
+  const [messages, setMessages] = useState(false);
+  const [authorProfile, setAuthorProfile] = useState(false);
+  const [teamView, setTeamView] = useState(null);
+  const [scale, setScale] = useState(1);
+  const [toast, setToast] = useState(null);
+  const flash = (m) => { setToast(m); setTimeout(()=>setToast(null), 1800); };
+  const W = 402, H = 874;
+  useEffect(() => {
+    const fit = () => { const pad = window.innerWidth < 560 ? 12 : 48; setScale(Math.min(1, (window.innerWidth-pad)/W, (window.innerHeight-pad)/H)); };
+    fit(); window.addEventListener('resize', fit); return () => window.removeEventListener('resize', fit);
+  }, []);
+  // search iframe avatar → open menu
+  useEffect(() => {
+    const onMsg = (e) => { if (e.data && e.data.mdProfile) setMenu(true); if (e.data && e.data.mdCloseSearch) setSearch(false); };
+    window.addEventListener('message', onMsg); return () => window.removeEventListener('message', onMsg);
+  }, []);
+  const header = (
+    <GlobalHeader onMenu={()=>setMenu(true)} onSearch={()=>setSearch(true)} onMessages={()=>setMessages(true)} msgBadge={2} />
+  );
+  const area = { flex:1, minHeight:0, position:'relative', display:'flex', flexDirection:'column', overflow:'hidden' };
+
+  return (
+    <div style={{ position:'fixed', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'var(--stage-bg)' }}>
+      <div style={{ transform:`scale(${scale})`, transformOrigin:'center center' }}>
+        <IOSDevice width={W} height={H} statusBar={false}>
+          <div style={{ height:'100%', display:'flex', flexDirection:'column', background:paper, position:'relative' }}>
+            <div style={{ ...area, display: tab==='home'?'flex':'none' }}><window.HomeFeed header={header} onCompose={()=>flash('Composer')} onComment={()=>{}} onAuthor={(p)=> p&&p.team ? setTeamView(p) : setAuthorProfile(true)} /></div>
+            <div style={{ ...area, display: tab==='matches'?'flex':'none' }}><window.PublicMatches header={header} onOpenTournament={()=>flash('Opening fixtures…')} /></div>
+            <div style={{ ...area, display: tab==='notifications'?'flex':'none' }}><NotificationsTab header={header} /></div>
+
+            <AppNav active={tab} onNav={setTab} />
+
+            {search && (
+              <div style={{ position:'absolute', inset:0, zIndex:86, background:paper, display:'flex', flexDirection:'column' }}>
+                <iframe src="embed/search.html" title="Search" style={{ flex:1, width:'100%', border:'none', display:'block', minHeight:0 }} />
+              </div>
+            )}
+            {messages && <window.MessagesScreen onBack={()=>setMessages(false)} />}
+            {menu && <MenuOverlay onClose={()=>setMenu(false)} flash={flash} />}
+            {authorProfile && <ProfileOverlay onClose={()=>setAuthorProfile(false)} />}
+            {teamView && (() => {
+              const C = window.tpCases || {};
+              const baseCase = teamView.mono === 'LL' ? (C.following || C.stranger) : C.stranger;
+              const src = (baseCase && baseCase.team) || {};
+              // Carry the tapped team's identity (name, crest, color) onto the
+              // faithful Team Page so it visually matches the feed.
+              const team = { ...src, name: teamView.author, mono: teamView.mono, primary: teamView.color };
+              if (teamView.mono !== 'LL') { team.city = 'Lahore'; team.area = 'DHA'; team.tagline = ''; team.verified = false; team.record = { p:17, w:8, l:9 }; }
+              const caseData = { ...baseCase, viewer: baseCase.viewer || 'stranger', team, tabs: baseCase.tabs || ['Squad','Matches','Stats','About'], initial: 'Squad' };
+              return <window.CkTeamPage caseData={caseData} onBack={()=>setTeamView(null)} onAction={(act)=>{
+                if (act === 'follow') flash('Following '+team.name);
+                else if (act === 'join') flash('Request sent to '+team.name);
+                else flash('Done');
+              }} />;
+            })()}
+            {toast && (
+              <div style={{ position:'absolute', left:16, right:16, bottom:74, padding:'13px 16px', borderRadius:14, background:ink, color:paper, zIndex:120, animation:'ch-pop 0.3s cubic-bezier(0.22,1,0.36,1)' }}>
+                <span style={{ fontSize:13, fontWeight:600 }}>{toast}</span>
+              </div>
+            )}
+          </div>
+        </IOSDevice>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Shell />);
+</script>
+</body>
+</html>

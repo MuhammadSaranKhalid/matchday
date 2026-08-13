@@ -97,16 +97,7 @@ class OnboardingRemoteDataSource {
   Future<ProfileDto> completeOnboarding({
     required String username,
     required String displayName,
-    required String city,
-    String? label,
-    String? district,
-    String? province,
-    String? postcode,
-    String? placeId,
-    double? latitude,
-    double? longitude,
-    String? countryCode,
-    Map<String, dynamic>? playerProfile,
+    String? photoUrl,
   }) async {
     try {
       final uid = _requireUid();
@@ -116,28 +107,11 @@ class OnboardingRemoteDataSource {
           .update({
             'username': username,
             'display_name': displayName,
-            'location': {
-              'city': city,
-              if (label != null) 'label': label,
-              if (district != null) 'district': district,
-              if (province != null) 'province': province,
-              if (postcode != null) 'postcode': postcode,
-              if (placeId != null) 'place_id': placeId,
-              if (latitude != null) 'lat': latitude,
-              if (longitude != null) 'lng': longitude,
-              if (countryCode != null) 'country_code': countryCode,
-            },
+            if (photoUrl != null) 'profile_photo_url': photoUrl,
             'onboarded_at': now,
             'last_active_at': now,
           })
           .eq('user_id', uid);
-
-      if (playerProfile != null) {
-        await _supabase.from(_playerProfiles).upsert(
-          {'user_id': uid, ...playerProfile},
-          onConflict: 'user_id',
-        );
-      }
 
       final fresh = await fetchMyProfile();
       if (fresh == null) {

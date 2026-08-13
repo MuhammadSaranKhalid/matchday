@@ -1,6 +1,9 @@
 import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:path_provider/path_provider.dart';
+
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/player_profile.dart';
@@ -10,7 +13,6 @@ import '../../domain/value_objects/city.dart';
 import '../../domain/value_objects/display_name.dart';
 import '../../domain/value_objects/username.dart';
 import '../datasources/onboarding_remote_datasource.dart';
-import '../models/player_profile_dto.dart';
 
 /// Online-only profile repository. The single place where the onboarding data
 /// source's raw exceptions are translated into [Failure]s.
@@ -64,33 +66,32 @@ class ProfileRepositoryImpl implements ProfileRepository {
   Future<Either<Failure, Profile>> completeOnboarding({
     required DisplayName displayName,
     required Username username,
-    required City city,
-    String? label,
-    String? district,
-    String? province,
-    String? postcode,
-    String? placeId,
-    double? latitude,
-    double? longitude,
-    String? countryCode,
-    PlayerProfile? playerProfile,
+    String? avatarFilePath,
   }) async {
     try {
+      String? photoUrl;
+      if (avatarFilePath != null) {
+        final tempDir = await getTemporaryDirectory();
+        final targetPath =
+            '${tempDir.path}/avatar_compressed_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+        final compressedFile = await FlutterImageCompress.compressAndGetFile(
+          avatarFilePath,
+          targetPath,
+          quality: 80,
+          minWidth: 500,
+          minHeight: 500,
+          format: CompressFormat.jpeg,
+        );
+
+        photoUrl = await _remote.uploadAvatar(
+          File(compressedFile?.path ?? avatarFilePath),
+        );
+      }
       final dto = await _remote.completeOnboarding(
         username: username.value,
         displayName: displayName.value,
-        city: city.value,
-        label: label,
-        district: district,
-        province: province,
-        postcode: postcode,
-        placeId: placeId,
-        latitude: latitude,
-        longitude: longitude,
-        countryCode: countryCode,
-        playerProfile: (playerProfile != null && playerProfile.hasAny)
-            ? PlayerProfileDto.toWritePayload(playerProfile)
-            : null,
+        photoUrl: photoUrl,
       );
       return Right(dto.toEntity());
     } on UnauthorizedException catch (e) {

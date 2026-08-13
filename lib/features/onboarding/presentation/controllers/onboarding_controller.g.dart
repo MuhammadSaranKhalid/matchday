@@ -8,28 +8,25 @@ part of 'onboarding_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Drives the onboarding wizard: profile → player → welcome.
+/// Drives the onboarding wizard: identity → username → welcome.
 ///
-/// An [AsyncNotifier] so [build] can restore a persisted draft before the form
-/// seeds. Once loaded, sub-states (username checking, submitting) live as
+/// An [AsyncNotifier] so sub-states (username checking, submitting) live as
 /// fields on [OnboardingState] rather than flipping the [AsyncValue] to
 /// loading, so the form never disappears mid-edit.
 
 @ProviderFor(OnboardingController)
 final onboardingControllerProvider = OnboardingControllerProvider._();
 
-/// Drives the onboarding wizard: profile → player → welcome.
+/// Drives the onboarding wizard: identity → username → welcome.
 ///
-/// An [AsyncNotifier] so [build] can restore a persisted draft before the form
-/// seeds. Once loaded, sub-states (username checking, submitting) live as
+/// An [AsyncNotifier] so sub-states (username checking, submitting) live as
 /// fields on [OnboardingState] rather than flipping the [AsyncValue] to
 /// loading, so the form never disappears mid-edit.
 final class OnboardingControllerProvider
     extends $AsyncNotifierProvider<OnboardingController, OnboardingState> {
-  /// Drives the onboarding wizard: profile → player → welcome.
+  /// Drives the onboarding wizard: identity → username → welcome.
   ///
-  /// An [AsyncNotifier] so [build] can restore a persisted draft before the form
-  /// seeds. Once loaded, sub-states (username checking, submitting) live as
+  /// An [AsyncNotifier] so sub-states (username checking, submitting) live as
   /// fields on [OnboardingState] rather than flipping the [AsyncValue] to
   /// loading, so the form never disappears mid-edit.
   OnboardingControllerProvider._()
@@ -52,12 +49,11 @@ final class OnboardingControllerProvider
 }
 
 String _$onboardingControllerHash() =>
-    r'565d5447bd3a22bc2eba8eeec35f406c9e02071e';
+    r'4c39cafc7cc399421a07ae8660b5b0e74beeb4ab';
 
-/// Drives the onboarding wizard: profile → player → welcome.
+/// Drives the onboarding wizard: identity → username → welcome.
 ///
-/// An [AsyncNotifier] so [build] can restore a persisted draft before the form
-/// seeds. Once loaded, sub-states (username checking, submitting) live as
+/// An [AsyncNotifier] so sub-states (username checking, submitting) live as
 /// fields on [OnboardingState] rather than flipping the [AsyncValue] to
 /// loading, so the form never disappears mid-edit.
 

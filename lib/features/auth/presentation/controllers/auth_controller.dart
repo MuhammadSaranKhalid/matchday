@@ -91,7 +91,16 @@ class AuthController extends _$AuthController {
     state = const AuthSigningInWithGoogle();
     final result =
         await ref.read(authRepositoryProvider).signInWithGoogle();
-    state = result.fold(AuthFailed.new, AuthAuthenticated.new);
+    state = result.fold(
+      (failure) {
+        // Silently abort if the user simply closed the Google popup
+        if (failure.message.toLowerCase().contains('cancelled')) {
+          return const AuthInitial();
+        }
+        return AuthFailed(failure);
+      },
+      AuthAuthenticated.new,
+    );
   }
 
   // ─── Sign out ───────────────────────────────────────────────────────────

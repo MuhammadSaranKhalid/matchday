@@ -18,7 +18,7 @@ class AppConfig {
   factory AppConfig.fromEnvironment() {
     const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
     const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-    
+
     // Fail fast in development if critical keys are missing
     assert(supabaseUrl.isNotEmpty, 'SUPABASE_URL environment variable is not set');
     assert(supabaseAnonKey.isNotEmpty, 'SUPABASE_ANON_KEY environment variable is not set');

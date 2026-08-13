@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:novex_clean_arch/features/onboarding/presentation/state/onboarding_state.dart';
+import 'package:matchday/features/onboarding/presentation/state/onboarding_state.dart';
 
 void main() {
   const base = OnboardingState(

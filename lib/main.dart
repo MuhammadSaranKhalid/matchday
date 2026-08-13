@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
+import 'core/config/app_config.dart';
 import 'firebase_options.dart';
 
 /// Required top-level handler for FCM messages received while the app is
@@ -16,26 +17,11 @@ import 'firebase_options.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
 
-// Pass these via --dart-define at run/build time.
-const _supabaseUrl = String.fromEnvironment(
-  'SUPABASE_URL',
-  defaultValue: 'https://YOUR-PROJECT.supabase.co',
-);
-const _supabaseAnonKey = String.fromEnvironment(
-  'SUPABASE_ANON_KEY',
-  defaultValue: 'YOUR-ANON-KEY',
-);
-const _googleWebClientId = String.fromEnvironment(
-  'GOOGLE_WEB_CLIENT_ID',
-  defaultValue: '',
-);
-const _googleIosClientId = String.fromEnvironment(
-  'GOOGLE_IOS_CLIENT_ID',
-  defaultValue: '',
-);
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Extract environment variables via our centralized config class.
+  final config = AppConfig.fromEnvironment();
 
   // 0. Firebase — needed for Cloud Messaging (push). The background handler
   //    must be registered before runApp so terminated-state messages route to
@@ -45,8 +31,8 @@ Future<void> main() async {
 
   // 1. Supabase — PKCE flow is the v2 default; safer on mobile than implicit.
   await Supabase.initialize(
-    url: _supabaseUrl,
-    anonKey: _supabaseAnonKey,
+    url: config.supabaseUrl,
+    anonKey: config.supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
     ),
@@ -67,12 +53,20 @@ Future<void> main() async {
   //    on mobile.
   //    On web, serverClientId is rejected outright ("not supported on Web"),
   //    so it must be null there; the web client ID goes in clientId instead.
-  final clientId = kIsWeb ? _googleWebClientId : _googleIosClientId;
-  final serverClientId = kIsWeb ? '' : _googleWebClientId;
+  final clientId = kIsWeb ? config.googleWebClientId : config.googleIosClientId;
+  final serverClientId = kIsWeb ? '' : config.googleWebClientId;
   await GoogleSignIn.instance.initialize(
     serverClientId: serverClientId.isEmpty ? null : serverClientId,
     clientId: clientId.isEmpty ? null : clientId,
   );
 
-  runApp(const ProviderScope(child: NovexApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        // Optionally override the provider with our initialized config instance
+        appConfigProvider.overrideWithValue(config),
+      ],
+      child: const MatchdayApp(),
+    ),
+  );
 }

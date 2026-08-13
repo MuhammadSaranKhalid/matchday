@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:novex_clean_arch/core/error/failures.dart';
-import 'package:novex_clean_arch/core/theme/circk_theme.dart';
-import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
-import 'package:novex_clean_arch/features/follows/domain/entities/follow_direction.dart';
-import 'package:novex_clean_arch/features/follows/domain/entities/follow_list_entry.dart';
-import 'package:novex_clean_arch/features/follows/presentation/controllers/follow_toggle_controller.dart';
-import 'package:novex_clean_arch/features/follows/presentation/providers/follows_providers.dart';
+import 'package:matchday/core/error/failures.dart';
+import 'package:matchday/core/theme/circk_theme.dart';
+import 'package:matchday/core/widgets/v2/v2_kit.dart';
+import 'package:matchday/features/follows/domain/entities/follow_direction.dart';
+import 'package:matchday/features/follows/domain/entities/follow_list_entry.dart';
+import 'package:matchday/features/follows/presentation/controllers/follow_toggle_controller.dart';
+import 'package:matchday/features/follows/presentation/providers/follows_providers.dart';
 
 /// Followers / Following list screen.
 ///

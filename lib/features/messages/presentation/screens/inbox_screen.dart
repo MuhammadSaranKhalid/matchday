@@ -5,12 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-import 'package:novex_clean_arch/core/error/failures.dart';
-import 'package:novex_clean_arch/core/theme/circk_theme.dart';
-import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
-import 'package:novex_clean_arch/features/messages/domain/entities/chat.dart';
-import 'package:novex_clean_arch/features/messages/presentation/providers/messages_providers.dart';
-import 'package:novex_clean_arch/features/messages/presentation/widgets/color_utils.dart';
+import 'package:matchday/core/error/failures.dart';
+import 'package:matchday/core/theme/circk_theme.dart';
+import 'package:matchday/core/widgets/v2/v2_kit.dart';
+import 'package:matchday/features/messages/domain/entities/chat.dart';
+import 'package:matchday/features/messages/presentation/providers/messages_providers.dart';
+import 'package:matchday/features/messages/presentation/widgets/color_utils.dart';
 
 /// V1 inbox tabs. The schema only has team chats — DMs is permanently 0
 /// until `chat_type` grows a `'dm'` value (tracked in ticket #7's follow-ups).

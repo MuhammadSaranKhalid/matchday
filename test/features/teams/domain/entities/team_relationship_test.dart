@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:novex_clean_arch/features/teams/domain/entities/team.dart';
-import 'package:novex_clean_arch/features/teams/domain/entities/team_member.dart';
-import 'package:novex_clean_arch/features/teams/domain/entities/team_relationship.dart';
+import 'package:matchday/features/teams/domain/entities/team.dart';
+import 'package:matchday/features/teams/domain/entities/team_member.dart';
+import 'package:matchday/features/teams/domain/entities/team_relationship.dart';
 
 Team _team({String owner = 'owner1', List<String> managers = const []}) => Team(
       id: const TeamId('t1'),

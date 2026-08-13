@@ -2,17 +2,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:novex_clean_arch/core/error/failures.dart';
-import 'package:novex_clean_arch/features/auth/domain/entities/user.dart';
-import 'package:novex_clean_arch/features/auth/domain/value_objects/email.dart';
-import 'package:novex_clean_arch/features/auth/presentation/providers/auth_providers.dart';
-import 'package:novex_clean_arch/features/matches/domain/entities/match.dart';
-import 'package:novex_clean_arch/features/matches/domain/repositories/matches_repository.dart';
-import 'package:novex_clean_arch/features/matches/presentation/providers/matches_providers.dart';
-import 'package:novex_clean_arch/features/teams/domain/entities/team.dart';
-import 'package:novex_clean_arch/features/teams/presentation/controllers/teams_list_controller.dart';
-import 'package:novex_clean_arch/features/teams/presentation/providers/teams_providers.dart';
-import 'package:novex_clean_arch/features/teams/presentation/state/my_teams_view.dart';
+import 'package:matchday/core/error/failures.dart';
+import 'package:matchday/features/auth/domain/entities/user.dart';
+import 'package:matchday/features/auth/domain/value_objects/email.dart';
+import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/features/matches/domain/entities/match.dart';
+import 'package:matchday/features/matches/domain/repositories/matches_repository.dart';
+import 'package:matchday/features/matches/presentation/providers/matches_providers.dart';
+import 'package:matchday/features/teams/domain/entities/team.dart';
+import 'package:matchday/features/teams/presentation/controllers/teams_list_controller.dart';
+import 'package:matchday/features/teams/presentation/providers/teams_providers.dart';
+import 'package:matchday/features/teams/presentation/state/my_teams_view.dart';
 
 class _MockMatchesRepo extends Mock implements MatchesRepository {}
 

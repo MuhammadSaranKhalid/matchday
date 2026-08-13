@@ -2,13 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:novex_clean_arch/core/error/failures.dart';
-import 'package:novex_clean_arch/features/auth/domain/repositories/auth_repository.dart';
-import 'package:novex_clean_arch/features/auth/domain/value_objects/email.dart';
-import 'package:novex_clean_arch/features/auth/domain/value_objects/otp_code.dart';
-import 'package:novex_clean_arch/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:novex_clean_arch/features/auth/presentation/providers/auth_providers.dart';
-import 'package:novex_clean_arch/features/auth/presentation/state/auth_state.dart';
+import 'package:matchday/core/error/failures.dart';
+import 'package:matchday/features/auth/domain/repositories/auth_repository.dart';
+import 'package:matchday/features/auth/domain/value_objects/email.dart';
+import 'package:matchday/features/auth/domain/value_objects/otp_code.dart';
+import 'package:matchday/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/features/auth/presentation/state/auth_state.dart';
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
 

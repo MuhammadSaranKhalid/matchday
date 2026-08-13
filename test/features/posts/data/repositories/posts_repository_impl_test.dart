@@ -2,11 +2,11 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:novex_clean_arch/core/error/exceptions.dart';
-import 'package:novex_clean_arch/core/error/failures.dart';
-import 'package:novex_clean_arch/features/posts/data/datasources/posts_remote_datasource.dart';
-import 'package:novex_clean_arch/features/posts/data/repositories/posts_repository_impl.dart';
-import 'package:novex_clean_arch/features/posts/domain/entities/post_draft.dart';
+import 'package:matchday/core/error/exceptions.dart';
+import 'package:matchday/core/error/failures.dart';
+import 'package:matchday/features/posts/data/datasources/posts_remote_datasource.dart';
+import 'package:matchday/features/posts/data/repositories/posts_repository_impl.dart';
+import 'package:matchday/features/posts/domain/entities/post_draft.dart';
 
 ProcessedPhoto _photo() =>
     ProcessedPhoto(file: File('x.webp'), blurhash: 'L', width: 1, height: 1);

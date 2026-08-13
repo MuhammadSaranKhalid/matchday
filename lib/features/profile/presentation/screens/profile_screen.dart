@@ -15,21 +15,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
-import 'package:novex_clean_arch/core/theme/circk_theme.dart';
-import 'package:novex_clean_arch/features/posts/presentation/widgets/post_card.dart';
-import 'package:novex_clean_arch/core/widgets/v2/ck_shimmer.dart';
-import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
-import 'package:novex_clean_arch/core/widgets/v2/v2_modals.dart';
-import 'package:novex_clean_arch/features/auth/presentation/providers/auth_providers.dart';
-import 'package:novex_clean_arch/features/follows/domain/entities/follow_direction.dart';
-import 'package:novex_clean_arch/features/follows/presentation/providers/follows_providers.dart';
-import 'package:novex_clean_arch/features/follows/presentation/screens/followers_list_screen.dart';
-import 'package:novex_clean_arch/features/onboarding/domain/entities/player_profile.dart';
-import 'package:novex_clean_arch/features/onboarding/domain/entities/profile.dart';
-import 'package:novex_clean_arch/features/onboarding/presentation/providers/onboarding_providers.dart';
-import 'package:novex_clean_arch/features/posts/presentation/providers/posts_providers.dart';
-import 'package:novex_clean_arch/features/posts/presentation/screens/composer_screen.dart';
-import 'package:novex_clean_arch/features/posts/presentation/screens/photo_viewer_screen.dart';
+import 'package:matchday/core/theme/circk_theme.dart';
+import 'package:matchday/features/posts/presentation/widgets/post_card.dart';
+import 'package:matchday/core/widgets/v2/ck_shimmer.dart';
+import 'package:matchday/core/widgets/v2/v2_kit.dart';
+import 'package:matchday/core/widgets/v2/v2_modals.dart';
+import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/features/follows/domain/entities/follow_direction.dart';
+import 'package:matchday/features/follows/presentation/providers/follows_providers.dart';
+import 'package:matchday/features/follows/presentation/screens/followers_list_screen.dart';
+import 'package:matchday/features/onboarding/domain/entities/player_profile.dart';
+import 'package:matchday/features/onboarding/domain/entities/profile.dart';
+import 'package:matchday/features/onboarding/presentation/providers/onboarding_providers.dart';
+import 'package:matchday/features/posts/presentation/providers/posts_providers.dart';
+import 'package:matchday/features/posts/presentation/screens/composer_screen.dart';
+import 'package:matchday/features/posts/presentation/screens/photo_viewer_screen.dart';
 
 import 'profile_edit_screen.dart';
 

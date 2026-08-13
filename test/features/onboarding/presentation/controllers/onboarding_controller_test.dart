@@ -2,19 +2,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:novex_clean_arch/core/database/database_provider.dart';
-import 'package:novex_clean_arch/core/database/wizard_draft_store.dart';
-import 'package:novex_clean_arch/features/onboarding/domain/entities/profile.dart';
-import 'package:novex_clean_arch/features/onboarding/domain/repositories/profile_repository.dart';
-import 'package:novex_clean_arch/features/onboarding/domain/value_objects/city.dart';
-import 'package:novex_clean_arch/features/onboarding/domain/value_objects/display_name.dart';
-import 'package:novex_clean_arch/features/onboarding/domain/value_objects/username.dart';
-import 'package:novex_clean_arch/features/onboarding/presentation/controllers/onboarding_controller.dart';
-import 'package:novex_clean_arch/features/onboarding/presentation/providers/onboarding_providers.dart';
-import 'package:novex_clean_arch/features/onboarding/presentation/state/onboarding_state.dart';
-import 'package:novex_clean_arch/features/location/domain/entities/geo_place.dart';
-import 'package:novex_clean_arch/features/location/domain/repositories/location_repository.dart';
-import 'package:novex_clean_arch/features/location/presentation/providers/location_providers.dart';
+import 'package:matchday/core/database/database_provider.dart';
+import 'package:matchday/core/database/wizard_draft_store.dart';
+import 'package:matchday/features/onboarding/domain/entities/profile.dart';
+import 'package:matchday/features/onboarding/domain/repositories/profile_repository.dart';
+import 'package:matchday/features/onboarding/domain/value_objects/city.dart';
+import 'package:matchday/features/onboarding/domain/value_objects/display_name.dart';
+import 'package:matchday/features/onboarding/domain/value_objects/username.dart';
+import 'package:matchday/features/onboarding/presentation/controllers/onboarding_controller.dart';
+import 'package:matchday/features/onboarding/presentation/providers/onboarding_providers.dart';
+import 'package:matchday/features/onboarding/presentation/state/onboarding_state.dart';
+import 'package:matchday/features/location/domain/entities/geo_place.dart';
+import 'package:matchday/features/location/domain/repositories/location_repository.dart';
+import 'package:matchday/features/location/presentation/providers/location_providers.dart';
 
 class _MockProfileRepo extends Mock implements ProfileRepository {}
 

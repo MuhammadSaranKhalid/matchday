@@ -6,8 +6,8 @@ import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/notifications/presentation/controllers/push_registrar.dart';
 import 'router/app_router.dart';
 
-class NovexApp extends ConsumerWidget {
-  const NovexApp({super.key});
+class MatchdayApp extends ConsumerWidget {
+  const MatchdayApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -27,7 +27,7 @@ class NovexApp extends ConsumerWidget {
 
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
-      title: 'Novex Clean Arch',
+      title: 'Matchday',
       theme: buildCirckTheme(),
       routerConfig: router,
       debugShowCheckedModeBanner: false,

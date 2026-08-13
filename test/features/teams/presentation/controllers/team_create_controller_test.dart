@@ -2,14 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:novex_clean_arch/core/database/database_provider.dart';
-import 'package:novex_clean_arch/core/database/wizard_draft_store.dart';
-import 'package:novex_clean_arch/features/teams/domain/entities/team.dart';
-import 'package:novex_clean_arch/features/teams/domain/repositories/teams_repository.dart';
-import 'package:novex_clean_arch/features/teams/domain/value_objects/team_name.dart';
-import 'package:novex_clean_arch/features/teams/presentation/controllers/team_create_controller.dart';
-import 'package:novex_clean_arch/features/teams/presentation/providers/teams_providers.dart';
-import 'package:novex_clean_arch/features/teams/presentation/state/team_create_state.dart';
+import 'package:matchday/core/database/database_provider.dart';
+import 'package:matchday/core/database/wizard_draft_store.dart';
+import 'package:matchday/features/teams/domain/entities/team.dart';
+import 'package:matchday/features/teams/domain/repositories/teams_repository.dart';
+import 'package:matchday/features/teams/domain/value_objects/team_name.dart';
+import 'package:matchday/features/teams/presentation/controllers/team_create_controller.dart';
+import 'package:matchday/features/teams/presentation/providers/teams_providers.dart';
+import 'package:matchday/features/teams/presentation/state/team_create_state.dart';
 
 class _MockTeamsRepo extends Mock implements TeamsRepository {}
 

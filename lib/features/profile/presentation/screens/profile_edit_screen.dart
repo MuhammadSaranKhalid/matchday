@@ -7,9 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:novex_clean_arch/core/theme/circk_theme.dart';
-import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
-import 'package:novex_clean_arch/features/onboarding/presentation/providers/onboarding_providers.dart';
+import 'package:matchday/core/theme/circk_theme.dart';
+import 'package:matchday/core/widgets/v2/v2_kit.dart';
+import 'package:matchday/features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../controllers/profile_edit_controller.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {

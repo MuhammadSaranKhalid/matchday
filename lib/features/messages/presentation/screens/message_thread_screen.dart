@@ -5,14 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import 'package:novex_clean_arch/core/error/failures.dart';
-import 'package:novex_clean_arch/core/theme/circk_theme.dart';
-import 'package:novex_clean_arch/core/widgets/v2/v2_kit.dart';
-import 'package:novex_clean_arch/features/messages/domain/entities/chat.dart';
-import 'package:novex_clean_arch/features/messages/domain/entities/message.dart';
-import 'package:novex_clean_arch/features/messages/presentation/controllers/message_thread_controller.dart';
-import 'package:novex_clean_arch/features/messages/presentation/providers/messages_providers.dart';
-import 'package:novex_clean_arch/features/messages/presentation/widgets/color_utils.dart';
+import 'package:matchday/core/error/failures.dart';
+import 'package:matchday/core/theme/circk_theme.dart';
+import 'package:matchday/core/widgets/v2/v2_kit.dart';
+import 'package:matchday/features/messages/domain/entities/chat.dart';
+import 'package:matchday/features/messages/domain/entities/message.dart';
+import 'package:matchday/features/messages/presentation/controllers/message_thread_controller.dart';
+import 'package:matchday/features/messages/presentation/providers/messages_providers.dart';
+import 'package:matchday/features/messages/presentation/widgets/color_utils.dart';
 
 class MessageThreadScreen extends ConsumerStatefulWidget {
   const MessageThreadScreen({super.key, required this.chatId});

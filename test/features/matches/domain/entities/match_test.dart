@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:novex_clean_arch/features/matches/domain/entities/match.dart';
-import 'package:novex_clean_arch/features/teams/domain/entities/team.dart';
+import 'package:matchday/features/matches/domain/entities/match.dart';
+import 'package:matchday/features/teams/domain/entities/team.dart';
 
 void main() {
   test('MatchStatus.isActive covers upcoming, in-play, completed + legacy',

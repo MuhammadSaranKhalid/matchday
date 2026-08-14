@@ -4,32 +4,22 @@
 // public URL plus the metadata we persist alongside it: a BlurHash string (for
 // the instant placeholder) and the stored pixel dimensions (to reserve the
 // layout box before the image loads).
-class PostMedia {
-  const PostMedia({
-    required this.url,
-    required this.blurhash,
-    required this.width,
-    required this.height,
-  });
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  final String url;
-  final String blurhash;
-  final int width;
-  final int height;
+part 'post_media.freezed.dart';
+
+@freezed
+abstract class PostMedia with _$PostMedia {
+  const factory PostMedia({
+    required String url,
+    required String blurhash,
+    required int width,
+    required int height,
+  }) = _PostMedia;
+
+  const PostMedia._();
 
   /// width / height; falls back to square if dimensions are missing.
   double get aspectRatio =>
       (width <= 0 || height <= 0) ? 1.0 : width / height;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is PostMedia &&
-          other.url == url &&
-          other.blurhash == blurhash &&
-          other.width == width &&
-          other.height == height;
-
-  @override
-  int get hashCode => Object.hash(url, blurhash, width, height);
 }

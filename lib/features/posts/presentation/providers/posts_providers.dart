@@ -21,3 +21,12 @@ Future<List<Post>> authorPosts(Ref ref, String authorId) async {
   final result = await repo.getAuthorPosts(authorId);
   return result.fold((f) => throw FailureWrapper(f), (p) => p);
 }
+
+/// The currently selected feed filter ('all', 'people', 'teams', 'tournaments', 'matches').
+@riverpod
+class FeedFilter extends _$FeedFilter {
+  @override
+  String build() => 'all';
+
+  void setFilter(String filter) => state = filter;
+}

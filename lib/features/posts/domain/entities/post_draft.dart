@@ -7,48 +7,35 @@
 // metadata.
 import 'dart:io';
 
+import 'package:freezed_annotation/freezed_annotation.dart';
+
 import 'post.dart';
 
-class ProcessedPhoto {
-  const ProcessedPhoto({
-    required this.file,
-    required this.blurhash,
-    required this.width,
-    required this.height,
-    this.hashPending = false,
-  });
+part 'post_draft.freezed.dart';
 
-  final File file;
-  final String blurhash;
-  final int width;
-  final int height;
-
-  /// True while the BlurHash is still being computed in the background — the
-  /// composer shows a loading overlay on the thumbnail until it resolves.
-  final bool hashPending;
-
-  ProcessedPhoto copyWith({String? blurhash, bool? hashPending}) =>
-      ProcessedPhoto(
-        file: file,
-        blurhash: blurhash ?? this.blurhash,
-        width: width,
-        height: height,
-        hashPending: hashPending ?? this.hashPending,
-      );
+@freezed
+abstract class ProcessedPhoto with _$ProcessedPhoto {
+  const factory ProcessedPhoto({
+    required File file,
+    required String blurhash,
+    required int width,
+    required int height,
+    /// True while the BlurHash is still being computed in the background — the
+    /// composer shows a loading overlay on the thumbnail until it resolves.
+    @Default(false) bool hashPending,
+  }) = _ProcessedPhoto;
 }
 
-class PostDraft {
-  const PostDraft({
-    this.text,
-    this.photos = const [],
-    this.authorContext = PostAuthorContext.personal,
-    this.contextEntityId,
-  });
+@freezed
+abstract class PostDraft with _$PostDraft {
+  const factory PostDraft({
+    String? text,
+    @Default([]) List<ProcessedPhoto> photos,
+    @Default(PostAuthorContext.personal) PostAuthorContext authorContext,
+    String? contextEntityId,
+  }) = _PostDraft;
 
-  final String? text;
-  final List<ProcessedPhoto> photos;
-  final PostAuthorContext authorContext;
-  final String? contextEntityId;
+  const PostDraft._();
 
   bool get hasPhotos => photos.isNotEmpty;
 }

@@ -22,6 +22,7 @@ import 'package:matchday/core/widgets/v2/v2_kit.dart';
 import 'package:matchday/core/widgets/v2/v2_modals.dart';
 import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
 import 'package:matchday/features/follows/domain/entities/follow_direction.dart';
+import 'package:matchday/features/follows/presentation/controllers/follow_toggle_controller.dart';
 import 'package:matchday/features/follows/presentation/providers/follows_providers.dart';
 import 'package:matchday/features/follows/presentation/screens/followers_list_screen.dart';
 import 'package:matchday/features/onboarding/domain/entities/player_profile.dart';
@@ -610,7 +611,7 @@ class _IdentityHero extends ConsumerWidget {
             child: !isSelf
                 ? Row(
                     children: [
-                      const _PrimaryBtn(label: 'Follow'),
+                      _FollowButton(userId: subjectUserId),
                       const SizedBox(width: 8),
                       const _GhostBtn(label: 'Message'),
                       const SizedBox(width: 8),
@@ -1084,6 +1085,32 @@ class _GhostBtn extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _FollowButton extends ConsumerWidget {
+  const _FollowButton({required this.userId});
+  final String? userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (userId == null) return const _PrimaryBtn(label: 'Follow');
+    final state = ref.watch(followToggleProvider('user', userId!));
+    final isFollowing = state.value ?? false;
+
+    if (isFollowing) {
+      return _GhostBtn(
+        label: 'Following',
+        onTap: () =>
+            ref.read(followToggleProvider('user', userId!).notifier).toggle(),
+      );
+    } else {
+      return _PrimaryBtn(
+        label: 'Follow',
+        onTap: () =>
+            ref.read(followToggleProvider('user', userId!).notifier).toggle(),
+      );
+    }
   }
 }
 

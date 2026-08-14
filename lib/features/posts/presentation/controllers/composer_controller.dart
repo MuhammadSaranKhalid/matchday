@@ -1,39 +1,15 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../core/error/failures.dart';
 import '../../data/datasources/posts_datasource_providers.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_draft.dart';
 import '../providers/posts_providers.dart';
+import '../state/composer_state.dart';
+export '../state/composer_state.dart';
 import 'feed_controller.dart';
 
 part 'composer_controller.g.dart';
 
-class ComposerState {
-  const ComposerState({
-    this.photos = const [],
-    this.busy = false,
-    this.error,
-  });
-
-  final List<ProcessedPhoto> photos;
-  final bool busy;
-  final Failure? error;
-
-  static const maxPhotos = 4;
-  bool get canAddPhoto => photos.length < maxPhotos;
-
-  ComposerState copyWith({
-    List<ProcessedPhoto>? photos,
-    bool? busy,
-    Failure? error,
-  }) =>
-      ComposerState(
-        photos: photos ?? this.photos,
-        busy: busy ?? this.busy,
-        error: error,
-      );
-}
 
 /// Composer draft state: staged (cropped+resized) photos + submit lifecycle.
 /// The text is owned by the screen's TextEditingController and passed to submit.

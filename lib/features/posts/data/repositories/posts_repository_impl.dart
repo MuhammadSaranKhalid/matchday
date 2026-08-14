@@ -23,10 +23,11 @@ class PostsRepositoryImpl implements PostsRepository {
   @override
   Future<Either<Failure, List<Post>>> getFeed({
     int limit = 20,
+    String filter = 'all',
     DateTime? before,
   }) async {
     try {
-      final dtos = await _remote.getFeed(limit: limit, before: before);
+      final dtos = await _remote.getFeed(limit: limit, filter: filter, before: before);
       return Right(dtos.map((d) => d.toEntity()).toList());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));

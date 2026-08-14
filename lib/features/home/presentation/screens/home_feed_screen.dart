@@ -11,8 +11,10 @@ import 'package:matchday/features/posts/presentation/widgets/post_card.dart';
 import 'package:matchday/core/widgets/v2/v2_kit.dart';
 import 'package:matchday/core/widgets/v2/v2_modals.dart';
 import 'package:matchday/features/posts/domain/entities/post.dart';
+import 'package:matchday/features/matches/presentation/providers/my_matches_providers.dart';
 import 'package:matchday/features/posts/domain/entities/post_media.dart';
 import 'package:matchday/features/posts/presentation/controllers/feed_controller.dart';
+import 'package:matchday/features/posts/presentation/providers/posts_providers.dart';
 import 'package:matchday/features/posts/presentation/screens/photo_viewer_screen.dart';
 
 // ─── Temporary visibility flags ──────────────────────────────────────────
@@ -29,8 +31,8 @@ import 'package:matchday/features/posts/presentation/screens/photo_viewer_screen
 // below so re-enabling is a one-line change. They are referenced from the
 // const-false branches below, which keeps the analyzer's unused-element
 // check happy.
-const bool _kShowLiveCards = false;
-const bool _kShowFeedFilters = false;
+const bool _kShowLiveCards = true;
+const bool _kShowFeedFilters = true;
 
 class HomeFeedScreen extends ConsumerStatefulWidget {
   const HomeFeedScreen({super.key, this.onBell, this.onOpenProfile});
@@ -155,19 +157,14 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
 }
 
 // ─── feed filters (static chip row) ───────────────────
-class FeedFilters extends StatefulWidget {
-  const FeedFilters({super.key, this.active = 'all'});
-  final String active;
-  @override
-  State<FeedFilters> createState() => _FeedFiltersState();
-}
+class FeedFilters extends ConsumerWidget {
+  const FeedFilters({super.key});
 
-class _FeedFiltersState extends State<FeedFilters> {
   static const _labels = ['All', 'People', 'Teams', 'Tournaments', 'Matches'];
-  late String _active = widget.active;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = ref.watch(feedFilterProvider);
     return SizedBox(
       height: 34,
       child: ListView.separated(
@@ -178,9 +175,9 @@ class _FeedFiltersState extends State<FeedFilters> {
         itemBuilder: (context, i) {
           final label = _labels[i];
           final k = label.toLowerCase();
-          final isActive = _active == k;
+          final isActive = active == k;
           return GestureDetector(
-            onTap: () => setState(() => _active = k),
+            onTap: () => ref.read(feedFilterProvider.notifier).setFilter(k),
             child: Container(
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -208,90 +205,94 @@ class _FeedFiltersState extends State<FeedFilters> {
 }
 
 // ─── live-now rail ────────────────────────────────────
-class _LiveRail extends StatelessWidget {
+class _LiveRail extends ConsumerWidget {
   const _LiveRail();
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-      child: Container(
-        decoration: BoxDecoration(
-          color: CkColors.ink,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final matchesViewAsync = ref.watch(myMatchesViewProvider);
+    
+    return matchesViewAsync.when(
+      data: (view) {
+        final liveMatches = view.confirmed.where((m) => m.live).toList();
+        if (liveMatches.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+          child: Container(
+            decoration: BoxDecoration(
+              color: CkColors.ink,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: CkColors.red,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        spreadRadius: 2,
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: CkColors.red,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'LIVE NOW · ${liveMatches.length}',
+                      style: CkType.mono(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.10,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'see all →',
+                      style: CkType.body(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'LIVE NOW · 2',
-                  style: CkType.mono(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.10,
-                    color: Colors.white,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  'see all →',
-                  style: CkType.body(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.55),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 66,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: liveMatches.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final m = liveMatches[i];
+                      return _LiveCard(
+                        aShort: m.homeShort,
+                        aColor: m.homeColor,
+                        bShort: m.awayShort,
+                        bColor: m.awayColor,
+                        aScore: '—', // v1: placeholder
+                        bScore: '—', // v1: placeholder
+                        need: m.tag,
+                      );
+                    },
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 66,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: const [
-                  _LiveCard(
-                    aShort: 'LL',
-                    aColor: CkCrest.ll,
-                    bShort: 'KC',
-                    bColor: CkCrest.kc,
-                    aScore: '142/6',
-                    bScore: '119/9',
-                    need: 'L need 24 (12)',
-                  ),
-                  SizedBox(width: 8),
-                  _LiveCard(
-                    aShort: 'MT',
-                    aColor: CkCrest.mt,
-                    bShort: 'OB',
-                    bColor: CkCrest.ob,
-                    aScore: '98/2',
-                    bScore: '—',
-                    need: 'MT 12.4 ov',
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }

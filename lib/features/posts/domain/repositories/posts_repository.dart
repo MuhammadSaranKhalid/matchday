@@ -9,7 +9,7 @@ import '../entities/post_draft.dart';
 abstract class PostsRepository {
   /// The public feed (active posts, newest first). Pass [before] = the oldest
   /// loaded post's `createdAt` to page further back.
-  Future<Either<Failure, List<Post>>> getFeed({int limit, DateTime? before});
+  Future<Either<Failure, List<Post>>> getFeed({int limit, String filter = 'all', DateTime? before});
 
   /// Posts authored by [authorId], newest first.
   Future<Either<Failure, List<Post>>> getAuthorPosts(

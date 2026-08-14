@@ -15,13 +15,14 @@ class FeedController extends _$FeedController {
   bool _hasMore = true;
   bool get hasMore => _hasMore;
 
-  // build() watches the repository provider (reactive); action methods read it.
   @override
-  Future<List<Post>> build() =>
-      _fetch(ref.watch(postsRepositoryProvider), before: null);
+  Future<List<Post>> build() {
+    final filter = ref.watch(feedFilterProvider);
+    return _fetch(ref.watch(postsRepositoryProvider), filter: filter, before: null);
+  }
 
-  Future<List<Post>> _fetch(PostsRepository repo, {DateTime? before}) async {
-    final result = await repo.getFeed(limit: _pageSize, before: before);
+  Future<List<Post>> _fetch(PostsRepository repo, {required String filter, DateTime? before}) async {
+    final result = await repo.getFeed(limit: _pageSize, filter: filter, before: before);
     return result.fold(
       (f) => throw FailureWrapper(f),
       (posts) {
@@ -31,21 +32,22 @@ class FeedController extends _$FeedController {
     );
   }
 
-  /// Pull-to-refresh: reset to the first page.
   Future<void> refresh() async {
     _hasMore = true;
     state = const AsyncLoading();
+    final filter = ref.read(feedFilterProvider);
     state = await AsyncValue.guard(
-      () => _fetch(ref.read(postsRepositoryProvider), before: null),
+      () => _fetch(ref.read(postsRepositoryProvider), filter: filter, before: null),
     );
   }
 
-  /// Append the next page (keyset cursor = the oldest loaded post's createdAt).
   Future<void> loadMore() async {
     final current = state.value;
     if (current == null || current.isEmpty || !_hasMore) return;
+    final filter = ref.read(feedFilterProvider);
     final more = await _fetch(
       ref.read(postsRepositoryProvider),
+      filter: filter,
       before: current.last.createdAt,
     );
     state = AsyncData([...current, ...more]);

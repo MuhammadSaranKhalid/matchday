@@ -24,9 +24,20 @@ class PostsRemoteDataSource {
     return id;
   }
 
-  Future<List<PostDto>> getFeed({required int limit, DateTime? before}) async {
+  Future<List<PostDto>> getFeed({required int limit, String filter = 'all', DateTime? before}) async {
     try {
       var q = _supabase.from(_table).select(_select).eq('status', 'active');
+      
+      if (filter == 'people') {
+        q = q.eq('author_context', 'personal');
+      } else if (filter == 'teams') {
+        q = q.eq('author_context', 'team_manager');
+      } else if (filter == 'tournaments') {
+        q = q.eq('author_context', 'tournament_organizer');
+      } else if (filter == 'matches') {
+        q = q.eq('post_type', 'match_announcement');
+      }
+
       if (before != null) q = q.lt('created_at', before.toIso8601String());
       final rows = await q.order('created_at', ascending: false).limit(limit);
       return rows

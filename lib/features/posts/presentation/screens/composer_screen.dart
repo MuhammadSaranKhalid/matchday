@@ -1,14 +1,16 @@
 // The post composer — type and/or attach up to 4 photos (each picked → cropped
 // → resized). Online-only: submitting inserts the post + uploads media to
 // Supabase, then prepends it to the feed.
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/v2/v2_kit.dart';
 import '../controllers/composer_controller.dart';
+import '../widgets/composer_avatar.dart';
+import '../widgets/composer_header.dart';
+import '../widgets/composer_photo_strip.dart';
+import '../widgets/composer_toolbar.dart';
 
 class ComposerScreen extends ConsumerStatefulWidget {
   const ComposerScreen({super.key});
@@ -43,15 +45,21 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(composerControllerProvider);
-    final canPost =
-        (_text.text.trim().isNotEmpty || state.photos.isNotEmpty) && !state.busy;
+    final canPost = (_text.text.trim().isNotEmpty || state.photos.isNotEmpty) &&
+        !state.busy &&
+        !state.photos.any((p) => p.hashPending);
 
     return Scaffold(
       backgroundColor: CkColors.paper,
       body: SafeArea(
         child: Column(
           children: [
-            _header(canPost: canPost, busy: state.busy),
+            ComposerHeader(
+              canPost: canPost,
+              busy: state.busy,
+              onPost: _post,
+              onCancel: () => Navigator.of(context).pop(),
+            ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
@@ -59,44 +67,66 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
                   // Media-first composer: photos on top, caption below
                   // (only after the first photo — no empty placeholder).
                   if (state.photos.isNotEmpty) ...[
-                    _PhotoStrip(
+                    ComposerPhotoStrip(
                       state: state,
                       onAdd: () =>
                           ref.read(composerControllerProvider.notifier).addPhoto(),
-                      onRemove: (i) => ref
+                      onRemove: (int i) => ref
                           .read(composerControllerProvider.notifier)
                           .removePhoto(i),
                     ),
                     const SizedBox(height: 16),
                   ],
-                  TextField(
-                    controller: _text,
-                    autofocus: true,
-                    maxLines: null,
-                    onChanged: (_) => setState(() {}),
-                    // Borderless caption (social-composer norm) — explicit
-                    // none on every state so the theme's focused outline can't
-                    // bleed in via autofocus.
-                    decoration: InputDecoration(
-                      isCollapsed: true,
-                      filled: false,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      errorBorder: InputBorder.none,
-                      focusedErrorBorder: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                      hintText: 'What happened on the field?',
-                      hintStyle:
-                          CkType.body(fontSize: 16, height: 1.5, color: CkColors.soft),
-                    ),
-                    style:
-                        CkType.body(fontSize: 16, height: 1.5, color: CkColors.ink),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const ComposerAvatar(),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _text,
+                          autofocus: true,
+                          maxLines: null,
+                          maxLength: 2000,
+                          onChanged: (_) => setState(() {}),
+                          // Custom counter so it matches theme styles
+                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
+                            if (currentLength == 0) return null;
+                            final over = currentLength > (maxLength ?? 2000);
+                            return Text(
+                              '$currentLength / $maxLength',
+                              style: CkType.mono(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.10,
+                                color: over ? CkColors.amber : CkColors.muted,
+                              ),
+                            );
+                          },
+                          // Borderless caption (social-composer norm) — explicit
+                          // none on every state so the theme's focused outline can't
+                          // bleed in via autofocus.
+                          decoration: InputDecoration(
+                            isCollapsed: true,
+                            filled: false,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            focusedErrorBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            hintText: 'What happened on the field?',
+                            hintStyle: CkType.body(fontSize: 16, height: 1.5, color: CkColors.soft),
+                          ),
+                          style: CkType.body(fontSize: 16, height: 1.5, color: CkColors.ink),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            _toolbar(
+            ComposerToolbar(
               canAddPhoto: state.canAddPhoto && !state.busy,
               onAddPhoto: () =>
                   ref.read(composerControllerProvider.notifier).addPhoto(),
@@ -106,219 +136,6 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
       ),
     );
   }
-
-  Widget _header({required bool canPost, required bool busy}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          GestureDetector(
-            onTap: busy ? null : () => Navigator.of(context).pop(),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-              child: Text('Cancel',
-                  style: CkType.body(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: CkColors.ink2)),
-            ),
-          ),
-          Text('New post', style: CkType.display(fontSize: 15, fontWeight: FontWeight.w600)),
-          GestureDetector(
-            onTap: canPost ? _post : null,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                color: canPost ? CkColors.ink : CkColors.paper2,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: busy
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: CkColors.paper),
-                    )
-                  : Text('Post',
-                      style: CkType.body(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: canPost ? CkColors.paper : CkColors.muted)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _toolbar({required bool canAddPhoto, required VoidCallback onAddPhoto}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: canAddPhoto ? onAddPhoto : null,
-            child: Row(
-              children: [
-                V2Svg(V2Icons.camera,
-                    size: 18,
-                    color: canAddPhoto ? CkColors.ink2 : CkColors.soft),
-                const SizedBox(width: 8),
-                Text('PHOTO',
-                    style: CkType.mono(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.08,
-                        color: canAddPhoto ? CkColors.ink2 : CkColors.soft)),
-              ],
-            ),
-          ),
-          const Spacer(),
-          Text('PUBLIC ▾',
-              style: CkType.mono(
-                  fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.08)),
-        ],
-      ),
-    );
-  }
 }
 
-class _PhotoStrip extends StatelessWidget {
-  const _PhotoStrip({
-    required this.state,
-    required this.onAdd,
-    required this.onRemove,
-  });
 
-  final ComposerState state;
-  final VoidCallback onAdd;
-  final void Function(int index) onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 84,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        itemCount: state.photos.length + (state.canAddPhoto ? 1 : 0),
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          if (i < state.photos.length) {
-            return _Thumb(
-              file: state.photos[i].file,
-              onRemove: () => onRemove(i),
-              cover: i == 0,
-              loading: state.photos[i].hashPending,
-            );
-          }
-          // Trailing "add more" tile (appears only alongside existing photos,
-          // hidden at the 4-photo cap).
-          return GestureDetector(
-            onTap: onAdd,
-            child: Container(
-              width: 84,
-              height: 84,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: CkColors.paper2,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: CkColors.line),
-              ),
-              child: const Icon(Icons.add, color: CkColors.muted),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _Thumb extends StatelessWidget {
-  const _Thumb({
-    required this.file,
-    required this.onRemove,
-    this.cover = false,
-    this.loading = false,
-  });
-  final File file;
-  final VoidCallback onRemove;
-  final bool cover;
-
-  /// Dim + spinner overlay while the BlurHash is still being computed.
-  final bool loading;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 84,
-      height: 84,
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.file(file, width: 84, height: 84, fit: BoxFit.cover),
-          ),
-          if (loading)
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: ColoredBox(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  child: const Center(
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          if (cover)
-            Positioned(
-              left: 4,
-              bottom: 4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text('COVER',
-                    style: CkType.mono(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.08,
-                        color: Colors.white)),
-              ),
-            ),
-          Positioned(
-            right: 2,
-            top: 2,
-            child: GestureDetector(
-              onTap: onRemove,
-              child: Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.close, size: 13, color: Colors.white),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

@@ -138,3 +138,60 @@ final class AuthorPostsFamily extends $Family
   @override
   String toString() => r'authorPostsProvider';
 }
+
+/// The currently selected feed filter ('all', 'people', 'teams', 'tournaments', 'matches').
+
+@ProviderFor(FeedFilter)
+final feedFilterProvider = FeedFilterProvider._();
+
+/// The currently selected feed filter ('all', 'people', 'teams', 'tournaments', 'matches').
+final class FeedFilterProvider extends $NotifierProvider<FeedFilter, String> {
+  /// The currently selected feed filter ('all', 'people', 'teams', 'tournaments', 'matches').
+  FeedFilterProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'feedFilterProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$feedFilterHash();
+
+  @$internal
+  @override
+  FeedFilter create() => FeedFilter();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$feedFilterHash() => r'aa7268201bcec9160faeabc4378b46021b896dca';
+
+/// The currently selected feed filter ('all', 'people', 'teams', 'tournaments', 'matches').
+
+abstract class _$FeedFilter extends $Notifier<String> {
+  String build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<String, String>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String, String>,
+              String,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

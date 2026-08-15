@@ -16,7 +16,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../matches/presentation/providers/my_matches_providers.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
@@ -122,13 +121,10 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
       color: CkColors.paper,
       child: Stack(
         children: [
-          SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                _header(),
-                _segmented(matchesBadge: matchesBadge, toursBadge: toursBadge),
-                Expanded(
+          Column(
+            children: [
+              _segmented(matchesBadge: matchesBadge, toursBadge: toursBadge),
+              Expanded(
                   child: switch (_seg) {
                     PvSeg.matches => switch (matchesAsync) {
                         AsyncError(:final error) => _errorView(
@@ -153,7 +149,7 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
                 ),
               ],
             ),
-          ),
+          
 
           Positioned(right: 16, bottom: 18, child: _fab()),
 
@@ -252,12 +248,6 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
       ),
     );
   }
-
-  // ── header ──
-  // The same shared [V2Header] as Home / Matches / Messages (big title + bell →
-  // notifications) so the Pavilion reads as a sibling tab. No avatar — profile /
-  // account live on the You tab.
-  Widget _header() => V2Header(title: 'Pavilion', onBell: widget.onBell);
 
   // ── segmented control ──
   Widget _segmented({required int matchesBadge, required int toursBadge}) {

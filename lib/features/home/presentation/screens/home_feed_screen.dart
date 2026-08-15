@@ -78,32 +78,25 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
     final feed = ref.watch(feedControllerProvider);
     return ColoredBox(
       color: CkColors.paper,
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            V2Header(
-              title: 'Home',
-              onBell: widget.onBell,
+      child: Column(
+        children: [
+          if (_kShowFeedFilters) const FeedFilters(),
+          Expanded(
+            child: RefreshIndicator(
+              color: CkColors.ink,
+              onRefresh: () =>
+                  ref.read(feedControllerProvider.notifier).refresh(),
+              child: switch (feed) {
+                AsyncData(:final value) => _dataList(value),
+                AsyncError(:final error) => _scrollable([
+                    if (_kShowLiveCards) const _LiveRail(),
+                    _ErrorState(error: error),
+                  ]),
+                _ => const FeedShimmerSkeleton(),
+              },
             ),
-            if (_kShowFeedFilters) const FeedFilters(),
-            Expanded(
-              child: RefreshIndicator(
-                color: CkColors.ink,
-                onRefresh: () =>
-                    ref.read(feedControllerProvider.notifier).refresh(),
-                child: switch (feed) {
-                  AsyncData(:final value) => _dataList(value),
-                  AsyncError(:final error) => _scrollable([
-                      if (_kShowLiveCards) const _LiveRail(),
-                      _ErrorState(error: error),
-                    ]),
-                  _ => const FeedShimmerSkeleton(),
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

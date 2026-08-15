@@ -57,21 +57,14 @@ class _MatchesV2ScreenState extends State<MatchesV2Screen> {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: CkColors.paper,
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            V2Header(
-              title: 'Matches',
-              onBell: widget.onBell,
-            ),
-            _MatchTabs(
-              active: _tab,
-              onChange: (t) => setState(() => _tab = t),
-            ),
-            Expanded(child: _body()),
-          ],
-        ),
+      child: Column(
+        children: [
+          _MatchTabs(
+            active: _tab,
+            onChange: (t) => setState(() => _tab = t),
+          ),
+          Expanded(child: _body()),
+        ],
       ),
     );
   }

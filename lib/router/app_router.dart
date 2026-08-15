@@ -114,7 +114,6 @@ GoRouter appRouter(Ref ref) {
               GoRoute(
                 path: '/home',
                 builder: (context, _) => HomeFeedScreen(
-                  onBell: () => _openBell(context),
                   // Tap an author in the feed → push their public profile
                   // by @username. Defined as `/u/:username` (root-level
                   // route, full-screen over the shell — see below).
@@ -131,8 +130,7 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: '/search',
-                builder: (context, _) =>
-                    TeamSearchScreen(onBell: () => _openBell(context)),
+                builder: (_, __) => const TeamSearchScreen(),
               ),
             ],
           ),
@@ -144,8 +142,7 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: '/matches',
-                builder: (context, _) =>
-                    MatchesV2Screen(onBell: () => _openBell(context)),
+                builder: (_, __) => const MatchesV2Screen(),
               ),
             ],
           ),
@@ -155,8 +152,7 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: '/pavilion',
-                builder: (context, _) =>
-                    PavilionV2Screen(onBell: () => _openBell(context)),
+                builder: (_, __) => const PavilionV2Screen(),
                 routes: [
                   // My matches — rendered full-screen over the shell (root
                   // navigator), but URL-nested under /pavilion. Navigated with

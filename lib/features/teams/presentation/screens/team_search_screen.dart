@@ -70,21 +70,18 @@ class _TeamSearchScreenState extends ConsumerState<TeamSearchScreen> {
 
     return ColoredBox(
       color: CkColors.paper,
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            V2Header(title: 'Search', onBell: widget.onBell),
-            // ====== SEARCH INPUT (sticky) ======
-            _SearchField(
-              controller: _queryCtrl,
-              focusNode: _focus,
-              onChanged: notifier.setQuery,
-              onClear: () {
-                _queryCtrl.clear();
-                notifier.setQuery('');
-              },
-            ),
+      child: Column(
+        children: [
+          // ====== SEARCH INPUT (sticky) ======
+          _SearchField(
+            controller: _queryCtrl,
+            focusNode: _focus,
+            onChanged: notifier.setQuery,
+            onClear: () {
+              _queryCtrl.clear();
+              notifier.setQuery('');
+            },
+          ),
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
@@ -124,7 +121,7 @@ class _TeamSearchScreenState extends ConsumerState<TeamSearchScreen> {
             ),
           ],
         ),
-      ),
+      
     );
   }
 }

@@ -2,6 +2,7 @@
 // 1–4 photo mosaic via CkFeedImage + action bar). Lives in the posts feature
 // (it's coupled to the Post entity), not in the feature-agnostic core kit.
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../../core/theme/circk_theme.dart';
@@ -41,10 +42,12 @@ class FeedPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTeam = post.authorContext == PostAuthorContext.teamManager;
+
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _header(),
+        _header(context),
         if ((post.text ?? '').isNotEmpty) ...[
           const SizedBox(height: 6),
           _ExpandablePostText(text: post.text!),
@@ -79,11 +82,35 @@ class FeedPostCard extends StatelessWidget {
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
+                    if (isTeam) {
+                      final teamId = post.linkedTeamId ?? post.contextEntityId;
+                      if (teamId != null && teamId.isNotEmpty) {
+                        context.push('/teams/$teamId');
+                        return;
+                      }
+                    }
                     final u = post.authorUsername;
                     if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
                   },
-                  child:
-                      Avatar(mono: post.authorMonogram, tone: AvatarTone.ink),
+                  child: isTeam
+                      ? Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: CkColors.ink,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            post.displayMonogram,
+                            style: CkType.display(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: CkColors.paper,
+                            ),
+                          ),
+                        )
+                      : Avatar(mono: post.authorMonogram, tone: AvatarTone.ink),
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: content),
@@ -93,8 +120,10 @@ class FeedPostCard extends StatelessWidget {
     );
   }
 
-  Widget _header() {
+  Widget _header(BuildContext context) {
     final time = timeago.format(post.createdAt, locale: 'en_short');
+    final isTeam = post.authorContext == PostAuthorContext.teamManager;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
@@ -103,6 +132,13 @@ class FeedPostCard extends StatelessWidget {
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {
+              if (isTeam) {
+                final teamId = post.linkedTeamId ?? post.contextEntityId;
+                if (teamId != null && teamId.isNotEmpty) {
+                  context.push('/teams/$teamId');
+                  return;
+                }
+              }
               final u = post.authorUsername;
               if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
             },
@@ -113,13 +149,13 @@ class FeedPostCard extends StatelessWidget {
               children: [
                 Flexible(
                   child: Text(
-                    post.authorName ?? 'matchday player',
+                    post.displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: CkType.display(fontSize: 13.5, letterSpacing: -0.01),
                   ),
                 ),
-                if (post.authorUsername != null) ...[
+                if (!isTeam && post.authorUsername != null) ...[
                   const SizedBox(width: 6),
                   Text(
                     '@${post.authorUsername}',
@@ -127,6 +163,26 @@ class FeedPostCard extends StatelessWidget {
                   ),
                 ],
               ],
+            ),
+          ),
+        ],
+        if (isTeam) ...[
+          if (showAuthor) const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: CkColors.hairline),
+            ),
+            child: Text(
+              'TEAM',
+              style: CkType.mono(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.08,
+                color: CkColors.ink,
+              ),
             ),
           ),
         ],

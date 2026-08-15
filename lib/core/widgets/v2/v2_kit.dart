@@ -11,6 +11,7 @@
 //
 // This is presentation-only chassis for the faithful UI rebuild; the prototype
 // itself ships mock data and inert affordances, mirrored here.
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -87,6 +88,8 @@ abstract final class V2Icons {
       '<rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="3"/>';
   static const profile =
       '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>';
+  static const management =
+      '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>';
 }
 
 /// Renders an inline 24-viewBox SVG icon, either stroked (outline) or filled.
@@ -139,50 +142,78 @@ class Crest extends StatelessWidget {
   final double size;
   final double radius;
 
-  Widget _monoTile() => Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(radius),
-        ),
-        child: Text(
-          short,
-          style: CkType.display(
-            fontSize: size * 0.34,
-            fontWeight: FontWeight.w700,
-            color: CkColors.paper,
+  @override
+  Widget build(BuildContext context) {
+    if (logoUrl != null && logoUrl!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: CachedNetworkImage(
+          imageUrl: logoUrl!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => _MonogramTile(
+            short: short,
+            color: color,
+            size: size,
+            radius: radius,
+          ),
+          errorWidget: (_, __, ___) => _MonogramTile(
+            short: short,
+            color: color,
+            size: size,
+            radius: radius,
           ),
         ),
       );
+    }
+    return _MonogramTile(
+      short: short,
+      color: color,
+      size: size,
+      radius: radius,
+    );
+  }
+}
+
+class _MonogramTile extends StatelessWidget {
+  const _MonogramTile({
+    required this.short,
+    required this.color,
+    required this.size,
+    required this.radius,
+  });
+
+  final String short;
+  final Color color;
+  final double size;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
-    if (logoUrl == null || logoUrl!.isEmpty) return _monoTile();
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: Container(
-        width: size,
-        height: size,
-        color: CkColors.paper2,
-        child: Image.network(
-          logoUrl!,
-          fit: BoxFit.cover,
-          width: size,
-          height: size,
-          errorBuilder: (_, __, ___) => _monoTile(),
-          loadingBuilder: (ctx, child, progress) =>
-              progress == null ? child : _monoTile(),
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: Text(
+        short,
+        style: CkType.display(
+          fontSize: size * 0.38,
+          fontWeight: FontWeight.w700,
+          color: CkColors.paper,
         ),
       ),
     );
   }
 }
 
-enum AvatarTone { paper, ink }
+enum AvatarTone { paper, ink, neutral }
 
-/// Circular initials avatar.
+/// Player avatar — circle.
 class Avatar extends StatelessWidget {
   const Avatar({
     super.key,
@@ -257,16 +288,8 @@ class Pill extends StatelessWidget {
   }
 }
 
-/// Universal top header: large title on the left; bell (→ notifications) and
-/// the messages/chat button (→ `/messages`) on the right.
-///
-/// The messages icon in the header replaces the bottom-nav Messages tab, which
-/// is now the Profile tab. Pass [showMessages] = false for screens where it
-/// doesn't belong (e.g. within the messages inbox itself).
-///
-/// The bell badge auto-reads the unread notifications count via
-/// `unreadNotificationsCountProvider`. The chat badge auto-reads via
-/// `unreadMessagesCountProvider`.
+/// Universal top header: large title on the left; management, bell, and
+/// the messages/chat button on the right.
 class V2Header extends ConsumerWidget {
   const V2Header({
     super.key,
@@ -276,8 +299,10 @@ class V2Header extends ConsumerWidget {
     this.messagesCount,
     this.onBell,
     this.onMessages,
+    this.onManagement,
     this.refreshing = false,
     this.showMessages = true,
+    this.showManagement = true,
     this.showAvatar = false,
     this.showBack = false,
     this.onBack,
@@ -289,9 +314,13 @@ class V2Header extends ConsumerWidget {
   final int? messagesCount;
   final VoidCallback? onBell;
   final VoidCallback? onMessages;
+  final VoidCallback? onManagement;
 
   /// Whether to render the chat/messages inbox button on the right.
   final bool showMessages;
+
+  /// Whether to render the management console button on the right.
+  final bool showManagement;
 
   /// Retained for legacy compatibility.
   final bool showAvatar;
@@ -300,10 +329,6 @@ class V2Header extends ConsumerWidget {
   final bool showBack;
   final VoidCallback? onBack;
 
-  /// When true AND [sub] is null, a subtle inline spinner renders below the
-  /// title in the sub's slot. Used by screens that paint from a local cache
-  /// while a network refresh is in flight (ticket #23). Ignored when [sub]
-  /// is non-null — the explicit subtitle takes precedence.
   final bool refreshing;
 
   @override
@@ -339,6 +364,9 @@ class V2Header extends ConsumerWidget {
                 ),
               ),
             ),
+          ] else if (showManagement && onManagement != null) ...[
+            _ManagementButton(onTap: onManagement),
+            const SizedBox(width: 12),
           ],
           Expanded(
             child: Column(
@@ -369,7 +397,7 @@ class V2Header extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           _BellButton(count: bellCount, onTap: onBell),
           if (showMessages) ...[
             const SizedBox(width: 8),
@@ -379,6 +407,33 @@ class V2Header extends ConsumerWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _ManagementButton extends StatelessWidget {
+  const _ManagementButton({this.onTap});
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          shape: BoxShape.circle,
+          border: Border.all(color: CkColors.hairline),
+        ),
+        child: const V2Svg(
+          V2Icons.management,
+          size: 17,
+          color: CkColors.ink,
+        ),
       ),
     );
   }

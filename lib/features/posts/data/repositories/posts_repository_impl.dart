@@ -56,6 +56,26 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
+  Future<Either<Failure, List<Post>>> getTeamPosts(
+    String teamId, {
+    int limit = 20,
+    DateTime? before,
+  }) async {
+    try {
+      final dtos = await _remote.getByTeam(
+        teamId,
+        limit: limit,
+        before: before,
+      );
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, Post>> createPost(PostDraft draft) async {
     final text = draft.text?.trim();
     final hasText = text != null && text.isNotEmpty;
@@ -109,6 +129,9 @@ class PostsRepositoryImpl implements PostsRepository {
         'author_context': draft.authorContext.wire,
         if (draft.contextEntityId != null)
           'context_entity_id': draft.contextEntityId,
+        if (draft.authorContext == PostAuthorContext.teamManager &&
+            draft.contextEntityId != null)
+          'linked_team_id': draft.contextEntityId,
         'post_type': type.wire,
         if (draft.text != null) 'text': draft.text,
         'media_urls': urls,

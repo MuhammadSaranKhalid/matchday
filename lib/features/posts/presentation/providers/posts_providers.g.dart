@@ -139,6 +139,89 @@ final class AuthorPostsFamily extends $Family
   String toString() => r'authorPostsProvider';
 }
 
+/// Posts authored by or linked to [teamId] (Team Profile Posts tab).
+
+@ProviderFor(teamPosts)
+final teamPostsProvider = TeamPostsFamily._();
+
+/// Posts authored by or linked to [teamId] (Team Profile Posts tab).
+
+final class TeamPostsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Post>>,
+          List<Post>,
+          FutureOr<List<Post>>
+        >
+    with $FutureModifier<List<Post>>, $FutureProvider<List<Post>> {
+  /// Posts authored by or linked to [teamId] (Team Profile Posts tab).
+  TeamPostsProvider._({
+    required TeamPostsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'teamPostsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$teamPostsHash();
+
+  @override
+  String toString() {
+    return r'teamPostsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<Post>> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<Post>> create(Ref ref) {
+    final argument = this.argument as String;
+    return teamPosts(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TeamPostsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$teamPostsHash() => r'5b476ca6b4edfeb0fa3f55256f835cc23bb18ef0';
+
+/// Posts authored by or linked to [teamId] (Team Profile Posts tab).
+
+final class TeamPostsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<Post>>, String> {
+  TeamPostsFamily._()
+    : super(
+        retry: null,
+        name: r'teamPostsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Posts authored by or linked to [teamId] (Team Profile Posts tab).
+
+  TeamPostsProvider call(String teamId) =>
+      TeamPostsProvider._(argument: teamId, from: this);
+
+  @override
+  String toString() => r'teamPostsProvider';
+}
+
 /// The currently selected feed filter ('all', 'people', 'teams', 'tournaments', 'matches').
 
 @ProviderFor(FeedFilter)

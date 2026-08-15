@@ -22,6 +22,14 @@ Future<List<Post>> authorPosts(Ref ref, String authorId) async {
   return result.fold((f) => throw FailureWrapper(f), (p) => p);
 }
 
+/// Posts authored by or linked to [teamId] (Team Profile Posts tab).
+@riverpod
+Future<List<Post>> teamPosts(Ref ref, String teamId) async {
+  final repo = ref.watch(postsRepositoryProvider);
+  final result = await repo.getTeamPosts(teamId);
+  return result.fold((f) => throw FailureWrapper(f), (p) => p);
+}
+
 /// The currently selected feed filter ('all', 'people', 'teams', 'tournaments', 'matches').
 @riverpod
 class FeedFilter extends _$FeedFilter {

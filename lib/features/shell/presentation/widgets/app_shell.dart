@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
+import '../../../management/presentation/widgets/management_sheet.dart';
 
 /// The authenticated app shell (v2 IA): hosts the five branch navigators
 /// (Home · Search · Matches · Pavilion · Profile) and renders the shared
@@ -50,6 +51,7 @@ class AppShell extends StatelessWidget {
             V2Header(
               title: title,
               onBell: () => context.push('/notifications'),
+              onManagement: () => ManagementSheet.show(context),
             ),
             Expanded(child: navigationShell),
           ],

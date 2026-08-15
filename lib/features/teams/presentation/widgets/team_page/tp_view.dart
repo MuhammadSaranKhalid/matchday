@@ -44,8 +44,8 @@ enum TpPlayerRole { captain, viceCaptain, wicketKeeper, player }
 /// Action-queue tone — controls left-border accent on Manage rows.
 enum TpQueueTone { red, amber, ink }
 
-/// One of the five (or six, when `Recent` substitutes for `Matches`) tab ids.
-enum TeamPageTab { squad, matches, stats, about, manage, recent }
+/// Tab IDs for the Team Page.
+enum TeamPageTab { posts, squad, matches, stats, about, recent }
 
 @immutable
 class TpRecord {

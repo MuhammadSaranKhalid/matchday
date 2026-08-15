@@ -108,11 +108,49 @@ abstract class Post with _$Post {
     String? authorName,
     String? authorUsername,
     String? authorPhotoUrl,
+    // Team display (from embedded teams join when speaking as team).
+    String? teamName,
+    String? teamLogoUrl,
+    String? teamMonogram,
+    String? teamColor,
   }) = _Post;
 
   const Post._();
 
   bool get hasMedia => media.isNotEmpty;
+
+  /// Effective display name depending on voice context.
+  String get displayName {
+    if (authorContext == PostAuthorContext.teamManager &&
+        teamName != null &&
+        teamName!.isNotEmpty) {
+      return teamName!;
+    }
+    return authorName ?? 'matchday player';
+  }
+
+  /// Effective monogram depending on voice context.
+  String get displayMonogram {
+    if (authorContext == PostAuthorContext.teamManager) {
+      if (teamMonogram != null && teamMonogram!.isNotEmpty) return teamMonogram!;
+      if (teamName != null && teamName!.isNotEmpty) {
+        final parts = teamName!.trim().split(RegExp(r'\s+'));
+        if (parts.length == 1) {
+          return parts.first.substring(0, parts.first.length >= 2 ? 2 : 1).toUpperCase();
+        }
+        return (parts.first[0] + parts[1][0]).toUpperCase();
+      }
+    }
+    return authorMonogram;
+  }
+
+  /// Effective avatar photo URL.
+  String? get displayPhotoUrl {
+    if (authorContext == PostAuthorContext.teamManager) {
+      return teamLogoUrl;
+    }
+    return authorPhotoUrl;
+  }
 
   /// Two-letter monogram for the avatar/crest, derived from the author name.
   String get authorMonogram {

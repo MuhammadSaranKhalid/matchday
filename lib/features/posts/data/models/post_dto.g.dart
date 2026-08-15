@@ -39,6 +39,7 @@ _PostDto _$PostDtoFromJson(Map<String, dynamic> json) => _PostDto(
   editedAt: json['edited_at'] as String?,
   updatedAt: json['updated_at'] as String,
   author: json['author'] as Map<String, dynamic>?,
+  team: json['team'] as Map<String, dynamic>?,
 );
 
 Map<String, dynamic> _$PostDtoToJson(_PostDto instance) => <String, dynamic>{
@@ -66,4 +67,5 @@ Map<String, dynamic> _$PostDtoToJson(_PostDto instance) => <String, dynamic>{
   'edited_at': instance.editedAt,
   'updated_at': instance.updatedAt,
   'author': instance.author,
+  'team': instance.team,
 };

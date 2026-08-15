@@ -38,6 +38,8 @@ abstract class PostDto with _$PostDto {
     @JsonKey(name: 'updated_at') required String updatedAt,
     // Embedded profiles join (alias `author`).
     Map<String, dynamic>? author,
+    // Embedded teams join (alias `team`).
+    Map<String, dynamic>? team,
   }) = _PostDto;
 
   const PostDto._();
@@ -71,6 +73,10 @@ abstract class PostDto with _$PostDto {
         authorName: author?['display_name'] as String?,
         authorUsername: author?['username'] as String?,
         authorPhotoUrl: author?['profile_photo_url'] as String?,
+        teamName: team?['team_name'] as String?,
+        teamLogoUrl: team?['logo_url'] as String?,
+        teamMonogram: team?['logo_monogram'] as String?,
+        teamColor: (team?['team_colors'] as Map<String, dynamic>?)?['primary'] as String?,
       );
 
   /// Prefer the rich `media` jsonb; fall back to bare `media_urls` for any

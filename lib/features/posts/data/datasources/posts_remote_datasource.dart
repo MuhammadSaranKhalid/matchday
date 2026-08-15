@@ -17,9 +17,9 @@ class PostsRemoteDataSource {
   static const _bookmarksTable = 'bookmarks';
   static const _bucket = 'post-media';
 
-  // Embed the author's profile so the feed renders without a second query.
+  // Embed the author's profile and team so the feed renders without extra queries.
   static const _select =
-      '*, author:profiles!author_id(display_name, username, profile_photo_url)';
+      '*, author:profiles!author_id(display_name, username, profile_photo_url), team:teams!linked_team_id(team_name, logo_url, logo_monogram, team_colors)';
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
@@ -102,6 +102,26 @@ class PostsRemoteDataSource {
           .from(_table)
           .select(_select)
           .eq('author_id', authorId)
+          .eq('status', 'active');
+      if (before != null) q = q.lt('created_at', before.toIso8601String());
+      final rows = await q.order('created_at', ascending: false).limit(limit);
+      final dtos = rows.map((r) => PostDto.fromJson(r)).toList();
+      return _enrichWithUserInteractions(dtos);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<List<PostDto>> getByTeam(
+    String teamId, {
+    required int limit,
+    DateTime? before,
+  }) async {
+    try {
+      var q = _supabase
+          .from(_table)
+          .select(_select)
+          .or('context_entity_id.eq.$teamId,linked_team_id.eq.$teamId')
           .eq('status', 'active');
       if (before != null) q = q.lt('created_at', before.toIso8601String());
       final rows = await q.order('created_at', ascending: false).limit(limit);

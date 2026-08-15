@@ -18,55 +18,16 @@ import '../widgets/my_teams/role_pill.dart';
 class TeamsListScreen extends ConsumerWidget {
   const TeamsListScreen({super.key});
 
-  static const _filterChipDefs = [
-    (MyTeamsFilter.all, 'All'),
-    (MyTeamsFilter.playing, 'Playing'),
-    (MyTeamsFilter.managing, 'Manage'),
-    (MyTeamsFilter.following, 'Following'),
-    (MyTeamsFilter.archived, 'Archived'),
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncView = ref.watch(teamsListControllerProvider);
     final controller = ref.read(teamsListControllerProvider.notifier);
 
     switch (asyncView) {
-      // ── Loaded — the whole screen as one tree. Sections only appear
-      //    when their list/value is non-empty, so each case stays
-      //    focused. ──────────────────────────────────────────────────
       case AsyncData(value: final view):
         final t = view.teams;
-        final totalActive =
-            t.captain.length +
-            t.vc.length +
-            t.playing.length +
-            t.manage.length +
-            t.scorer.length +
-            t.draft.length +
-            t.pending.length;
         final leadCount = t.captain.length + t.vc.length;
         final manageCount = t.manage.length + t.draft.length + t.scorer.length;
-        final counts = <MyTeamsFilter, int>{
-          MyTeamsFilter.all:
-              totalActive + view.following.length + t.archived.length,
-          MyTeamsFilter.playing:
-              t.vc.length + t.playing.length + t.captain.length,
-          MyTeamsFilter.managing:
-              t.manage.length + t.draft.length + t.scorer.length,
-          MyTeamsFilter.following: view.following.length,
-          MyTeamsFilter.archived: t.archived.length,
-        };
-        final showChips = !view.isEmpty && (counts[MyTeamsFilter.all] ?? 0) > 1;
-
-        // Filter chips — visible filters for the segmented row (All always shows;
-        // others only when their count > 0).
-        final visibleChips =
-            _filterChipDefs
-                .where(
-                  (p) => p.$1 == MyTeamsFilter.all || (counts[p.$1] ?? 0) > 0,
-                )
-                .toList();
 
         return Scaffold(
           backgroundColor: CkColors.paper,
@@ -81,10 +42,9 @@ class TeamsListScreen extends ConsumerWidget {
                   children: [
                     Column(
                       children: [
-                        // ── Header — back chevron, title (with optional `· N`
-                        //    count), and subtitle. ─────────────────────────
+                        // ── Header — back chevron, title, and + Create action ─
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(6, 6, 18, 12),
+                          padding: const EdgeInsets.fromLTRB(6, 6, 16, 8),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
@@ -94,134 +54,47 @@ class TeamsListScreen extends ConsumerWidget {
                                 child: const Padding(
                                   padding: EdgeInsets.all(8),
                                   child: Icon(
-                                    Icons.chevron_left,
-                                    size: 22,
+                                    Icons.chevron_left_rounded,
+                                    size: 26,
                                     color: CkColors.ink,
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 4),
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.baseline,
-                                      textBaseline: TextBaseline.alphabetic,
-                                      children: [
-                                        Text(
-                                          'My teams',
-                                          style: CkType.display(
-                                            fontSize: 26,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: -0.025,
-                                          ),
-                                        ),
-                                        if (totalActive > 0) ...[
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '· $totalActive',
-                                            style: CkType.mono(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
-                                              letterSpacing: 0.10,
-                                              color: CkColors.muted,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    if (view.subtitle != null) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        view.subtitle!,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: CkType.body(
-                                          fontSize: 12,
-                                          color: CkColors.muted,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                                child: Text(
+                                  'My Teams',
+                                  style: CkType.display(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.02,
+                                  ),
+                                ),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: () => context.push('/teams/create'),
+                                icon: const Icon(Icons.add_rounded, size: 16),
+                                label: const Text('Create Team'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: CkColors.ink,
+                                  foregroundColor: CkColors.paper,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        // ── Filter chips: All / Playing / Manage / Following /
-                        //    Archived. Hidden chips for zero-count filters. ──
-                        if (showChips)
-                          SizedBox(
-                            height: 32,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-                              itemCount: visibleChips.length,
-                              separatorBuilder:
-                                  (_, __) => const SizedBox(width: 6),
-                              itemBuilder: (_, i) {
-                                final (filter, label) = visibleChips[i];
-                                final isActive = filter == view.activeFilter;
-                                final count = counts[filter] ?? 0;
-                                return InkWell(
-                                  onTap: () => controller.setFilter(filter),
-                                  borderRadius: BorderRadius.circular(999),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 11,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          isActive
-                                              ? CkColors.ink
-                                              : CkColors.paper,
-                                      borderRadius: BorderRadius.circular(999),
-                                      border:
-                                          isActive
-                                              ? null
-                                              : Border.all(
-                                                color: CkColors.hairline,
-                                              ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          label,
-                                          style: CkType.body(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color:
-                                                isActive
-                                                    ? CkColors.paper
-                                                    : CkColors.ink2,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 5),
-                                        Text(
-                                          '$count',
-                                          style: CkType.mono(
-                                            fontSize: 8.5,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: 0.10,
-                                            color:
-                                                isActive
-                                                    ? CkColors.paper.withValues(
-                                                      alpha: 0.55,
-                                                    )
-                                                    : CkColors.muted,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
                         Expanded(
                           child: ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
@@ -853,7 +726,7 @@ class TeamsListScreen extends ConsumerWidget {
 
                               // ── You lead (captain + vc) ─────────────────
                               if (leadCount > 0) ...[
-                                Subhead('You lead', count: leadCount),
+                                const Subhead('Teams you lead'),
                                 for (final row in t.captain)
                                   TeamRow(
                                     vm: row,
@@ -863,7 +736,7 @@ class TeamsListScreen extends ConsumerWidget {
                                         row.teamId == null
                                             ? null
                                             : () => context.push(
-                                              '/teams/${row.teamId}',
+                                              '/teams/${row.teamId}/manage',
                                             ),
                                   ),
                                 for (final row in t.vc)
@@ -877,14 +750,14 @@ class TeamsListScreen extends ConsumerWidget {
                                         row.teamId == null
                                             ? null
                                             : () => context.push(
-                                              '/teams/${row.teamId}',
+                                              '/teams/${row.teamId}/manage',
                                             ),
                                   ),
                               ],
 
                               // ── You play ────────────────────────────────
                               if (t.playing.isNotEmpty) ...[
-                                Subhead('You play', count: t.playing.length),
+                                const Subhead('Teams you play in'),
                                 for (final row in t.playing)
                                   TeamRow(
                                     vm: row,
@@ -901,7 +774,7 @@ class TeamsListScreen extends ConsumerWidget {
 
                               // ── You manage (manage + draft + scorer) ────
                               if (manageCount > 0) ...[
-                                Subhead('You manage', count: manageCount),
+                                const Subhead('Teams you manage'),
                                 for (final row in t.manage)
                                   TeamRow(
                                     vm: row,
@@ -911,7 +784,7 @@ class TeamsListScreen extends ConsumerWidget {
                                         row.teamId == null
                                             ? null
                                             : () => context.push(
-                                              '/teams/${row.teamId}',
+                                              '/teams/${row.teamId}/manage',
                                             ),
                                   ),
                                 for (final row in t.draft)
@@ -925,7 +798,7 @@ class TeamsListScreen extends ConsumerWidget {
                                         row.teamId == null
                                             ? null
                                             : () => context.push(
-                                              '/teams/${row.teamId}',
+                                              '/teams/${row.teamId}/manage',
                                             ),
                                   ),
                                 for (final row in t.scorer)
@@ -940,7 +813,7 @@ class TeamsListScreen extends ConsumerWidget {
                                         row.teamId == null
                                             ? null
                                             : () => context.push(
-                                              '/teams/${row.teamId}',
+                                              '/teams/${row.teamId}/manage',
                                             ),
                                   ),
                               ],
@@ -1221,45 +1094,6 @@ class TeamsListScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    if (!view.isEmpty)
-                      Positioned(
-                        right: 14,
-                        bottom: 22,
-                        child: InkWell(
-                          onTap: () => context.push('/teams/create'),
-                          borderRadius: BorderRadius.circular(999),
-                          child: Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: CkColors.ink,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF281E0F,
-                                  ).withValues(alpha: 0.18),
-                                  offset: const Offset(0, 10),
-                                  blurRadius: 28,
-                                ),
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF281E0F,
-                                  ).withValues(alpha: 0.10),
-                                  offset: const Offset(0, 3),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            alignment: Alignment.center,
-                            child: const Icon(
-                              Icons.add,
-                              size: 22,
-                              color: CkColors.paper,
-                            ),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -1587,63 +1421,32 @@ class TeamsListScreen extends ConsumerWidget {
   }
 }
 
-/// Section subhead — mono uppercase label, optional accent color, optional
-/// trailing `· N` count. Used between every section of the My Teams body.
+/// Section subhead — clean mono uppercase label.
 class Subhead extends StatelessWidget {
   const Subhead(this.label, {super.key, this.accent, this.count});
 
-  /// Header text — rendered as-typed (the JSX source uses Title Case, not
-  /// uppercase — the mono style font is what gives it the "label" feel).
   final String label;
-
-  /// Color override for the label (e.g. red on "Invites · 2").
   final Color? accent;
-
-  /// When non-null renders ` · N` next to the label in muted mono.
   final int? count;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text(
-            label,
-            style: CkType.mono(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.10,
-              color: accent ?? CkColors.muted,
-            ),
-          ),
-          if (count != null) ...[
-            const SizedBox(width: 6),
-            Text(
-              '· $count',
-              style: CkType.mono(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.10,
-                color: CkColors.muted,
-              ),
-            ),
-          ],
-        ],
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 6),
+      child: Text(
+        label.toUpperCase(),
+        style: CkType.mono(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.08,
+          color: accent ?? CkColors.muted,
+        ),
       ),
     );
   }
 }
 
-/// Swiss-army row used by every team-list section (captain/vc/playing/manage/
-/// draft/scorer/pending/archived/following). Crest on the left (with optional
-/// notification badge), name + verified tick + role pill, mono meta line with
-/// optional jersey number and inline LIVE pill, chevron on the right.
-///
-/// Archived rows render with a dim opacity, a dashed crest, and no chevron
-/// (controllable via [withChevron]).
+/// Modern team card row used across all team sections.
 class TeamRow extends StatelessWidget {
   const TeamRow({
     super.key,
@@ -1654,11 +1457,7 @@ class TeamRow extends StatelessWidget {
   });
 
   final TeamRowVm vm;
-
-  /// When true skips the top hairline divider (used by the first row in a section).
   final bool isFirst;
-
-  /// Archived rows pass false — they are present but quiet.
   final bool withChevron;
   final VoidCallback? onTap;
 
@@ -1667,69 +1466,75 @@ class TeamRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Opacity(
-        opacity: _inactive ? 0.74 : 1,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          decoration: BoxDecoration(
-            border:
-                isFirst
-                    ? null
-                    : const Border(top: BorderSide(color: CkColors.hairline)),
-          ),
-          child: Row(
-            children: [
-              _crestWithBadge(
-                context,
-                crest: vm.crest,
-                dim: vm.role == MyTeamsRole.archived,
-                badge: vm.notifCount,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: CkColors.paper2,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: CkColors.hairline),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Opacity(
+            opacity: _inactive ? 0.74 : 1,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  _crestWithBadge(
+                    context,
+                    crest: vm.crest,
+                    dim: vm.role == MyTeamsRole.archived,
+                    badge: vm.notifCount,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: Text(
-                            vm.crest.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: CkType.display(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.02,
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                vm.crest.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: CkType.display(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.01,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (vm.verified) ...[
+                              const SizedBox(width: 6),
+                              const VerifiedTick(),
+                            ],
+                            if (RolePill.hasSpec(vm.role)) ...[
+                              const SizedBox(width: 6),
+                              RolePill(role: vm.role),
+                            ],
+                          ],
                         ),
-                        if (vm.verified) ...[
-                          const SizedBox(width: 6),
-                          const VerifiedTick(),
-                        ],
-                        if (RolePill.hasSpec(vm.role)) ...[
-                          const SizedBox(width: 6),
-                          RolePill(role: vm.role),
-                        ],
+                        const SizedBox(height: 3),
+                        _metaLine(),
                       ],
                     ),
-                    const SizedBox(height: 3),
-                    _metaLine(),
+                  ),
+                  if (withChevron) ...[
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: CkColors.muted,
+                    ),
                   ],
-                ),
+                ],
               ),
-              if (withChevron) ...[
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.chevron_right,
-                  size: 18,
-                  color: CkColors.muted,
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),

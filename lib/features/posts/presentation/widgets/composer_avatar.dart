@@ -3,12 +3,37 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
+import '../../domain/entities/post.dart';
+import '../controllers/composer_controller.dart';
 
 class ComposerAvatar extends ConsumerWidget {
   const ComposerAvatar({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(composerControllerProvider);
+
+    if (state.authorContext == PostAuthorContext.teamManager) {
+      final mono = state.entityMono ?? 'T';
+      return Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: CkColors.ink,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          mono,
+          style: CkType.display(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: CkColors.paper,
+          ),
+        ),
+      );
+    }
+
     final p = ref.watch(myProfileProvider).value;
     final url = p?.avatarUrl;
 

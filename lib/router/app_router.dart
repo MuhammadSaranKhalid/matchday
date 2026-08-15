@@ -33,6 +33,8 @@ import '../features/matches/presentation/screens/innings_break_screen.dart';
 import '../features/matches/presentation/screens/scorecard_screen.dart';
 import '../features/matches/presentation/screens/result_screen.dart';
 import '../features/notifications/presentation/screens/notifications_screen.dart';
+import '../features/posts/domain/entities/post.dart';
+import '../features/posts/presentation/screens/composer_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -303,6 +305,23 @@ GoRouter appRouter(Ref ref) {
         path: '/u/:username',
         builder: (_, state) =>
             PublicProfileScreen(username: state.pathParameters['username']!),
+      ),
+      GoRoute(
+        path: '/composer',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, state) {
+          final teamId = state.uri.queryParameters['teamId'];
+          final teamName = state.uri.queryParameters['teamName'];
+          final teamMono = state.uri.queryParameters['teamMono'];
+          return ComposerScreen(
+            initialAuthorContext: teamId != null
+                ? PostAuthorContext.teamManager
+                : PostAuthorContext.personal,
+            initialEntityId: teamId,
+            initialEntityName: teamName,
+            initialEntityMono: teamMono,
+          );
+        },
       ),
     ],
   );

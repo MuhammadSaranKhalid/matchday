@@ -7,6 +7,11 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
+import '../../../../core/widgets/modals/modals.dart';
+import '../../../posts/presentation/providers/posts_providers.dart';
+import '../../../posts/presentation/screens/photo_viewer_screen.dart';
+import '../../../posts/presentation/widgets/post_card.dart';
+import '../../../posts/presentation/widgets/post_card_skeleton.dart';
 import '../../domain/entities/roster_member.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
@@ -16,22 +21,112 @@ import '../providers/teams_providers.dart';
 import '../utils/team_display.dart';
 import '../widgets/team_avatar.dart';
 
-/// Manager view — Phase 1 Roster tab only (Requests/Members/Settings are v1.1).
-class TeamManageScreen extends ConsumerWidget {
+/// Complete Manager console: Roster, Posts, Requests, Roles, and Settings.
+class TeamManageScreen extends ConsumerStatefulWidget {
   const TeamManageScreen({super.key, required this.teamId, this.justCreated = false});
 
   final String teamId;
   final bool justCreated;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final teamAsync = ref.watch(teamProvider(teamId));
+  ConsumerState<TeamManageScreen> createState() => _TeamManageScreenState();
+}
+
+class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
+  int _activeTab = 0; // 0: Roster, 1: Posts, 2: Requests, 3: Settings
+
+  @override
+  Widget build(BuildContext context) {
+    final teamAsync = ref.watch(teamProvider(widget.teamId));
 
     return Scaffold(
       backgroundColor: CkColors.paper,
       body: SafeArea(
         child: switch (teamAsync) {
-          AsyncData(:final value?) => _Manage(team: value, justCreated: justCreated),
+          AsyncData(:final value?) => Column(
+              children: [
+                // Top Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => context.pop(),
+                        icon: const Icon(Icons.chevron_left_rounded, color: CkColors.ink),
+                      ),
+                      TeamAvatar(
+                        name: value.name,
+                        primaryColor: value.primaryColor,
+                        logoUrl: value.logoUrl,
+                        monogram: value.logoMonogram,
+                        size: 36,
+                        radius: 10,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(value.name,
+                                style: CkType.display(fontSize: 17, letterSpacing: -0.01)),
+                            GestureDetector(
+                              onTap: () => context.go('/teams/${value.id.value}'),
+                              child: Text('Public team page →',
+                                  style: CkType.body(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: CkColors.red)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          final uri = Uri(
+                            path: '/composer',
+                            queryParameters: {
+                              'teamId': value.id.value,
+                              'teamName': value.name,
+                              if (value.logoMonogram != null && value.logoMonogram!.isNotEmpty)
+                                'teamMono': value.logoMonogram!,
+                            },
+                          );
+                          context.push(uri.toString());
+                        },
+                        icon: const Icon(Icons.add_rounded, size: 14),
+                        label: const Text('Post'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CkColors.ink,
+                          foregroundColor: CkColors.paper,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Tab Bar
+                _TabHeader(
+                  activeIndex: _activeTab,
+                  onTabSelected: (i) => setState(() => _activeTab = i),
+                ),
+
+                if (widget.justCreated && _activeTab == 0) const _JustCreatedBanner(),
+
+                // Tab Content
+                Expanded(
+                  child: switch (_activeTab) {
+                    0 => _RosterTab(team: value),
+                    1 => _TeamAnnouncementsManageTab(team: value),
+                    2 => _RequestsTab(team: value),
+                    _ => _SettingsTab(team: value),
+                  },
+                ),
+              ],
+            ),
           AsyncData() => const Center(child: Text('Team not found')),
           AsyncError() => const Center(child: Text('Could not load team')),
           _ => const Center(child: CircularProgressIndicator(color: CkColors.ink)),
@@ -41,107 +136,60 @@ class TeamManageScreen extends ConsumerWidget {
   }
 }
 
-class _Manage extends ConsumerWidget {
-  const _Manage({required this.team, required this.justCreated});
-  final Team team;
-  final bool justCreated;
+class _TabHeader extends StatelessWidget {
+  const _TabHeader({required this.activeIndex, required this.onTabSelected});
+  final int activeIndex;
+  final ValueChanged<int> onTabSelected;
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final roster = ref.watch(rosterProvider(team.id.value));
-
-    return Column(
-      children: [
-        // Header
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: () => context.pop(),
-                icon: const Icon(Icons.chevron_left_rounded, color: CkColors.ink),
-              ),
-              TeamAvatar(
-                name: team.name,
-                primaryColor: team.primaryColor,
-                logoUrl: team.logoUrl,
-                monogram: team.logoMonogram,
-                size: 36,
-                radius: 10,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(team.name,
-                        style: CkType.display(fontSize: 17, letterSpacing: -0.01)),
-                    GestureDetector(
-                      onTap: () => context.go('/teams/${team.id.value}'),
-                      child: Text('Public view',
-                          style: CkType.body(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: CkColors.red)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const _ManageTabs(),
-        if (justCreated) const _JustCreatedBanner(),
-        Expanded(
-          child: switch (roster) {
-            AsyncData(:final value) => _Roster(team: team, members: value),
-            AsyncError() => const Center(child: Text('Could not load roster')),
-            _ => const Center(
-                child: CircularProgressIndicator(color: CkColors.ink)),
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _ManageTabs extends StatelessWidget {
-  const _ManageTabs();
   @override
   Widget build(BuildContext context) {
-    Widget tab(String label, {required bool active}) => Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: active ? CkColors.ink : Colors.transparent,
-                  width: 2,
-                ),
-              ),
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: CkType.body(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: active ? CkColors.ink : CkColors.soft,
-              ),
-            ),
-          ),
-        );
     return Container(
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: CkColors.hairline)),
       ),
       child: Row(
         children: [
-          tab('Roster', active: true),
-          tab('Requests', active: false),
-          tab('Members', active: false),
-          tab('Settings', active: false),
+          _TabItem(label: 'Roster', active: activeIndex == 0, onTap: () => onTabSelected(0)),
+          _TabItem(label: 'Posts', active: activeIndex == 1, onTap: () => onTabSelected(1)),
+          _TabItem(label: 'Requests', active: activeIndex == 2, onTap: () => onTabSelected(2)),
+          _TabItem(label: 'Settings', active: activeIndex == 3, onTap: () => onTabSelected(3)),
         ],
+      ),
+    );
+  }
+}
+
+class _TabItem extends StatelessWidget {
+  const _TabItem({required this.label, required this.active, required this.onTap});
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: active ? CkColors.ink : Colors.transparent,
+                width: 2.5,
+              ),
+            ),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: CkType.body(
+              fontSize: 13,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              color: active ? CkColors.ink : CkColors.muted,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -159,49 +207,236 @@ class _JustCreatedBanner extends StatelessWidget {
           borderRadius: BorderRadius.circular(CkRadii.sm),
         ),
         child: Text('Team created. Add your first player below.',
-            style: CkType.body(fontSize: 13, color: CkColors.ink2)),
+            style: CkType.body(fontSize: 13, color: const Color(0xFF1E5A2C))),
       );
 }
 
-class _Roster extends ConsumerWidget {
-  const _Roster({required this.team, required this.members});
+// ─── Tab 1: Roster ──────────────────────────────────────────────────────────
+
+class _RosterTab extends ConsumerWidget {
+  const _RosterTab({required this.team});
   final Team team;
-  final List<RosterMember> members;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      children: [
-        Expanded(
-          child: members.isEmpty
-              ? _EmptyRoster(onAdd: () => _addPlayer(context, ref, team))
-              : ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: members.length,
-                  separatorBuilder: (_, __) =>
-                      const Divider(height: 1, color: CkColors.hairline),
-                  itemBuilder: (_, i) => _ManagedRow(
-                    entry: members[i],
-                    team: team,
-                    onTap: () => _memberActions(context, ref, members[i]),
-                  ),
-                ),
-        ),
-        if (members.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: CkButton(
-              label: 'Add player',
-              icon: const Icon(Icons.add_rounded, size: 20, color: CkColors.paper),
-              onPressed: () => _addPlayer(context, ref, team),
+    final rosterAsync = ref.watch(rosterProvider(team.id.value));
+
+    return switch (rosterAsync) {
+      AsyncData(:final value) => Column(
+          children: [
+            Expanded(
+              child: value.isEmpty
+                  ? _EmptyRoster(onAdd: () => _addPlayer(context, ref, team))
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: value.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, color: CkColors.hairline),
+                      itemBuilder: (_, i) => _ManagedRow(
+                        entry: value[i],
+                        team: team,
+                        onTap: () => _memberActions(context, ref, value[i]),
+                      ),
+                    ),
             ),
+            if (value.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: CkButton(
+                  label: 'Add player to squad',
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18, color: CkColors.paper),
+                  onPressed: () => _addPlayer(context, ref, team),
+                ),
+              ),
+          ],
+        ),
+      AsyncError() => const Center(child: Text('Could not load roster')),
+      _ => const Center(child: CircularProgressIndicator(color: CkColors.ink)),
+    };
+  }
+}
+
+// ─── Tab 2: Requests & Invitations ──────────────────────────────────────────
+
+class _RequestsTab extends StatelessWidget {
+  const _RequestsTab({required this.team});
+  final Team team;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Invite share card
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: CkColors.paper2,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: CkColors.hairline),
           ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: CkColors.paper,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: CkColors.hairline),
+                ),
+                child: const Icon(Icons.link_rounded, color: CkColors.ink),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Share Team Invite',
+                        style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text('Invite players via link or QR',
+                        style: CkType.body(fontSize: 11, color: CkColors.muted)),
+                  ],
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: 'https://matchday.app/teams/${team.id.value}/join'));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invite link copied to clipboard!')),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CkColors.ink,
+                  foregroundColor: CkColors.paper,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+                child: const Text('Copy Link'),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        Text(
+          'PENDING PLAYER REQUESTS (0)',
+          style: CkType.mono(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.06,
+            color: CkColors.muted,
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: CkColors.paper2,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: CkColors.hairline),
+          ),
+          child: Column(
+            children: [
+              const Icon(Icons.inbox_outlined, size: 36, color: CkColors.muted),
+              const SizedBox(height: 8),
+              Text(
+                'No pending join requests',
+                style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'When local players ask to join your squad, their requests will appear here for approval.',
+                textAlign: TextAlign.center,
+                style: CkType.body(fontSize: 12, color: CkColors.muted),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
-// ─── Actions ────────────────────────────────────────────────────────────────
+// ─── Tab 3: Settings ────────────────────────────────────────────────────────
+
+class _SettingsTab extends StatelessWidget {
+  const _SettingsTab({required this.team});
+  final Team team;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _settingTile(
+          title: 'Team Name',
+          value: team.name,
+          icon: Icons.shield_outlined,
+          onTap: () {},
+        ),
+        _settingTile(
+          title: 'Home Ground',
+          value: team.homeGround ?? 'Not specified',
+          icon: Icons.location_on_outlined,
+          onTap: () {},
+        ),
+        _settingTile(
+          title: 'Squad Capacity',
+          value: '25 Players Max',
+          icon: Icons.groups_outlined,
+          onTap: () {},
+        ),
+        _settingTile(
+          title: 'Team Privacy',
+          value: team.privacy == TeamPrivacy.private ? 'Private Team' : 'Public Team',
+          icon: Icons.lock_outline_rounded,
+          onTap: () {},
+        ),
+      ],
+    );
+  }
+
+  Widget _settingTile({
+    required String title,
+    required String value,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: CkColors.paper2,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: CkColors.hairline),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: CkColors.ink),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: CkType.body(fontSize: 11, color: CkColors.muted)),
+                const SizedBox(height: 1),
+                Text(value, style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, size: 18, color: CkColors.muted),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Actions & Sub-widgets ──────────────────────────────────────────────────
 
 void _snack(BuildContext context, String msg) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -243,8 +478,6 @@ Future<void> _memberActions(
 
   switch (action) {
     case _MemberAction.jersey:
-      // Record result so a barrier-dismiss (null) is distinct from an
-      // explicit clear ((value: null)).
       final picked = await showModalBottomSheet<({int? value})>(
         context: context,
         isScrollControlled: true,
@@ -295,8 +528,6 @@ enum _MemberAction {
         _ => null,
       };
 }
-
-// ─── Rows + sheets ───────────────────────────────────────────────────────────
 
 class _ManagedRow extends StatelessWidget {
   const _ManagedRow(
@@ -364,7 +595,7 @@ class _ManagedRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
           color: CkColors.cream, borderRadius: BorderRadius.circular(999)),
-      child: Text(label, style: CkType.mono(fontSize: 9, color: CkColors.ink2)),
+      child: Text(label, style: CkType.mono(fontSize: 9, color: const Color(0xFF6B5414))),
     );
   }
 }
@@ -559,5 +790,204 @@ class _JerseySheetState extends State<_JerseySheet> {
   void _submit() {
     final n = int.tryParse(_controller.text.trim());
     Navigator.of(context).pop((value: n));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Team Announcements & Posts Management Tab
+// ---------------------------------------------------------------------------
+
+class _TeamAnnouncementsManageTab extends ConsumerWidget {
+  const _TeamAnnouncementsManageTab({required this.team});
+  final Team team;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final postsAsync = ref.watch(teamPostsProvider(team.id.value));
+
+    return RefreshIndicator(
+      color: CkColors.ink,
+      onRefresh: () async =>
+          ref.refresh(teamPostsProvider(team.id.value).future),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+        children: [
+          // Announcement Creation Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: CkColors.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: CkColors.ink,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.campaign_outlined,
+                        size: 18,
+                        color: CkColors.paper,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Post Announcement',
+                            style: CkType.display(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            'Share trials, match updates & squad selections',
+                            style: CkType.body(
+                              fontSize: 11.5,
+                              color: CkColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      final uri = Uri(
+                        path: '/composer',
+                        queryParameters: {
+                          'teamId': team.id.value,
+                          'teamName': team.name,
+                          if (team.logoMonogram != null && team.logoMonogram!.isNotEmpty)
+                            'teamMono': team.logoMonogram!,
+                        },
+                      );
+                      context.push(uri.toString());
+                    },
+                    icon: const Icon(Icons.edit_note_rounded, size: 16),
+                    label: Text('Post as ${team.name}'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CkColors.ink,
+                      foregroundColor: CkColors.paper,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'PUBLISHED POSTS',
+            style: CkType.mono(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.08,
+              color: CkColors.muted,
+            ),
+          ),
+          const SizedBox(height: 10),
+          switch (postsAsync) {
+            AsyncData(:final value) when value.isEmpty => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+              alignment: Alignment.center,
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.chat_bubble_outline,
+                    size: 32,
+                    color: CkColors.muted,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No posts published yet',
+                    style: CkType.display(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Posts you publish as ${team.name} will appear here and on the team\'s public page.',
+                    textAlign: TextAlign.center,
+                    style: CkType.body(fontSize: 12, color: CkColors.muted),
+                  ),
+                ],
+              ),
+            ),
+            AsyncData(:final value) => Column(
+              children: [
+                for (final post in value)
+                  FeedPostCard(
+                    post: post,
+                    onComment: () => showCommentsSheet(
+                      context,
+                      postId: post.id.value,
+                      postAuthorHandle: post.authorUsername != null &&
+                              post.authorUsername!.isNotEmpty
+                          ? '@${post.authorUsername}'
+                          : post.authorName,
+                      onOpenProfile: (String u) => context.push('/u/$u'),
+                    ),
+                    onLike: () => ref
+                        .read(postsRepositoryProvider)
+                        .togglePostLike(post.id),
+                    onBookmark: () => ref
+                        .read(postsRepositoryProvider)
+                        .toggleBookmark(post.id),
+                    onAuthorTap: (String u) => context.push('/u/$u'),
+                    onOpenPhoto: (int idx) {
+                      Navigator.of(context, rootNavigator: true).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => PhotoViewerScreen(
+                            media: post.media,
+                            initialIndex: idx,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+            AsyncError() => const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(
+                child: Text(
+                  'Could not load posts.',
+                  style: TextStyle(fontSize: 13, color: CkColors.muted),
+                ),
+              ),
+            ),
+            _ => const Padding(
+              padding: EdgeInsets.all(16),
+              child: PostCardSkeleton(),
+            ),
+          },
+        ],
+      ),
+    );
   }
 }

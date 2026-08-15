@@ -18,6 +18,13 @@ abstract class PostsRepository {
     DateTime? before,
   });
 
+  /// Posts authored by or linked to [teamId], newest first.
+  Future<Either<Failure, List<Post>>> getTeamPosts(
+    String teamId, {
+    int limit = 20,
+    DateTime? before,
+  });
+
   /// Create a post: inserts the row, then uploads any photos to `post-media`.
   Future<Either<Failure, Post>> createPost(PostDraft draft);
 

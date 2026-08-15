@@ -13,7 +13,7 @@ part 'composer_controller.g.dart';
 
 /// Composer draft state: staged (cropped+resized) photos + submit lifecycle.
 /// The text is owned by the screen's TextEditingController and passed to submit.
-@riverpod
+@Riverpod(keepAlive: true)
 class ComposerController extends _$ComposerController {
   @override
   ComposerState build() => const ComposerState();
@@ -46,12 +46,31 @@ class ComposerController extends _$ComposerController {
     state = state.copyWith(photos: next);
   }
 
-  /// Returns the created post on success (and refreshes feed/profile), or null
+  void setIdentity({
+    required PostAuthorContext authorContext,
+    String? contextEntityId,
+    String? entityName,
+    String? entityMono,
+  }) {
+    state = state.copyWith(
+      authorContext: authorContext,
+      contextEntityId: contextEntityId,
+      entityName: entityName,
+      entityMono: entityMono,
+    );
+  }
+
+  /// Returns the created post on success (and refreshes feed/profile/team), or null
   /// on failure (with [ComposerState.error] set).
   Future<Post?> submit(String text) async {
     state = state.copyWith(busy: true);
     final result = await ref.read(postsRepositoryProvider).createPost(
-          PostDraft(text: text, photos: state.photos),
+          PostDraft(
+            text: text,
+            photos: state.photos,
+            authorContext: state.authorContext,
+            contextEntityId: state.contextEntityId,
+          ),
         );
     // Composer closed mid-submit → don't touch disposed state/providers.
     if (!ref.mounted) return null;
@@ -61,9 +80,12 @@ class ComposerController extends _$ComposerController {
         return null;
       },
       (post) {
-        // Surface the new post immediately, and let the author's profile refetch.
+        // Surface the new post immediately, and let the author's profile & team refetch.
         ref.read(feedControllerProvider.notifier).prepend(post);
         ref.invalidate(authorPostsProvider(post.authorId));
+        if (post.contextEntityId != null) {
+          ref.invalidate(teamPostsProvider(post.contextEntityId!));
+        }
         state = const ComposerState();
         return post;
       },

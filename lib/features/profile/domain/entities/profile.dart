@@ -19,6 +19,7 @@ class Profile {
     this.longitude,
     this.countryCode,
     this.avatarUrl,
+    this.coverUrl,
     this.bio,
     this.onboardedAt,
     this.playerProfile,
@@ -48,6 +49,9 @@ class Profile {
   /// Public URL of the avatar in the `avatars` bucket (`profiles.profile_photo_url`).
   final String? avatarUrl;
 
+  /// Public URL of the cover photo in the `avatars` bucket (`profiles.cover_photo_url`).
+  final String? coverUrl;
+
   /// Free-text bio (`profiles.bio`, ≤200 chars).
   final String? bio;
 
@@ -71,6 +75,7 @@ class Profile {
     double? longitude,
     String? countryCode,
     String? avatarUrl,
+    String? coverUrl,
     String? bio,
     DateTime? onboardedAt,
     PlayerProfile? playerProfile,
@@ -85,6 +90,7 @@ class Profile {
         longitude: longitude ?? this.longitude,
         countryCode: countryCode ?? this.countryCode,
         avatarUrl: avatarUrl ?? this.avatarUrl,
+        coverUrl: coverUrl ?? this.coverUrl,
         bio: bio ?? this.bio,
         onboardedAt: onboardedAt ?? this.onboardedAt,
         playerProfile: playerProfile ?? this.playerProfile,
@@ -103,6 +109,7 @@ class Profile {
           other.longitude == longitude &&
           other.countryCode == countryCode &&
           other.avatarUrl == avatarUrl &&
+          other.coverUrl == coverUrl &&
           other.bio == bio &&
           other.onboardedAt == onboardedAt &&
           other.playerProfile == playerProfile;
@@ -118,6 +125,7 @@ class Profile {
         longitude,
         countryCode,
         avatarUrl,
+        coverUrl,
         bio,
         onboardedAt,
         playerProfile,

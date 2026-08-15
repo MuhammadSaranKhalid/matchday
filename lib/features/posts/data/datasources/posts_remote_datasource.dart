@@ -5,13 +5,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/post_dto.dart';
 
-/// Talks to Supabase for the `posts` table + `post-media` storage bucket.
+/// Talks to Supabase for the `posts` table + `post-media` storage bucket +
+/// `post_likes` and `bookmarks` junction tables.
 /// Returns DTOs, throws raw exceptions. RLS scopes reads/writes.
 class PostsRemoteDataSource {
   PostsRemoteDataSource(this._supabase);
   final SupabaseClient _supabase;
 
   static const _table = 'posts';
+  static const _likesTable = 'post_likes';
+  static const _bookmarksTable = 'bookmarks';
   static const _bucket = 'post-media';
 
   // Embed the author's profile so the feed renders without a second query.
@@ -24,10 +27,52 @@ class PostsRemoteDataSource {
     return id;
   }
 
-  Future<List<PostDto>> getFeed({required int limit, String filter = 'all', DateTime? before}) async {
+  Future<List<PostDto>> _enrichWithUserInteractions(List<PostDto> dtos) async {
+    final currentUid = _supabase.auth.currentUser?.id;
+    if (currentUid == null || dtos.isEmpty) return dtos;
+
+    final postIds = dtos.map((d) => d.postId).toList();
+
+    try {
+      final likesFuture = _supabase
+          .from(_likesTable)
+          .select('post_id')
+          .eq('user_id', currentUid)
+          .inFilter('post_id', postIds);
+
+      final bookmarksFuture = _supabase
+          .from(_bookmarksTable)
+          .select('post_id')
+          .eq('user_id', currentUid)
+          .inFilter('post_id', postIds);
+
+      final results = await Future.wait([likesFuture, bookmarksFuture]);
+      final likedPostIds = (results[0] as List)
+          .map((r) => r['post_id'] as String)
+          .toSet();
+      final bookmarkedPostIds = (results[1] as List)
+          .map((r) => r['post_id'] as String)
+          .toSet();
+
+      return dtos.map((d) {
+        return d.copyWith(
+          isLiked: likedPostIds.contains(d.postId),
+          isBookmarked: bookmarkedPostIds.contains(d.postId),
+        );
+      }).toList();
+    } catch (_) {
+      return dtos;
+    }
+  }
+
+  Future<List<PostDto>> getFeed({
+    required int limit,
+    String filter = 'all',
+    DateTime? before,
+  }) async {
     try {
       var q = _supabase.from(_table).select(_select).eq('status', 'active');
-      
+
       if (filter == 'people') {
         q = q.eq('author_context', 'personal');
       } else if (filter == 'teams') {
@@ -40,9 +85,8 @@ class PostsRemoteDataSource {
 
       if (before != null) q = q.lt('created_at', before.toIso8601String());
       final rows = await q.order('created_at', ascending: false).limit(limit);
-      return rows
-          .map((r) => PostDto.fromJson(r))
-          .toList();
+      final dtos = rows.map((r) => PostDto.fromJson(r)).toList();
+      return _enrichWithUserInteractions(dtos);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -61,9 +105,98 @@ class PostsRemoteDataSource {
           .eq('status', 'active');
       if (before != null) q = q.lt('created_at', before.toIso8601String());
       final rows = await q.order('created_at', ascending: false).limit(limit);
-      return rows
-          .map((r) => PostDto.fromJson(r))
-          .toList();
+      final dtos = rows.map((r) => PostDto.fromJson(r)).toList();
+      return _enrichWithUserInteractions(dtos);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Toggle post like for authenticated user. Returns `true` if liked, `false` if unliked.
+  Future<bool> togglePostLike(String postId) async {
+    try {
+      final uid = _requireUid();
+      final existing = await _supabase
+          .from(_likesTable)
+          .select('like_id')
+          .eq('post_id', postId)
+          .eq('user_id', uid)
+          .maybeSingle();
+
+      if (existing != null) {
+        await _supabase
+            .from(_likesTable)
+            .delete()
+            .eq('post_id', postId)
+            .eq('user_id', uid);
+        return false;
+      } else {
+        await _supabase.from(_likesTable).insert({
+          'post_id': postId,
+          'user_id': uid,
+        });
+        return true;
+      }
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Toggle bookmark for authenticated user. Returns `true` if bookmarked, `false` if removed.
+  Future<bool> toggleBookmark(String postId) async {
+    try {
+      final uid = _requireUid();
+      final existing = await _supabase
+          .from(_bookmarksTable)
+          .select('bookmark_id')
+          .eq('post_id', postId)
+          .eq('user_id', uid)
+          .maybeSingle();
+
+      if (existing != null) {
+        await _supabase
+            .from(_bookmarksTable)
+            .delete()
+            .eq('post_id', postId)
+            .eq('user_id', uid);
+        return false;
+      } else {
+        await _supabase.from(_bookmarksTable).insert({
+          'post_id': postId,
+          'user_id': uid,
+        });
+        return true;
+      }
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Fetch posts bookmarked by the current user.
+  Future<List<PostDto>> getBookmarkedPosts({
+    required int limit,
+    DateTime? before,
+  }) async {
+    try {
+      final uid = _requireUid();
+      var q = _supabase
+          .from(_bookmarksTable)
+          .select('created_at, post:posts!post_id($_select)')
+          .eq('user_id', uid);
+
+      if (before != null) q = q.lt('created_at', before.toIso8601String());
+      final rows = await q.order('created_at', ascending: false).limit(limit);
+
+      final dtos = <PostDto>[];
+      for (final r in rows) {
+        final postMap = r['post'] as Map<String, dynamic>?;
+        if (postMap != null && postMap['status'] == 'active') {
+          dtos.add(
+            PostDto.fromJson(postMap).copyWith(isBookmarked: true),
+          );
+        }
+      }
+      return _enrichWithUserInteractions(dtos);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

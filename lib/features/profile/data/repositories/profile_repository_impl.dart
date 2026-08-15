@@ -6,19 +6,18 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
-import '../../domain/entities/player_profile.dart';
 import '../../domain/entities/profile.dart';
 import '../../domain/repositories/profile_repository.dart';
 import '../../domain/value_objects/city.dart';
 import '../../domain/value_objects/display_name.dart';
 import '../../domain/value_objects/username.dart';
-import '../datasources/onboarding_remote_datasource.dart';
+import '../datasources/profile_remote_datasource.dart';
 
 /// Online-only profile repository. The single place where the onboarding data
 /// source's raw exceptions are translated into [Failure]s.
 class ProfileRepositoryImpl implements ProfileRepository {
   ProfileRepositoryImpl(this._remote);
-  final OnboardingRemoteDataSource _remote;
+  final ProfileRemoteDataSource _remote;
 
   @override
   Future<Either<Failure, Profile?>> getMyProfile() async {

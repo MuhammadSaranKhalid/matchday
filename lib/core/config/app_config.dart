@@ -45,8 +45,8 @@ class AppConfig {
       environment: environment,
       supabaseUrl: supabaseUrl,
       supabaseAnonKey: supabaseAnonKey,
-      googleWebClientId: String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: ''),
-      googleIosClientId: String.fromEnvironment('GOOGLE_IOS_CLIENT_ID', defaultValue: ''),
+      googleWebClientId: const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: ''),
+      googleIosClientId: const String.fromEnvironment('GOOGLE_IOS_CLIENT_ID', defaultValue: ''),
     );
   }
 }

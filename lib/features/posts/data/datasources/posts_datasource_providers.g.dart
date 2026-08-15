@@ -57,6 +57,54 @@ final class PostsRemoteDataSourceProvider
 String _$postsRemoteDataSourceHash() =>
     r'fc2a1ba6b774cbe01bb26a9a77ce890fba04419b';
 
+@ProviderFor(commentsRemoteDataSource)
+final commentsRemoteDataSourceProvider = CommentsRemoteDataSourceProvider._();
+
+final class CommentsRemoteDataSourceProvider
+    extends
+        $FunctionalProvider<
+          CommentsRemoteDataSource,
+          CommentsRemoteDataSource,
+          CommentsRemoteDataSource
+        >
+    with $Provider<CommentsRemoteDataSource> {
+  CommentsRemoteDataSourceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'commentsRemoteDataSourceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$commentsRemoteDataSourceHash();
+
+  @$internal
+  @override
+  $ProviderElement<CommentsRemoteDataSource> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  CommentsRemoteDataSource create(Ref ref) {
+    return commentsRemoteDataSource(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CommentsRemoteDataSource value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CommentsRemoteDataSource>(value),
+    );
+  }
+}
+
+String _$commentsRemoteDataSourceHash() =>
+    r'5873364a62ba53ad87fd8e491614b8f209813878';
+
 @ProviderFor(photoPicker)
 final photoPickerProvider = PhotoPickerProvider._();
 

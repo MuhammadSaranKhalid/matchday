@@ -3,6 +3,7 @@
 // Supabase, then prepends it to the feed.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/circk_theme.dart';
@@ -21,9 +22,11 @@ class ComposerScreen extends ConsumerStatefulWidget {
 
 class _ComposerScreenState extends ConsumerState<ComposerScreen> {
   final _text = TextEditingController();
+  final _focusNode = FocusNode();
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _text.dispose();
     super.dispose();
   }
@@ -61,7 +64,13 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
               onCancel: () => Navigator.of(context).pop(),
             ),
             Expanded(
-              child: ListView(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  // Massive UX win: tapping anywhere in the composer space focuses the text field
+                  FocusScope.of(context).requestFocus(_focusNode);
+                },
+                child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
                 children: [
                   // Media-first composer: photos on top, caption below
@@ -85,24 +94,11 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
                       Expanded(
                         child: TextField(
                           controller: _text,
+                          focusNode: _focusNode,
                           autofocus: true,
                           maxLines: null,
-                          maxLength: 2000,
+                          inputFormatters: [LengthLimitingTextInputFormatter(2000)],
                           onChanged: (_) => setState(() {}),
-                          // Custom counter so it matches theme styles
-                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
-                            if (currentLength == 0) return null;
-                            final over = currentLength > (maxLength ?? 2000);
-                            return Text(
-                              '$currentLength / $maxLength',
-                              style: CkType.mono(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.10,
-                                color: over ? CkColors.amber : CkColors.muted,
-                              ),
-                            );
-                          },
                           // Borderless caption (social-composer norm) — explicit
                           // none on every state so the theme's focused outline can't
                           // bleed in via autofocus.
@@ -126,8 +122,10 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
                 ],
               ),
             ),
-            ComposerToolbar(
+          ),
+          ComposerToolbar(
               canAddPhoto: state.canAddPhoto && !state.busy,
+              charCount: _text.text.length,
               onAddPhoto: () =>
                   ref.read(composerControllerProvider.notifier).addPhoto(),
             ),

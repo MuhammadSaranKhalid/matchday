@@ -10,7 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../../core/widgets/v2/v2_kit.dart';
-import '../../../../onboarding/presentation/providers/onboarding_providers.dart';
+import '../../../../profile/presentation/providers/profile_providers.dart';
 import 'pv_v2_data.dart';
 import 'pv_v2_kit.dart';
 import 'pv_v2_map.dart';

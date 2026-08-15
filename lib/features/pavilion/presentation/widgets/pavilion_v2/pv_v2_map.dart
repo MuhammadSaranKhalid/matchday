@@ -12,7 +12,7 @@
 //     subtitle carries the real type + city instead, needs is empty.
 import '../../../../matches/domain/entities/match_role.dart';
 import '../../../../matches/presentation/state/my_matches_view.dart';
-import '../../../../onboarding/domain/entities/player_profile.dart';
+import '../../../../profile/domain/entities/player_profile.dart';
 import '../../../../teams/domain/entities/team.dart';
 import '../../../../teams/domain/entities/team_relationship.dart';
 import '../../../../teams/presentation/utils/team_display.dart';

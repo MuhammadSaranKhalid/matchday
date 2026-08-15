@@ -38,29 +38,66 @@ class PhotoProcessor implements PhotoPicker {
       uiSettings: [
         AndroidUiSettings(
           toolbarTitle: 'Adjust',
+          initAspectRatio: CropAspectRatioPreset.original,
           lockAspectRatio: false,
           hideBottomControls: false,
+          aspectRatioPresets: [
+            CropAspectRatioPreset.original,
+            CropAspectRatioPreset.square,
+            CropAspectRatioPreset.ratio3x2,
+            CropAspectRatioPreset.ratio4x3,
+            CropAspectRatioPreset.ratio16x9
+          ],
         ),
-        IOSUiSettings(title: 'Adjust'),
+        IOSUiSettings(
+          title: 'Adjust',
+          aspectRatioPresets: [
+            CropAspectRatioPreset.original,
+            CropAspectRatioPreset.square,
+            CropAspectRatioPreset.ratio3x2,
+            CropAspectRatioPreset.ratio4x3,
+            CropAspectRatioPreset.ratio16x9
+          ],
+        ),
       ],
     );
     if (cropped == null) return null;
 
+    // uCrop native optimization bug: if the user hits "done" without changing anything,
+    // it sometimes returns a target path but fails to actually write the file to disk.
+    final String sourceForCompression = await File(cropped.path).exists() 
+        ? cropped.path 
+        : picked.path;
+
     final dir = await getTemporaryDirectory();
     final target =
         '${dir.path}/mday_${DateTime.now().microsecondsSinceEpoch}.jpg';
+        
     // Native resize/compress (runs off the Dart main isolate).
-    final out = await FlutterImageCompress.compressAndGetFile(
-      cropped.path,
-      target,
-      minWidth: _maxEdge,
-      minHeight: _maxEdge,
-      quality: _quality,
-      format: CompressFormat.jpeg,
-    );
-    if (out == null) return null;
+    XFile? out;
+    try {
+      out = await FlutterImageCompress.compressAndGetFile(
+        sourceForCompression,
+        target,
+        minWidth: _maxEdge,
+        minHeight: _maxEdge,
+        quality: _quality,
+        format: CompressFormat.jpeg,
+      );
+    } catch (_) {
+      // Catch CompressError or any filesystem exception.
+      out = null;
+    }
 
-    final file = File(out.path);
+    File file;
+    if (out != null && await File(out.path).exists()) {
+      file = File(out.path);
+    } else {
+      // flutter_image_compress natively fails sometimes on specific Android OS variants
+      // but still returns an XFile object. If the file doesn't actually exist on disk,
+      // fallback to using the uncompressed cropped (or picked) image to prevent crashes.
+      file = File(sourceForCompression);
+    }
     // Dimensions from the header only (no full pure-Dart decode).
     final (width, height) = await _dimensions(file);
 

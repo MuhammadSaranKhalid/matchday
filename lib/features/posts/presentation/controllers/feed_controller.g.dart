@@ -36,7 +36,7 @@ final class FeedControllerProvider
   FeedController create() => FeedController();
 }
 
-String _$feedControllerHash() => r'6760bfcf8b6250560f4ea5acd387805c318984e4';
+String _$feedControllerHash() => r'09911ea03acff191963d364f41281eab09efe6b3';
 
 /// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
 

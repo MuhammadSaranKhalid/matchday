@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../onboarding/presentation/providers/onboarding_providers.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
 
 class ComposerAvatar extends ConsumerWidget {
   const ComposerAvatar({super.key});

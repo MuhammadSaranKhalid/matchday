@@ -1,6 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import '../../domain/value_objects/display_name.dart';
+import '../../../profile/domain/value_objects/display_name.dart';
 
 part 'onboarding_state.freezed.dart';
 

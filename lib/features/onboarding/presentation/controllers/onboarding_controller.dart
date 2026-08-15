@@ -5,8 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
-import '../../domain/value_objects/display_name.dart';
-import '../../domain/value_objects/username.dart';
+import '../../../profile/domain/value_objects/display_name.dart';
+import '../../../profile/domain/value_objects/username.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
 import '../providers/onboarding_providers.dart';
 import '../state/onboarding_state.dart';
 

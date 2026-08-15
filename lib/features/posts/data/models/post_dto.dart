@@ -30,6 +30,8 @@ abstract class PostDto with _$PostDto {
     @JsonKey(name: 'likes_count') @Default(0) int likesCount,
     @JsonKey(name: 'comments_count') @Default(0) int commentsCount,
     @JsonKey(name: 'shares_count') @Default(0) int sharesCount,
+    @JsonKey(name: 'is_liked') @Default(false) bool isLiked,
+    @JsonKey(name: 'is_bookmarked') @Default(false) bool isBookmarked,
     @Default('active') String status,
     @JsonKey(name: 'created_at') required String createdAt,
     @JsonKey(name: 'edited_at') String? editedAt,
@@ -43,7 +45,7 @@ abstract class PostDto with _$PostDto {
   factory PostDto.fromJson(Map<String, dynamic> json) =>
       _$PostDtoFromJson(json);
 
-  Post toEntity() => Post(
+  Post toEntity({bool? isLikedOverride, bool? isBookmarkedOverride}) => Post(
         id: PostId(postId),
         authorId: authorId,
         authorContext: PostAuthorContext.fromWire(authorContext),
@@ -60,6 +62,8 @@ abstract class PostDto with _$PostDto {
         likesCount: likesCount,
         commentsCount: commentsCount,
         sharesCount: sharesCount,
+        isLiked: isLikedOverride ?? isLiked,
+        isBookmarked: isBookmarkedOverride ?? isBookmarked,
         status: PostStatus.fromWire(status),
         createdAt: DateTime.parse(createdAt),
         editedAt: editedAt == null ? null : DateTime.tryParse(editedAt!),

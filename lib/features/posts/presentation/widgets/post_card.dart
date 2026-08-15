@@ -16,6 +16,9 @@ class FeedPostCard extends StatelessWidget {
     required this.post,
     required this.onComment,
     required this.onOpenPhoto,
+    this.onLike,
+    this.onBookmark,
+    this.onShare,
     this.onAuthorTap,
     this.showAuthor = true,
   });
@@ -23,6 +26,9 @@ class FeedPostCard extends StatelessWidget {
   final Post post;
   final VoidCallback onComment;
   final void Function(int index) onOpenPhoto;
+  final VoidCallback? onLike;
+  final VoidCallback? onBookmark;
+  final VoidCallback? onShare;
 
   /// Fires when the author avatar is tapped, passing the author's @handle.
   /// The host route pushes `/u/<username>` to open the public profile.
@@ -41,10 +47,7 @@ class FeedPostCard extends StatelessWidget {
         _header(),
         if ((post.text ?? '').isNotEmpty) ...[
           const SizedBox(height: 6),
-          Text(
-            post.text!,
-            style: CkType.body(fontSize: 14, height: 1.45, color: CkColors.ink),
-          ),
+          _ExpandablePostText(text: post.text!),
         ],
         if (post.hasMedia) ...[
           const SizedBox(height: 10),
@@ -53,39 +56,40 @@ class FeedPostCard extends StatelessWidget {
         PostActions(
           likes: post.likesCount,
           comments: post.commentsCount,
+          liked: post.isLiked,
+          saved: post.isBookmarked,
+          onLike: onLike,
+          onBookmark: onBookmark,
+          onShare: onShare,
           onComment: onComment,
         ),
       ],
     );
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onComment,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: const BoxDecoration(
-          color: CkColors.paper,
-          border: Border(top: BorderSide(color: CkColors.hairline)),
-        ),
-        child: showAuthor
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      final u = post.authorUsername;
-                      if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
-                    },
-                    child:
-                        Avatar(mono: post.authorMonogram, tone: AvatarTone.ink),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: content),
-                ],
-              )
-            : content,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: const BoxDecoration(
+        color: CkColors.paper,
+        border: Border(top: BorderSide(color: CkColors.hairline)),
       ),
+      child: showAuthor
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    final u = post.authorUsername;
+                    if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
+                  },
+                  child:
+                      Avatar(mono: post.authorMonogram, tone: AvatarTone.ink),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: content),
+              ],
+            )
+          : content,
     );
   }
 
@@ -96,19 +100,35 @@ class FeedPostCard extends StatelessWidget {
       textBaseline: TextBaseline.alphabetic,
       children: [
         if (showAuthor) ...[
-          Flexible(
-            child: Text(
-              post.authorName ?? 'matchday player',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: CkType.display(fontSize: 13.5, letterSpacing: -0.01),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              final u = post.authorUsername;
+              if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Flexible(
+                  child: Text(
+                    post.authorName ?? 'matchday player',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: CkType.display(fontSize: 13.5, letterSpacing: -0.01),
+                  ),
+                ),
+                if (post.authorUsername != null) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '@${post.authorUsername}',
+                    style: CkType.body(fontSize: 11, color: CkColors.muted),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (post.authorUsername != null) ...[
-            const SizedBox(width: 6),
-            Text('@${post.authorUsername}',
-                style: CkType.body(fontSize: 11, color: CkColors.muted)),
-          ],
         ],
         if (post.autoGenerated) ...[
           if (showAuthor) const SizedBox(width: 6),
@@ -212,6 +232,58 @@ class PostMediaGrid extends StatelessWidget {
     return GestureDetector(
       onTap: () => onOpen(i),
       child: CkFeedImage(url: m.url, blurhash: m.blurhash, useAspectRatio: false),
+    );
+  }
+}
+
+class _ExpandablePostText extends StatefulWidget {
+  const _ExpandablePostText({required this.text});
+  final String text;
+
+  @override
+  State<_ExpandablePostText> createState() => _ExpandablePostTextState();
+}
+
+class _ExpandablePostTextState extends State<_ExpandablePostText> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLong = widget.text.length > 200 || '\n'.allMatches(widget.text).length >= 4;
+
+    if (!isLong) {
+      return Text(
+        widget.text,
+        style: CkType.body(fontSize: 14, height: 1.45, color: CkColors.ink),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.text,
+          maxLines: _expanded ? null : 4,
+          overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+          style: CkType.body(fontSize: 14, height: 1.45, color: CkColors.ink),
+        ),
+        const SizedBox(height: 4),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              _expanded ? 'Show less' : 'See more',
+              style: CkType.body(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: CkColors.muted,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

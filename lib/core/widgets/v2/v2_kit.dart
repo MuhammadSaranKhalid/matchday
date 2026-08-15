@@ -18,7 +18,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../theme/circk_theme.dart';
 import '../../../features/notifications/presentation/providers/notifications_providers.dart';
-import '../../../features/onboarding/presentation/providers/onboarding_providers.dart';
+import '../../../features/profile/presentation/providers/profile_providers.dart';
 
 /// `Color` → `#RRGGBB` for embedding in raw SVG markup.
 String ckHex(Color c) {
@@ -576,15 +576,23 @@ class PostActions extends StatefulWidget {
     required this.likes,
     required this.comments,
     this.liked = false,
+    this.saved = false,
     this.rsvp,
+    this.onLike,
     this.onComment,
+    this.onBookmark,
+    this.onShare,
   });
 
   final int likes;
   final int comments;
   final bool liked;
+  final bool saved;
   final String? rsvp;
+  final VoidCallback? onLike;
   final VoidCallback? onComment;
+  final VoidCallback? onBookmark;
+  final VoidCallback? onShare;
 
   @override
   State<PostActions> createState() => _PostActionsState();
@@ -593,7 +601,19 @@ class PostActions extends StatefulWidget {
 class _PostActionsState extends State<PostActions> {
   late bool _liked = widget.liked;
   late int _likes = widget.likes;
-  bool _saved = false;
+  late bool _saved = widget.saved;
+
+  @override
+  void didUpdateWidget(covariant PostActions oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.liked != widget.liked || oldWidget.likes != widget.likes) {
+      _liked = widget.liked;
+      _likes = widget.likes;
+    }
+    if (oldWidget.saved != widget.saved) {
+      _saved = widget.saved;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -613,10 +633,13 @@ class _PostActionsState extends State<PostActions> {
             label: '$_likes',
             filled: _liked,
             color: _liked ? CkColors.red : CkColors.ink2,
-            onTap: () => setState(() {
-              _liked = !_liked;
-              _likes += _liked ? 1 : -1;
-            }),
+            onTap: () {
+              setState(() {
+                _liked = !_liked;
+                _likes += _liked ? 1 : -1;
+              });
+              widget.onLike?.call();
+            },
           ),
           _action(
             icon: V2Icons.comment,
@@ -628,7 +651,7 @@ class _PostActionsState extends State<PostActions> {
             icon: V2Icons.share,
             label: 'Share',
             color: CkColors.ink2,
-            onTap: () {},
+            onTap: widget.onShare ?? () {},
           ),
           // The RSVP text takes the remaining space and right-aligns next to
           // Save, ellipsizing on narrow screens rather than overflowing.
@@ -652,7 +675,10 @@ class _PostActionsState extends State<PostActions> {
             label: null,
             filled: _saved,
             color: _saved ? CkColors.ink : CkColors.ink2,
-            onTap: () => setState(() => _saved = !_saved),
+            onTap: () {
+              setState(() => _saved = !_saved);
+              widget.onBookmark?.call();
+            },
           ),
         ],
       ),

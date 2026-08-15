@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../entities/profile.dart';
-import '../entities/player_profile.dart';
 import '../value_objects/city.dart';
 import '../value_objects/display_name.dart';
 import '../value_objects/username.dart';

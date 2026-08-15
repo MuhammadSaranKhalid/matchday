@@ -7,10 +7,12 @@ class ComposerToolbar extends StatelessWidget {
     super.key,
     required this.canAddPhoto,
     required this.onAddPhoto,
+    required this.charCount,
   });
 
   final bool canAddPhoto;
   final VoidCallback onAddPhoto;
+  final int charCount;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +41,18 @@ class ComposerToolbar extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          if (charCount > 0) ...[
+            Text(
+              '$charCount / 2000',
+              style: CkType.mono(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.10,
+                color: charCount >= 2000 ? CkColors.amber : CkColors.soft,
+              ),
+            ),
+            const SizedBox(width: 16),
+          ],
           Text('PUBLIC ▾',
               style: CkType.mono(
                   fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.08)),

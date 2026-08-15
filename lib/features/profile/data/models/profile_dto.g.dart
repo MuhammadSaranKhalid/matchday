@@ -12,6 +12,7 @@ _ProfileDto _$ProfileDtoFromJson(Map<String, dynamic> json) => _ProfileDto(
   displayName: json['display_name'] as String?,
   bio: json['bio'] as String?,
   profilePhotoUrl: json['profile_photo_url'] as String?,
+  coverPhotoUrl: json['cover_photo_url'] as String?,
   location: json['location'] as Map<String, dynamic>?,
   onboardedAt: json['onboarded_at'] as String?,
   playerProfile:
@@ -29,6 +30,7 @@ Map<String, dynamic> _$ProfileDtoToJson(_ProfileDto instance) =>
       'display_name': instance.displayName,
       'bio': instance.bio,
       'profile_photo_url': instance.profilePhotoUrl,
+      'cover_photo_url': instance.coverPhotoUrl,
       'location': instance.location,
       'onboarded_at': instance.onboardedAt,
       'player_profile': instance.playerProfile,

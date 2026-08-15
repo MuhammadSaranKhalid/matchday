@@ -1,7 +1,7 @@
 // Profile editor — loads the signed-in user's real profile, edits name /
 // username / bio / location, lets them pick a new avatar, and saves to Supabase
 // (text fields + avatar upload). Visual layout ports `V21ProfileEdit`.
-import 'dart:io';
+
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,133 +9,37 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:matchday/core/theme/circk_theme.dart';
 import 'package:matchday/core/widgets/v2/v2_kit.dart';
-import 'package:matchday/features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../controllers/profile_edit_controller.dart';
+import '../state/profile_edit_state.dart';
 
-class ProfileEditScreen extends ConsumerStatefulWidget {
+class ProfileEditScreen extends ConsumerWidget {
   const ProfileEditScreen({super.key});
 
   @override
-  ConsumerState<ProfileEditScreen> createState() => _ProfileEditScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(profileEditControllerProvider);
+    final ctrl = ref.read(profileEditControllerProvider.notifier);
 
-class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
-  late final TextEditingController _name;
-  late final TextEditingController _username;
-  late final TextEditingController _bio;
-  late final TextEditingController _city;
-
-  // Seeded from the loaded profile; passed through on save so we don't wipe geo
-  // or trip the username cooldown on an unchanged handle.
-  String? _originalUsername;
-  String? _avatarUrl;
-  String? _placeId;
-  double? _lat;
-  double? _lng;
-  String? _countryCode;
-
-  bool _locating = false;
-  int _bioLen = 0;
-  String _initials = '?';
-
-  @override
-  void initState() {
-    super.initState();
-    final p = ref.read(myProfileProvider).value;
-    _name = TextEditingController(text: p?.displayName ?? '')
-      ..addListener(_recomputeInitials);
-    _username = TextEditingController(text: p?.username ?? '');
-    _bio = TextEditingController(text: p?.bio ?? '')..addListener(_recomputeBioLen);
-    _bioLen = _bio.text.length;
-    _city = TextEditingController(text: p?.city ?? '');
-    _originalUsername = p?.username;
-    _avatarUrl = p?.avatarUrl;
-    _placeId = p?.placeId;
-    _lat = p?.latitude;
-    _lng = p?.longitude;
-    _countryCode = p?.countryCode;
-    _recomputeInitials();
-  }
-
-  void _recomputeInitials() {
-    final words = _name.text.trim().split(RegExp(r'\s+'));
-    final letters =
-        words.where((w) => w.isNotEmpty).map((w) => w[0]).join();
-    final next = letters.isEmpty
-        ? '?'
-        : letters.substring(0, letters.length >= 2 ? 2 : 1).toUpperCase();
-    if (next != _initials) setState(() => _initials = next);
-  }
-
-  void _recomputeBioLen() {
-    if (_bio.text.length != _bioLen) setState(() => _bioLen = _bio.text.length);
-  }
-
-  Future<void> _useGps() async {
-    setState(() => _locating = true);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() {
-      _city.text = 'Korangi, Karachi';
-      _locating = false;
-    });
-  }
-
-  Future<void> _save() async {
-    final ok = await ref.read(profileEditControllerProvider.notifier).save(
-          displayName: _name.text,
-          username: _username.text,
-          originalUsername: _originalUsername,
-          bio: _bio.text,
-          city: _city.text,
-          placeId: _placeId,
-          latitude: _lat,
-          longitude: _lng,
-          countryCode: _countryCode,
-        );
-    if (!mounted) return;
-    if (ok) {
-      Navigator.maybePop(context);
-    } else {
-      final err = ref.read(profileEditControllerProvider).error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(err?.message ?? 'Could not save your profile.')),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _username.dispose();
-    _bio.dispose();
-    _city.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final edit = ref.watch(profileEditControllerProvider);
     return Scaffold(
       backgroundColor: CkColors.paper,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            _nav(context, saving: edit.saving),
+            _nav(context, ref: ref, state: state, ctrl: ctrl),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _avatarAndName(edit.avatar),
+                    _avatarAndName(state: state, ctrl: ctrl),
                     const SizedBox(height: 16),
-                    _usernameField(),
+                    _usernameField(state: state, ctrl: ctrl),
                     const SizedBox(height: 12),
-                    _bioField(),
+                    _bioField(state: state, ctrl: ctrl),
                     const SizedBox(height: 4),
-                    _locationField(),
+                    _locationField(state: state, ctrl: ctrl),
                     const SizedBox(height: 18),
                     _privacyNote(),
                   ],
@@ -148,7 +52,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     );
   }
 
-  Widget _nav(BuildContext context, {required bool saving}) {
+  Widget _nav(
+    BuildContext context, {
+    required WidgetRef ref,
+    required ProfileEditState state,
+    required ProfileEditController ctrl,
+  }) {
+    final saving = state.saving;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
       child: Row(
@@ -177,7 +87,21 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           ),
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: saving ? null : _save,
+            onTap: saving
+                ? null
+                : () async {
+                    final ok = await ctrl.save();
+                    if (ok && context.mounted) {
+                      Navigator.maybePop(context);
+                    } else if (!ok && context.mounted) {
+                      final err = ref.read(profileEditControllerProvider).error;
+                      if (err != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(err.message)),
+                        );
+                      }
+                    }
+                  },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
               decoration: BoxDecoration(
@@ -206,7 +130,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     );
   }
 
-  Widget _avatarAndName(File? picked) {
+  Widget _avatarAndName({
+    required ProfileEditState state,
+    required ProfileEditController ctrl,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -220,7 +147,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 child: SizedBox(
                   width: 88,
                   height: 88,
-                  child: _avatarImage(picked),
+                  child: _avatarImage(state),
                 ),
               ),
               Positioned(
@@ -228,9 +155,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 bottom: -4,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: () => ref
-                      .read(profileEditControllerProvider.notifier)
-                      .pickAvatar(),
+                  onTap: ctrl.pickAvatar,
                   child: Container(
                     width: 30,
                     height: 30,
@@ -264,7 +189,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               children: [
                 const _FieldLabel('NAME'),
                 const SizedBox(height: 4),
-                _EditField(controller: _name),
+                _EditField(
+                  initialValue: state.displayName,
+                  onChanged: ctrl.setDisplayName,
+                ),
               ],
             ),
           ),
@@ -274,44 +202,56 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   /// Picked file > existing avatar URL > initials.
-  Widget _avatarImage(File? picked) {
-    if (picked != null) {
-      return Image.file(picked, width: 88, height: 88, fit: BoxFit.cover);
+  Widget _avatarImage(ProfileEditState state) {
+    if (state.avatar != null) {
+      return Image.file(state.avatar!, width: 88, height: 88, fit: BoxFit.cover);
     }
-    if (_avatarUrl != null && _avatarUrl!.isNotEmpty) {
+    if (state.currentAvatarUrl != null && state.currentAvatarUrl!.isNotEmpty) {
       return Image.network(
-        _avatarUrl!,
+        state.currentAvatarUrl!,
         width: 88,
         height: 88,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _initialsAvatar(),
+        errorBuilder: (_, __, ___) => _initialsAvatar(state.displayName),
       );
     }
-    return _initialsAvatar();
+    return _initialsAvatar(state.displayName);
   }
 
-  Widget _initialsAvatar() => Container(
-        color: CkColors.ink,
-        alignment: Alignment.center,
-        child: Text(
-          _initials,
-          style: CkType.display(
-            fontSize: 34,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.03,
-            color: CkColors.paper,
-          ),
-        ),
-      );
+  Widget _initialsAvatar(String name) {
+    final words = name.trim().split(RegExp(r'\s+'));
+    final letters = words.where((w) => w.isNotEmpty).map((w) => w[0]).join();
+    final initials = letters.isEmpty
+        ? '?'
+        : letters.substring(0, letters.length >= 2 ? 2 : 1).toUpperCase();
 
-  Widget _usernameField() {
+    return Container(
+      color: CkColors.ink,
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: CkType.display(
+          fontSize: 34,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.03,
+          color: CkColors.paper,
+        ),
+      ),
+    );
+  }
+
+  Widget _usernameField({
+    required ProfileEditState state,
+    required ProfileEditController ctrl,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _FieldLabel('USERNAME'),
         const SizedBox(height: 4),
         _EditField(
-          controller: _username,
+          initialValue: state.username,
+          onChanged: ctrl.setUsername,
           prefix: '@',
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9_]')),
@@ -321,19 +261,28 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     );
   }
 
-  Widget _bioField() {
-    final over = _bioLen > 150;
+  Widget _bioField({
+    required ProfileEditState state,
+    required ProfileEditController ctrl,
+  }) {
+    final over = state.bio.length > 200;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _FieldLabel('BIO'),
         const SizedBox(height: 4),
-        _EditField(controller: _bio, minLines: 3, maxLines: 5, maxLength: 200),
+        _EditField(
+          initialValue: state.bio,
+          onChanged: ctrl.setBio,
+          minLines: 3,
+          maxLines: 5,
+          maxLength: 200,
+        ),
         const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
           child: Text(
-            '$_bioLen / 200',
+            '${state.bio.length} / 200',
             style: CkType.mono(
               fontSize: 9,
               fontWeight: FontWeight.w600,
@@ -346,7 +295,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     );
   }
 
-  Widget _locationField() {
+  Widget _locationField({
+    required ProfileEditState state,
+    required ProfileEditController ctrl,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -354,11 +306,18 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         const SizedBox(height: 4),
         Row(
           children: [
-            Expanded(child: _EditField(controller: _city)),
+            Expanded(
+              child: _EditField(
+                // Use a key based on city to force update when GPS is clicked
+                key: ValueKey(state.city),
+                initialValue: state.city,
+                onChanged: ctrl.setCity,
+              ),
+            ),
             const SizedBox(width: 8),
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: _locating ? null : _useGps,
+              onTap: ctrl.useGps,
               child: Container(
                 height: 42,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -375,7 +334,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         size: 12, color: CkColors.ink2, strokeWidth: 2),
                     const SizedBox(width: 5),
                     Text(
-                      _locating ? 'Locating…' : 'GPS',
+                      'GPS',
                       style: CkType.body(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -440,9 +399,11 @@ class _FieldLabel extends StatelessWidget {
   }
 }
 
-class _EditField extends StatelessWidget {
+class _EditField extends StatefulWidget {
   const _EditField({
-    required this.controller,
+    super.key,
+    required this.initialValue,
+    required this.onChanged,
     this.prefix,
     this.minLines,
     this.maxLines = 1,
@@ -450,7 +411,8 @@ class _EditField extends StatelessWidget {
     this.inputFormatters,
   });
 
-  final TextEditingController controller;
+  final String initialValue;
+  final ValueChanged<String> onChanged;
   final String? prefix;
   final int? minLines;
   final int maxLines;
@@ -458,13 +420,33 @@ class _EditField extends StatelessWidget {
   final List<TextInputFormatter>? inputFormatters;
 
   @override
+  State<_EditField> createState() => _EditFieldState();
+}
+
+class _EditFieldState extends State<_EditField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: controller,
-      minLines: minLines,
-      maxLines: maxLines,
-      maxLength: maxLength,
-      inputFormatters: inputFormatters,
+      controller: _controller,
+      onChanged: widget.onChanged,
+      minLines: widget.minLines,
+      maxLines: widget.maxLines,
+      maxLength: widget.maxLength,
+      inputFormatters: widget.inputFormatters,
       cursorColor: CkColors.ink,
       style: CkType.body(fontSize: 14, color: CkColors.ink, height: 1.45),
       decoration: InputDecoration(
@@ -472,7 +454,7 @@ class _EditField extends StatelessWidget {
         counterText: '',
         filled: true,
         fillColor: CkColors.paper,
-        prefixText: prefix,
+        prefixText: widget.prefix,
         prefixStyle: CkType.body(
           fontSize: 14,
           fontWeight: FontWeight.w500,

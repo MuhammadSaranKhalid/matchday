@@ -23,4 +23,16 @@ abstract class PostsRepository {
 
   /// Soft-delete a post the current user authored.
   Future<Either<Failure, Unit>> deletePost(PostId id);
+
+  /// Toggle like state on a post for the authenticated user.
+  /// Returns updated isLiked boolean.
+  Future<Either<Failure, bool>> togglePostLike(PostId id);
+
+  /// Toggle bookmark/saved state on a post for the authenticated user.
+  /// Returns updated isBookmarked boolean.
+  Future<Either<Failure, bool>> toggleBookmark(PostId id);
+
+  /// Fetch posts bookmarked by the current user.
+  Future<Either<Failure, List<Post>>> getBookmarkedPosts({int limit = 20, DateTime? before});
 }
+

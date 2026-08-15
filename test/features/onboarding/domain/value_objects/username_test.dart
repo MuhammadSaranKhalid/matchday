@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matchday/core/error/failures.dart';
-import 'package:matchday/features/onboarding/domain/value_objects/username.dart';
+import 'package:matchday/features/profile/domain/value_objects/username.dart';
 
 void main() {
   group('Username.create', () {

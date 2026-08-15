@@ -8,8 +8,8 @@ import '../models/profile_dto.dart';
 /// throws raw exceptions. The profiles row already exists (created by the
 /// `handle_new_auth_user` trigger), so onboarding UPDATEs it — never INSERTs.
 /// Cricketing attributes live in `player_profiles` and are upserted separately.
-class OnboardingRemoteDataSource {
-  OnboardingRemoteDataSource(this._supabase);
+class ProfileRemoteDataSource {
+  ProfileRemoteDataSource(this._supabase);
   final SupabaseClient _supabase;
 
   static const _profiles = 'profiles';

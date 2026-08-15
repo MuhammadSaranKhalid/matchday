@@ -1,3 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
@@ -27,6 +29,16 @@ class FeedController extends _$FeedController {
       (f) => throw FailureWrapper(f),
       (posts) {
         _hasMore = posts.length == _pageSize;
+        
+        // Aggressive Prefetching: Start downloading images for these posts immediately
+        // in the background before the UI ever scrolls to them. This ensures they
+        // are instantly available in the local disk cache.
+        for (final p in posts) {
+          for (final m in p.media) {
+            CachedNetworkImageProvider(m.url).resolve(ImageConfiguration.empty);
+          }
+        }
+        
         return posts;
       },
     );
@@ -58,4 +70,74 @@ class FeedController extends _$FeedController {
     final current = state.value ?? const [];
     state = AsyncData([post, ...current]);
   }
+
+  /// Toggle like state on a post in the feed optimistically.
+  Future<void> toggleLike(PostId postId) async {
+    final current = state.value;
+    if (current == null) return;
+
+    final updated = current.map((p) {
+      if (p.id == postId) {
+        final newIsLiked = !p.isLiked;
+        final newCount = newIsLiked ? p.likesCount + 1 : (p.likesCount > 0 ? p.likesCount - 1 : 0);
+        return p.copyWith(isLiked: newIsLiked, likesCount: newCount);
+      }
+      return p;
+    }).toList();
+
+    state = AsyncData(updated);
+
+    final repo = ref.read(postsRepositoryProvider);
+    final result = await repo.togglePostLike(postId);
+
+    result.fold(
+      (failure) {
+        // Rollback on failure
+        state = AsyncData(current);
+      },
+      (_) {},
+    );
+  }
+
+  /// Toggle bookmark state on a post in the feed optimistically.
+  Future<void> toggleBookmark(PostId postId) async {
+    final current = state.value;
+    if (current == null) return;
+
+    final updated = current.map((p) {
+      if (p.id == postId) {
+        return p.copyWith(isBookmarked: !p.isBookmarked);
+      }
+      return p;
+    }).toList();
+
+    state = AsyncData(updated);
+
+    final repo = ref.read(postsRepositoryProvider);
+    final result = await repo.toggleBookmark(postId);
+
+    result.fold(
+      (failure) {
+        // Rollback on failure
+        state = AsyncData(current);
+      },
+      (_) {},
+    );
+  }
+
+  /// Increment comments count on a post when a comment is added.
+  void incrementCommentsCount(PostId postId) {
+    final current = state.value;
+    if (current == null) return;
+
+    final updated = current.map((p) {
+      if (p.id == postId) {
+        return p.copyWith(commentsCount: p.commentsCount + 1);
+      }
+      return p;
+    }).toList();
+
+    state = AsyncData(updated);
+  }
 }
+

@@ -98,6 +98,8 @@ abstract class Post with _$Post {
     @Default(0) int likesCount,
     @Default(0) int commentsCount,
     @Default(0) int sharesCount,
+    @Default(false) bool isLiked,
+    @Default(false) bool isBookmarked,
     @Default(PostStatus.active) PostStatus status,
     required DateTime createdAt,
     DateTime? editedAt,

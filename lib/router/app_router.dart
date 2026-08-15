@@ -8,11 +8,12 @@ import '../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../features/home/presentation/screens/home_feed_screen.dart';
 import '../features/matches/presentation/screens/matches_v2_screen.dart';
 import '../features/messages/presentation/screens/message_thread_screen.dart';
+import '../features/profile/presentation/screens/my_profile_screen.dart';
+import '../features/profile/presentation/screens/public_profile_screen.dart';
 import '../features/messages/presentation/screens/inbox_screen.dart';
 import '../features/pavilion/presentation/screens/my_matches_screen.dart';
 import '../features/pavilion/presentation/screens/pavilion_match_detail_screen.dart';
 import '../features/pavilion/presentation/screens/pavilion_v2_screen.dart';
-import '../features/profile/presentation/screens/profile_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
 import '../features/shell/presentation/widgets/swipeable_branch_view.dart';
 import '../features/teams/presentation/screens/add_unclaimed_player_screen.dart';
@@ -299,7 +300,7 @@ GoRouter appRouter(Ref ref) {
       // Search tab — D9 in docs/search-feature-design.md.)
       GoRoute(
         path: '/profile',
-        builder: (_, __) => const ProfileScreen(),
+        builder: (_, __) => const MyProfileScreen(),
       ),
       // Public profile by @username — the landing for a shared
       // `joinmatchday.com/u/<username>` link (universal/app link) and for
@@ -308,7 +309,7 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/u/:username',
         builder: (_, state) =>
-            ProfileScreen(username: state.pathParameters['username']!),
+            PublicProfileScreen(username: state.pathParameters['username']!),
       ),
     ],
   );

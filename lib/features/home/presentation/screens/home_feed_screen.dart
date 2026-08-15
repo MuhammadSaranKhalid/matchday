@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:matchday/core/theme/circk_theme.dart';
 import 'package:matchday/features/posts/presentation/widgets/post_card.dart';
 import 'package:matchday/core/widgets/v2/v2_kit.dart';
-import 'package:matchday/core/widgets/v2/v2_modals.dart';
+import 'package:matchday/core/widgets/modals/modals.dart';
 import 'package:matchday/features/posts/domain/entities/post.dart';
 import 'package:matchday/features/matches/presentation/providers/my_matches_providers.dart';
 import 'package:matchday/features/posts/domain/entities/post_media.dart';
@@ -66,7 +66,7 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
   }
 
   void _onScroll() {
-    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 600) {
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 1500) {
       ref.read(feedControllerProvider.notifier).loadMore();
     }
   }
@@ -138,7 +138,16 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
         return RepaintBoundary(
           child: FeedPostCard(
             post: post,
-            onComment: () => showCommentsSheet(context),
+            onComment: () => showCommentsSheet(
+              context,
+              postId: post.id.value,
+              postAuthorHandle: post.authorUsername != null && post.authorUsername!.isNotEmpty
+                  ? '@${post.authorUsername}'
+                  : post.authorName,
+              onOpenProfile: (username) => widget.onOpenProfile?.call(username),
+            ),
+            onLike: () => ref.read(feedControllerProvider.notifier).toggleLike(post.id),
+            onBookmark: () => ref.read(feedControllerProvider.notifier).toggleBookmark(post.id),
             onAuthorTap: (username) => widget.onOpenProfile?.call(username),
             onOpenPhoto: (index) => _openPhoto(post.media, index),
           ),

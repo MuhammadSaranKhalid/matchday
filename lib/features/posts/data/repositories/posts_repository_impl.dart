@@ -155,4 +155,50 @@ class PostsRepositoryImpl implements PostsRepository {
       return Left(UnknownFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, bool>> togglePostLike(PostId id) async {
+    try {
+      final isLiked = await _remote.togglePostLike(id.value);
+      return Right(isLiked);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> toggleBookmark(PostId id) async {
+    try {
+      final isBookmarked = await _remote.toggleBookmark(id.value);
+      return Right(isBookmarked);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Post>>> getBookmarkedPosts({
+    int limit = 20,
+    DateTime? before,
+  }) async {
+    try {
+      final dtos = await _remote.getBookmarkedPosts(limit: limit, before: before);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
 }
+

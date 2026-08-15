@@ -1,42 +1,35 @@
-import 'dart:io';
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
-import '../../../onboarding/domain/value_objects/city.dart';
-import '../../../onboarding/domain/value_objects/display_name.dart';
-import '../../../onboarding/domain/value_objects/username.dart';
-import '../../../onboarding/presentation/providers/onboarding_providers.dart';
+import '../../../profile/domain/value_objects/city.dart';
+import '../../../profile/domain/value_objects/display_name.dart';
+import '../../../profile/domain/value_objects/username.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
+import '../state/profile_edit_state.dart';
 
 part 'profile_edit_controller.g.dart';
 
 const _maxBio = 200;
 
-class ProfileEditState {
-  const ProfileEditState({this.avatar, this.saving = false, this.error});
-
-  /// Newly-picked avatar (square-cropped, resized) awaiting upload on save.
-  final File? avatar;
-  final bool saving;
-  final Failure? error;
-
-  ProfileEditState copyWith({
-    File? avatar,
-    bool? saving,
-    Failure? error,
-    bool clearError = false,
-  }) =>
-      ProfileEditState(
-        avatar: avatar ?? this.avatar,
-        saving: saving ?? this.saving,
-        error: clearError ? null : (error ?? this.error),
-      );
-}
-
 @riverpod
 class ProfileEditController extends _$ProfileEditController {
   @override
-  ProfileEditState build() => const ProfileEditState();
+  ProfileEditState build() {
+    final profile = ref.read(myProfileProvider).value;
+    return ProfileEditState.initial(profile);
+  }
+
+  void setDisplayName(String value) => state = state.copyWith(displayName: value);
+  void setUsername(String value) => state = state.copyWith(username: value);
+  void setBio(String value) => state = state.copyWith(bio: value);
+  void setCity(String value) => state = state.copyWith(city: value);
+
+  Future<void> useGps() async {
+    // Fake GPS delay
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (!ref.mounted) return;
+    state = state.copyWith(city: 'Korangi, Karachi');
+  }
 
   Future<void> pickAvatar() async {
     final file = await ref.read(avatarPickerProvider).pickSquare();
@@ -44,36 +37,24 @@ class ProfileEditController extends _$ProfileEditController {
     state = state.copyWith(avatar: file);
   }
 
-  /// Save the edits. Returns true on success (and refreshes [myProfileProvider]).
-  /// [originalUsername] avoids re-sending an unchanged username (30-day cooldown).
-  Future<bool> save({
-    required String displayName,
-    required String username,
-    required String? originalUsername,
-    required String bio,
-    required String city,
-    String? placeId,
-    double? latitude,
-    double? longitude,
-    String? countryCode,
-  }) async {
-    state = state.copyWith(saving: true, clearError: true);
+  Future<bool> save() async {
+    state = state.copyWith(saving: true, error: null);
 
-    final nameRes = DisplayName.create(displayName);
+    final nameRes = DisplayName.create(state.displayName);
     if (nameRes.isLeft()) {
       state = state.copyWith(saving: false, error: nameRes.getLeft().toNullable());
       return false;
     }
-    final cityRes = City.create(city);
+    final cityRes = City.create(state.city);
     if (cityRes.isLeft()) {
       state = state.copyWith(saving: false, error: cityRes.getLeft().toNullable());
       return false;
     }
 
-    final usernameChanged = username.trim() != (originalUsername ?? '');
+    final usernameChanged = state.username.trim() != (state.originalUsername ?? '');
     Username? usernameVo;
     if (usernameChanged) {
-      final uRes = Username.create(username);
+      final uRes = Username.create(state.username);
       if (uRes.isLeft()) {
         state = state.copyWith(saving: false, error: uRes.getLeft().toNullable());
         return false;
@@ -81,7 +62,7 @@ class ProfileEditController extends _$ProfileEditController {
       usernameVo = uRes.getRight().toNullable();
     }
 
-    final bioTrimmed = bio.trim();
+    final bioTrimmed = state.bio.trim();
     if (bioTrimmed.length > _maxBio) {
       state = state.copyWith(
         saving: false,
@@ -95,10 +76,10 @@ class ProfileEditController extends _$ProfileEditController {
           username: usernameVo,
           bio: bioTrimmed.isEmpty ? null : bioTrimmed,
           city: cityRes.getRight().toNullable()!,
-          placeId: placeId,
-          latitude: latitude,
-          longitude: longitude,
-          countryCode: countryCode,
+          placeId: state.placeId,
+          latitude: state.latitude,
+          longitude: state.longitude,
+          countryCode: state.countryCode,
           avatar: state.avatar,
         );
     if (!ref.mounted) return false;

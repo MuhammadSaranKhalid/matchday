@@ -17,6 +17,14 @@ class TeamPageScreen extends ConsumerWidget {
   const TeamPageScreen({super.key, required this.teamId});
   final String teamId;
 
+  void _handleBack(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/teams');
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final teamAsync = ref.watch(teamProvider(teamId));
@@ -29,10 +37,15 @@ class TeamPageScreen extends ConsumerWidget {
       body: switch (teamAsync) {
         AsyncData(value: final team?) => SafeArea(
           top: false,
-          child: _LoadedBody(teamId: teamId, team: team, userId: userId),
+          child: _LoadedBody(
+            teamId: teamId,
+            team: team,
+            userId: userId,
+            onBack: () => _handleBack(context),
+          ),
         ),
-        AsyncData(value: null) => _NotFound(onBack: () => context.pop()),
-        AsyncError() => _NotFound(onBack: () => context.pop()),
+        AsyncData(value: null) => _NotFound(onBack: () => _handleBack(context)),
+        AsyncError() => _NotFound(onBack: () => _handleBack(context)),
         _ => const Center(
           child: CircularProgressIndicator(color: CkColors.ink),
         ),
@@ -48,11 +61,13 @@ class _LoadedBody extends ConsumerWidget {
     required this.teamId,
     required this.team,
     required this.userId,
+    required this.onBack,
   });
 
   final String teamId;
   final Team team;
   final String? userId;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -74,7 +89,7 @@ class _LoadedBody extends ConsumerWidget {
         matches: matchesForTeam,
         viewerUserId: userId,
       ),
-      onBack: () => context.pop(),
+      onBack: onBack,
     );
   }
 }

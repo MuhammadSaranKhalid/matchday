@@ -51,7 +51,13 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
                   child: Row(
                     children: [
                       IconButton(
-                        onPressed: () => context.pop(),
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/teams');
+                          }
+                        },
                         icon: const Icon(Icons.chevron_left_rounded, color: CkColors.ink),
                       ),
                       TeamAvatar(
@@ -70,7 +76,7 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
                             Text(value.name,
                                 style: CkType.display(fontSize: 17, letterSpacing: -0.01)),
                             GestureDetector(
-                              onTap: () => context.go('/teams/${value.id.value}'),
+                              onTap: () => context.push('/teams/${value.id.value}'),
                               child: Text('Public team page →',
                                   style: CkType.body(
                                       fontSize: 11.5,

@@ -46,11 +46,18 @@ class MessagesRemoteDataSource {
   // Inbox
   // ═══════════════════════════════════════════════════════════════════════
 
-  /// One-shot inbox fetch via the `list-my-chats` edge function.
+  /// One-shot inbox fetch via the native `list_my_chats` RPC (fallback: edge fn).
   Future<List<ChatDto>> listMyChats() async {
     try {
-      final res = await _supabase.functions.invoke('list-my-chats');
-      final data = res.data;
+      final res = await _supabase.rpc<dynamic>('list_my_chats');
+      if (res is List) {
+        return res
+            .map((row) =>
+                ChatDto.fromJson(Map<String, dynamic>.from(row as Map)))
+            .toList();
+      }
+      final fnRes = await _supabase.functions.invoke('list-my-chats');
+      final data = fnRes.data;
       final rows = data is Map ? data['chats'] : data;
       if (rows is! List) {
         throw ServerException('list-my-chats returned an unexpected payload');
@@ -59,10 +66,31 @@ class MessagesRemoteDataSource {
           .map((row) =>
               ChatDto.fromJson(Map<String, dynamic>.from(row as Map)))
           .toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message, statusCode: int.tryParse(e.code ?? ''));
     } on FunctionException catch (e) {
       throw _functionException(e);
     }
   }
+
+  /// Finds or creates a canonical DM chat container between the authenticated
+  /// user and [targetUserId].
+  Future<String> getOrCreateDmChat(String targetUserId) async {
+    try {
+      final res = await _supabase.rpc<String>(
+        'get_or_create_dm_chat',
+        params: {'p_target_user_id': targetUserId},
+      );
+      return res;
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message, statusCode: int.tryParse(e.code ?? ''));
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException('Failed to get or create DM: $e');
+    }
+  }
+
+
 
   /// Streams the inbox. Yields the initial fetch, then patches in-memory on
   /// each `chat_updated` broadcast from `user:<uid>:notifications` (fired by

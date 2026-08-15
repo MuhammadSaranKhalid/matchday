@@ -48,6 +48,10 @@ abstract class MessagesRepository {
   /// chat, so unread counts re-emit as 0.
   Future<Either<Failure, Unit>> markRead(ChatId chatId);
 
+  /// Resolves or creates a 1-on-1 direct message conversation with [targetUserId].
+  Future<Either<Failure, ChatId>> getOrCreateDmChat(String targetUserId);
+
+
   // ─── Drafts (local-only; ticket #23) ──────────────────────────────────
   //
   // Compose-state persistence so a killed app can restore a half-typed

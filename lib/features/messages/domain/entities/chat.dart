@@ -1,16 +1,6 @@
 import '../../../teams/domain/entities/team.dart' show TeamId;
 
-/// A chat — the addressable container for a conversation. The chat itself
-/// doesn't carry a name, crest, or member roster; those are derived from the
-/// joined [teamId] via the teams feature (per CLAUDE.md §6.6 — the messages
-/// screen ref.watches teams' presentation providers for crest + colour).
-///
-/// In v1, every chat is a team chat (one per team, schema enforces
-/// `chat_type = 'team'`). When the schema grows DMs / tournament chats,
-/// [kind] gains values and [teamId] becomes nullable in practice.
-///
-/// Sort key for the inbox is [lastMessageAt] desc, nulls last — matches the
-/// `chats_last_message_at` index. Empty new chats settle at the bottom.
+/// A chat — the addressable container for a conversation (Teams, DMs, Matches, Groups).
 class Chat {
   const Chat({
     required this.id,
@@ -27,6 +17,12 @@ class Chat {
     this.teamLogoUrl,
     this.teamLogoMonogram,
     this.teamPrimaryColorHex,
+    this.dmOtherUserId,
+    this.dmOtherUserName,
+    this.dmOtherUserUsername,
+    this.dmOtherUserAvatarUrl,
+    this.youFollow = false,
+    this.theyFollowYou = false,
   });
 
   final ChatId id;
@@ -37,35 +33,58 @@ class Chat {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  /// Crest display fields, denormalised onto the chat at fetch time so the
-  /// inbox renders without a cross-feature lookup per row. Source: the
-  /// joined `teams` row in the `list-my-chats` edge function. Null for
-  /// future non-team chats.
+  /// Crest display fields for team chats.
   final String? teamLogoUrl;
   final String? teamLogoMonogram;
   final String? teamPrimaryColorHex;
 
-  /// Time of the most recent non-deleted message in this chat, or null if the
-  /// chat has no messages yet. Maintained server-side by the
-  /// `bump_chat_last_message_at` trigger.
+  /// DM recipient metadata.
+  final String? dmOtherUserId;
+  final String? dmOtherUserName;
+  final String? dmOtherUserUsername;
+  final String? dmOtherUserAvatarUrl;
+  final bool youFollow;
+  final bool theyFollowYou;
+
+  /// Time of the most recent non-deleted message.
   final DateTime? lastMessageAt;
 
-  /// Body of the latest non-deleted message, untruncated. The screen
-  /// truncates for display.
+  /// Body of the latest non-deleted message.
   final String? lastMessagePreview;
 
-  /// Sender id of the latest message — raw String because the column is
-  /// nullable (profile may be deleted) and avoids a wrapper for a value the
-  /// presentation never needs to compare against a strongly-typed id.
+  /// Sender id of the latest message.
   final String? lastMessageSenderId;
 
-  /// True when the latest message was sent by the current user. Set by the
-  /// repository at fetch time so the screen can render a "You: …" prefix
-  /// without re-checking auth.
+  /// True when the latest message was sent by the current user.
   final bool lastMessageFromMe;
 
   bool get isUnread => unreadCount > 0;
   bool get isEmpty => lastMessageAt == null;
+  bool get isDm => kind == ChatKind.dm;
+  bool get isTeam => kind == ChatKind.team;
+
+  String get displayName {
+    if (isDm) {
+      if (dmOtherUserName != null && dmOtherUserName!.trim().isNotEmpty) {
+        return dmOtherUserName!.trim();
+      }
+      if (dmOtherUserUsername != null && dmOtherUserUsername!.trim().isNotEmpty) {
+        return '@${dmOtherUserUsername!.trim()}';
+      }
+      return 'Direct Message';
+    }
+    return name;
+  }
+
+  String get displayAvatarUrl => isDm ? (dmOtherUserAvatarUrl ?? '') : (teamLogoUrl ?? '');
+
+  String get displayMonogram {
+    if (isDm) {
+      final n = displayName;
+      return n.isNotEmpty ? n[0].toUpperCase() : '?';
+    }
+    return teamLogoMonogram?.toUpperCase() ?? '?';
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -82,6 +101,12 @@ class Chat {
       other.teamLogoUrl == teamLogoUrl &&
       other.teamLogoMonogram == teamLogoMonogram &&
       other.teamPrimaryColorHex == teamPrimaryColorHex &&
+      other.dmOtherUserId == dmOtherUserId &&
+      other.dmOtherUserName == dmOtherUserName &&
+      other.dmOtherUserUsername == dmOtherUserUsername &&
+      other.dmOtherUserAvatarUrl == dmOtherUserAvatarUrl &&
+      other.youFollow == youFollow &&
+      other.theyFollowYou == theyFollowYou &&
       other.createdAt == createdAt &&
       other.updatedAt == updatedAt;
 
@@ -99,6 +124,12 @@ class Chat {
         teamLogoUrl,
         teamLogoMonogram,
         teamPrimaryColorHex,
+        dmOtherUserId,
+        dmOtherUserName,
+        dmOtherUserUsername,
+        dmOtherUserAvatarUrl,
+        youFollow,
+        theyFollowYou,
         createdAt,
         updatedAt,
       );
@@ -118,9 +149,12 @@ class ChatId {
   String toString() => value;
 }
 
-/// Mirrors the `public.chat_type` Postgres enum. Only `team` exists in v1.
+/// Mirrors the `public.chat_type` Postgres enum.
 enum ChatKind {
-  team('team');
+  team('team'),
+  dm('dm'),
+  match('match'),
+  group('group');
 
   const ChatKind(this.wire);
   final String wire;

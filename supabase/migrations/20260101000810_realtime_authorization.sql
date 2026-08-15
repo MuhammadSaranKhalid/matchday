@@ -28,7 +28,13 @@
 -- =============================================================================
 
 -- Allow Realtime to run RLS on the messages table. Idempotent.
-alter table realtime.messages enable row level security;
+do $$
+begin
+  alter table realtime.messages enable row level security;
+exception
+  when others then null;
+end $$;
+
 
 
 -- -----------------------------------------------------------------------------

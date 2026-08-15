@@ -6,9 +6,7 @@ import '../../domain/entities/chat.dart';
 part 'chat_dto.freezed.dart';
 part 'chat_dto.g.dart';
 
-/// Wire shape returned by the `list-my-chats` edge function. Each row is the
-/// joined output of `chats` + my `chat_members` + the `teams` table + the
-/// latest non-deleted message, plus a computed unread count.
+/// Wire shape returned by `list_my_chats` RPC / edge function.
 @freezed
 abstract class ChatDto with _$ChatDto {
   const factory ChatDto({
@@ -19,6 +17,12 @@ abstract class ChatDto with _$ChatDto {
     @JsonKey(name: 'team_logo_url') String? teamLogoUrl,
     @JsonKey(name: 'team_logo_monogram') String? teamLogoMonogram,
     @JsonKey(name: 'team_primary_color') String? teamPrimaryColor,
+    @JsonKey(name: 'dm_other_user_id') String? dmOtherUserId,
+    @JsonKey(name: 'dm_other_user_name') String? dmOtherUserName,
+    @JsonKey(name: 'dm_other_user_username') String? dmOtherUserUsername,
+    @JsonKey(name: 'dm_other_user_avatar_url') String? dmOtherUserAvatarUrl,
+    @JsonKey(name: 'you_follow') @Default(false) bool youFollow,
+    @JsonKey(name: 'they_follow_you') @Default(false) bool theyFollowYou,
     @JsonKey(name: 'last_message_at') String? lastMessageAt,
     @JsonKey(name: 'last_message_body') String? lastMessageBody,
     @JsonKey(name: 'last_message_sender_id') String? lastMessageSenderId,
@@ -35,9 +39,7 @@ abstract class ChatDto with _$ChatDto {
   Chat toEntity() => Chat(
         id: ChatId(chatId),
         kind: ChatKind.fromWire(type),
-        // v1 schema: only team chats. team_name is non-null for them; for
-        // safety (future chat kinds) fall back to an empty string.
-        name: teamName ?? '',
+        name: teamName ?? dmOtherUserName ?? dmOtherUserUsername ?? '',
         teamId: teamId == null ? null : TeamId(teamId!),
         unreadCount: unreadCount,
         createdAt: DateTime.parse(createdAt),
@@ -49,5 +51,11 @@ abstract class ChatDto with _$ChatDto {
         teamLogoUrl: teamLogoUrl,
         teamLogoMonogram: teamLogoMonogram,
         teamPrimaryColorHex: teamPrimaryColor,
+        dmOtherUserId: dmOtherUserId,
+        dmOtherUserName: dmOtherUserName,
+        dmOtherUserUsername: dmOtherUserUsername,
+        dmOtherUserAvatarUrl: dmOtherUserAvatarUrl,
+        youFollow: youFollow,
+        theyFollowYou: theyFollowYou,
       );
 }

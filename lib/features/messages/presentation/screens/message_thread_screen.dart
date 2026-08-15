@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -253,8 +254,8 @@ class _ThreadHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = chat?.name ?? '…';
-    final mono = chat?.teamLogoMonogram?.toUpperCase() ?? '?';
+    final name = chat?.displayName ?? '…';
+    final mono = chat?.displayMonogram ?? '?';
     final color = parseHexColor(chat?.teamPrimaryColorHex, CkColors.ink);
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
@@ -277,7 +278,23 @@ class _ThreadHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          Crest(short: mono, color: color, size: 32, radius: 8),
+          if (chat?.isTeam == true)
+            Crest(short: mono, color: color, size: 32, radius: 8)
+          else if (chat?.displayAvatarUrl.isNotEmpty == true)
+            ClipOval(
+              child: CachedNetworkImage(
+                imageUrl: chat!.displayAvatarUrl,
+                width: 32,
+                height: 32,
+                fit: BoxFit.cover,
+                placeholder: (_, __) =>
+                    Avatar(mono: mono, size: 32, tone: AvatarTone.ink),
+                errorWidget: (_, __, ___) =>
+                    Avatar(mono: mono, size: 32, tone: AvatarTone.ink),
+              ),
+            )
+          else
+            Avatar(mono: mono, size: 32, tone: AvatarTone.ink),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -296,6 +313,7 @@ class _ThreadHeader extends StatelessWidget {
     );
   }
 }
+
 
 // ─── Conversation list ───────────────────────────────────────────────────────
 

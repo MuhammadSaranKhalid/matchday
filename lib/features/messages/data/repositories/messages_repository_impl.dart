@@ -120,6 +120,23 @@ class MessagesRepositoryImpl implements MessagesRepository {
     }
   }
 
+  @override
+  Future<Either<Failure, ChatId>> getOrCreateDmChat(String targetUserId) async {
+    try {
+      final chatIdStr = await _remote.getOrCreateDmChat(targetUserId);
+      return Right(ChatId(chatIdStr));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+
   // ─── Drafts ───────────────────────────────────────────────────────────
 
   @override

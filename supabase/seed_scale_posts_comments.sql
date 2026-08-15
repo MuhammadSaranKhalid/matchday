@@ -21,7 +21,8 @@ declare
   v_adeel    constant uuid := '00000000-0000-0000-0000-000000000005';
   v_karim    constant uuid := '00000000-0000-0000-0000-000000000006';
   v_saad     constant uuid := '00000000-0000-0000-0000-000000000007';
-  v_zaid     constant uuid := '00000000-0000-0000-0000-00000000000a';
+  v_zaid     constant uuid := '0000000a-0000-0000-0000-00000000000a';
+
 
   -- Specific post UUIDs for comment threading
   p1 constant uuid := '20000000-0000-0000-0000-000000000001';
@@ -82,6 +83,7 @@ begin
     insert into auth.users (
       instance_id, id, aud, role, email, encrypted_password,
       email_confirmed_at, raw_user_meta_data, raw_app_meta_data,
+      confirmation_token, recovery_token, email_change_token_new, email_change,
       created_at, updated_at
     )
     values (
@@ -94,12 +96,14 @@ begin
       now(),
       jsonb_build_object('username', u.username, 'display_name', u.display_name),
       '{"provider": "email", "providers": ["email"]}'::jsonb,
+      '', '', '', '',
       now() - interval '30 days',
       now()
     )
     on conflict (id) do update set
       raw_user_meta_data = excluded.raw_user_meta_data,
       updated_at = now();
+
 
     -- Identity
     insert into auth.identities (

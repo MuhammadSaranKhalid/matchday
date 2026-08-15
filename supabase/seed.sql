@@ -50,15 +50,57 @@ begin
     from auth.users
    where email = 'muhammadsarankhalid@gmail.com';
   if v_me is null then
-    raise exception 'Account muhammadsarankhalid@gmail.com not found in auth.users. '
-      'Sign up first (in the app or via the dashboard), then re-run the seed.';
-  end if;
-  if not exists (select 1 from public.profiles where user_id = v_me) then
-    raise exception 'Profile for muhammadsarankhalid@gmail.com not found. '
-      'Complete onboarding in the app first so a profile row exists.';
+    v_me := '00000000-0000-0000-0000-000000000001'::uuid;
+    insert into auth.users (
+      instance_id, id, aud, role, email, encrypted_password,
+      email_confirmed_at, raw_user_meta_data, raw_app_meta_data,
+      created_at, updated_at
+    )
+    values (
+      '00000000-0000-0000-0000-000000000000',
+      v_me, 'authenticated', 'authenticated', 'muhammadsarankhalid@gmail.com',
+      crypt('pass1234', gen_salt('bf')),
+      now(),
+      jsonb_build_object('display_name', 'Muhammad Saran'),
+      jsonb_build_object('provider', 'email', 'providers', array['email']),
+      now(), now()
+    )
+    on conflict (id) do nothing;
+
+    insert into auth.identities (
+      id, user_id, identity_data, provider, provider_id,
+      last_sign_in_at, created_at, updated_at
+    )
+    values (
+      gen_random_uuid(),
+      v_me,
+      jsonb_build_object(
+        'sub', v_me::text,
+        'email', 'muhammadsarankhalid@gmail.com',
+        'email_verified', true
+      ),
+      'email',
+      v_me::text,
+      now(), now(), now()
+    )
+    on conflict do nothing;
+
+    insert into public.profiles (
+      user_id, username, display_name, bio,
+      created_at, updated_at, onboarded_at, last_active_at
+    )
+    values (
+      v_me, 'saran', 'Muhammad Saran', 'Cricket enthusiast & captain.',
+      now(), now(), now(), now()
+    )
+    on conflict (user_id) do update set
+      username = excluded.username,
+      display_name = excluded.display_name;
+
   end if;
   raise notice 'Seeding for user: %', v_me;
 end $$;
+
 
 -- Note: the dashboard SQL editor and `psql` autocommit each statement, which
 -- would drop a `temp table … on commit drop` between blocks. Instead, every
@@ -211,80 +253,77 @@ begin
   select id into v_me from auth.users
     where email = 'muhammadsarankhalid@gmail.com';
 
-  insert into public.team_members (team_id, user_id, role, status, joined_at)
-  values
-    ('11111111-1111-1111-1111-111111111103', v_me, 'player', 'active', now() - interval '60 days'),  -- Karachi Eagles
-    ('11111111-1111-1111-1111-111111111105', v_me, 'player', 'active', now() - interval '70 days'),  -- Multan Sultans
-    ('11111111-1111-1111-1111-111111111107', v_me, 'player', 'active', now() - interval '55 days'),  -- Quetta Cobras
-    ('11111111-1111-1111-1111-111111111109', v_me, 'player', 'active', now() - interval '50 days'),  -- Sialkot Stallions
-    ('1111111b-1111-1111-1111-11111111110b', v_me, 'player', 'active', now() - interval '45 days');  -- Peshawar Tigers
+  insert into public.team_members (team_id, user_id, added_by, role, status, joined_at)
+  select t.team_id, v_me, t.owner_id, 'player', 'active', j.joined_at
+  from (values
+    ('11111111-1111-1111-1111-111111111103'::uuid, now() - interval '60 days'),  -- Karachi Eagles
+    ('11111111-1111-1111-1111-111111111105'::uuid, now() - interval '70 days'),  -- Multan Sultans
+    ('11111111-1111-1111-1111-111111111107'::uuid, now() - interval '55 days'),  -- Quetta Cobras
+    ('11111111-1111-1111-1111-111111111109'::uuid, now() - interval '50 days'),  -- Sialkot Stallions
+    ('1111111b-1111-1111-1111-11111111110b'::uuid, now() - interval '45 days')   -- Peshawar Tigers
+  ) as j(team_id, joined_at)
+  join public.teams t on t.team_id = j.team_id;
 end $seed_my_memberships$;
 
 -- Teammates joining each other's teams + your teams (so messages have
 -- varied senders in every active chat).
-insert into public.team_members (team_id, user_id, role, status, joined_at)
-values
+insert into public.team_members (team_id, user_id, added_by, role, status, joined_at)
+select r.team_id, r.user_id, t.owner_id, r.role::public.member_role, r.status::public.member_status, r.joined_at
+from (values
+
   -- Lahore Lions (yours) — rich roster for the curated thread
-  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000002', 'player', 'active', now() - interval '120 days'),
-  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000003', 'player', 'active', now() - interval '110 days'),
-  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000004', 'wicket_keeper', 'active', now() - interval '100 days'),
-  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000005', 'player', 'active', now() - interval '95 days'),
-  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000006', 'player', 'active', now() - interval '90 days'),
-  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000007', 'player', 'active', now() - interval '85 days'),
-  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000008', 'player', 'active', now() - interval '80 days'),
-  ('11111111-1111-1111-1111-111111111101', '00000000-0000-0000-0000-000000000009', 'player', 'active', now() - interval '75 days'),
-  ('11111111-1111-1111-1111-111111111101', '0000000a-0000-0000-0000-00000000000a', 'player', 'active', now() - interval '70 days'),
+  ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000002'::uuid, 'player', 'active', now() - interval '120 days'),
+  ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000003'::uuid, 'player', 'active', now() - interval '110 days'),
+  ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000004'::uuid, 'wicket_keeper', 'active', now() - interval '100 days'),
+  ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000005'::uuid, 'player', 'active', now() - interval '95 days'),
+  ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000006'::uuid, 'player', 'active', now() - interval '90 days'),
+  ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000007'::uuid, 'player', 'active', now() - interval '85 days'),
+  ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000008'::uuid, 'player', 'active', now() - interval '80 days'),
+  ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000009'::uuid, 'player', 'active', now() - interval '75 days'),
+  ('11111111-1111-1111-1111-111111111101'::uuid, '0000000a-0000-0000-0000-00000000000a'::uuid, 'player', 'active', now() - interval '70 days'),
   -- Islamabad United (yours) — moderate activity
-  ('11111111-1111-1111-1111-111111111102', '00000000-0000-0000-0000-000000000006', 'player', 'active', now() - interval '50 days'),
-  ('11111111-1111-1111-1111-111111111102', '00000000-0000-0000-0000-000000000007', 'player', 'active', now() - interval '45 days'),
-  ('11111111-1111-1111-1111-111111111102', '00000000-0000-0000-0000-000000000003', 'player', 'active', now() - interval '40 days'),
+  ('11111111-1111-1111-1111-111111111102'::uuid, '00000000-0000-0000-0000-000000000006'::uuid, 'player', 'active', now() - interval '50 days'),
+  ('11111111-1111-1111-1111-111111111102'::uuid, '00000000-0000-0000-0000-000000000007'::uuid, 'player', 'active', now() - interval '45 days'),
+  ('11111111-1111-1111-1111-111111111102'::uuid, '00000000-0000-0000-0000-000000000003'::uuid, 'player', 'active', now() - interval '40 days'),
   -- Hyderabad Hawks (yours, empty) — intentionally no extra members
   -- Karachi Eagles (Bilal owns) — pagination stress; multiple senders
-  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000004', 'player', 'active', now() - interval '55 days'),
-  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000005', 'player', 'active', now() - interval '50 days'),
-  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000003', 'player', 'active', now() - interval '45 days'),
-  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000007', 'player', 'active', now() - interval '40 days'),
-  ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000008', 'player', 'active', now() - interval '35 days'),
+  ('11111111-1111-1111-1111-111111111103'::uuid, '00000000-0000-0000-0000-000000000004'::uuid, 'player', 'active', now() - interval '55 days'),
+  ('11111111-1111-1111-1111-111111111103'::uuid, '00000000-0000-0000-0000-000000000005'::uuid, 'player', 'active', now() - interval '50 days'),
+  ('11111111-1111-1111-1111-111111111103'::uuid, '00000000-0000-0000-0000-000000000003'::uuid, 'player', 'active', now() - interval '45 days'),
+  ('11111111-1111-1111-1111-111111111103'::uuid, '00000000-0000-0000-0000-000000000007'::uuid, 'player', 'active', now() - interval '40 days'),
+  ('11111111-1111-1111-1111-111111111103'::uuid, '00000000-0000-0000-0000-000000000008'::uuid, 'player', 'active', now() - interval '35 days'),
   -- Karachi Knights (Bilal)
-  ('11111111-1111-1111-1111-111111111104', '00000000-0000-0000-0000-000000000008', 'player', 'active', now() - interval '40 days'),
-  ('11111111-1111-1111-1111-111111111104', '00000000-0000-0000-0000-000000000009', 'player', 'active', now() - interval '35 days'),
+  ('11111111-1111-1111-1111-111111111104'::uuid, '00000000-0000-0000-0000-000000000008'::uuid, 'player', 'active', now() - interval '40 days'),
+  ('11111111-1111-1111-1111-111111111104'::uuid, '00000000-0000-0000-0000-000000000009'::uuid, 'player', 'active', now() - interval '35 days'),
   -- Multan Sultans (Faraz)
-  ('11111111-1111-1111-1111-111111111105', '00000000-0000-0000-0000-000000000006', 'player', 'active', now() - interval '65 days'),
-  ('11111111-1111-1111-1111-111111111105', '00000000-0000-0000-0000-000000000009', 'player', 'active', now() - interval '60 days'),
-  ('11111111-1111-1111-1111-111111111105', '00000000-0000-0000-0000-000000000005', 'player', 'active', now() - interval '55 days'),
+  ('11111111-1111-1111-1111-111111111105'::uuid, '00000000-0000-0000-0000-000000000006'::uuid, 'player', 'active', now() - interval '65 days'),
+  ('11111111-1111-1111-1111-111111111105'::uuid, '00000000-0000-0000-0000-000000000009'::uuid, 'player', 'active', now() - interval '60 days'),
+  ('11111111-1111-1111-1111-111111111105'::uuid, '00000000-0000-0000-0000-000000000005'::uuid, 'player', 'active', now() - interval '55 days'),
   -- Multan Mavericks (Faraz)
-  ('11111111-1111-1111-1111-111111111106', '00000000-0000-0000-0000-000000000004', 'player', 'active', now() - interval '30 days'),
+  ('11111111-1111-1111-1111-111111111106'::uuid, '00000000-0000-0000-0000-000000000004'::uuid, 'player', 'active', now() - interval '30 days'),
   -- Quetta Cobras (Hassan)
-  ('11111111-1111-1111-1111-111111111107', '00000000-0000-0000-0000-000000000009', 'player', 'active', now() - interval '55 days'),
-  ('11111111-1111-1111-1111-111111111107', '00000000-0000-0000-0000-000000000002', 'player', 'active', now() - interval '50 days'),
-  ('11111111-1111-1111-1111-111111111107', '00000000-0000-0000-0000-000000000007', 'player', 'active', now() - interval '45 days'),
+  ('11111111-1111-1111-1111-111111111107'::uuid, '00000000-0000-0000-0000-000000000009'::uuid, 'player', 'active', now() - interval '55 days'),
+  ('11111111-1111-1111-1111-111111111107'::uuid, '00000000-0000-0000-0000-000000000002'::uuid, 'player', 'active', now() - interval '50 days'),
+  ('11111111-1111-1111-1111-111111111107'::uuid, '00000000-0000-0000-0000-000000000007'::uuid, 'player', 'active', now() - interval '45 days'),
   -- Quetta Gladiators (Hassan)
-  ('11111111-1111-1111-1111-111111111108', '0000000a-0000-0000-0000-00000000000a', 'player', 'active', now() - interval '25 days'),
+  ('11111111-1111-1111-1111-111111111108'::uuid, '0000000a-0000-0000-0000-00000000000a'::uuid, 'player', 'active', now() - interval '25 days'),
   -- Sialkot Stallions (Adeel)
-  ('11111111-1111-1111-1111-111111111109', '0000000a-0000-0000-0000-00000000000a', 'player', 'active', now() - interval '50 days'),
-  ('11111111-1111-1111-1111-111111111109', '00000000-0000-0000-0000-000000000008', 'player', 'active', now() - interval '45 days'),
+  ('11111111-1111-1111-1111-111111111109'::uuid, '0000000a-0000-0000-0000-00000000000a'::uuid, 'player', 'active', now() - interval '50 days'),
+  ('11111111-1111-1111-1111-111111111109'::uuid, '00000000-0000-0000-0000-000000000008'::uuid, 'player', 'active', now() - interval '45 days'),
   -- Sialkot Strikers (Adeel)
-  ('1111111a-1111-1111-1111-11111111110a', '00000000-0000-0000-0000-000000000009', 'player', 'active', now() - interval '30 days'),
-  ('1111111a-1111-1111-1111-11111111110a', '00000000-0000-0000-0000-000000000006', 'player', 'active', now() - interval '25 days'),
+  ('1111111a-1111-1111-1111-11111111110a'::uuid, '00000000-0000-0000-0000-000000000009'::uuid, 'player', 'active', now() - interval '30 days'),
+  ('1111111a-1111-1111-1111-11111111110a'::uuid, '00000000-0000-0000-0000-000000000006'::uuid, 'player', 'active', now() - interval '25 days'),
   -- Peshawar Tigers (Karim)
-  ('1111111b-1111-1111-1111-11111111110b', '00000000-0000-0000-0000-000000000003', 'player', 'active', now() - interval '40 days'),
+  ('1111111b-1111-1111-1111-11111111110b'::uuid, '00000000-0000-0000-0000-000000000003'::uuid, 'player', 'active', now() - interval '40 days'),
   -- Faisalabad Falcons (Saad)
-  ('1111111c-1111-1111-1111-11111111110c', '00000000-0000-0000-0000-000000000002', 'player', 'active', now() - interval '40 days'),
-  ('1111111c-1111-1111-1111-11111111110c', '00000000-0000-0000-0000-000000000004', 'player', 'active', now() - interval '35 days'),
+  ('1111111c-1111-1111-1111-11111111110c'::uuid, '00000000-0000-0000-0000-000000000002'::uuid, 'player', 'active', now() - interval '40 days'),
+  ('1111111c-1111-1111-1111-11111111110c'::uuid, '00000000-0000-0000-0000-000000000004'::uuid, 'player', 'active', now() - interval '35 days'),
   -- Rawalpindi Rams (Usman)
-  ('1111111d-1111-1111-1111-11111111110d', '00000000-0000-0000-0000-000000000003', 'player', 'active', now() - interval '40 days'),
-  ('1111111d-1111-1111-1111-11111111110d', '00000000-0000-0000-0000-000000000005', 'player', 'active', now() - interval '35 days');
--- Bahawalpur Bears (Zaid) — owner only, no extra members → another empty
--- chat path, but Zaid sees it and you don't (you're not a member).
+  ('1111111d-1111-1111-1111-11111111110d'::uuid, '00000000-0000-0000-0000-000000000003'::uuid, 'player', 'active', now() - interval '40 days'),
+  ('1111111d-1111-1111-1111-11111111110d'::uuid, '00000000-0000-0000-0000-000000000005'::uuid, 'player', 'active', now() - interval '35 days')
+) as r(team_id, user_id, role, status, joined_at)
+join public.teams t on t.team_id = r.team_id;
 
--- The inserts above omit added_by (it's the owner who adds members in the
--- seed narrative). team_members.added_by is NOT NULL, so set it from the
--- owning team in one pass rather than per-row.
-update public.team_members m
-set added_by = t.owner_id
-from public.teams t
-where t.team_id = m.team_id
-  and m.added_by is null;
 
 -- =============================================================================
 -- 4) Lahore Lions — curated 30-message coordination thread

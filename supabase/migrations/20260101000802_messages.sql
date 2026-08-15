@@ -1,25 +1,21 @@
 -- =============================================================================
--- 0802 · messages — the chat ledger + realtime + push fan-out
+-- 0802 · messages — chat ledger + realtime + read receipts + inbox queries
 -- =============================================================================
 -- WHAT THIS TABLE IS
 -- ------------------
 -- The source-of-truth ledger for every line of text in every chat. Soft-
 -- deleted (deleted_at) instead of removed so quotes / replies always
 -- resolve and an audit of "what was sent here" is possible.
---
--- Both `edited_at` and `deleted_at` are nullable and editable by the
--- sender via the messages_update_own policy below; the policy enforces
--- that a single UPDATE statement can't set both at once.
 -- =============================================================================
 
 create table public.messages (
   message_id      uuid primary key default gen_random_uuid(),
   chat_id         uuid not null references public.chats(chat_id) on delete cascade,
-  -- ON DELETE SET NULL so a profile delete (delete_user RPC in 0700)
-  -- preserves the message but anonymises the sender. UI renders
-  -- "Deleted user" when sender_id is null.
   sender_id       uuid references public.profiles(user_id) on delete set null,
-  body            text not null check (length(body) between 1 and 2000),
+  body            text not null check (length(body) between 1 and 4000),
+  message_type    text not null default 'text',
+  payload         jsonb default '{}'::jsonb,
+  reply_to_id     uuid references public.messages(message_id) on delete set null,
   created_at      timestamptz not null default now(),
   edited_at       timestamptz,
   deleted_at      timestamptz
@@ -27,23 +23,12 @@ create table public.messages (
 
 -- Hot read path: "latest messages in this chat", paginated by created_at.
 create index messages_chat_created on public.messages (chat_id, created_at desc);
+create index messages_reply_to on public.messages (reply_to_id) where reply_to_id is not null;
 
 alter table public.messages enable row level security;
 
 -- =============================================================================
 -- RLS
--- =============================================================================
--- READ:   any active member of the chat (the chat list and the open
---         chat screen both read every message in the channel).
--- INSERT: any active member, AND the row's sender_id must equal the
---         caller (no impersonation).
--- UPDATE: the sender only — to edit body OR soft-delete. The XOR check
---         on (edited_at, deleted_at) prevents a single statement from
---         setting both, which would conflate "edited" with "deleted"
---         in the audit trail.
--- DELETE: no policy. Hard delete is denied. Soft-delete via UPDATE
---         is the only path; cascade-delete (chat or profile) is the
---         only way to remove a row.
 -- =============================================================================
 create policy "messages_read_for_members"
   on public.messages for select
@@ -67,10 +52,7 @@ create policy "messages_update_own"
   );
 
 -- =============================================================================
--- bump_chat_last_message_at — keep the inbox in sync
--- =============================================================================
--- An AFTER INSERT trigger on messages that updates chats.last_message_at
--- so the chat list can sort by recency without a per-row aggregate.
+-- bump_chat_last_message_at — keep the inbox sorted in sync
 -- =============================================================================
 create or replace function public.bump_chat_last_message_at()
 returns trigger
@@ -81,7 +63,7 @@ as $$
 begin
   update public.chats
      set last_message_at = new.created_at,
-         updated_at      = new.created_at
+         updated_at = now()
    where chat_id = new.chat_id;
   return new;
 end;
@@ -92,145 +74,137 @@ create trigger messages_after_insert_bump_chat
   for each row execute function public.bump_chat_last_message_at();
 
 -- =============================================================================
--- Realtime — two channels per inserted message
+-- RPC: mark_chat_read
 -- =============================================================================
--- 1. `chat:<chat_id>:messages` — the hot stream. ONE publish per insert;
---    every member currently subscribed to this chat's screen receives
---    the new message in their existing socket.
---
--- 2. `user:<member_id>:notifications` — the per-member ping. One small
---    publish for each OTHER active member of the chat so their chat
---    list can update unread badges without polling. The body is capped
---    at 160 chars for the preview; the chat screen reads the full body
---    from channel #1.
---
--- Both publishes run in the same transaction as the INSERT so a reader
--- doing an immediate refetch always sees the row that triggered the
--- broadcast.
---
--- COST SHAPE
--- ----------
--- The hot stream is O(1) per insert regardless of chat size; only
--- subscribers pay. The per-member ping is O(N members) per insert with
--- a tiny payload — acceptable for v1 chat sizes.
+create or replace function public.mark_chat_read(p_chat_id uuid)
+returns timestamptz
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  update public.chat_members
+     set last_read_at = now()
+   where chat_id = p_chat_id
+     and user_id = (select auth.uid())
+     and left_at is null
+  returning last_read_at;
+$$;
+
+revoke all on function public.mark_chat_read(uuid) from public;
+grant execute on function public.mark_chat_read(uuid) to authenticated;
+
 -- =============================================================================
-create or replace function public.broadcast_new_message()
-returns trigger
+-- RPC: list_my_chats — fast polymorphic inbox query
+-- =============================================================================
+create or replace function public.list_my_chats()
+returns table (
+  chat_id                  uuid,
+  type                     public.chat_type,
+  team_id                  uuid,
+  last_message_at          timestamptz,
+  created_at               timestamptz,
+  updated_at               timestamptz,
+  team_name                text,
+  team_logo_url            text,
+  team_logo_monogram       text,
+  team_primary_color       text,
+  dm_other_user_id         uuid,
+  dm_other_user_name       text,
+  dm_other_user_username   text,
+  dm_other_user_avatar_url text,
+  you_follow               boolean,
+  they_follow_you          boolean,
+  last_message_body        text,
+  last_message_sender_id   uuid,
+  last_message_from_me     boolean,
+  unread_count             int
+)
 language plpgsql
 security definer
 set search_path = public, auth, pg_temp
 as $$
 declare
-  v_member_id uuid;
-  v_payload   jsonb;
-  v_preview   text;
+  v_actor uuid := auth.uid();
 begin
-  -- Hot-stream payload — shape mirrors the chat screen's renderer.
-  v_payload := jsonb_build_object(
-    'message_id', new.message_id,
-    'chat_id',    new.chat_id,
-    'sender_id',  new.sender_id,
-    'body',       new.body,
-    'created_at', new.created_at
-  );
-
-  perform realtime.send(
-    v_payload,
-    'new_message',
-    'chat:' || new.chat_id::text || ':messages',
-    true
-  );
-
-  -- Per-member ping for chat-list badge + unread updates.
-  v_preview := left(new.body, 160);
-
-  for v_member_id in
-    select user_id
-      from public.chat_members
-     where chat_id   = new.chat_id
-       and user_id   is not null
-       and user_id   is distinct from new.sender_id
-       and left_at   is null
-  loop
-    perform realtime.send(
-      jsonb_build_object(
-        'chat_id',      new.chat_id,
-        'message_id',   new.message_id,
-        'sender_id',    new.sender_id,
-        'body_preview', v_preview,
-        'created_at',   new.created_at
-      ),
-      'chat_updated',
-      'user:' || v_member_id::text || ':notifications',
-      true
-    );
-  end loop;
-
-  return null;
-end;
-$$;
-
-revoke all on function public.broadcast_new_message() from public;
-
-create trigger messages_after_insert_broadcast
-  after insert on public.messages
-  for each row execute function public.broadcast_new_message();
-
--- =============================================================================
--- Push fan-out for chat messages (FCM/APNs via the send-push Edge Function)
--- =============================================================================
--- This is the BACKGROUND delivery path. While the recipient is
--- foregrounded, the broadcast above handles in-app rendering and FCM
--- silences the OS banner. While the recipient is backgrounded, the
--- Edge Function reads device_tokens (0900) and pushes the body to
--- every device they're signed in on.
---
--- Depends on `vault.decrypted_secrets` carrying supabase_url and
--- service_role_key. See 0900 device_tokens for the bootstrap notes.
---
--- Failure shape: any error in pg_net is caught and demoted to a warning.
--- A failed push must not abort the message insert; the in-app
--- broadcast above already covers the foreground case.
--- =============================================================================
-create or replace function public.invoke_send_push_message()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, net, vault, pg_temp
-as $$
-declare
-  v_url text;
-  v_key text;
-begin
-  select decrypted_secret into v_url
-    from vault.decrypted_secrets where name = 'supabase_url' limit 1;
-  select decrypted_secret into v_key
-    from vault.decrypted_secrets where name = 'service_role_key' limit 1;
-
-  if v_url is null or v_key is null then
-    raise warning
-      '[invoke_send_push_message] vault secrets missing (url_present=%, key_present=%)',
-      v_url is not null, v_key is not null;
-    return new;
+  if v_actor is null then
+    return;
   end if;
 
-  perform net.http_post(
-    url     := rtrim(v_url, '/') || '/functions/v1/send-push',
-    headers := jsonb_build_object(
-      'content-type',  'application/json',
-      'authorization', 'Bearer ' || v_key
-    ),
-    body    := jsonb_build_object('message_id', new.message_id)
-  );
-  return new;
-exception
-  when others then
-    raise warning '[invoke_send_push_message] failed for message_id=%: %',
-      new.message_id, sqlerrm;
-    return new;
+  return query
+  select
+    c.chat_id,
+    c.type,
+    c.team_id,
+    c.last_message_at,
+    c.created_at,
+    c.updated_at,
+    t.team_name,
+    t.logo_url as team_logo_url,
+    t.logo_monogram as team_logo_monogram,
+    (t.team_colors->>'primary') as team_primary_color,
+    other_p.user_id as dm_other_user_id,
+    other_p.display_name as dm_other_user_name,
+    other_p.username as dm_other_user_username,
+    other_p.profile_photo_url as dm_other_user_avatar_url,
+    case
+      when other_p.user_id is not null then
+        exists (
+          select 1 from public.follows
+           where follower_id = v_actor
+             and target_type = 'user'
+             and target_id = other_p.user_id
+        )
+      else false
+    end as you_follow,
+    case
+      when other_p.user_id is not null then
+        exists (
+          select 1 from public.follows
+           where follower_id = other_p.user_id
+             and target_type = 'user'
+             and target_id = v_actor
+        )
+      else false
+    end as they_follow_you,
+    lm.body as last_message_body,
+    lm.sender_id as last_message_sender_id,
+    (lm.sender_id is not distinct from v_actor)::boolean as last_message_from_me,
+    (
+      select count(*)::int from (
+        select 1 from public.messages m
+         where m.chat_id = c.chat_id
+           and m.created_at > coalesce(cm.last_read_at, 'epoch'::timestamptz)
+           and m.sender_id is distinct from v_actor
+           and m.deleted_at is null
+         limit 100
+      ) capped
+    ) as unread_count
+  from public.chats c
+  join public.chat_members cm
+    on cm.chat_id = c.chat_id
+   and cm.user_id = v_actor
+   and cm.left_at is null
+  left join public.teams t on t.team_id = c.team_id
+  -- For DM chats, join the other participant's profile
+  left join lateral (
+    select p.user_id, p.display_name, p.username, p.profile_photo_url
+      from public.chat_members other_cm
+      join public.profiles p on p.user_id = other_cm.user_id
+     where other_cm.chat_id = c.chat_id
+       and other_cm.user_id <> v_actor
+     limit 1
+  ) other_p on c.type = 'dm'
+  left join lateral (
+    select m.body, m.sender_id
+      from public.messages m
+     where m.chat_id = c.chat_id
+       and m.deleted_at is null
+     order by m.created_at desc
+     limit 1
+  ) lm on true
+  order by c.last_message_at desc nulls last;
 end;
 $$;
 
-create trigger messages_invoke_send_push
-  after insert on public.messages
-  for each row execute function public.invoke_send_push_message();
+revoke all on function public.list_my_chats() from public;
+grant execute on function public.list_my_chats() to authenticated;

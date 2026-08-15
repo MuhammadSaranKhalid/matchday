@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,15 +13,13 @@ import 'package:matchday/features/messages/domain/entities/chat.dart';
 import 'package:matchday/features/messages/presentation/providers/messages_providers.dart';
 import 'package:matchday/features/messages/presentation/widgets/color_utils.dart';
 
-/// V1 inbox tabs. The schema only has team chats — DMs is permanently 0
-/// until `chat_type` grows a `'dm'` value (tracked in ticket #7's follow-ups).
+/// Inbox tabs: All / Teams / DMs.
 enum _InboxTab { all, teams, dms }
 
-/// Temporary hide (ticket #15). The schema only carries one chat kind
-/// today (team), so filtering by All / Teams / DMs is visual noise. Flip
-/// this to `true` to restore the tab row — `_TabRow`, `_MTab`, and
-/// `_InboxTab` stay defined for a one-line re-enable.
-const bool _kShowInboxTabs = false;
+/// Inbox tab bar display flag.
+const bool _kShowInboxTabs = true;
+
+
 
 class InboxScreen extends ConsumerStatefulWidget {
   const InboxScreen({super.key, this.onBell});
@@ -133,7 +132,8 @@ class _Loaded extends StatelessWidget {
     if (_kShowInboxTabs) {
       final teamChats =
           chats.where((c) => c.kind == ChatKind.team).toList();
-      const dmChats = <Chat>[]; // v1: no DMs in schema yet
+      final dmChats =
+          chats.where((c) => c.kind == ChatKind.dm).toList();
       visible = switch (tab) {
         _InboxTab.all => chats,
         _InboxTab.teams => teamChats,
@@ -291,7 +291,7 @@ class _ThreadRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unread = chat.unreadCount > 0;
-    final mono = chat.teamLogoMonogram?.toUpperCase() ?? _deriveMono(chat.name);
+    final mono = chat.displayMonogram;
     final color = parseHexColor(chat.teamPrimaryColorHex, CkColors.ink);
     final time = chat.lastMessageAt == null
         ? ''
@@ -311,6 +311,19 @@ class _ThreadRow extends StatelessWidget {
           children: [
             if (chat.kind == ChatKind.team)
               Crest(short: mono, color: color, size: 42, radius: 11)
+            else if (chat.displayAvatarUrl.isNotEmpty)
+              ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: chat.displayAvatarUrl,
+                  width: 42,
+                  height: 42,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) =>
+                      Avatar(mono: mono, size: 42, tone: AvatarTone.ink),
+                  errorWidget: (_, __, ___) =>
+                      Avatar(mono: mono, size: 42, tone: AvatarTone.ink),
+                ),
+              )
             else
               Avatar(mono: mono, size: 42, tone: AvatarTone.ink),
             const SizedBox(width: 12),
@@ -325,7 +338,7 @@ class _ThreadRow extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          chat.name,
+                          chat.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: CkType.display(
@@ -532,19 +545,3 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/// Derive a 1–2 letter monogram from a team name when `logo_monogram` is
-/// null. Mirrors the "AB" convention used elsewhere in the kit: first letter
-/// of the first word + first letter of the last word (or first two letters
-/// for single-word names).
-String _deriveMono(String name) {
-  final clean = name.trim();
-  if (clean.isEmpty) return '?';
-  final parts = clean.split(RegExp(r'\s+'));
-  if (parts.length == 1) {
-    final w = parts[0];
-    return w.substring(0, w.length.clamp(1, 2)).toUpperCase();
-  }
-  return (parts.first[0] + parts.last[0]).toUpperCase();
-}

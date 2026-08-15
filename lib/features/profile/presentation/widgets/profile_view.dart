@@ -12,6 +12,7 @@ import '../../../follows/domain/entities/follow_direction.dart';
 import '../../../follows/presentation/controllers/follow_toggle_controller.dart';
 import '../../../follows/presentation/providers/follows_providers.dart';
 import '../../../follows/presentation/screens/followers_list_screen.dart';
+import '../../../messages/presentation/providers/messages_providers.dart';
 import '../../../posts/presentation/providers/posts_providers.dart';
 import '../../../posts/presentation/screens/composer_screen.dart';
 import '../../../posts/presentation/screens/photo_viewer_screen.dart';
@@ -212,29 +213,8 @@ class ProfileView extends ConsumerWidget {
                                               userId: profile.userId.value,
                                             ),
                                             const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Container(
-                                                height: 38,
-                                                alignment: Alignment.center,
-                                                decoration: BoxDecoration(
-                                                  color: CkColors.paper,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                        999,
-                                                      ),
-                                                  border: Border.all(
-                                                    color: CkColors.hairline,
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  'Message',
-                                                  style: CkType.body(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: CkColors.ink,
-                                                  ),
-                                                ),
-                                              ),
+                                            _MessageButton(
+                                              userId: profile.userId.value,
                                             ),
                                             const SizedBox(width: 8),
                                             GestureDetector(
@@ -771,6 +751,72 @@ class _FollowButton extends ConsumerWidget {
               color: isFollowing ? CkColors.ink : CkColors.paper,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageButton extends ConsumerStatefulWidget {
+  const _MessageButton({required this.userId});
+  final String? userId;
+
+  @override
+  ConsumerState<_MessageButton> createState() => _MessageButtonState();
+}
+
+class _MessageButtonState extends ConsumerState<_MessageButton> {
+  bool _loading = false;
+
+  Future<void> _handleMessage() async {
+    if (widget.userId == null || _loading) return;
+    setState(() => _loading = true);
+    final result = await ref
+        .read(messagesRepositoryProvider)
+        .getOrCreateDmChat(widget.userId!);
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    result.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(failure.message)),
+        );
+      },
+      (chatId) {
+        context.push('/messages/${chatId.value}');
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _handleMessage,
+        child: Container(
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: CkColors.paper,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: CkColors.hairline),
+          ),
+          child: _loading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(
+                  'Message',
+                  style: CkType.body(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: CkColors.ink,
+                  ),
+                ),
         ),
       ),
     );

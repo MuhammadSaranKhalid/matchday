@@ -132,3 +132,50 @@ final class MyChatsProvider
 }
 
 String _$myChatsHash() => r'64705df418e5974228836f9c8cd5d5c47482f3fe';
+
+/// Derived total unread messages count across all active conversations.
+
+@ProviderFor(unreadMessagesCount)
+final unreadMessagesCountProvider = UnreadMessagesCountProvider._();
+
+/// Derived total unread messages count across all active conversations.
+
+final class UnreadMessagesCountProvider
+    extends $FunctionalProvider<int, int, int>
+    with $Provider<int> {
+  /// Derived total unread messages count across all active conversations.
+  UnreadMessagesCountProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'unreadMessagesCountProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$unreadMessagesCountHash();
+
+  @$internal
+  @override
+  $ProviderElement<int> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  int create(Ref ref) {
+    return unreadMessagesCount(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$unreadMessagesCountHash() =>
+    r'45ae1d166f4d05d9d1d6fc958e86f804d4f4ac7a';

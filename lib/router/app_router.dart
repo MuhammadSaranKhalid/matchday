@@ -149,31 +149,7 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 3 · Messages — threads aggregator
-          StatefulShellBranch(
-            preload: true,
-            routes: [
-              GoRoute(
-                path: '/messages',
-                builder: (context, _) =>
-                    InboxScreen(onBell: () => _openBell(context)),
-                routes: [
-                  // Message thread — rendered full-screen over the shell
-                  // (root navigator), URL-nested under /messages so a refresh
-                  // or push deep-link restores [Messages → thread] with a
-                  // working back. Mirrors the /pavilion/match/:id pattern.
-                  GoRoute(
-                    path: ':chatId',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    builder: (_, state) => MessageThreadScreen(
-                      chatId: state.pathParameters['chatId']!,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          // 4 · Pavilion — workspace (calendar + yours + create)
+          // 3 · Pavilion — workspace (calendar + yours + create)
           StatefulShellBranch(
             preload: true,
             routes: [
@@ -202,6 +178,16 @@ GoRouter appRouter(Ref ref) {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+          // 4 · Profile — own profile tab
+          StatefulShellBranch(
+            preload: true,
+            routes: [
+              GoRoute(
+                path: '/profile',
+                builder: (_, __) => const MyProfileScreen(),
               ),
             ],
           ),
@@ -295,12 +281,23 @@ GoRouter appRouter(Ref ref) {
         path: '/notifications',
         builder: (_, __) => const NotificationsScreen(),
       ),
-      // Own profile — full-screen over the shell, opened from the header
-      // avatar in [V2Header]. (The dedicated Profile tab was replaced by the
-      // Search tab — D9 in docs/search-feature-design.md.)
+      // Messages inbox — full-screen over the shell, opened from the header
+      // messages button in [V2Header].
       GoRoute(
-        path: '/profile',
-        builder: (_, __) => const MyProfileScreen(),
+        path: '/messages',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, _) =>
+            InboxScreen(onBell: () => _openBell(context), showBack: true),
+        routes: [
+          // Message thread — rendered full-screen over the shell
+          GoRoute(
+            path: ':chatId',
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (_, state) => MessageThreadScreen(
+              chatId: state.pathParameters['chatId']!,
+            ),
+          ),
+        ],
       ),
       // Public profile by @username — the landing for a shared
       // `joinmatchday.com/u/<username>` link (universal/app link) and for

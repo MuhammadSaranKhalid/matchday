@@ -28,3 +28,11 @@ MessagesRepository messagesRepository(Ref ref) => MessagesRepositoryImpl(
 @riverpod
 Stream<List<Chat>> myChats(Ref ref) =>
     ref.watch(messagesRepositoryProvider).watchMyChats();
+
+/// Derived total unread messages count across all active conversations.
+@Riverpod(keepAlive: true)
+int unreadMessagesCount(Ref ref) {
+  final list = ref.watch(myChatsProvider).value ?? const [];
+  return list.fold<int>(0, (acc, c) => acc + c.unreadCount);
+}
+

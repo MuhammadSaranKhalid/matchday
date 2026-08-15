@@ -23,9 +23,10 @@ enum _InboxTab { all, teams, dms }
 const bool _kShowInboxTabs = true;
 
 class InboxScreen extends ConsumerStatefulWidget {
-  const InboxScreen({super.key, this.onBell});
+  const InboxScreen({super.key, this.onBell, this.showBack = false});
 
   final VoidCallback? onBell;
+  final bool showBack;
 
   @override
   ConsumerState<InboxScreen> createState() => _InboxScreenState();
@@ -59,9 +60,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     final chatsAsync = ref.watch(myChatsProvider);
     final showRefreshChip = _refreshing && chatsAsync.hasValue;
 
-    return ColoredBox(
-      color: CkColors.paper,
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: CkColors.paper,
+      body: SafeArea(
         bottom: false,
         child: switch (chatsAsync) {
           AsyncData(:final value) => _Loaded(
@@ -69,6 +70,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               tab: _tab,
               onTabChanged: (t) => setState(() => _tab = t),
               onBell: widget.onBell,
+              showBack: widget.showBack,
               refreshing: showRefreshChip,
               searchController: _searchController,
               searchQuery: _searchQuery,
@@ -81,12 +83,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           AsyncError(:final error) => _ErrorView(
               title: 'Messages',
               onBell: widget.onBell,
+              showBack: widget.showBack,
               message: _messageFor(error),
               onRetry: () => ref.invalidate(myChatsProvider),
             ),
           _ => _Skeleton(
               title: 'Messages',
               onBell: widget.onBell,
+              showBack: widget.showBack,
               tab: _tab,
               onTabChanged: (t) => setState(() => _tab = t),
             ),
@@ -114,6 +118,7 @@ class _Loaded extends StatelessWidget {
     required this.onSearchChanged,
     required this.onRefresh,
     this.refreshing = false,
+    this.showBack = false,
   });
 
   final List<Chat> chats;
@@ -125,6 +130,7 @@ class _Loaded extends StatelessWidget {
   final ValueChanged<String> onSearchChanged;
   final Future<void> Function() onRefresh;
   final bool refreshing;
+  final bool showBack;
 
   @override
   Widget build(BuildContext context) {
@@ -160,6 +166,8 @@ class _Loaded extends StatelessWidget {
           title: 'Messages',
           onBell: onBell,
           refreshing: refreshing,
+          showMessages: false,
+          showBack: showBack,
         ),
         InboxSearchBar(
           controller: searchController,
@@ -539,18 +547,25 @@ class _Skeleton extends StatelessWidget {
     required this.onBell,
     required this.tab,
     required this.onTabChanged,
+    this.showBack = false,
   });
 
   final String title;
   final VoidCallback? onBell;
   final _InboxTab tab;
   final ValueChanged<_InboxTab> onTabChanged;
+  final bool showBack;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        V2Header(title: title, onBell: onBell),
+        V2Header(
+          title: title,
+          onBell: onBell,
+          showMessages: false,
+          showBack: showBack,
+        ),
         InboxSearchBar(
           controller: TextEditingController(),
           onChanged: (_) {},
@@ -719,18 +734,26 @@ class _ErrorView extends StatelessWidget {
     required this.onBell,
     required this.message,
     required this.onRetry,
+    this.showBack = false,
   });
 
   final String title;
   final VoidCallback? onBell;
   final String message;
   final VoidCallback onRetry;
+  final bool showBack;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        V2Header(title: title, sub: 'something went wrong', onBell: onBell),
+        V2Header(
+          title: title,
+          sub: 'something went wrong',
+          onBell: onBell,
+          showMessages: false,
+          showBack: showBack,
+        ),
         Expanded(
           child: Center(
             child: Padding(

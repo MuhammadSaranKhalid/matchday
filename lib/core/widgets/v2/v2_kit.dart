@@ -17,8 +17,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/circk_theme.dart';
+import '../../../features/messages/presentation/providers/messages_providers.dart';
 import '../../../features/notifications/presentation/providers/notifications_providers.dart';
-import '../../../features/profile/presentation/providers/profile_providers.dart';
 
 /// `Color` → `#RRGGBB` for embedding in raw SVG markup.
 String ckHex(Color c) {
@@ -85,6 +85,8 @@ abstract final class V2Icons {
   static const close = '<path d="M6 6l12 12M18 6L6 18"/>';
   static const camera =
       '<rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="3"/>';
+  static const profile =
+      '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>';
 }
 
 /// Renders an inline 24-viewBox SVG icon, either stroked (outline) or filled.
@@ -256,33 +258,47 @@ class Pill extends StatelessWidget {
 }
 
 /// Universal top header: large title on the left; bell (→ notifications) and
-/// the signed-in user's avatar (→ `/profile`) on the right.
+/// the messages/chat button (→ `/messages`) on the right.
 ///
-/// The avatar replaces the removed Profile tab (D9 in
-/// docs/search-feature-design.md — nav is Home · Search · Matches · Messages ·
-/// Pavilion). Pass [showAvatar] = false for headers where it doesn't belong.
+/// The messages icon in the header replaces the bottom-nav Messages tab, which
+/// is now the Profile tab. Pass [showMessages] = false for screens where it
+/// doesn't belong (e.g. within the messages inbox itself).
 ///
-/// The bell badge auto-reads the unread notifications count via the
-/// `unreadNotificationsCountProvider` if no explicit [notifCount] is passed.
-/// Callers can still override (e.g. in widget tests).
+/// The bell badge auto-reads the unread notifications count via
+/// `unreadNotificationsCountProvider`. The chat badge auto-reads via
+/// `unreadMessagesCountProvider`.
 class V2Header extends ConsumerWidget {
   const V2Header({
     super.key,
     required this.title,
     this.sub,
     this.notifCount,
+    this.messagesCount,
     this.onBell,
+    this.onMessages,
     this.refreshing = false,
-    this.showAvatar = true,
+    this.showMessages = true,
+    this.showAvatar = false,
+    this.showBack = false,
+    this.onBack,
   });
 
   final String title;
   final String? sub;
   final int? notifCount;
+  final int? messagesCount;
   final VoidCallback? onBell;
+  final VoidCallback? onMessages;
 
-  /// Whether to render the own-profile avatar button on the right.
+  /// Whether to render the chat/messages inbox button on the right.
+  final bool showMessages;
+
+  /// Retained for legacy compatibility.
   final bool showAvatar;
+
+  /// Whether to render a back chevron on the left.
+  final bool showBack;
+  final VoidCallback? onBack;
 
   /// When true AND [sub] is null, a subtle inline spinner renders below the
   /// title in the sub's slot. Used by screens that paint from a local cache
@@ -292,13 +308,38 @@ class V2Header extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final int count =
+    final int bellCount =
         notifCount ?? ref.watch(unreadNotificationsCountProvider);
+    final int chatCount =
+        messagesCount ?? ref.watch(unreadMessagesCountProvider);
+    final bool renderBack = showBack || (onBack != null);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 6, 18, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          if (renderBack) ...[
+            GestureDetector(
+              onTap: onBack ?? () => Navigator.of(context).maybePop(),
+              child: Container(
+                width: 36,
+                height: 36,
+                margin: const EdgeInsets.only(right: 10),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: CkColors.paper,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: CkColors.hairline),
+                ),
+                child: const V2Svg(
+                  V2Icons.chevronLeft,
+                  size: 18,
+                  color: CkColors.ink,
+                ),
+              ),
+            ),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,10 +370,13 @@ class V2Header extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 12),
-          _BellButton(count: count, onTap: onBell),
-          if (showAvatar) ...[
+          _BellButton(count: bellCount, onTap: onBell),
+          if (showMessages) ...[
             const SizedBox(width: 8),
-            const _HeaderAvatar(),
+            _MessagesButton(
+              count: chatCount,
+              onTap: onMessages ?? () => context.push('/messages'),
+            ),
           ],
         ],
       ),
@@ -340,47 +384,47 @@ class V2Header extends ConsumerWidget {
   }
 }
 
-/// Header avatar — the signed-in user's photo (or initials fallback); tapping
-/// opens the own-profile screen, full-screen over the shell. Replaces the
-/// removed Profile tab (D9, docs/search-feature-design.md).
-class _HeaderAvatar extends ConsumerWidget {
-  const _HeaderAvatar();
+class _MessagesButton extends StatelessWidget {
+  const _MessagesButton({required this.count, this.onTap});
+  final int count;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(myProfileProvider).value;
-    final name = profile?.displayName ?? profile?.username ?? '';
-    final url = profile?.avatarUrl;
-    final mono = _initialsOf(name);
-    final Widget face = (url == null || url.isEmpty)
-        ? Avatar(mono: mono, size: 36)
-        : ClipOval(
-            child: Container(
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
               width: 36,
               height: 36,
-              color: CkColors.paper2,
-              child: Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Avatar(mono: mono, size: 36),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: CkColors.paper,
+                shape: BoxShape.circle,
+                border: Border.all(color: CkColors.hairline),
+              ),
+              child: const V2Svg(
+                V2Icons.messages,
+                size: 18,
+                color: CkColors.ink,
               ),
             ),
-          );
-    return GestureDetector(
-      onTap: () => context.push('/profile'),
-      child: face,
+            if (count > 0)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: _Badge(text: count > 9 ? '9+' : '$count'),
+              ),
+          ],
+        ),
+      ),
     );
   }
-}
-
-/// "Muhammad Saran" → "MS"; single word → first letter; empty → "·".
-String _initialsOf(String name) {
-  final t = name.trim();
-  if (t.isEmpty) return '·';
-  final parts = t.split(RegExp(r'\s+'));
-  final b = StringBuffer(parts.first[0]);
-  if (parts.length > 1) b.write(parts[1][0]);
-  return b.toString().toUpperCase();
 }
 
 class _BellButton extends StatelessWidget {
@@ -449,36 +493,19 @@ class _Badge extends StatelessWidget {
   }
 }
 
-/// The five v2 bottom-nav destinations. Order = bar order (D9 in
-/// docs/search-feature-design.md): Home · Search · Matches · Messages ·
-/// Pavilion. Own profile lives behind the header avatar, not a tab.
-enum V2Tab { home, search, matches, messages, pavilion }
+/// The five v2 bottom-nav destinations: Home · Search · Matches · Pavilion · Profile.
+enum V2Tab { home, search, matches, pavilion, profile }
 
-/// 5-tab bottom navigation — Home · Search · Matches · Messages · Pavilion.
-///
-/// Implements the "Option B · Filled square tile" direction from
-/// `matchday-challenge/Bottom Nav Options.html` (the designer's recommended
-/// variant): inactive = soft outline glyph, active = white glyph reversed
-/// inside a red rounded-square tile. (The former "You"/avatar tab was replaced
-/// by Search per D9; the avatar moved to [V2Header].)
-///
-/// Tokens taken verbatim from the design CSS:
-///   bar bg          surface (#fff)            hairline border top
-///   tile (active)   40×32  radius 11  red bg  21px white glyph
-///   tile (inactive) 40×32  transparent        23px soft glyph
-///   label          9.5px Inter  600 → 700     muted → ink on active
-///   tab gap (glyph→label) 5px   tab vertical padding 4px
+/// 5-tab bottom navigation — Home · Search · Matches · Pavilion · Profile.
 class V2BottomNav extends StatelessWidget {
   const V2BottomNav({
     super.key,
     required this.active,
     required this.onSelect,
-    this.messagesBadge = 2,
   });
 
   final V2Tab active;
   final ValueChanged<V2Tab> onSelect;
-  final int messagesBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -497,9 +524,8 @@ class V2BottomNav extends StatelessWidget {
             _navItem(V2Tab.home, 'Home', V2Icons.home),
             _navItem(V2Tab.search, 'Search', V2Icons.search),
             _navItem(V2Tab.matches, 'Matches', V2Icons.matches),
-            _navItem(V2Tab.messages, 'Messages', V2Icons.messages,
-                badge: messagesBadge),
             _navItem(V2Tab.pavilion, 'Pavilion', V2Icons.pavilion),
+            _navItem(V2Tab.profile, 'Profile', V2Icons.profile),
           ],
         ),
       ),

@@ -19,14 +19,13 @@ class AppShell extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  // Branch index ↔ tab identity. Order must match the router's branch order
-  // AND the D9 nav order: Home · Search · Matches · Messages · Pavilion.
+  // Branch index ↔ tab identity: Home · Search · Matches · Pavilion · Profile.
   static const _tabs = <V2Tab>[
     V2Tab.home,
     V2Tab.search,
     V2Tab.matches,
-    V2Tab.messages,
     V2Tab.pavilion,
+    V2Tab.profile,
   ];
 
   @override

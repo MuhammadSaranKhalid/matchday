@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/exceptions.dart';
@@ -66,17 +68,73 @@ class MessagesRepositoryImpl implements MessagesRepository {
   @override
   Future<Either<Failure, Message>> sendMessage(
     ChatId chatId,
-    MessageBody body,
-  ) async {
+    MessageBody body, {
+    String? replyToId,
+  }) async {
     try {
       final dto = await _remote.sendMessage(
         chatId: chatId.value,
         body: body.value,
+        replyToId: replyToId,
       );
       // The data source already wrote the message + own-send inbox patch
       // to the cache. We just clear the draft for this chat.
       await _local.deleteDraft(chatId.value);
       return Right(dto.toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Message>> sendImageMessage(
+    ChatId chatId, {
+    required List<int> imageBytes,
+    required String extension,
+    String? caption,
+    String? replyToId,
+  }) async {
+    try {
+      final url = await _remote.uploadChatImage(
+        bytes: Uint8List.fromList(imageBytes),
+        extension: extension,
+      );
+      final dto = await _remote.sendMessage(
+        chatId: chatId.value,
+        body: (caption != null && caption.trim().isNotEmpty) ? caption.trim() : 'Photo',
+        messageType: 'image',
+        payload: {'media_url': url},
+        replyToId: replyToId,
+      );
+      return Right(dto.toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> deleteMessage(
+    ChatId chatId,
+    MessageId messageId,
+  ) async {
+    try {
+      await _remote.deleteMessage(
+        chatId: chatId.value,
+        messageId: messageId.value,
+      );
+      return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on NetworkException catch (e) {

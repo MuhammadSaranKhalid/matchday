@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' show SocketException;
+import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -282,7 +283,7 @@ class MessagesRemoteDataSource {
   static const _messages = 'messages';
 
   static const _messageSelect =
-      'message_id, chat_id, sender_id, body, created_at, edited_at, deleted_at, '
+      'message_id, chat_id, sender_id, body, message_type, payload, reply_to_id, created_at, edited_at, deleted_at, '
       'sender:profiles(display_name)';
 
   /// Initial-load + load-more page size for thread pagination (ticket #35).
@@ -605,16 +606,24 @@ class MessagesRemoteDataSource {
   Future<MessageDto> sendMessage({
     required String chatId,
     required String body,
+    String messageType = 'text',
+    Map<String, dynamic>? payload,
+    String? replyToId,
   }) async {
     final uid = _supabase.requireUid();
     try {
+      final insertData = <String, dynamic>{
+        'chat_id': chatId,
+        'sender_id': uid,
+        'body': body,
+        'message_type': messageType,
+      };
+      if (payload != null) insertData['payload'] = payload;
+      if (replyToId != null) insertData['reply_to_id'] = replyToId;
+
       final row = await _supabase
           .from(_messages)
-          .insert({
-            'chat_id': chatId,
-            'sender_id': uid,
-            'body': body,
-          })
+          .insert(insertData)
           .select(_messageSelect)
           .single();
       final dto = _dtoFromRow(Map<String, dynamic>.from(row), uid);
@@ -637,6 +646,64 @@ class MessagesRemoteDataSource {
       _patchInboxForOwnSend(dto);
 
       return dto;
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Upload an image to Supabase Storage and return its public URL.
+  Future<String> uploadChatImage({
+    required Uint8List bytes,
+    required String extension,
+  }) async {
+    final uid = _supabase.requireUid();
+    final cleanExt = extension.toLowerCase().replaceAll('.', '');
+    final mimeType = switch (cleanExt) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'heic' => 'image/heic',
+      _ => 'image/jpeg',
+    };
+    final filename = 'chat_${DateTime.now().millisecondsSinceEpoch}.$cleanExt';
+    final path = '$uid/$filename';
+    try {
+      await _supabase.storage.from('avatars').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: mimeType,
+              upsert: true,
+            ),
+          );
+      return _supabase.storage.from('avatars').getPublicUrl(path);
+    } catch (e) {
+      throw ServerException('Failed to upload image: $e');
+    }
+  }
+
+  /// Soft-delete a message (sets deleted_at = now()).
+  Future<void> deleteMessage({
+    required String chatId,
+    required String messageId,
+  }) async {
+    final uid = _supabase.requireUid();
+    try {
+      await _supabase
+          .from(_messages)
+          .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('message_id', messageId)
+          .eq('sender_id', uid);
+
+      final thread = _threads[chatId];
+      if (thread != null && !thread.controller.isClosed) {
+        thread.current = thread.current
+            .map((m) => m.messageId == messageId
+                ? m.copyWith(deletedAt: DateTime.now().toUtc().toIso8601String())
+                : m)
+            .toList();
+        thread.controller.add(List.unmodifiable(thread.current));
+      }
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

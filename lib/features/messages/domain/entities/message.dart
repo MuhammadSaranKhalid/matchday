@@ -22,6 +22,11 @@ class Message {
     required this.body,
     required this.createdAt,
     required this.fromMe,
+    this.messageType = 'text',
+    this.mediaUrl,
+    this.replyToId,
+    this.replyToBody,
+    this.replyToAuthor,
     this.editedAt,
     this.deletedAt,
   });
@@ -32,12 +37,18 @@ class Message {
   final String? senderDisplayName;
   final String body;
   final DateTime createdAt;
+  final bool fromMe;
+  final String messageType;
+  final String? mediaUrl;
+  final String? replyToId;
+  final String? replyToBody;
+  final String? replyToAuthor;
   final DateTime? editedAt;
   final DateTime? deletedAt;
-  final bool fromMe;
 
   bool get isDeleted => deletedAt != null;
   bool get isEdited => editedAt != null;
+  bool get isImage => messageType == 'image' || (mediaUrl != null && mediaUrl!.isNotEmpty);
 
   @override
   bool operator ==(Object other) =>
@@ -50,7 +61,12 @@ class Message {
       other.createdAt == createdAt &&
       other.editedAt == editedAt &&
       other.deletedAt == deletedAt &&
-      other.fromMe == fromMe;
+      other.fromMe == fromMe &&
+      other.messageType == messageType &&
+      other.mediaUrl == mediaUrl &&
+      other.replyToId == replyToId &&
+      other.replyToBody == replyToBody &&
+      other.replyToAuthor == replyToAuthor;
 
   @override
   int get hashCode => Object.hash(
@@ -63,6 +79,11 @@ class Message {
         editedAt,
         deletedAt,
         fromMe,
+        messageType,
+        mediaUrl,
+        replyToId,
+        replyToBody,
+        replyToAuthor,
       );
 }
 

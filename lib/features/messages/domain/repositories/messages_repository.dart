@@ -42,7 +42,23 @@ abstract class MessagesRepository {
   /// Inserts a new message authored by the current user. Server-side
   /// triggers handle the realtime broadcast and the push fan-out — this
   /// returns once the row is committed.
-  Future<Either<Failure, Message>> sendMessage(ChatId chatId, MessageBody body);
+  Future<Either<Failure, Message>> sendMessage(
+    ChatId chatId,
+    MessageBody body, {
+    String? replyToId,
+  });
+
+  /// Uploads an image and sends an image message.
+  Future<Either<Failure, Message>> sendImageMessage(
+    ChatId chatId, {
+    required List<int> imageBytes,
+    required String extension,
+    String? caption,
+    String? replyToId,
+  });
+
+  /// Soft deletes a message for the user.
+  Future<Either<Failure, Unit>> deleteMessage(ChatId chatId, MessageId messageId);
 
   /// Stamps `chat_members.last_read_at = now()` for the current user in this
   /// chat, so unread counts re-emit as 0.

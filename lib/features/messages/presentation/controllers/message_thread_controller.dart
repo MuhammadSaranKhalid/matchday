@@ -40,12 +40,39 @@ class MessageThread extends _$MessageThread {
   /// Validate via the [MessageBody] value object, then send. Returns the
   /// inserted message on success so the widget can react (clear input,
   /// scroll to bottom). On a validation failure the repo is never called.
-  Future<Either<Failure, Message>> send(String raw) {
+  Future<Either<Failure, Message>> send(String raw, {String? replyToId}) {
     return MessageBody.create(raw).fold(
       (failure) => Future.value(Left<Failure, Message>(failure)),
-      (body) =>
-          ref.read(messagesRepositoryProvider).sendMessage(ChatId(chatId), body),
+      (body) => ref.read(messagesRepositoryProvider).sendMessage(
+            ChatId(chatId),
+            body,
+            replyToId: replyToId,
+          ),
     );
+  }
+
+  /// Send an image message with optional caption and quote reply.
+  Future<Either<Failure, Message>> sendImage({
+    required List<int> imageBytes,
+    required String extension,
+    String? caption,
+    String? replyToId,
+  }) {
+    return ref.read(messagesRepositoryProvider).sendImageMessage(
+          ChatId(chatId),
+          imageBytes: imageBytes,
+          extension: extension,
+          caption: caption,
+          replyToId: replyToId,
+        );
+  }
+
+  /// Soft delete a message.
+  Future<Either<Failure, Unit>> deleteMessage(String messageId) {
+    return ref.read(messagesRepositoryProvider).deleteMessage(
+          ChatId(chatId),
+          MessageId(messageId),
+        );
   }
 
   /// Load the next page of older messages (ticket #35). Returns the number

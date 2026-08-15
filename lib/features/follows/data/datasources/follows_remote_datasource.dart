@@ -109,20 +109,19 @@ class FollowsRemoteDataSource {
     int offset = 0,
   }) async {
     try {
-      final res = await _supabase.functions.invoke(
-        'list-follow-list',
-        body: {
-          'user_id': userId,
-          'direction': direction,
-          'limit': limit,
-          'offset': offset,
+      final res = await _supabase.rpc<dynamic>(
+        'get_follow_list',
+        params: {
+          'p_user_id': userId,
+          'p_direction': direction,
+          'p_limit': limit,
+          'p_offset': offset,
         },
       );
-      final data = res.data;
-      final rows = data is Map ? data['entries'] : data;
+      final rows = res is List ? res : (res is Map ? res['entries'] : null);
       if (rows is! List) {
         throw ServerException(
-          'list-follow-list returned an unexpected payload',
+          'get_follow_list returned an unexpected payload',
         );
       }
       return rows
@@ -132,6 +131,8 @@ class FollowsRemoteDataSource {
             ),
           )
           .toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
     } on FunctionException catch (e) {
       throw _functionException(e);
     }

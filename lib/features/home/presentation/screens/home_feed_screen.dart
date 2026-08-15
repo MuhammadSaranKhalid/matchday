@@ -15,7 +15,9 @@ import 'package:matchday/features/matches/presentation/providers/my_matches_prov
 import 'package:matchday/features/posts/domain/entities/post_media.dart';
 import 'package:matchday/features/posts/presentation/controllers/feed_controller.dart';
 import 'package:matchday/features/posts/presentation/providers/posts_providers.dart';
+import 'package:matchday/core/widgets/v2/ck_shimmer.dart';
 import 'package:matchday/features/posts/presentation/screens/photo_viewer_screen.dart';
+import 'package:matchday/features/posts/presentation/widgets/post_card_skeleton.dart';
 
 // ─── Temporary visibility flags ──────────────────────────────────────────
 //
@@ -96,10 +98,7 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
                       if (_kShowLiveCards) const _LiveRail(),
                       _ErrorState(error: error),
                     ]),
-                  _ => _scrollable([
-                      if (_kShowLiveCards) const _LiveRail(),
-                      const _Loader(),
-                    ]),
+                  _ => const FeedShimmerSkeleton(),
                 },
               ),
             ),
@@ -384,15 +383,8 @@ class _LiveCard extends StatelessWidget {
 class _Loader extends StatelessWidget {
   const _Loader();
   @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 28),
-        child: Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2, color: CkColors.muted),
-          ),
-        ),
+  Widget build(BuildContext context) => const CkShimmer(
+        child: PostCardSkeleton(hasMedia: false),
       );
 }
 

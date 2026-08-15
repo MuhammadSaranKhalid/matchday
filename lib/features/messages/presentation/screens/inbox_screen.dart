@@ -6,20 +6,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-import 'package:matchday/core/error/failures.dart';
-import 'package:matchday/core/theme/circk_theme.dart';
-import 'package:matchday/core/widgets/v2/v2_kit.dart';
-import 'package:matchday/features/messages/domain/entities/chat.dart';
-import 'package:matchday/features/messages/presentation/providers/messages_providers.dart';
-import 'package:matchday/features/messages/presentation/widgets/color_utils.dart';
+import '../../../../core/error/failures.dart';
+import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/widgets/v2/v2_kit.dart';
+import '../../domain/entities/chat.dart';
+import '../providers/messages_providers.dart';
+import '../widgets/color_utils.dart';
+import '../widgets/inbox_search_bar.dart';
+import '../widgets/inbox_shimmer_skeleton.dart';
+import '../widgets/new_message_sheet.dart';
 
 /// Inbox tabs: All / Teams / DMs.
 enum _InboxTab { all, teams, dms }
 
 /// Inbox tab bar display flag.
 const bool _kShowInboxTabs = true;
-
-
 
 class InboxScreen extends ConsumerStatefulWidget {
   const InboxScreen({super.key, this.onBell});
@@ -32,20 +33,9 @@ class InboxScreen extends ConsumerStatefulWidget {
 
 class _InboxScreenState extends ConsumerState<InboxScreen> {
   _InboxTab _tab = _InboxTab.all;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
-  /// Cold-start refresh affordance. Time-bounded visual hint, NOT a
-  /// strict "fetch is in flight" signal:
-  ///
-  ///   • Network faster than the 2-second timeout (common) → chip lingers
-  ///     a beat after the data has actually painted. Mild but harmless.
-  ///   • Network slower than the timeout (slow connection) → chip
-  ///     DISAPPEARS while the refresh is still in flight. Trade-off
-  ///     accepted: a stuck-looking spinner is worse than a brief one that
-  ///     stops early. The cache renders immediately regardless.
-  ///
-  /// A precise version would `ref.listen(myChatsProvider, ...)` and clear
-  /// on the second emission, but the time-bounded version is intentional
-  /// for v1 — re-evaluate if real-user data shows the trade-off bites.
   bool _refreshing = true;
   Timer? _refreshTimeout;
 
@@ -60,15 +50,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   @override
   void dispose() {
     _refreshTimeout?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final chatsAsync = ref.watch(myChatsProvider);
-    // Show the chip only while we already have something to show AND the
-    // timeout hasn't elapsed; never on top of the initial loading skeleton.
     final showRefreshChip = _refreshing && chatsAsync.hasValue;
+
     return ColoredBox(
       color: CkColors.paper,
       child: SafeArea(
@@ -80,6 +70,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               onTabChanged: (t) => setState(() => _tab = t),
               onBell: widget.onBell,
               refreshing: showRefreshChip,
+              searchController: _searchController,
+              searchQuery: _searchQuery,
+              onSearchChanged: (q) => setState(() => _searchQuery = q),
+              onRefresh: () async {
+                ref.invalidate(myChatsProvider);
+                await ref.read(myChatsProvider.future);
+              },
             ),
           AsyncError(:final error) => _ErrorView(
               title: 'Messages',
@@ -112,6 +109,10 @@ class _Loaded extends StatelessWidget {
     required this.tab,
     required this.onTabChanged,
     required this.onBell,
+    required this.searchController,
+    required this.searchQuery,
+    required this.onSearchChanged,
+    required this.onRefresh,
     this.refreshing = false,
   });
 
@@ -119,33 +120,39 @@ class _Loaded extends StatelessWidget {
   final _InboxTab tab;
   final ValueChanged<_InboxTab> onTabChanged;
   final VoidCallback? onBell;
+  final TextEditingController searchController;
+  final String searchQuery;
+  final ValueChanged<String> onSearchChanged;
+  final Future<void> Function() onRefresh;
   final bool refreshing;
 
   @override
   Widget build(BuildContext context) {
-    // Tab filtering only kicks in when the tab row is visible. With it
-    // hidden (`_kShowInboxTabs = false`), the inbox surfaces every chat
-    // regardless of `tab`.
-    final List<Chat> visible;
-    final int teamsCount;
-    final int dmsCount;
-    if (_kShowInboxTabs) {
-      final teamChats =
-          chats.where((c) => c.kind == ChatKind.team).toList();
-      final dmChats =
-          chats.where((c) => c.kind == ChatKind.dm).toList();
-      visible = switch (tab) {
-        _InboxTab.all => chats,
-        _InboxTab.teams => teamChats,
-        _InboxTab.dms => dmChats,
-      };
-      teamsCount = teamChats.length;
-      dmsCount = dmChats.length;
-    } else {
-      visible = chats;
-      teamsCount = 0;
-      dmsCount = 0;
-    }
+    final teamChats = chats.where((c) => c.kind == ChatKind.team).toList();
+    final dmChats = chats.where((c) => c.kind == ChatKind.dm).toList();
+
+    final teamsHasUnread = teamChats.any((c) => c.unreadCount > 0);
+    final dmsHasUnread = dmChats.any((c) => c.unreadCount > 0);
+
+    // Tab filtering
+    final List<Chat> tabFiltered = switch (tab) {
+      _InboxTab.all => chats,
+      _InboxTab.teams => teamChats,
+      _InboxTab.dms => dmChats,
+    };
+
+    // Search query filtering
+    final cleanQuery = searchQuery.trim().toLowerCase();
+    final List<Chat> visible = cleanQuery.isEmpty
+        ? tabFiltered
+        : tabFiltered.where((c) {
+            final nameMatch = c.displayName.toLowerCase().contains(cleanQuery);
+            final usernameMatch =
+                (c.dmOtherUserUsername ?? '').toLowerCase().contains(cleanQuery);
+            final msgMatch =
+                (c.lastMessagePreview ?? '').toLowerCase().contains(cleanQuery);
+            return nameMatch || usernameMatch || msgMatch;
+          }).toList();
 
     return Column(
       children: [
@@ -154,26 +161,48 @@ class _Loaded extends StatelessWidget {
           onBell: onBell,
           refreshing: refreshing,
         ),
+        InboxSearchBar(
+          controller: searchController,
+          onChanged: onSearchChanged,
+          onClear: () => onSearchChanged(''),
+        ),
         if (_kShowInboxTabs)
           _TabRow(
             tab: tab,
             onChanged: onTabChanged,
             allCount: chats.length,
-            teamsCount: teamsCount,
-            dmsCount: dmsCount,
+            teamsCount: teamChats.length,
+            dmsCount: dmChats.length,
+            teamsHasUnread: teamsHasUnread,
+            dmsHasUnread: dmsHasUnread,
           ),
         Expanded(
-          child: visible.isEmpty
-              ? const _EmptyList()
-              : ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: visible.length,
-                  itemBuilder: (context, i) => _ThreadRow(
-                    chat: visible[i],
-                    onOpen: () =>
-                        context.go('/messages/${visible[i].id.value}'),
+          child: RefreshIndicator(
+            onRefresh: onRefresh,
+            color: CkColors.ink,
+            backgroundColor: CkColors.paper,
+            child: visible.isEmpty
+                ? _EmptyList(
+                    tab: tab,
+                    isSearching: cleanQuery.isNotEmpty,
+                    query: cleanQuery,
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    itemCount: visible.length,
+                    separatorBuilder: (_, __) => const Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: 78,
+                      color: CkColors.hairline,
+                    ),
+                    itemBuilder: (context, i) => _ThreadRow(
+                      chat: visible[i],
+                      onOpen: () =>
+                          context.push('/messages/${visible[i].id.value}'),
+                    ),
                   ),
-                ),
+          ),
         ),
       ],
     );
@@ -189,6 +218,8 @@ class _TabRow extends StatelessWidget {
     required this.allCount,
     required this.teamsCount,
     required this.dmsCount,
+    this.teamsHasUnread = false,
+    this.dmsHasUnread = false,
   });
 
   final _InboxTab tab;
@@ -196,11 +227,13 @@ class _TabRow extends StatelessWidget {
   final int allCount;
   final int teamsCount;
   final int dmsCount;
+  final bool teamsHasUnread;
+  final bool dmsHasUnread;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+      padding: const EdgeInsets.fromLTRB(18, 2, 18, 10),
       child: Row(
         children: [
           _MTab(
@@ -209,17 +242,19 @@ class _TabRow extends StatelessWidget {
             active: tab == _InboxTab.all,
             onTap: () => onChanged(_InboxTab.all),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           _MTab(
             label: 'Teams',
             count: teamsCount,
+            hasUnreadPip: teamsHasUnread,
             active: tab == _InboxTab.teams,
             onTap: () => onChanged(_InboxTab.teams),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           _MTab(
             label: 'DMs',
             count: dmsCount,
+            hasUnreadPip: dmsHasUnread,
             active: tab == _InboxTab.dms,
             onTap: () => onChanged(_InboxTab.dms),
           ),
@@ -235,45 +270,67 @@ class _MTab extends StatelessWidget {
     required this.count,
     required this.active,
     required this.onTap,
+    this.hasUnreadPip = false,
   });
 
   final String label;
   final int count;
   final bool active;
   final VoidCallback onTap;
+  final bool hasUnreadPip;
 
   @override
   Widget build(BuildContext context) {
-    final fg = active ? CkColors.paper : CkColors.ink2;
+    final fg = active ? CkColors.paper : CkColors.ink;
     final base = CkType.mono(
-      fontSize: 9.5,
+      fontSize: 10,
       fontWeight: FontWeight.w700,
-      letterSpacing: 0.10,
+      letterSpacing: 0.15,
       color: fg,
     );
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: active ? CkColors.ink : CkColors.paper,
+          color: active ? CkColors.ink : CkColors.paper2,
           borderRadius: BorderRadius.circular(999),
-          border: active ? null : Border.all(color: CkColors.hairline),
+          border: Border.all(
+            color: active ? CkColors.ink : CkColors.line.withValues(alpha: 0.5),
+            width: 1,
+          ),
         ),
-        child: Text.rich(
-          TextSpan(
-            style: base,
-            children: [
-              TextSpan(text: label.toUpperCase()),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text.rich(
               TextSpan(
-                text: ' · $count',
-                style: base.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: fg.withValues(alpha: 0.6),
+                style: base,
+                children: [
+                  TextSpan(text: label.toUpperCase()),
+                  TextSpan(
+                    text: ' · $count',
+                    style: base.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: fg.withValues(alpha: active ? 0.7 : 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (hasUnreadPip && !active) ...[
+              const SizedBox(width: 6),
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: CkColors.red,
+                  shape: BoxShape.circle,
                 ),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -297,137 +354,179 @@ class _ThreadRow extends StatelessWidget {
         ? ''
         : timeago.format(chat.lastMessageAt!, locale: 'en_short');
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onOpen,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: const BoxDecoration(
-          color: CkColors.paper,
-          border: Border(top: BorderSide(color: CkColors.hairline)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (chat.kind == ChatKind.team)
-              Crest(short: mono, color: color, size: 42, radius: 11)
-            else if (chat.displayAvatarUrl.isNotEmpty)
-              ClipOval(
-                child: CachedNetworkImage(
-                  imageUrl: chat.displayAvatarUrl,
-                  width: 42,
-                  height: 42,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) =>
-                      Avatar(mono: mono, size: 42, tone: AvatarTone.ink),
-                  errorWidget: (_, __, ___) =>
-                      Avatar(mono: mono, size: 42, tone: AvatarTone.ink),
-                ),
-              )
-            else
-              Avatar(mono: mono, size: 42, tone: AvatarTone.ink),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+    return Material(
+      color: CkColors.paper,
+      child: InkWell(
+        onTap: onOpen,
+        splashColor: CkColors.ink.withValues(alpha: 0.05),
+        highlightColor: CkColors.ink.withValues(alpha: 0.03),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Avatar or Crest
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          chat.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: CkType.display(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.01,
+                  if (chat.kind == ChatKind.team)
+                    Crest(short: mono, color: color, size: 48, radius: 14)
+                  else if (chat.displayAvatarUrl.isNotEmpty)
+                    ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: chat.displayAvatarUrl,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) =>
+                            Avatar(mono: mono, size: 48, tone: AvatarTone.ink),
+                        errorWidget: (_, __, ___) =>
+                            Avatar(mono: mono, size: 48, tone: AvatarTone.ink),
+                      ),
+                    )
+                  else
+                    Avatar(mono: mono, size: 48, tone: AvatarTone.ink),
+                  // Small team pip badge on DM or vice-versa
+                  if (chat.isTeam)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: CkColors.paper,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: CkColors.ink,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.groups,
+                            size: 10,
+                            color: CkColors.paper,
                           ),
                         ),
                       ),
-                      const Spacer(),
-                      const SizedBox(width: 6),
-                      if (time.isNotEmpty)
-                        Text(
-                          time,
-                          style: CkType.mono(
-                            fontSize: 9,
-                            color: unread ? CkColors.red : CkColors.muted,
-                          ),
-                        ),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Text.rich(
-                      _previewSpan(chat, unread: unread),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
                 ],
               ),
-            ),
-            if (unread) ...[
-              const SizedBox(width: 12),
-              Container(
-                constraints: const BoxConstraints(minWidth: 18),
-                height: 18,
-                padding: const EdgeInsets.symmetric(horizontal: 5),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: CkColors.red,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  // The `list-my-chats` edge fn caps its unread count at 100
-                  // (LIMIT 100 in the inner subquery — bounded scan even for
-                  // heavy chats with thousands of unread). Render the cap as
-                  // "99+" so the badge isn't misread as an exact count
-                  // (ticket #37).
-                  chat.unreadCount >= 100 ? '99+' : '${chat.unreadCount}',
-                  style: CkType.display(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: CkColors.paper,
-                  ),
+              const SizedBox(width: 14),
+              // Thread info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            chat.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: CkType.display(
+                              fontSize: 14.5,
+                              fontWeight:
+                                  unread ? FontWeight.w800 : FontWeight.w600,
+                              letterSpacing: -0.01,
+                              color: CkColors.ink,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (time.isNotEmpty)
+                          Text(
+                            time,
+                            style: CkType.mono(
+                              fontSize: 9.5,
+                              fontWeight:
+                                  unread ? FontWeight.w700 : FontWeight.w400,
+                              color: unread ? CkColors.red : CkColors.muted,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text.rich(
+                            _previewSpan(chat, unread: unread),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (unread) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 19),
+                            height: 19,
+                            padding: const EdgeInsets.symmetric(horizontal: 5.5),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: CkColors.red,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              chat.unreadCount >= 100
+                                  ? '99+'
+                                  : '${chat.unreadCount}',
+                              style: CkType.display(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: CkColors.paper,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
   TextSpan _previewSpan(Chat c, {required bool unread}) {
-    final isEmpty = c.lastMessagePreview == null || c.lastMessagePreview!.isEmpty;
+    final isEmpty =
+        c.lastMessagePreview == null || c.lastMessagePreview!.isEmpty;
     final base = CkType.body(
       fontSize: 12.5,
-      height: 1.4,
+      height: 1.35,
       color: unread ? CkColors.ink : CkColors.muted,
-      fontWeight: FontWeight.w400,
+      fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
     ).copyWith(
       fontStyle: isEmpty ? FontStyle.italic : FontStyle.normal,
     );
+
     if (isEmpty) {
       return TextSpan(text: 'No messages yet', style: base);
     }
+
     if (c.lastMessageFromMe) {
       return TextSpan(
         style: base,
         children: [
           TextSpan(
-            text: 'You:',
-            style: base.copyWith(fontWeight: FontWeight.w700),
+            text: 'You: ',
+            style: base.copyWith(
+              fontWeight: FontWeight.w700,
+              color: unread ? CkColors.ink : CkColors.ink2,
+            ),
           ),
-          TextSpan(text: ' ${c.lastMessagePreview}'),
+          TextSpan(text: c.lastMessagePreview),
         ],
       );
     }
+
     return TextSpan(text: c.lastMessagePreview, style: base);
   }
 }
@@ -452,6 +551,10 @@ class _Skeleton extends StatelessWidget {
     return Column(
       children: [
         V2Header(title: title, onBell: onBell),
+        InboxSearchBar(
+          controller: TextEditingController(),
+          onChanged: (_) {},
+        ),
         if (_kShowInboxTabs)
           _TabRow(
             tab: tab,
@@ -461,13 +564,7 @@ class _Skeleton extends StatelessWidget {
             dmsCount: 0,
           ),
         const Expanded(
-          child: Center(
-            child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
+          child: InboxShimmerSkeleton(),
         ),
       ],
     );
@@ -475,21 +572,141 @@ class _Skeleton extends StatelessWidget {
 }
 
 class _EmptyList extends StatelessWidget {
-  const _EmptyList();
+  const _EmptyList({
+    required this.tab,
+    this.isSearching = false,
+    this.query = '',
+  });
+
+  final _InboxTab tab;
+  final bool isSearching;
+  final String query;
 
   @override
   Widget build(BuildContext context) {
+    if (isSearching) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const V2Svg(
+                V2Icons.search,
+                size: 36,
+                color: CkColors.muted,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'No conversations found',
+                style: CkType.display(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: CkColors.ink,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'No chats match "$query". Check for spelling or start a new message.',
+                textAlign: TextAlign.center,
+                style: CkType.body(
+                  fontSize: 13,
+                  color: CkColors.muted,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final (icon, title, desc, ctaLabel, VoidCallback cta) = switch (tab) {
+      _InboxTab.teams => (
+          V2Icons.pavilion,
+          'No team chats yet',
+          'Join or create a cricket team to coordinate matches and strategy.',
+          'Discover Teams',
+          () => context.go('/search'),
+        ),
+      _InboxTab.dms => (
+          V2Icons.messages,
+          'No direct messages yet',
+          'Send a direct message to teammates, friends, and players.',
+          'New Message',
+          () => NewMessageSheet.show(context),
+        ),
+      _InboxTab.all => (
+          V2Icons.messages,
+          'Your Inbox is quiet',
+          'Start a direct message or join a team chat to start messaging.',
+          'Start a Conversation',
+          () => NewMessageSheet.show(context),
+        ),
+    };
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Text(
-          'No chats yet.\nJoin a team and a chat will appear here.',
-          textAlign: TextAlign.center,
-          style: CkType.body(
-            fontSize: 13,
-            color: CkColors.muted,
-            height: 1.5,
-          ),
+        padding: const EdgeInsets.symmetric(horizontal: 36),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: CkColors.paper2,
+                shape: BoxShape.circle,
+                border: Border.all(color: CkColors.line),
+              ),
+              child: V2Svg(
+                icon,
+                size: 28,
+                color: CkColors.ink,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: CkType.display(
+                fontSize: 16.5,
+                fontWeight: FontWeight.w700,
+                color: CkColors.ink,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              desc,
+              textAlign: TextAlign.center,
+              style: CkType.body(
+                fontSize: 13,
+                color: CkColors.muted,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: cta,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CkColors.ink,
+                foregroundColor: CkColors.paper,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              child: Text(
+                ctaLabel,
+                style: CkType.body(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: CkColors.paper,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -530,9 +747,16 @@ class _ErrorView extends StatelessWidget {
                       height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  TextButton(
+                  const SizedBox(height: 14),
+                  ElevatedButton(
                     onPressed: onRetry,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CkColors.ink,
+                      foregroundColor: CkColors.paper,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -544,4 +768,3 @@ class _ErrorView extends StatelessWidget {
     );
   }
 }
-

@@ -86,30 +86,6 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
                           ],
                         ),
                       ),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          final uri = Uri(
-                            path: '/composer',
-                            queryParameters: {
-                              'teamId': value.id.value,
-                              'teamName': value.name,
-                              if (value.logoMonogram != null && value.logoMonogram!.isNotEmpty)
-                                'teamMono': value.logoMonogram!,
-                            },
-                          );
-                          context.push(uri.toString());
-                        },
-                        icon: const Icon(Icons.add_rounded, size: 14),
-                        label: const Text('Post'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: CkColors.ink,
-                          foregroundColor: CkColors.paper,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                        ),
-                      ),
                     ],
                   ),
                 ),

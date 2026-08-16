@@ -4,8 +4,12 @@ import '../entities/place_facet.dart';
 import '../entities/player_skills.dart';
 import '../entities/roster_member.dart';
 import '../entities/team.dart';
+import '../entities/team_claim_request.dart';
+import '../entities/team_invite.dart';
+import '../entities/team_join_request.dart';
 import '../entities/team_member.dart';
 import '../entities/team_search_result.dart';
+import '../entities/user_team_affiliation.dart';
 import '../value_objects/jersey_number.dart';
 import '../value_objects/player_display_name.dart';
 import '../value_objects/team_name.dart';
@@ -21,6 +25,16 @@ abstract class TeamsRepository {
   Stream<Team?> watchTeam(TeamId id);
   Future<Either<Failure, Team?>> getTeam(TeamId id);
   Stream<List<RosterMember>> watchRoster(TeamId teamId);
+  Stream<List<UserTeamAffiliation>> watchUserAffiliatedTeams(String userId);
+
+  /// Pending team invites sent to players.
+  Future<Either<Failure, List<TeamInvite>>> getTeamPendingInvites(String teamId);
+
+  /// Pending claim requests for offline player spots.
+  Future<Either<Failure, List<TeamClaimRequest>>> getTeamPendingClaimRequests(String teamId);
+
+  /// Pending player join requests.
+  Future<Either<Failure, List<TeamJoinRequest>>> getTeamPendingJoinRequests(String teamId);
 
   // ─── Writes ────────────────────────────────────────────────────────────
   Future<Either<Failure, Team>> createTeam({
@@ -116,6 +130,37 @@ abstract class TeamsRepository {
   /// Sets a member's role. Promoting to captain demotes the current captain
   /// (one captain per team).
   Future<Either<Failure, Unit>> setMemberRole(MembershipId id, MemberRole role);
+
+  /// Sends an invitation to a registered Matchday player.
+  Future<Either<Failure, Unit>> sendTeamInvite({
+    required String teamId,
+    required String inviteeId,
+    String? message,
+    MemberRole role = MemberRole.player,
+    int? jerseyNumber,
+  });
+
+  /// Cancels an in-flight team invite.
+  Future<Either<Failure, Unit>> cancelTeamInvite(String inviteId);
+
+  /// Accepts a roster claim request, binding the player's account.
+  Future<Either<Failure, Unit>> acceptClaimRequest(String requestId);
+
+  /// Declines a roster claim request.
+  Future<Either<Failure, Unit>> declineClaimRequest(String requestId);
+
+  /// Requests to join a team squad.
+  Future<Either<Failure, Unit>> requestToJoinTeam({
+    required String teamId,
+    MemberRole role = MemberRole.player,
+    String? message,
+  });
+
+  /// Accepts a player's join request, adding them to the roster.
+  Future<Either<Failure, Unit>> acceptJoinRequest(String requestId);
+
+  /// Declines a player's join request.
+  Future<Either<Failure, Unit>> declineJoinRequest(String requestId);
 
   // ─── Search & discovery ────────────────────────────────────────────────
 

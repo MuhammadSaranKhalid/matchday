@@ -7,8 +7,12 @@ import '../../domain/entities/place_facet.dart';
 import '../../domain/entities/player_skills.dart';
 import '../../domain/entities/roster_member.dart';
 import '../../domain/entities/team.dart';
+import '../../domain/entities/team_claim_request.dart';
+import '../../domain/entities/team_invite.dart';
+import '../../domain/entities/team_join_request.dart';
 import '../../domain/entities/team_member.dart';
 import '../../domain/entities/team_search_result.dart';
+import '../../domain/entities/user_team_affiliation.dart';
 import '../../domain/repositories/teams_repository.dart';
 import '../../domain/value_objects/jersey_number.dart';
 import '../../domain/value_objects/player_display_name.dart';
@@ -134,6 +138,150 @@ class TeamsRepositoryImpl implements TeamsRepository {
         ..sort((a, b) => a.member.joinedAt.compareTo(b.member.joinedAt));
       return roster;
     });
+  }
+
+  @override
+  Stream<List<UserTeamAffiliation>> watchUserAffiliatedTeams(String userId) {
+    return Rx.combineLatest2(
+      _remote.watchTeams(),
+      _remote.watchMembers(),
+      (teams, members) {
+        final List<UserTeamAffiliation> result = [];
+        final myMemberships = members.where((m) => m.userId == userId).toList();
+        final memberByTeamId = {for (final m in myMemberships) m.teamId: m};
+
+        for (final t in teams) {
+          final member = memberByTeamId[t.teamId];
+          final isOwner = t.ownerId == userId;
+          final isManager = t.managers.contains(userId);
+          final isCaptainRole = member?.role == 'captain';
+
+          if (isOwner || isManager || isCaptainRole || member != null) {
+            final isCaptain = isOwner || isManager || isCaptainRole;
+            final roleStr = isOwner || isCaptainRole
+                ? 'CAPTAIN'
+                : isManager
+                    ? 'MANAGER'
+                    : switch (member?.role) {
+                        'vice_captain' => 'VICE CAPTAIN',
+                        'wicket_keeper' => 'WICKET-KEEPER',
+                        _ => 'PLAYER',
+                      };
+
+            result.add(
+              UserTeamAffiliation(
+                teamId: t.teamId,
+                teamName: t.teamName,
+                logoMonogram: t.logoMonogram ??
+                    (t.teamName.isNotEmpty ? t.teamName[0].toUpperCase() : 'T'),
+                logoUrl: t.logoUrl,
+                primaryColor: t.teamColors?['primary'] as String?,
+                role: roleStr,
+                isCaptain: isCaptain,
+              ),
+            );
+          }
+        }
+        return result;
+      },
+    );
+  }
+
+  @override
+  Future<Either<Failure, List<TeamInvite>>> getTeamPendingInvites(
+      String teamId) async {
+    try {
+      final rows = await _remote.getTeamInvites(teamId);
+      final invites = rows.map((row) {
+        final invitee = row['invitee'] as Map<String, dynamic>?;
+        return TeamInvite(
+          inviteId: row['invite_id'] as String,
+          teamId: row['team_id'] as String,
+          inviteeId: row['invitee_id'] as String,
+          invitedBy: row['invited_by'] as String,
+          role: MemberRole.fromWire(row['role'] as String?),
+          status: row['status'] as String? ?? 'pending',
+          createdAt: DateTime.parse(row['created_at'] as String),
+          message: row['message'] as String?,
+          jerseyNumber: row['jersey_number'] as int?,
+          inviteeName:
+              invitee?['display_name'] as String? ?? invitee?['username'] as String?,
+          inviteeUsername: invitee?['username'] as String?,
+          inviteePhotoUrl: invitee?['profile_photo_url'] as String?,
+        );
+      }).toList();
+      return Right(invites);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<TeamClaimRequest>>> getTeamPendingClaimRequests(
+      String teamId) async {
+    try {
+      final rows = await _remote.getClaimRequests(teamId);
+      final requests = rows.map((row) {
+        final unclaimed = row['unclaimed'] as Map<String, dynamic>?;
+        final requester = row['requester'] as Map<String, dynamic>?;
+        return TeamClaimRequest(
+          requestId: row['request_id'] as String,
+          unclaimedId: row['unclaimed_id'] as String,
+          requesterId: row['requester_id'] as String,
+          status: row['status'] as String? ?? 'pending',
+          createdAt: DateTime.parse(row['created_at'] as String),
+          message: row['message'] as String?,
+          unclaimedPlayerName: unclaimed?['display_name'] as String?,
+          unclaimedJerseyNumber: unclaimed?['jersey_number'] as int?,
+          requesterName:
+              requester?['display_name'] as String? ?? requester?['username'] as String?,
+          requesterUsername: requester?['username'] as String?,
+          requesterPhotoUrl: requester?['profile_photo_url'] as String?,
+        );
+      }).toList();
+      return Right(requests);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<TeamJoinRequest>>> getTeamPendingJoinRequests(
+      String teamId) async {
+    try {
+      final rows = await _remote.getTeamJoinRequests(teamId);
+      final requests = rows.map((row) {
+        final applicant = row['applicant'] as Map<String, dynamic>?;
+        return TeamJoinRequest(
+          requestId: row['request_id'] as String,
+          teamId: row['team_id'] as String,
+          applicantId: row['applicant_id'] as String,
+          role: MemberRole.fromWire(row['role'] as String?),
+          status: row['status'] as String? ?? 'pending',
+          createdAt: DateTime.parse(row['created_at'] as String),
+          message: row['message'] as String?,
+          applicantName:
+              applicant?['display_name'] as String? ?? applicant?['username'] as String?,
+          applicantUsername: applicant?['username'] as String?,
+          applicantPhotoUrl: applicant?['profile_photo_url'] as String?,
+        );
+      }).toList();
+      return Right(requests);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
   }
 
   // ─── Writes ─────────────────────────────────────────────────────────────
@@ -417,6 +565,124 @@ class TeamsRepositoryImpl implements TeamsRepository {
       if (m.membershipId == id.value) return m.toEntity();
     }
     return null;
+  }
+
+  @override
+  Future<Either<Failure, Unit>> sendTeamInvite({
+    required String teamId,
+    required String inviteeId,
+    String? message,
+    MemberRole role = MemberRole.player,
+    int? jerseyNumber,
+  }) async {
+    try {
+      await _remote.sendTeamInvite(
+        teamId: teamId,
+        inviteeId: inviteeId,
+        message: message,
+        role: role.wire,
+        jerseyNumber: jerseyNumber,
+      );
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> cancelTeamInvite(String inviteId) async {
+    try {
+      await _remote.cancelTeamInvite(inviteId);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> acceptClaimRequest(String requestId) async {
+    try {
+      await _remote.approveClaimRequest(requestId);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> declineClaimRequest(String requestId) async {
+    try {
+      await _remote.rejectClaimRequest(requestId);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> requestToJoinTeam({
+    required String teamId,
+    MemberRole role = MemberRole.player,
+    String? message,
+  }) async {
+    try {
+      await _remote.requestToJoinTeam(
+        teamId,
+        role: role.wire,
+        message: message,
+      );
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> acceptJoinRequest(String requestId) async {
+    try {
+      await _remote.acceptTeamJoinRequest(requestId);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> declineJoinRequest(String requestId) async {
+    try {
+      await _remote.declineTeamJoinRequest(requestId);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
   }
 
   // ─── Search & discovery ────────────────────────────────────────────────

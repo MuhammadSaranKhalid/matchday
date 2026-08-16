@@ -5,7 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../follows/presentation/controllers/follow_toggle_controller.dart';
-import '../../../data/datasources/teams_datasource_providers.dart';
+import '../../../domain/entities/team_member.dart';
+import '../../providers/teams_providers.dart';
 import 'tp_atoms.dart';
 import 'tp_view.dart';
 
@@ -549,23 +550,21 @@ class TpActionRow extends ConsumerWidget {
                 child: ElevatedButton(
                   onPressed: () async {
                     Navigator.of(ctx).pop();
-                    try {
-                      await ref.read(teamsRemoteDataSourceProvider).requestToJoinTeam(
-                            teamId,
-                            role: selectedRole,
-                            message: msgController.text.trim(),
-                          );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                    final roleEnum = MemberRole.fromWire(selectedRole);
+                    final res = await ref.read(teamsRepositoryProvider).requestToJoinTeam(
+                          teamId: teamId,
+                          role: roleEnum,
+                          message: msgController.text.trim().isNotEmpty ? msgController.text.trim() : null,
+                        );
+                    if (context.mounted) {
+                      res.fold(
+                        (failure) => ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to send request: ${failure.message}')),
+                        ),
+                        (_) => ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Join request sent to team managers!')),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to send request: $e')),
-                        );
-                      }
+                        ),
+                      );
                     }
                   },
                   style: ElevatedButton.styleFrom(

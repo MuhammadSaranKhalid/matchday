@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
-import '../../data/datasources/teams_datasource_providers.dart';
 import '../../domain/entities/player_skills.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
@@ -701,33 +700,30 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
     }
     final note = _noteController.text.trim();
 
-    try {
-      final roleStr = switch (_selectedRole) {
-        MemberRole.captain => 'captain',
-        MemberRole.viceCaptain => 'vice_captain',
-        MemberRole.wicketKeeper => 'wicket_keeper',
-        MemberRole.player => 'player',
-      };
-
-      await ref.read(teamsRemoteDataSourceProvider).sendTeamInvite(
-            teamId: widget.team.id.value,
-            inviteeId: widget.userId,
-            role: roleStr,
-            jerseyNumber: jerseyNumber,
-            message: note.isNotEmpty ? note : null,
-          );
-
-      if (mounted) {
-        Navigator.of(context).pop();
-        widget.onSent();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSending = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send invite: $e'), backgroundColor: CkColors.red),
+    final res = await ref.read(teamsRepositoryProvider).sendTeamInvite(
+          teamId: widget.team.id.value,
+          inviteeId: widget.userId,
+          role: _selectedRole,
+          jerseyNumber: jerseyNumber,
+          message: note.isNotEmpty ? note : null,
         );
-      }
+
+    if (mounted) {
+      res.fold(
+        (failure) {
+          setState(() => _isSending = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to send invite: ${failure.message}'),
+              backgroundColor: CkColors.red,
+            ),
+          );
+        },
+        (_) {
+          Navigator.of(context).pop();
+          widget.onSent();
+        },
+      );
     }
   }
 

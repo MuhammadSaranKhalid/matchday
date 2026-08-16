@@ -13,9 +13,11 @@ import '../../../posts/presentation/providers/posts_providers.dart';
 import '../../../posts/presentation/screens/photo_viewer_screen.dart';
 import '../../../posts/presentation/widgets/post_card.dart';
 import '../../../posts/presentation/widgets/post_card_skeleton.dart';
-import '../../data/datasources/teams_datasource_providers.dart';
 import '../../domain/entities/roster_member.dart';
 import '../../domain/entities/team.dart';
+import '../../domain/entities/team_claim_request.dart';
+import '../../domain/entities/team_invite.dart';
+import '../../domain/entities/team_join_request.dart';
 import '../../domain/entities/team_member.dart';
 import '../../domain/value_objects/jersey_number.dart';
 import '../providers/teams_providers.dart';
@@ -243,15 +245,6 @@ class _RosterTab extends ConsumerWidget {
 
 // ─── Tab 2: Requests & Invitations ──────────────────────────────────────────
 
-Map<String, dynamic> _asMap(dynamic val) {
-  if (val == null) return const <String, dynamic>{};
-  if (val is Map<String, dynamic>) return val;
-  if (val is Map) {
-    return val.map((k, v) => MapEntry(k.toString(), v));
-  }
-  return const <String, dynamic>{};
-}
-
 class _RequestsTab extends ConsumerWidget {
   const _RequestsTab({required this.team});
   final Team team;
@@ -438,24 +431,22 @@ class _RequestsTab extends ConsumerWidget {
 
 class _PlayerJoinRequestCard extends ConsumerWidget {
   const _PlayerJoinRequestCard({required this.request, required this.teamId});
-  final Map<String, dynamic> request;
+  final TeamJoinRequest request;
   final String teamId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reqId = request['request_id']?.toString() ?? '';
-    final player = _asMap(request['player']);
-    final playerName = player['display_name']?.toString() ?? 'Player';
-    final playerHandle = player['username']?.toString();
-    final photoUrl = player['profile_photo_url']?.toString();
-    final role = request['role']?.toString() ?? 'player';
-    final message = request['message']?.toString();
+    final reqId = request.requestId;
+    final playerName = request.applicantName ?? 'Player';
+    final playerHandle = request.applicantUsername;
+    final photoUrl = request.applicantPhotoUrl;
+    final message = request.message;
 
-    final roleLabel = switch (role) {
-      'captain' => 'Captain',
-      'vice_captain' => 'Vice Captain',
-      'wicket_keeper' => 'Wicket-keeper',
-      _ => 'Squad Player',
+    final roleLabel = switch (request.role) {
+      MemberRole.captain => 'Captain',
+      MemberRole.viceCaptain => 'Vice Captain',
+      MemberRole.wicketKeeper => 'Wicket-keeper',
+      MemberRole.player => 'Squad Player',
     };
 
     return Container(
@@ -523,7 +514,7 @@ class _PlayerJoinRequestCard extends ConsumerWidget {
             children: [
               InkWell(
                 onTap: () async {
-                  await ref.read(teamsRemoteDataSourceProvider).declineTeamJoinRequest(reqId);
+                  await ref.read(teamsRepositoryProvider).declineJoinRequest(reqId);
                   ref.invalidate(teamPendingJoinRequestsProvider(teamId));
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -548,7 +539,7 @@ class _PlayerJoinRequestCard extends ConsumerWidget {
               const SizedBox(width: 8),
               InkWell(
                 onTap: () async {
-                  await ref.read(teamsRemoteDataSourceProvider).acceptTeamJoinRequest(reqId);
+                  await ref.read(teamsRepositoryProvider).acceptJoinRequest(reqId);
                   ref.invalidate(teamPendingJoinRequestsProvider(teamId));
                   ref.invalidate(rosterProvider(teamId));
                   ref.invalidate(teamProvider(teamId));
@@ -581,19 +572,17 @@ class _PlayerJoinRequestCard extends ConsumerWidget {
 
 class _ClaimRequestCard extends ConsumerWidget {
   const _ClaimRequestCard({required this.request, required this.teamId});
-  final Map<String, dynamic> request;
+  final TeamClaimRequest request;
   final String teamId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reqId = request['request_id']?.toString() ?? '';
-    final requester = _asMap(request['requester']);
-    final unclaimed = _asMap(request['unclaimed']);
-    final requesterName = requester['display_name']?.toString() ?? 'Player';
-    final requesterHandle = requester['username']?.toString();
-    final photoUrl = requester['profile_photo_url']?.toString();
-    final unclaimedName = unclaimed['display_name']?.toString() ?? 'Roster spot';
-    final message = request['message']?.toString();
+    final reqId = request.requestId;
+    final requesterName = request.requesterName ?? 'Player';
+    final requesterHandle = request.requesterUsername;
+    final photoUrl = request.requesterPhotoUrl;
+    final unclaimedName = request.unclaimedPlayerName ?? 'Roster spot';
+    final message = request.message;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -660,7 +649,7 @@ class _ClaimRequestCard extends ConsumerWidget {
             children: [
               InkWell(
                 onTap: () async {
-                  await ref.read(teamsRemoteDataSourceProvider).rejectClaimRequest(reqId);
+                  await ref.read(teamsRepositoryProvider).declineClaimRequest(reqId);
                   ref.invalidate(teamPendingClaimRequestsProvider(teamId));
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -685,7 +674,7 @@ class _ClaimRequestCard extends ConsumerWidget {
               const SizedBox(width: 8),
               InkWell(
                 onTap: () async {
-                  await ref.read(teamsRemoteDataSourceProvider).approveClaimRequest(reqId);
+                  await ref.read(teamsRepositoryProvider).acceptClaimRequest(reqId);
                   ref.invalidate(teamPendingClaimRequestsProvider(teamId));
                   ref.invalidate(rosterProvider(teamId));
                   ref.invalidate(teamProvider(teamId));
@@ -718,25 +707,23 @@ class _ClaimRequestCard extends ConsumerWidget {
 
 class _SentInviteCard extends ConsumerWidget {
   const _SentInviteCard({required this.invite, required this.teamId});
-  final Map<String, dynamic> invite;
+  final TeamInvite invite;
   final String teamId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inviteId = invite['invite_id']?.toString() ?? '';
-    final invitee = _asMap(invite['invitee']);
-    final inviteeName = invitee['display_name']?.toString() ?? 'Player';
-    final inviteeHandle = invitee['username']?.toString();
-    final photoUrl = invitee['profile_photo_url']?.toString();
-    final role = invite['role']?.toString() ?? 'player';
-    final jersey = invite['jersey_number'] as int?;
-    final message = invite['message']?.toString();
+    final inviteId = invite.inviteId;
+    final inviteeName = invite.inviteeName ?? 'Player';
+    final inviteeHandle = invite.inviteeUsername;
+    final photoUrl = invite.inviteePhotoUrl;
+    final jersey = invite.jerseyNumber;
+    final message = invite.message;
 
-    final roleLabel = switch (role) {
-      'captain' => 'Captain',
-      'vice_captain' => 'Vice Captain',
-      'wicket_keeper' => 'Wicket-keeper',
-      _ => 'Squad Player',
+    final roleLabel = switch (invite.role) {
+      MemberRole.captain => 'Captain',
+      MemberRole.viceCaptain => 'Vice Captain',
+      MemberRole.wicketKeeper => 'Wicket-keeper',
+      MemberRole.player => 'Squad Player',
     };
 
     return Container(
@@ -813,7 +800,7 @@ class _SentInviteCard extends ConsumerWidget {
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: () async {
-                await ref.read(teamsRemoteDataSourceProvider).cancelTeamInvite(inviteId);
+                await ref.read(teamsRepositoryProvider).cancelTeamInvite(inviteId);
                 ref.invalidate(teamPendingInvitesProvider(teamId));
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

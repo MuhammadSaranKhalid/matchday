@@ -4,6 +4,10 @@ import '../../data/datasources/teams_datasource_providers.dart';
 import '../../data/repositories/teams_repository_impl.dart';
 import '../../domain/entities/roster_member.dart';
 import '../../domain/entities/team.dart';
+import '../../domain/entities/team_claim_request.dart';
+import '../../domain/entities/team_invite.dart';
+import '../../domain/entities/team_join_request.dart';
+import '../../domain/entities/user_team_affiliation.dart';
 import '../../domain/repositories/teams_repository.dart';
 
 part 'teams_providers.g.dart';
@@ -23,8 +27,7 @@ Stream<List<Team>> myTeams(Ref ref) {
   return ref.watch(teamsRepositoryProvider).watchMyTeams(userId);
 }
 
-/// All teams visible to the signed-in user (used by match setup's opponent
-/// picker).
+/// All teams visible to the signed-in user (used by match setup's opponent picker).
 @riverpod
 Stream<List<Team>> allTeams(Ref ref) =>
     ref.watch(teamsRepositoryProvider).watchAllTeams();
@@ -39,87 +42,36 @@ Stream<Team?> team(Ref ref, String teamId) =>
 Stream<List<RosterMember>> roster(Ref ref, String teamId) =>
     ref.watch(teamsRepositoryProvider).watchRoster(TeamId(teamId));
 
+/// Real-time stream of all teams affiliated with a user (captained and played for).
+@riverpod
+Stream<List<UserTeamAffiliation>> userAffiliatedTeams(Ref ref, String userId) =>
+    ref.watch(teamsRepositoryProvider).watchUserAffiliatedTeams(userId);
+
 /// Team invites sent to players for a team.
 @riverpod
-Future<List<Map<String, dynamic>>> teamPendingInvites(Ref ref, String teamId) =>
-    ref.watch(teamsRemoteDataSourceProvider).getTeamInvites(teamId);
+Future<List<TeamInvite>> teamPendingInvites(Ref ref, String teamId) async {
+  final res =
+      await ref.watch(teamsRepositoryProvider).getTeamPendingInvites(teamId);
+  return res.getOrElse((_) => const []);
+}
 
 /// Claim requests from users claiming unclaimed roster spots for a team.
 @riverpod
-Future<List<Map<String, dynamic>>> teamPendingClaimRequests(Ref ref, String teamId) =>
-    ref.watch(teamsRemoteDataSourceProvider).getClaimRequests(teamId);
+Future<List<TeamClaimRequest>> teamPendingClaimRequests(
+    Ref ref, String teamId) async {
+  final res = await ref
+      .watch(teamsRepositoryProvider)
+      .getTeamPendingClaimRequests(teamId);
+  return res.getOrElse((_) => const []);
+}
 
 /// Join requests from players asking to join a team.
 @riverpod
-Future<List<Map<String, dynamic>>> teamPendingJoinRequests(Ref ref, String teamId) =>
-    ref.watch(teamsRemoteDataSourceProvider).getTeamJoinRequests(teamId);
-
-class UserTeamAffiliation {
-  const UserTeamAffiliation({
-    required this.teamId,
-    required this.teamName,
-    required this.logoMonogram,
-    this.logoUrl,
-    this.primaryColor,
-    required this.role,
-    required this.isCaptain,
-  });
-
-  final String teamId;
-  final String teamName;
-  final String logoMonogram;
-  final String? logoUrl;
-  final String? primaryColor;
-  final String role;
-  final bool isCaptain;
+Future<List<TeamJoinRequest>> teamPendingJoinRequests(
+    Ref ref, String teamId) async {
+  final res =
+      await ref.watch(teamsRepositoryProvider).getTeamPendingJoinRequests(teamId);
+  return res.getOrElse((_) => const []);
 }
 
-/// Real-time stream of all teams affiliated with a user (captained and played for).
-@riverpod
-Stream<List<UserTeamAffiliation>> userAffiliatedTeams(Ref ref, String userId) {
-  final remote = ref.watch(teamsRemoteDataSourceProvider);
-  return ref.watch(teamsRepositoryProvider).watchAllTeams().asyncMap((allTeams) async {
-    try {
-      final members = await remote.listMembers();
-      final myMemberships = members.where((m) => m.userId == userId).toList();
-      final memberByTeamId = {for (final m in myMemberships) m.teamId: m};
-
-      final List<UserTeamAffiliation> result = [];
-      for (final t in allTeams) {
-        final member = memberByTeamId[t.id.value];
-        final isOwner = t.ownerId == userId;
-        final isManager = t.managers.contains(userId);
-        final isCaptainRole = member?.role == 'captain';
-
-        if (isOwner || isManager || isCaptainRole || member != null) {
-          final isCaptain = isOwner || isManager || isCaptainRole;
-          final roleStr = isOwner || isCaptainRole
-              ? 'CAPTAIN'
-              : isManager
-                  ? 'MANAGER'
-                  : switch (member?.role) {
-                      'vice_captain' => 'VICE CAPTAIN',
-                      'wicket_keeper' => 'WICKET-KEEPER',
-                      _ => 'PLAYER',
-                    };
-
-          result.add(
-            UserTeamAffiliation(
-              teamId: t.id.value,
-              teamName: t.name,
-              logoMonogram: t.logoMonogram ?? (t.name.isNotEmpty ? t.name[0].toUpperCase() : 'T'),
-              logoUrl: t.logoUrl,
-              primaryColor: t.primaryColor,
-              role: roleStr,
-              isCaptain: isCaptain,
-            ),
-          );
-        }
-      }
-      return result;
-    } catch (_) {
-      return <UserTeamAffiliation>[];
-    }
-  });
-}
 

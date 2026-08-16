@@ -17,6 +17,7 @@ import '../../../posts/presentation/providers/posts_providers.dart';
 import '../../../posts/presentation/screens/composer_screen.dart';
 import '../../../posts/presentation/screens/photo_viewer_screen.dart';
 import '../../../posts/presentation/widgets/post_card.dart';
+import '../../../teams/domain/entities/user_team_affiliation.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/player_profile.dart';
 import '../../domain/entities/profile.dart';
@@ -348,7 +349,7 @@ class ProfileView extends ConsumerWidget {
                           onLike: () => ref.read(postsRepositoryProvider).togglePostLike(post.id),
                           onBookmark: () => ref.read(postsRepositoryProvider).toggleBookmark(post.id),
                           onOpenPhoto:
-                              (idx) => Navigator.of(
+                              (int idx) => Navigator.of(
                                 context,
                                 rootNavigator: true,
                               ).push(

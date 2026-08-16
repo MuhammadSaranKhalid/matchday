@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
+import '../../../../../core/widgets/v2/v2_kit.dart';
 import 'tp_view.dart';
 
 /// Mono / uppercase / letter-spaced label — the design's single most-used
@@ -308,170 +310,100 @@ class TpPlayerRowWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        border: isFirst
-            ? null
-            : const Border(top: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        children: [
-          _JerseyTile(
-            jersey: player.jersey,
-            primary: primary,
-            unclaimed: _isUnclaimed,
-            sms: player.status == TpPlayerStatus.sms,
-            isMe: _isMe,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        player.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: CkType.display(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -0.01,
+    final hasUsername = player.username != null && player.username!.isNotEmpty;
+
+    return InkWell(
+      onTap: () {
+        if (!_isUnclaimed && hasUsername) {
+          context.push('/u/${player.username}');
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: isFirst
+              ? null
+              : const Border(top: BorderSide(color: CkColors.hairline)),
+        ),
+        child: Row(
+          children: [
+            Avatar(
+              mono: player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
+              imageUrl: !_isUnclaimed ? player.photoUrl : null,
+              size: 38,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          player.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: CkType.display(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.01,
+                          ),
                         ),
                       ),
+                      if (_roleAbbr.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        _SmallChip(
+                          label: _roleAbbr,
+                          bg: CkColors.cream,
+                          fg: const Color(0xFF6B5414),
+                        ),
+                      ],
+                      if (player.jersey > 0) ...[
+                        const SizedBox(width: 6),
+                        _SmallChip(
+                          label: '#${player.jersey}',
+                          bg: CkColors.paper2,
+                          fg: CkColors.ink,
+                          border: CkColors.hairline,
+                        ),
+                      ],
+                      if (_isMe) ...[
+                        const SizedBox(width: 6),
+                        const _SmallChip(
+                          label: 'YOU',
+                          bg: CkColors.ink,
+                          fg: CkColors.paper,
+                        ),
+                      ],
+                      if (_isUnclaimed) ...[
+                        const SizedBox(width: 6),
+                        const _SmallChip(
+                          label: 'UNCLAIMED',
+                          bg: CkColors.paper2,
+                          fg: CkColors.muted,
+                          border: CkColors.hairline,
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasUsername
+                        ? '@${player.username}'
+                        : (_isUnclaimed ? 'Offline squad player' : 'Squad member'),
+                    style: CkType.body(
+                      fontSize: 11.5,
+                      color: hasUsername ? const Color(0xFF1E5A2C) : CkColors.muted,
                     ),
-                    if (_roleAbbr.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      _SmallChip(
-                        label: _roleAbbr,
-                        bg: CkColors.cream,
-                        fg: CkColors.ink2,
-                      ),
-                    ],
-                    if (_isMe) ...[
-                      const SizedBox(width: 6),
-                      const _SmallChip(
-                        label: 'YOU',
-                        bg: CkColors.ink,
-                        fg: CkColors.paper,
-                      ),
-                    ],
-                    if (_isUnclaimed) ...[
-                      const SizedBox(width: 6),
-                      const _SmallChip(
-                        label: 'UNCLAIMED',
-                        bg: CkColors.paper2,
-                        fg: CkColors.muted,
-                        border: CkColors.hairline,
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  player.bowl != '—'
-                      ? '${player.bat} · ${player.bowl}'
-                      : player.bat,
-                  style: tpMono(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: CkColors.muted,
-                  ).copyWith(letterSpacing: 0.02),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          TpSparkline(values: player.last5),
-        ],
-      ),
-    );
-  }
-}
-
-class _JerseyTile extends StatelessWidget {
-  const _JerseyTile({
-    required this.jersey,
-    required this.primary,
-    required this.unclaimed,
-    required this.sms,
-    required this.isMe,
-  });
-
-  final int jersey;
-  final Color primary;
-  final bool unclaimed;
-  final bool sms;
-  final bool isMe;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 40,
-      height: 40,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: unclaimed ? Colors.transparent : primary,
-              borderRadius: BorderRadius.circular(10),
-              border: unclaimed
-                  ? Border.all(
-                      color: CkColors.line, style: BorderStyle.solid)
-                  : null,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '#$jersey',
-              style: CkType.display(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.02,
-                color: unclaimed ? CkColors.muted : Colors.white,
+                  ),
+                ],
               ),
             ),
-          ),
-          if (sms)
-            Positioned(
-              top: -3,
-              right: -3,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: CkColors.amber,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: CkColors.paper, width: 2),
-                ),
-              ),
-            ),
-          if (isMe)
-            Positioned(
-              top: -5,
-              right: -5,
-              child: Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: CkColors.ink,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: CkColors.paper, width: 2),
-                ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.check_rounded,
-                  size: 8,
-                  color: CkColors.paper,
-                ),
-              ),
-            ),
-        ],
+            const SizedBox(width: 8),
+            TpSparkline(values: player.last5),
+          ],
+        ),
       ),
     );
   }

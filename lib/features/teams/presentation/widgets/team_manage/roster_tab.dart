@@ -11,7 +11,6 @@ import '../../../domain/entities/team.dart';
 import '../../../domain/entities/team_member.dart';
 import '../../controllers/team_manage_controller.dart';
 import '../../providers/teams_providers.dart';
-import '../../utils/team_display.dart';
 import '../add_player_sheet.dart';
 import 'jersey_sheet.dart';
 import 'member_actions_sheet.dart';
@@ -153,7 +152,6 @@ class ManagedRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = entry.member;
-    final primary = parseHexColor(team.primaryColor, fallback: CkColors.ink);
     final isUnclaimed = m.playerType == PlayerType.unclaimed;
 
     return Padding(
@@ -174,33 +172,11 @@ class ManagedRow extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    if (!isUnclaimed && (entry.profilePhotoUrl != null && entry.profilePhotoUrl!.isNotEmpty))
-                      Avatar(
-                        mono: entry.displayName.isNotEmpty ? entry.displayName[0].toUpperCase() : '?',
-                        imageUrl: entry.profilePhotoUrl,
-                        size: 38,
-                      )
-                    else
-                      Container(
-                        width: 38,
-                        height: 38,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: m.jerseyNumber == null ? CkColors.paper2 : primary,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: m.jerseyNumber == null ? CkColors.hairline : Colors.transparent,
-                          ),
-                        ),
-                        child: Text(
-                          m.jerseyNumber == null ? '—' : '#${m.jerseyNumber}',
-                          style: CkType.display(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: m.jerseyNumber == null ? CkColors.muted : Colors.white,
-                          ),
-                        ),
-                      ),
+                    Avatar(
+                      mono: entry.displayName.isNotEmpty ? entry.displayName[0].toUpperCase() : '?',
+                      imageUrl: !isUnclaimed ? entry.profilePhotoUrl : null,
+                      size: 38,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -221,6 +197,10 @@ class ManagedRow extends StatelessWidget {
                               if (m.role != MemberRole.player) ...[
                                 const SizedBox(width: 6),
                                 _roleChip(m.role),
+                              ],
+                              if (m.jerseyNumber != null) ...[
+                                const SizedBox(width: 6),
+                                _jerseyBadge(m.jerseyNumber!),
                               ],
                             ],
                           ),
@@ -261,6 +241,25 @@ class ManagedRow extends StatelessWidget {
             tooltip: 'Member actions',
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _jerseyBadge(int number) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: CkColors.paper2,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: CkColors.hairline),
+      ),
+      child: Text(
+        '#$number',
+        style: CkType.mono(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w700,
+          color: CkColors.ink,
+        ),
       ),
     );
   }

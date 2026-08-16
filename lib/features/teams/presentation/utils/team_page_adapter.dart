@@ -45,6 +45,8 @@ TeamPageView buildTeamPageViewFromReal({
         jersey: m.jerseyNumber ?? 0,
         bat: '—',
         bowl: '—',
+        photoUrl: r.profilePhotoUrl,
+        username: r.username,
         status:
             m.playerType == PlayerType.unclaimed
                 ? TpPlayerStatus.unclaimed

@@ -236,6 +236,8 @@ class TpPlayerRow {
     required this.bat,
     required this.bowl,
     required this.status,
+    this.photoUrl,
+    this.username,
     this.last5 = const [],
   });
   final String id;
@@ -250,6 +252,12 @@ class TpPlayerRow {
   final String bowl;
 
   final TpPlayerStatus status;
+
+  /// Profile photo URL if available.
+  final String? photoUrl;
+
+  /// Profile username handle if claimed.
+  final String? username;
 
   /// Up to 5 most recent batting scores for the inline sparkline.
   final List<int> last5;

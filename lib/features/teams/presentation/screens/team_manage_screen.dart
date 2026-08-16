@@ -445,6 +445,12 @@ class _SettingsTab extends StatelessWidget {
         const SizedBox(height: 8),
 
         _settingTile(
+          title: 'Team Logo & Brand Colors',
+          value: team.logoUrl != null && team.logoUrl!.isNotEmpty ? 'Custom Logo Uploaded' : (team.logoMonogram != null ? 'Monogram (${team.logoMonogram})' : 'Preset Colors'),
+          icon: Icons.palette_outlined,
+          onTap: () => showEditTeamSheet(context, team),
+        ),
+        _settingTile(
           title: 'Team Name',
           value: team.name,
           icon: Icons.shield_outlined,

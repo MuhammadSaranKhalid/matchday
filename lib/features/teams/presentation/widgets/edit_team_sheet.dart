@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
@@ -7,7 +8,7 @@ import '../../domain/entities/team.dart';
 import '../../domain/value_objects/team_name.dart';
 import '../providers/teams_providers.dart';
 
-/// Shows the bottom sheet to edit team details.
+/// Shows the bottom sheet to edit team details (and upload logo).
 Future<bool?> showEditTeamSheet(BuildContext context, Team team) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -38,7 +39,9 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
 
   late TeamPrivacy _privacy;
   late String _primaryColor;
+  String? _currentLogoUrl;
   bool _isSaving = false;
+  bool _isUploadingLogo = false;
   String? _error;
 
   static const _presetColors = [
@@ -66,6 +69,7 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
         TextEditingController(text: widget.team.logoMonogram ?? '');
     _privacy = widget.team.privacy;
     _primaryColor = widget.team.primaryColor ?? '#2E7D32';
+    _currentLogoUrl = widget.team.logoUrl;
   }
 
   @override
@@ -77,6 +81,51 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
     _homeGroundController.dispose();
     _monogramController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndUploadLogo() async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+    );
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (bytes.length > 2 * 1024 * 1024) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image is too large (max 2 MB)')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isUploadingLogo = true);
+    final ext = file.name.contains('.') ? file.name.split('.').last : 'jpg';
+    final repo = ref.read(teamsRepositoryProvider);
+    final res = await repo.uploadTeamLogo(
+      teamId: widget.team.id,
+      bytes: bytes,
+      extension: ext,
+    );
+    if (!mounted) return;
+    res.fold(
+      (f) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to upload logo: ${f.message}')),
+      ),
+      (url) {
+        setState(() {
+          _currentLogoUrl = url;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Team logo updated!')),
+        );
+      },
+    );
+    if (mounted) {
+      setState(() => _isUploadingLogo = false);
+    }
   }
 
   Future<void> _handleSave() async {
@@ -186,6 +235,101 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
+              ),
+              const SizedBox(height: 14),
+
+              // Logo Uploader Avatar
+              Center(
+                child: GestureDetector(
+                  onTap: _isUploadingLogo ? null : _pickAndUploadLogo,
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: _parseHex(_primaryColor),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: CkColors.hairline,
+                            width: 2,
+                          ),
+                          image:
+                              (_currentLogoUrl != null &&
+                                      _currentLogoUrl!.isNotEmpty)
+                                  ? DecorationImage(
+                                    image: NetworkImage(_currentLogoUrl!),
+                                    fit: BoxFit.cover,
+                                  )
+                                  : null,
+                        ),
+                        alignment: Alignment.center,
+                        child:
+                            (_currentLogoUrl == null ||
+                                    _currentLogoUrl!.isEmpty)
+                                ? Text(
+                                  _monogramController.text.isNotEmpty
+                                      ? _monogramController.text
+                                      : widget.team.name.isNotEmpty
+                                      ? widget.team.name
+                                          .substring(0, 1)
+                                          .toUpperCase()
+                                      : 'T',
+                                  style: CkType.display(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                )
+                                : null,
+                      ),
+                      Positioned(
+                        bottom: -2,
+                        right: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: CkColors.ink,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: CkColors.surface,
+                              width: 2,
+                            ),
+                          ),
+                          child:
+                              _isUploadingLogo
+                                  ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                  : const Icon(
+                                    Icons.camera_alt_rounded,
+                                    size: 13,
+                                    color: Colors.white,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Center(
+                child: GestureDetector(
+                  onTap: _isUploadingLogo ? null : _pickAndUploadLogo,
+                  child: Text(
+                    _isUploadingLogo ? 'Uploading logo...' : 'Change Team Logo',
+                    style: CkType.body(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: CkColors.red,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 18),
 
@@ -324,19 +468,21 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                           color: _parseHex(hex),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: _primaryColor == hex
-                                ? CkColors.ink
-                                : Colors.transparent,
+                            color:
+                                _primaryColor == hex
+                                    ? CkColors.ink
+                                    : Colors.transparent,
                             width: 2.5,
                           ),
                         ),
-                        child: _primaryColor == hex
-                            ? const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 18,
-                            )
-                            : null,
+                        child:
+                            _primaryColor == hex
+                                ? const Icon(
+                                  Icons.check,
+                                  color: Colors.white,
+                                  size: 18,
+                                )
+                                : null,
                       ),
                     ),
                 ],

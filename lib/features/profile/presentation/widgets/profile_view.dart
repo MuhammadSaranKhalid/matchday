@@ -17,6 +17,7 @@ import '../../../posts/presentation/providers/posts_providers.dart';
 import '../../../posts/presentation/screens/composer_screen.dart';
 import '../../../posts/presentation/screens/photo_viewer_screen.dart';
 import '../../../posts/presentation/widgets/post_card.dart';
+import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/player_profile.dart';
 import '../../domain/entities/profile.dart';
 import '../screens/profile_edit_screen.dart';
@@ -255,7 +256,7 @@ class ProfileView extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const SliverToBoxAdapter(child: _PlaysForSection()),
+                  SliverToBoxAdapter(child: _PlaysForSection(userId: profile.userId.value)),
 
                   // ── Posts Header & Filter Strip ──
                   SliverToBoxAdapter(
@@ -929,47 +930,48 @@ class _RealSignals extends ConsumerWidget {
 
 // ── Plays For & Teams Strip ───────────────────────────────────────────────────
 
-class _PlaysForSection extends StatelessWidget {
-  const _PlaysForSection();
+class _PlaysForSection extends ConsumerWidget {
+  const _PlaysForSection({required this.userId});
+
+  final String userId;
 
   @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _ChipStrip(
-          label: 'Captains',
-          main: true,
-          teams: [
-            (
-              crest: CkCrest.ll,
-              short: 'LL',
-              name: 'Lahore Lions',
-              role: 'CAPTAIN',
-            ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final affiliationsAsync = ref.watch(userAffiliatedTeamsProvider(userId));
+
+    return affiliationsAsync.when(
+      data: (affiliations) {
+        if (affiliations.isEmpty) return const SizedBox.shrink();
+
+        final captains = affiliations.where((a) => a.isCaptain).toList();
+        final playsFor = affiliations.where((a) => !a.isCaptain).toList();
+
+        if (captains.isEmpty && playsFor.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (captains.isNotEmpty) ...[
+              _ChipStrip(
+                label: 'Captains',
+                main: true,
+                teams: captains,
+              ),
+              if (playsFor.isNotEmpty) const SizedBox(height: 14),
+            ],
+            if (playsFor.isNotEmpty) ...[
+              _ChipStrip(
+                label: 'Plays for',
+                main: false,
+                teams: playsFor,
+              ),
+            ],
+            const SizedBox(height: 6),
           ],
-        ),
-        SizedBox(height: 14),
-        _ChipStrip(
-          label: 'Plays for',
-          main: false,
-          teams: [
-            (
-              crest: CkCrest.ob,
-              short: 'OB',
-              name: 'Old Boys',
-              role: 'ALL-ROUNDER',
-            ),
-            (
-              crest: CkCrest.mk,
-              short: 'MK',
-              name: 'Mohalla Kings',
-              role: 'BATTER',
-            ),
-          ],
-        ),
-        SizedBox(height: 6),
-      ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }
@@ -982,8 +984,19 @@ class _ChipStrip extends StatelessWidget {
   });
 
   final String label;
-  final List<({Color crest, String short, String name, String role})> teams;
+  final List<UserTeamAffiliation> teams;
   final bool main;
+
+  Color _parsePrimaryColor(String? hex) {
+    if (hex == null || hex.isEmpty) return CkColors.ink;
+    try {
+      final clean = hex.replaceAll('#', '');
+      if (clean.length == 6) {
+        return Color(int.parse('FF$clean', radix: 16));
+      }
+    } catch (_) {}
+    return CkColors.ink;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1007,55 +1020,86 @@ class _ChipStrip extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 18),
           child: Row(
-            children:
-                teams.map((t) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: main ? CkColors.ink : CkColors.paper,
-                        borderRadius: BorderRadius.circular(999),
-                        border:
-                            main ? null : Border.all(color: CkColors.hairline),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: t.crest,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              t.short,
-                              style: const TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
+            children: teams.map((t) {
+              final crestBg = _parsePrimaryColor(t.primaryColor);
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () => context.push('/teams/${t.teamId}'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: main ? CkColors.ink : CkColors.paper,
+                      borderRadius: BorderRadius.circular(999),
+                      border: main ? null : Border.all(color: CkColors.hairline),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Crest / Monogram / Logo
+                        Container(
+                          width: 18,
+                          height: 18,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: crestBg,
+                            shape: BoxShape.circle,
                           ),
-                          const SizedBox(width: 6),
+                          child: t.logoUrl != null && t.logoUrl!.isNotEmpty
+                              ? ClipOval(
+                                  child: CachedNetworkImage(
+                                    imageUrl: t.logoUrl!,
+                                    width: 18,
+                                    height: 18,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => Text(
+                                      t.logoMonogram,
+                                      style: const TextStyle(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  t.logoMonogram,
+                                  style: const TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          t.teamName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: main ? CkColors.paper : CkColors.ink,
+                          ),
+                        ),
+                        if (!main && t.role != 'PLAYER') ...[
+                          const SizedBox(width: 4),
                           Text(
-                            t.name,
+                            '(${t.role})',
                             style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: main ? CkColors.paper : CkColors.ink,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: main ? CkColors.paper.withValues(alpha: 0.7) : CkColors.muted,
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
-                  );
-                }).toList(),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ),
       ],

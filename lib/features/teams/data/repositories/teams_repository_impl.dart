@@ -1,4 +1,5 @@
 import 'package:fpdart/fpdart.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
@@ -30,15 +31,26 @@ class TeamsRepositoryImpl implements TeamsRepository {
   // ─── Reads ──────────────────────────────────────────────────────────────
 
   @override
-  Stream<List<Team>> watchMyTeams(String userId) =>
-      _remote.watchTeams().map((dtos) {
-        final mine = dtos
-            .map((d) => d.toEntity())
-            .where((t) => t.ownerId == userId || t.managers.contains(userId))
-            .toList()
-          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-        return mine;
-      });
+  Stream<List<Team>> watchMyTeams(String userId) => Rx.combineLatest2(
+        _remote.watchTeams(),
+        _remote.watchMembers(),
+        (teams, members) {
+          final myMemberTeamIds = members
+              .where((m) => m.userId == userId)
+              .map((m) => m.teamId)
+              .toSet();
+
+          final mine = teams
+              .map((d) => d.toEntity())
+              .where((t) =>
+                  t.ownerId == userId ||
+                  t.managers.contains(userId) ||
+                  myMemberTeamIds.contains(t.id.value))
+              .toList()
+            ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          return mine;
+        },
+      );
 
   @override
   Stream<List<Team>> watchAllTeams() => _remote.watchTeams().map((dtos) {

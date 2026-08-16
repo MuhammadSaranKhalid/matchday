@@ -1,15 +1,18 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/ck_feed_image.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../follows/presentation/controllers/follow_toggle_controller.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_media.dart';
 
-class FeedPostCard extends StatelessWidget {
+class FeedPostCard extends ConsumerWidget {
   const FeedPostCard({
     super.key,
     required this.post,
@@ -40,11 +43,11 @@ class FeedPostCard extends StatelessWidget {
 
   Widget _buildTeamMonogram() {
     return Container(
-      width: 36,
-      height: 36,
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
         color: CkColors.ink,
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(10),
       ),
       alignment: Alignment.center,
       child: Text(
@@ -59,172 +62,237 @@ class FeedPostCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isTeam = post.authorContext == PostAuthorContext.teamManager;
-
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _header(context),
-        if ((post.text ?? '').isNotEmpty) ...[
-          const SizedBox(height: 6),
-          _ExpandablePostText(text: post.text!),
-        ],
-        if (post.hasMedia) ...[
-          const SizedBox(height: 10),
-          PostMediaGrid(media: post.media, onOpen: onOpenPhoto),
-        ],
-        PostActions(
-          likes: post.likesCount,
-          comments: post.commentsCount,
-          liked: post.isLiked,
-          saved: post.isBookmarked,
-          onLike: onLike,
-          onBookmark: onBookmark,
-          onShare: onShare,
-          onComment: onComment,
-        ),
-      ],
-    );
-
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: const BoxDecoration(
         color: CkColors.paper,
-        border: Border(top: BorderSide(color: CkColors.hairline)),
+        border: Border(bottom: BorderSide(color: CkColors.hairline)),
       ),
-      child: showAuthor
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    if (isTeam) {
-                      final teamId = post.linkedTeamId ?? post.contextEntityId;
-                      if (teamId != null && teamId.isNotEmpty) {
-                        context.push('/teams/$teamId');
-                        return;
-                      }
-                    }
-                    final u = post.authorUsername;
-                    if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
-                  },
-                  child: isTeam
-                      ? (post.displayPhotoUrl != null &&
-                              post.displayPhotoUrl!.trim().isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(9),
-                              child: CachedNetworkImage(
-                                imageUrl: post.displayPhotoUrl!.trim(),
-                                width: 36,
-                                height: 36,
-                                fit: BoxFit.cover,
-                                placeholder: (_, __) => _buildTeamMonogram(),
-                                errorWidget: (_, __, ___) =>
-                                    _buildTeamMonogram(),
-                              ),
-                            )
-                          : _buildTeamMonogram())
-                      : Avatar(
-                          mono: post.authorMonogram,
-                          imageUrl: post.displayPhotoUrl,
-                          tone: AvatarTone.ink,
-                        ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(child: content),
-              ],
-            )
-          : content,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showAuthor) ...[
+            _header(context, ref),
+            const SizedBox(height: 10),
+          ],
+          if ((post.text ?? '').isNotEmpty) ...[
+            _ExpandablePostText(text: post.text!),
+            const SizedBox(height: 10),
+          ],
+          if (post.hasMedia) ...[
+            PostMediaGrid(media: post.media, onOpen: onOpenPhoto),
+            const SizedBox(height: 4),
+          ],
+          PostActions(
+            likes: post.likesCount,
+            comments: post.commentsCount,
+            liked: post.isLiked,
+            saved: post.isBookmarked,
+            onLike: onLike,
+            onBookmark: onBookmark,
+            onShare: onShare,
+            onComment: onComment,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _header(BuildContext context) {
+  Widget _header(BuildContext context, WidgetRef ref) {
     final time = timeago.format(post.createdAt, locale: 'en_short');
     final isTeam = post.authorContext == PostAuthorContext.teamManager;
+    final currentUserId = ref.watch(currentUserStreamProvider).value?.id.value;
+
+    final targetType = isTeam ? 'team' : 'user';
+    final targetId = isTeam ? (post.linkedTeamId ?? post.contextEntityId) : post.authorId;
+    final isSelf = targetId != null && (targetId == currentUserId || post.authorId == currentUserId);
+
+    final isFollowingAsync = (targetId != null && !isSelf)
+        ? ref.watch(followToggleProvider(targetType, targetId))
+        : null;
+    final isFollowing = isFollowingAsync?.value ?? false;
+
+    void onNavigate() {
+      if (isTeam) {
+        final teamId = post.linkedTeamId ?? post.contextEntityId;
+        if (teamId != null && teamId.isNotEmpty) {
+          context.push('/teams/$teamId');
+          return;
+        }
+      }
+      final u = post.authorUsername;
+      if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
+    }
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
       children: [
-        if (showAuthor) ...[
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              if (isTeam) {
-                final teamId = post.linkedTeamId ?? post.contextEntityId;
-                if (teamId != null && teamId.isNotEmpty) {
-                  context.push('/teams/$teamId');
-                  return;
-                }
-              }
-              final u = post.authorUsername;
-              if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Flexible(
-                  child: Text(
-                    post.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: CkType.display(fontSize: 13.5, letterSpacing: -0.01),
-                  ),
+        // Avatar / Monogram
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onNavigate,
+          child: isTeam
+              ? (post.displayPhotoUrl != null && post.displayPhotoUrl!.trim().isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: CachedNetworkImage(
+                        imageUrl: post.displayPhotoUrl!.trim(),
+                        width: 38,
+                        height: 38,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => _buildTeamMonogram(),
+                        errorWidget: (_, __, ___) => _buildTeamMonogram(),
+                      ),
+                    )
+                  : _buildTeamMonogram())
+              : Avatar(
+                  mono: post.authorMonogram,
+                  imageUrl: post.displayPhotoUrl,
+                  tone: AvatarTone.ink,
+                  size: 38,
                 ),
-                if (!isTeam && post.authorUsername != null) ...[
-                  const SizedBox(width: 6),
+        ),
+        const SizedBox(width: 10),
+
+        // Display Name, Badges, Time, and Username Subtitle
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onNavigate,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        post.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: CkType.display(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.01,
+                        ),
+                      ),
+                    ),
+                    if (isTeam) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: CkColors.paper2,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: CkColors.hairline),
+                        ),
+                        child: Text(
+                          'TEAM',
+                          style: CkType.mono(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.08,
+                            color: CkColors.ink,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (post.autoGenerated) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: CkColors.cream,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          '★ AUTO',
+                          style: CkType.mono(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.08,
+                            color: CkColors.amber,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 5),
+                    Text(
+                      '· $time',
+                      style: CkType.body(fontSize: 12, color: CkColors.muted),
+                    ),
+                  ],
+                ),
+                if (!isTeam && post.authorUsername != null && post.authorUsername!.isNotEmpty) ...[
+                  const SizedBox(height: 1),
                   Text(
                     '@${post.authorUsername}',
-                    style: CkType.body(fontSize: 11, color: CkColors.muted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: CkType.mono(fontSize: 11, color: CkColors.muted),
                   ),
                 ],
               ],
             ),
           ),
-        ],
-        if (isTeam) ...[
-          if (showAuthor) const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            decoration: BoxDecoration(
-              color: CkColors.paper2,
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: CkColors.hairline),
-            ),
-            child: Text(
-              'TEAM',
-              style: CkType.mono(
-                fontSize: 8.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.08,
-                color: CkColors.ink,
-              ),
-            ),
+        ),
+
+        // Follow Button
+        if (targetId != null && !isSelf) ...[
+          const SizedBox(width: 8),
+          _FeedFollowButton(
+            isFollowing: isFollowing,
+            onTap: () {
+              ref.read(followToggleProvider(targetType, targetId).notifier).toggle();
+            },
           ),
         ],
-        if (post.autoGenerated) ...[
-          if (showAuthor) const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            decoration: BoxDecoration(
-              color: CkColors.cream,
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: Text('★ AUTO',
-                style: CkType.mono(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: CkColors.amber)),
-          ),
-        ],
-        const Spacer(),
-        Text(time, style: CkType.mono(fontSize: 9, letterSpacing: 0.10)),
+
+        // 3-dots more menu
+        IconButton(
+          icon: const Icon(Icons.more_horiz_rounded, size: 20, color: CkColors.muted),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          onPressed: onShare,
+        ),
       ],
+    );
+  }
+}
+
+class _FeedFollowButton extends StatelessWidget {
+  const _FeedFollowButton({
+    required this.isFollowing,
+    required this.onTap,
+  });
+
+  final bool isFollowing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isFollowing ? CkColors.paper2 : CkColors.ink,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isFollowing ? CkColors.hairline : Colors.transparent,
+          ),
+        ),
+        child: Text(
+          isFollowing ? 'Following' : 'Follow',
+          style: CkType.display(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: isFollowing ? CkColors.ink : CkColors.paper,
+          ),
+        ),
+      ),
     );
   }
 }

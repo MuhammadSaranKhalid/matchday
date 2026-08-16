@@ -578,3 +578,90 @@ final class TeamPendingJoinRequestsFamily extends $Family
   @override
   String toString() => r'teamPendingJoinRequestsProvider';
 }
+
+/// Real-time stream of all teams affiliated with a user (captained and played for).
+
+@ProviderFor(userAffiliatedTeams)
+final userAffiliatedTeamsProvider = UserAffiliatedTeamsFamily._();
+
+/// Real-time stream of all teams affiliated with a user (captained and played for).
+
+final class UserAffiliatedTeamsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<UserTeamAffiliation>>,
+          List<UserTeamAffiliation>,
+          Stream<List<UserTeamAffiliation>>
+        >
+    with
+        $FutureModifier<List<UserTeamAffiliation>>,
+        $StreamProvider<List<UserTeamAffiliation>> {
+  /// Real-time stream of all teams affiliated with a user (captained and played for).
+  UserAffiliatedTeamsProvider._({
+    required UserAffiliatedTeamsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'userAffiliatedTeamsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$userAffiliatedTeamsHash();
+
+  @override
+  String toString() {
+    return r'userAffiliatedTeamsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<List<UserTeamAffiliation>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<UserTeamAffiliation>> create(Ref ref) {
+    final argument = this.argument as String;
+    return userAffiliatedTeams(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is UserAffiliatedTeamsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$userAffiliatedTeamsHash() =>
+    r'9bc33c4b51c76ce306db137b52571128c7da64e1';
+
+/// Real-time stream of all teams affiliated with a user (captained and played for).
+
+final class UserAffiliatedTeamsFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<UserTeamAffiliation>>, String> {
+  UserAffiliatedTeamsFamily._()
+    : super(
+        retry: null,
+        name: r'userAffiliatedTeamsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Real-time stream of all teams affiliated with a user (captained and played for).
+
+  UserAffiliatedTeamsProvider call(String userId) =>
+      UserAffiliatedTeamsProvider._(argument: userId, from: this);
+
+  @override
+  String toString() => r'userAffiliatedTeamsProvider';
+}

@@ -53,3 +53,73 @@ Future<List<Map<String, dynamic>>> teamPendingClaimRequests(Ref ref, String team
 @riverpod
 Future<List<Map<String, dynamic>>> teamPendingJoinRequests(Ref ref, String teamId) =>
     ref.watch(teamsRemoteDataSourceProvider).getTeamJoinRequests(teamId);
+
+class UserTeamAffiliation {
+  const UserTeamAffiliation({
+    required this.teamId,
+    required this.teamName,
+    required this.logoMonogram,
+    this.logoUrl,
+    this.primaryColor,
+    required this.role,
+    required this.isCaptain,
+  });
+
+  final String teamId;
+  final String teamName;
+  final String logoMonogram;
+  final String? logoUrl;
+  final String? primaryColor;
+  final String role;
+  final bool isCaptain;
+}
+
+/// Real-time stream of all teams affiliated with a user (captained and played for).
+@riverpod
+Stream<List<UserTeamAffiliation>> userAffiliatedTeams(Ref ref, String userId) {
+  final remote = ref.watch(teamsRemoteDataSourceProvider);
+  return ref.watch(teamsRepositoryProvider).watchAllTeams().asyncMap((allTeams) async {
+    try {
+      final members = await remote.listMembers();
+      final myMemberships = members.where((m) => m.userId == userId).toList();
+      final memberByTeamId = {for (final m in myMemberships) m.teamId: m};
+
+      final List<UserTeamAffiliation> result = [];
+      for (final t in allTeams) {
+        final member = memberByTeamId[t.id.value];
+        final isOwner = t.ownerId == userId;
+        final isManager = t.managers.contains(userId);
+        final isCaptainRole = member?.role == 'captain';
+
+        if (isOwner || isManager || isCaptainRole || member != null) {
+          final isCaptain = isOwner || isManager || isCaptainRole;
+          final roleStr = isOwner || isCaptainRole
+              ? 'CAPTAIN'
+              : isManager
+                  ? 'MANAGER'
+                  : switch (member?.role) {
+                      'vice_captain' => 'VICE CAPTAIN',
+                      'wicket_keeper' => 'WICKET-KEEPER',
+                      _ => 'PLAYER',
+                    };
+
+          result.add(
+            UserTeamAffiliation(
+              teamId: t.id.value,
+              teamName: t.name,
+              logoMonogram: t.logoMonogram ?? (t.name.isNotEmpty ? t.name[0].toUpperCase() : 'T'),
+              logoUrl: t.logoUrl,
+              primaryColor: t.primaryColor,
+              role: roleStr,
+              isCaptain: isCaptain,
+            ),
+          );
+        }
+      }
+      return result;
+    } catch (_) {
+      return <UserTeamAffiliation>[];
+    }
+  });
+}
+

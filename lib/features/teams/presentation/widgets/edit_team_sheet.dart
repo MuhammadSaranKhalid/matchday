@@ -118,6 +118,9 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
         setState(() {
           _currentLogoUrl = url;
         });
+        ref.invalidate(teamProvider(widget.team.id.value));
+        ref.invalidate(myTeamsProvider);
+        ref.invalidate(allTeamsProvider);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Team logo updated!')),
         );
@@ -175,6 +178,9 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
         });
       },
       (updatedTeam) {
+        ref.invalidate(teamProvider(widget.team.id.value));
+        ref.invalidate(myTeamsProvider);
+        ref.invalidate(allTeamsProvider);
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Team details updated successfully!')),

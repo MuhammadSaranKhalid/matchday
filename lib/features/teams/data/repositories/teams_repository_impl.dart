@@ -153,6 +153,54 @@ class TeamsRepositoryImpl implements TeamsRepository {
   }
 
   @override
+  Future<Either<Failure, Team>> updateTeam({
+    required TeamId teamId,
+    TeamName? name,
+    TeamType? type,
+    TeamPrivacy? privacy,
+    String? description,
+    String? homeGround,
+    String? city,
+    int? foundedYear,
+    String? primaryColor,
+    String? secondaryColor,
+    String? tagline,
+    String? logoMonogram,
+    String? district,
+    String? province,
+    String? postcode,
+    String? countryCode,
+  }) async {
+    try {
+      final payload = <String, dynamic>{};
+      if (name != null) payload['team_name'] = name.value;
+      if (type != null) payload['team_type'] = type.wire;
+      if (privacy != null) payload['privacy'] = privacy.wire;
+      if (description != null) payload['description'] = description;
+      if (homeGround != null) payload['home_ground'] = homeGround;
+      if (city != null) payload['city'] = city;
+      if (foundedYear != null) payload['founded_year'] = foundedYear;
+      if (primaryColor != null) payload['primary_color'] = primaryColor;
+      if (secondaryColor != null) payload['secondary_color'] = secondaryColor;
+      if (tagline != null) payload['tagline'] = tagline;
+      if (logoMonogram != null) payload['logo_monogram'] = logoMonogram;
+      if (district != null) payload['district'] = district;
+      if (province != null) payload['province'] = province;
+      if (postcode != null) payload['postcode'] = postcode;
+      if (countryCode != null) payload['country_code'] = countryCode;
+
+      final dto = await _remote.updateTeam(teamId.value, payload);
+      return Right(dto.toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, String>> uploadTeamLogo({
     required TeamId teamId,
     required List<int> bytes,

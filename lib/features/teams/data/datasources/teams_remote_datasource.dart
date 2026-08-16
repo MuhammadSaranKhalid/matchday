@@ -110,6 +110,46 @@ class TeamsRemoteDataSource {
     }
   }
 
+  Future<TeamDto> updateTeam(String teamId, Map<String, dynamic> payload) async {
+    try {
+      _requireUid();
+      final updates = <String, dynamic>{};
+      if (payload.containsKey('team_name')) updates['team_name'] = payload['team_name'];
+      if (payload.containsKey('team_type')) updates['team_type'] = payload['team_type'];
+      if (payload.containsKey('privacy')) updates['privacy'] = payload['privacy'];
+      if (payload.containsKey('description')) updates['description'] = payload['description'];
+      if (payload.containsKey('home_ground')) updates['home_ground'] = payload['home_ground'];
+      if (payload.containsKey('tagline')) updates['tagline'] = payload['tagline'];
+      if (payload.containsKey('logo_monogram')) updates['logo_monogram'] = payload['logo_monogram'];
+      if (payload.containsKey('founded_year')) updates['founded_year'] = payload['founded_year'];
+      if (payload.containsKey('city') || payload.containsKey('district') || payload.containsKey('province')) {
+        updates['location'] = {
+          if (payload['city'] != null) 'city': payload['city'],
+          if (payload['district'] != null) 'district': payload['district'],
+          if (payload['province'] != null) 'province': payload['province'],
+          if (payload['postcode'] != null) 'postcode': payload['postcode'],
+          if (payload['country_code'] != null) 'country_code': payload['country_code'],
+        };
+      }
+      if (payload.containsKey('primary_color') || payload.containsKey('secondary_color')) {
+        updates['team_colors'] = {
+          if (payload['primary_color'] != null) 'primary': payload['primary_color'],
+          if (payload['secondary_color'] != null) 'secondary': payload['secondary_color'],
+        };
+      }
+
+      final row = await _supabase
+          .from(_teams)
+          .update(updates)
+          .eq('team_id', teamId)
+          .select()
+          .single();
+      return TeamDto.fromJson(row);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
   /// Uploads [bytes] to `team-logos/<teamId>/logo.<ext>` and patches the
   /// team row's `logo_url`. Returns the public URL. Mirrors the avatar
   /// upload pattern in `onboarding_remote_datasource.dart`.

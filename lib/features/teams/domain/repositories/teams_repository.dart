@@ -49,6 +49,26 @@ abstract class TeamsRepository {
     String? countryCode,
   });
 
+  /// Updates an existing team's details.
+  Future<Either<Failure, Team>> updateTeam({
+    required TeamId teamId,
+    TeamName? name,
+    TeamType? type,
+    TeamPrivacy? privacy,
+    String? description,
+    String? homeGround,
+    String? city,
+    int? foundedYear,
+    String? primaryColor,
+    String? secondaryColor,
+    String? tagline,
+    String? logoMonogram,
+    String? district,
+    String? province,
+    String? postcode,
+    String? countryCode,
+  });
+
   /// Uploads [bytes] (encoded as [extension], e.g. 'jpg'/'png'/'webp') to the
   /// `team-logos` bucket under `<teamId>/...`, patches the team row's
   /// `logo_url`, and returns the public URL. Existing logo for the team is

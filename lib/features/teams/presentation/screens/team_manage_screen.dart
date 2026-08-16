@@ -19,6 +19,7 @@ import '../../domain/value_objects/jersey_number.dart';
 import '../../domain/value_objects/player_display_name.dart';
 import '../providers/teams_providers.dart';
 import '../utils/team_display.dart';
+import '../widgets/edit_team_sheet.dart';
 import '../widgets/team_avatar.dart';
 
 /// Complete Manager console: Roster, Posts, Requests, Roles, and Settings.
@@ -355,29 +356,123 @@ class _SettingsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // Primary Edit Action Card
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: CkColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: CkColors.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  TeamAvatar(
+                    name: team.name,
+                    primaryColor: team.primaryColor,
+                    logoUrl: team.logoUrl,
+                    monogram: team.logoMonogram,
+                    size: 44,
+                    radius: 12,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          team.name,
+                          style: CkType.display(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.01,
+                          ),
+                        ),
+                        if (team.tagline != null && team.tagline!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            team.tagline!,
+                            style: CkType.body(
+                              fontSize: 12,
+                              color: CkColors.muted,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => showEditTeamSheet(context, team),
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Edit Team Details'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: CkColors.ink,
+                    foregroundColor: CkColors.paper,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const Text(
+          'TEAM CONFIGURATION',
+          style: TextStyle(
+            fontFamily: 'JetBrainsMono',
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+            color: CkColors.muted,
+          ),
+        ),
+        const SizedBox(height: 8),
+
         _settingTile(
           title: 'Team Name',
           value: team.name,
           icon: Icons.shield_outlined,
-          onTap: () {},
+          onTap: () => showEditTeamSheet(context, team),
         ),
         _settingTile(
-          title: 'Home Ground',
-          value: team.homeGround ?? 'Not specified',
+          title: 'Tagline & Description',
+          value: team.tagline ?? (team.description != null && team.description!.isNotEmpty ? team.description! : 'Not set'),
+          icon: Icons.notes_rounded,
+          onTap: () => showEditTeamSheet(context, team),
+        ),
+        _settingTile(
+          title: 'Location & Home Ground',
+          value: '${team.city ?? "No city"} · ${team.homeGround ?? "No ground specified"}',
           icon: Icons.location_on_outlined,
-          onTap: () {},
+          onTap: () => showEditTeamSheet(context, team),
         ),
         _settingTile(
           title: 'Squad Capacity',
           value: '25 Players Max',
           icon: Icons.groups_outlined,
-          onTap: () {},
+          onTap: () => _snack(context, 'Squad capacity is fixed at 25 players.'),
         ),
         _settingTile(
           title: 'Team Privacy',
-          value: team.privacy == TeamPrivacy.private ? 'Private Team' : 'Public Team',
+          value: team.privacy == TeamPrivacy.private ? 'Private Team (Invite-only)' : 'Public Team (Discoverable)',
           icon: Icons.lock_outline_rounded,
-          onTap: () {},
+          onTap: () => showEditTeamSheet(context, team),
         ),
       ],
     );
@@ -389,30 +484,39 @@ class _SettingsTab extends StatelessWidget {
     required IconData icon,
     required VoidCallback onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: CkColors.paper2,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: CkColors.ink),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: CkType.body(fontSize: 11, color: CkColors.muted)),
-                const SizedBox(height: 1),
-                Text(value, style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700)),
-              ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: CkColors.paper2,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: CkColors.hairline),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: CkColors.ink),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: CkType.body(fontSize: 11, color: CkColors.muted)),
+                  const SizedBox(height: 1),
+                  Text(
+                    value,
+                    style: CkType.display(fontSize: 13.5, fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right_rounded, size: 18, color: CkColors.muted),
-        ],
+            const Icon(Icons.chevron_right_rounded, size: 18, color: CkColors.muted),
+          ],
+        ),
       ),
     );
   }

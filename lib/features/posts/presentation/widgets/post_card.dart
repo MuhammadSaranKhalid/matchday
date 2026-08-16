@@ -1,6 +1,4 @@
-// Post UI for the feed/profile — renders a real [Post] (author header + text +
-// 1–4 photo mosaic via CkFeedImage + action bar). Lives in the posts feature
-// (it's coupled to the Post entity), not in the feature-agnostic core kit.
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -39,6 +37,26 @@ class FeedPostCard extends StatelessWidget {
 
   /// Hide the author avatar/name on a profile (where every post is the owner's).
   final bool showAuthor;
+
+  Widget _buildTeamMonogram() {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: CkColors.ink,
+        borderRadius: BorderRadius.circular(9),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        post.displayMonogram,
+        style: CkType.display(
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          color: CkColors.paper,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,24 +111,26 @@ class FeedPostCard extends StatelessWidget {
                     if (u != null && u.isNotEmpty) onAuthorTap?.call(u);
                   },
                   child: isTeam
-                      ? Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: CkColors.ink,
-                            borderRadius: BorderRadius.circular(9),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            post.displayMonogram,
-                            style: CkType.display(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: CkColors.paper,
-                            ),
-                          ),
-                        )
-                      : Avatar(mono: post.authorMonogram, tone: AvatarTone.ink),
+                      ? (post.displayPhotoUrl != null &&
+                              post.displayPhotoUrl!.trim().isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(9),
+                              child: CachedNetworkImage(
+                                imageUrl: post.displayPhotoUrl!.trim(),
+                                width: 36,
+                                height: 36,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => _buildTeamMonogram(),
+                                errorWidget: (_, __, ___) =>
+                                    _buildTeamMonogram(),
+                              ),
+                            )
+                          : _buildTeamMonogram())
+                      : Avatar(
+                          mono: post.authorMonogram,
+                          imageUrl: post.displayPhotoUrl,
+                          tone: AvatarTone.ink,
+                        ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: content),

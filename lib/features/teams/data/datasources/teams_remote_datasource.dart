@@ -47,9 +47,45 @@ class TeamsRemoteDataSource {
 
   Future<List<UnclaimedPlayerDto>> listUnclaimed() async {
     try {
-      // RLS scopes to rows the signed-in user added.
       final rows = await _supabase.from(_unclaimed).select();
       return rows.map(UnclaimedPlayerDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Batch-fetches public profile metadata (display name, username, photo) for user IDs.
+  Future<Map<String, Map<String, dynamic>>> getProfilesByIds(
+      List<String> userIds) async {
+    if (userIds.isEmpty) return {};
+    try {
+      final rows = await _supabase
+          .from('profiles')
+          .select('user_id, username, display_name, profile_photo_url')
+          .filter('user_id', 'in', userIds);
+      return {
+        for (final r in (rows as List))
+          r['user_id'] as String: r as Map<String, dynamic>,
+      };
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Batch-fetches unclaimed player records by unclaimed IDs.
+  Future<Map<String, UnclaimedPlayerDto>> getUnclaimedByIds(
+      List<String> unclaimedIds) async {
+    if (unclaimedIds.isEmpty) return {};
+    try {
+      final rows = await _supabase
+          .from(_unclaimed)
+          .select()
+          .filter('unclaimed_id', 'in', unclaimedIds);
+      return {
+        for (final r in (rows as List))
+          r['unclaimed_id'] as String:
+              UnclaimedPlayerDto.fromJson(r as Map<String, dynamic>),
+      };
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -219,6 +255,8 @@ class TeamsRemoteDataSource {
           .insert({
             'unclaimed_id': payload['id'],
             'display_name': payload['display_name'],
+            if (payload['phone_number'] != null)
+              'phone_number': payload['phone_number'],
             if (payload['player_profile'] != null)
               'player_profile': payload['player_profile'],
             'added_by': _requireUid(),
@@ -226,6 +264,22 @@ class TeamsRemoteDataSource {
           .select()
           .single();
       return UnclaimedPlayerDto.fromJson(row);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Searches registered Matchday users by username or display name.
+  Future<List<Map<String, dynamic>>> searchUsers(String query) async {
+    try {
+      if (query.trim().isEmpty) return [];
+      final clean = query.trim().replaceAll('@', '');
+      final rows = await _supabase
+          .from('profiles')
+          .select('user_id, username, display_name, profile_photo_url, player_profiles(player_role)')
+          .or('username.ilike.%$clean%,display_name.ilike.%$clean%')
+          .limit(20);
+      return (rows as List).cast<Map<String, dynamic>>();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -347,6 +401,170 @@ class TeamsRemoteDataSource {
       return rows.map(PlaceFacetDto.fromJson).toList();
     } on FunctionException catch (e) {
       throw ServerException('team-place-facets failed: ${e.details ?? e.reasonPhrase ?? ''}');
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // ─── Team Invites & Claim Requests ────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getTeamInvites(String teamId) async {
+    try {
+      final rows = await _supabase
+          .from('team_invites')
+          .select('*, invitee:profiles!invitee_id(display_name, username, profile_photo_url)')
+          .eq('team_id', teamId)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(rows);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> cancelTeamInvite(String inviteId) async {
+    try {
+      await _supabase
+          .from('team_invites')
+          .update({'status': 'cancelled'})
+          .eq('invite_id', inviteId);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+  Future<void> sendTeamInvite({
+    required String teamId,
+    required String inviteeId,
+    String? message,
+    String? role,
+    int? jerseyNumber,
+  }) async {
+    final uid = _supabase.auth.currentUser?.id;
+    if (uid == null) throw ServerException('Not authenticated');
+    try {
+      await _supabase.from('team_invites').insert({
+        'team_id': teamId,
+        'invitee_id': inviteeId,
+        'invited_by': uid,
+        if (message != null && message.trim().isNotEmpty) 'message': message.trim(),
+        if (role != null) 'role': role,
+        if (jerseyNumber != null) 'jersey_number': jerseyNumber,
+        'status': 'pending',
+      });
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> sendClaimRequest({
+    required String unclaimedId,
+    String? message,
+  }) async {
+    final uid = _supabase.auth.currentUser?.id;
+    if (uid == null) throw ServerException('Not authenticated');
+    try {
+      await _supabase.from('claim_requests').insert({
+        'unclaimed_id': unclaimedId,
+        'requester_id': uid,
+        if (message != null && message.trim().isNotEmpty) 'message': message.trim(),
+        'status': 'pending',
+      });
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getClaimRequests(String teamId) async {
+    try {
+      final members = await _supabase
+          .from('team_members')
+          .select('unclaimed_id')
+          .eq('team_id', teamId)
+          .not('unclaimed_id', 'is', null)
+          .eq('status', 'active');
+      final unclaimedIds = members
+          .map((m) => m['unclaimed_id'] as String?)
+          .whereType<String>()
+          .toList();
+      if (unclaimedIds.isEmpty) return [];
+
+      final rows = await _supabase
+          .from('claim_requests')
+          .select('*, requester:profiles!requester_id(display_name, username, profile_photo_url), unclaimed:unclaimed_players!unclaimed_id(display_name, phone_number)')
+          .inFilter('unclaimed_id', unclaimedIds)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(rows);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> approveClaimRequest(String requestId) async {
+    try {
+      await _supabase.rpc<void>('approve_claim_request', params: {'p_request_id': requestId});
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> rejectClaimRequest(String requestId) async {
+    try {
+      await _supabase
+          .from('claim_requests')
+          .update({
+            'status': 'rejected',
+            'decided_by': _requireUid(),
+            'decided_at': DateTime.now().toIso8601String(),
+          })
+          .eq('request_id', requestId);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTeamJoinRequests(String teamId) async {
+    try {
+      final rows = await _supabase
+          .from('team_join_requests')
+          .select('*, player:profiles!player_id(display_name, username, profile_photo_url)')
+          .eq('team_id', teamId)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(rows);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> acceptTeamJoinRequest(String requestId, {int? jerseyNumber}) async {
+    try {
+      await _supabase.rpc<dynamic>('accept_team_join_request', params: {
+        'p_request_id': requestId,
+        if (jerseyNumber != null) 'p_jersey_number': jerseyNumber,
+      });
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> declineTeamJoinRequest(String requestId) async {
+    try {
+      await _supabase.rpc<void>('decline_team_join_request', params: {
+        'p_request_id': requestId,
+      });
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> requestToJoinTeam(String teamId, {String role = 'player', String? message}) async {
+    try {
+      await _supabase.rpc<dynamic>('request_to_join_team', params: {
+        'p_team_id': teamId,
+        'p_role': role,
+        if (message != null && message.isNotEmpty) 'p_message': message,
+      });
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

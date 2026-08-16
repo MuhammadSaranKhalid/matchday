@@ -22,19 +22,15 @@ class PostCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: const BoxDecoration(
-        color: CkColors.paper,
-        border: Border(top: BorderSide(color: CkColors.hairline)),
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Author Avatar Circle (38x38 matching standard Avatar widget)
+          // Author Avatar Circle (36x36 matching standard Avatar widget)
           const CkShimmerBox(
-            width: 38,
-            height: 38,
+            width: 36,
+            height: 36,
             shape: BoxShape.circle,
           ),
           const SizedBox(width: 12),
@@ -46,11 +42,11 @@ class PostCardSkeleton extends StatelessWidget {
                 // Header (Name + Handle + Timestamp)
                 const Row(
                   children: [
-                    CkShimmerBox(width: 100, height: 13, radius: 4),
+                    CkShimmerBox(width: 110, height: 13, radius: 4),
                     SizedBox(width: 6),
-                    CkShimmerBox(width: 54, height: 11, radius: 4),
+                    CkShimmerBox(width: 52, height: 11, radius: 4),
                     Spacer(),
-                    CkShimmerBox(width: 22, height: 10, radius: 4),
+                    CkShimmerBox(width: 24, height: 10, radius: 4),
                   ],
                 ),
                 const SizedBox(height: 9),
@@ -59,7 +55,7 @@ class PostCardSkeleton extends StatelessWidget {
                 const CkShimmerBox(height: 11, radius: 4),
                 const SizedBox(height: 6),
                 const FractionallySizedBox(
-                  widthFactor: 0.72,
+                  widthFactor: 0.68,
                   alignment: Alignment.centerLeft,
                   child: CkShimmerBox(height: 11, radius: 4),
                 ),
@@ -78,13 +74,13 @@ class PostCardSkeleton extends StatelessWidget {
                 // Action Bar Row (Likes, Comments, Share, Bookmark)
                 const Row(
                   children: [
-                    CkShimmerBox(width: 36, height: 14, radius: 4),
+                    CkShimmerBox(width: 34, height: 13, radius: 4),
                     SizedBox(width: 18),
-                    CkShimmerBox(width: 36, height: 14, radius: 4),
+                    CkShimmerBox(width: 34, height: 13, radius: 4),
                     SizedBox(width: 18),
-                    CkShimmerBox(width: 44, height: 14, radius: 4),
+                    CkShimmerBox(width: 42, height: 13, radius: 4),
                     Spacer(),
-                    CkShimmerBox(width: 14, height: 14, radius: 4),
+                    CkShimmerBox(width: 14, height: 13, radius: 4),
                   ],
                 ),
               ],
@@ -108,10 +104,15 @@ class FeedShimmerSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CkShimmer(
-      child: ListView.builder(
+      child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 24),
         itemCount: itemCount,
+        separatorBuilder: (_, __) => const Divider(
+          height: 1,
+          thickness: 0.8,
+          color: CkColors.hairline,
+        ),
         itemBuilder: (context, index) {
           // Alternate between photo posts and text-only posts for visual variety
           final hasMedia = index % 3 != 1;

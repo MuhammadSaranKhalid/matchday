@@ -144,3 +144,31 @@ create policy "realtime_send_typing_self"
 -- bypass RLS; service_role is granted as well for Edge Function publishes.
 -- -----------------------------------------------------------------------------
 grant insert on realtime.messages to postgres, service_role;
+
+-- -----------------------------------------------------------------------------
+-- Supabase Realtime Table Publications
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  alter publication supabase_realtime add table public.teams;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.team_members;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.unclaimed_players;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.posts;
+exception when duplicate_object then null;
+end $$;
+

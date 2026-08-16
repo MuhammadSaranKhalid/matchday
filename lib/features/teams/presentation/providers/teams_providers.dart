@@ -38,3 +38,18 @@ Stream<Team?> team(Ref ref, String teamId) =>
 @riverpod
 Stream<List<RosterMember>> roster(Ref ref, String teamId) =>
     ref.watch(teamsRepositoryProvider).watchRoster(TeamId(teamId));
+
+/// Team invites sent to players for a team.
+@riverpod
+Future<List<Map<String, dynamic>>> teamPendingInvites(Ref ref, String teamId) =>
+    ref.watch(teamsRemoteDataSourceProvider).getTeamInvites(teamId);
+
+/// Claim requests from users claiming unclaimed roster spots for a team.
+@riverpod
+Future<List<Map<String, dynamic>>> teamPendingClaimRequests(Ref ref, String teamId) =>
+    ref.watch(teamsRemoteDataSourceProvider).getClaimRequests(teamId);
+
+/// Join requests from players asking to join a team.
+@riverpod
+Future<List<Map<String, dynamic>>> teamPendingJoinRequests(Ref ref, String teamId) =>
+    ref.watch(teamsRemoteDataSourceProvider).getTeamJoinRequests(teamId);

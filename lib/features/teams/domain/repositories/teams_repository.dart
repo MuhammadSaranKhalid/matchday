@@ -86,11 +86,23 @@ abstract class TeamsRepository {
   Future<Either<Failure, Unit>> addUnclaimedPlayer({
     required TeamId teamId,
     required PlayerDisplayName displayName,
+    String? phoneNumber,
     JerseyNumber? jerseyNumber,
     PlayingRole? playingRole,
     BattingStyle? battingStyle,
     BowlingStyle? bowlingStyle,
   });
+
+  /// Adds an existing registered Matchday user to the team roster.
+  Future<Either<Failure, Unit>> addRegisteredPlayer({
+    required TeamId teamId,
+    required String userId,
+    JerseyNumber? jerseyNumber,
+    MemberRole role = MemberRole.player,
+  });
+
+  /// Searches registered users by name / username for roster inclusion.
+  Future<Either<Failure, List<Map<String, dynamic>>>> searchUsers(String query);
 
   Future<Either<Failure, Unit>> removeMember(MembershipId id);
 

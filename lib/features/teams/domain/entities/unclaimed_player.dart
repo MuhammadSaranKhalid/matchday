@@ -10,6 +10,7 @@ class UnclaimedPlayer {
     required this.addedBy,
     required this.createdAt,
     required this.updatedAt,
+    this.phoneNumber,
     this.playingRole,
     this.battingStyle,
     this.bowlingStyle,
@@ -17,6 +18,7 @@ class UnclaimedPlayer {
 
   final UnclaimedPlayerId id;
   final String displayName;
+  final String? phoneNumber;
 
   /// Guaranteed non-null — enforced by the `unclaimed_players.added_by NOT
   /// NULL` constraint.
@@ -33,6 +35,7 @@ class UnclaimedPlayer {
       other is UnclaimedPlayer &&
           other.id == id &&
           other.displayName == displayName &&
+          other.phoneNumber == phoneNumber &&
           other.addedBy == addedBy &&
           other.updatedAt == updatedAt &&
           other.playingRole == playingRole &&
@@ -43,6 +46,7 @@ class UnclaimedPlayer {
   int get hashCode => Object.hash(
         id,
         displayName,
+        phoneNumber,
         addedBy,
         updatedAt,
         playingRole,

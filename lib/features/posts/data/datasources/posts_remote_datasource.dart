@@ -65,6 +65,44 @@ class PostsRemoteDataSource {
     }
   }
 
+  Future<List<PostDto>> _enrichWithTeams(List<PostDto> dtos) async {
+    if (dtos.isEmpty) return dtos;
+
+    final teamIds = dtos
+        .where((d) =>
+            d.authorContext == 'team_manager' ||
+            (d.linkedTeamId != null && d.linkedTeamId!.isNotEmpty))
+        .map((d) => d.contextEntityId ?? d.linkedTeamId)
+        .whereType<String>()
+        .toSet()
+        .toList();
+
+    if (teamIds.isEmpty) return dtos;
+
+    try {
+      final teamRows = await _supabase
+          .from('teams')
+          .select('team_id, team_name, logo_url, logo_monogram, team_colors')
+          .filter('team_id', 'in', teamIds);
+
+      final teamsById = {
+        for (final r in (teamRows as List))
+          r['team_id'] as String: r as Map<String, dynamic>,
+      };
+
+      return dtos.map((d) {
+        final tid = d.contextEntityId ?? d.linkedTeamId;
+        if (tid != null && teamsById.containsKey(tid)) {
+          final t = teamsById[tid]!;
+          return d.copyWith(team: t);
+        }
+        return d;
+      }).toList();
+    } catch (_) {
+      return dtos;
+    }
+  }
+
   Future<List<PostDto>> getFeed({
     required int limit,
     String filter = 'all',
@@ -86,7 +124,8 @@ class PostsRemoteDataSource {
       if (before != null) q = q.lt('created_at', before.toIso8601String());
       final rows = await q.order('created_at', ascending: false).limit(limit);
       final dtos = rows.map((r) => PostDto.fromJson(r)).toList();
-      return _enrichWithUserInteractions(dtos);
+      final withTeams = await _enrichWithTeams(dtos);
+      return _enrichWithUserInteractions(withTeams);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -106,7 +145,8 @@ class PostsRemoteDataSource {
       if (before != null) q = q.lt('created_at', before.toIso8601String());
       final rows = await q.order('created_at', ascending: false).limit(limit);
       final dtos = rows.map((r) => PostDto.fromJson(r)).toList();
-      return _enrichWithUserInteractions(dtos);
+      final withTeams = await _enrichWithTeams(dtos);
+      return _enrichWithUserInteractions(withTeams);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -126,7 +166,8 @@ class PostsRemoteDataSource {
       if (before != null) q = q.lt('created_at', before.toIso8601String());
       final rows = await q.order('created_at', ascending: false).limit(limit);
       final dtos = rows.map((r) => PostDto.fromJson(r)).toList();
-      return _enrichWithUserInteractions(dtos);
+      final withTeams = await _enrichWithTeams(dtos);
+      return _enrichWithUserInteractions(withTeams);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -216,7 +257,8 @@ class PostsRemoteDataSource {
           );
         }
       }
-      return _enrichWithUserInteractions(dtos);
+      final withTeams = await _enrichWithTeams(dtos);
+      return _enrichWithUserInteractions(withTeams);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -231,7 +273,9 @@ class PostsRemoteDataSource {
           .insert({...payload, 'author_id': _requireUid()})
           .select(_select)
           .single();
-      return PostDto.fromJson(row);
+      final dto = PostDto.fromJson(row);
+      final withTeams = await _enrichWithTeams([dto]);
+      return withTeams.first;
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

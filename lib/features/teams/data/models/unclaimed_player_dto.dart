@@ -12,6 +12,7 @@ abstract class UnclaimedPlayerDto with _$UnclaimedPlayerDto {
     @JsonKey(name: 'unclaimed_id') required String unclaimedId,
     @JsonKey(name: 'display_name') required String displayName,
     @JsonKey(name: 'added_by') required String addedBy,
+    @JsonKey(name: 'phone_number') String? phoneNumber,
     @JsonKey(name: 'created_at') required String createdAt,
     @JsonKey(name: 'updated_at') required String updatedAt,
     @JsonKey(name: 'player_profile')
@@ -28,6 +29,7 @@ abstract class UnclaimedPlayerDto with _$UnclaimedPlayerDto {
         id: UnclaimedPlayerId(unclaimedId),
         displayName: displayName,
         addedBy: addedBy,
+        phoneNumber: phoneNumber,
         createdAt: DateTime.parse(createdAt),
         updatedAt: DateTime.parse(updatedAt),
         playingRole: PlayingRole.fromWire(playerProfile['playing_role'] as String?),

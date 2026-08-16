@@ -171,3 +171,51 @@ create policy "unclaimed_players_update_owner"
 create policy "unclaimed_players_delete_owner"
   on public.unclaimed_players for delete
   using ((select auth.uid()) = added_by);
+
+-- -----------------------------------------------------------------------------
+-- RPC: claim_unclaimed_by_phone()
+-- Links any unclaimed_players records matching the authenticated user's phone
+-- number to their real user_id, triggering the cascade claim rewrites.
+-- -----------------------------------------------------------------------------
+create or replace function public.claim_unclaimed_by_phone()
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_phone text;
+  v_claimed_count int := 0;
+  v_rec record;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select phone into v_phone from auth.users where id = auth.uid();
+  if v_phone is null or length(trim(v_phone)) = 0 then
+    return 0;
+  end if;
+
+  v_phone := '+' || ltrim(trim(v_phone), '+');
+
+  for v_rec in
+    select unclaimed_id from public.unclaimed_players
+    where (phone_number = v_phone or phone_number = ltrim(v_phone, '+'))
+      and claimed_by_user_id is null
+  loop
+    update public.unclaimed_players
+    set claimed_by_user_id = auth.uid(),
+        claimed_at = now()
+    where unclaimed_id = v_rec.unclaimed_id;
+
+    v_claimed_count := v_claimed_count + 1;
+  end loop;
+
+  return v_claimed_count;
+end;
+$$;
+
+revoke all on function public.claim_unclaimed_by_phone() from public;
+grant execute on function public.claim_unclaimed_by_phone() to authenticated;
+

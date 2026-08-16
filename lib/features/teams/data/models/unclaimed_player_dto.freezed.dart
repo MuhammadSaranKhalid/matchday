@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$UnclaimedPlayerDto {
 
-@JsonKey(name: 'unclaimed_id') String get unclaimedId;@JsonKey(name: 'display_name') String get displayName;@JsonKey(name: 'added_by') String get addedBy;@JsonKey(name: 'created_at') String get createdAt;@JsonKey(name: 'updated_at') String get updatedAt;@JsonKey(name: 'player_profile') Map<String, dynamic> get playerProfile;
+@JsonKey(name: 'unclaimed_id') String get unclaimedId;@JsonKey(name: 'display_name') String get displayName;@JsonKey(name: 'added_by') String get addedBy;@JsonKey(name: 'phone_number') String? get phoneNumber;@JsonKey(name: 'created_at') String get createdAt;@JsonKey(name: 'updated_at') String get updatedAt;@JsonKey(name: 'player_profile') Map<String, dynamic> get playerProfile;
 /// Create a copy of UnclaimedPlayerDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $UnclaimedPlayerDtoCopyWith<UnclaimedPlayerDto> get copyWith => _$UnclaimedPlaye
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is UnclaimedPlayerDto&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.addedBy, addedBy) || other.addedBy == addedBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&const DeepCollectionEquality().equals(other.playerProfile, playerProfile));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is UnclaimedPlayerDto&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.addedBy, addedBy) || other.addedBy == addedBy)&&(identical(other.phoneNumber, phoneNumber) || other.phoneNumber == phoneNumber)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&const DeepCollectionEquality().equals(other.playerProfile, playerProfile));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,unclaimedId,displayName,addedBy,createdAt,updatedAt,const DeepCollectionEquality().hash(playerProfile));
+int get hashCode => Object.hash(runtimeType,unclaimedId,displayName,addedBy,phoneNumber,createdAt,updatedAt,const DeepCollectionEquality().hash(playerProfile));
 
 @override
 String toString() {
-  return 'UnclaimedPlayerDto(unclaimedId: $unclaimedId, displayName: $displayName, addedBy: $addedBy, createdAt: $createdAt, updatedAt: $updatedAt, playerProfile: $playerProfile)';
+  return 'UnclaimedPlayerDto(unclaimedId: $unclaimedId, displayName: $displayName, addedBy: $addedBy, phoneNumber: $phoneNumber, createdAt: $createdAt, updatedAt: $updatedAt, playerProfile: $playerProfile)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $UnclaimedPlayerDtoCopyWith<$Res>  {
   factory $UnclaimedPlayerDtoCopyWith(UnclaimedPlayerDto value, $Res Function(UnclaimedPlayerDto) _then) = _$UnclaimedPlayerDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'unclaimed_id') String unclaimedId,@JsonKey(name: 'display_name') String displayName,@JsonKey(name: 'added_by') String addedBy,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'updated_at') String updatedAt,@JsonKey(name: 'player_profile') Map<String, dynamic> playerProfile
+@JsonKey(name: 'unclaimed_id') String unclaimedId,@JsonKey(name: 'display_name') String displayName,@JsonKey(name: 'added_by') String addedBy,@JsonKey(name: 'phone_number') String? phoneNumber,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'updated_at') String updatedAt,@JsonKey(name: 'player_profile') Map<String, dynamic> playerProfile
 });
 
 
@@ -65,12 +65,13 @@ class _$UnclaimedPlayerDtoCopyWithImpl<$Res>
 
 /// Create a copy of UnclaimedPlayerDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? unclaimedId = null,Object? displayName = null,Object? addedBy = null,Object? createdAt = null,Object? updatedAt = null,Object? playerProfile = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? unclaimedId = null,Object? displayName = null,Object? addedBy = null,Object? phoneNumber = freezed,Object? createdAt = null,Object? updatedAt = null,Object? playerProfile = null,}) {
   return _then(_self.copyWith(
 unclaimedId: null == unclaimedId ? _self.unclaimedId : unclaimedId // ignore: cast_nullable_to_non_nullable
 as String,displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
 as String,addedBy: null == addedBy ? _self.addedBy : addedBy // ignore: cast_nullable_to_non_nullable
-as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String,phoneNumber: freezed == phoneNumber ? _self.phoneNumber : phoneNumber // ignore: cast_nullable_to_non_nullable
+as String?,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as String,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as String,playerProfile: null == playerProfile ? _self.playerProfile : playerProfile // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>,
@@ -158,10 +159,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'unclaimed_id')  String unclaimedId, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'added_by')  String addedBy, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt, @JsonKey(name: 'player_profile')  Map<String, dynamic> playerProfile)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'unclaimed_id')  String unclaimedId, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'added_by')  String addedBy, @JsonKey(name: 'phone_number')  String? phoneNumber, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt, @JsonKey(name: 'player_profile')  Map<String, dynamic> playerProfile)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _UnclaimedPlayerDto() when $default != null:
-return $default(_that.unclaimedId,_that.displayName,_that.addedBy,_that.createdAt,_that.updatedAt,_that.playerProfile);case _:
+return $default(_that.unclaimedId,_that.displayName,_that.addedBy,_that.phoneNumber,_that.createdAt,_that.updatedAt,_that.playerProfile);case _:
   return orElse();
 
 }
@@ -179,10 +180,10 @@ return $default(_that.unclaimedId,_that.displayName,_that.addedBy,_that.createdA
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'unclaimed_id')  String unclaimedId, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'added_by')  String addedBy, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt, @JsonKey(name: 'player_profile')  Map<String, dynamic> playerProfile)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'unclaimed_id')  String unclaimedId, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'added_by')  String addedBy, @JsonKey(name: 'phone_number')  String? phoneNumber, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt, @JsonKey(name: 'player_profile')  Map<String, dynamic> playerProfile)  $default,) {final _that = this;
 switch (_that) {
 case _UnclaimedPlayerDto():
-return $default(_that.unclaimedId,_that.displayName,_that.addedBy,_that.createdAt,_that.updatedAt,_that.playerProfile);case _:
+return $default(_that.unclaimedId,_that.displayName,_that.addedBy,_that.phoneNumber,_that.createdAt,_that.updatedAt,_that.playerProfile);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -199,10 +200,10 @@ return $default(_that.unclaimedId,_that.displayName,_that.addedBy,_that.createdA
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'unclaimed_id')  String unclaimedId, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'added_by')  String addedBy, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt, @JsonKey(name: 'player_profile')  Map<String, dynamic> playerProfile)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'unclaimed_id')  String unclaimedId, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'added_by')  String addedBy, @JsonKey(name: 'phone_number')  String? phoneNumber, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt, @JsonKey(name: 'player_profile')  Map<String, dynamic> playerProfile)?  $default,) {final _that = this;
 switch (_that) {
 case _UnclaimedPlayerDto() when $default != null:
-return $default(_that.unclaimedId,_that.displayName,_that.addedBy,_that.createdAt,_that.updatedAt,_that.playerProfile);case _:
+return $default(_that.unclaimedId,_that.displayName,_that.addedBy,_that.phoneNumber,_that.createdAt,_that.updatedAt,_that.playerProfile);case _:
   return null;
 
 }
@@ -214,12 +215,13 @@ return $default(_that.unclaimedId,_that.displayName,_that.addedBy,_that.createdA
 @JsonSerializable()
 
 class _UnclaimedPlayerDto extends UnclaimedPlayerDto {
-  const _UnclaimedPlayerDto({@JsonKey(name: 'unclaimed_id') required this.unclaimedId, @JsonKey(name: 'display_name') required this.displayName, @JsonKey(name: 'added_by') required this.addedBy, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'updated_at') required this.updatedAt, @JsonKey(name: 'player_profile') final  Map<String, dynamic> playerProfile = const <String, dynamic>{}}): _playerProfile = playerProfile,super._();
+  const _UnclaimedPlayerDto({@JsonKey(name: 'unclaimed_id') required this.unclaimedId, @JsonKey(name: 'display_name') required this.displayName, @JsonKey(name: 'added_by') required this.addedBy, @JsonKey(name: 'phone_number') this.phoneNumber, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'updated_at') required this.updatedAt, @JsonKey(name: 'player_profile') final  Map<String, dynamic> playerProfile = const <String, dynamic>{}}): _playerProfile = playerProfile,super._();
   factory _UnclaimedPlayerDto.fromJson(Map<String, dynamic> json) => _$UnclaimedPlayerDtoFromJson(json);
 
 @override@JsonKey(name: 'unclaimed_id') final  String unclaimedId;
 @override@JsonKey(name: 'display_name') final  String displayName;
 @override@JsonKey(name: 'added_by') final  String addedBy;
+@override@JsonKey(name: 'phone_number') final  String? phoneNumber;
 @override@JsonKey(name: 'created_at') final  String createdAt;
 @override@JsonKey(name: 'updated_at') final  String updatedAt;
  final  Map<String, dynamic> _playerProfile;
@@ -243,16 +245,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UnclaimedPlayerDto&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.addedBy, addedBy) || other.addedBy == addedBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&const DeepCollectionEquality().equals(other._playerProfile, _playerProfile));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UnclaimedPlayerDto&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.addedBy, addedBy) || other.addedBy == addedBy)&&(identical(other.phoneNumber, phoneNumber) || other.phoneNumber == phoneNumber)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&const DeepCollectionEquality().equals(other._playerProfile, _playerProfile));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,unclaimedId,displayName,addedBy,createdAt,updatedAt,const DeepCollectionEquality().hash(_playerProfile));
+int get hashCode => Object.hash(runtimeType,unclaimedId,displayName,addedBy,phoneNumber,createdAt,updatedAt,const DeepCollectionEquality().hash(_playerProfile));
 
 @override
 String toString() {
-  return 'UnclaimedPlayerDto(unclaimedId: $unclaimedId, displayName: $displayName, addedBy: $addedBy, createdAt: $createdAt, updatedAt: $updatedAt, playerProfile: $playerProfile)';
+  return 'UnclaimedPlayerDto(unclaimedId: $unclaimedId, displayName: $displayName, addedBy: $addedBy, phoneNumber: $phoneNumber, createdAt: $createdAt, updatedAt: $updatedAt, playerProfile: $playerProfile)';
 }
 
 
@@ -263,7 +265,7 @@ abstract mixin class _$UnclaimedPlayerDtoCopyWith<$Res> implements $UnclaimedPla
   factory _$UnclaimedPlayerDtoCopyWith(_UnclaimedPlayerDto value, $Res Function(_UnclaimedPlayerDto) _then) = __$UnclaimedPlayerDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'unclaimed_id') String unclaimedId,@JsonKey(name: 'display_name') String displayName,@JsonKey(name: 'added_by') String addedBy,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'updated_at') String updatedAt,@JsonKey(name: 'player_profile') Map<String, dynamic> playerProfile
+@JsonKey(name: 'unclaimed_id') String unclaimedId,@JsonKey(name: 'display_name') String displayName,@JsonKey(name: 'added_by') String addedBy,@JsonKey(name: 'phone_number') String? phoneNumber,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'updated_at') String updatedAt,@JsonKey(name: 'player_profile') Map<String, dynamic> playerProfile
 });
 
 
@@ -280,12 +282,13 @@ class __$UnclaimedPlayerDtoCopyWithImpl<$Res>
 
 /// Create a copy of UnclaimedPlayerDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? unclaimedId = null,Object? displayName = null,Object? addedBy = null,Object? createdAt = null,Object? updatedAt = null,Object? playerProfile = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? unclaimedId = null,Object? displayName = null,Object? addedBy = null,Object? phoneNumber = freezed,Object? createdAt = null,Object? updatedAt = null,Object? playerProfile = null,}) {
   return _then(_UnclaimedPlayerDto(
 unclaimedId: null == unclaimedId ? _self.unclaimedId : unclaimedId // ignore: cast_nullable_to_non_nullable
 as String,displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
 as String,addedBy: null == addedBy ? _self.addedBy : addedBy // ignore: cast_nullable_to_non_nullable
-as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String,phoneNumber: freezed == phoneNumber ? _self.phoneNumber : phoneNumber // ignore: cast_nullable_to_non_nullable
+as String?,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as String,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as String,playerProfile: null == playerProfile ? _self._playerProfile : playerProfile // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>,

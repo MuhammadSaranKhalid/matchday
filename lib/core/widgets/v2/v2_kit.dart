@@ -213,23 +213,25 @@ class _MonogramTile extends StatelessWidget {
 
 enum AvatarTone { paper, ink, neutral }
 
-/// Player avatar — circle.
+/// Player avatar — circle with cached network image support + monogram fallback.
 class Avatar extends StatelessWidget {
   const Avatar({
     super.key,
     required this.mono,
+    this.imageUrl,
     this.size = 36,
     this.tone = AvatarTone.paper,
   });
 
   final String mono;
+  final String? imageUrl;
   final double size;
   final AvatarTone tone;
 
   @override
   Widget build(BuildContext context) {
     final ink = tone == AvatarTone.ink;
-    return Container(
+    final fallback = Container(
       width: size,
       height: size,
       alignment: Alignment.center,
@@ -247,6 +249,21 @@ class Avatar extends StatelessWidget {
         ),
       ),
     );
+
+    if (imageUrl != null && imageUrl!.trim().isNotEmpty) {
+      return ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: imageUrl!.trim(),
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => fallback,
+          errorWidget: (_, __, ___) => fallback,
+        ),
+      );
+    }
+
+    return fallback;
   }
 }
 

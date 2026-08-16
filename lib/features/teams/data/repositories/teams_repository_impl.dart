@@ -74,21 +74,50 @@ class TeamsRepositoryImpl implements TeamsRepository {
 
   @override
   Stream<List<RosterMember>> watchRoster(TeamId teamId) {
-    // Stream the members table; re-fetch the unclaimed-players table on each
-    // tick to resolve display names. Acceptable trade-off for online-only:
-    // renames to an unclaimed player won't reflect until the member stream
-    // pings again (typically next edit or pull-to-refresh).
     return _remote.watchMembers().asyncMap((memberDtos) async {
       final teamMembers =
           memberDtos.where((m) => m.teamId == teamId.value).toList();
-      final unclaimed = await _remote.listUnclaimed();
-      final byId = {for (final u in unclaimed) u.unclaimedId: u};
+
+      final userIds = teamMembers
+          .map((m) => m.userId)
+          .whereType<String>()
+          .toSet()
+          .toList();
+      final unclaimedIds = teamMembers
+          .map((m) => m.unclaimedId)
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+      final profilesById = await _remote.getProfilesByIds(userIds);
+      final unclaimedById = await _remote.getUnclaimedByIds(unclaimedIds);
+
       final roster = teamMembers
-          .map((m) => RosterMember(
-                member: m.toEntity(),
-                displayName:
-                    byId[m.unclaimedId]?.displayName ?? 'Unknown player',
-              ))
+          .map((m) {
+            String displayName = 'Unknown player';
+            String? username;
+            String? profilePhotoUrl;
+            String? phoneNumber;
+            if (m.userId != null) {
+              final p = profilesById[m.userId];
+              displayName = p?['display_name'] as String? ??
+                  p?['username'] as String? ??
+                  'Verified Member';
+              username = p?['username'] as String?;
+              profilePhotoUrl = p?['profile_photo_url'] as String?;
+            } else if (m.unclaimedId != null) {
+              final u = unclaimedById[m.unclaimedId];
+              displayName = u?.displayName ?? 'Offline Player';
+              phoneNumber = u?.phoneNumber;
+            }
+            return RosterMember(
+              member: m.toEntity(),
+              displayName: displayName,
+              username: username,
+              profilePhotoUrl: profilePhotoUrl,
+              phoneNumber: phoneNumber,
+            );
+          })
           .toList()
         ..sort((a, b) => a.member.joinedAt.compareTo(b.member.joinedAt));
       return roster;
@@ -226,14 +255,12 @@ class TeamsRepositoryImpl implements TeamsRepository {
   Future<Either<Failure, Unit>> addUnclaimedPlayer({
     required TeamId teamId,
     required PlayerDisplayName displayName,
+    String? phoneNumber,
     JerseyNumber? jerseyNumber,
     PlayingRole? playingRole,
     BattingStyle? battingStyle,
     BowlingStyle? bowlingStyle,
   }) async {
-    // TODO: wrap createUnclaimed + createMember in a Postgres RPC so a
-    // failure on the membership insert doesn't leave an orphaned
-    // unclaimed_players row.
     try {
       final unclaimedId = _uuid.v4();
       final profile = <String, dynamic>{
@@ -244,6 +271,8 @@ class TeamsRepositoryImpl implements TeamsRepository {
       await _remote.createUnclaimed({
         'id': unclaimedId,
         'display_name': displayName.value,
+        if (phoneNumber != null && phoneNumber.trim().isNotEmpty)
+          'phone_number': phoneNumber.trim(),
         if (profile.isNotEmpty) 'player_profile': profile,
       });
       await _remote.createMember({
@@ -257,6 +286,45 @@ class TeamsRepositoryImpl implements TeamsRepository {
       return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> addRegisteredPlayer({
+    required TeamId teamId,
+    required String userId,
+    JerseyNumber? jerseyNumber,
+    MemberRole role = MemberRole.player,
+  }) async {
+    try {
+      await _remote.createMember({
+        'id': _uuid.v4(),
+        'team_id': teamId.value,
+        'player_id': userId,
+        'player_type': PlayerType.claimed.wire,
+        'role': role.wire,
+        'jersey_number': jerseyNumber?.value,
+      });
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Map<String, dynamic>>>> searchUsers(
+      String query) async {
+    try {
+      final results = await _remote.searchUsers(query);
+      return Right(results);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

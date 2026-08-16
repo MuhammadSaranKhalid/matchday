@@ -8,17 +8,19 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
 import '../../../../core/widgets/modals/modals.dart';
+import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../posts/presentation/providers/posts_providers.dart';
 import '../../../posts/presentation/screens/photo_viewer_screen.dart';
 import '../../../posts/presentation/widgets/post_card.dart';
 import '../../../posts/presentation/widgets/post_card_skeleton.dart';
+import '../../data/datasources/teams_datasource_providers.dart';
 import '../../domain/entities/roster_member.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
 import '../../domain/value_objects/jersey_number.dart';
-import '../../domain/value_objects/player_display_name.dart';
 import '../providers/teams_providers.dart';
 import '../utils/team_display.dart';
+import '../widgets/add_player_sheet.dart';
 import '../widgets/edit_team_sheet.dart';
 import '../widgets/team_avatar.dart';
 
@@ -218,7 +220,7 @@ class _RosterTab extends ConsumerWidget {
                       itemBuilder: (_, i) => _ManagedRow(
                         entry: value[i],
                         team: team,
-                        onTap: () => _memberActions(context, ref, value[i]),
+                        onManage: () => _memberActions(context, ref, value[i]),
                       ),
                     ),
             ),
@@ -241,106 +243,593 @@ class _RosterTab extends ConsumerWidget {
 
 // ─── Tab 2: Requests & Invitations ──────────────────────────────────────────
 
-class _RequestsTab extends StatelessWidget {
+Map<String, dynamic> _asMap(dynamic val) {
+  if (val == null) return const <String, dynamic>{};
+  if (val is Map<String, dynamic>) return val;
+  if (val is Map) {
+    return val.map((k, v) => MapEntry(k.toString(), v));
+  }
+  return const <String, dynamic>{};
+}
+
+class _RequestsTab extends ConsumerWidget {
   const _RequestsTab({required this.team});
   final Team team;
 
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Invite share card
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: CkColors.paper2,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: CkColors.hairline),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final joinReqsAsync = ref.watch(teamPendingJoinRequestsProvider(team.id.value));
+    final claimsAsync = ref.watch(teamPendingClaimRequestsProvider(team.id.value));
+    final invitesAsync = ref.watch(teamPendingInvitesProvider(team.id.value));
+
+    final hasJoin = (joinReqsAsync.value?.isNotEmpty ?? false);
+    final hasClaims = (claimsAsync.value?.isNotEmpty ?? false);
+    final hasInvites = (invitesAsync.value?.isNotEmpty ?? false);
+    final isAllLoaded = joinReqsAsync.hasValue && claimsAsync.hasValue && invitesAsync.hasValue;
+    final isEmpty = isAllLoaded && !hasJoin && !hasClaims && !hasInvites;
+
+    return RefreshIndicator(
+      color: CkColors.ink,
+      onRefresh: () async {
+        ref.invalidate(teamPendingJoinRequestsProvider(team.id.value));
+        ref.invalidate(teamPendingClaimRequestsProvider(team.id.value));
+        ref.invalidate(teamPendingInvitesProvider(team.id.value));
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Invite share card
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: CkColors.hairline),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: CkColors.paper,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: CkColors.hairline),
+                  ),
+                  child: const Icon(Icons.link_rounded, color: CkColors.ink),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Share Team Invite',
+                          style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text('Invite players via link or QR',
+                          style: CkType.body(fontSize: 11, color: CkColors.muted)),
+                    ],
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: 'https://matchday.app/teams/${team.id.value}/join'));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Invite link copied to clipboard!')),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: CkColors.ink,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Copy Link',
+                      style: CkType.body(fontSize: 12, fontWeight: FontWeight.w700, color: CkColors.paper),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          child: Row(
+
+          const SizedBox(height: 24),
+
+          // ─── Section 1: Player Join Requests ───
+          if (hasJoin) ...[
+            Text(
+              'PLAYER JOIN REQUESTS (${joinReqsAsync.value!.length})',
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.06,
+                color: CkColors.muted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            for (final req in joinReqsAsync.value!) ...[
+              _PlayerJoinRequestCard(
+                request: req,
+                teamId: team.id.value,
+              ),
+              const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 16),
+          ],
+
+          // ─── Section 2: Roster Claim Requests ───
+          if (hasClaims) ...[
+            Text(
+              'ROSTER CLAIM REQUESTS (${claimsAsync.value!.length})',
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.06,
+                color: CkColors.muted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            for (final req in claimsAsync.value!) ...[
+              _ClaimRequestCard(
+                request: req,
+                teamId: team.id.value,
+              ),
+              const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 16),
+          ],
+
+          // ─── Section 3: Sent Team Invitations ───
+          if (hasInvites) ...[
+            Text(
+              'SENT INVITATIONS (${invitesAsync.value!.length})',
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.06,
+                color: CkColors.muted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            for (final inv in invitesAsync.value!) ...[
+              _SentInviteCard(
+                invite: inv,
+                teamId: team.id.value,
+              ),
+              const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 16),
+          ],
+
+          // ─── Empty state if all are empty ───
+          if (isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: CkColors.paper2,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: CkColors.hairline),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.inbox_outlined, size: 36, color: CkColors.muted),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No pending requests',
+                    style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'When players ask to join your squad, claim historical scorecards, or when you invite players, their status will appear here.',
+                    textAlign: TextAlign.center,
+                    style: CkType.body(fontSize: 12, color: CkColors.muted),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlayerJoinRequestCard extends ConsumerWidget {
+  const _PlayerJoinRequestCard({required this.request, required this.teamId});
+  final Map<String, dynamic> request;
+  final String teamId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reqId = request['request_id']?.toString() ?? '';
+    final player = _asMap(request['player']);
+    final playerName = player['display_name']?.toString() ?? 'Player';
+    final playerHandle = player['username']?.toString();
+    final photoUrl = player['profile_photo_url']?.toString();
+    final role = request['role']?.toString() ?? 'player';
+    final message = request['message']?.toString();
+
+    final roleLabel = switch (role) {
+      'captain' => 'Captain',
+      'vice_captain' => 'Vice Captain',
+      'wicket_keeper' => 'Wicket-keeper',
+      _ => 'Squad Player',
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: CkColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: CkColors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () {
+              if (playerHandle != null && playerHandle.isNotEmpty) {
+                context.push('/u/$playerHandle');
+              }
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                Avatar(
+                  mono: playerName.isNotEmpty ? playerName[0].toUpperCase() : '?',
+                  imageUrl: photoUrl,
+                  size: 40,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        playerName,
+                        style: CkType.display(fontSize: 14.5, fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        '${playerHandle != null ? '@$playerHandle · ' : ''}Applying as $roleLabel',
+                        style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, size: 20, color: CkColors.muted),
+              ],
+            ),
+          ),
+          if (message != null && message.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: CkColors.paper2,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '"$message"',
+                style: CkType.body(fontSize: 12, color: CkColors.ink).copyWith(fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: CkColors.paper,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: CkColors.hairline),
-                ),
-                child: const Icon(Icons.link_rounded, color: CkColors.ink),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Share Team Invite',
-                        style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 2),
-                    Text('Invite players via link or QR',
-                        style: CkType.body(fontSize: 11, color: CkColors.muted)),
-                  ],
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: 'https://matchday.app/teams/${team.id.value}/join'));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invite link copied to clipboard!')),
-                  );
+              InkWell(
+                onTap: () async {
+                  await ref.read(teamsRemoteDataSourceProvider).declineTeamJoinRequest(reqId);
+                  ref.invalidate(teamPendingJoinRequestsProvider(teamId));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Join request declined')),
+                    );
+                  }
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: CkColors.ink,
-                  foregroundColor: CkColors.paper,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: CkColors.paper,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: CkColors.hairline),
+                  ),
+                  child: Text(
+                    'Decline',
+                    style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600, color: CkColors.red),
+                  ),
                 ),
-                child: const Text('Copy Link'),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () async {
+                  await ref.read(teamsRemoteDataSourceProvider).acceptTeamJoinRequest(reqId);
+                  ref.invalidate(teamPendingJoinRequestsProvider(teamId));
+                  ref.invalidate(rosterProvider(teamId));
+                  ref.invalidate(teamProvider(teamId));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Accepted! $playerName added to squad roster.')),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: CkColors.ink,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Accept Request',
+                    style: CkType.body(fontSize: 12, fontWeight: FontWeight.w700, color: CkColors.paper),
+                  ),
+                ),
               ),
             ],
           ),
-        ),
+        ],
+      ),
+    );
+  }
+}
 
-        const SizedBox(height: 20),
+class _ClaimRequestCard extends ConsumerWidget {
+  const _ClaimRequestCard({required this.request, required this.teamId});
+  final Map<String, dynamic> request;
+  final String teamId;
 
-        Text(
-          'PENDING PLAYER REQUESTS (0)',
-          style: CkType.mono(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.06,
-            color: CkColors.muted,
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reqId = request['request_id']?.toString() ?? '';
+    final requester = _asMap(request['requester']);
+    final unclaimed = _asMap(request['unclaimed']);
+    final requesterName = requester['display_name']?.toString() ?? 'Player';
+    final requesterHandle = requester['username']?.toString();
+    final photoUrl = requester['profile_photo_url']?.toString();
+    final unclaimedName = unclaimed['display_name']?.toString() ?? 'Roster spot';
+    final message = request['message']?.toString();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: CkColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: CkColors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () {
+              if (requesterHandle != null && requesterHandle.isNotEmpty) {
+                context.push('/u/$requesterHandle');
+              }
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                Avatar(
+                  mono: requesterName.isNotEmpty ? requesterName[0].toUpperCase() : '?',
+                  imageUrl: photoUrl,
+                  size: 40,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        requesterName,
+                        style: CkType.display(fontSize: 14.5, fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        '${requesterHandle != null ? '@$requesterHandle · ' : ''}wants to claim: $unclaimedName',
+                        style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, size: 20, color: CkColors.muted),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: CkColors.paper2,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: CkColors.hairline),
-          ),
-          child: Column(
+          if (message != null && message.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: CkColors.paper2,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '"$message"',
+                style: CkType.body(fontSize: 12, color: CkColors.ink).copyWith(fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              const Icon(Icons.inbox_outlined, size: 36, color: CkColors.muted),
-              const SizedBox(height: 8),
-              Text(
-                'No pending join requests',
-                style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700),
+              InkWell(
+                onTap: () async {
+                  await ref.read(teamsRemoteDataSourceProvider).rejectClaimRequest(reqId);
+                  ref.invalidate(teamPendingClaimRequestsProvider(teamId));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Claim request rejected')),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: CkColors.paper,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: CkColors.hairline),
+                  ),
+                  child: Text(
+                    'Reject',
+                    style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600, color: CkColors.red),
+                  ),
+                ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                'When local players ask to join your squad, their requests will appear here for approval.',
-                textAlign: TextAlign.center,
-                style: CkType.body(fontSize: 12, color: CkColors.muted),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () async {
+                  await ref.read(teamsRemoteDataSourceProvider).approveClaimRequest(reqId);
+                  ref.invalidate(teamPendingClaimRequestsProvider(teamId));
+                  ref.invalidate(rosterProvider(teamId));
+                  ref.invalidate(teamProvider(teamId));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Claim approved! $requesterName added to roster.')),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: CkColors.ink,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Approve Claim',
+                    style: CkType.body(fontSize: 12, fontWeight: FontWeight.w700, color: CkColors.paper),
+                  ),
+                ),
               ),
             ],
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SentInviteCard extends ConsumerWidget {
+  const _SentInviteCard({required this.invite, required this.teamId});
+  final Map<String, dynamic> invite;
+  final String teamId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final inviteId = invite['invite_id']?.toString() ?? '';
+    final invitee = _asMap(invite['invitee']);
+    final inviteeName = invitee['display_name']?.toString() ?? 'Player';
+    final inviteeHandle = invitee['username']?.toString();
+    final photoUrl = invitee['profile_photo_url']?.toString();
+    final role = invite['role']?.toString() ?? 'player';
+    final jersey = invite['jersey_number'] as int?;
+    final message = invite['message']?.toString();
+
+    final roleLabel = switch (role) {
+      'captain' => 'Captain',
+      'vice_captain' => 'Vice Captain',
+      'wicket_keeper' => 'Wicket-keeper',
+      _ => 'Squad Player',
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: CkColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: CkColors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () {
+              if (inviteeHandle != null && inviteeHandle.isNotEmpty) {
+                context.push('/u/$inviteeHandle');
+              }
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                Avatar(
+                  mono: inviteeName.isNotEmpty ? inviteeName[0].toUpperCase() : '?',
+                  imageUrl: photoUrl,
+                  size: 40,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        inviteeName,
+                        style: CkType.display(fontSize: 14.5, fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        '${inviteeHandle != null ? '@$inviteeHandle · ' : ''}Invited as $roleLabel${jersey != null ? ' (#$jersey)' : ''}',
+                        style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: CkColors.amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Pending',
+                    style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, color: CkColors.amber),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (message != null && message.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: CkColors.paper2,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '"$message"',
+                style: CkType.body(fontSize: 12, color: CkColors.ink).copyWith(fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () async {
+                await ref.read(teamsRemoteDataSourceProvider).cancelTeamInvite(inviteId);
+                ref.invalidate(teamPendingInvitesProvider(teamId));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invitation cancelled')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.close_rounded, size: 14, color: CkColors.red),
+              label: Text(
+                'Cancel Invite',
+                style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600, color: CkColors.red),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -539,23 +1028,7 @@ void _showFailure(BuildContext context, Either<Failure, Object?> result) {
 }
 
 Future<void> _addPlayer(BuildContext context, WidgetRef ref, Team team) async {
-  final name = await showModalBottomSheet<String>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: CkColors.paper,
-    builder: (_) => const _AddPlayerSheet(),
-  );
-  if (name == null || !context.mounted) return;
-  final nameRes = PlayerDisplayName.create(name);
-  if (nameRes.isLeft()) {
-    _snack(context, nameRes.getLeft().toNullable()!.message);
-    return;
-  }
-  final result = await ref.read(teamsRepositoryProvider).addUnclaimedPlayer(
-        teamId: team.id,
-        displayName: nameRes.getRight().toNullable()!,
-      );
-  if (context.mounted) _showFailure(context, result);
+  await AddPlayerSheet.show(context, team);
 }
 
 Future<void> _memberActions(
@@ -563,6 +1036,9 @@ Future<void> _memberActions(
   final action = await showModalBottomSheet<_MemberAction>(
     context: context,
     backgroundColor: CkColors.paper,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
     builder: (_) => _MemberActionsSheet(entry: entry),
   );
   if (action == null || !context.mounted) return;
@@ -574,6 +1050,9 @@ Future<void> _memberActions(
         context: context,
         isScrollControlled: true,
         backgroundColor: CkColors.paper,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
         builder: (_) => _JerseySheet(initial: m.jerseyNumber),
       );
       if (picked == null || !context.mounted) return;
@@ -588,7 +1067,11 @@ Future<void> _memberActions(
       }
       final result =
           await ref.read(teamsRepositoryProvider).setJerseyNumber(m.id, jersey);
-      if (context.mounted) _showFailure(context, result);
+      if (context.mounted) {
+        _showFailure(context, result);
+        ref.invalidate(rosterProvider(m.teamId.value));
+        ref.invalidate(teamProvider(m.teamId.value));
+      }
     case _MemberAction.captain:
     case _MemberAction.viceCaptain:
     case _MemberAction.keeper:
@@ -596,11 +1079,42 @@ Future<void> _memberActions(
       final result = await ref
           .read(teamsRepositoryProvider)
           .setMemberRole(m.id, action.role!);
-      if (context.mounted) _showFailure(context, result);
+      if (context.mounted) {
+        _showFailure(context, result);
+        ref.invalidate(rosterProvider(m.teamId.value));
+        ref.invalidate(teamProvider(m.teamId.value));
+      }
     case _MemberAction.remove:
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Remove from squad?', style: CkType.display(fontSize: 17, fontWeight: FontWeight.w700)),
+          content: Text(
+            'Remove ${entry.displayName} from the active team roster? Historical match scorecards will remain intact.',
+            style: CkType.body(fontSize: 13, color: CkColors.muted),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel', style: TextStyle(color: CkColors.ink)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Remove',
+                  style: TextStyle(color: CkColors.red, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true || !context.mounted) return;
       final result =
           await ref.read(teamsRepositoryProvider).removeMember(m.id);
-      if (context.mounted) _showFailure(context, result);
+      if (context.mounted) {
+        _showFailure(context, result);
+        ref.invalidate(rosterProvider(m.teamId.value));
+        ref.invalidate(teamProvider(m.teamId.value));
+      }
   }
 }
 
@@ -622,56 +1136,128 @@ enum _MemberAction {
 }
 
 class _ManagedRow extends StatelessWidget {
-  const _ManagedRow(
-      {required this.entry, required this.team, required this.onTap});
+  const _ManagedRow({
+    required this.entry,
+    required this.team,
+    required this.onManage,
+  });
   final RosterMember entry;
   final Team team;
-  final VoidCallback onTap;
+  final VoidCallback onManage;
 
   @override
   Widget build(BuildContext context) {
     final m = entry.member;
     final primary = parseHexColor(team.primaryColor, fallback: CkColors.ink);
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: m.jerseyNumber == null ? CkColors.paper2 : primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(m.jerseyNumber == null ? '—' : '#${m.jerseyNumber}',
-                  style: CkType.display(
-                      fontSize: 12,
-                      color: m.jerseyNumber == null
-                          ? CkColors.muted
-                          : Colors.white)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Row(
-                children: [
-                  Flexible(
-                    child: Text(entry.displayName,
-                        style:
-                            CkType.display(fontSize: 15, letterSpacing: -0.01)),
-                  ),
-                  if (m.role != MemberRole.player) ...[
-                    const SizedBox(width: 6),
-                    _roleChip(m.role),
+    final isUnclaimed = m.playerType == PlayerType.unclaimed;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          // Left + Center: Clickable player profile / info area
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (!isUnclaimed && entry.username != null && entry.username!.isNotEmpty) {
+                  context.push('/u/${entry.username}');
+                } else if (isUnclaimed) {
+                  _showOfflinePlayerSheet(context, team, entry, onManage);
+                }
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    if (!isUnclaimed && (entry.profilePhotoUrl != null && entry.profilePhotoUrl!.isNotEmpty))
+                      Avatar(
+                        mono: entry.displayName.isNotEmpty ? entry.displayName[0].toUpperCase() : '?',
+                        imageUrl: entry.profilePhotoUrl,
+                        size: 38,
+                      )
+                    else
+                      Container(
+                        width: 38,
+                        height: 38,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: m.jerseyNumber == null ? CkColors.paper2 : primary,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: m.jerseyNumber == null ? CkColors.hairline : Colors.transparent,
+                          ),
+                        ),
+                        child: Text(
+                          m.jerseyNumber == null ? '—' : '#${m.jerseyNumber}',
+                          style: CkType.display(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: m.jerseyNumber == null ? CkColors.muted : Colors.white,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  entry.displayName,
+                                  style: CkType.display(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: -0.01,
+                                  ),
+                                ),
+                              ),
+                              if (m.role != MemberRole.player) ...[
+                                const SizedBox(width: 6),
+                                _roleChip(m.role),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              if (isUnclaimed) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: CkColors.paper2,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Offline Player',
+                                    style: CkType.mono(fontSize: 9, color: CkColors.muted),
+                                  ),
+                                ),
+                              ] else ...[
+                                Text(
+                                  entry.username != null ? '@${entry.username}' : 'Verified Member',
+                                  style: CkType.body(fontSize: 11, color: const Color(0xFF1E5A2C)),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
-                ],
+                ),
               ),
             ),
-            const Icon(Icons.more_horiz_rounded, color: CkColors.muted),
-          ],
-        ),
+          ),
+          // Right: 3-dots actions button
+          IconButton(
+            onPressed: onManage,
+            icon: const Icon(Icons.more_horiz_rounded, color: CkColors.ink),
+            tooltip: 'Member actions',
+          ),
+        ],
       ),
     );
   }
@@ -686,10 +1272,169 @@ class _ManagedRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-          color: CkColors.cream, borderRadius: BorderRadius.circular(999)),
-      child: Text(label, style: CkType.mono(fontSize: 9, color: const Color(0xFF6B5414))),
+        color: CkColors.cream,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: CkType.mono(fontSize: 9, fontWeight: FontWeight.w700, color: const Color(0xFF6B5414)),
+      ),
     );
   }
+}
+
+void _showOfflinePlayerSheet(
+  BuildContext context,
+  Team team,
+  RosterMember entry,
+  VoidCallback onManage,
+) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: CkColors.paper,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: CkColors.hairline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: CkColors.paper2,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: CkColors.hairline),
+                  ),
+                  child: Text(
+                    entry.displayName.isNotEmpty ? entry.displayName[0].toUpperCase() : '?',
+                    style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.displayName,
+                        style: CkType.display(fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        'Offline Squad Placeholder',
+                        style: CkType.body(fontSize: 12, color: CkColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (entry.phoneNumber != null && entry.phoneNumber!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: CkColors.paper2,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.phone_outlined, size: 16, color: CkColors.muted),
+                    const SizedBox(width: 8),
+                    Text(
+                      entry.phoneNumber!,
+                      style: CkType.mono(fontSize: 13, fontWeight: FontWeight.w600, color: CkColors.ink),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: CkColors.paper2,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 18, color: CkColors.muted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'This player does not have a linked Matchday account yet. You can share the claim link so they can register and claim their stats.',
+                      style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(
+                        text: 'https://matchday.app/teams/${team.id.value}/claim',
+                      ));
+                      Navigator.of(ctx).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Claim link copied to clipboard!')),
+                      );
+                    },
+                    icon: const Icon(Icons.link_rounded, size: 16),
+                    label: const Text('Claim Link'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: CkColors.ink,
+                      side: const BorderSide(color: CkColors.hairline),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      onManage();
+                    },
+                    icon: const Icon(Icons.tune_rounded, size: 16),
+                    label: const Text('Manage Role'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CkColors.ink,
+                      foregroundColor: CkColors.paper,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _EmptyRoster extends StatelessWidget {
@@ -726,54 +1471,6 @@ class _EmptyRoster extends StatelessWidget {
   }
 }
 
-class _AddPlayerSheet extends StatefulWidget {
-  const _AddPlayerSheet();
-  @override
-  State<_AddPlayerSheet> createState() => _AddPlayerSheetState();
-}
-
-class _AddPlayerSheetState extends State<_AddPlayerSheet> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-          20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Add player', style: CkType.display(fontSize: 20)),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-            style: CkType.body(fontSize: 16),
-            decoration: const InputDecoration(hintText: 'Player name'),
-            onSubmitted: (_) => _submit(),
-          ),
-          const SizedBox(height: 14),
-          CkButton(label: 'Add to squad', onPressed: _submit),
-        ],
-      ),
-    );
-  }
-
-  void _submit() {
-    final name = _controller.text.trim();
-    if (name.isEmpty) return;
-    Navigator.of(context).pop(name);
-  }
-}
-
 class _MemberActionsSheet extends StatelessWidget {
   const _MemberActionsSheet({required this.entry});
   final RosterMember entry;
@@ -783,34 +1480,75 @@ class _MemberActionsSheet extends StatelessWidget {
     Widget item(IconData icon, String label, _MemberAction action,
             {Color color = CkColors.ink}) =>
         ListTile(
-          leading: Icon(icon, color: color),
+          leading: Icon(icon, color: color, size: 20),
           title: Text(label,
               style: CkType.body(
-                  fontSize: 15, fontWeight: FontWeight.w500, color: color)),
+                  fontSize: 14.5, fontWeight: FontWeight.w500, color: color)),
           onTap: () => Navigator.of(context).pop(action),
         );
 
+    final m = entry.member;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(entry.displayName,
-                  style: CkType.display(fontSize: 18)),
+          // Drag handle
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(top: 10, bottom: 8),
+            decoration: BoxDecoration(
+              color: CkColors.hairline,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: CkColors.paper2,
+                  child: Text(
+                    entry.displayName.isNotEmpty ? entry.displayName[0].toUpperCase() : '?',
+                    style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(entry.displayName,
+                          style: CkType.display(fontSize: 16, fontWeight: FontWeight.w700)),
+                      Text(
+                        m.role == MemberRole.captain
+                            ? 'Captain'
+                            : m.role == MemberRole.viceCaptain
+                                ? 'Vice Captain'
+                                : m.role == MemberRole.wicketKeeper
+                                    ? 'Wicket-keeper'
+                                    : 'Squad Player',
+                        style: CkType.body(fontSize: 12, color: CkColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: CkColors.hairline),
           item(Icons.tag_rounded, 'Set jersey number', _MemberAction.jersey),
-          item(Icons.star_rounded, 'Make captain', _MemberAction.captain),
-          item(Icons.star_half_rounded, 'Make vice-captain',
-              _MemberAction.viceCaptain),
-          item(Icons.sports_baseball_outlined, 'Make wicket-keeper',
-              _MemberAction.keeper),
-          item(Icons.person_outline_rounded, 'Set as player',
-              _MemberAction.player),
-          item(Icons.delete_outline_rounded, 'Remove from roster',
+          if (m.role != MemberRole.captain)
+            item(Icons.star_rounded, 'Promote to Captain', _MemberAction.captain,
+                color: const Color(0xFFB45309)),
+          if (m.role != MemberRole.viceCaptain)
+            item(Icons.star_half_rounded, 'Make Vice-Captain', _MemberAction.viceCaptain),
+          if (m.role != MemberRole.wicketKeeper)
+            item(Icons.sports_baseball_outlined, 'Make Wicket-keeper', _MemberAction.keeper),
+          if (m.role != MemberRole.player)
+            item(Icons.person_outline_rounded, 'Set as regular player', _MemberAction.player),
+          item(Icons.delete_outline_rounded, 'Remove from squad',
               _MemberAction.remove,
               color: CkColors.red),
           const SizedBox(height: 8),

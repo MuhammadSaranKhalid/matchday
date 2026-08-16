@@ -638,6 +638,7 @@ class _InstagramCommentRow extends StatelessWidget {
             behavior: HitTestBehavior.opaque,
             child: Avatar(
               mono: comment.authorMonogram,
+              imageUrl: comment.authorPhotoUrl,
               size: isReply ? 26 : 34,
               tone: isMe ? AvatarTone.ink : AvatarTone.paper,
             ),

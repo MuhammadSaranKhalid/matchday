@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../follows/presentation/controllers/follow_toggle_controller.dart';
+import '../../../data/datasources/teams_datasource_providers.dart';
 import 'tp_atoms.dart';
 import 'tp_view.dart';
 
@@ -430,15 +431,157 @@ class TpActionRow extends ConsumerWidget {
           const _Action(label: 'Notify', icon: Icons.notifications_none),
         ];
       case TeamPageViewer.strangerPrivate:
-        return const [
-          _Action(label: 'Request to join', icon: Icons.add, primary: true),
+        return [
+          _joinAction(context, ref, primary: true),
         ];
       case TeamPageViewer.stranger:
         return [
           _followAction(ref),
-          const _Action(label: 'Request to join'),
+          _joinAction(context, ref, primary: false),
         ];
     }
+  }
+
+  _Action _joinAction(BuildContext context, WidgetRef ref, {bool primary = false}) {
+    return _Action(
+      label: 'Request to join',
+      icon: Icons.add_rounded,
+      primary: primary,
+      onTap: () => _showJoinRequestModal(context, ref),
+    );
+  }
+
+  void _showJoinRequestModal(BuildContext context, WidgetRef ref) {
+    final msgController = TextEditingController();
+    String selectedRole = 'player';
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: CkColors.paper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: CkColors.hairline,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Text(
+                'Join ${team.name}',
+                style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Send a join request to the team managers.',
+                style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'PLAYING ROLE',
+                style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, color: CkColors.muted),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final r in [
+                    (id: 'player', label: 'Squad Player'),
+                    (id: 'wicket_keeper', label: 'Wicket-keeper'),
+                  ])
+                    ChoiceChip(
+                      label: Text(r.label),
+                      selected: selectedRole == r.id,
+                      onSelected: (_) => setState(() => selectedRole = r.id),
+                      selectedColor: CkColors.ink,
+                      backgroundColor: CkColors.paper2,
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: selectedRole == r.id ? CkColors.paper : CkColors.ink,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'NOTE / MESSAGE (OPTIONAL)',
+                style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, color: CkColors.muted),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: msgController,
+                maxLines: 3,
+                style: CkType.body(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'e.g. Right-arm fast bowler, available on weekends...',
+                  hintStyle: const TextStyle(fontSize: 12.5, color: CkColors.muted),
+                  filled: true,
+                  fillColor: CkColors.paper2,
+                  contentPadding: const EdgeInsets.all(12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: CkColors.hairline),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.of(ctx).pop();
+                    try {
+                      await ref.read(teamsRemoteDataSourceProvider).requestToJoinTeam(
+                            teamId,
+                            role: selectedRole,
+                            message: msgController.text.trim(),
+                          );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Join request sent to team managers!')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to send request: $e')),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: CkColors.ink,
+                    foregroundColor: CkColors.paper,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Send Request', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   _Action _followAction(WidgetRef ref) {

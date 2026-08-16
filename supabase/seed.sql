@@ -54,6 +54,8 @@ begin
     insert into auth.users (
       instance_id, id, aud, role, email, encrypted_password,
       email_confirmed_at, raw_user_meta_data, raw_app_meta_data,
+      confirmation_token, recovery_token, email_change_token_new, email_change,
+      reauthentication_token, phone_change, phone_change_token,
       created_at, updated_at
     )
     values (
@@ -63,6 +65,8 @@ begin
       now(),
       jsonb_build_object('display_name', 'Muhammad Saran'),
       jsonb_build_object('provider', 'email', 'providers', array['email']),
+      '', '', '', '',
+      '', '', '',
       now(), now()
     )
     on conflict (id) do nothing;
@@ -138,6 +142,8 @@ begin
     insert into auth.users (
       instance_id, id, aud, role, email, encrypted_password,
       email_confirmed_at, raw_user_meta_data, raw_app_meta_data,
+      confirmation_token, recovery_token, email_change_token_new, email_change,
+      reauthentication_token, phone_change, phone_change_token,
       created_at, updated_at
     )
     values (
@@ -147,6 +153,8 @@ begin
       now(),
       jsonb_build_object('display_name', v.display_name),
       jsonb_build_object('provider', 'email', 'providers', array['email']),
+      '', '', '', '',
+      '', '', '',
       now(), now()
     )
     on conflict (id) do nothing;
@@ -546,6 +554,116 @@ begin
 end $seed_random$;
 
 -- =============================================================================
+-- Posts & Comments Seed
+-- =============================================================================
+do $seed_posts$
+declare
+  v_owner uuid := '00000000-0000-0000-0000-000000000001';
+  v_bilal uuid := '00000000-0000-0000-0000-000000000002';
+  v_faraz uuid := '00000000-0000-0000-0000-000000000003';
+  v_hassan uuid := '00000000-0000-0000-0000-000000000004';
+  v_adeel uuid := '00000000-0000-0000-0000-000000000005';
+  v_lahore_team uuid := '11111111-1111-1111-1111-111111111101';
+  v_karachi_team uuid := '11111111-1111-1111-1111-111111111103';
+  v_isb_team uuid := '11111111-1111-1111-1111-111111111102';
+
+  v_tp1 uuid := '20000000-0000-0000-0000-000000000001';
+  v_tp2 uuid := '20000000-0000-0000-0000-000000000002';
+  v_tp3 uuid := '20000000-0000-0000-0000-000000000003';
+  v_tp4 uuid := '20000000-0000-0000-0000-000000000004';
+  v_tp5 uuid := '20000000-0000-0000-0000-000000000005';
+begin
+  -- 1. Lahore Lions official photo post
+  insert into public.posts (post_id, author_id, author_context, context_entity_id, post_type, text, media_urls, media, created_at)
+  values (
+    v_tp1,
+    v_owner,
+    'team_manager',
+    v_lahore_team,
+    'photo',
+    '🦁 Official squad training ahead of the Super Weekend derby! The boys are looking sharp and ready.',
+    array['https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80', 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80'],
+    '[{"url":"https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80","width":1080,"height":720},{"url":"https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80","width":1080,"height":720}]'::jsonb,
+    now() - interval '2 hours'
+  ) on conflict (post_id) do nothing;
+
+  -- 2. Lahore Lions Matchday Announcement
+  insert into public.posts (post_id, author_id, author_context, context_entity_id, post_type, text, media_urls, media, created_at)
+  values (
+    v_tp2,
+    v_owner,
+    'team_manager',
+    v_lahore_team,
+    'match_announcement',
+    '⚡ MATCHDAY ANNOUNCEMENT: Lahore Lions vs Karachi Eagles this Sunday at Gaddafi Stadium Ground 2. Toss at 4:30 PM!',
+    array['https://images.unsplash.com/photo-1589801258579-18e091f4ca26?w=1080&q=80'],
+    '[{"url":"https://images.unsplash.com/photo-1589801258579-18e091f4ca26?w=1080&q=80","width":1080,"height":720}]'::jsonb,
+    now() - interval '1 day'
+  ) on conflict (post_id) do nothing;
+
+  -- 3. Karachi Eagles Team Post
+  insert into public.posts (post_id, author_id, author_context, context_entity_id, post_type, text, media_urls, media, created_at)
+  values (
+    v_tp3,
+    v_bilal,
+    'team_manager',
+    v_karachi_team,
+    'recruitment',
+    '🦅 Karachi Eagles are recruiting 2 opening batsmen and an express pacer for the upcoming T20 tournament. DM or drop a comment to try out!',
+    array['https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80'],
+    '[{"url":"https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80","width":1080,"height":720}]'::jsonb,
+    now() - interval '3 days'
+  ) on conflict (post_id) do nothing;
+
+  -- 4. Player Personal Posts
+  insert into public.posts (post_id, author_id, author_context, context_entity_id, post_type, text, media_urls, media, created_at)
+  values
+    (
+      v_tp4,
+      v_faraz,
+      'personal',
+      null,
+      'photo',
+      'Solid net session today with the squad. Batting rhythm feeling crisp and timing is right on point!',
+      array['https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80'],
+      '[{"url":"https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80","width":1080,"height":720}]'::jsonb,
+      now() - interval '4 hours'
+    ),
+    (
+      v_tp5,
+      v_hassan,
+      'personal',
+      null,
+      'text',
+      'Tape ball under the lights hits different in Lahore 🔥 Great match against Gulberg Strikers tonight!',
+      '{}',
+      '[]'::jsonb,
+      now() - interval '6 hours'
+    )
+  on conflict (post_id) do nothing;
+
+  -- 5. Threaded Comments on Posts
+  insert into public.comments (comment_id, post_id, author_id, text, created_at)
+  values
+    (gen_random_uuid(), v_tp1, v_bilal, 'Looking sharp boys! Looking forward to the derby 🏆', now() - interval '1 hour'),
+    (gen_random_uuid(), v_tp1, v_faraz, 'Pace attack is fully locked in 🔥', now() - interval '45 minutes'),
+    (gen_random_uuid(), v_tp2, v_adeel, 'InshaAllah big win coming this weekend!', now() - interval '12 hours'),
+    (gen_random_uuid(), v_tp3, v_hassan, 'Sent my stats over DM, would love to join!', now() - interval '2 days')
+  on conflict do nothing;
+
+  -- 6. Post Likes
+  insert into public.post_likes (post_id, user_id, created_at)
+  values
+    (v_tp1, v_bilal, now()),
+    (v_tp1, v_faraz, now()),
+    (v_tp1, v_hassan, now()),
+    (v_tp2, v_bilal, now()),
+    (v_tp2, v_adeel, now()),
+    (v_tp3, v_owner, now())
+  on conflict do nothing;
+end $seed_posts$;
+
+-- =============================================================================
 -- Summary — what your inbox looks like when you sign in
 -- =============================================================================
 --   1. Lahore Lions       owner    curated 30 messages, captain you, very recent
@@ -575,6 +693,256 @@ end $seed_random$;
 -- =============================================================================
 
 -- =============================================================================
+-- 4) Team Requests Seed (Match Requests, Team Invites & Player Claim Requests)
+-- =============================================================================
+
+do $seed_team_requests$
+declare
+  v_saran_uid   uuid;
+  v_bilal_uid   constant uuid := '00000000-0000-0000-0000-000000000002';
+  v_hassan_uid  constant uuid := '00000000-0000-0000-0000-000000000004';
+  v_babar_uid   constant uuid := '00000000-0000-0000-0000-000000000010';
+  v_shaheen_uid constant uuid := '00000000-0000-0000-0000-000000000011';
+  v_rizwan_uid  constant uuid := '00000000-0000-0000-0000-000000000012';
+  v_shadab_uid  constant uuid := '00000000-0000-0000-0000-000000000013';
+
+  v_lahore_lions      constant uuid := '11111111-1111-1111-1111-111111111101';
+  v_islamabad_united  constant uuid := '11111111-1111-1111-1111-111111111102';
+  v_karachi_kings     constant uuid := '11111111-1111-1111-1111-111111111104';
+  v_rawalpindi_rams   constant uuid := '11111111-1111-1111-1111-111111111106';
+
+  v_unclaimed_wahab   constant uuid := '50000000-0000-0000-0000-000000000001';
+  v_unclaimed_imad    constant uuid := '50000000-0000-0000-0000-000000000002';
+begin
+  select id into v_saran_uid from auth.users where email = 'muhammadsarankhalid@gmail.com' limit 1;
+  if v_saran_uid is null then
+    select user_id into v_saran_uid from public.profiles limit 1;
+  end if;
+
+  -- 1) Create Extra Stars in auth.users if not present
+  insert into auth.users (
+    instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, raw_user_meta_data, raw_app_meta_data,
+    confirmation_token, recovery_token, email_change_token_new, email_change,
+    reauthentication_token, phone_change, phone_change_token,
+    created_at, updated_at
+  )
+  values
+    (
+      '00000000-0000-0000-0000-000000000000',
+      v_babar_uid, 'authenticated', 'authenticated', 'babar@cricket.pk',
+      crypt('pass1234', gen_salt('bf')),
+      now(),
+      jsonb_build_object('display_name', 'Babar Azam'),
+      jsonb_build_object('provider', 'email', 'providers', array['email']),
+      '', '', '', '', '', '', '', now(), now()
+    ),
+    (
+      '00000000-0000-0000-0000-000000000000',
+      v_shaheen_uid, 'authenticated', 'authenticated', 'shaheen@cricket.pk',
+      crypt('pass1234', gen_salt('bf')),
+      now(),
+      jsonb_build_object('display_name', 'Shaheen Afridi'),
+      jsonb_build_object('provider', 'email', 'providers', array['email']),
+      '', '', '', '', '', '', '', now(), now()
+    ),
+    (
+      '00000000-0000-0000-0000-000000000000',
+      v_rizwan_uid, 'authenticated', 'authenticated', 'rizwan@cricket.pk',
+      crypt('pass1234', gen_salt('bf')),
+      now(),
+      jsonb_build_object('display_name', 'Mohammad Rizwan'),
+      jsonb_build_object('provider', 'email', 'providers', array['email']),
+      '', '', '', '', '', '', '', now(), now()
+    ),
+    (
+      '00000000-0000-0000-0000-000000000000',
+      v_shadab_uid, 'authenticated', 'authenticated', 'shadab@cricket.pk',
+      crypt('pass1234', gen_salt('bf')),
+      now(),
+      jsonb_build_object('display_name', 'Shadab Khan'),
+      jsonb_build_object('provider', 'email', 'providers', array['email']),
+      '', '', '', '', '', '', '', now(), now()
+    )
+  on conflict (id) do nothing;
+
+  insert into public.profiles (user_id, username, display_name, bio, onboarded_at)
+  values
+    (v_babar_uid,   'babar',   'Babar Azam',       'Cover drive enthusiast · Batter · Lahore',       now()),
+    (v_shaheen_uid, 'shaheen', 'Shaheen Afridi',   'Eagle of Lahore · Left-arm Fast Bowler',         now()),
+    (v_rizwan_uid,  'rizwan',  'Mohammad Rizwan',  'Hard work & faith · Wicket-keeper Batter',       now()),
+    (v_shadab_uid,  'shadab',  'Shadab Khan',      'Leg spin & fielding · All-Rounder',              now())
+  on conflict (user_id) do update set
+    username = excluded.username,
+    display_name = excluded.display_name;
+
+  -- 2) Unclaimed Players on Lahore Lions Roster
+  insert into public.unclaimed_players (unclaimed_id, display_name, phone_number, added_by, created_at, updated_at)
+  values
+    (v_unclaimed_wahab, 'Wahab Riaz', '+923001112233', v_saran_uid, now(), now()),
+    (v_unclaimed_imad,  'Imad Wasim', '+923004445566', v_saran_uid, now(), now())
+  on conflict (unclaimed_id) do nothing;
+
+  insert into public.team_members (membership_id, team_id, unclaimed_id, added_by, role, jersey_number, status)
+  values
+    ('60000000-0000-0000-0000-000000000001', v_lahore_lions, v_unclaimed_wahab, v_saran_uid, 'player', 14, 'active'),
+    ('60000000-0000-0000-0000-000000000002', v_lahore_lions, v_unclaimed_imad,  v_saran_uid, 'player', 9,  'active')
+  on conflict (membership_id) do nothing;
+
+  -- 3) Player Claim Request: Babar claiming the Wahab Riaz spot on Lahore Lions
+  insert into public.claim_requests (request_id, unclaimed_id, requester_id, message, status, created_at, updated_at)
+  values (
+    '70000000-0000-0000-0000-000000000001',
+    v_unclaimed_wahab,
+    v_babar_uid,
+    'Hey captain, that was me playing in the Sunday friendly! Linking my stats to my new Matchday account.',
+    'pending',
+    now() - interval '3 hours',
+    now() - interval '3 hours'
+  )
+  on conflict (request_id) do nothing;
+
+  -- 4) Player Join Requests (Players asking to join Lahore Lions)
+  insert into public.team_join_requests (request_id, team_id, player_id, role, message, status, created_at)
+  values
+    (
+      '75000000-0000-0000-0000-000000000001',
+      v_lahore_lions,
+      v_rizwan_uid,
+      'wicket_keeper',
+      'Assalam o Alaikum! I am a wicketkeeper-batter based in Lahore. Looking to join Lahore Lions for weekend league matches.',
+      'pending',
+      now() - interval '2 hours'
+    ),
+    (
+      '75000000-0000-0000-0000-000000000002',
+      v_lahore_lions,
+      v_shadab_uid,
+      'player',
+      'Leg-spin all-rounder available for the upcoming season. Would love to join the squad!',
+      'pending',
+      now() - interval '6 hours'
+    )
+  on conflict (request_id) do nothing;
+
+  -- 5) Team Invites:
+  --    a. Outgoing invite from Lahore Lions to Shaheen Afridi
+  insert into public.team_invites (invite_id, team_id, invitee_id, invited_by, message, role, jersey_number, status, created_at)
+  values (
+    '80000000-0000-0000-0000-000000000001',
+    v_lahore_lions,
+    v_shaheen_uid,
+    v_saran_uid,
+    'Join Lahore Lions as our premier strike bowler for the upcoming Super Weekend Derby!',
+    'player',
+    10,
+    'pending',
+    now() - interval '1 day'
+  )
+  on conflict (invite_id) do nothing;
+
+  --    b. Incoming invite to Saran from Islamabad United
+  insert into public.team_invites (invite_id, team_id, invitee_id, invited_by, message, role, jersey_number, status, created_at)
+  values (
+    '80000000-0000-0000-0000-000000000002',
+    v_islamabad_united,
+    v_saran_uid,
+    v_bilal_uid,
+    'Would love to have you guest-captain our Islamabad side this weekend!',
+    'captain',
+    7,
+    'pending',
+    now() - interval '5 hours'
+  )
+  on conflict (invite_id) do nothing;
+
+  -- 5) Match Requests (Challenges for Lahore Lions):
+  --    a. Incoming Match Challenge from Karachi Kings to Lahore Lions
+  insert into public.match_requests (
+    request_id, from_team_id, to_team_id, requested_by,
+    proposed_start_time, proposed_venue, proposed_format,
+    share_code, message, status,
+    proposal_expires_at, created_at, updated_at
+  )
+  values (
+    '90000000-0000-0000-0000-000000000001',
+    v_karachi_kings,
+    v_lahore_lions,
+    v_bilal_uid,
+    now() + interval '3 days',
+    'Gaddafi Stadium, Lahore',
+    '{"overs": 20, "ball_type": "leather", "pitch_type": "turf", "match_type": "limited_overs", "players_per_team": 11}'::jsonb,
+    '582914',
+    'Super Weekend 20-over challenge! We have booked the main turf ground. Let us know if you accept.',
+    'pending',
+    now() + interval '48 hours',
+    now() - interval '4 hours',
+    now() - interval '4 hours'
+  )
+  on conflict (request_id) do nothing;
+
+  --    b. Countered Match Challenge from Rawalpindi Rams to Lahore Lions
+  insert into public.match_requests (
+    request_id, from_team_id, to_team_id, requested_by,
+    proposed_start_time, proposed_venue, proposed_format,
+    countered_start_time, countered_venue, countered_players_per_side,
+    share_code, message, status,
+    decided_by, decided_at, decision_note,
+    proposal_expires_at, counter_expires_at, created_at, updated_at
+  )
+  values (
+    '90000000-0000-0000-0000-000000000002',
+    v_rawalpindi_rams,
+    v_lahore_lions,
+    v_hassan_uid,
+    now() + interval '5 days',
+    'Rawalpindi Cricket Stadium',
+    '{"overs": 15, "ball_type": "tape_ball", "match_type": "limited_overs", "players_per_team": 11}'::jsonb,
+    now() + interval '5 days 2 hours',
+    'LCCA Ground, Lahore',
+    11,
+    '418902',
+    'Tape ball night match challenge under lights.',
+    'countered',
+    v_saran_uid,
+    now() - interval '1 hour',
+    'Can we move the venue to LCCA Ground Lahore so our local squad can make it?',
+    now() + interval '48 hours',
+    now() + interval '24 hours',
+    now() - interval '8 hours',
+    now() - interval '1 hour'
+  )
+  on conflict (request_id) do nothing;
+
+  --    c. Outgoing Open Challenge by Lahore Lions (with share code)
+  insert into public.match_requests (
+    request_id, from_team_id, to_team_id, requested_by,
+    proposed_start_time, proposed_venue, proposed_format,
+    share_code, message, status,
+    proposal_expires_at, code_expires_at, created_at, updated_at
+  )
+  values (
+    '90000000-0000-0000-0000-000000000003',
+    v_lahore_lions,
+    null,
+    v_saran_uid,
+    now() + interval '2 days',
+    'Model Town Club Ground, Lahore',
+    '{"overs": 20, "ball_type": "leather", "match_type": "limited_overs", "players_per_team": 11}'::jsonb,
+    '729401',
+    'Open weekend friendly! Any Lahore team up for a 20-over leather ball match, enter share code 729401 to accept.',
+    'pending',
+    now() + interval '48 hours',
+    now() + interval '24 hours',
+    now() - interval '2 hours',
+    now() - interval '2 hours'
+  )
+  on conflict (request_id) do nothing;
+
+  raise notice 'Team requests seeded successfully for Lahore Lions.';
+end $seed_team_requests$;
+
+-- =============================================================================
 -- CLEANUP — paste into the SQL editor when you want to remove the seed
 -- =============================================================================
 -- Drops everything seeded above. Your own account + profile + any teams you
@@ -598,3 +966,4 @@ end $seed_random$;
 -- -- and messaging layer. Only the auth users remain:
 -- delete from auth.users where email like '%@local.test';
 -- commit;
+

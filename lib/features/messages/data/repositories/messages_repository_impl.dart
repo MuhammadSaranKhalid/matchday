@@ -194,6 +194,38 @@ class MessagesRepositoryImpl implements MessagesRepository {
     }
   }
 
+  @override
+  Future<Either<Failure, Unit>> acceptDmRequest(ChatId chatId) async {
+    try {
+      await _remote.acceptDmRequest(chatId.value);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> declineDmRequest(ChatId chatId) async {
+    try {
+      await _remote.declineDmRequest(chatId.value);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
 
   // ─── Drafts ───────────────────────────────────────────────────────────
 

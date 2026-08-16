@@ -939,8 +939,240 @@ begin
   )
   on conflict (request_id) do nothing;
 
-  raise notice 'Team requests seeded successfully for Lahore Lions.';
+  -- ===========================================================================
+  -- 5b) Seed Realistic Matches for Lahore Lions (Confirmed, Live, Past)
+  -- ===========================================================================
+  -- 1. Live Match in Play: Lahore Lions vs Karachi Kings (20 overs)
+  --    Lahore Lions batting 142/3 in 15.4 overs
+  declare
+    m_live_id       constant uuid := '30000000-0000-0000-0000-000000000001';
+    m_upcoming_id   constant uuid := '30000000-0000-0000-0000-000000000002';
+    m_past_id       constant uuid := '30000000-0000-0000-0000-000000000003';
+    mp_saran_live   constant uuid := '31000000-0000-0000-0000-000000000001';
+    mp_babar_live   constant uuid := '31000000-0000-0000-0000-000000000002';
+    mp_bilal_live   constant uuid := '31000000-0000-0000-0000-000000000003';
+  begin
+    -- 1. LIVE MATCH
+    insert into public.matches (
+      match_id, match_type, team_a_id, team_b_id, team_a_captain, team_b_captain,
+      format, venue, scheduled_start_time, actual_start_time,
+      toss_won_by, toss_decision, toss_face, start_phase, status, created_by, created_at, updated_at
+    )
+    values (
+      m_live_id, 'friendly', v_lahore_lions, v_karachi_kings, v_saran_uid, v_bilal_uid,
+      '{"players_per_team": 11, "overs_per_innings": 20, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 4, "ball_type": "leather"}'::jsonb,
+      'Gaddafi Stadium, Lahore',
+      now() - interval '1 hour 15 minutes',
+      now() - interval '1 hour 15 minutes',
+      v_lahore_lions, 'bat', 'H', 'live', 'live', v_saran_uid, now() - interval '2 days', now()
+    )
+    on conflict (match_id) do update set
+      status = excluded.status,
+      start_phase = excluded.start_phase,
+      scheduled_start_time = excluded.scheduled_start_time,
+      actual_start_time = excluded.actual_start_time;
+
+    -- Match Players for Live Match
+    insert into public.match_players (match_player_id, match_id, team_side, profile_id, batting_order, jersey_number, is_captain)
+    values
+      (mp_saran_live, m_live_id, 'a', v_saran_uid, 1, 7, true),
+      (mp_babar_live, m_live_id, 'a', v_babar_uid, 2, 56, false),
+      (mp_bilal_live, m_live_id, 'b', v_bilal_uid, null, 10, true)
+    on conflict (match_player_id) do nothing;
+
+    -- Live Innings State
+    insert into public.match_innings_state (
+      match_id, innings_number,
+      striker_id, non_striker_id, bowler_id,
+      legal_ball_count, total_runs, total_wickets, total_extras,
+      version
+    )
+    values (
+      m_live_id, 1,
+      mp_saran_live, mp_babar_live, mp_bilal_live,
+      94, 142, 3, 8, 1
+    )
+    on conflict (match_id, innings_number) do update set
+      legal_ball_count = excluded.legal_ball_count,
+      total_runs = excluded.total_runs,
+      total_wickets = excluded.total_wickets,
+      total_extras = excluded.total_extras;
+
+    -- 2. CONFIRMED UPCOMING MATCH: Lahore Lions vs Rawalpindi Rams (Tomorrow at 4:30 PM)
+    insert into public.matches (
+      match_id, match_type, team_a_id, team_b_id, team_a_captain, team_b_captain,
+      format, venue, scheduled_start_time,
+      start_phase, status, created_by, created_at, updated_at
+    )
+    values (
+      m_upcoming_id, 'friendly', v_lahore_lions, v_rawalpindi_rams, v_saran_uid, v_hassan_uid,
+      '{"players_per_team": 11, "overs_per_innings": 20, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 4, "ball_type": "leather"}'::jsonb,
+      'Model Town Club Ground, Lahore',
+      now() + interval '1 day 2 hours',
+      'toss', 'scheduled', v_saran_uid, now() - interval '1 day', now()
+    )
+    on conflict (match_id) do update set
+      status = excluded.status,
+      start_phase = excluded.start_phase,
+      scheduled_start_time = excluded.scheduled_start_time;
+
+    -- 3. PAST COMPLETED MATCH: Lahore Lions vs Islamabad United (Yesterday)
+    --    Lahore Lions won by 24 runs (LL: 168/5, IU: 144/9)
+    insert into public.matches (
+      match_id, match_type, team_a_id, team_b_id, team_a_captain, team_b_captain,
+      format, venue, scheduled_start_time, actual_start_time, end_time,
+      toss_won_by, toss_decision, toss_face, start_phase, status,
+      result, created_by, created_at, updated_at
+    )
+    values (
+      m_past_id, 'friendly', v_lahore_lions, v_islamabad_united, v_saran_uid, v_bilal_uid,
+      '{"players_per_team": 11, "overs_per_innings": 20, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 4, "ball_type": "leather"}'::jsonb,
+      'LCCA Ground, Lahore',
+      now() - interval '1 day 4 hours',
+      now() - interval '1 day 4 hours',
+      now() - interval '1 day 1 hour',
+      v_lahore_lions, 'bat', 'H', 'live', 'completed',
+      '{"winner_team_id": "11111111-1111-1111-1111-111111111101", "win_type": "runs", "win_margin": 24, "summary": "Lahore Lions won by 24 runs"}'::jsonb,
+      v_saran_uid, now() - interval '2 days', now()
+    )
+    on conflict (match_id) do update set
+      status = excluded.status,
+      start_phase = excluded.start_phase,
+      result = excluded.result;
+
+    -- Past Match Innings 1 (Lahore Lions: 168/5)
+    insert into public.match_innings_state (
+      match_id, innings_number,
+      legal_ball_count, total_runs, total_wickets, total_extras, version
+    )
+    values (
+      m_past_id, 1,
+      120, 168, 5, 12, 1
+    )
+    on conflict (match_id, innings_number) do update set
+      legal_ball_count = excluded.legal_ball_count,
+      total_runs = excluded.total_runs,
+      total_wickets = excluded.total_wickets;
+
+    -- Past Match Innings 2 (Islamabad United: 144/9)
+    insert into public.match_innings_state (
+      match_id, innings_number,
+      legal_ball_count, total_runs, total_wickets, total_extras, version
+    )
+    values (
+      m_past_id, 2,
+      120, 144, 9, 6, 1
+    )
+    on conflict (match_id, innings_number) do update set
+      legal_ball_count = excluded.legal_ball_count,
+      total_runs = excluded.total_runs,
+      total_wickets = excluded.total_wickets;
+
+    -- Also insert sample deliveries into public.balls for listInningsForMatches aggregation
+    insert into public.balls (
+      match_id, innings_number, over_number, ball_in_over,
+      bowler_id, batsman_id, non_striker_id, runs_scored, is_legal_delivery
+    )
+    values
+      (m_past_id, 1, 19, 6, mp_bilal_live, mp_saran_live, mp_babar_live, 4, true),
+      (m_past_id, 2, 19, 6, mp_saran_live, mp_bilal_live, mp_babar_live, 1, true)
+    on conflict (match_id, innings_number, seq) do nothing;
+  end;
+
+  raise notice 'Team requests & matches seeded successfully for Lahore Lions.';
+
+
+
 end $seed_team_requests$;
+
+
+-- =============================================================================
+-- 6) Direct Message from Non-Follower (Message Request Demo)
+-- =============================================================================
+do $seed_dm$
+declare
+  v_saran_uid   uuid;
+  v_sender_uid  constant uuid := '00000000-0000-0000-0000-000000000005'; -- Adeel Saeed (@adeel)
+  v_user_a      uuid;
+  v_user_b      uuid;
+  v_chat_id     uuid;
+  c_chat_id     constant uuid := '40000000-0000-0000-0000-000000000001';
+begin
+  select id into v_saran_uid from auth.users where email = 'muhammadsarankhalid@gmail.com' limit 1;
+  if v_saran_uid is null then
+    select user_id into v_saran_uid from public.profiles limit 1;
+  end if;
+  if v_saran_uid is null then
+    v_saran_uid := '00000000-0000-0000-0000-000000000001'::uuid;
+  end if;
+
+  -- Ensure non-follower relationship
+  delete from public.follows
+   where (follower_id = v_saran_uid and target_type = 'user' and target_id = v_sender_uid)
+      or (follower_id = v_sender_uid and target_type = 'user' and target_id = v_saran_uid);
+
+  if v_saran_uid < v_sender_uid then
+    v_user_a := v_saran_uid;
+    v_user_b := v_sender_uid;
+  else
+    v_user_a := v_sender_uid;
+    v_user_b := v_saran_uid;
+  end if;
+
+  select chat_id into v_chat_id
+    from public.dm_channels
+   where user_a = v_user_a and user_b = v_user_b;
+
+  if v_chat_id is null then
+    v_chat_id := c_chat_id;
+    delete from public.messages where chat_id = v_chat_id;
+    delete from public.chat_members where chat_id = v_chat_id;
+    delete from public.dm_channels where chat_id = v_chat_id;
+    delete from public.chats where chat_id = v_chat_id;
+
+    insert into public.chats (chat_id, type, last_message_at, created_at, updated_at)
+    values (v_chat_id, 'dm', now() - interval '25 minutes', now() - interval '2 days', now());
+
+    insert into public.dm_channels (chat_id, user_a, user_b, created_at, accepted_at, accepted_by)
+    values (v_chat_id, v_user_a, v_user_b, now() - interval '2 days', null, null);
+  else
+    update public.dm_channels
+       set accepted_at = null,
+           accepted_by = null
+     where chat_id = v_chat_id;
+  end if;
+
+  insert into public.chat_members (chat_id, user_id, role, joined_at, last_read_at, left_at)
+  values
+    (v_chat_id, v_sender_uid, 'member', now() - interval '2 days', now() - interval '10 minutes', null),
+    (v_chat_id, v_saran_uid,  'member', now() - interval '2 days', null, null)
+  on conflict (chat_id, user_id) do update set
+    last_read_at = excluded.last_read_at,
+    left_at = null;
+
+  delete from public.messages where chat_id = v_chat_id;
+
+  insert into public.messages (
+    message_id, chat_id, sender_id, body, message_type, payload, created_at
+  )
+  values
+    (
+      '41000000-0000-0000-0000-000000000001',
+      v_chat_id,
+      v_sender_uid,
+      'Salam Saran! I saw your post regarding Lahore Lions trials. I am an off-spin all-rounder playing in Faisalabad Premier League. Would love to join the trial session this Tuesday at Model Town.',
+      'text',
+      '{}'::jsonb,
+      now() - interval '25 minutes'
+    );
+
+  update public.chats
+     set last_message_at = now() - interval '25 minutes'
+   where chat_id = v_chat_id;
+
+  raise notice 'Message request DM seeded successfully from Adeel Saeed to Saran.';
+end $seed_dm$;
+
 
 -- =============================================================================
 -- CLEANUP — paste into the SQL editor when you want to remove the seed

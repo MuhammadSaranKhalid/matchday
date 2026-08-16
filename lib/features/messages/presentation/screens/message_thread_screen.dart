@@ -213,10 +213,90 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
     });
   }
 
+  bool _actingOnRequest = false;
+
+  Future<void> _acceptRequest() async {
+    if (_actingOnRequest) return;
+    setState(() => _actingOnRequest = true);
+    final res = await ref
+        .read(messageThreadProvider(widget.chatId).notifier)
+        .acceptRequest();
+    if (!mounted) return;
+    setState(() => _actingOnRequest = false);
+    res.fold(
+      (f) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(f.message), backgroundColor: CkColors.red),
+      ),
+      (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Message request accepted'),
+            backgroundColor: CkColors.green,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _declineRequest() async {
+    if (_actingOnRequest) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: CkColors.paper,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Delete Request?',
+          style: CkType.display(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'This message request will be removed from your inbox.',
+          style: CkType.body(fontSize: 13, color: CkColors.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancel',
+              style: CkType.body(fontSize: 13, fontWeight: FontWeight.w600, color: CkColors.ink2),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Delete',
+              style: CkType.body(fontSize: 13, fontWeight: FontWeight.w700, color: CkColors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() => _actingOnRequest = true);
+    final res = await ref
+        .read(messageThreadProvider(widget.chatId).notifier)
+        .declineRequest();
+    if (!mounted) return;
+    setState(() => _actingOnRequest = false);
+    res.fold(
+      (f) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(f.message), backgroundColor: CkColors.red),
+      ),
+      (_) {
+        Navigator.of(context).pop();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final chat = _findChat();
     final threadAsync = ref.watch(messageThreadProvider(widget.chatId));
+
+    final isIncomingRequest = chat?.isRequest == true;
+    final isPendingOutgoing = chat?.isPendingOutgoingRequest == true;
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -227,6 +307,10 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
               chat: chat,
               onBack: () => Navigator.of(context).pop(),
             ),
+            if (isIncomingRequest)
+              _RequestNoticeBanner(
+                userName: chat?.displayName ?? 'This player',
+              ),
             Expanded(
               child: switch (threadAsync) {
                 AsyncData(:final value) => value.isEmpty
@@ -260,22 +344,32 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
                   ),
               },
             ),
-            ChatComposer(
-              textController: _textController,
-              focusNode: _composerFocus,
-              onSendText: _send,
-              onSendImage: _sendImage,
-              sending: _sending,
-              replyingTo: _replyingTo,
-              onCancelReply: () => setState(() => _replyingTo = null),
-              error: _composerError,
-            ),
+            if (isIncomingRequest)
+              _RequestActionBar(
+                onAccept: _acceptRequest,
+                onDecline: _declineRequest,
+                isLoading: _actingOnRequest,
+              )
+            else if (isPendingOutgoing)
+              const _PendingOutgoingNotice()
+            else
+              ChatComposer(
+                textController: _textController,
+                focusNode: _composerFocus,
+                onSendText: _send,
+                onSendImage: _sendImage,
+                sending: _sending,
+                replyingTo: _replyingTo,
+                onCancelReply: () => setState(() => _replyingTo = null),
+                error: _composerError,
+              ),
           ],
         ),
       ),
     );
   }
 }
+
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
@@ -586,3 +680,180 @@ class _ErrorBody extends StatelessWidget {
     );
   }
 }
+
+// ─── Request Widgets ─────────────────────────────────────────────────────────
+
+class _RequestNoticeBanner extends StatelessWidget {
+  const _RequestNoticeBanner({required this.userName});
+  final String userName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        color: CkColors.paper2,
+        border: Border(bottom: BorderSide(color: CkColors.hairline)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: CkColors.ink.withValues(alpha: 0.06),
+              shape: BoxShape.circle,
+            ),
+            child: const V2Svg(
+              V2Icons.messages,
+              size: 14,
+              color: CkColors.ink,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Message Request',
+                  style: CkType.display(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: CkColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$userName wants to send you a message. Accept to reply and add them to your Direct Messages.',
+                  style: CkType.body(
+                    fontSize: 11.5,
+                    color: CkColors.muted,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RequestActionBar extends StatelessWidget {
+  const _RequestActionBar({
+    required this.onAccept,
+    required this.onDecline,
+    this.isLoading = false,
+  });
+
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: const BoxDecoration(
+        color: CkColors.paper,
+        border: Border(top: BorderSide(color: CkColors.hairline)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: isLoading ? null : onDecline,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: const BorderSide(color: CkColors.hairline),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                'Delete',
+                style: CkType.body(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: CkColors.red,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: isLoading ? null : onAccept,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CkColors.ink,
+                foregroundColor: CkColors.paper,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: CkColors.paper,
+                      ),
+                    )
+                  : Text(
+                      'Accept',
+                      style: CkType.body(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: CkColors.paper,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingOutgoingNotice extends StatelessWidget {
+  const _PendingOutgoingNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+      decoration: const BoxDecoration(
+        color: CkColors.paper2,
+        border: Border(top: BorderSide(color: CkColors.hairline)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.hourglass_top_rounded,
+            size: 18,
+            color: CkColors.muted,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Message request sent. You can send more messages once they accept.',
+              style: CkType.body(
+                fontSize: 12,
+                color: CkColors.muted,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

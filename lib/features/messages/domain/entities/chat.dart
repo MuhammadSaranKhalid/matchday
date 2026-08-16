@@ -23,6 +23,7 @@ class Chat {
     this.dmOtherUserAvatarUrl,
     this.youFollow = false,
     this.theyFollowYou = false,
+    this.isAccepted = true,
   });
 
   final ChatId id;
@@ -45,6 +46,7 @@ class Chat {
   final String? dmOtherUserAvatarUrl;
   final bool youFollow;
   final bool theyFollowYou;
+  final bool isAccepted;
 
   /// Time of the most recent non-deleted message.
   final DateTime? lastMessageAt;
@@ -62,6 +64,12 @@ class Chat {
   bool get isEmpty => lastMessageAt == null;
   bool get isDm => kind == ChatKind.dm;
   bool get isTeam => kind == ChatKind.team;
+
+  /// Whether this conversation is an incoming message request for the current user.
+  bool get isRequest => isDm && !isAccepted && !lastMessageFromMe && !youFollow;
+
+  /// Whether this conversation is an outgoing message request waiting for recipient approval.
+  bool get isPendingOutgoingRequest => isDm && !isAccepted && lastMessageFromMe && !theyFollowYou;
 
   String get displayName {
     if (isDm) {
@@ -107,11 +115,12 @@ class Chat {
       other.dmOtherUserAvatarUrl == dmOtherUserAvatarUrl &&
       other.youFollow == youFollow &&
       other.theyFollowYou == theyFollowYou &&
+      other.isAccepted == isAccepted &&
       other.createdAt == createdAt &&
       other.updatedAt == updatedAt;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
         id,
         kind,
         name,
@@ -130,9 +139,10 @@ class Chat {
         dmOtherUserAvatarUrl,
         youFollow,
         theyFollowYou,
+        isAccepted,
         createdAt,
         updatedAt,
-      );
+      ]);
 }
 
 class ChatId {

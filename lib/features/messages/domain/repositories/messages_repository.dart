@@ -67,6 +67,12 @@ abstract class MessagesRepository {
   /// Resolves or creates a 1-on-1 direct message conversation with [targetUserId].
   Future<Either<Failure, ChatId>> getOrCreateDmChat(String targetUserId);
 
+  /// Accepts an incoming DM message request.
+  Future<Either<Failure, Unit>> acceptDmRequest(ChatId chatId);
+
+  /// Declines / archives an incoming DM message request.
+  Future<Either<Failure, Unit>> declineDmRequest(ChatId chatId);
+
 
   // ─── Drafts (local-only; ticket #23) ──────────────────────────────────
   //

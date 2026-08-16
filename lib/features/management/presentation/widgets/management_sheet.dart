@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
+import '../../../matches/presentation/providers/my_matches_providers.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 
 /// The sliding Management Console Side Sheet.
@@ -40,6 +41,26 @@ class ManagementSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final myTeamsAsync = ref.watch(myTeamsProvider);
     final teamCount = myTeamsAsync.value?.length ?? 0;
+
+    final myMatchesAsync = ref.watch(myMatchesViewProvider);
+    final (matchBadge, matchBadgeColor) = myMatchesAsync.maybeWhen(
+      data: (view) {
+        final hasLive = view.confirmed.any((m) => m.live);
+        if (hasLive) {
+          return ('LIVE NOW', CkColors.red);
+        }
+        final count = view.confirmed.length;
+        if (count > 0) {
+          return ('$count Upcoming', CkColors.ink);
+        }
+        if (view.pendingRequestsCount > 0) {
+          return ('${view.pendingRequestsCount} Pending', CkColors.amber);
+        }
+        return (null, null);
+      },
+      orElse: () => (null, null),
+    );
+
     final width = MediaQuery.of(context).size.width * 0.86;
 
     return Material(
@@ -133,6 +154,38 @@ class ManagementSheet extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   children: [
+                    // Section: Matches & Fixtures
+                    const _SectionHeader(
+                      title: 'Matches & Fixtures',
+                      icon: Icons.sports_cricket_rounded,
+                    ),
+                    const SizedBox(height: 8),
+                    _ActionCard(
+                      title: 'My Matches',
+                      subtitle: 'Upcoming fixtures, live scoreboards, match challenges & history',
+                      icon: Icons.event_available_rounded,
+                      badge: matchBadge,
+                      badgeColor: matchBadgeColor,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/pavilion/my-matches');
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _ActionCard(
+                      title: 'Send Match Challenge',
+                      subtitle: 'Challenge another team, set format, overs & pick playing XI',
+                      icon: Icons.add_circle_outline_rounded,
+                      badge: 'New Match',
+                      badgeColor: CkColors.red,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/challenge');
+                      },
+                    ),
+
+                    const SizedBox(height: 24),
+
                     // Section: Teams & Rosters
                     const _SectionHeader(
                       title: 'Teams & Rosters',
@@ -155,44 +208,14 @@ class ManagementSheet extends ConsumerWidget {
 
                     // Section: Matchmaking & Challenges
                     const _SectionHeader(
-                      title: 'Matchmaking & Challenges',
-                      icon: Icons.sports_cricket_outlined,
+                      title: 'Matchmaking & Open Pool',
+                      icon: Icons.travel_explore_rounded,
                     ),
                     const SizedBox(height: 8),
                     _ActionCard(
                       title: 'Find Opponent / Open Pool',
                       subtitle: 'Browse local open requests or broadcast an open fixture',
-                      icon: Icons.travel_explore_rounded,
-                      badge: 'Matchmaking',
-                      badgeColor: CkColors.red,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        context.go('/matches');
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    _ActionCard(
-                      title: 'Challenge Match Hub',
-                      subtitle: 'Review incoming invitations & proposed counter-offers',
-                      icon: Icons.mail_outline_rounded,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        context.go('/matches');
-                      },
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Section: Live Match Operations
-                    const _SectionHeader(
-                      title: 'Match Operations & Scoring',
-                      icon: Icons.scoreboard_outlined,
-                    ),
-                    const SizedBox(height: 8),
-                    _ActionCard(
-                      title: 'Start Match (Toss & Playing XI)',
-                      subtitle: 'Configure conditions, overs, and choose playing lineups',
-                      icon: Icons.play_circle_outline_rounded,
+                      icon: Icons.explore_outlined,
                       onTap: () {
                         Navigator.of(context).pop();
                         context.go('/matches');
@@ -226,6 +249,7 @@ class ManagementSheet extends ConsumerWidget {
     );
   }
 }
+
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({

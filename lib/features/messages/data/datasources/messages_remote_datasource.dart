@@ -91,6 +91,64 @@ class MessagesRemoteDataSource {
     }
   }
 
+  /// Accepts an incoming DM message request.
+  Future<void> acceptDmRequest(String chatId) async {
+    try {
+      await _supabase.rpc<dynamic>(
+        'accept_dm_request',
+        params: {'p_chat_id': chatId},
+      );
+      _patchInboxForAcceptDm(chatId);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message, statusCode: int.tryParse(e.code ?? ''));
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException('Failed to accept DM request: $e');
+    }
+  }
+
+  /// Declines / archives an incoming DM message request.
+  Future<void> declineDmRequest(String chatId) async {
+    try {
+      await _supabase.rpc<dynamic>(
+        'decline_dm_request',
+        params: {'p_chat_id': chatId},
+      );
+      _patchInboxForDeclineDm(chatId);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message, statusCode: int.tryParse(e.code ?? ''));
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException('Failed to decline DM request: $e');
+    }
+  }
+
+  void _patchInboxForAcceptDm(String chatId) {
+    final current = _inboxCurrent;
+    final controller = _inboxController;
+    if (current == null || controller == null || controller.isClosed) return;
+
+    final idx = current.indexWhere((c) => c.chatId == chatId);
+    if (idx == -1) return;
+
+    final patched = current[idx].copyWith(isAccepted: true, unreadCount: 0);
+    final next = [...current.take(idx), patched, ...current.skip(idx + 1)];
+    _inboxCurrent = next;
+    controller.add(List.unmodifiable(next));
+
+    _writeCacheChat(patched);
+  }
+
+  void _patchInboxForDeclineDm(String chatId) {
+    final current = _inboxCurrent;
+    final controller = _inboxController;
+    if (current == null || controller == null || controller.isClosed) return;
+
+    final next = current.where((c) => c.chatId != chatId).toList();
+    _inboxCurrent = next;
+    controller.add(List.unmodifiable(next));
+  }
+
 
 
   /// Streams the inbox. Yields the initial fetch, then patches in-memory on

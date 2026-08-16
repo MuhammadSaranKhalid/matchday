@@ -23,6 +23,7 @@ abstract class ChatDto with _$ChatDto {
     @JsonKey(name: 'dm_other_user_avatar_url') String? dmOtherUserAvatarUrl,
     @JsonKey(name: 'you_follow') @Default(false) bool youFollow,
     @JsonKey(name: 'they_follow_you') @Default(false) bool theyFollowYou,
+    @JsonKey(name: 'is_accepted') @Default(true) bool isAccepted,
     @JsonKey(name: 'last_message_at') String? lastMessageAt,
     @JsonKey(name: 'last_message_body') String? lastMessageBody,
     @JsonKey(name: 'last_message_sender_id') String? lastMessageSenderId,
@@ -57,5 +58,6 @@ abstract class ChatDto with _$ChatDto {
         dmOtherUserAvatarUrl: dmOtherUserAvatarUrl,
         youFollow: youFollow,
         theyFollowYou: theyFollowYou,
+        isAccepted: isAccepted,
       );
 }

@@ -37,10 +37,9 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   final allRequests =
       reqResult.fold<List<MatchRequest>>((_) => const [], (list) => list);
 
-  // Await teams so "teams I manage" is reliable even on a cold cache —
-  // otherwise the outbound filter below would see an empty set and hide the
-  // section. Establishes a dependency, so this recomputes when myTeams emits.
-  final teams = await ref.watch(myTeamsProvider.future);
+  // Resolve teams owned/managed by the user without hanging on stream .future.
+  final teamsAsync = ref.watch(myTeamsProvider);
+  final teams = teamsAsync.value ?? const <Team>[];
   final myTeamIds = {for (final t in teams) t.id.value};
 
   final outbound = allRequests
@@ -69,12 +68,17 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
     final to = r.toTeamId?.value;
     if (to != null && !teamsById.containsKey(to)) missingTeamIds.add(to);
   }
-  for (final id in missingTeamIds) {
-    final result =
-        await ref.read(teamsRepositoryProvider).getTeam(TeamId(id));
-    final team = result.fold((_) => null, (t) => t);
-    if (team != null) teamsById[id] = team;
+  if (missingTeamIds.isNotEmpty) {
+    await Future.wait(
+      missingTeamIds.map((id) async {
+        final result =
+            await ref.read(teamsRepositoryProvider).getTeam(TeamId(id));
+        final team = result.fold((_) => null, (t) => t);
+        if (team != null) teamsById[id] = team;
+      }),
+    );
   }
+
 
   final past = matches.where((m) => m.status.isPast).toList();
   final upcoming = matches

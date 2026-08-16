@@ -16,8 +16,8 @@ import '../widgets/inbox_search_bar.dart';
 import '../widgets/inbox_shimmer_skeleton.dart';
 import '../widgets/new_message_sheet.dart';
 
-/// Inbox tabs: All / Teams / DMs.
-enum _InboxTab { all, teams, dms }
+/// Inbox tabs: All / Teams / DMs / Requests.
+enum _InboxTab { all, teams, dms, requests }
 
 /// Inbox tab bar display flag.
 const bool _kShowInboxTabs = true;
@@ -58,10 +58,23 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   @override
   Widget build(BuildContext context) {
     final chatsAsync = ref.watch(myChatsProvider);
-    final showRefreshChip = _refreshing && chatsAsync.hasValue;
 
     return Scaffold(
       backgroundColor: CkColors.paper,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => NewMessageSheet.show(context),
+        backgroundColor: CkColors.ink,
+        foregroundColor: CkColors.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        elevation: 3,
+        child: const V2Svg(
+          V2Icons.plus,
+          size: 20,
+          color: CkColors.paper,
+        ),
+      ),
       body: SafeArea(
         bottom: false,
         child: switch (chatsAsync) {
@@ -71,21 +84,28 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               onTabChanged: (t) => setState(() => _tab = t),
               onBell: widget.onBell,
               showBack: widget.showBack,
-              refreshing: showRefreshChip,
               searchController: _searchController,
               searchQuery: _searchQuery,
               onSearchChanged: (q) => setState(() => _searchQuery = q),
               onRefresh: () async {
+                setState(() => _refreshing = true);
                 ref.invalidate(myChatsProvider);
-                await ref.read(myChatsProvider.future);
+                try {
+                  await ref.read(myChatsProvider.future);
+                } catch (_) {}
+                if (mounted) setState(() => _refreshing = false);
               },
+              refreshing: _refreshing,
             ),
           AsyncError(:final error) => _ErrorView(
               title: 'Messages',
               onBell: widget.onBell,
               showBack: widget.showBack,
               message: _messageFor(error),
-              onRetry: () => ref.invalidate(myChatsProvider),
+              onRetry: () {
+                setState(() => _refreshing = true);
+                ref.invalidate(myChatsProvider);
+              },
             ),
           _ => _Skeleton(
               title: 'Messages',
@@ -134,17 +154,23 @@ class _Loaded extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final teamChats = chats.where((c) => c.kind == ChatKind.team).toList();
-    final dmChats = chats.where((c) => c.kind == ChatKind.dm).toList();
+    // Separate incoming requests from standard inbox chats
+    final requestChats = chats.where((c) => c.isRequest).toList();
+    final nonRequestChats = chats.where((c) => !c.isRequest).toList();
+
+    final teamChats = nonRequestChats.where((c) => c.kind == ChatKind.team).toList();
+    final dmChats = nonRequestChats.where((c) => c.kind == ChatKind.dm).toList();
 
     final teamsHasUnread = teamChats.any((c) => c.unreadCount > 0);
     final dmsHasUnread = dmChats.any((c) => c.unreadCount > 0);
+    final requestsHasUnread = requestChats.isNotEmpty;
 
     // Tab filtering
     final List<Chat> tabFiltered = switch (tab) {
-      _InboxTab.all => chats,
+      _InboxTab.all => nonRequestChats,
       _InboxTab.teams => teamChats,
       _InboxTab.dms => dmChats,
+      _InboxTab.requests => requestChats,
     };
 
     // Search query filtering
@@ -178,11 +204,13 @@ class _Loaded extends StatelessWidget {
           _TabRow(
             tab: tab,
             onChanged: onTabChanged,
-            allCount: chats.length,
+            allCount: nonRequestChats.length,
             teamsCount: teamChats.length,
             dmsCount: dmChats.length,
+            requestsCount: requestChats.length,
             teamsHasUnread: teamsHasUnread,
             dmsHasUnread: dmsHasUnread,
+            requestsHasUnread: requestsHasUnread,
           ),
         Expanded(
           child: RefreshIndicator(
@@ -226,8 +254,10 @@ class _TabRow extends StatelessWidget {
     required this.allCount,
     required this.teamsCount,
     required this.dmsCount,
+    this.requestsCount = 0,
     this.teamsHasUnread = false,
     this.dmsHasUnread = false,
+    this.requestsHasUnread = false,
   });
 
   final _InboxTab tab;
@@ -235,12 +265,15 @@ class _TabRow extends StatelessWidget {
   final int allCount;
   final int teamsCount;
   final int dmsCount;
+  final int requestsCount;
   final bool teamsHasUnread;
   final bool dmsHasUnread;
+  final bool requestsHasUnread;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(18, 2, 18, 10),
       child: Row(
         children: [
@@ -266,11 +299,22 @@ class _TabRow extends StatelessWidget {
             active: tab == _InboxTab.dms,
             onTap: () => onChanged(_InboxTab.dms),
           ),
+          if (requestsCount > 0 || tab == _InboxTab.requests) ...[
+            const SizedBox(width: 8),
+            _MTab(
+              label: 'Requests',
+              count: requestsCount,
+              hasUnreadPip: requestsHasUnread,
+              active: tab == _InboxTab.requests,
+              onTap: () => onChanged(_InboxTab.requests),
+            ),
+          ],
         ],
       ),
     );
   }
 }
+
 
 class _MTab extends StatelessWidget {
   const _MTab({
@@ -651,6 +695,13 @@ class _EmptyList extends StatelessWidget {
           'New Message',
           () => NewMessageSheet.show(context),
         ),
+      _InboxTab.requests => (
+          V2Icons.messages,
+          'No message requests',
+          'Messages from players you do not follow will appear here.',
+          'Start a Conversation',
+          () => NewMessageSheet.show(context),
+        ),
       _InboxTab.all => (
           V2Icons.messages,
           'Your Inbox is quiet',
@@ -659,6 +710,7 @@ class _EmptyList extends StatelessWidget {
           () => NewMessageSheet.show(context),
         ),
     };
+
 
     return Center(
       child: Padding(

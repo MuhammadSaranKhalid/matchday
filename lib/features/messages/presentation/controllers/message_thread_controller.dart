@@ -93,4 +93,28 @@ class MessageThread extends _$MessageThread {
     }
     return result;
   }
+
+  /// Accept an incoming DM message request.
+  Future<Either<Failure, Unit>> acceptRequest() async {
+    final result = await ref
+        .read(messagesRepositoryProvider)
+        .acceptDmRequest(ChatId(chatId));
+    if (result.isRight()) {
+      ref.invalidate(myChatsProvider);
+    }
+    return result;
+  }
+
+  /// Decline an incoming DM message request.
+  Future<Either<Failure, Unit>> declineRequest() async {
+    final result = await ref
+        .read(messagesRepositoryProvider)
+        .declineDmRequest(ChatId(chatId));
+    if (result.isRight()) {
+      ref.invalidate(myChatsProvider);
+    }
+    return result;
+  }
 }
+
+

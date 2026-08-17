@@ -44,21 +44,28 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
 
   final outbound = allRequests
       .where((r) =>
+          r.toTeamId != null &&
           myTeamIds.contains(r.fromTeamId.value) &&
           (r.status == MatchRequestStatus.pending ||
               r.status == MatchRequestStatus.countered))
       .toList();
 
+  final inbound = allRequests
+      .where((r) =>
+          r.toTeamId != null &&
+          myTeamIds.contains(r.toTeamId!.value) &&
+          (r.status == MatchRequestStatus.pending ||
+              r.status == MatchRequestStatus.countered))
+      .toList();
+
   // Nothing at all to show.
-  if (matches.isEmpty && outbound.isEmpty) {
+  if (matches.isEmpty && outbound.isEmpty && inbound.isEmpty) {
     return const MyMatchesView.empty();
   }
 
   final teamsById = <String, Team>{for (final t in teams) t.id.value: t};
 
-  // Fan-out: any team referenced by a match OR an outbound request (the
-  // opponent you challenged) that isn't already loaded. One-shot getTeam —
-  // cheap relative to the list roundtrips.
+  // Fan-out: any team referenced by a match OR requests that isn't already loaded.
   final missingTeamIds = <String>{};
   for (final m in matches) {
     if (!teamsById.containsKey(m.teamAId.value)) missingTeamIds.add(m.teamAId.value);
@@ -67,6 +74,10 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   for (final r in outbound) {
     final to = r.toTeamId?.value;
     if (to != null && !teamsById.containsKey(to)) missingTeamIds.add(to);
+  }
+  for (final r in inbound) {
+    final from = r.fromTeamId.value;
+    if (!teamsById.containsKey(from)) missingTeamIds.add(from);
   }
   if (missingTeamIds.isNotEmpty) {
     await Future.wait(
@@ -78,7 +89,6 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
       }),
     );
   }
-
 
   final past = matches.where((m) => m.status.isPast).toList();
   final upcoming = matches
@@ -109,15 +119,15 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
           currentUserId: user.id.value),
   ];
   final sentRows = [for (final r in outbound) _sentFor(r, teamsById)];
+  final inboundRows = [for (final r in inbound) _inboundFor(r, teamsById)];
 
   return MyMatchesView(
     confirmed: confirmedRows,
     past: pastRows.take(_pastWindow).toList(),
     totalPastCount: pastRows.length,
-    // Inbound "needs your reply" count is out of scope (handled in
-    // Notifications); keep 0 so the inbound amber banner stays dormant.
-    pendingRequestsCount: 0,
+    pendingRequestsCount: inboundRows.length,
     sent: sentRows,
+    inbound: inboundRows,
   );
 }
 
@@ -257,6 +267,7 @@ MyMatchRequest _sentFor(MatchRequest r, Map<String, Team> teamsById) {
   return MyMatchRequest(
     requestId: r.id.value,
     isOpen: isOpen,
+    isInbound: false,
     opponentName: isOpen ? 'Open challenge' : (opp?.name ?? 'A team'),
     opponentShort: isOpen ? 'OPN' : _short(opp, fallback: '?'),
     opponentColor: isOpen
@@ -266,6 +277,24 @@ MyMatchRequest _sentFor(MatchRequest r, Map<String, Team> teamsById) {
     statusLabel: r.status == MatchRequestStatus.countered
         ? 'Countered'
         : 'Awaiting reply',
+    expiresLabel: _expiresLabel(r),
+    status: r.status,
+  );
+}
+
+MyMatchRequest _inboundFor(MatchRequest r, Map<String, Team> teamsById) {
+  final challenger = teamsById[r.fromTeamId.value];
+  return MyMatchRequest(
+    requestId: r.id.value,
+    isOpen: false,
+    isInbound: true,
+    opponentName: challenger?.name ?? 'Challenging Team',
+    opponentShort: _short(challenger, fallback: 'CH'),
+    opponentColor: _color(challenger?.primaryColor, fallback: const Color(0xFF7A746A)),
+    shareCode: r.shareCode,
+    statusLabel: r.status == MatchRequestStatus.countered
+        ? 'Countered by you'
+        : 'Needs your reply',
     expiresLabel: _expiresLabel(r),
     status: r.status,
   );

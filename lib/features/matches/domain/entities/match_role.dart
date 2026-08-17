@@ -44,11 +44,15 @@ MatchRoleKind roleOnMatch(
   String userId, {
   Set<String> userTeamIds = const {},
   Set<String> xiPlayerRefIds = const {},
+  bool isScorer = false,
 }) {
   if (userId.isEmpty) return MatchRoleKind.spectator;
 
   if (match.teamACaptain == userId || match.teamBCaptain == userId) {
     return MatchRoleKind.captain;
+  }
+  if (isScorer) {
+    return MatchRoleKind.scoring;
   }
   if (xiPlayerRefIds.contains(userId)) {
     return MatchRoleKind.xi;

@@ -20,6 +20,7 @@ class MyMatchesView {
     required this.totalPastCount,
     required this.pendingRequestsCount,
     required this.sent,
+    this.inbound = const [],
   });
 
   const MyMatchesView.empty()
@@ -27,30 +28,30 @@ class MyMatchesView {
         past = const [],
         totalPastCount = 0,
         pendingRequestsCount = 0,
-        sent = const [];
+        sent = const [],
+        inbound = const [];
 
   final List<MyMatchConfirmed> confirmed;
   final List<MyMatchPast> past;
 
-  /// Outbound challenges the signed-in user has sent that are still active
-  /// (`pending` / `countered`) — the sender's view of a request before it
-  /// resolves. Rendered as the "Requests" section with a Withdraw action.
+  /// Outbound challenges the signed-in user has sent that are still active.
   final List<MyMatchRequest> sent;
+
+  /// Inbound challenges sent by other teams directly to user's managed teams.
+  final List<MyMatchRequest> inbound;
 
   /// Total past matches the signed-in user has played, including the ones
   /// outside the visible window. Powers the "SEE ALL N MATCHES →" footer.
   final int totalPastCount;
 
-  /// Inbound match requests awaiting reply. Drives the amber banner that
-  /// links to the Notifications inbox.
+  /// Inbound match requests awaiting reply.
   final int pendingRequestsCount;
 
-  bool get isEmpty => confirmed.isEmpty && past.isEmpty && sent.isEmpty;
+  bool get isEmpty =>
+      confirmed.isEmpty && past.isEmpty && sent.isEmpty && inbound.isEmpty;
 }
 
-/// Pre-rendered outbound request row for the "Requests" section. Only
-/// `pending` / `countered` requests reach here; accepted ones graduate to a
-/// [MyMatchConfirmed] and declined/cancelled/expired drop off the list.
+/// Pre-rendered request row for the "Requests" section.
 @immutable
 class MyMatchRequest {
   const MyMatchRequest({
@@ -62,14 +63,17 @@ class MyMatchRequest {
     required this.statusLabel,
     required this.expiresLabel,
     required this.status,
+    this.isInbound = false,
     this.shareCode,
   });
 
   final String requestId;
 
-  /// True when this is an open challenge (no target team) — the row shows the
-  /// 6-digit [shareCode] instead of an opponent crest.
+  /// True when this is an open challenge (no target team).
   final bool isOpen;
+
+  /// True when another team sent this challenge to our team.
+  final bool isInbound;
 
   final String opponentName;
   final String opponentShort;
@@ -78,7 +82,7 @@ class MyMatchRequest {
   /// 6-digit share code, present for open challenges.
   final String? shareCode;
 
-  /// e.g. "Awaiting reply" / "Countered".
+  /// e.g. "Awaiting reply" / "Countered" / "Needs your reply".
   final String statusLabel;
 
   /// e.g. "expires 41h". Empty when no expiry is set.
@@ -199,18 +203,21 @@ class MyMatchPast {
   switch (kind) {
     case MatchRoleKind.captain:
       return (
-        label: 'Captain · pick XI',
-        urgent: isToday,
+        label: match.status.isLive ? 'Captain · Live' : 'Captain · pick XI',
+        urgent: isToday || match.status.isLive,
+      );
+    case MatchRoleKind.scoring:
+      return (
+        label: match.status.isLive ? 'Scorer · Score live' : 'Official Scorer',
+        urgent: isToday || match.status.isLive,
       );
     case MatchRoleKind.xi:
       return (
-        label: 'On the XI',
+        label: match.status.isLive ? 'In Playing XI · Playing now' : 'Selected in XI',
         urgent: isToday,
       );
-    case MatchRoleKind.scoring:
-      return (label: 'Scoring', urgent: false);
     case MatchRoleKind.optional:
-      return (label: 'Optional', urgent: false);
+      return (label: 'Squad member', urgent: false);
     case MatchRoleKind.spectator:
       return (label: '', urgent: false);
   }

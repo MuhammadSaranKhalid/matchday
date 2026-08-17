@@ -430,7 +430,7 @@ class _ChallengeDetailScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Match created successfully!')),
         );
-        context.go('/pavilion/matches/${matchId.value}');
+        context.go('/pavilion/match/${matchId.value}');
       },
     );
   }

@@ -78,7 +78,7 @@ class PvMatchDetail extends StatelessWidget {
       ],
     ];
 
-    return ColoredBox(
+    return Material(
       color: CkColors.paper,
       child: SafeArea(
         bottom: false,
@@ -465,6 +465,8 @@ class PvMatchDetail extends StatelessWidget {
     final captain = m.role == 'captain' || m.role == 'owner';
     final live = m.phase == PvPhase.live;
     final rows = <(String action, String label, String icon, bool danger)>[
+      if (!live && captain)
+        ('start', 'Start match / Toss', PvIcons.play, false),
       ('message', 'Message opponent', PvIcons.msg, false),
       if (!live) ('reschedule', 'Propose a new time', PvIcons.cal, false),
       if (!live && captain)

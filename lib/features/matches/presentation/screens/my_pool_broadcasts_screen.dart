@@ -331,11 +331,17 @@ class _MyBroadcastItem extends ConsumerWidget {
                       color: CkColors.muted,
                     ),
                     const SizedBox(width: 5),
-                    Text(
-                      'Scheduled: ${item.timeLabel}',
-                      style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+                    Expanded(
+                      child: Text(
+                        item.timeLabel,
+                        style: CkType.body(
+                          fontSize: 11.5,
+                          color: CkColors.muted,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     Text(
                       'Review Applications →',
                       style: CkType.body(

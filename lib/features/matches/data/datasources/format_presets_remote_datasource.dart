@@ -11,7 +11,7 @@ class FormatPresetsRemoteDataSource {
   FormatPresetsRemoteDataSource(this._supabase);
   final SupabaseClient _supabase;
 
-  static const _table = 'format_presets';
+  static const _table = 'match_format_presets';
 
   /// The active format presets, in display order.
   Future<List<FormatPresetDto>> listFormatPresets() async {

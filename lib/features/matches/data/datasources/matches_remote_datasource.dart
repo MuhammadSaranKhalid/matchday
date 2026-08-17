@@ -23,7 +23,7 @@ class MatchesRemoteDataSource {
   static const _matches = 'matches';
   static const _matchPlayers = 'match_players';
   static const _matchInningsState = 'match_innings_state';
-  static const _balls = 'balls';
+  static const _balls = 'match_deliveries';
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;

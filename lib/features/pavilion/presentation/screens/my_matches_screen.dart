@@ -56,11 +56,12 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
                     padding: EdgeInsets.zero,
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      if (view.sent.isNotEmpty)
+                      if (view.sent.isNotEmpty || view.inbound.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
                           child: _RequestsSection(
-                            rows: view.sent,
+                            inbound: view.inbound,
+                            outbound: view.sent,
                             onOpen: (id) => context.push('/challenges/$id'),
                             onWithdraw: _onWithdraw,
                           ),
@@ -441,7 +442,7 @@ class _PendingRequestsBanner extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      'Accept · counter · decline — all happen in Notifications',
+                      'Accept · counter · decline — tap challenge to review',
                       style: CkType.body(fontSize: 11, color: CkColors.muted),
                     ),
                   ),
@@ -463,42 +464,148 @@ class _PendingRequestsBanner extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Requests section (outbound sent challenges)
-// ═══════════════════════════════════════════════════════════════════════════
-
 class _RequestsSection extends StatelessWidget {
   const _RequestsSection({
-    required this.rows,
+    required this.inbound,
+    required this.outbound,
     required this.onOpen,
     required this.onWithdraw,
   });
 
-  final List<MyMatchRequest> rows;
+  final List<MyMatchRequest> inbound;
+  final List<MyMatchRequest> outbound;
   final ValueChanged<String> onOpen;
-  final Future<void> Function(MyMatchRequest) onWithdraw;
+  final ValueChanged<MyMatchRequest> onWithdraw;
 
   @override
   Widget build(BuildContext context) {
+    final total = inbound.length + outbound.length;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+          padding: const EdgeInsets.only(bottom: 8),
           child: Text(
-            'REQUESTS · ${rows.length}',
+            'CHALLENGES · $total',
             style: _monoLabel(color: CkColors.ink),
           ),
         ),
-        for (var i = 0; i < rows.length; i++) ...[
-          if (i > 0) const SizedBox(height: 8),
+        // Inbound Challenges First (Action required!)
+        for (final req in inbound) ...[
+          _InboundRequestRow(
+            row: req,
+            onOpen: () => onOpen(req.requestId),
+          ),
+          const SizedBox(height: 8),
+        ],
+        // Outbound Challenges
+        for (var i = 0; i < outbound.length; i++) ...[
+          if (i > 0 || inbound.isNotEmpty) const SizedBox(height: 8),
           _SentRequestRow(
-            row: rows[i],
-            onOpen: () => onOpen(rows[i].requestId),
-            onWithdraw: () => onWithdraw(rows[i]),
+            row: outbound[i],
+            onOpen: () => onOpen(outbound[i].requestId),
+            onWithdraw: () => onWithdraw(outbound[i]),
           ),
         ],
       ],
+    );
+  }
+}
+
+class _InboundRequestRow extends StatelessWidget {
+  const _InboundRequestRow({
+    required this.row,
+    required this.onOpen,
+  });
+
+  final MyMatchRequest row;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = [
+      row.statusLabel,
+      if (row.expiresLabel.isNotEmpty) row.expiresLabel,
+    ].join(' · ');
+
+    return InkWell(
+      onTap: onOpen,
+      borderRadius: BorderRadius.circular(12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: const BoxDecoration(
+            color: CkColors.paper,
+            border: Border(
+              top: BorderSide(color: CkColors.hairline),
+              right: BorderSide(color: CkColors.hairline),
+              bottom: BorderSide(color: CkColors.hairline),
+              left: BorderSide(color: Color(0xFFD97706), width: 3.5),
+            ),
+          ),
+          child: Row(
+            children: [
+              _MiniCrest(short: row.opponentShort, color: row.opponentColor),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text('← ',
+                            style: CkType.mono(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFD97706),
+                            )),
+                        Flexible(
+                          child: Text(
+                            row.opponentName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: CkType.body(
+                                fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        sub,
+                        style: CkType.body(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF92400E),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: CkColors.ink,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Review →',
+                  style: CkType.mono(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: CkColors.paper,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -725,13 +832,12 @@ class _ConfirmedCard extends StatelessWidget {
     const tossHeaderBg = Color(0xFFFFEEEC);
 
     return InkWell(
-      // Live → scoring screen. Toss-ready → Match Start.
-      // Scheduled / awaiting toss → not tappable (the card is informational).
+      // Live → scoring screen. Toss-ready → Match Start. Scheduled/upcoming → Match Detail.
       onTap: v.live
           ? () => _openScoring(context)
           : tossReady
               ? () => _openMatchStart(context)
-              : null,
+              : () => _openMatchDetail(context),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         clipBehavior: Clip.antiAlias,
@@ -938,6 +1044,10 @@ class _ConfirmedCard extends StatelessWidget {
     context.push('/matches/${v.id}/start');
   }
 
+  void _openMatchDetail(BuildContext context) {
+    context.push('/pavilion/match/${v.id}');
+  }
+
   void _openScoring(BuildContext context) {
     context.push('/matches/${v.id}/score');
   }
@@ -1031,6 +1141,7 @@ class _TossActionButton extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 typedef _Past = ({
+  String id,
   String tag,
   String when,
   String homeShort,
@@ -1047,6 +1158,7 @@ typedef _Past = ({
 });
 
 _Past _pastToRecord(MyMatchPast v) => (
+      id: v.id,
       tag: v.tag,
       when: v.when,
       homeShort: v.homeShort,
@@ -1068,95 +1180,99 @@ class _PastRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 56,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(m.when.toUpperCase(),
-                    style: CkType.mono(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.06,
-                      color: CkColors.ink,
-                    )),
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(m.tag,
-                      style: CkType.mono(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0,
-                        color: CkColors.muted,
-                      )),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          _MiniCrest(short: m.homeShort, color: m.homeColor, size: 22),
-          const SizedBox(width: 4),
-          _MiniCrest(short: m.awayShort, color: m.awayColor, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    style: CkType.body(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    children: [
-                      TextSpan(text: '${m.homeRuns}/${m.homeWkts} '),
-                      TextSpan(
-                        text: 'v',
-                        style: CkType.body(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: CkColors.muted,
-                        ),
-                      ),
-                      TextSpan(text: ' ${m.awayRuns}/${m.awayWkts}'),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(m.mine,
+    return InkWell(
+      onTap: () => context.push('/matches/${m.id}'),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: CkColors.hairline),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 56,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(m.when.toUpperCase(),
                       style: CkType.mono(
                         fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.04,
-                        color: CkColors.muted,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.06,
+                        color: CkColors.ink,
                       )),
-                ),
-              ],
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(m.tag,
+                        style: CkType.mono(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0,
+                          color: CkColors.muted,
+                        )),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            m.result.split(' ').first.toUpperCase(),
-            style: CkType.mono(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.08,
-              color: m.homeWon ? CkColors.green : CkColors.red,
+            const SizedBox(width: 12),
+            _MiniCrest(short: m.homeShort, color: m.homeColor, size: 22),
+            const SizedBox(width: 4),
+            _MiniCrest(short: m.awayShort, color: m.awayColor, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      style: CkType.body(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      children: [
+                        TextSpan(text: '${m.homeRuns}/${m.homeWkts} '),
+                        TextSpan(
+                          text: 'v',
+                          style: CkType.body(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: CkColors.muted,
+                          ),
+                        ),
+                        TextSpan(text: ' ${m.awayRuns}/${m.awayWkts}'),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(m.mine,
+                        style: CkType.mono(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.04,
+                          color: CkColors.muted,
+                        )),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Text(
+              m.result.split(' ').first.toUpperCase(),
+              style: CkType.mono(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.08,
+                color: m.homeWon ? CkColors.green : CkColors.red,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -21,7 +21,7 @@ class MatchRequestsRemoteDataSource {
   MatchRequestsRemoteDataSource(this._supabase);
   final SupabaseClient _supabase;
 
-  static const _table = 'match_requests';
+  static const _table = 'match_challenges';
 
   /// Send a challenge. Returns the new request id.
   ///

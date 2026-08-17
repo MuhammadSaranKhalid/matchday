@@ -1,7 +1,7 @@
 {
     "ENVIRONMENT": "prod",
-    "SUPABASE_URL": "https://your-prod-project.supabase.co",
-    "SUPABASE_ANON_KEY": "your-prod-anon-key",
+    "SUPABASE_URL": "https://rqdenhgnmjuxzhjugspi.supabase.co",
+    "SUPABASE_ANON_KEY": "sb_publishable_8IAHtqmGF6GmsXvHaQXYDA_Icl-hudu",
     "GOOGLE_WEB_CLIENT_ID": "45146159151-r7p1gg5cpk8mefnb466sh758tga5fddh.apps.googleusercontent.com",
     "GOOGLE_IOS_CLIENT_ID": "...apps.googleusercontent.com",
     "GOOGLE_PLACES_API_KEY": "AIza...your-places-api-key"

@@ -22,10 +22,24 @@ MatchPoolRepository matchPoolRepository(Ref ref) {
 // ─── Presentation Providers ──────────────────────────────────────────────────
 
 String _formatMatchTime(DateTime dt) {
+  final now = DateTime.now();
+  final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+  final tomorrow = now.add(const Duration(days: 1));
+  final isTomorrow = dt.year == tomorrow.year && dt.month == tomorrow.month && dt.day == tomorrow.day;
+
   final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
   final ampm = dt.hour >= 12 ? 'PM' : 'AM';
   final min = dt.minute.toString().padLeft(2, '0');
-  return '$hour:$min $ampm';
+  final timeStr = '$hour:$min $ampm';
+
+  if (isToday) return 'Today · $timeStr';
+  if (isTomorrow) return 'Tomorrow · $timeStr';
+
+  final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  final dow = days[dt.weekday - 1];
+  final mon = months[dt.month - 1];
+  return '$dow, $mon ${dt.day} · $timeStr';
 }
 
 /// Open match pool challenges from other teams, mapped with team metadata.

@@ -28,8 +28,37 @@ class MatchStartScreen extends ConsumerWidget {
       backgroundColor: CkColors.paper,
       body: SafeArea(
         child: switch (async) {
-          AsyncData(:final value) => _ready(context, ref, value),
-          AsyncError(:final error) => _errorBody(context, error),
+          AsyncError(:final error) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                MatchStartHeaderRow(
+                    onBack: () => context.pop(), title: 'Match start'),
+                const Spacer(),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      error is FailureWrapper
+                          ? error.failure.message
+                          : error.toString(),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+              ],
+            ),
+          AsyncData(:final value) when value.phase == MatchStartPhase.live =>
+            Builder(builder: (_) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (context.mounted) {
+                  context.go('/matches/${value.match.id.value}/score');
+                }
+              });
+              return const Center(
+                  child: CircularProgressIndicator(color: CkColors.ink));
+            }),
+          AsyncData(:final value) => _layout(context, ref, value),
           _ => const Center(
               child: CircularProgressIndicator(color: CkColors.ink),
             ),
@@ -38,34 +67,7 @@ class MatchStartScreen extends ConsumerWidget {
     );
   }
 
-  Widget _errorBody(BuildContext context, Object e) {
-    final msg = e is FailureWrapper ? e.failure.message : e.toString();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        MatchStartHeaderRow(onBack: () => context.pop(), title: 'Match start'),
-        const Spacer(),
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(msg, textAlign: TextAlign.center),
-          ),
-        ),
-        const Spacer(),
-      ],
-    );
-  }
-
-  Widget _ready(BuildContext context, WidgetRef ref, MatchStartState state) {
-    if (state.phase == MatchStartPhase.live) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          context.go('/matches/${state.match.id.value}/score');
-        }
-      });
-      return const Center(child: CircularProgressIndicator(color: CkColors.ink));
-    }
-
+  Widget _layout(BuildContext context, WidgetRef ref, MatchStartState state) {
     final controller =
         ref.read(matchStartControllerProvider(matchId).notifier);
 

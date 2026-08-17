@@ -18,9 +18,9 @@ enum MatchStartViewerRole {
   spectator,
 }
 
-/// Read-only view of a match in the Match Start flow. Composes the raw
-/// [Match] row + currentUser + the inferred role/batting-team. Per
-/// CLAUDE.md §5.3 pattern 3 — passive struct, no behaviour.
+/// View state of a match in the Match Start flow.
+/// Clean passive state representation containing both server match data
+/// and client interaction/form state.
 @immutable
 class MatchStartState {
   const MatchStartState({
@@ -28,6 +28,11 @@ class MatchStartState {
     required this.viewerRole,
     required this.battingTeamId,
     required this.bowlingTeamId,
+    this.pendingTossWinner,
+    this.pendingDecision,
+    this.pendingStriker,
+    this.pendingNonStriker,
+    this.isBusy = false,
   });
 
   /// Live row.
@@ -42,6 +47,13 @@ class MatchStartState {
   /// Side bowling innings 1. Null until the toss is recorded.
   final TeamId? bowlingTeamId;
 
+  /// Local form/selection state
+  final TeamId? pendingTossWinner;
+  final TossDecision? pendingDecision;
+  final String? pendingStriker;
+  final String? pendingNonStriker;
+  final bool isBusy;
+
   /// Where the match sits in the pre-live progression. Mirrors
   /// [Match.startPhase] for convenience.
   MatchStartPhase get phase => match.startPhase;
@@ -50,8 +62,6 @@ class MatchStartState {
   bool get viewerCanAct {
     switch (phase) {
       case MatchStartPhase.toss:
-        // Either captain can flip; design says sender hosts the coin but we
-        // allow whichever captain opens the screen first to record.
         return viewerRole == MatchStartViewerRole.battingCaptain ||
             viewerRole == MatchStartViewerRole.bowlingCaptain;
       case MatchStartPhase.lineup:
@@ -61,6 +71,45 @@ class MatchStartState {
         return false;
     }
   }
+
+  bool get isTossReady =>
+      pendingTossWinner != null && pendingDecision != null;
+
+  bool get isLineupReady =>
+      pendingStriker != null &&
+      pendingNonStriker != null &&
+      pendingStriker != pendingNonStriker;
+
+  MatchStartState copyWith({
+    Match? match,
+    MatchStartViewerRole? viewerRole,
+    TeamId? battingTeamId,
+    TeamId? bowlingTeamId,
+    TeamId? Function()? pendingTossWinner,
+    TossDecision? Function()? pendingDecision,
+    String? Function()? pendingStriker,
+    String? Function()? pendingNonStriker,
+    bool? isBusy,
+  }) {
+    return MatchStartState(
+      match: match ?? this.match,
+      viewerRole: viewerRole ?? this.viewerRole,
+      battingTeamId: battingTeamId ?? this.battingTeamId,
+      bowlingTeamId: bowlingTeamId ?? this.bowlingTeamId,
+      pendingTossWinner: pendingTossWinner != null
+          ? pendingTossWinner()
+          : this.pendingTossWinner,
+      pendingDecision: pendingDecision != null
+          ? pendingDecision()
+          : this.pendingDecision,
+      pendingStriker:
+          pendingStriker != null ? pendingStriker() : this.pendingStriker,
+      pendingNonStriker: pendingNonStriker != null
+          ? pendingNonStriker()
+          : this.pendingNonStriker,
+      isBusy: isBusy ?? this.isBusy,
+    );
+  }
 }
 
 /// Resolve the viewer's role given the match row + their user id.
@@ -68,9 +117,8 @@ MatchStartViewerRole viewerRoleOnMatch(Match m, String? userId) {
   if (userId == null || userId.isEmpty) return MatchStartViewerRole.spectator;
   final batting = battingFirstTeam(m);
   if (batting == null) {
-    // Toss not yet recorded — call them by which captaincy they hold.
     if (m.teamACaptain == userId || m.teamBCaptain == userId) {
-      return MatchStartViewerRole.battingCaptain; // surrogate
+      return MatchStartViewerRole.battingCaptain;
     }
     return MatchStartViewerRole.spectator;
   }
@@ -91,7 +139,6 @@ TeamId? battingFirstTeam(Match m) {
   final decision = m.tossDecision;
   if (won == null || decision == null) return null;
   if (decision == TossDecision.bat) return won;
-  // Bowl: the other team bats.
   if (won == m.teamAId) return m.teamBId;
   if (won == m.teamBId) return m.teamAId;
   return null;

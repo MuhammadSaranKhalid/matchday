@@ -10,10 +10,8 @@ import '../state/match_start_state.dart';
 
 part 'match_start_controller.g.dart';
 
-/// Watches the match row in real time and exposes the three Match Start
-/// action methods. The `build()` stream-aware shape means widgets get an
-/// [AsyncValue] that updates without manual refresh as the other captain
-/// progresses through stages.
+/// Watches the match row in real time and exposes the Match Start
+/// state and actions.
 @riverpod
 class MatchStartController extends _$MatchStartController {
   @override
@@ -21,54 +19,170 @@ class MatchStartController extends _$MatchStartController {
     final user = ref.watch(currentUserStreamProvider).value;
     final userId = user?.id.value;
 
-    // Listen to the broadcast channel for this match. liveMatch is an
-    // autodispose Stream provider — keep our subscription alive for as long
-    // as build() lives.
     final liveAsync = ref.watch(liveMatchProvider(matchId));
     final match = liveAsync.value;
     if (match == null) {
       throw const FailureWrapper(NotFoundFailure('Match not found'));
     }
-    return _deriveState(match, userId);
+
+    final previous = state.value;
+
+    return _deriveState(
+      match,
+      userId,
+      previous: previous,
+    );
   }
 
-  MatchStartState _deriveState(Match m, String? userId) {
+  MatchStartState _deriveState(
+    Match m,
+    String? userId, {
+    MatchStartState? previous,
+  }) {
     final batting = battingFirstTeam(m);
     final bowling = batting == null
         ? null
         : (batting == m.teamAId ? m.teamBId : m.teamAId);
+
     return MatchStartState(
       match: m,
       viewerRole: viewerRoleOnMatch(m, userId),
       battingTeamId: batting,
       bowlingTeamId: bowling,
+      pendingTossWinner: previous?.pendingTossWinner,
+      pendingDecision: previous?.pendingDecision,
+      pendingStriker: previous?.pendingStriker,
+      pendingNonStriker: previous?.pendingNonStriker,
+      isBusy: previous?.isBusy ?? false,
     );
   }
 
-  Future<Either<Failure, Unit>> recordToss({
-    required TeamId wonBy,
-    required TossDecision decision,
-    String? face,
-  }) =>
-      ref.read(matchesRepositoryProvider).recordMatchToss(
-        id: MatchId(matchId),
-        wonBy: wonBy,
-        decision: decision,
-        face: face,
-      );
+  void pickTossWinner(TeamId winner) {
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncData(current.copyWith(
+      pendingTossWinner: () => winner,
+    ));
+  }
 
-  Future<Either<Failure, Unit>> submitOpeners({
-    required String strikerId,
-    required String nonStrikerId,
-  }) =>
-      ref.read(matchesRepositoryProvider).submitMatchOpeners(
-        id: MatchId(matchId),
-        strikerId: strikerId,
-        nonStrikerId: nonStrikerId,
-      );
+  void pickTossDecision(TossDecision decision) {
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncData(current.copyWith(
+      pendingDecision: () => decision,
+    ));
+  }
 
-  Future<Either<Failure, Unit>> startMatchNow() =>
-      ref.read(matchesRepositoryProvider).startMatchNow(MatchId(matchId));
+  void pickStriker(String refId) {
+    final current = state.value;
+    if (current == null) return;
+    // Tapping the existing non-striker into striker swaps them.
+    String? newNonStriker = current.pendingNonStriker;
+    if (current.pendingNonStriker == refId) {
+      newNonStriker = current.pendingStriker;
+    }
+    state = AsyncData(current.copyWith(
+      pendingStriker: () => refId,
+      pendingNonStriker: () => newNonStriker,
+    ));
+  }
 
-  Future<Either<Failure, Unit>> startMatch() => startMatchNow();
+  void pickNonStriker(String refId) {
+    final current = state.value;
+    if (current == null) return;
+    // Tapping the existing striker into non-striker swaps them.
+    String? newStriker = current.pendingStriker;
+    if (current.pendingStriker == refId) {
+      newStriker = current.pendingNonStriker;
+    }
+    state = AsyncData(current.copyWith(
+      pendingStriker: () => newStriker,
+      pendingNonStriker: () => refId,
+    ));
+  }
+
+  Future<Either<Failure, Unit>> submitToss() async {
+    final current = state.value;
+    if (current == null || !current.isTossReady) {
+      return const Left(ValidationFailure('Please select toss winner and decision'));
+    }
+
+    state = AsyncData(current.copyWith(isBusy: true));
+
+    final result = await ref.read(matchesRepositoryProvider).recordMatchToss(
+          id: MatchId(matchId),
+          wonBy: current.pendingTossWinner!,
+          decision: current.pendingDecision!,
+        );
+
+    final updated = state.value ?? current;
+    state = AsyncData(updated.copyWith(
+      isBusy: false,
+      pendingTossWinner: () => null,
+      pendingDecision: () => null,
+    ));
+
+    return result;
+  }
+
+  Future<Either<Failure, Unit>> submitOpeners() async {
+    final current = state.value;
+    if (current == null || !current.isLineupReady) {
+      return const Left(ValidationFailure('Please select both openers'));
+    }
+
+    final allMatchPlayers =
+        ref.read(matchPlayersProvider(matchId)).value ?? const [];
+
+    String? matchPlayerIdFor(String refId) {
+      for (final mp in allMatchPlayers) {
+        if (mp.playerRefId == refId) return mp.id.value;
+      }
+      return null;
+    }
+
+    final strikerMpId = matchPlayerIdFor(current.pendingStriker!);
+    final nonStrikerMpId = matchPlayerIdFor(current.pendingNonStriker!);
+
+    if (strikerMpId == null || nonStrikerMpId == null) {
+      return const Left(ValidationFailure(
+        'Selected player is not in this match\'s lineup. Reopen the screen and try again.',
+      ));
+    }
+
+    state = AsyncData(current.copyWith(isBusy: true));
+
+    final result = await ref.read(matchesRepositoryProvider).submitMatchOpeners(
+          id: MatchId(matchId),
+          strikerId: strikerMpId,
+          nonStrikerId: nonStrikerMpId,
+        );
+
+    final updated = state.value ?? current;
+    state = AsyncData(updated.copyWith(
+      isBusy: false,
+      pendingStriker: () => null,
+      pendingNonStriker: () => null,
+    ));
+
+    return result;
+  }
+
+  Future<Either<Failure, Unit>> startMatchNow() async {
+    final current = state.value;
+    if (current != null) {
+      state = AsyncData(current.copyWith(isBusy: true));
+    }
+
+    final result = await ref
+        .read(matchesRepositoryProvider)
+        .startMatchNow(MatchId(matchId));
+
+    final updated = state.value ?? current;
+    if (updated != null) {
+      state = AsyncData(updated.copyWith(isBusy: false));
+    }
+
+    return result;
+  }
 }

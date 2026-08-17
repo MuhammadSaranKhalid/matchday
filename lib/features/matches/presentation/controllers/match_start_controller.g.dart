@@ -8,24 +8,18 @@ part of 'match_start_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Watches the match row in real time and exposes the three Match Start
-/// action methods. The `build()` stream-aware shape means widgets get an
-/// [AsyncValue] that updates without manual refresh as the other captain
-/// progresses through stages.
+/// Watches the match row in real time and exposes the Match Start
+/// state and actions.
 
 @ProviderFor(MatchStartController)
 final matchStartControllerProvider = MatchStartControllerFamily._();
 
-/// Watches the match row in real time and exposes the three Match Start
-/// action methods. The `build()` stream-aware shape means widgets get an
-/// [AsyncValue] that updates without manual refresh as the other captain
-/// progresses through stages.
+/// Watches the match row in real time and exposes the Match Start
+/// state and actions.
 final class MatchStartControllerProvider
     extends $AsyncNotifierProvider<MatchStartController, MatchStartState> {
-  /// Watches the match row in real time and exposes the three Match Start
-  /// action methods. The `build()` stream-aware shape means widgets get an
-  /// [AsyncValue] that updates without manual refresh as the other captain
-  /// progresses through stages.
+  /// Watches the match row in real time and exposes the Match Start
+  /// state and actions.
   MatchStartControllerProvider._({
     required MatchStartControllerFamily super.from,
     required String super.argument,
@@ -63,12 +57,10 @@ final class MatchStartControllerProvider
 }
 
 String _$matchStartControllerHash() =>
-    r'a8f2a91c4bb7a4955a6376494550358eef4683c3';
+    r'7044996c883ca8663b890e0e75e2ff87208b28c1';
 
-/// Watches the match row in real time and exposes the three Match Start
-/// action methods. The `build()` stream-aware shape means widgets get an
-/// [AsyncValue] that updates without manual refresh as the other captain
-/// progresses through stages.
+/// Watches the match row in real time and exposes the Match Start
+/// state and actions.
 
 final class MatchStartControllerFamily extends $Family
     with
@@ -88,10 +80,8 @@ final class MatchStartControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Watches the match row in real time and exposes the three Match Start
-  /// action methods. The `build()` stream-aware shape means widgets get an
-  /// [AsyncValue] that updates without manual refresh as the other captain
-  /// progresses through stages.
+  /// Watches the match row in real time and exposes the Match Start
+  /// state and actions.
 
   MatchStartControllerProvider call(String matchId) =>
       MatchStartControllerProvider._(argument: matchId, from: this);
@@ -100,10 +90,8 @@ final class MatchStartControllerFamily extends $Family
   String toString() => r'matchStartControllerProvider';
 }
 
-/// Watches the match row in real time and exposes the three Match Start
-/// action methods. The `build()` stream-aware shape means widgets get an
-/// [AsyncValue] that updates without manual refresh as the other captain
-/// progresses through stages.
+/// Watches the match row in real time and exposes the Match Start
+/// state and actions.
 
 abstract class _$MatchStartController extends $AsyncNotifier<MatchStartState> {
   late final _$args = ref.$arg as String;

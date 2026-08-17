@@ -13,13 +13,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../matches/presentation/providers/my_matches_providers.dart';
 import '../../../matches/presentation/widgets/withdraw_sheet.dart';
-import '../../../teams/presentation/providers/teams_providers.dart';
 import '../controllers/pavilion_controller.dart';
-import '../widgets/pavilion_v2/pv_v2_data.dart';
-import '../widgets/pavilion_v2/pv_v2_map.dart';
+import '../providers/pavilion_match_detail_provider.dart';
 import '../widgets/pavilion_v2/pv_v2_match_detail.dart';
 
 class PavilionMatchDetailScreen extends ConsumerWidget {
@@ -29,47 +26,24 @@ class PavilionMatchDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userId = ref.watch(currentUserStreamProvider).value?.id.value;
-    final teamsAsync = ref.watch(myTeamsProvider);
-    final matchesAsync = ref.watch(myMatchesViewProvider);
-
-    // Resolve the match by id from the mapped workspace list (same mapping the
-    // Pavilion uses). Awaiting challenges resolve too (by request id).
-    final view = matchesAsync.value;
-    PvMatch? match;
-    if (view != null) {
-      final pvTeams = pvTeamsFromTeams(teamsAsync.value ?? const [], userId: userId);
-      final meFallback = pvTeams.isNotEmpty ? pvTeams.first.crest : kPvUnknownCrest;
-      for (final m in pvMatchesFromView(view, meFallback: meFallback)) {
-        if (m.id == matchId) {
-          match = m;
-          break;
-        }
-      }
-    }
+    final detailAsync = ref.watch(pavilionMatchDetailProvider(matchId));
 
     return Scaffold(
       backgroundColor: CkColors.paper,
-      body: switch (matchesAsync) {
+      body: switch (detailAsync) {
         AsyncError(:final error) => _error(
             context,
             error is FailureWrapper ? error.failure.message : error.toString(),
-            () => ref.invalidate(myMatchesViewProvider),
+            () => ref.invalidate(pavilionMatchDetailProvider(matchId)),
           ),
-        AsyncData() when match != null => PvMatchDetail(
-            m: match,
+        _ when detailAsync.hasValue && detailAsync.value != null => PvMatchDetail(
+            m: detailAsync.value!,
             onBack: () =>
                 context.canPop() ? context.pop() : context.go('/pavilion'),
             onAction: (id, action) => _onAction(context, ref, id, action),
           ),
-        // Loaded but empty — on a cold load / refresh, auth + data settle a
-        // frame or two after first build. Wait, don't declare the match gone.
-        AsyncData(:final value) when value.isEmpty =>
-          const Center(child: CircularProgressIndicator()),
-        // The workspace is populated but this id isn't in it (withdrawn / stale
-        // link). Show a calm message — never auto-navigate away.
-        AsyncData() => _notAvailable(context),
-        _ => const Center(child: CircularProgressIndicator()),
+        AsyncLoading() => const Center(child: CircularProgressIndicator()),
+        _ => _notAvailable(context),
       },
     );
   }

@@ -972,7 +972,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
           ),
         );
       } else {
-        final res = await ref.read(matchesRepositoryProvider).startInnings(
+        final res = await ref.read(startInningsUseCaseProvider)(
               matchId: match.id,
               inningsNumber: widget.inningsNumber,
               strikerId: r.nextBatterMatchPlayerId!,
@@ -994,7 +994,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
   Future<void> _submit(BallDraft draft) async {
     setState(() => _busy = true);
     final result =
-        await ref.read(matchesRepositoryProvider).recordBall(draft);
+        await ref.read(recordBallUseCaseProvider)(draft);
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(
@@ -1030,7 +1030,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
   Future<void> _handleUndo(Match match) async {
     setState(() => _busy = true);
     final result =
-        await ref.read(matchesRepositoryProvider).undoLastBall(
+        await ref.read(undoLastBallUseCaseProvider)(
               matchId: match.id,
               inningsNumber: widget.inningsNumber,
             );
@@ -1218,7 +1218,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       ),
     );
     if (pick == null || !mounted) return;
-    final res = await ref.read(matchesRepositoryProvider).startInnings(
+    final res = await ref.read(startInningsUseCaseProvider)(
           matchId: match.id,
           inningsNumber: widget.inningsNumber,
           // Strike rotates at end of over: previous non-striker is on strike.
@@ -1281,7 +1281,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
         .read(liveInningsStateProvider(widget.matchId, widget.inningsNumber))
         .value;
     setState(() => _busy = true);
-    final result = await ref.read(matchesRepositoryProvider).startInnings(
+    final result = await ref.read(startInningsUseCaseProvider)(
           matchId: match.id,
           inningsNumber: widget.inningsNumber,
           strikerId: inningsState?.strikerId?.value ?? '',

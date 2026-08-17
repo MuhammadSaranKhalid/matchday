@@ -63,7 +63,7 @@ final class MatchStartControllerProvider
 }
 
 String _$matchStartControllerHash() =>
-    r'7c249769122468be0e58951117a8ec875746454d';
+    r'6259ba8c28cc3af8b47b029879288656848531d2';
 
 /// Watches the match row in real time and exposes the three Match Start
 /// action methods. The `build()` stream-aware shape means widgets get an

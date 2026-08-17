@@ -50,6 +50,7 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   // Form data — sane defaults so a captain in a rush can hit Continue × 3.
   Team? _fromTeam;
   Team? _opponent;
+  bool _isOpenChallenge = false;
   String _opponentSearch = '';
 
   // Format — preset id + the snapshotted MatchFormat that ships.
@@ -103,7 +104,7 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
       case _Step.team:
         return _fromTeam != null;
       case _Step.opponent:
-        return _opponent != null;
+        return _isOpenChallenge || _opponent != null;
       case _Step.format:
         // Preset always selected (seeded to first preset on load).
         return _overs > 0 && _playersPerSide >= 5 && _playersPerSide <= 15;
@@ -149,9 +150,15 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   }
 
   String get _ctaLabel {
-    if (_step == _Step.review) return 'Send challenge';
+    if (_step == _Step.review) {
+      return _isOpenChallenge ? 'Broadcast open challenge' : 'Send challenge';
+    }
     if (_step == _Step.team && _fromTeam != null) {
       return 'Continue as ${_fromTeam!.name} →';
+    }
+    if (_step == _Step.opponent) {
+      if (_isOpenChallenge) return 'Continue with Open Challenge →';
+      if (_opponent != null) return 'Continue vs ${_opponent!.name} →';
     }
     if (_step == _Step.format) {
       final label = _presetLabel ?? 'T$_overs';
@@ -252,11 +259,11 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
     final opp = _opponent;
     final start = _startTime;
     final fromId = _resolvedFromTeamId;
-    if (opp == null || start == null || fromId == null) return;
+    if ((!_isOpenChallenge && opp == null) || start == null || fromId == null) return;
     setState(() => _busy = true);
-    final result = await ref.read(matchesRepositoryProvider).sendMatchChallenge(
+    final result = await ref.read(sendMatchChallengeUseCaseProvider)(
           fromTeamId: TeamId(fromId),
-          toTeamId: opp.id,
+          toTeamId: _isOpenChallenge ? null : opp?.id,
           proposedStartTime: start,
           proposedVenue: _venueCtrl.text.trim(),
           proposedFormat: MatchFormat(
@@ -334,9 +341,17 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
         return _OpponentStep(
           query: _opponentSearch,
           selected: _opponent,
+          isOpen: _isOpenChallenge,
           fromTeamId: TeamId(fromId),
           onSearch: (q) => setState(() => _opponentSearch = q),
-          onPick: (t) => setState(() => _opponent = t),
+          onPick: (t) => setState(() {
+            _opponent = t;
+            _isOpenChallenge = false;
+          }),
+          onPickOpen: () => setState(() {
+            _opponent = null;
+            _isOpenChallenge = true;
+          }),
         );
       case _Step.format:
         return StepFormat(
@@ -363,16 +378,14 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           playersNeeded: _playersPerSide,
           xi: _xi,
           keeperId: _keeperId,
-          onToggle: (id) {
-            setState(() {
-              if (_xi.contains(id)) {
-                _xi.remove(id);
-                if (_keeperId == id) _keeperId = null;
-              } else if (_xi.length < _playersPerSide) {
-                _xi.add(id);
-              }
-            });
-          },
+          onToggle: (id) => setState(() {
+            if (_xi.contains(id)) {
+              _xi.remove(id);
+              if (_keeperId == id) _keeperId = null;
+            } else {
+              _xi.add(id);
+            }
+          }),
           onKeeper: (id) => setState(() => _keeperId = id),
           onAutoFill: (roster) {
             setState(() {
@@ -393,7 +406,8 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
         return _ReviewStepHost(
           fromTeam: _fromTeam,
           fromTeamId: _resolvedFromTeamId,
-          opponent: _opponent!,
+          opponent: _opponent,
+          isOpen: _isOpenChallenge,
           startTime: _startTime!,
           venue: _venueCtrl.text.trim(),
           format: MatchFormat(
@@ -425,6 +439,7 @@ class _ReviewStepHost extends ConsumerWidget {
     required this.fromTeam,
     required this.fromTeamId,
     required this.opponent,
+    required this.isOpen,
     required this.startTime,
     required this.venue,
     required this.format,
@@ -437,7 +452,8 @@ class _ReviewStepHost extends ConsumerWidget {
 
   final Team? fromTeam;
   final String? fromTeamId;
-  final Team opponent;
+  final Team? opponent;
+  final bool isOpen;
   final DateTime startTime;
   final String venue;
   final MatchFormat format;
@@ -471,6 +487,7 @@ class _ReviewStepHost extends ConsumerWidget {
     return StepReview(
       fromTeam: resolvedFromTeam,
       opponent: opponent,
+      isOpen: isOpen,
       format: format,
       presetLabel: presetLabel,
       startTime: startTime,
@@ -1079,16 +1096,20 @@ class _OpponentStep extends ConsumerWidget {
   const _OpponentStep({
     required this.query,
     required this.selected,
+    required this.isOpen,
     required this.fromTeamId,
     required this.onSearch,
     required this.onPick,
+    required this.onPickOpen,
   });
 
   final String query;
   final Team? selected;
+  final bool isOpen;
   final TeamId fromTeamId;
   final ValueChanged<String> onSearch;
   final ValueChanged<Team> onPick;
+  final VoidCallback onPickOpen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1107,9 +1128,97 @@ class _OpponentStep extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           children: [
+            // Option 1: Broadcast as Open Pool Challenge with Share Code
+            InkWell(
+              onTap: onPickOpen,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isOpen ? CkColors.paper2 : CkColors.paper,
+                  border: Border.all(
+                    color: isOpen ? CkColors.ink : CkColors.hairline,
+                    width: isOpen ? 2 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isOpen ? CkColors.ink : CkColors.paper2,
+                        borderRadius: BorderRadius.circular(11),
+                        border: Border.all(color: CkColors.hairline),
+                      ),
+                      child: Icon(
+                        Icons.public,
+                        size: 22,
+                        color: isOpen ? CkColors.paper : CkColors.ink,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Open Challenge',
+                                style: CkType.display(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Pill(label: 'BROADCAST', tone: PillTone.green),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Post to match pool & generate 6-digit share code',
+                            style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isOpen)
+                      Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: CkColors.ink,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check, size: 14, color: CkColors.paper),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Expanded(child: Divider(color: CkColors.hairline)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(
+                    'OR DIRECT 1-ON-1 CHALLENGE',
+                    style: CkType.mono(fontSize: 9.5, fontWeight: FontWeight.w700, color: CkColors.muted),
+                  ),
+                ),
+                const Expanded(child: Divider(color: CkColors.hairline)),
+              ],
+            ),
+            const SizedBox(height: 14),
             TextField(
               decoration: InputDecoration(
-                hintText: 'Search teams',
+                hintText: 'Search specific opponent team',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: const BorderSide(color: CkColors.hairline),
@@ -1125,7 +1234,7 @@ class _OpponentStep extends ConsumerWidget {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: _TeamRow(
                   team: t,
-                  selected: selected?.id == t.id,
+                  selected: selected?.id == t.id && !isOpen,
                   onTap: () => onPick(t),
                 ),
               ),

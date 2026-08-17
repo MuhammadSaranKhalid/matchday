@@ -7,6 +7,7 @@ import '../entities/innings_summary.dart';
 import '../entities/match.dart';
 import '../entities/match_innings_state.dart';
 import '../entities/match_player.dart';
+import '../entities/match_pool_application.dart';
 import '../entities/match_request.dart';
 
 /// Online-only matches contract. Reads/writes hit Supabase directly; no
@@ -121,6 +122,32 @@ abstract class MatchesRepository {
 
   /// Lookup the 6-digit in-person share code.
   Future<Either<Failure, MatchRequest?>> findMatchChallengeByCode(String code);
+
+  /// Apply to an open match pool post with a team and optional XI.
+  Future<Either<Failure, String>> applyToMatchPool({
+    required MatchRequestId requestId,
+    required TeamId teamId,
+    List<String> xi = const [],
+    String? keeperId,
+    String? message,
+  });
+
+  /// List all applications submitted for a match challenge.
+  Future<Either<Failure, List<MatchPoolApplication>>> listPoolApplications(
+    MatchRequestId requestId,
+  );
+
+  /// Host captain accepts an applicant to lock in the match fixture.
+  Future<Either<Failure, MatchId>> acceptPoolApplication({
+    required String applicationId,
+    String? decisionNote,
+  });
+
+  /// Host captain rejects an applicant.
+  Future<Either<Failure, Unit>> rejectPoolApplication({
+    required String applicationId,
+    String? reason,
+  });
 
   /// Mark a match completed with a result description.
   Future<Either<Failure, Match>> completeMatch({

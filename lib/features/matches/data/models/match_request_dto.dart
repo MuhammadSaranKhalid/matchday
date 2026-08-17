@@ -49,7 +49,9 @@ abstract class MatchRequestDto with _$MatchRequestDto {
     MatchFormat? format(Map<String, dynamic>? m) {
       if (m == null) return null;
       return MatchFormat(
-        oversPerInnings: (m['overs_per_innings'] as num?)?.toInt() ?? 20,
+        oversPerInnings: (m['overs_per_innings'] as num?)?.toInt() ??
+            (m['overs'] as num?)?.toInt() ??
+            20,
         playersPerTeam: (m['players_per_team'] as num?)?.toInt() ?? 11,
         ballType: MatchBallType.fromWire(m['ball_type'] as String?),
         maxOversPerBowler:

@@ -159,7 +159,7 @@ class _ChallengeCounterScreenState
 
   Future<void> _submit(MatchRequest req) async {
     setState(() => _busy = true);
-    final result = await ref.read(matchesRepositoryProvider).counterMatchChallenge(
+    final result = await ref.read(counterMatchChallengeUseCaseProvider)(
           requestId: req.id,
           counteredStartTime: _newStart,
           counteredVenue: _venueCtrl.text.trim().isEmpty

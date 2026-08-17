@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/match.dart';
+import '../../domain/entities/match_pool_application.dart';
 import '../../domain/entities/match_request.dart';
+import '../providers/match_pool_providers.dart';
+import '../providers/matches_feed_providers.dart';
 import '../providers/matches_providers.dart';
 import '../providers/my_matches_providers.dart';
 import '../widgets/withdraw_sheet.dart';
@@ -51,34 +55,51 @@ class _ChallengeDetailScreenState
         ? null
         : ref.watch(teamProvider(req.toTeamId!.value)).value;
 
-    // Perspective: am I the sender (I manage the from-team) or the receiver?
-    // Receiver is the default while myTeams is cold — the common deep-link
-    // case (opening from a notification) is a receiver. A sender arriving from
-    // their own My Matches row has myTeams warm. If a user manages both teams,
-    // sender wins (they initiated).
     final myTeams = ref.watch(myTeamsProvider).value ?? const <Team>[];
     final viewerIsSender = myTeams.any((t) => t.id == req.fromTeamId);
+    final isOpenPool = req.toTeamId == null;
 
     final actionable = req.isPending;
+
+    // Watch applications if it's an open pool post
+    final appsAsync = isOpenPool
+        ? ref.watch(poolApplicationsProvider(req.id.value))
+        : const AsyncValue.data(<MatchPoolApplication>[]);
+
+    final applications = appsAsync.value ?? const <MatchPoolApplication>[];
+    final myAppliedTeamIds = myTeams.map((t) => t.id).toSet();
+    final hasAlreadyApplied = applications.any(
+      (app) =>
+          myAppliedTeamIds.contains(app.applicantTeamId) &&
+          app.status == PoolApplicationStatus.pending,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Header(
-          // Deep links (notifications, share URLs, paste-into-browser) land
-          // here with an empty stack; pop would throw "There is nothing to
-          // pop". Fall back to My Matches in that case.
           onBack: () =>
               context.canPop() ? context.pop() : context.go('/pavilion/my-matches'),
-          kicker: viewerIsSender ? 'CHALLENGE SENT' : 'INCOMING CHALLENGE',
+          kicker: viewerIsSender
+              ? (isOpenPool ? 'OPEN CHALLENGE POSTED' : 'CHALLENGE SENT')
+              : (isOpenPool ? 'OPEN MATCH POOL' : 'INCOMING CHALLENGE'),
           title: viewerIsSender
-              ? 'To ${to?.name ?? 'an open challenge'}'
-              : 'From ${from?.name ?? 'a team'}',
+              ? (isOpenPool ? 'Open Pool Broadcast' : 'To ${to?.name ?? 'a team'}')
+              : (isOpenPool
+                  ? 'Challenge from ${from?.name ?? 'Open Challenger'}'
+                  : 'From ${from?.name ?? 'a team'}'),
         ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
             children: [
-              _Hero(req: req, from: from, to: to, viewerIsSender: viewerIsSender),
+              _Hero(
+                req: req,
+                from: from,
+                to: to,
+                viewerIsSender: viewerIsSender,
+                isOpenPool: isOpenPool,
+              ),
               const _SectionLabel('Match spec'),
               _Spec(req: req),
               if (req.message != null && req.message!.isNotEmpty) ...[
@@ -86,6 +107,34 @@ class _ChallengeDetailScreenState
                     ? 'Your note'
                     : 'Note from ${_firstName(from?.name)}'),
                 _Note(text: req.message!, sentAt: req.createdAt),
+              ],
+              // For Poster of Open Pool: Show Applicants List
+              if (isOpenPool && viewerIsSender) ...[
+                _SectionLabel('Applicants (${applications.length})'),
+                if (applications.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: CkColors.paper,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: CkColors.hairline),
+                    ),
+                    child: Text(
+                      'No teams have applied yet. Interested captains will appear here.',
+                      style: CkType.body(fontSize: 13, color: CkColors.muted),
+                    ),
+                  )
+                else
+                  ...applications.map(
+                    (app) => _ApplicantCard(
+                      application: app,
+                      isPoster: true,
+                      req: req,
+                      busy: _busy,
+                      onAccept: () => _onAcceptApplication(app, req),
+                      onReject: () => _onRejectApplication(app),
+                    ),
+                  ),
               ],
               if (!actionable) ...[
                 const SizedBox(height: 14),
@@ -96,13 +145,18 @@ class _ChallengeDetailScreenState
         ),
         if (actionable && viewerIsSender)
           _WithdrawBar(busy: _busy, onWithdraw: () => _onWithdraw(req))
+        else if (actionable && isOpenPool)
+          _ApplyBar(
+            busy: _busy,
+            hasAlreadyApplied: hasAlreadyApplied,
+            onApply: () => _onApplyToPool(req),
+          )
         else if (actionable)
           _ReplyBar(
             busy: _busy,
+            isOpenPool: false,
             onDecline: () => _onDecline(req),
-            // Counter flow disabled — keep accept/decline only for now.
-            // onCounter: () => context.push('/challenges/${req.id.value}/counter'),
-            onAccept: () => _onAccept(req),
+            onAccept: () => _onAcceptDirect(req),
           ),
       ],
     );
@@ -113,13 +167,298 @@ class _ChallengeDetailScreenState
     return teamName.split(' ').first;
   }
 
-  Future<void> _onAccept(MatchRequest req) async {
-    // Step 5 in the design — bottom-sheet confirmation with the green
-    // "FINAL STEP" pill before the RPC fires.
+  Future<void> _onApplyToPool(MatchRequest req) async {
+    final myTeams = ref.read(myTeamsProvider).value ?? const <Team>[];
+    final eligibleTeams =
+        myTeams.where((t) => t.id != req.fromTeamId).toList();
+    if (eligibleTeams.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You need to create or manage a team to apply.')),
+      );
+      return;
+    }
+
+    Team? selectedTeam;
+    if (eligibleTeams.length == 1) {
+      selectedTeam = eligibleTeams.first;
+    } else {
+      selectedTeam = await showModalBottomSheet<Team>(
+        context: context,
+        backgroundColor: CkColors.paper,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: CkColors.hairline,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Select Your Team',
+                    style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Which team are you applying with?',
+                    style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+                  ),
+                  const SizedBox(height: 14),
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: eligibleTeams.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) {
+                        final t = eligibleTeams[i];
+                        return ListTile(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: CkColors.hairline),
+                          ),
+                          leading: Crest(
+                            short: _short(t, fallback: 'TM'),
+                            color: _teamColor(t.primaryColor),
+                            size: 36,
+                          ),
+                          title: Text(
+                            t.name,
+                            style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            t.homeGround ?? 'Local Club',
+                            style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded, color: CkColors.ink),
+                          onTap: () => Navigator.of(ctx).pop(t),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      if (selectedTeam == null || !mounted) return;
+    }
+
+    final noteController = TextEditingController();
+    final shouldApply = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: CkColors.paper,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          left: 20,
+          right: 20,
+          top: 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Apply to Match Pool',
+              style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Apply to play against ${ref.read(teamProvider(req.fromTeamId.value)).value?.name ?? 'host'} with ${selectedTeam!.name}. The host captain will review and accept.',
+              style: CkType.body(fontSize: 13, color: CkColors.muted),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: noteController,
+              decoration: const InputDecoration(
+                labelText: 'Optional message to host captain',
+                hintText: 'e.g. We have our full squad ready on time!',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CkColors.ink,
+                      foregroundColor: CkColors.paper,
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Submit Application'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+
+    if (shouldApply != true || !mounted) return;
+
+    setState(() => _busy = true);
+    final result = await ref.read(applyToMatchPoolUseCaseProvider)(
+          requestId: req.id,
+          teamId: selectedTeam.id,
+          message: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+        );
+
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    result.fold(
+      (f) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(f.message)),
+      ),
+      (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Application submitted! Host captain has been notified.')),
+        );
+        ref.invalidate(poolApplicationsProvider(req.id.value));
+        ref.invalidate(matchesFeedProvider);
+      },
+    );
+  }
+
+  Future<void> _onAcceptApplication(
+    MatchPoolApplication app,
+    MatchRequest req,
+  ) async {
+    final appTeam = ref.read(teamProvider(app.applicantTeamId.value)).value;
+    final confirm = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: CkColors.paper,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Accept Applicant & Lock Match?',
+              style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Accepting ${appTeam?.name ?? 'this team'} will immediately create the match fixture and automatically reject all other pending applications for this post.',
+              style: CkType.body(fontSize: 13, color: CkColors.muted),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CkColors.green,
+                      foregroundColor: CkColors.paper,
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Accept & Lock Match'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() => _busy = true);
+    final result = await ref.read(acceptPoolApplicationUseCaseProvider)(
+          applicationId: app.id,
+        );
+
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    result.fold(
+      (f) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(f.message)),
+      ),
+      (matchId) {
+        ref.invalidate(myMatchChallengesProvider);
+        ref.invalidate(myMatchesViewProvider);
+        ref.invalidate(matchesFeedProvider);
+        ref.invalidate(poolApplicationsProvider(req.id.value));
+        ref.invalidate(matchChallengeProvider(req.id.value));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Match created successfully!')),
+        );
+        context.go('/pavilion/matches/${matchId.value}');
+      },
+    );
+  }
+
+  Future<void> _onRejectApplication(MatchPoolApplication app) async {
+    setState(() => _busy = true);
+    final result = await ref.read(rejectPoolApplicationUseCaseProvider)(
+          applicationId: app.id,
+        );
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    result.fold(
+      (f) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(f.message)),
+      ),
+      (_) {
+        ref.invalidate(poolApplicationsProvider(app.requestId));
+      },
+    );
+  }
+
+  Future<void> _onAcceptDirect(MatchRequest req) async {
     final fromTeam = ref.read(teamProvider(req.fromTeamId.value)).value;
     final toTeam = req.toTeamId == null
         ? null
         : ref.read(teamProvider(req.toTeamId!.value)).value;
+
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: CkColors.paper,
@@ -138,8 +477,10 @@ class _ChallengeDetailScreenState
 
     setState(() => _busy = true);
     final result = await ref
-        .read(matchesRepositoryProvider)
-        .acceptMatchChallenge(requestId: req.id);
+        .read(acceptMatchChallengeUseCaseProvider)(
+          requestId: req.id,
+          toTeamId: toTeam?.id,
+        );
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(
@@ -149,9 +490,7 @@ class _ChallengeDetailScreenState
       (_) {
         ref.invalidate(myMatchChallengesProvider);
         ref.invalidate(myMatchesViewProvider);
-        // Land on My Matches — the new fixture appears in Confirmed; the
-        // user can tap into the match to Pick XI / start it when they're
-        // ready. The design's green "you accepted" banner lives there.
+        ref.invalidate(matchesFeedProvider);
         context.go('/pavilion');
       },
     );
@@ -169,7 +508,7 @@ class _ChallengeDetailScreenState
     );
     if (picked == null || !mounted) return;
     setState(() => _busy = true);
-    final result = await ref.read(matchesRepositoryProvider).declineMatchChallenge(
+    final result = await ref.read(declineMatchChallengeUseCaseProvider)(
           requestId: req.id,
           decisionReason: picked.reason,
           decisionNote: picked.note,
@@ -202,7 +541,7 @@ class _ChallengeDetailScreenState
     );
     if (result == null || !mounted) return;
     setState(() => _busy = true);
-    final res = await ref.read(matchesRepositoryProvider).withdrawMatchChallenge(
+    final res = await ref.read(withdrawMatchChallengeUseCaseProvider)(
           requestId: req.id,
           decisionNote: result.note,
         );
@@ -301,6 +640,7 @@ class _Hero extends StatelessWidget {
     required this.from,
     required this.to,
     this.viewerIsSender = false,
+    this.isOpenPool = false,
   });
   final MatchRequest req;
   final Team? from;
@@ -309,16 +649,19 @@ class _Hero extends StatelessWidget {
   /// When true, the "You" label sits on the from-team (left) column and the
   /// opponent goes right. Receiver view (false) keeps the original layout.
   final bool viewerIsSender;
+  final bool isOpenPool;
 
   @override
   Widget build(BuildContext context) {
     final start = req.effectiveStartTime;
     final expiry = req.status == MatchRequestStatus.countered
         ? req.counterExpiresAt
-        : req.proposalExpiresAt;
+        : (req.proposalExpiresAt ?? req.codeExpiresAt);
     final expiresLabel = expiry == null
-        ? 'CHALLENGE'
-        : 'CHALLENGE · EXPIRES ${_humanRemaining(expiry)}';
+        ? (isOpenPool ? 'OPEN MATCH POOL' : 'CHALLENGE')
+        : (isOpenPool
+            ? 'OPEN POOL · EXPIRES ${_humanRemaining(expiry)}'
+            : 'CHALLENGE · EXPIRES ${_humanRemaining(expiry)}');
     final whenLabel = start == null
         ? ''
         : '${_dowShort(start)} ${start.day} · ${_hhmm(start)}';
@@ -332,7 +675,7 @@ class _Hero extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Header strip — red pill left, mono date right.
+          // Header strip — red/green pill left, mono date right.
           Container(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
             decoration: const BoxDecoration(
@@ -349,7 +692,7 @@ class _Hero extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: CkColors.red,
+                      color: isOpenPool ? CkColors.green : CkColors.red,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -402,11 +745,13 @@ class _Hero extends StatelessWidget {
                 Expanded(
                   child: _CrestColumn(
                     team: to,
-                    fallback: 'B',
+                    fallback: isOpenPool ? '?' : 'B',
                     overrideName: viewerIsSender
-                        ? (req.toTeamId == null ? 'Open' : null)
-                        : 'You',
-                    captain: viewerIsSender ? 'Captain' : 'You · cap',
+                        ? (isOpenPool ? 'Open Pool' : null)
+                        : (isOpenPool ? 'Open Slot (You)' : 'You'),
+                    captain: viewerIsSender
+                        ? (isOpenPool ? 'Anyone' : 'Captain')
+                        : 'Your Team',
                   ),
                 ),
               ],
@@ -699,20 +1044,222 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-/// Sticky reply bar — Decline (red text) + ink-filled Accept.
-/// (Counter button temporarily removed; the original 3-button layout is
-/// preserved as commented-out code so we can restore it without rebuilding.)
+/// Sticky bar for open pool browsing captains: "Apply to Play →" or "Application Pending".
+class _ApplyBar extends StatelessWidget {
+  const _ApplyBar({
+    required this.busy,
+    required this.hasAlreadyApplied,
+    required this.onApply,
+  });
+  final bool busy;
+  final bool hasAlreadyApplied;
+  final VoidCallback onApply;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+      decoration: const BoxDecoration(
+        color: CkColors.paper,
+        border: Border(top: BorderSide(color: CkColors.hairline)),
+      ),
+      child: hasAlreadyApplied
+          ? Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: CkColors.hairline,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.hourglass_top_rounded, size: 18, color: CkColors.muted),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Application Pending Host Review',
+                    style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700, color: CkColors.muted),
+                  ),
+                ],
+              ),
+            )
+          : _ReplyButton(
+              label: 'Apply to Play →',
+              onTap: busy ? null : onApply,
+              primary: true,
+              busy: busy,
+            ),
+    );
+  }
+}
+
+/// Card showing an applicant team for the open pool host.
+class _ApplicantCard extends ConsumerWidget {
+  const _ApplicantCard({
+    required this.application,
+    required this.isPoster,
+    required this.req,
+    required this.busy,
+    required this.onAccept,
+    required this.onReject,
+  });
+
+  final MatchPoolApplication application;
+  final bool isPoster;
+  final MatchRequest req;
+  final bool busy;
+  final VoidCallback onAccept;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final team = ref.watch(teamProvider(application.applicantTeamId.value)).value;
+    final isPending = application.status == PoolApplicationStatus.pending;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: CkColors.paper,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: application.status == PoolApplicationStatus.accepted
+              ? CkColors.green
+              : CkColors.hairline,
+          width: application.status == PoolApplicationStatus.accepted ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Crest(
+                short: _short(team, fallback: 'TM'),
+                color: _teamColor(team?.primaryColor),
+                size: 40,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      team?.name ?? 'Team Applicant',
+                      style: CkType.display(fontSize: 15, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      team?.homeGround ?? 'Local Club',
+                      style: CkType.body(fontSize: 12, color: CkColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: application.status == PoolApplicationStatus.accepted
+                      ? CkColors.green.withValues(alpha: 0.12)
+                      : application.status == PoolApplicationStatus.rejected
+                          ? CkColors.red.withValues(alpha: 0.12)
+                          : CkColors.ink.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  application.status == PoolApplicationStatus.accepted
+                      ? 'ACCEPTED'
+                      : application.status == PoolApplicationStatus.rejected
+                          ? 'DECLINED'
+                          : 'APPLICANT',
+                  style: CkType.mono(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: application.status == PoolApplicationStatus.accepted
+                        ? CkColors.green
+                        : application.status == PoolApplicationStatus.rejected
+                            ? CkColors.red
+                            : CkColors.ink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (application.message != null && application.message!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: CkColors.hairline.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '“${application.message}”',
+                style: CkType.body(fontSize: 12.5, color: CkColors.ink).copyWith(
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
+          if (isPoster && isPending && req.isPending) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: CkColors.red,
+                      side: const BorderSide(color: CkColors.hairline),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: busy ? null : onReject,
+                    child: const Text('Decline'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CkColors.green,
+                      foregroundColor: CkColors.paper,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: busy ? null : onAccept,
+                    child: const Text(
+                      'Accept & Lock Match',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Sticky reply bar — Decline (red text) + ink-filled Accept (or single Claim Match button for open pool).
 class _ReplyBar extends StatelessWidget {
   const _ReplyBar({
     required this.busy,
     required this.onDecline,
-    // required this.onCounter,
     required this.onAccept,
+    this.isOpenPool = false,
   });
   final bool busy;
   final VoidCallback onDecline;
-  // final VoidCallback onCounter;
   final VoidCallback onAccept;
+  final bool isOpenPool;
 
   @override
   Widget build(BuildContext context) {
@@ -724,29 +1271,21 @@ class _ReplyBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(
-            flex: 10,
-            child: _ReplyButton(
-              label: 'Decline',
-              onTap: busy ? null : onDecline,
-              foreground: CkColors.red,
+          if (!isOpenPool) ...[
+            Expanded(
+              flex: 10,
+              child: _ReplyButton(
+                label: 'Decline',
+                onTap: busy ? null : onDecline,
+                foreground: CkColors.red,
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          // Counter flow disabled — keep accept/decline only for now.
-          // Expanded(
-          //   flex: 10,
-          //   child: _ReplyButton(
-          //     label: 'Counter',
-          //     onTap: busy ? null : onCounter,
-          //     foreground: CkColors.ink,
-          //   ),
-          // ),
-          // const SizedBox(width: 8),
+            const SizedBox(width: 8),
+          ],
           Expanded(
-            flex: 16,
+            flex: isOpenPool ? 1 : 16,
             child: _ReplyButton(
-              label: 'Accept →',
+              label: isOpenPool ? 'Accept & Claim Match →' : 'Accept →',
               onTap: busy ? null : onAccept,
               primary: true,
               busy: busy,

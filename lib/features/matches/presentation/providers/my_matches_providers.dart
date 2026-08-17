@@ -23,7 +23,7 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   if (user == null) return const MyMatchesView.empty();
 
   final matchesResult =
-      await ref.watch(matchesRepositoryProvider).listMyMatches();
+      await ref.watch(listMyMatchesUseCaseProvider)();
   final matches = matchesResult.fold<List<Match>>(
     (f) => throw FailureWrapper(f),
     (list) => list,
@@ -33,7 +33,7 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   // challenges. Degrade to empty on failure so a requests error never blanks
   // the matches screen (mirrors the innings fold below).
   final reqResult =
-      await ref.watch(matchesRepositoryProvider).listMyMatchChallenges();
+      await ref.watch(listMyMatchChallengesUseCaseProvider)();
   final allRequests =
       reqResult.fold<List<MatchRequest>>((_) => const [], (list) => list);
 
@@ -89,8 +89,7 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   Map<MatchId, List<InningsSummary>> inningsByMatch = const {};
   if (past.isNotEmpty) {
     final result = await ref
-        .read(matchesRepositoryProvider)
-        .listInningsForMatches(past.map((m) => m.id));
+        .read(listInningsForMatchesUseCaseProvider)(past.map((m) => m.id));
     inningsByMatch = result.fold((_) => const {}, (map) => map);
   }
 

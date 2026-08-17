@@ -9,6 +9,7 @@ import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_innings_state.dart';
 import '../../domain/entities/match_player.dart';
+import '../../domain/entities/match_pool_application.dart';
 import '../../domain/entities/match_request.dart';
 import '../../domain/repositories/matches_repository.dart';
 import '../datasources/format_presets_remote_datasource.dart';
@@ -623,6 +624,88 @@ class MatchesRepositoryImpl implements MatchesRepository {
       return Left(AuthFailure(e.message));
     } on NotFoundException catch (e) {
       return Left(NotFoundFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> applyToMatchPool({
+    required MatchRequestId requestId,
+    required TeamId teamId,
+    List<String> xi = const [],
+    String? keeperId,
+    String? message,
+  }) async {
+    try {
+      final appId = await _requests.applyToMatchPool(
+        requestId: requestId.value,
+        applicantTeamId: teamId.value,
+        applicantXi: xi,
+        applicantKeeperId: keeperId,
+        message: message,
+      );
+      return Right(appId);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<MatchPoolApplication>>> listPoolApplications(
+    MatchRequestId requestId,
+  ) async {
+    try {
+      final dtos = await _requests.listPoolApplications(requestId.value);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, MatchId>> acceptPoolApplication({
+    required String applicationId,
+    String? decisionNote,
+  }) async {
+    try {
+      final matchId = await _requests.acceptPoolApplication(
+        applicationId: applicationId,
+        decisionNote: decisionNote,
+      );
+      return Right(MatchId(matchId));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> rejectPoolApplication({
+    required String applicationId,
+    String? reason,
+  }) async {
+    try {
+      await _requests.rejectPoolApplication(
+        applicationId: applicationId,
+        reason: reason,
+      );
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

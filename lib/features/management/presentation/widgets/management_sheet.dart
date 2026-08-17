@@ -218,7 +218,7 @@ class ManagementSheet extends ConsumerWidget {
                       icon: Icons.explore_outlined,
                       onTap: () {
                         Navigator.of(context).pop();
-                        context.go('/matches');
+                        context.push('/matches/pool');
                       },
                     ),
 

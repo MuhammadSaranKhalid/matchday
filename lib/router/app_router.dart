@@ -28,6 +28,8 @@ import '../features/matches/presentation/screens/challenge_detail_screen.dart';
 import '../features/matches/presentation/screens/challenge_send_screen.dart';
 import '../features/matches/presentation/screens/challenge_sent_screen.dart';
 import '../features/matches/presentation/screens/match_start_screen.dart';
+import '../features/matches/presentation/screens/my_pool_broadcasts_screen.dart';
+import '../features/matches/presentation/screens/open_match_pool_screen.dart';
 import '../features/matches/presentation/screens/scoring_screen.dart';
 import '../features/matches/presentation/screens/innings_break_screen.dart';
 import '../features/matches/presentation/screens/scorecard_screen.dart';
@@ -232,6 +234,14 @@ GoRouter appRouter(Ref ref) {
         ),
       ),
       GoRoute(
+        path: '/matches/:matchId/scoring',
+        builder: (_, state) => ScoringScreen(
+          matchId: state.pathParameters['matchId']!,
+          inningsNumber:
+              int.tryParse(state.uri.queryParameters['innings'] ?? '') ?? 1,
+        ),
+      ),
+      GoRoute(
         path: '/matches/:matchId/innings-break',
         builder: (_, state) =>
             InningsBreakScreen(matchId: state.pathParameters['matchId']!),
@@ -247,7 +257,19 @@ GoRouter appRouter(Ref ref) {
             ResultScreen(matchId: state.pathParameters['matchId']!),
       ),
       GoRoute(
+        path: '/matches/pool',
+        builder: (_, __) => const OpenMatchPoolScreen(),
+      ),
+      GoRoute(
+        path: '/matches/my-broadcasts',
+        builder: (_, __) => const MyPoolBroadcastsScreen(),
+      ),
+      GoRoute(
         path: '/challenge',
+        builder: (_, __) => const ChallengeSendScreen(),
+      ),
+      GoRoute(
+        path: '/matches/send-challenge',
         builder: (_, __) => const ChallengeSendScreen(),
       ),
       GoRoute(

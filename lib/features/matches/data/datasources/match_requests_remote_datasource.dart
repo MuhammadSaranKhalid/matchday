@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../domain/entities/match.dart' show MatchFormat;
+import '../models/match_pool_application_dto.dart';
 import '../models/match_request_dto.dart';
 
 /// Talks to Supabase for the `match_requests` table and its challenge-handshake
@@ -191,6 +192,81 @@ class MatchRequestsRemoteDataSource {
       return rows.map(MatchRequestDto.fromJson).toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
+    }
+  }
+
+  Future<String> applyToMatchPool({
+    required String requestId,
+    required String applicantTeamId,
+    List<String> applicantXi = const [],
+    String? applicantKeeperId,
+    String? message,
+  }) async {
+    try {
+      final id = await _supabase.rpc<String>(
+        'apply_to_match_pool',
+        params: {
+          'p_request_id': requestId,
+          'p_applicant_team_id': applicantTeamId,
+          'p_applicant_xi': applicantXi,
+          if (applicantKeeperId != null)
+            'p_applicant_keeper_id': applicantKeeperId,
+          if (message != null) 'p_message': message,
+        },
+      );
+      return id;
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
+    }
+  }
+
+  Future<List<MatchPoolApplicationDto>> listPoolApplications(
+    String requestId,
+  ) async {
+    try {
+      final rows = await _supabase
+          .from('match_pool_applications')
+          .select()
+          .eq('request_id', requestId)
+          .order('created_at', ascending: false);
+      return rows.map(MatchPoolApplicationDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<String> acceptPoolApplication({
+    required String applicationId,
+    String? decisionNote,
+  }) async {
+    try {
+      final matchId = await _supabase.rpc<String>(
+        'accept_pool_application',
+        params: {
+          'p_application_id': applicationId,
+          if (decisionNote != null) 'p_decision_note': decisionNote,
+        },
+      );
+      return matchId;
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
+    }
+  }
+
+  Future<void> rejectPoolApplication({
+    required String applicationId,
+    String? reason,
+  }) async {
+    try {
+      await _supabase.rpc<void>(
+        'reject_pool_application',
+        params: {
+          'p_application_id': applicationId,
+          if (reason != null) 'p_reason': reason,
+        },
+      );
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
     }
   }
 

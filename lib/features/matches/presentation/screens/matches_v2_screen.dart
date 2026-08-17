@@ -9,9 +9,12 @@
 // Colours / radii / type come from [CkColors] / [CkRadii] / [CkType]; shared
 // atoms (Crest, Pill, V2Header, V2Svg, CkCrest, CkInk) come from the v2 kit.
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
+import '../providers/matches_feed_providers.dart';
 
 /// The base mono eyebrow style used across the prototype: JetBrains Mono
 /// 0.10em uppercase muted. (`mono` in the JSX; `CkType.mono` defaults to the
@@ -39,47 +42,107 @@ TextStyle _monoPlain({required double fontSize, Color color = CkColors.muted}) =
       color: color,
     );
 
-class MatchesV2Screen extends StatefulWidget {
+String _teamShort(dynamic team) {
+  if (team == null) return 'TM';
+  if (team.logoMonogram != null && (team.logoMonogram as String).isNotEmpty) {
+    return team.logoMonogram as String;
+  }
+  final name = team.name as String? ?? '';
+  if (name.length >= 2) {
+    final parts = name.split(' ');
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  }
+  return name.toUpperCase();
+}
+
+Color _teamColor(dynamic team) {
+  if (team == null || team.primaryColor == null) return CkColors.red;
+  final hex = (team.primaryColor as String).replaceAll('#', '');
+  final val = int.tryParse(hex, radix: 16);
+  if (val == null) return CkColors.red;
+  return Color(0xFF000000 | val);
+}
+
+class MatchesV2Screen extends ConsumerStatefulWidget {
   const MatchesV2Screen({super.key, this.onBell});
 
   final VoidCallback? onBell;
 
   @override
-  State<MatchesV2Screen> createState() => _MatchesV2ScreenState();
+  ConsumerState<MatchesV2Screen> createState() => _MatchesV2ScreenState();
 }
 
 enum _MatchTab { live, upcoming, recent, browse }
 
-class _MatchesV2ScreenState extends State<MatchesV2Screen> {
+class _MatchesV2ScreenState extends ConsumerState<MatchesV2Screen> {
   _MatchTab _tab = _MatchTab.live;
 
   @override
   Widget build(BuildContext context) {
+    final feedAsync = ref.watch(matchesFeedProvider);
+
     return ColoredBox(
       color: CkColors.paper,
       child: Column(
         children: [
           _MatchTabs(
             active: _tab,
+            feedState: feedAsync.value,
             onChange: (t) => setState(() => _tab = t),
           ),
-          Expanded(child: _body()),
+          Expanded(
+            child: RefreshIndicator(
+              color: CkColors.ink,
+              backgroundColor: CkColors.paper,
+              onRefresh: () async {
+                ref.invalidate(matchesFeedProvider);
+              },
+              child: switch (feedAsync) {
+                AsyncData(:final value) => _bodyFor(value),
+                AsyncError() => ListView(
+                    padding: const EdgeInsets.all(24),
+                    children: [
+                      Center(
+                        child: Text(
+                          'Failed to load matches feed',
+                          style: CkType.body(fontSize: 13, color: CkColors.muted),
+                        ),
+                      ),
+                    ],
+                  ),
+                _ => const Center(
+                    child: CircularProgressIndicator(color: CkColors.ink),
+                  ),
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _body() {
-    // JSX scroll container padding: '4px 0 12px'.
+  Widget _bodyFor(MatchesFeedState state) {
     const pad = EdgeInsets.fromLTRB(0, 4, 0, 12);
     return switch (_tab) {
-      _MatchTab.live => ListView(padding: pad, children: const [_LiveBody()]),
-      _MatchTab.upcoming =>
-        ListView(padding: pad, children: const [_UpcomingBody()]),
-      _MatchTab.recent =>
-        ListView(padding: pad, children: const [_RecentBody()]),
-      _MatchTab.browse =>
-        ListView(padding: pad, children: const [_BrowseBody()]),
+      _MatchTab.live => ListView(
+          padding: pad,
+          children: [_LiveBody(items: state.live)],
+        ),
+      _MatchTab.upcoming => ListView(
+          padding: pad,
+          children: [_UpcomingBody(items: state.upcoming)],
+        ),
+      _MatchTab.recent => ListView(
+          padding: pad,
+          children: [_RecentBody(items: state.recent)],
+        ),
+      _MatchTab.browse => ListView(
+          padding: pad,
+          children: [_BrowseBody(poolItems: state.openPool)],
+        ),
     };
   }
 }
@@ -89,18 +152,28 @@ class _MatchesV2ScreenState extends State<MatchesV2Screen> {
 // ───────────────────────────────────────────────────────────────────────────
 
 class _MatchTabs extends StatelessWidget {
-  const _MatchTabs({required this.active, required this.onChange});
+  const _MatchTabs({
+    required this.active,
+    required this.onChange,
+    this.feedState,
+  });
 
   final _MatchTab active;
   final ValueChanged<_MatchTab> onChange;
+  final MatchesFeedState? feedState;
 
   @override
   Widget build(BuildContext context) {
-    const tabs = [
-      (_MatchTab.live, 'Live', '2', true, false),
-      (_MatchTab.upcoming, 'Upcoming', '5', false, false),
-      (_MatchTab.recent, 'Recent', '7', false, false),
-      (_MatchTab.browse, 'Browse', '∞', false, true),
+    final liveCount = feedState?.liveCount ?? 0;
+    final upcomingCount = feedState?.upcomingCount ?? 0;
+    final recentCount = feedState?.recentCount ?? 0;
+    final poolCount = feedState?.poolCount ?? 0;
+
+    final tabs = [
+      (_MatchTab.live, 'Live', '$liveCount', true, false),
+      (_MatchTab.upcoming, 'Upcoming', '$upcomingCount', false, false),
+      (_MatchTab.recent, 'Recent', '$recentCount', false, false),
+      (_MatchTab.browse, 'Browse', poolCount > 0 ? '$poolCount' : '∞', false, poolCount > 0),
     ];
     return Padding(
       // JSX: padding '0 14px 10px'.
@@ -247,43 +320,59 @@ class _Subhead extends StatelessWidget {
 // ───────────────────────────────────────────────────────────────────────────
 
 class _LiveBody extends StatelessWidget {
-  const _LiveBody();
+  const _LiveBody({this.items = const []});
+
+  final List<PublicLiveMatchItem> items;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 6),
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'NO LIVE MATCHES',
+                style: _mono(fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Matches currently in progress or toss will show here.',
+                textAlign: TextAlign.center,
+                style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Subhead("Spring Cup '26 · QF"),
-          _LiveMatchCard(
-            tournament: 'QF · MATCH 2',
-            aShort: 'LL',
-            aColor: CkCrest.ll,
-            aName: 'Lahore Lions',
-            aScore: '142/6 (20)',
-            bShort: 'KC',
-            bColor: CkCrest.kc,
-            bName: 'Karachi Cobras',
-            bScore: '119/9 (19.2)',
-            need: 'L need 24 from 12 balls',
-            rate: 'CRR 5.97  RRR 12.00',
-          ),
-          _Subhead('Sunday League'),
-          _LiveMatchCard(
-            tournament: 'GROUP A · R1',
-            aShort: 'MT',
-            aColor: CkCrest.mt,
-            aName: 'Multan Tigers',
-            aScore: '98/2 (12.4)',
-            bShort: 'OB',
-            bColor: CkCrest.ob,
-            bName: 'Old Boys',
-            bScore: '—',
-            need: 'MT building a base',
-            rate: 'CRR 7.74  Target —',
-          ),
+          const _Subhead('In Progress'),
+          for (final item in items)
+            _LiveMatchCard(
+              matchId: item.match.id.value,
+              tournament: item.match.format.oversPerInnings > 0
+                  ? '${item.match.format.oversPerInnings} OVERS · ${item.match.format.ballType.wire.toUpperCase()}'
+                  : 'FRIENDLY MATCH',
+              aShort: _teamShort(item.teamA),
+              aColor: _teamColor(item.teamA),
+              aName: item.teamA?.name ?? 'Team A',
+              aScore: item.scoreA,
+              bShort: _teamShort(item.teamB),
+              bColor: _teamColor(item.teamB),
+              bName: item.teamB?.name ?? 'Team B',
+              bScore: item.scoreB,
+              need: item.need,
+              rate: item.rate,
+              scorer: item.scorerName ?? 'Matchday Scorer',
+            ),
         ],
       ),
     );
@@ -292,6 +381,7 @@ class _LiveBody extends StatelessWidget {
 
 class _LiveMatchCard extends StatelessWidget {
   const _LiveMatchCard({
+    required this.matchId,
     required this.tournament,
     required this.aShort,
     required this.aColor,
@@ -303,8 +393,10 @@ class _LiveMatchCard extends StatelessWidget {
     required this.bScore,
     required this.need,
     required this.rate,
+    required this.scorer,
   });
 
+  final String matchId;
   final String tournament;
   final String aShort;
   final Color aColor;
@@ -316,99 +408,105 @@ class _LiveMatchCard extends StatelessWidget {
   final String bScore;
   final String need;
   final String rate;
+  final String scorer;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       // JSX: '0 14px 12px'.
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          border: Border.all(color: CkColors.hairline),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header row.
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  const Pill(label: 'LIVE', tone: PillTone.red),
-                  const SizedBox(width: 8),
-                  Text(tournament, style: _mono(fontSize: 9)),
-                  const Spacer(),
-                  Text(
-                    'scoring · Imran S.',
-                    style: _monoPlain(fontSize: 9),
-                  ),
-                ],
+      child: GestureDetector(
+        onTap: () {
+          context.push('/matches/$matchId/scoring');
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: CkColors.paper,
+            border: Border.all(color: CkColors.hairline),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header row.
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    const Pill(label: 'LIVE', tone: PillTone.red),
+                    const SizedBox(width: 8),
+                    Text(tournament, style: _mono(fontSize: 9)),
+                    const Spacer(),
+                    Text(
+                      'scoring · $scorer',
+                      style: _monoPlain(fontSize: 9),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            // Team A.
-            _TeamRow(
-              short: aShort,
-              color: aColor,
-              name: aName,
-              score: aScore,
-              topHairline: false,
-            ),
-            // Team B (chasing — score in red).
-            _TeamRow(
-              short: bShort,
-              color: bColor,
-              name: bName,
-              score: bScore,
-              scoreColor: CkColors.red,
-              topHairline: true,
-            ),
-            // Footer.
-            Container(
-              padding: const EdgeInsets.only(top: 8),
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: CkColors.hairline)),
+              // Team A.
+              _TeamRow(
+                short: aShort,
+                color: aColor,
+                name: aName,
+                score: aScore,
+                topHairline: false,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          need,
-                          style: CkType.body(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: CkColors.ink,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            rate,
-                            style: const TextStyle(
-                              fontFamily: 'JetBrains Mono',
-                              fontSize: 10,
-                              fontWeight: FontWeight.w400,
-                              color: CkColors.muted,
+              // Team B (chasing — score in red).
+              _TeamRow(
+                short: bShort,
+                color: bColor,
+                name: bName,
+                score: bScore,
+                scoreColor: CkColors.red,
+                topHairline: true,
+              ),
+              // Footer.
+              Container(
+                padding: const EdgeInsets.only(top: 8),
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: CkColors.hairline)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            need,
+                            style: CkType.body(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: CkColors.ink,
                             ),
                           ),
-                        ),
-                      ],
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              rate,
+                              style: const TextStyle(
+                                fontFamily: 'JetBrains Mono',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w400,
+                                color: CkColors.muted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  const _WatchButton(),
-                ],
+                    const SizedBox(width: 10),
+                    _WatchButton(matchId: matchId),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -477,12 +575,15 @@ class _TeamRow extends StatelessWidget {
 }
 
 class _WatchButton extends StatelessWidget {
-  const _WatchButton();
+  const _WatchButton({required this.matchId});
+  final String matchId;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        context.push('/matches/$matchId/scoring');
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
@@ -490,7 +591,7 @@ class _WatchButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
-          'Watch',
+          'Score / Watch',
           style: CkType.body(
             fontSize: 12,
             fontWeight: FontWeight.w700,
@@ -507,63 +608,71 @@ class _WatchButton extends StatelessWidget {
 // ───────────────────────────────────────────────────────────────────────────
 
 class _UpcomingBody extends StatelessWidget {
-  const _UpcomingBody();
+  const _UpcomingBody({this.items = const []});
+
+  final List<PublicUpcomingMatchItem> items;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 6),
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'NO UPCOMING FIXTURES',
+                style: _mono(fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Confirmed upcoming matches will appear here.',
+                textAlign: TextAlign.center,
+                style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final today = items.where((i) => i.isToday).toList();
+    final later = items.where((i) => !i.isToday).toList();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Subhead('Today'),
-          _UpcomingRow(
-            when: '4:00 PM',
-            aShort: 'LL',
-            aColor: CkCrest.ll,
-            bShort: 'KC',
-            bColor: CkCrest.kc,
-            ctx: 'Spring Cup · SF 1',
-            venue: 'Gaddafi B',
-          ),
-          _UpcomingRow(
-            when: '6:30 PM',
-            aShort: 'MT',
-            aColor: CkCrest.mt,
-            bShort: 'OB',
-            bColor: CkCrest.ob,
-            ctx: 'Sunday League · R2',
-            venue: 'Iqbal Park',
-          ),
-          _Subhead('This week'),
-          _UpcomingRow(
-            when: 'Sat 25 · 4 PM',
-            aShort: 'LL',
-            aColor: CkCrest.ll,
-            bShort: 'MK',
-            bColor: CkCrest.mk,
-            ctx: 'Friendly',
-            venue: 'Model Town',
-          ),
-          _UpcomingRow(
-            when: 'Sun 26 · 7 AM',
-            aShort: 'KE',
-            aColor: CkCrest.ke,
-            bShort: 'OB',
-            bColor: CkCrest.ob,
-            ctx: 'Friendly · T10',
-            venue: 'Iqbal Park',
-          ),
-          _UpcomingRow(
-            when: 'Wed 29 · 4 PM',
-            aShort: 'SC',
-            aColor: CkCrest.sc,
-            bShort: 'SC',
-            bColor: CkCrest.sc,
-            ctx: 'Spring Cup · F',
-            venue: 'Gaddafi B',
-            isFinal: true,
-          ),
+          if (today.isNotEmpty) ...[
+            const _Subhead('Today'),
+            for (final item in today)
+              _UpcomingRow(
+                matchId: item.match.id.value,
+                when: item.whenFormatted,
+                aShort: _teamShort(item.teamA),
+                aColor: _teamColor(item.teamA),
+                bShort: _teamShort(item.teamB),
+                bColor: _teamColor(item.teamB),
+                ctx: item.contextLabel,
+                venue: item.venue,
+              ),
+          ],
+          if (later.isNotEmpty) ...[
+            const _Subhead('Upcoming'),
+            for (final item in later)
+              _UpcomingRow(
+                matchId: item.match.id.value,
+                when: item.whenFormatted,
+                aShort: _teamShort(item.teamA),
+                aColor: _teamColor(item.teamA),
+                bShort: _teamShort(item.teamB),
+                bColor: _teamColor(item.teamB),
+                ctx: item.contextLabel,
+                venue: item.venue,
+              ),
+          ],
         ],
       ),
     );
@@ -572,6 +681,7 @@ class _UpcomingBody extends StatelessWidget {
 
 class _UpcomingRow extends StatelessWidget {
   const _UpcomingRow({
+    required this.matchId,
     required this.when,
     required this.aShort,
     required this.aColor,
@@ -579,9 +689,9 @@ class _UpcomingRow extends StatelessWidget {
     required this.bColor,
     required this.ctx,
     required this.venue,
-    this.isFinal = false,
   });
 
+  final String matchId;
   final String when;
   final String aShort;
   final Color aColor;
@@ -589,86 +699,88 @@ class _UpcomingRow extends StatelessWidget {
   final Color bColor;
   final String ctx;
   final String venue;
-  final bool isFinal;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      // JSX: margin '0 14px 8px'.
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        border: Border.all(color: CkColors.hairline),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Left column.
-            SizedBox(
-              width: 78,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    when,
-                    style: CkType.display(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+    return GestureDetector(
+      onTap: () {
+        context.push('/matches/$matchId/start');
+      },
+      child: Container(
+        // JSX: margin '0 14px 8px'.
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          border: Border.all(color: CkColors.hairline),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Left column.
+              SizedBox(
+                width: 78,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      when,
+                      style: CkType.display(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(venue, style: _monoPlain(fontSize: 9)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Vertical divider.
-            const VerticalDivider(
-              width: 1,
-              thickness: 1,
-              color: CkColors.hairline,
-            ),
-            const SizedBox(width: 10),
-            // Middle: crests + vs + optional FINAL pill.
-            Expanded(
-              child: Row(
-                children: [
-                  Crest(short: aShort, color: aColor, size: 26, radius: 6),
-                  const SizedBox(width: 6),
-                  Text(
-                    'vs',
-                    style: CkType.mono(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.10,
-                      color: CkColors.muted,
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(venue, style: _monoPlain(fontSize: 9)),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Crest(short: bShort, color: bColor, size: 26, radius: 6),
-                  const Spacer(),
-                  if (isFinal)
-                    const Pill(label: 'FINAL', tone: PillTone.amber),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            // Right: context.
-            SizedBox(
-              width: 70,
-              child: Text(
-                ctx.toUpperCase(),
-                textAlign: TextAlign.right,
-                style: _mono(fontSize: 9),
+              const SizedBox(width: 10),
+              // Vertical divider.
+              const VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: CkColors.hairline,
               ),
-            ),
-          ],
+              const SizedBox(width: 10),
+              // Middle: crests + vs + optional FINAL pill.
+              Expanded(
+                child: Row(
+                  children: [
+                    Crest(short: aShort, color: aColor, size: 26, radius: 6),
+                    const SizedBox(width: 6),
+                    Text(
+                      'vs',
+                      style: CkType.mono(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.10,
+                        color: CkColors.muted,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Crest(short: bShort, color: bColor, size: 26, radius: 6),
+                    const Spacer(),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Right: context.
+              SizedBox(
+                width: 70,
+                child: Text(
+                  ctx.toUpperCase(),
+                  textAlign: TextAlign.right,
+                  style: _mono(fontSize: 9),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -680,58 +792,53 @@ class _UpcomingRow extends StatelessWidget {
 // ───────────────────────────────────────────────────────────────────────────
 
 class _RecentBody extends StatelessWidget {
-  const _RecentBody();
+  const _RecentBody({this.items = const []});
+
+  final List<PublicRecentMatchItem> items;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 6),
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'NO RECENT MATCHES',
+                style: _mono(fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Completed match scorecards will appear here.',
+                textAlign: TextAlign.center,
+                style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Subhead('Yesterday'),
-          _RecentRow(
-            aShort: 'LL',
-            aColor: CkCrest.ll,
-            bShort: 'MT',
-            bColor: CkCrest.mt,
-            aScore: '142/6',
-            bScore: '119/9',
-            result: 'Lions won by 23 runs',
-            ctx: 'Spring Cup · R1',
-          ),
-          _Subhead('This week'),
-          _RecentRow(
-            aShort: 'KE',
-            aColor: CkCrest.ke,
-            bShort: 'MK',
-            bColor: CkCrest.mk,
-            aScore: '178/4',
-            bScore: '142/9',
-            result: 'Eagles won by 36 runs',
-            ctx: 'Friendly · 20 ov',
-          ),
-          _RecentRow(
-            aShort: 'OB',
-            aColor: CkCrest.ob,
-            bShort: 'KC',
-            bColor: CkCrest.kc,
-            aScore: '108',
-            bScore: '111/4',
-            result: 'Cobras won by 6 wkts',
-            ctx: 'Sunday League',
-          ),
-          _Subhead('Earlier'),
-          _RecentRow(
-            aShort: 'MT',
-            aColor: CkCrest.mt,
-            bShort: 'LL',
-            bColor: CkCrest.ll,
-            aScore: '156/8',
-            bScore: '159/6',
-            result: 'Lions won by 4 wkts',
-            ctx: 'Friendly',
-          ),
+          const _Subhead('Completed Matches'),
+          for (final item in items)
+            _RecentRow(
+              matchId: item.match.id.value,
+              aShort: _teamShort(item.teamA),
+              aColor: _teamColor(item.teamA),
+              bShort: _teamShort(item.teamB),
+              bColor: _teamColor(item.teamB),
+              aScore: item.scoreA,
+              bScore: item.scoreB,
+              result: item.resultSummary,
+              ctx: item.contextLabel,
+            ),
         ],
       ),
     );
@@ -740,6 +847,7 @@ class _RecentBody extends StatelessWidget {
 
 class _RecentRow extends StatelessWidget {
   const _RecentRow({
+    required this.matchId,
     required this.aShort,
     required this.aColor,
     required this.bShort,
@@ -750,6 +858,7 @@ class _RecentRow extends StatelessWidget {
     required this.ctx,
   });
 
+  final String matchId;
   final String aShort;
   final Color aColor;
   final String bShort;
@@ -761,48 +870,53 @@ class _RecentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        border: Border.all(color: CkColors.hairline),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Score row.
-          Row(
-            children: [
-              Crest(short: aShort, color: aColor, size: 26, radius: 6),
-              const SizedBox(width: 10),
-              Text(aScore, style: _score(CkColors.ink)),
-              const Spacer(),
-              Text(bScore, style: _score(CkColors.muted)),
-              const SizedBox(width: 10),
-              Crest(short: bShort, color: bColor, size: 26, radius: 6),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Result row.
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                result,
-                style: CkType.body(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: CkColors.ink,
+    return GestureDetector(
+      onTap: () {
+        context.push('/matches/$matchId/scoring');
+      },
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          border: Border.all(color: CkColors.hairline),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Score row.
+            Row(
+              children: [
+                Crest(short: aShort, color: aColor, size: 26, radius: 6),
+                const SizedBox(width: 10),
+                Text(aScore, style: _score(CkColors.ink)),
+                const Spacer(),
+                Text(bScore, style: _score(CkColors.muted)),
+                const SizedBox(width: 10),
+                Crest(short: bShort, color: bColor, size: 26, radius: 6),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Result row.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  result,
+                  style: CkType.body(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: CkColors.ink,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              Text(ctx.toUpperCase(), style: _mono(fontSize: 9)),
-            ],
-          ),
-        ],
+                const Spacer(),
+                Text(ctx.toUpperCase(), style: _mono(fontSize: 9)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -820,27 +934,180 @@ class _RecentRow extends StatelessWidget {
 // ───────────────────────────────────────────────────────────────────────────
 
 class _BrowseBody extends StatelessWidget {
-  const _BrowseBody();
+  const _BrowseBody({this.poolItems = const []});
+
+  final List<OpenMatchPoolItem> poolItems;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Open Challenge Matchmaking banner & quick code entry
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: CkColors.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Pill(label: 'OPEN POOL', tone: PillTone.green),
+                    const SizedBox(width: 8),
+                    Text('CHALLENGE MATCHMAKING', style: _mono(fontSize: 9.5)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Join an open match challenge or accept an opponent\'s 6-digit share code.',
+                  style: CkType.body(fontSize: 12.5, color: CkColors.ink2),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          context.push('/matches/send-challenge');
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: CkColors.ink,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '+ Post Open Challenge',
+                            style: CkType.body(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: CkColors.paper,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          context.push('/matches/pool');
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: CkColors.paper,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: CkColors.hairline),
+                          ),
+                          child: Text(
+                            'Open Match Pool →',
+                            style: CkType.body(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: CkColors.ink,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        if (poolItems.isNotEmpty) ...[
+          const _Subhead('Open Challenges'),
+          for (final item in poolItems)
+            GestureDetector(
+              onTap: () {
+                context.push('/challenges/${item.request.id.value}');
+              },
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: CkColors.paper,
+                  border: Border.all(color: CkColors.hairline),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Crest(
+                      short: _teamShort(item.fromTeam),
+                      color: _teamColor(item.fromTeam),
+                      size: 36,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            item.fromTeam?.name ?? 'Open Challenger',
+                            style: CkType.display(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              '${item.formatLabel} · ${item.venue}',
+                              style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: CkColors.paper2,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: CkColors.hairline),
+                      ),
+                      child: Text(
+                        item.shareCode,
+                        style: CkType.mono(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.14,
+                          color: CkColors.ink,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+
         // Filter chips row (horizontally scrollable).
         Padding(
           // JSX: padding '4px 18px 12px'.
-          padding: const EdgeInsets.fromLTRB(18, 4, 18, 12),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
                 for (final (i, label) in const [
+                  'Tournaments',
                   'Following',
                   'Playing',
                   'Organizing',
                   'Near you',
-                  'Featured',
                 ].indexed) ...[
                   if (i > 0) const SizedBox(width: 6),
                   _FilterChip(label: label, active: i == 0),
@@ -851,7 +1118,7 @@ class _BrowseBody extends StatelessWidget {
         ),
         // Featured hero.
         const _FeaturedHero(),
-        const _Subhead('Following · 2'),
+        const _Subhead('Tournaments · Active'),
         const _TourneyRow(
           short: 'SC',
           color: CkCrest.sc,
@@ -861,42 +1128,15 @@ class _BrowseBody extends StatelessWidget {
         ),
         const _TourneyRow(
           short: 'SL',
-          // oklch(0.42 0.10 260) — deep indigo (same family as KC).
           color: Color(0xFF2E3E63),
           name: "Sunday League '26",
           meta: 'R1 · 24 matches scheduled',
         ),
-        const _Subhead('Playing · 1'),
-        const _TourneyRow(
-          short: 'SC',
-          color: CkCrest.sc,
-          name: "Spring Cup '26",
-          meta: 'You · Lahore Lions · seeded #3',
-          role: 'PLAYING',
-        ),
-        const _Subhead('Organizing · 1'),
-        const _TourneyRow(
-          short: 'IF',
-          // oklch(0.55 0.13 80) — warm olive/amber-brown.
-          color: Color(0xFF8A6A1E),
-          name: 'Iqbal Park Festival',
-          meta: 'Registration opens Mon',
-          role: 'DRAFT',
-        ),
-        const _Subhead('Near you · Karachi'),
         const _TourneyRow(
           short: 'KT',
-          // oklch(0.45 0.12 250) — blue.
           color: Color(0xFF2F4C84),
           name: 'Karachi T20 Open',
           meta: '32 teams · prize ₨ 50k',
-        ),
-        const _TourneyRow(
-          short: 'KC',
-          // oklch(0.42 0.10 260) — deep indigo.
-          color: Color(0xFF2E3E63),
-          name: 'Korangi Cup',
-          meta: '16 teams · tape ball',
         ),
       ],
     );
@@ -1095,7 +1335,6 @@ class _TourneyRow extends StatelessWidget {
     required this.color,
     required this.name,
     required this.meta,
-    this.role,
     this.live = false,
   });
 
@@ -1103,7 +1342,6 @@ class _TourneyRow extends StatelessWidget {
   final Color color;
   final String name;
   final String meta;
-  final String? role;
   final bool live;
 
   @override
@@ -1153,10 +1391,6 @@ class _TourneyRow extends StatelessWidget {
               ],
             ),
           ),
-          if (role != null) ...[
-            const SizedBox(width: 8),
-            Pill(label: role!, tone: PillTone.neutral),
-          ],
           const SizedBox(width: 8),
           const V2Svg(V2Icons.chevronRight, size: 14, color: CkColors.muted),
         ],

@@ -50,23 +50,25 @@ class MatchStartController extends _$MatchStartController {
     required TossDecision decision,
     String? face,
   }) =>
-      ref.read(matchesRepositoryProvider).recordMatchToss(
-            id: MatchId(matchId),
-            wonBy: wonBy,
-            decision: decision,
-            face: face,
-          );
+      ref.read(recordMatchTossUseCaseProvider)(
+        id: MatchId(matchId),
+        wonBy: wonBy,
+        decision: decision,
+        face: face,
+      );
 
   Future<Either<Failure, Unit>> submitOpeners({
     required String strikerId,
     required String nonStrikerId,
   }) =>
-      ref.read(matchesRepositoryProvider).submitMatchOpeners(
-            id: MatchId(matchId),
-            strikerId: strikerId,
-            nonStrikerId: nonStrikerId,
-          );
+      ref.read(submitMatchOpenersUseCaseProvider)(
+        id: MatchId(matchId),
+        strikerId: strikerId,
+        nonStrikerId: nonStrikerId,
+      );
 
   Future<Either<Failure, Unit>> startMatchNow() =>
-      ref.read(matchesRepositoryProvider).startMatchNow(MatchId(matchId));
+      ref.read(startMatchNowUseCaseProvider)(MatchId(matchId));
+
+  Future<Either<Failure, Unit>> startMatch() => startMatchNow();
 }

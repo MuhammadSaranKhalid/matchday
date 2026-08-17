@@ -67,7 +67,7 @@ void main() {
 
   group('graph hygiene', () {
     test('no import cycles anywhere in lib/', () {
-      shouldBeFreeOfCycles(allFiles(), graph);
+      shouldBeFreeOfCycles(filesMatching('lib/**'), graph);
     });
   });
 

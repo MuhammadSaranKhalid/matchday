@@ -1018,6 +1018,7 @@ create policy "match_requests_read_team_managers"
   using (
     public.is_team_manager(from_team_id)
     or (to_team_id is not null and public.is_team_manager(to_team_id))
+    or (to_team_id is null and status = 'pending')
   );
 
 create policy "match_requests_no_direct_insert"

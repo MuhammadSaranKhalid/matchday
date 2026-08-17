@@ -6,59 +6,17 @@ import '../../data/repositories/match_pool_repository_impl.dart';
 import '../../domain/entities/match_pool_application.dart';
 import '../../domain/entities/match_request.dart';
 import '../../domain/repositories/match_pool_repository.dart';
-import '../../domain/usecases/accept_pool_application_usecase.dart';
-import '../../domain/usecases/apply_to_match_pool_usecase.dart';
-import '../../domain/usecases/find_match_challenge_by_code_usecase.dart';
-import '../../domain/usecases/get_my_pool_broadcasts_usecase.dart';
-import '../../domain/usecases/get_open_match_pool_usecase.dart';
-import '../../domain/usecases/list_pool_applications_usecase.dart';
-import '../../domain/usecases/reject_pool_application_usecase.dart';
 import 'matches_feed_providers.dart';
 
 part 'match_pool_providers.g.dart';
 
-// ─── Repositories & Use Cases ───────────────────────────────────────────────
+// ─── Repositories ───────────────────────────────────────────────────────────
 
 @Riverpod(keepAlive: true)
 MatchPoolRepository matchPoolRepository(Ref ref) {
   return MatchPoolRepositoryImpl(
     requestsDataSource: ref.watch(matchRequestsRemoteDataSourceProvider),
   );
-}
-
-@riverpod
-GetOpenMatchPoolUseCase getOpenMatchPoolUseCase(Ref ref) {
-  return GetOpenMatchPoolUseCase(ref.watch(matchPoolRepositoryProvider));
-}
-
-@riverpod
-GetMyPoolBroadcastsUseCase getMyPoolBroadcastsUseCase(Ref ref) {
-  return GetMyPoolBroadcastsUseCase(ref.watch(matchPoolRepositoryProvider));
-}
-
-@riverpod
-ApplyToMatchPoolUseCase applyToMatchPoolUseCase(Ref ref) {
-  return ApplyToMatchPoolUseCase(ref.watch(matchPoolRepositoryProvider));
-}
-
-@riverpod
-ListPoolApplicationsUseCase listPoolApplicationsUseCase(Ref ref) {
-  return ListPoolApplicationsUseCase(ref.watch(matchPoolRepositoryProvider));
-}
-
-@riverpod
-AcceptPoolApplicationUseCase acceptPoolApplicationUseCase(Ref ref) {
-  return AcceptPoolApplicationUseCase(ref.watch(matchPoolRepositoryProvider));
-}
-
-@riverpod
-FindMatchChallengeByCodeUseCase findMatchChallengeByCodeUseCase(Ref ref) {
-  return FindMatchChallengeByCodeUseCase(ref.watch(matchPoolRepositoryProvider));
-}
-
-@riverpod
-RejectPoolApplicationUseCase rejectPoolApplicationUseCase(Ref ref) {
-  return RejectPoolApplicationUseCase(ref.watch(matchPoolRepositoryProvider));
 }
 
 // ─── Presentation Providers ──────────────────────────────────────────────────
@@ -73,11 +31,11 @@ String _formatMatchTime(DateTime dt) {
 /// Open match pool challenges from other teams, mapped with team metadata.
 @riverpod
 Future<List<OpenMatchPoolItem>> openMatchPool(Ref ref) async {
-  final useCase = ref.watch(getOpenMatchPoolUseCaseProvider);
+  final repo = ref.watch(matchPoolRepositoryProvider);
   final myTeams = (await ref.watch(myTeamsProvider.future));
   final myTeamIds = myTeams.map((t) => t.id.value).toSet();
 
-  final result = await useCase();
+  final result = await repo.getOpenPoolChallenges();
   final challenges = result.fold<List<MatchRequest>>(
     (failure) => throw Exception(failure.message),
     (list) => list,
@@ -111,11 +69,11 @@ Future<List<OpenMatchPoolItem>> openMatchPool(Ref ref) async {
 /// Active match pool challenges hosted by user's own teams.
 @riverpod
 Future<List<OpenMatchPoolItem>> myPoolBroadcasts(Ref ref) async {
-  final useCase = ref.watch(getMyPoolBroadcastsUseCaseProvider);
+  final repo = ref.watch(matchPoolRepositoryProvider);
   final myTeams = (await ref.watch(myTeamsProvider.future));
   final myTeamIds = myTeams.map((t) => t.id).toSet();
 
-  final result = await useCase(myTeamIds: myTeamIds);
+  final result = await repo.getMyPoolBroadcasts(myTeamIds: myTeamIds);
   final challenges = result.fold<List<MatchRequest>>(
     (failure) => throw Exception(failure.message),
     (list) => list,
@@ -147,8 +105,8 @@ Future<List<MatchPoolApplication>> challengePoolApplications(
   Ref ref,
   String requestId,
 ) async {
-  final useCase = ref.watch(listPoolApplicationsUseCaseProvider);
-  final result = await useCase(MatchRequestId(requestId));
+  final repo = ref.watch(matchPoolRepositoryProvider);
+  final result = await repo.listPoolApplications(MatchRequestId(requestId));
   return result.fold(
     (failure) => throw Exception(failure.message),
     (apps) => apps,
@@ -188,4 +146,3 @@ Future<List<OpenMatchPoolItem>> filteredOpenMatchPool(Ref ref) async {
     return true;
   }).toList();
 }
-

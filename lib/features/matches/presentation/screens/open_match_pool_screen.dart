@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../teams/domain/entities/team.dart';
+import '../../domain/entities/match_request.dart';
 import '../providers/match_pool_providers.dart';
 import '../providers/matches_feed_providers.dart';
 
@@ -86,10 +88,10 @@ class OpenMatchPoolScreen extends ConsumerWidget {
     WidgetRef ref,
     String code,
   ) async {
-    final useCase = ref.read(findMatchChallengeByCodeUseCaseProvider);
-    final result = await useCase(code);
+    final repo = ref.read(matchPoolRepositoryProvider);
+    final result = await repo.findChallengeByCode(code);
     result.fold(
-      (failure) {
+      (Failure failure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${failure.message}'),
@@ -97,7 +99,7 @@ class OpenMatchPoolScreen extends ConsumerWidget {
           ),
         );
       },
-      (challenge) {
+      (MatchRequest? challenge) {
         if (challenge == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

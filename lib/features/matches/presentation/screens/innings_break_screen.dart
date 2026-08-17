@@ -219,13 +219,12 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
 
   Future<void> _start(int target) async {
     setState(() => _busy = true);
-    final result = await ref.read(startInningsUseCaseProvider)(
+    final result = await ref.read(matchesRepositoryProvider).startInnings(
           matchId: MatchId(widget.matchId),
           inningsNumber: 2,
           strikerId: _strikerId!,
           nonStrikerId: _nonStrikerId!,
           bowlerId: _bowlerId!,
-          target: target,
         );
     if (!mounted) return;
     setState(() => _busy = false);

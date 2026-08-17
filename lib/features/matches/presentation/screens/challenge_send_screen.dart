@@ -261,7 +261,7 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
     final fromId = _resolvedFromTeamId;
     if ((!_isOpenChallenge && opp == null) || start == null || fromId == null) return;
     setState(() => _busy = true);
-    final result = await ref.read(sendMatchChallengeUseCaseProvider)(
+    final result = await ref.read(matchesRepositoryProvider).sendMatchChallenge(
           fromTeamId: TeamId(fromId),
           toTeamId: _isOpenChallenge ? null : opp?.id,
           proposedStartTime: start,

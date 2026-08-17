@@ -330,7 +330,7 @@ class _ChallengeDetailScreenState
     if (shouldApply != true || !mounted) return;
 
     setState(() => _busy = true);
-    final result = await ref.read(applyToMatchPoolUseCaseProvider)(
+    final result = await ref.read(matchPoolRepositoryProvider).applyToMatchPool(
           requestId: req.id,
           teamId: selectedTeam.id,
           message: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
@@ -410,7 +410,7 @@ class _ChallengeDetailScreenState
     if (confirm != true || !mounted) return;
 
     setState(() => _busy = true);
-    final result = await ref.read(acceptPoolApplicationUseCaseProvider)(
+    final result = await ref.read(matchPoolRepositoryProvider).acceptPoolApplication(
           applicationId: app.id,
         );
 
@@ -437,7 +437,7 @@ class _ChallengeDetailScreenState
 
   Future<void> _onRejectApplication(MatchPoolApplication app) async {
     setState(() => _busy = true);
-    final result = await ref.read(rejectPoolApplicationUseCaseProvider)(
+    final result = await ref.read(matchPoolRepositoryProvider).rejectPoolApplication(
           applicationId: app.id,
         );
     if (!mounted) return;
@@ -477,7 +477,8 @@ class _ChallengeDetailScreenState
 
     setState(() => _busy = true);
     final result = await ref
-        .read(acceptMatchChallengeUseCaseProvider)(
+        .read(matchesRepositoryProvider)
+        .acceptMatchChallenge(
           requestId: req.id,
           toTeamId: toTeam?.id,
         );
@@ -508,7 +509,7 @@ class _ChallengeDetailScreenState
     );
     if (picked == null || !mounted) return;
     setState(() => _busy = true);
-    final result = await ref.read(declineMatchChallengeUseCaseProvider)(
+    final result = await ref.read(matchesRepositoryProvider).declineMatchChallenge(
           requestId: req.id,
           decisionReason: picked.reason,
           decisionNote: picked.note,
@@ -541,7 +542,7 @@ class _ChallengeDetailScreenState
     );
     if (result == null || !mounted) return;
     setState(() => _busy = true);
-    final res = await ref.read(withdrawMatchChallengeUseCaseProvider)(
+    final res = await ref.read(matchesRepositoryProvider).withdrawMatchChallenge(
           requestId: req.id,
           decisionNote: result.note,
         );

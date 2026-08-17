@@ -159,12 +159,11 @@ class _ChallengeCounterScreenState
 
   Future<void> _submit(MatchRequest req) async {
     setState(() => _busy = true);
-    final result = await ref.read(counterMatchChallengeUseCaseProvider)(
-          requestId: req.id,
+    final result = await ref.read(matchesRepositoryProvider).counterMatchChallenge(
+          requestId: MatchRequestId(widget.requestId),
+          counteredFormat: null,
+          counteredVenue: _venueCtrl.text.trim().isEmpty ? null : _venueCtrl.text.trim(),
           counteredStartTime: _newStart,
-          counteredVenue: _venueCtrl.text.trim().isEmpty
-              ? null
-              : _venueCtrl.text.trim(),
           decisionNote: _noteCtrl.text.trim().isEmpty
               ? null
               : _noteCtrl.text.trim(),

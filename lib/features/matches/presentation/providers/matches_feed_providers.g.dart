@@ -46,4 +46,4 @@ final class MatchesFeedProvider
   }
 }
 
-String _$matchesFeedHash() => r'f900a133566da5aa1fda175308cbe60828b33bd2';
+String _$matchesFeedHash() => r'99ece6c4b6d23a7735a51fbdddd7063eb31162cc';

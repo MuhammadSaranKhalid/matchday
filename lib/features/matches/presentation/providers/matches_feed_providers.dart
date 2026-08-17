@@ -114,15 +114,16 @@ class MatchesFeedState {
 
 @riverpod
 Future<MatchesFeedState> matchesFeed(Ref ref) async {
-  // 1. Fetch public matches via domain use case
-  final matchesResult = await ref.watch(listMyMatchesUseCaseProvider)();
+  // 1. Fetch public matches
+  final matchesRepo = ref.watch(matchesRepositoryProvider);
+  final matchesResult = await matchesRepo.listMyMatches();
   final allMatches = matchesResult.fold<List<Match>>(
     (_) => const [],
     (list) => list,
   );
 
-  // 2. Fetch all challenges / open pool requests via domain use case
-  final challengesResult = await ref.watch(listMyMatchChallengesUseCaseProvider)();
+  // 2. Fetch all challenges / open pool requests
+  final challengesResult = await matchesRepo.listMyMatchChallenges();
   final allChallenges = challengesResult.fold<List<MatchRequest>>(
     (_) => const [],
     (list) => list,
@@ -157,11 +158,10 @@ Future<MatchesFeedState> matchesFeed(Ref ref) async {
   final upcomingMatches = allMatches.where((m) => m.status.isUpcoming).toList();
   final pastMatches = allMatches.where((m) => m.status.isPast).toList();
 
-  // Innings for past matches via domain use case
+  // Innings for past matches
   Map<MatchId, List<InningsSummary>> inningsByMatch = const {};
   if (pastMatches.isNotEmpty) {
-    final res = await ref
-        .watch(listInningsForMatchesUseCaseProvider)(pastMatches.map((m) => m.id));
+    final res = await matchesRepo.listInningsForMatches(pastMatches.map((m) => m.id));
     inningsByMatch = res.fold((_) => const {}, (map) => map);
   }
 

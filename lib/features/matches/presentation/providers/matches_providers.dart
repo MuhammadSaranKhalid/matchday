@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
+import '../../../../core/lifecycle/app_lifecycle_provider.dart';
 import '../../data/datasources/matches_datasource_providers.dart';
 import '../../data/repositories/matches_repository_impl.dart';
 import '../../domain/entities/ball.dart';
@@ -51,9 +52,15 @@ Future<List<Match>> myMatches(Ref ref) async {
 /// Live match-row updates (broadcast channel). Each subscription opens its
 /// own channel; keep usage to one consumer per route (the Match Start
 /// screen + the spectator scoreboard).
+///
+/// Watching [appResumeCountProvider] rebuilds the subscription whenever the
+/// app returns to the foreground — a backgrounded socket is often a zombie,
+/// so reconnecting is the only reliable way to know the state is current.
 @riverpod
-Stream<Match?> liveMatch(Ref ref, String matchId) =>
-    ref.watch(matchesRepositoryProvider).watchMatch(MatchId(matchId));
+Stream<Match?> liveMatch(Ref ref, String matchId) {
+  ref.watch(appResumeCountProvider);
+  return ref.watch(matchesRepositoryProvider).watchMatch(MatchId(matchId));
+}
 
 // ─── Match players (per-match XI) ──────────────────────────────────────────
 
@@ -81,11 +88,13 @@ Stream<MatchInningsState?> liveInningsState(
   Ref ref,
   String matchId,
   int inningsNumber,
-) =>
-    ref.watch(matchesRepositoryProvider).watchMatchInningsState(
-          matchId: MatchId(matchId),
-          inningsNumber: inningsNumber,
-        );
+) {
+  ref.watch(appResumeCountProvider);
+  return ref.watch(matchesRepositoryProvider).watchMatchInningsState(
+        matchId: MatchId(matchId),
+        inningsNumber: inningsNumber,
+      );
+}
 
 /// Live deliveries for (matchId, inningsNumber) via the broadcast channel.
 /// `inningsNumber` is read off the match row; spectators + scorers both
@@ -99,6 +108,32 @@ Stream<List<Ball>> liveBalls(
     ref
         .watch(matchesRepositoryProvider)
         .watchBalls(MatchId(matchId), inningsNumber);
+
+/// Whether this device may record deliveries for (match, innings).
+///
+/// Asks the server rather than deriving it, so the UI gate is the same rule
+/// the write path enforces. Re-evaluated on resume and whenever the match row
+/// changes — control passes to the other side at the innings break, and the
+/// answer flips at exactly that moment.
+@riverpod
+Future<bool> canScoreInnings(
+  Ref ref,
+  String matchId,
+  int inningsNumber,
+) async {
+  ref.watch(appResumeCountProvider);
+  // Re-ask when the match row moves: the toss decides who bats, and the
+  // innings break hands scoring to the other team.
+  ref.watch(liveMatchProvider(matchId));
+
+  final result = await ref.watch(matchesRepositoryProvider).canScoreInnings(
+        matchId: MatchId(matchId),
+        inningsNumber: inningsNumber,
+      );
+  // Fail closed: if we cannot establish permission, show the read-only
+  // scoreboard rather than controls whose taps the server would reject.
+  return result.getOrElse((_) => false);
+}
 
 // ─── Match Requests (challenge handshake) ──────────────────────────────────
 

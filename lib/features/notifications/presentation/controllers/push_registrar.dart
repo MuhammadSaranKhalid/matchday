@@ -49,17 +49,25 @@ class PushRegistrar extends _$PushRegistrar {
     });
   }
 
+  /// Best-effort — a failed registration just means no push until the next
+  /// token refresh or app start.
+  ///
+  /// The catch-all is load-bearing: when Play services can't reach Firebase
+  /// Installations the FCM channel *throws* (`SERVICE_NOT_AVAILABLE`) rather
+  /// than yielding a null token, and this runs fire-and-forget from [build],
+  /// so an escaping error would land as an unhandled async exception.
   Future<void> _register() async {
     final platform = _platform();
     if (platform == null) return; // mobile-only — skip web/desktop
-    final push = ref.read(pushMessagingServiceProvider);
-    if (!await push.requestPermission()) return;
-    final token = await push.getToken();
-    if (token == null) return;
-    // Best-effort — a failed registration just means no push until next boot.
-    await ref
-        .read(notificationsRepositoryProvider)
-        .registerDeviceToken(fcmToken: token, platform: platform);
+    try {
+      final push = ref.read(pushMessagingServiceProvider);
+      if (!await push.requestPermission()) return;
+      final token = await push.getToken();
+      if (token == null) return;
+      await ref
+          .read(notificationsRepositoryProvider)
+          .registerDeviceToken(fcmToken: token, platform: platform);
+    } catch (_) {/* no push this session — retried on refresh/next start */}
   }
 
   /// Revoke this device's token server-side, then drop it locally. MUST run

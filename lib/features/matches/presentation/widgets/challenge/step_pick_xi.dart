@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
+import '../../../../../core/util/initials.dart';
 import '../../../../../core/widgets/v2/v2_kit.dart';
 import 'ch_icons.dart';
 import 'ch_role_pill.dart';
@@ -14,6 +15,7 @@ class XiCandidate {
     required this.id,
     required this.name,
     required this.role,
+    this.photoUrl,
     this.subStyle,
     this.captain = false,
     this.guest = false,
@@ -24,6 +26,10 @@ class XiCandidate {
   final String id;
   final String name;
   final ChPlayingRole role;
+
+  /// Avatar URL, or null to fall back to the player's monogram. Unclaimed
+  /// placeholders never have one.
+  final String? photoUrl;
 
   /// Optional second line, e.g. "RHB · RM".
   final String? subStyle;
@@ -352,7 +358,11 @@ class _PlayerRow extends StatelessWidget {
             children: [
               _Checkbox(on: selected),
               const SizedBox(width: 12),
-              Avatar(mono: _initials(player.name), size: 34),
+              Avatar(
+                mono: personInitials(player.name),
+                imageUrl: player.photoUrl,
+                size: 34,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -400,17 +410,6 @@ class _PlayerRow extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static String _initials(String name) {
-    final parts =
-        name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
-    if (parts.isEmpty) return '–';
-    if (parts.length == 1) {
-      final w = parts.first;
-      return (w.length >= 2 ? w.substring(0, 2) : w).toUpperCase();
-    }
-    return (parts.first[0] + parts.elementAt(1)[0]).toUpperCase();
   }
 }
 

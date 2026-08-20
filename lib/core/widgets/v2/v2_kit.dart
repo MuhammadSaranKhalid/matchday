@@ -214,6 +214,11 @@ class _MonogramTile extends StatelessWidget {
 enum AvatarTone { paper, ink, neutral }
 
 /// Player avatar — circle with cached network image support + monogram fallback.
+///
+/// The monogram is not a loading state: for unclaimed players (who have no
+/// photo column at all) and for users who never uploaded one, it is the final
+/// rendering. It also backstops a broken URL, so a dead object in the
+/// `avatars` bucket degrades to initials rather than a grey box.
 class Avatar extends StatelessWidget {
   const Avatar({
     super.key,
@@ -221,6 +226,8 @@ class Avatar extends StatelessWidget {
     this.imageUrl,
     this.size = 36,
     this.tone = AvatarTone.paper,
+    this.background,
+    this.foreground,
   });
 
   final String mono;
@@ -228,35 +235,52 @@ class Avatar extends StatelessWidget {
   final double size;
   final AvatarTone tone;
 
+  /// Overrides the tone's fill. Used where an avatar doubles as a role badge
+  /// — the scoring screen's bowler carries its own green.
+  final Color? background;
+
+  /// Overrides the tone's monogram colour. Pair with [background].
+  final Color? foreground;
+
   @override
   Widget build(BuildContext context) {
     final ink = tone == AvatarTone.ink;
+    final bg = background ?? (ink ? CkColors.ink : CkColors.paper2);
+    final fg = foreground ?? (ink ? CkColors.paper : CkColors.ink2);
     final fallback = Container(
       width: size,
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: ink ? CkColors.ink : CkColors.paper2,
+        color: bg,
         shape: BoxShape.circle,
-        border: ink ? null : Border.all(color: CkColors.hairline),
+        border: (ink || background != null)
+            ? null
+            : Border.all(color: CkColors.hairline),
       ),
       child: Text(
         mono,
         style: CkType.display(
           fontSize: size * 0.36,
           fontWeight: FontWeight.w700,
-          color: ink ? CkColors.paper : CkColors.ink2,
+          color: fg,
         ),
       ),
     );
 
-    if (imageUrl != null && imageUrl!.trim().isNotEmpty) {
+    final url = imageUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      // Sized decode. Avatars come out of the `avatars` bucket at up to 5 MB
+      // and these render at 22–36 px, often eleven at a time in a picker
+      // grid; decoding at full resolution is a real memory and jank cost.
+      final memW = (size * MediaQuery.devicePixelRatioOf(context)).round();
       return ClipOval(
         child: CachedNetworkImage(
-          imageUrl: imageUrl!.trim(),
+          imageUrl: url,
           width: size,
           height: size,
           fit: BoxFit.cover,
+          memCacheWidth: memW,
           placeholder: (_, __) => fallback,
           errorWidget: (_, __, ___) => fallback,
         ),

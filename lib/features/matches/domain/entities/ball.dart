@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import 'match.dart';
+import 'match_innings_state.dart';
 
 /// One recorded delivery. The deployed `balls` table keys by
 /// `(match_id, innings_number, seq)` — there is no separate innings table;
@@ -191,4 +192,27 @@ class BallDraft {
   /// since the client read it — protecting against two scorers
   /// committing the same delivery. Pass NULL in single-scorer flows.
   final int? expectedVersion;
+}
+
+/// What the server produced from one recorded delivery: the persisted ball,
+/// and the innings row as it stands after it.
+///
+/// The innings row is returned so the scoring screen can show the new score
+/// the moment the write replies. Before this existed the client got only the
+/// ball, threw it away, and waited for the realtime broadcast to make a second
+/// trip back from the server before the scoreboard moved — which is what made
+/// a tap feel slow even when the write itself was quick.
+///
+/// [innings] is nullable because an older deployment of the record-ball
+/// function does not return it. Callers fall back to the broadcast in that
+/// case, so a client running ahead of the server still works — just no faster
+/// than before.
+class BallOutcome extends Equatable {
+  const BallOutcome({required this.ball, this.innings});
+
+  final Ball ball;
+  final MatchInningsState? innings;
+
+  @override
+  List<Object?> get props => [ball, innings];
 }

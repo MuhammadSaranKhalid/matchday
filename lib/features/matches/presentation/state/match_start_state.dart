@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:equatable/equatable.dart';
 
 import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/match.dart';
@@ -18,16 +18,24 @@ enum MatchStartViewerRole {
   spectator,
 }
 
+/// Visible steps in the Match Start progress bar: toss → lineup → ready.
+/// [MatchStartPhase.live] is the exit, not a step, so it is not counted.
+const int matchStartStepCount = 3;
+
 /// View state of a match in the Match Start flow.
-/// Clean passive state representation containing both server match data
-/// and client interaction/form state.
-@immutable
-class MatchStartState {
+///
+/// A passive struct: the live server row, the viewer's derived role, the
+/// openers already locked server-side, and the viewer's in-flight selections.
+/// Every question the UI asks about "what is selected" is answered here, so
+/// widgets never merge pending-vs-locked themselves.
+class MatchStartState extends Equatable {
   const MatchStartState({
     required this.match,
     required this.viewerRole,
     required this.battingTeamId,
     required this.bowlingTeamId,
+    this.lockedStriker,
+    this.lockedNonStriker,
     this.pendingTossWinner,
     this.pendingDecision,
     this.pendingStriker,
@@ -47,7 +55,12 @@ class MatchStartState {
   /// Side bowling innings 1. Null until the toss is recorded.
   final TeamId? bowlingTeamId;
 
-  /// Local form/selection state
+  /// Openers already persisted on `match_innings_state` for innings 1,
+  /// resolved back to player ref ids. Null before they are submitted.
+  final String? lockedStriker;
+  final String? lockedNonStriker;
+
+  /// Local form/selection state — what this phone has picked but not yet sent.
   final TeamId? pendingTossWinner;
   final TossDecision? pendingDecision;
   final String? pendingStriker;
@@ -58,33 +71,46 @@ class MatchStartState {
   /// [Match.startPhase] for convenience.
   MatchStartPhase get phase => match.startPhase;
 
-  /// True when the viewer should see active picker UI for the current phase.
-  bool get viewerCanAct {
-    switch (phase) {
-      case MatchStartPhase.toss:
-        return viewerRole == MatchStartViewerRole.battingCaptain ||
-            viewerRole == MatchStartViewerRole.bowlingCaptain;
-      case MatchStartPhase.lineup:
-      case MatchStartPhase.ready:
-        return viewerRole == MatchStartViewerRole.battingCaptain;
-      case MatchStartPhase.live:
-        return false;
-    }
-  }
+  /// Zero-based index into the [matchStartStepCount] progress bar. `live`
+  /// pins to the last step so the bar doesn't jump during the redirect.
+  int get stepIndex => switch (phase) {
+        MatchStartPhase.toss => 0,
+        MatchStartPhase.lineup => 1,
+        MatchStartPhase.ready => 2,
+        MatchStartPhase.live => 2,
+      };
 
-  bool get isTossReady =>
-      pendingTossWinner != null && pendingDecision != null;
+  bool get isViewerBattingCaptain =>
+      viewerRole == MatchStartViewerRole.battingCaptain;
+
+  /// True when the viewer should see active picker UI for the current phase.
+  bool get viewerCanAct => switch (phase) {
+        MatchStartPhase.toss =>
+          viewerRole == MatchStartViewerRole.battingCaptain ||
+              viewerRole == MatchStartViewerRole.bowlingCaptain,
+        MatchStartPhase.lineup ||
+        MatchStartPhase.ready =>
+          viewerRole == MatchStartViewerRole.battingCaptain,
+        MatchStartPhase.live => false,
+      };
+
+  bool get isTossReady => pendingTossWinner != null && pendingDecision != null;
+
+  /// The opener shown in each slot: this phone's pick if it has one, else
+  /// whatever is already locked server-side.
+  String? get striker => pendingStriker ?? lockedStriker;
+  String? get nonStriker => pendingNonStriker ?? lockedNonStriker;
 
   bool get isLineupReady =>
-      pendingStriker != null &&
-      pendingNonStriker != null &&
-      pendingStriker != pendingNonStriker;
+      striker != null && nonStriker != null && striker != nonStriker;
 
   MatchStartState copyWith({
     Match? match,
     MatchStartViewerRole? viewerRole,
     TeamId? battingTeamId,
     TeamId? bowlingTeamId,
+    String? lockedStriker,
+    String? lockedNonStriker,
     TeamId? Function()? pendingTossWinner,
     TossDecision? Function()? pendingDecision,
     String? Function()? pendingStriker,
@@ -96,12 +122,13 @@ class MatchStartState {
       viewerRole: viewerRole ?? this.viewerRole,
       battingTeamId: battingTeamId ?? this.battingTeamId,
       bowlingTeamId: bowlingTeamId ?? this.bowlingTeamId,
+      lockedStriker: lockedStriker ?? this.lockedStriker,
+      lockedNonStriker: lockedNonStriker ?? this.lockedNonStriker,
       pendingTossWinner: pendingTossWinner != null
           ? pendingTossWinner()
           : this.pendingTossWinner,
-      pendingDecision: pendingDecision != null
-          ? pendingDecision()
-          : this.pendingDecision,
+      pendingDecision:
+          pendingDecision != null ? pendingDecision() : this.pendingDecision,
       pendingStriker:
           pendingStriker != null ? pendingStriker() : this.pendingStriker,
       pendingNonStriker: pendingNonStriker != null
@@ -110,6 +137,21 @@ class MatchStartState {
       isBusy: isBusy ?? this.isBusy,
     );
   }
+
+  @override
+  List<Object?> get props => [
+        match,
+        viewerRole,
+        battingTeamId,
+        bowlingTeamId,
+        lockedStriker,
+        lockedNonStriker,
+        pendingTossWinner,
+        pendingDecision,
+        pendingStriker,
+        pendingNonStriker,
+        isBusy,
+      ];
 }
 
 /// Resolve the viewer's role given the match row + their user id.
@@ -142,4 +184,17 @@ TeamId? battingFirstTeam(Match m) {
   if (won == m.teamAId) return m.teamBId;
   if (won == m.teamBId) return m.teamAId;
   return null;
+}
+
+/// The `T-12 MIN` / `STARTING NOW` kicker for the header, or null when the
+/// start time is too far out (or unset) to be worth showing.
+///
+/// Pure over [now] so it can be tested without clock control.
+String? matchStartCountdownLabel(DateTime? scheduledStart, DateTime now) {
+  if (scheduledStart == null) return null;
+  final delta = scheduledStart.difference(now);
+  if (delta.isNegative && delta.inHours > -2) return 'STARTING NOW';
+  if (delta.isNegative) return 'T+${-delta.inMinutes} MIN';
+  if (delta.inHours > 1) return null;
+  return 'T-${delta.inMinutes} MIN';
 }

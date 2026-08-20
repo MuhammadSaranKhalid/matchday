@@ -60,10 +60,17 @@ Deno.serve(async (req) => {
   }
 
   // 1. Identify the caller.
+  //
+  // getClaims() verifies the JWT signature LOCALLY against a cached JWKS when
+  // the project uses asymmetric signing keys; getUser() always spent a network
+  // round trip on the Auth server. On the scoring hot path that hop was paid
+  // once per delivery, in front of the scorer, for information the token
+  // already carries. Projects still on a shared secret fall back to a verified
+  // network check inside getClaims, so this is never weaker than getUser —
+  // only, where the keys allow it, faster.
   const asUser = userClient(authHeader);
-  const { data: userData, error: userErr } = await asUser.auth.getUser();
-  const actor = userData?.user?.id;
-  if (userErr || !actor) {
+  const actor = await identifyActor(asUser);
+  if (!actor) {
     return json(401, {
       ok: false,
       error: { code: "unauthenticated", message: "Invalid session" },
@@ -95,36 +102,50 @@ Deno.serve(async (req) => {
     ? Number(body.p_expected_version)
     : null;
 
-  // 3. Authorize via the batting-side rule, run AS the user. Control of live
-  //    scoring belongs to the team CURRENTLY BATTING (plus tournament
-  //    organisers / assigned scorers / a practice match's creator); it passes
-  //    to the other side at the innings break. Hence the innings number is
-  //    part of the check — see _can_score_innings.
-  const { data: canScore, error: authzErr } = await asUser.rpc(
-    "_can_score_innings",
-    { p_match_id: matchId, p_innings_number: inningsNumber },
-  );
-  if (authzErr) {
-    return json(500, {
-      ok: false,
-      error: { code: "authz_failed", message: authzErr.message },
-    });
-  }
-  if (canScore !== true) {
-    return json(403, {
-      ok: false,
-      error: {
-        code: "forbidden",
-        message: "Only the batting team can score this innings",
-      },
-    });
-  }
-
   const sql = db();
 
-  // 4. One atomic transaction: lock → read → compute → write → maybe transition.
+  // 3. One atomic transaction: authorize → lock → read → compute → write →
+  //    maybe transition.
+  //
+  //    The authorization check used to be a SEPARATE PostgREST call made
+  //    before this block. Two costs: a second network round trip per delivery,
+  //    and a genuine time-of-check/time-of-use gap — permission was read from
+  //    one snapshot and the write happened against another. Running it on this
+  //    connection, inside this transaction, closes both.
   try {
     const out = await sql.begin(async (tx) => {
+      // _can_score_innings — and the is_team_manager / is_tournament_organizer
+      // helpers it calls — resolve the caller through auth.uid(), which reads
+      // the request.jwt.claims GUC that PostgREST would normally set. This is
+      // a direct pooled connection, so we set it ourselves from the token we
+      // just verified.
+      //
+      // `true` = transaction-local. That is not a detail: these connections
+      // are pooled and reused across requests, and a session-scoped setting
+      // would leak one scorer's identity into the next request on the same
+      // connection. Transaction-local is reset at COMMIT/ROLLBACK.
+      await tx`
+        select set_config(
+          'request.jwt.claims',
+          ${JSON.stringify({ sub: actor, role: "authenticated" })},
+          true
+        )`;
+
+      // Control of live scoring belongs to the team CURRENTLY BATTING (plus
+      // tournament organisers / assigned scorers / a practice match's
+      // creator); it passes to the other side at the innings break. Hence the
+      // innings number is part of the check. Calling the same
+      // _can_score_innings the client gates its UI on keeps one definition.
+      const authzRows = await tx`
+        select public._can_score_innings(${matchId}, ${inningsNumber}) as allowed`;
+      if (authzRows[0]?.allowed !== true) {
+        throw new HttpSignal(
+          403,
+          "forbidden",
+          "Only the batting team can score this innings",
+        );
+      }
+
       const stateRows = await tx`
         select striker_id, non_striker_id, bowler_id, legal_ball_count,
                total_runs, total_wickets, total_extras, is_all_out,
@@ -252,7 +273,11 @@ Deno.serve(async (req) => {
           ${b.commentary}, ${actor}
         ) returning *`;
 
-      await tx`
+      // `returning *` so the response can carry the new innings row. Without
+      // it the client had the ball but not the score, and had to wait for the
+      // realtime broadcast to make a second trip back before the scoreboard
+      // moved — the whole reason a tap felt slow.
+      const updatedState = await tx`
         update match_innings_state set
           legal_ball_count = ${ns.legalBallCount},
           total_runs       = ${ns.totalRuns},
@@ -263,7 +288,8 @@ Deno.serve(async (req) => {
           bowler_id        = ${ns.bowlerId},
           is_all_out       = ${events.allOut},
           version          = version + 1
-        where match_id = ${matchId} and innings_number = ${inningsNumber}`;
+        where match_id = ${matchId} and innings_number = ${inningsNumber}
+        returning *`;
 
       // ── Innings termination ──
       let transition: {
@@ -319,12 +345,18 @@ Deno.serve(async (req) => {
         }
       }
 
-      return { ball: inserted[0], events, transition };
+      return {
+        ball: inserted[0],
+        innings: updatedState[0] ?? null,
+        events,
+        transition,
+      };
     });
 
     return json(200, {
       ok: true,
       ball: out.ball,
+      innings: out.innings,
       events: out.events,
       transition: out.transition,
     });
@@ -345,6 +377,26 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+/// The caller's user id from a verified JWT, or null.
+///
+/// Prefers getClaims (local signature verification against a cached JWKS).
+/// Older supabase-js builds do not expose it, so getUser remains the fallback
+/// — correct, just a round trip slower.
+// deno-lint-ignore no-explicit-any
+async function identifyActor(asUser: any): Promise<string | null> {
+  try {
+    if (typeof asUser?.auth?.getClaims === "function") {
+      const { data, error } = await asUser.auth.getClaims();
+      const sub = data?.claims?.sub;
+      if (!error && typeof sub === "string" && sub.length > 0) return sub;
+    }
+  } catch (e) {
+    console.warn("record-ball: getClaims unavailable, falling back:", e);
+  }
+  const { data, error } = await asUser.auth.getUser();
+  return error ? null : (data?.user?.id ?? null);
+}
 
 function num(v: unknown, fallback: number): number {
   const n = Number(v);

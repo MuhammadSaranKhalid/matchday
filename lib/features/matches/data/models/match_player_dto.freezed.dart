@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$MatchPlayerDto {
 
-@JsonKey(name: 'match_player_id') String get matchPlayerId;@JsonKey(name: 'match_id') String get matchId;@JsonKey(name: 'team_side') String get teamSide;@JsonKey(name: 'profile_id') String? get profileId;@JsonKey(name: 'unclaimed_id') String? get unclaimedId;@JsonKey(name: 'batting_order') int? get battingOrder;@JsonKey(name: 'jersey_number') int? get jerseyNumber;@JsonKey(name: 'is_captain') bool get isCaptain;@JsonKey(name: 'is_keeper') bool get isKeeper;@JsonKey(name: 'is_substitute') bool get isSubstitute;
+@JsonKey(name: 'match_player_id') String get matchPlayerId;@JsonKey(name: 'match_id') String get matchId;@JsonKey(name: 'team_side') String get teamSide;@JsonKey(name: 'profile_id') String? get profileId;@JsonKey(name: 'unclaimed_id') String? get unclaimedId;@JsonKey(name: 'batting_order') int? get battingOrder;@JsonKey(name: 'jersey_number') int? get jerseyNumber;@JsonKey(name: 'is_captain') bool get isCaptain;@JsonKey(name: 'is_keeper') bool get isKeeper;@JsonKey(name: 'is_substitute') bool get isSubstitute;@JsonKey(includeToJson: false) Map<String, dynamic>? get profile;@JsonKey(includeToJson: false) Map<String, dynamic>? get unclaimed;
 /// Create a copy of MatchPlayerDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $MatchPlayerDtoCopyWith<MatchPlayerDto> get copyWith => _$MatchPlayerDtoCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchPlayerDto&&(identical(other.matchPlayerId, matchPlayerId) || other.matchPlayerId == matchPlayerId)&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamSide, teamSide) || other.teamSide == teamSide)&&(identical(other.profileId, profileId) || other.profileId == profileId)&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.battingOrder, battingOrder) || other.battingOrder == battingOrder)&&(identical(other.jerseyNumber, jerseyNumber) || other.jerseyNumber == jerseyNumber)&&(identical(other.isCaptain, isCaptain) || other.isCaptain == isCaptain)&&(identical(other.isKeeper, isKeeper) || other.isKeeper == isKeeper)&&(identical(other.isSubstitute, isSubstitute) || other.isSubstitute == isSubstitute));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchPlayerDto&&(identical(other.matchPlayerId, matchPlayerId) || other.matchPlayerId == matchPlayerId)&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamSide, teamSide) || other.teamSide == teamSide)&&(identical(other.profileId, profileId) || other.profileId == profileId)&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.battingOrder, battingOrder) || other.battingOrder == battingOrder)&&(identical(other.jerseyNumber, jerseyNumber) || other.jerseyNumber == jerseyNumber)&&(identical(other.isCaptain, isCaptain) || other.isCaptain == isCaptain)&&(identical(other.isKeeper, isKeeper) || other.isKeeper == isKeeper)&&(identical(other.isSubstitute, isSubstitute) || other.isSubstitute == isSubstitute)&&const DeepCollectionEquality().equals(other.profile, profile)&&const DeepCollectionEquality().equals(other.unclaimed, unclaimed));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,matchPlayerId,matchId,teamSide,profileId,unclaimedId,battingOrder,jerseyNumber,isCaptain,isKeeper,isSubstitute);
+int get hashCode => Object.hash(runtimeType,matchPlayerId,matchId,teamSide,profileId,unclaimedId,battingOrder,jerseyNumber,isCaptain,isKeeper,isSubstitute,const DeepCollectionEquality().hash(profile),const DeepCollectionEquality().hash(unclaimed));
 
 @override
 String toString() {
-  return 'MatchPlayerDto(matchPlayerId: $matchPlayerId, matchId: $matchId, teamSide: $teamSide, profileId: $profileId, unclaimedId: $unclaimedId, battingOrder: $battingOrder, jerseyNumber: $jerseyNumber, isCaptain: $isCaptain, isKeeper: $isKeeper, isSubstitute: $isSubstitute)';
+  return 'MatchPlayerDto(matchPlayerId: $matchPlayerId, matchId: $matchId, teamSide: $teamSide, profileId: $profileId, unclaimedId: $unclaimedId, battingOrder: $battingOrder, jerseyNumber: $jerseyNumber, isCaptain: $isCaptain, isKeeper: $isKeeper, isSubstitute: $isSubstitute, profile: $profile, unclaimed: $unclaimed)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $MatchPlayerDtoCopyWith<$Res>  {
   factory $MatchPlayerDtoCopyWith(MatchPlayerDto value, $Res Function(MatchPlayerDto) _then) = _$MatchPlayerDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'match_player_id') String matchPlayerId,@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'team_side') String teamSide,@JsonKey(name: 'profile_id') String? profileId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'batting_order') int? battingOrder,@JsonKey(name: 'jersey_number') int? jerseyNumber,@JsonKey(name: 'is_captain') bool isCaptain,@JsonKey(name: 'is_keeper') bool isKeeper,@JsonKey(name: 'is_substitute') bool isSubstitute
+@JsonKey(name: 'match_player_id') String matchPlayerId,@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'team_side') String teamSide,@JsonKey(name: 'profile_id') String? profileId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'batting_order') int? battingOrder,@JsonKey(name: 'jersey_number') int? jerseyNumber,@JsonKey(name: 'is_captain') bool isCaptain,@JsonKey(name: 'is_keeper') bool isKeeper,@JsonKey(name: 'is_substitute') bool isSubstitute,@JsonKey(includeToJson: false) Map<String, dynamic>? profile,@JsonKey(includeToJson: false) Map<String, dynamic>? unclaimed
 });
 
 
@@ -65,7 +65,7 @@ class _$MatchPlayerDtoCopyWithImpl<$Res>
 
 /// Create a copy of MatchPlayerDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? matchPlayerId = null,Object? matchId = null,Object? teamSide = null,Object? profileId = freezed,Object? unclaimedId = freezed,Object? battingOrder = freezed,Object? jerseyNumber = freezed,Object? isCaptain = null,Object? isKeeper = null,Object? isSubstitute = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? matchPlayerId = null,Object? matchId = null,Object? teamSide = null,Object? profileId = freezed,Object? unclaimedId = freezed,Object? battingOrder = freezed,Object? jerseyNumber = freezed,Object? isCaptain = null,Object? isKeeper = null,Object? isSubstitute = null,Object? profile = freezed,Object? unclaimed = freezed,}) {
   return _then(_self.copyWith(
 matchPlayerId: null == matchPlayerId ? _self.matchPlayerId : matchPlayerId // ignore: cast_nullable_to_non_nullable
 as String,matchId: null == matchId ? _self.matchId : matchId // ignore: cast_nullable_to_non_nullable
@@ -77,7 +77,9 @@ as int?,jerseyNumber: freezed == jerseyNumber ? _self.jerseyNumber : jerseyNumbe
 as int?,isCaptain: null == isCaptain ? _self.isCaptain : isCaptain // ignore: cast_nullable_to_non_nullable
 as bool,isKeeper: null == isKeeper ? _self.isKeeper : isKeeper // ignore: cast_nullable_to_non_nullable
 as bool,isSubstitute: null == isSubstitute ? _self.isSubstitute : isSubstitute // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,profile: freezed == profile ? _self.profile : profile // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,unclaimed: freezed == unclaimed ? _self.unclaimed : unclaimed // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,
   ));
 }
 
@@ -162,10 +164,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_player_id')  String matchPlayerId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_side')  String teamSide, @JsonKey(name: 'profile_id')  String? profileId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'batting_order')  int? battingOrder, @JsonKey(name: 'jersey_number')  int? jerseyNumber, @JsonKey(name: 'is_captain')  bool isCaptain, @JsonKey(name: 'is_keeper')  bool isKeeper, @JsonKey(name: 'is_substitute')  bool isSubstitute)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_player_id')  String matchPlayerId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_side')  String teamSide, @JsonKey(name: 'profile_id')  String? profileId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'batting_order')  int? battingOrder, @JsonKey(name: 'jersey_number')  int? jerseyNumber, @JsonKey(name: 'is_captain')  bool isCaptain, @JsonKey(name: 'is_keeper')  bool isKeeper, @JsonKey(name: 'is_substitute')  bool isSubstitute, @JsonKey(includeToJson: false)  Map<String, dynamic>? profile, @JsonKey(includeToJson: false)  Map<String, dynamic>? unclaimed)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MatchPlayerDto() when $default != null:
-return $default(_that.matchPlayerId,_that.matchId,_that.teamSide,_that.profileId,_that.unclaimedId,_that.battingOrder,_that.jerseyNumber,_that.isCaptain,_that.isKeeper,_that.isSubstitute);case _:
+return $default(_that.matchPlayerId,_that.matchId,_that.teamSide,_that.profileId,_that.unclaimedId,_that.battingOrder,_that.jerseyNumber,_that.isCaptain,_that.isKeeper,_that.isSubstitute,_that.profile,_that.unclaimed);case _:
   return orElse();
 
 }
@@ -183,10 +185,10 @@ return $default(_that.matchPlayerId,_that.matchId,_that.teamSide,_that.profileId
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_player_id')  String matchPlayerId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_side')  String teamSide, @JsonKey(name: 'profile_id')  String? profileId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'batting_order')  int? battingOrder, @JsonKey(name: 'jersey_number')  int? jerseyNumber, @JsonKey(name: 'is_captain')  bool isCaptain, @JsonKey(name: 'is_keeper')  bool isKeeper, @JsonKey(name: 'is_substitute')  bool isSubstitute)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_player_id')  String matchPlayerId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_side')  String teamSide, @JsonKey(name: 'profile_id')  String? profileId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'batting_order')  int? battingOrder, @JsonKey(name: 'jersey_number')  int? jerseyNumber, @JsonKey(name: 'is_captain')  bool isCaptain, @JsonKey(name: 'is_keeper')  bool isKeeper, @JsonKey(name: 'is_substitute')  bool isSubstitute, @JsonKey(includeToJson: false)  Map<String, dynamic>? profile, @JsonKey(includeToJson: false)  Map<String, dynamic>? unclaimed)  $default,) {final _that = this;
 switch (_that) {
 case _MatchPlayerDto():
-return $default(_that.matchPlayerId,_that.matchId,_that.teamSide,_that.profileId,_that.unclaimedId,_that.battingOrder,_that.jerseyNumber,_that.isCaptain,_that.isKeeper,_that.isSubstitute);case _:
+return $default(_that.matchPlayerId,_that.matchId,_that.teamSide,_that.profileId,_that.unclaimedId,_that.battingOrder,_that.jerseyNumber,_that.isCaptain,_that.isKeeper,_that.isSubstitute,_that.profile,_that.unclaimed);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -203,10 +205,10 @@ return $default(_that.matchPlayerId,_that.matchId,_that.teamSide,_that.profileId
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'match_player_id')  String matchPlayerId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_side')  String teamSide, @JsonKey(name: 'profile_id')  String? profileId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'batting_order')  int? battingOrder, @JsonKey(name: 'jersey_number')  int? jerseyNumber, @JsonKey(name: 'is_captain')  bool isCaptain, @JsonKey(name: 'is_keeper')  bool isKeeper, @JsonKey(name: 'is_substitute')  bool isSubstitute)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'match_player_id')  String matchPlayerId, @JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'team_side')  String teamSide, @JsonKey(name: 'profile_id')  String? profileId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'batting_order')  int? battingOrder, @JsonKey(name: 'jersey_number')  int? jerseyNumber, @JsonKey(name: 'is_captain')  bool isCaptain, @JsonKey(name: 'is_keeper')  bool isKeeper, @JsonKey(name: 'is_substitute')  bool isSubstitute, @JsonKey(includeToJson: false)  Map<String, dynamic>? profile, @JsonKey(includeToJson: false)  Map<String, dynamic>? unclaimed)?  $default,) {final _that = this;
 switch (_that) {
 case _MatchPlayerDto() when $default != null:
-return $default(_that.matchPlayerId,_that.matchId,_that.teamSide,_that.profileId,_that.unclaimedId,_that.battingOrder,_that.jerseyNumber,_that.isCaptain,_that.isKeeper,_that.isSubstitute);case _:
+return $default(_that.matchPlayerId,_that.matchId,_that.teamSide,_that.profileId,_that.unclaimedId,_that.battingOrder,_that.jerseyNumber,_that.isCaptain,_that.isKeeper,_that.isSubstitute,_that.profile,_that.unclaimed);case _:
   return null;
 
 }
@@ -218,7 +220,7 @@ return $default(_that.matchPlayerId,_that.matchId,_that.teamSide,_that.profileId
 @JsonSerializable()
 
 class _MatchPlayerDto extends MatchPlayerDto {
-  const _MatchPlayerDto({@JsonKey(name: 'match_player_id') required this.matchPlayerId, @JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'team_side') required this.teamSide, @JsonKey(name: 'profile_id') this.profileId, @JsonKey(name: 'unclaimed_id') this.unclaimedId, @JsonKey(name: 'batting_order') this.battingOrder, @JsonKey(name: 'jersey_number') this.jerseyNumber, @JsonKey(name: 'is_captain') this.isCaptain = false, @JsonKey(name: 'is_keeper') this.isKeeper = false, @JsonKey(name: 'is_substitute') this.isSubstitute = false}): super._();
+  const _MatchPlayerDto({@JsonKey(name: 'match_player_id') required this.matchPlayerId, @JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'team_side') required this.teamSide, @JsonKey(name: 'profile_id') this.profileId, @JsonKey(name: 'unclaimed_id') this.unclaimedId, @JsonKey(name: 'batting_order') this.battingOrder, @JsonKey(name: 'jersey_number') this.jerseyNumber, @JsonKey(name: 'is_captain') this.isCaptain = false, @JsonKey(name: 'is_keeper') this.isKeeper = false, @JsonKey(name: 'is_substitute') this.isSubstitute = false, @JsonKey(includeToJson: false) final  Map<String, dynamic>? profile, @JsonKey(includeToJson: false) final  Map<String, dynamic>? unclaimed}): _profile = profile,_unclaimed = unclaimed,super._();
   factory _MatchPlayerDto.fromJson(Map<String, dynamic> json) => _$MatchPlayerDtoFromJson(json);
 
 @override@JsonKey(name: 'match_player_id') final  String matchPlayerId;
@@ -231,6 +233,24 @@ class _MatchPlayerDto extends MatchPlayerDto {
 @override@JsonKey(name: 'is_captain') final  bool isCaptain;
 @override@JsonKey(name: 'is_keeper') final  bool isKeeper;
 @override@JsonKey(name: 'is_substitute') final  bool isSubstitute;
+ final  Map<String, dynamic>? _profile;
+@override@JsonKey(includeToJson: false) Map<String, dynamic>? get profile {
+  final value = _profile;
+  if (value == null) return null;
+  if (_profile is EqualUnmodifiableMapView) return _profile;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(value);
+}
+
+ final  Map<String, dynamic>? _unclaimed;
+@override@JsonKey(includeToJson: false) Map<String, dynamic>? get unclaimed {
+  final value = _unclaimed;
+  if (value == null) return null;
+  if (_unclaimed is EqualUnmodifiableMapView) return _unclaimed;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(value);
+}
+
 
 /// Create a copy of MatchPlayerDto
 /// with the given fields replaced by the non-null parameter values.
@@ -245,16 +265,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchPlayerDto&&(identical(other.matchPlayerId, matchPlayerId) || other.matchPlayerId == matchPlayerId)&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamSide, teamSide) || other.teamSide == teamSide)&&(identical(other.profileId, profileId) || other.profileId == profileId)&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.battingOrder, battingOrder) || other.battingOrder == battingOrder)&&(identical(other.jerseyNumber, jerseyNumber) || other.jerseyNumber == jerseyNumber)&&(identical(other.isCaptain, isCaptain) || other.isCaptain == isCaptain)&&(identical(other.isKeeper, isKeeper) || other.isKeeper == isKeeper)&&(identical(other.isSubstitute, isSubstitute) || other.isSubstitute == isSubstitute));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchPlayerDto&&(identical(other.matchPlayerId, matchPlayerId) || other.matchPlayerId == matchPlayerId)&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamSide, teamSide) || other.teamSide == teamSide)&&(identical(other.profileId, profileId) || other.profileId == profileId)&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.battingOrder, battingOrder) || other.battingOrder == battingOrder)&&(identical(other.jerseyNumber, jerseyNumber) || other.jerseyNumber == jerseyNumber)&&(identical(other.isCaptain, isCaptain) || other.isCaptain == isCaptain)&&(identical(other.isKeeper, isKeeper) || other.isKeeper == isKeeper)&&(identical(other.isSubstitute, isSubstitute) || other.isSubstitute == isSubstitute)&&const DeepCollectionEquality().equals(other._profile, _profile)&&const DeepCollectionEquality().equals(other._unclaimed, _unclaimed));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,matchPlayerId,matchId,teamSide,profileId,unclaimedId,battingOrder,jerseyNumber,isCaptain,isKeeper,isSubstitute);
+int get hashCode => Object.hash(runtimeType,matchPlayerId,matchId,teamSide,profileId,unclaimedId,battingOrder,jerseyNumber,isCaptain,isKeeper,isSubstitute,const DeepCollectionEquality().hash(_profile),const DeepCollectionEquality().hash(_unclaimed));
 
 @override
 String toString() {
-  return 'MatchPlayerDto(matchPlayerId: $matchPlayerId, matchId: $matchId, teamSide: $teamSide, profileId: $profileId, unclaimedId: $unclaimedId, battingOrder: $battingOrder, jerseyNumber: $jerseyNumber, isCaptain: $isCaptain, isKeeper: $isKeeper, isSubstitute: $isSubstitute)';
+  return 'MatchPlayerDto(matchPlayerId: $matchPlayerId, matchId: $matchId, teamSide: $teamSide, profileId: $profileId, unclaimedId: $unclaimedId, battingOrder: $battingOrder, jerseyNumber: $jerseyNumber, isCaptain: $isCaptain, isKeeper: $isKeeper, isSubstitute: $isSubstitute, profile: $profile, unclaimed: $unclaimed)';
 }
 
 
@@ -265,7 +285,7 @@ abstract mixin class _$MatchPlayerDtoCopyWith<$Res> implements $MatchPlayerDtoCo
   factory _$MatchPlayerDtoCopyWith(_MatchPlayerDto value, $Res Function(_MatchPlayerDto) _then) = __$MatchPlayerDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'match_player_id') String matchPlayerId,@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'team_side') String teamSide,@JsonKey(name: 'profile_id') String? profileId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'batting_order') int? battingOrder,@JsonKey(name: 'jersey_number') int? jerseyNumber,@JsonKey(name: 'is_captain') bool isCaptain,@JsonKey(name: 'is_keeper') bool isKeeper,@JsonKey(name: 'is_substitute') bool isSubstitute
+@JsonKey(name: 'match_player_id') String matchPlayerId,@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'team_side') String teamSide,@JsonKey(name: 'profile_id') String? profileId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'batting_order') int? battingOrder,@JsonKey(name: 'jersey_number') int? jerseyNumber,@JsonKey(name: 'is_captain') bool isCaptain,@JsonKey(name: 'is_keeper') bool isKeeper,@JsonKey(name: 'is_substitute') bool isSubstitute,@JsonKey(includeToJson: false) Map<String, dynamic>? profile,@JsonKey(includeToJson: false) Map<String, dynamic>? unclaimed
 });
 
 
@@ -282,7 +302,7 @@ class __$MatchPlayerDtoCopyWithImpl<$Res>
 
 /// Create a copy of MatchPlayerDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? matchPlayerId = null,Object? matchId = null,Object? teamSide = null,Object? profileId = freezed,Object? unclaimedId = freezed,Object? battingOrder = freezed,Object? jerseyNumber = freezed,Object? isCaptain = null,Object? isKeeper = null,Object? isSubstitute = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? matchPlayerId = null,Object? matchId = null,Object? teamSide = null,Object? profileId = freezed,Object? unclaimedId = freezed,Object? battingOrder = freezed,Object? jerseyNumber = freezed,Object? isCaptain = null,Object? isKeeper = null,Object? isSubstitute = null,Object? profile = freezed,Object? unclaimed = freezed,}) {
   return _then(_MatchPlayerDto(
 matchPlayerId: null == matchPlayerId ? _self.matchPlayerId : matchPlayerId // ignore: cast_nullable_to_non_nullable
 as String,matchId: null == matchId ? _self.matchId : matchId // ignore: cast_nullable_to_non_nullable
@@ -294,7 +314,9 @@ as int?,jerseyNumber: freezed == jerseyNumber ? _self.jerseyNumber : jerseyNumbe
 as int?,isCaptain: null == isCaptain ? _self.isCaptain : isCaptain // ignore: cast_nullable_to_non_nullable
 as bool,isKeeper: null == isKeeper ? _self.isKeeper : isKeeper // ignore: cast_nullable_to_non_nullable
 as bool,isSubstitute: null == isSubstitute ? _self.isSubstitute : isSubstitute // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,profile: freezed == profile ? _self._profile : profile // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,unclaimed: freezed == unclaimed ? _self._unclaimed : unclaimed // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,
   ));
 }
 

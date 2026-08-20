@@ -4,190 +4,109 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/ck_button.dart';
 import '../../domain/entities/match.dart';
 import '../controllers/match_start_controller.dart';
-import '../state/match_start_state.dart';
-import '../widgets/match_start/match_start_widgets.dart';
+import '../widgets/match_start/match_start_atoms.dart';
+import '../widgets/match_start/match_start_header.dart';
+import '../widgets/match_start/match_start_layout.dart';
 
-/// Two-phone Match Start. Toss → openers → Start. The opening bowler is
-/// deferred to ball 1 in the scoring screen (matches the design intent +
-/// the deployed `start_match_now` RPC, which doesn't ask for a bowler).
+/// Two-phone Match Start screen.
 ///
-/// This screen is a thin UI shell. All form state lives in
-/// [MatchStartController] via [MatchStartState]. All actions are dispatched
-/// through the controller. The screen only handles navigation and snackbars.
+/// A routing shell: it watches [matchStartControllerProvider], maps the
+/// [AsyncValue] to error / loading / redirect / data, and delegates the whole
+/// data UI to [MatchStartLayout].
 class MatchStartScreen extends ConsumerWidget {
   const MatchStartScreen({super.key, required this.matchId});
+
   final String matchId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(matchStartControllerProvider(matchId));
+
     return Scaffold(
       backgroundColor: CkColors.paper,
       body: SafeArea(
         child: switch (async) {
-          AsyncError(:final error) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                MatchStartHeaderRow(
-                    onBack: () => context.pop(), title: 'Match start'),
-                const Spacer(),
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      error is FailureWrapper
-                          ? error.failure.message
-                          : error.toString(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-              ],
-            ),
+          AsyncError(:final error) => _ErrorView(message: failureMessageOf(error)),
+          // Terminal status wins over the setup phase: an abandoned match
+          // never advances `start_phase`, so without this the screen would
+          // strand the user on a Start button that can only error.
+          AsyncData(:final value) when _terminalRoute(value.match) != null =>
+            _Redirect(location: _terminalRoute(value.match)!),
+          // The match went live on the other phone (or was already live when
+          // we arrived) — hand over to the scoring screen.
           AsyncData(:final value) when value.phase == MatchStartPhase.live =>
-            Builder(builder: (_) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (context.mounted) {
-                  context.go('/matches/${value.match.id.value}/score');
-                }
-              });
-              return const Center(
-                  child: CircularProgressIndicator(color: CkColors.ink));
-            }),
-          AsyncData(:final value) => _layout(context, ref, value),
-          _ => const Center(
-              child: CircularProgressIndicator(color: CkColors.ink),
-            ),
+            _Redirect(location: '/matches/$matchId/score'),
+          AsyncData(:final value) =>
+            MatchStartLayout(matchId: matchId, state: value),
+          _ => const MatchStartLoader(),
         },
       ),
     );
   }
 
-  Widget _layout(BuildContext context, WidgetRef ref, MatchStartState state) {
-    final controller =
-        ref.read(matchStartControllerProvider(matchId).notifier);
+  /// Where a match that is no longer in setup belongs, or null while it is
+  /// still on its way to the first ball.
+  String? _terminalRoute(Match match) => switch (match.status) {
+        MatchStatus.completed ||
+        MatchStatus.abandoned ||
+        MatchStatus.walkover =>
+          '/matches/$matchId/result',
+        // Innings 2 setup has its own screen until phase 3 unifies them.
+        MatchStatus.inningsBreak => '/matches/$matchId/innings-break',
+        _ => null,
+      };
+}
 
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        MatchStartHeader(state: state, onBack: () => context.pop()),
-        MatchStartPhonePill(state: state),
-        Expanded(
-          child: _body(state, controller),
+        const MatchStartTopBar(title: 'Match start'),
+        const Spacer(),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(message, textAlign: TextAlign.center),
+          ),
         ),
-        MatchStartCtaBar(
-          state: state,
-          builder: (s) => _ctaForStage(context, ref, s),
-        ),
+        const Spacer(),
       ],
     );
   }
+}
 
-  Widget _body(MatchStartState state, MatchStartController controller) {
-    switch (state.phase) {
-      case MatchStartPhase.toss:
-        return MatchStartStage1Toss(
-          state: state,
-          onPickWinner: controller.pickTossWinner,
-          onPickDecision: controller.pickTossDecision,
-        );
-      case MatchStartPhase.lineup:
-        return MatchStartStage2Lineup(
-          state: state,
-          onPickStriker: controller.pickStriker,
-          onPickNonStriker: controller.pickNonStriker,
-        );
-      case MatchStartPhase.ready:
-        return MatchStartStage3Ready(state: state);
-      case MatchStartPhase.live:
-        return const SizedBox.shrink();
-    }
+/// Navigates away once, on the first frame after the match leaves setup —
+/// either because it went live or because it reached a terminal status.
+///
+/// A widget rather than a post-frame callback in `build` so the redirect
+/// fires exactly once: it is only inserted when the condition holds, and
+/// `initState` runs once per insertion.
+class _Redirect extends StatefulWidget {
+  const _Redirect({required this.location});
+
+  final String location;
+
+  @override
+  State<_Redirect> createState() => _RedirectState();
+}
+
+class _RedirectState extends State<_Redirect> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.go(widget.location);
+    });
   }
 
-  Widget _ctaForStage(
-      BuildContext context, WidgetRef ref, MatchStartState state) {
-    final controller =
-        ref.read(matchStartControllerProvider(matchId).notifier);
-
-    switch (state.phase) {
-      case MatchStartPhase.toss:
-        return CkButton(
-          label: 'Continue → lineup',
-          busy: state.isBusy,
-          onPressed: state.viewerCanAct && state.isTossReady && !state.isBusy
-              ? () => _submitToss(context, controller)
-              : null,
-        );
-      case MatchStartPhase.lineup:
-        if (state.viewerRole != MatchStartViewerRole.battingCaptain) {
-          return const CkButton(
-            label: 'Waiting on the batting captain…',
-            onPressed: null,
-          );
-        }
-        return CkButton(
-          label: 'Submit openers',
-          busy: state.isBusy,
-          onPressed: state.isLineupReady && !state.isBusy
-              ? () => _submitOpeners(context, controller)
-              : null,
-        );
-      case MatchStartPhase.ready:
-        if (state.viewerRole != MatchStartViewerRole.battingCaptain) {
-          return const CkButton(
-            label: 'Waiting for the batting captain to tap Start…',
-            onPressed: null,
-          );
-        }
-        return CkButton(
-          label: 'Start match — first ball',
-          busy: state.isBusy,
-          onPressed: !state.isBusy
-              ? () => _startMatch(context, controller)
-              : null,
-        );
-      case MatchStartPhase.live:
-        return const SizedBox.shrink();
-    }
-  }
-
-  Future<void> _submitToss(
-      BuildContext context, MatchStartController controller) async {
-    final result = await controller.submitToss();
-    if (!context.mounted) return;
-    result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
-      (_) {},
-    );
-  }
-
-  Future<void> _submitOpeners(
-      BuildContext context, MatchStartController controller) async {
-    final result = await controller.submitOpeners();
-    if (!context.mounted) return;
-    result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
-      (_) {},
-    );
-  }
-
-  Future<void> _startMatch(
-      BuildContext context, MatchStartController controller) async {
-    final result = await controller.startMatchNow();
-    if (!context.mounted) return;
-    result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
-      (_) => context.go('/matches/$matchId/score'),
-    );
-  }
+  @override
+  Widget build(BuildContext context) => const MatchStartLoader();
 }

@@ -2,53 +2,64 @@ import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
+import '../../../../core/log/ck_log.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/match.dart';
+import '../../domain/entities/match_player.dart';
 import '../providers/matches_providers.dart';
 import '../state/match_start_state.dart';
 
 part 'match_start_controller.g.dart';
 
-/// Watches the match row in real time and exposes the Match Start
-/// state and actions.
+/// Watches the match row in real time and owns every Match Start decision:
+/// who the viewer is, which openers are selected, and the three writes
+/// (toss → openers → start).
+///
+/// Widgets read [MatchStartState] and call these methods; they never merge
+/// pending-vs-locked selections or translate between id spaces themselves.
 @riverpod
 class MatchStartController extends _$MatchStartController {
   @override
   Future<MatchStartState> build(String matchId) async {
-    final user = ref.watch(currentUserStreamProvider).value;
-    final userId = user?.id.value;
+    final userId = ref.watch(currentUserStreamProvider).value?.id.value;
 
-    final liveAsync = ref.watch(liveMatchProvider(matchId));
-    final match = liveAsync.value;
+    final match = ref.watch(liveMatchProvider(matchId)).value;
     if (match == null) {
       throw const FailureWrapper(NotFoundFailure('Match not found'));
     }
 
+    // Openers already locked server-side, translated from match_player_ids
+    // back to the ref ids the picker speaks.
+    final lineup = ref.watch(matchPlayersProvider(matchId)).value ?? const [];
+    final innings = ref.watch(liveInningsStateProvider(matchId, 1)).value;
+
     final previous = state.value;
+    final batting = battingFirstTeam(match);
+    final role = viewerRoleOnMatch(match, userId);
 
-    return _deriveState(
-      match,
-      userId,
-      previous: previous,
-    );
-  }
-
-  MatchStartState _deriveState(
-    Match m,
-    String? userId, {
-    MatchStartState? previous,
-  }) {
-    final batting = battingFirstTeam(m);
-    final bowling = batting == null
-        ? null
-        : (batting == m.teamAId ? m.teamBId : m.teamAId);
+    // The single most useful line when two phones disagree: it shows what
+    // this device believes about who it is and what it may do.
+    CkLog.write(CkLogChannel.matchStart, 'derive', data: {
+      'match': matchId,
+      'phase': match.startPhase.wire,
+      'status': match.status.wire,
+      'was': previous?.phase.wire,
+      'role': role.name,
+      'batting': batting?.value,
+      'xi': lineup.length,
+      'locked': lineup.playerRefIdOf(innings?.strikerId?.value) != null,
+    });
 
     return MatchStartState(
-      match: m,
-      viewerRole: viewerRoleOnMatch(m, userId),
+      match: match,
+      viewerRole: role,
       battingTeamId: batting,
-      bowlingTeamId: bowling,
+      bowlingTeamId: batting == null
+          ? null
+          : (batting == match.teamAId ? match.teamBId : match.teamAId),
+      lockedStriker: lineup.playerRefIdOf(innings?.strikerId?.value),
+      lockedNonStriker: lineup.playerRefIdOf(innings?.nonStrikerId?.value),
       pendingTossWinner: previous?.pendingTossWinner,
       pendingDecision: previous?.pendingDecision,
       pendingStriker: previous?.pendingStriker,
@@ -57,131 +68,149 @@ class MatchStartController extends _$MatchStartController {
     );
   }
 
-  void pickTossWinner(TeamId winner) {
-    final current = state.value;
-    if (current == null) return;
-    state = AsyncData(current.copyWith(
-      pendingTossWinner: () => winner,
-    ));
-  }
+  // ── Toss ─────────────────────────────────────────────────────────────────
 
-  void pickTossDecision(TossDecision decision) {
-    final current = state.value;
-    if (current == null) return;
-    state = AsyncData(current.copyWith(
-      pendingDecision: () => decision,
-    ));
-  }
+  void pickTossWinner(TeamId winner) =>
+      _update((s) => s.copyWith(pendingTossWinner: () => winner));
 
-  void pickStriker(String refId) {
-    final current = state.value;
-    if (current == null) return;
-    // Tapping the existing non-striker into striker swaps them.
-    String? newNonStriker = current.pendingNonStriker;
-    if (current.pendingNonStriker == refId) {
-      newNonStriker = current.pendingStriker;
-    }
-    state = AsyncData(current.copyWith(
-      pendingStriker: () => refId,
-      pendingNonStriker: () => newNonStriker,
-    ));
-  }
+  void pickTossDecision(TossDecision decision) =>
+      _update((s) => s.copyWith(pendingDecision: () => decision));
 
-  void pickNonStriker(String refId) {
-    final current = state.value;
-    if (current == null) return;
-    // Tapping the existing striker into non-striker swaps them.
-    String? newStriker = current.pendingStriker;
-    if (current.pendingStriker == refId) {
-      newStriker = current.pendingNonStriker;
-    }
-    state = AsyncData(current.copyWith(
-      pendingStriker: () => newStriker,
-      pendingNonStriker: () => refId,
-    ));
-  }
-
-  Future<Either<Failure, Unit>> submitToss() async {
+  Future<Either<Failure, Unit>> submitToss() {
     final current = state.value;
     if (current == null || !current.isTossReady) {
-      return const Left(ValidationFailure('Please select toss winner and decision'));
+      return Future.value(
+        const Left(ValidationFailure('Please select toss winner and decision')),
+      );
     }
-
-    state = AsyncData(current.copyWith(isBusy: true));
-
-    final result = await ref.read(matchesRepositoryProvider).recordMatchToss(
-          id: MatchId(matchId),
-          wonBy: current.pendingTossWinner!,
-          decision: current.pendingDecision!,
-        );
-
-    final updated = state.value ?? current;
-    state = AsyncData(updated.copyWith(
-      isBusy: false,
-      pendingTossWinner: () => null,
-      pendingDecision: () => null,
-    ));
-
-    return result;
+    return _busy(
+      () => ref.read(matchesRepositoryProvider).recordMatchToss(
+            id: MatchId(matchId),
+            wonBy: current.pendingTossWinner!,
+            decision: current.pendingDecision!,
+          ),
+      label: 'submitToss',
+      // The recorded toss arrives back on the live row; drop the local copy.
+      reset: (s) => s.copyWith(
+        pendingTossWinner: () => null,
+        pendingDecision: () => null,
+      ),
+    );
   }
 
-  Future<Either<Failure, Unit>> submitOpeners() async {
+  // ── Openers ──────────────────────────────────────────────────────────────
+
+  /// Tap-to-assign: fills the striker slot first, then the non-striker, then
+  /// replaces the striker. Tapping a player already holding the other slot
+  /// swaps the two.
+  void tapOpener(String refId) {
+    _update((s) {
+      final striker = s.striker;
+      final nonStriker = s.nonStriker;
+
+      final (String? nextStriker, String? nextNonStriker) = switch ((
+        striker,
+        nonStriker,
+      )) {
+        (null, _) => (refId, nonStriker == refId ? null : nonStriker),
+        (_, null) => (striker == refId ? null : striker, refId),
+        _ => (refId, nonStriker == refId ? striker : nonStriker),
+      };
+
+      CkLog.write(CkLogChannel.matchStart, 'tapOpener', data: {
+        'tapped': refId,
+        'striker': '${CkLog.short(striker)}→${CkLog.short(nextStriker)}',
+        'nonStriker':
+            '${CkLog.short(nonStriker)}→${CkLog.short(nextNonStriker)}',
+      });
+
+      return s.copyWith(
+        pendingStriker: () => nextStriker,
+        pendingNonStriker: () => nextNonStriker,
+      );
+    });
+  }
+
+  Future<Either<Failure, Unit>> submitOpeners() {
     final current = state.value;
     if (current == null || !current.isLineupReady) {
-      return const Left(ValidationFailure('Please select both openers'));
+      return Future.value(
+        const Left(ValidationFailure('Please select both openers')),
+      );
     }
 
-    final allMatchPlayers =
-        ref.read(matchPlayersProvider(matchId)).value ?? const [];
-
-    String? matchPlayerIdFor(String refId) {
-      for (final mp in allMatchPlayers) {
-        if (mp.playerRefId == refId) return mp.id.value;
-      }
-      return null;
+    final lineup =
+        ref.read(matchPlayersProvider(matchId)).value ?? const <MatchPlayer>[];
+    final strikerId = lineup.matchPlayerIdOf(current.striker);
+    final nonStrikerId = lineup.matchPlayerIdOf(current.nonStriker);
+    if (strikerId == null || nonStrikerId == null) {
+      return Future.value(
+        const Left(ValidationFailure(
+          "Selected player is not in this match's lineup. "
+          'Reopen the screen and try again.',
+        )),
+      );
     }
 
-    final strikerMpId = matchPlayerIdFor(current.pendingStriker!);
-    final nonStrikerMpId = matchPlayerIdFor(current.pendingNonStriker!);
-
-    if (strikerMpId == null || nonStrikerMpId == null) {
-      return const Left(ValidationFailure(
-        'Selected player is not in this match\'s lineup. Reopen the screen and try again.',
-      ));
-    }
-
-    state = AsyncData(current.copyWith(isBusy: true));
-
-    final result = await ref.read(matchesRepositoryProvider).submitMatchOpeners(
-          id: MatchId(matchId),
-          strikerId: strikerMpId,
-          nonStrikerId: nonStrikerMpId,
-        );
-
-    final updated = state.value ?? current;
-    state = AsyncData(updated.copyWith(
-      isBusy: false,
-      pendingStriker: () => null,
-      pendingNonStriker: () => null,
-    ));
-
-    return result;
+    return _busy(
+      () => ref.read(matchesRepositoryProvider).submitMatchOpeners(
+            id: MatchId(matchId),
+            strikerId: strikerId,
+            nonStrikerId: nonStrikerId,
+          ),
+      label: 'submitOpeners',
+      // Once persisted the openers come back as `locked*` on the next build.
+      reset: (s) => s.copyWith(
+        pendingStriker: () => null,
+        pendingNonStriker: () => null,
+      ),
+    );
   }
 
-  Future<Either<Failure, Unit>> startMatchNow() async {
+  // ── Start ────────────────────────────────────────────────────────────────
+
+  Future<Either<Failure, Unit>> startMatchNow() => _busy(
+        () => ref
+            .read(matchesRepositoryProvider)
+            .startMatchNow(MatchId(matchId)),
+        label: 'startMatch',
+      );
+
+  // ── Plumbing ─────────────────────────────────────────────────────────────
+
+  /// Apply a synchronous edit to the loaded state. No-op while loading.
+  void _update(MatchStartState Function(MatchStartState) edit) {
     final current = state.value;
-    if (current != null) {
-      state = AsyncData(current.copyWith(isBusy: true));
-    }
+    if (current == null) return;
+    state = AsyncData(edit(current));
+  }
 
-    final result = await ref
-        .read(matchesRepositoryProvider)
-        .startMatchNow(MatchId(matchId));
+  /// Run a write with the busy flag raised, then lower it and apply [reset].
+  ///
+  /// Re-reads `state` after the await because the live row may have arrived
+  /// mid-flight — resetting onto the stale snapshot would discard it.
+  Future<Either<Failure, Unit>> _busy(
+    Future<Either<Failure, Unit>> Function() action, {
+    String label = 'action',
+    MatchStartState Function(MatchStartState)? reset,
+  }) async {
+    _update((s) => s.copyWith(isBusy: true));
+    CkLog.write(CkLogChannel.matchStart, '$label·start',
+        data: {'match': matchId});
 
-    final updated = state.value ?? current;
-    if (updated != null) {
-      state = AsyncData(updated.copyWith(isBusy: false));
-    }
+    final result = await action();
+
+    result.fold(
+      (f) => CkLog.warn(CkLogChannel.matchStart, '$label·fail',
+          data: {'match': matchId, 'failure': f.runtimeType, 'msg': f.message}),
+      (_) => CkLog.write(CkLogChannel.matchStart, '$label·ok',
+          data: {'match': matchId}),
+    );
+
+    _update((s) {
+      final settled = s.copyWith(isBusy: false);
+      return reset == null ? settled : reset(settled);
+    });
 
     return result;
   }

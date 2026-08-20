@@ -1,325 +1,95 @@
-// Golden-vector tests for the Slice-A scoring engine.
+// Golden-vector tests for the scoring engine.
 //
-// Run: deno test supabase/functions/_shared/scoring/engine.test.ts
+// Run: deno test --allow-read supabase/functions/_shared/scoring/engine.test.ts
+//   (no local Deno? `docker run --rm -v "$PWD":/app -w /app denoland/deno:latest
+//    test --allow-read --allow-net supabase/functions/_shared/scoring/engine.test.ts`)
 //
-// Each case asserts the engine reproduces the deployed record_ball semantics
-// for one delivery type. State uses readable ids ("S"=striker, "N"=non-striker,
-// "B"=bowler) so strike rotation is obvious.
+// The cases themselves live in `vectors.json`, NOT here. That file is the
+// executable specification of the engine, and it is deliberately language
+// neutral so a second implementation — the Dart engine on the scoring screen —
+// can be held to exactly the same expectations. Two implementations of cricket
+// scoring are only safe while one spec governs both.
+//
+// This file is just the runner. To add a rule, add a vector; it will fail here
+// and in every other implementation until each one satisfies it.
 
 import { assertEquals } from "jsr:@std/assert";
 import { applyBall } from "./engine.ts";
-import type { BallInput, EngineContext, InningsState, MatchFormat } from "./types.ts";
+import type {
+  BallInput,
+  EngineContext,
+  InningsState,
+  MatchFormat,
+} from "./types.ts";
 
-const FORMAT: MatchFormat = {
-  oversPerInnings: 20,
-  playersPerTeam: 11,
-  ballsPerOver: 6,
-  maxOversPerBowler: 4,
-  inningsPerSide: 1,
-  ballType: "leather",
-};
+// deno-lint-ignore no-explicit-any
+type Json = Record<string, any>;
 
-function state(over: Partial<InningsState> = {}): InningsState {
-  return {
-    strikerId: "S",
-    nonStrikerId: "N",
-    bowlerId: "B",
-    legalBallCount: 0,
-    totalRuns: 0,
-    totalWickets: 0,
-    totalExtras: 0,
-    isAllOut: false,
-    isDeclared: false,
-    target: null,
-    version: 1,
-    ...over,
+interface Vector {
+  name: string;
+  category: string;
+  state?: Json;
+  format?: Json;
+  input?: Json;
+  ctx?: Json;
+  expect: {
+    ok: boolean;
+    error?: string;
+    ball?: Json;
+    newState?: Json;
+    events?: Json;
   };
 }
 
-function ball(over: Partial<BallInput> = {}): BallInput {
-  return {
-    isLegalDelivery: true,
-    ballKind: "legal",
-    runsScored: 0,
-    extras: 0,
-    isWicket: false,
-    wicketType: null,
-    batsmanId: "S",
-    nonStrikerId: "N",
-    bowlerId: "B",
-    fielderId: null,
-    commentary: null,
-    ...over,
-  };
-}
+const suite = JSON.parse(
+  await Deno.readTextFile(new URL("./vectors.json", import.meta.url)),
+) as { defaults: Json; vectors: Vector[] };
 
-const NO_CTX: EngineContext = { prevNonWideKind: null };
+const D = suite.defaults;
 
-Deno.test("dot ball: counts, no swap, over not ended", () => {
-  const r = applyBall(state(), FORMAT, ball(), NO_CTX);
-  assertEquals(r.ok, true);
-  assertEquals(r.newState!.legalBallCount, 1);
-  assertEquals(r.newState!.totalRuns, 0);
-  assertEquals(r.newState!.strikerId, "S");
-  assertEquals(r.newState!.nonStrikerId, "N");
-  assertEquals(r.ball!.overNumber, 0);
-  assertEquals(r.ball!.ballInOver, 1);
-  assertEquals(r.events!.overEnded, false);
-});
-
-Deno.test("single: striker and non-striker swap", () => {
-  const r = applyBall(state(), FORMAT, ball({ runsScored: 1 }), NO_CTX);
-  assertEquals(r.newState!.strikerId, "N");
-  assertEquals(r.newState!.nonStrikerId, "S");
-  assertEquals(r.newState!.totalRuns, 1);
-});
-
-Deno.test("two / four / six: no swap", () => {
-  for (const runs of [2, 4, 6]) {
-    const r = applyBall(state(), FORMAT, ball({ runsScored: runs }), NO_CTX);
-    assertEquals(r.newState!.strikerId, "S", `runs=${runs}`);
-    assertEquals(r.newState!.totalRuns, runs, `runs=${runs}`);
+/** `expect` is a PARTIAL match: assert only the keys a vector names.
+ *
+ * Vectors stay additive this way — tightening one case never forces every
+ * other case to spell out fields it does not care about. */
+function assertSubset(actual: Json | null | undefined, expected: Json, where: string) {
+  for (const [key, want] of Object.entries(expected)) {
+    assertEquals(
+      actual?.[key],
+      want,
+      `${where}.${key}: expected ${JSON.stringify(want)}, got ${JSON.stringify(actual?.[key])}`,
+    );
   }
-});
+}
 
-Deno.test("wide: no legal ball counted, +1 extra, no swap (record_ball parity)", () => {
-  const r = applyBall(
-    state(),
-    FORMAT,
-    ball({ isLegalDelivery: false, ballKind: "wide", runsScored: 0, extras: 1 }),
-    NO_CTX,
-  );
-  assertEquals(r.newState!.legalBallCount, 0);
-  assertEquals(r.newState!.totalRuns, 1);
-  assertEquals(r.newState!.totalExtras, 1);
-  assertEquals(r.newState!.strikerId, "S");
-  assertEquals(r.ball!.ballInOver, 0);
-});
+for (const v of suite.vectors) {
+  Deno.test(`[${v.category}] ${v.name}`, () => {
+    const state = { ...D.state, ...(v.state ?? {}) } as InningsState;
+    const format = { ...D.format, ...(v.format ?? {}) } as MatchFormat;
+    const input = { ...D.input, ...(v.input ?? {}) } as BallInput;
+    const ctx = { ...D.ctx, ...(v.ctx ?? {}) } as EngineContext;
 
-Deno.test("no-ball: +1 extra, not legal, sets up free hit for next delivery", () => {
-  const r = applyBall(
-    state(),
-    FORMAT,
-    ball({ isLegalDelivery: false, ballKind: "no_ball", extras: 1 }),
-    NO_CTX,
-  );
-  assertEquals(r.newState!.legalBallCount, 0);
-  assertEquals(r.newState!.totalRuns, 1);
-  // free-hit is derived for the NEXT ball, via ctx.prevNonWideKind:
-  const next = applyBall(state({ totalRuns: 1 }), FORMAT, ball(), {
-    prevNonWideKind: "no_ball",
+    const r = applyBall(state, format, input, ctx);
+
+    assertEquals(r.ok, v.expect.ok, `ok: ${r.error?.code ?? ""} ${r.error?.message ?? ""}`);
+
+    if (!v.expect.ok) {
+      assertEquals(r.error?.code, v.expect.error, "error.code");
+      return;
+    }
+
+    if (v.expect.ball) assertSubset(r.ball as Json, v.expect.ball, "ball");
+    if (v.expect.newState) assertSubset(r.newState as Json, v.expect.newState, "newState");
+    if (v.expect.events) assertSubset(r.events as Json, v.expect.events, "events");
   });
-  assertEquals(next.ball!.isFreeHit, true);
+}
+
+// A vector file that silently loses its contents would turn this whole suite
+// green while asserting nothing at all.
+Deno.test("[meta] the vector file is populated", () => {
+  assertEquals(suite.vectors.length >= 30, true, `only ${suite.vectors.length} vectors`);
 });
 
-Deno.test("bye 1: legal ball, +1 extra, swap on odd byes", () => {
-  const r = applyBall(
-    state(),
-    FORMAT,
-    ball({ ballKind: "bye", runsScored: 0, extras: 1 }),
-    NO_CTX,
-  );
-  assertEquals(r.newState!.legalBallCount, 1);
-  assertEquals(r.newState!.totalExtras, 1);
-  assertEquals(r.newState!.strikerId, "N"); // odd byes => swap
-});
-
-Deno.test("leg-bye 2: legal ball, no swap on even", () => {
-  const r = applyBall(
-    state(),
-    FORMAT,
-    ball({ ballKind: "leg_bye", runsScored: 0, extras: 2 }),
-    NO_CTX,
-  );
-  assertEquals(r.newState!.totalExtras, 2);
-  assertEquals(r.newState!.strikerId, "S");
-});
-
-Deno.test("wicket: striker cleared, wicket counted", () => {
-  const r = applyBall(
-    state(),
-    FORMAT,
-    ball({ isWicket: true, wicketType: "bowled" }),
-    NO_CTX,
-  );
-  assertEquals(r.newState!.totalWickets, 1);
-  assertEquals(r.newState!.strikerId, null);
-  assertEquals(r.newState!.legalBallCount, 1);
-});
-
-Deno.test("end of over on a dot: bowler cleared, strikers swap", () => {
-  const r = applyBall(state({ legalBallCount: 5 }), FORMAT, ball(), NO_CTX);
-  assertEquals(r.newState!.legalBallCount, 6);
-  assertEquals(r.events!.overEnded, true);
-  assertEquals(r.newState!.bowlerId, null);
-  assertEquals(r.newState!.strikerId, "N"); // over-end swap
-});
-
-Deno.test("end of over on a single: net no swap (ran 1, then changed ends)", () => {
-  const r = applyBall(
-    state({ legalBallCount: 5 }),
-    FORMAT,
-    ball({ runsScored: 1 }),
-    NO_CTX,
-  );
-  assertEquals(r.events!.overEnded, true);
-  assertEquals(r.newState!.bowlerId, null);
-  assertEquals(r.newState!.strikerId, "S"); // ran a single AND swapped at over end
-});
-
-Deno.test("over/ball position derivation mid-over", () => {
-  const r = applyBall(state({ legalBallCount: 8 }), FORMAT, ball(), NO_CTX);
-  assertEquals(r.ball!.overNumber, 1); // floor(8/6)
-  assertEquals(r.ball!.ballInOver, 3); // 8%6 + 1
-});
-
-Deno.test("validation: wicket without a type is rejected", () => {
-  const r = applyBall(state(), FORMAT, ball({ isWicket: true }), NO_CTX);
-  assertEquals(r.ok, false);
-  assertEquals(r.error!.code, "wicket_type_required");
-});
-
-Deno.test("validation: wicket_type without isWicket is rejected", () => {
-  const r = applyBall(
-    state(),
-    FORMAT,
-    ball({ isWicket: false, wicketType: "caught" }),
-    NO_CTX,
-  );
-  assertEquals(r.ok, false);
-  assertEquals(r.error!.code, "wicket_type_unexpected");
-});
-
-// ── Innings termination (F1) ──────────────────────────────────────────────
-
-Deno.test("termination: a normal ball does NOT end the innings", () => {
-  const r = applyBall(state(), FORMAT, ball(), NO_CTX);
-  assertEquals(r.events!.inningsEnded, false);
-  assertEquals(r.events!.inningsEndReason, null);
-});
-
-Deno.test("termination: 10th wicket = all out (XI)", () => {
-  const r = applyBall(
-    state({ totalWickets: 9 }),
-    FORMAT,
-    ball({ isWicket: true, wicketType: "bowled" }),
-    NO_CTX,
-  );
-  assertEquals(r.newState!.totalWickets, 10);
-  assertEquals(r.events!.allOut, true);
-  assertEquals(r.events!.inningsEnded, true);
-  assertEquals(r.events!.inningsEndReason, "all_out");
-});
-
-Deno.test("termination: last legal ball of the over limit = overs complete", () => {
-  // 20-over T20 = 120 legal balls. The 120th legal delivery completes the innings.
-  const r = applyBall(state({ legalBallCount: 119 }), FORMAT, ball(), NO_CTX);
-  assertEquals(r.newState!.legalBallCount, 120);
-  assertEquals(r.events!.oversComplete, true);
-  assertEquals(r.events!.inningsEnded, true);
-  assertEquals(r.events!.inningsEndReason, "overs");
-});
-
-Deno.test("termination: reaching the chase target ends the innings", () => {
-  const r = applyBall(
-    state({ target: 50, totalRuns: 48 }),
-    FORMAT,
-    ball({ runsScored: 2 }),
-    NO_CTX,
-  );
-  assertEquals(r.newState!.totalRuns, 50);
-  assertEquals(r.events!.targetReached, true);
-  assertEquals(r.events!.inningsEnded, true);
-  // target wins precedence over any other reason
-  assertEquals(r.events!.inningsEndReason, "target");
-});
-
-Deno.test("termination: all-out scales with team size (6-a-side = 5 wkts)", () => {
-  const sixes = { ...FORMAT, playersPerTeam: 6 }; // wicketsToAllOut defaults to 5
-  const r = applyBall(
-    state({ totalWickets: 4 }),
-    sixes,
-    ball({ isWicket: true, wicketType: "lbw" }),
-    NO_CTX,
-  );
-  assertEquals(r.events!.allOut, true);
-  assertEquals(r.events!.inningsEndReason, "all_out");
-});
-
-Deno.test("termination: 9 down is NOT all out yet (XI)", () => {
-  const r = applyBall(
-    state({ totalWickets: 8 }),
-    FORMAT,
-    ball({ isWicket: true, wicketType: "bowled" }),
-    NO_CTX,
-  );
-  assertEquals(r.newState!.totalWickets, 9);
-  assertEquals(r.events!.allOut, false);
-  assertEquals(r.events!.inningsEnded, false);
-});
-
-// ── Bowler over-cap (B1) + free-hit dismissals (B5) ───────────────────────
-
-Deno.test("bowler cap: the over-limit-th legal ball is rejected", () => {
-  // FORMAT = 4 overs/bowler * 6 = 24 legal balls; the 25th is blocked.
-  const r = applyBall(state(), FORMAT, ball(), {
-    prevNonWideKind: null,
-    bowlerLegalBalls: 24,
-  });
-  assertEquals(r.ok, false);
-  assertEquals(r.error!.code, "bowler_over_cap");
-});
-
-Deno.test("bowler cap: one legal ball under the limit is fine", () => {
-  const r = applyBall(state(), FORMAT, ball(), {
-    prevNonWideKind: null,
-    bowlerLegalBalls: 23,
-  });
-  assertEquals(r.ok, true);
-});
-
-Deno.test("bowler cap: an illegal ball (wide) does not hit the cap", () => {
-  const r = applyBall(
-    state(),
-    FORMAT,
-    ball({ isLegalDelivery: false, ballKind: "wide", runsScored: 0, extras: 1 }),
-    { prevNonWideKind: null, bowlerLegalBalls: 24 },
-  );
-  assertEquals(r.ok, true);
-});
-
-Deno.test("free hit: bowled is rejected", () => {
-  const r = applyBall(
-    state(),
-    FORMAT,
-    ball({ isWicket: true, wicketType: "bowled" }),
-    { prevNonWideKind: "no_ball" },
-  );
-  assertEquals(r.ok, false);
-  assertEquals(r.error!.code, "free_hit_dismissal");
-});
-
-Deno.test("free hit: run out is allowed", () => {
-  const r = applyBall(
-    state(),
-    FORMAT,
-    ball({ isWicket: true, wicketType: "run_out" }),
-    { prevNonWideKind: "no_ball" },
-  );
-  assertEquals(r.ok, true);
-});
-
-// ── The Hundred (B2): ends change every 10 balls ──────────────────────────
-
-Deno.test("The Hundred: ends change every 10 balls, not every 5", () => {
-  const hundred: MatchFormat = { ...FORMAT, ballsPerOver: 5, endChangeBalls: 10 };
-  // 5th ball = set boundary: a new bowler is prompted, but the ENDS do NOT
-  // change, so the striker stays put.
-  const atFive = applyBall(state({ legalBallCount: 4 }), hundred, ball(), NO_CTX);
-  assertEquals(atFive.events!.overEnded, true); // set boundary → bowler prompt
-  assertEquals(atFive.newState!.bowlerId, null);
-  assertEquals(atFive.newState!.strikerId, "S"); // ends unchanged
-  // 10th ball: ends change → strike swaps to the other end.
-  const atTen = applyBall(state({ legalBallCount: 9 }), hundred, ball(), NO_CTX);
-  assertEquals(atTen.newState!.strikerId, "N");
+Deno.test("[meta] vector names are unique", () => {
+  const names = suite.vectors.map((v) => v.name);
+  assertEquals(new Set(names).size, names.length, "duplicate vector name");
 });

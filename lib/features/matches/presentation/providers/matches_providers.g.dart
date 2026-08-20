@@ -235,6 +235,10 @@ String _$myMatchesHash() => r'05974fa29d7172207af6913c9836b9ea06deee33';
 /// Live match-row updates (broadcast channel). Each subscription opens its
 /// own channel; keep usage to one consumer per route (the Match Start
 /// screen + the spectator scoreboard).
+///
+/// Watching [appResumeCountProvider] rebuilds the subscription whenever the
+/// app returns to the foreground — a backgrounded socket is often a zombie,
+/// so reconnecting is the only reliable way to know the state is current.
 
 @ProviderFor(liveMatch)
 final liveMatchProvider = LiveMatchFamily._();
@@ -242,6 +246,10 @@ final liveMatchProvider = LiveMatchFamily._();
 /// Live match-row updates (broadcast channel). Each subscription opens its
 /// own channel; keep usage to one consumer per route (the Match Start
 /// screen + the spectator scoreboard).
+///
+/// Watching [appResumeCountProvider] rebuilds the subscription whenever the
+/// app returns to the foreground — a backgrounded socket is often a zombie,
+/// so reconnecting is the only reliable way to know the state is current.
 
 final class LiveMatchProvider
     extends $FunctionalProvider<AsyncValue<Match?>, Match?, Stream<Match?>>
@@ -249,6 +257,10 @@ final class LiveMatchProvider
   /// Live match-row updates (broadcast channel). Each subscription opens its
   /// own channel; keep usage to one consumer per route (the Match Start
   /// screen + the spectator scoreboard).
+  ///
+  /// Watching [appResumeCountProvider] rebuilds the subscription whenever the
+  /// app returns to the foreground — a backgrounded socket is often a zombie,
+  /// so reconnecting is the only reliable way to know the state is current.
   LiveMatchProvider._({
     required LiveMatchFamily super.from,
     required String super.argument,
@@ -292,11 +304,15 @@ final class LiveMatchProvider
   }
 }
 
-String _$liveMatchHash() => r'45d02c0e052e73ef363dda3c69cec58774284ce8';
+String _$liveMatchHash() => r'584dff304f02ed82b7c02d812b9899a90f6bf122';
 
 /// Live match-row updates (broadcast channel). Each subscription opens its
 /// own channel; keep usage to one consumer per route (the Match Start
 /// screen + the spectator scoreboard).
+///
+/// Watching [appResumeCountProvider] rebuilds the subscription whenever the
+/// app returns to the foreground — a backgrounded socket is often a zombie,
+/// so reconnecting is the only reliable way to know the state is current.
 
 final class LiveMatchFamily extends $Family
     with $FunctionalFamilyOverride<Stream<Match?>, String> {
@@ -312,6 +328,10 @@ final class LiveMatchFamily extends $Family
   /// Live match-row updates (broadcast channel). Each subscription opens its
   /// own channel; keep usage to one consumer per route (the Match Start
   /// screen + the spectator scoreboard).
+  ///
+  /// Watching [appResumeCountProvider] rebuilds the subscription whenever the
+  /// app returns to the foreground — a backgrounded socket is often a zombie,
+  /// so reconnecting is the only reliable way to know the state is current.
 
   LiveMatchProvider call(String matchId) =>
       LiveMatchProvider._(argument: matchId, from: this);
@@ -495,7 +515,7 @@ final class LiveInningsStateProvider
   }
 }
 
-String _$liveInningsStateHash() => r'653323eeeda8718df69e245202202c6466a4f665';
+String _$liveInningsStateHash() => r'6cba345ff510539c0dd31e66baa4cf37e7cb6fa4';
 
 /// Live (match, innings) state — striker / non-striker / bowler trio +
 /// running totals + optimistic-lock version. Subscribes to the
@@ -621,6 +641,109 @@ final class LiveBallsFamily extends $Family
 
   @override
   String toString() => r'liveBallsProvider';
+}
+
+/// Whether this device may record deliveries for (match, innings).
+///
+/// Asks the server rather than deriving it, so the UI gate is the same rule
+/// the write path enforces. Re-evaluated on resume and whenever the match row
+/// changes — control passes to the other side at the innings break, and the
+/// answer flips at exactly that moment.
+
+@ProviderFor(canScoreInnings)
+final canScoreInningsProvider = CanScoreInningsFamily._();
+
+/// Whether this device may record deliveries for (match, innings).
+///
+/// Asks the server rather than deriving it, so the UI gate is the same rule
+/// the write path enforces. Re-evaluated on resume and whenever the match row
+/// changes — control passes to the other side at the innings break, and the
+/// answer flips at exactly that moment.
+
+final class CanScoreInningsProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, FutureOr<bool>>
+    with $FutureModifier<bool>, $FutureProvider<bool> {
+  /// Whether this device may record deliveries for (match, innings).
+  ///
+  /// Asks the server rather than deriving it, so the UI gate is the same rule
+  /// the write path enforces. Re-evaluated on resume and whenever the match row
+  /// changes — control passes to the other side at the innings break, and the
+  /// answer flips at exactly that moment.
+  CanScoreInningsProvider._({
+    required CanScoreInningsFamily super.from,
+    required (String, int) super.argument,
+  }) : super(
+         retry: null,
+         name: r'canScoreInningsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$canScoreInningsHash();
+
+  @override
+  String toString() {
+    return r'canScoreInningsProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<bool> create(Ref ref) {
+    final argument = this.argument as (String, int);
+    return canScoreInnings(ref, argument.$1, argument.$2);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CanScoreInningsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$canScoreInningsHash() => r'389cd686934dfadcd99d511f0b39b69b2c643627';
+
+/// Whether this device may record deliveries for (match, innings).
+///
+/// Asks the server rather than deriving it, so the UI gate is the same rule
+/// the write path enforces. Re-evaluated on resume and whenever the match row
+/// changes — control passes to the other side at the innings break, and the
+/// answer flips at exactly that moment.
+
+final class CanScoreInningsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<bool>, (String, int)> {
+  CanScoreInningsFamily._()
+    : super(
+        retry: null,
+        name: r'canScoreInningsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Whether this device may record deliveries for (match, innings).
+  ///
+  /// Asks the server rather than deriving it, so the UI gate is the same rule
+  /// the write path enforces. Re-evaluated on resume and whenever the match row
+  /// changes — control passes to the other side at the innings break, and the
+  /// answer flips at exactly that moment.
+
+  CanScoreInningsProvider call(String matchId, int inningsNumber) =>
+      CanScoreInningsProvider._(argument: (matchId, inningsNumber), from: this);
+
+  @override
+  String toString() => r'canScoreInningsProvider';
 }
 
 @ProviderFor(myMatchChallenges)

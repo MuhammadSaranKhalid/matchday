@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:matchday/core/log/provider_logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
 import 'core/config/app_config.dart';
@@ -62,6 +63,9 @@ Future<void> main() async {
 
   runApp(
     ProviderScope(
+      // Reports match-start provider transitions to the `riverpod` log
+      // channel. No-ops in release unless CkLog.forceEnabled is set.
+      observers: [CkProviderLogger()],
       overrides: [
         // Optionally override the provider with our initialized config instance
         appConfigProvider.overrideWithValue(config),

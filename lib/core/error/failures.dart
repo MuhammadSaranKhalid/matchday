@@ -70,3 +70,12 @@ class FailureWrapper implements Exception {
   @override
   String toString() => 'FailureWrapper(${failure.message})';
 }
+
+/// The user-facing message for an `AsyncError` / stream error: the typed
+/// [Failure] message when one survived the reactive boundary, else the raw
+/// error's string form.
+String failureMessageOf(Object error) => switch (error) {
+      FailureWrapper(:final failure) => failure.message,
+      Failure(:final message) => message,
+      _ => error.toString(),
+    };

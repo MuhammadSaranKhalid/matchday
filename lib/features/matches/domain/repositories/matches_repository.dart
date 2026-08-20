@@ -205,11 +205,15 @@ abstract class MatchesRepository {
     int? target,
   });
 
-  /// Persist one delivery via the `record_ball` RPC. The RPC also advances
-  /// the on-field trio (strike rotation, end-of-over swap) based on the
-  /// delivery's kind and runs, so the client doesn't have to mirror that
+  /// Persist one delivery via the `record-ball` edge function. The server also
+  /// advances the on-field trio (strike rotation, end-of-over swap) based on
+  /// the delivery's kind and runs, so the client doesn't have to mirror that
   /// logic.
-  Future<Either<Failure, Ball>> recordBall(BallDraft draft);
+  ///
+  /// Returns the ball together with the innings row it produced, so the caller
+  /// can render the new score straight from the reply instead of waiting for
+  /// the realtime broadcast to carry it back.
+  Future<Either<Failure, BallOutcome>> recordBall(BallDraft draft);
 
   /// Delete the last delivery in (matchId, inningsNumber). The server-side
   /// RPC reverses any state changes the delivery caused. Returns true when
@@ -224,4 +228,16 @@ abstract class MatchesRepository {
   /// list filtered to this innings, oldest-first. Initial hydration via a
   /// one-shot SELECT.
   Stream<List<Ball>> watchBalls(MatchId matchId, int inningsNumber);
+
+  /// Whether the signed-in user may record deliveries for this innings.
+  ///
+  /// Answered by the server so the UI gate and the write-path check are the
+  /// same rule: a tournament organiser, an assigned scorer, a practice-match
+  /// creator, or a manager of the side currently batting. Deriving it on the
+  /// client instead produced a narrower rule that locked assigned scorers out
+  /// of matches they were entitled to score.
+  Future<Either<Failure, bool>> canScoreInnings({
+    required MatchId matchId,
+    required int inningsNumber,
+  });
 }

@@ -14,6 +14,7 @@ class Match extends Equatable {
     required this.teamBId,
     required this.format,
     required this.status,
+    this.matchType = MatchType.friendly,
     required this.createdBy,
     required this.createdAt,
     this.teamACaptain,
@@ -35,6 +36,11 @@ class Match extends Equatable {
   final TeamId teamBId;
   final MatchFormat format;
   final MatchStatus status;
+
+  /// Tournament / friendly / practice. Drives the label in the scoring top
+  /// bar and, later, which rules apply.
+  final MatchType matchType;
+
   final String createdBy;
   final DateTime createdAt;
 
@@ -201,6 +207,22 @@ enum MatchStartPhase {
   final String wire;
   static MatchStartPhase fromWire(String? w) =>
       values.where((s) => s.wire == w).firstOrNull ?? MatchStartPhase.toss;
+}
+
+/// Mirrors the deployed `match_type` enum.
+enum MatchType {
+  tournament('tournament', 'TOURNAMENT'),
+  friendly('friendly', 'FRIENDLY'),
+  practice('practice', 'PRACTICE');
+
+  const MatchType(this.wire, this.label);
+  final String wire;
+
+  /// Uppercase display form, as used by the scoring top bar.
+  final String label;
+
+  static MatchType fromWire(String? w) =>
+      values.where((t) => t.wire == w).firstOrNull ?? MatchType.friendly;
 }
 
 enum MatchStatus {

@@ -88,6 +88,49 @@ class MatchInningsState extends Equatable {
 
   final DateTime updatedAt;
 
+  /// A copy with fields replaced.
+  ///
+  /// The three on-field ids need explicit `clear*` flags rather than plain
+  /// nullable parameters: null is a MEANINGFUL value for each of them — a
+  /// wicket clears the striker, the end of an over clears the bowler — and
+  /// `id ?? this.id` cannot express "set this to null" at all. Without the
+  /// flags a projected wicket would silently keep the dismissed batter at the
+  /// crease.
+  MatchInningsState copyWith({
+    MatchPlayerId? strikerId,
+    bool clearStriker = false,
+    MatchPlayerId? nonStrikerId,
+    bool clearNonStriker = false,
+    MatchPlayerId? bowlerId,
+    bool clearBowler = false,
+    int? legalBallCount,
+    int? totalRuns,
+    int? totalWickets,
+    int? totalExtras,
+    bool? isDeclared,
+    bool? isAllOut,
+    int? target,
+    int? version,
+    DateTime? updatedAt,
+  }) =>
+      MatchInningsState(
+        matchId: matchId,
+        inningsNumber: inningsNumber,
+        version: version ?? this.version,
+        updatedAt: updatedAt ?? this.updatedAt,
+        strikerId: clearStriker ? null : (strikerId ?? this.strikerId),
+        nonStrikerId:
+            clearNonStriker ? null : (nonStrikerId ?? this.nonStrikerId),
+        bowlerId: clearBowler ? null : (bowlerId ?? this.bowlerId),
+        legalBallCount: legalBallCount ?? this.legalBallCount,
+        totalRuns: totalRuns ?? this.totalRuns,
+        totalWickets: totalWickets ?? this.totalWickets,
+        totalExtras: totalExtras ?? this.totalExtras,
+        isDeclared: isDeclared ?? this.isDeclared,
+        isAllOut: isAllOut ?? this.isAllOut,
+        target: target ?? this.target,
+      );
+
   /// Completed overs as a decimal number — 19 + 4/6 ≈ 19.67. Useful for
   /// NRR / target calculations.
   double get oversDecimal => legalBallCount / 6.0;

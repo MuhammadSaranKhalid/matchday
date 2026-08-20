@@ -25,6 +25,7 @@ abstract class MatchDto with _$MatchDto {
     @JsonKey(name: 'actual_start_time') String? actualStartTime,
     Map<String, dynamic>? result,
     @Default('scheduled') String status,
+    @JsonKey(name: 'match_type') @Default('friendly') String matchType,
     @JsonKey(name: 'toss_won_by') String? tossWonBy,
     @JsonKey(name: 'toss_decision') String? tossDecision,
     @JsonKey(name: 'toss_face') String? tossFace,
@@ -79,6 +80,7 @@ abstract class MatchDto with _$MatchDto {
             : DateTime.tryParse(actualStartTime!),
         resultDescription: result?['description'] as String?,
         status: MatchStatus.fromWire(status),
+        matchType: MatchType.fromWire(matchType),
         tossWonBy: tossWonBy == null ? null : TeamId(tossWonBy!),
         tossDecision:
             tossDecision == null ? null : TossDecision.fromWire(tossDecision),

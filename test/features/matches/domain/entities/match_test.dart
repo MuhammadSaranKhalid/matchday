@@ -57,4 +57,25 @@ void main() {
     expect(build(MatchStatus.abandoned).isActive, isFalse);
     expect(build(MatchStatus.walkover).isActive, isFalse);
   });
+
+  group('MatchType', () {
+    test('maps every deployed wire value', () {
+      expect(MatchType.fromWire('tournament'), MatchType.tournament);
+      expect(MatchType.fromWire('friendly'), MatchType.friendly);
+      expect(MatchType.fromWire('practice'), MatchType.practice);
+    });
+
+    test('falls back to friendly on unknown or missing', () {
+      // The scoring top bar used to hardcode "FRIENDLY"; the label is now
+      // driven by this, so an unmapped value must not blank the header.
+      expect(MatchType.fromWire(null), MatchType.friendly);
+      expect(MatchType.fromWire('exhibition'), MatchType.friendly);
+    });
+
+    test('labels are the uppercase display forms the top bar renders', () {
+      expect(MatchType.tournament.label, 'TOURNAMENT');
+      expect(MatchType.friendly.label, 'FRIENDLY');
+      expect(MatchType.practice.label, 'PRACTICE');
+    });
+  });
 }

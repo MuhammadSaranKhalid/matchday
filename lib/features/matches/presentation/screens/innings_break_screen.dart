@@ -60,12 +60,10 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
         const <RosterMember>[];
     final rosterB = ref.watch(rosterProvider(match.teamBId.value)).value ??
         const <RosterMember>[];
-    final names = <String, String>{
-      for (final m in rosterA) m.member.playerId: m.displayName,
-      for (final m in rosterB) m.member.playerId: m.displayName,
-    };
-    String nameOf(MatchPlayer p) =>
-        names[p.playerRefId] ?? 'Player ${p.id.value.substring(0, 4)}';
+    // Name and avatar come off the lineup row, which resolves them at the data
+    // boundary — guests and substitutes have no roster entry to be named by.
+    // The roster is consulted only for the permanent jersey number.
+    String nameOf(MatchPlayer p) => p.displayName;
     final jerseyByRef = <String, int?>{
       for (final m in rosterA) m.member.playerId: m.member.jerseyNumber,
       for (final m in rosterB) m.member.playerId: m.member.jerseyNumber,
@@ -159,6 +157,7 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
               for (final p in batters)
                 LineupRosterRow(
                   name: nameOf(p),
+                  photoUrl: p.photoUrl,
                   jersey: jerseyByRef[p.playerRefId],
                   badge: _strikerId == p.id.value
                       ? 'STR'
@@ -173,6 +172,7 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
               for (final p in bowlers)
                 LineupRosterRow(
                   name: nameOf(p),
+                  photoUrl: p.photoUrl,
                   jersey: jerseyByRef[p.playerRefId],
                   badge: _bowlerId == p.id.value ? 'BWL' : null,
                   onTap: () => setState(() =>

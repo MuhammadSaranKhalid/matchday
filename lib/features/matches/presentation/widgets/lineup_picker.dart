@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/util/initials.dart';
+import '../../../../core/widgets/v2/v2_kit.dart';
 
 // Shared tap-to-pick lineup widgets, used by BOTH the first-innings Match Start
 // flow (match_start_screen.dart · _Stage2Lineup) and the second-innings setup
@@ -62,19 +64,28 @@ class LineupSlotCard extends StatelessWidget {
   }
 }
 
-/// A tappable roster row. [badge] shows the assigned slot (STR / NS / BWL) and
-/// tints the leading chip.
+/// A tappable roster row. The leading element is the player's avatar (their
+/// monogram when they have no photo); [badge] shows the assigned slot
+/// (STR / NS / BWL) as a pill beside the name.
+///
+/// The badge used to occupy the leading position, which meant every
+/// unassigned player — most of the list — led with an empty grey square.
 class LineupRosterRow extends StatelessWidget {
   const LineupRosterRow({
     super.key,
     required this.name,
     required this.onTap,
+    this.photoUrl,
     this.jersey,
     this.badge,
   });
 
   final String name;
   final VoidCallback onTap;
+
+  /// Avatar URL, or null to render the monogram.
+  final String? photoUrl;
+
   final int? jersey;
   final String? badge;
 
@@ -91,32 +102,13 @@ class LineupRosterRow extends StatelessWidget {
           ),
         ),
         child: Row(children: [
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: badge == 'STR'
-                  ? CkColors.red
-                  : badge == 'NS'
-                      ? CkColors.ink
-                      : badge == 'BWL'
-                          ? _bowlerBadge
-                          : CkColors.paper2,
-              borderRadius: BorderRadius.circular(7),
-            ),
-            child: Text(
-              badge ?? '',
-              style: CkType.mono(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.08,
-                color: badge == null ? CkColors.muted : CkColors.paper,
-              ),
-            ),
+          Avatar(
+            mono: personInitials(name),
+            imageUrl: photoUrl,
+            size: 28,
           ),
           const SizedBox(width: 12),
-          Expanded(
+          Flexible(
             child: Text(
               name,
               overflow: TextOverflow.ellipsis,
@@ -126,6 +118,31 @@ class LineupRosterRow extends StatelessWidget {
               ),
             ),
           ),
+          if (badge != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: badge == 'STR'
+                    ? CkColors.red
+                    : badge == 'NS'
+                        ? CkColors.ink
+                        : _bowlerBadge,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                badge!,
+                style: CkType.mono(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.08,
+                  color: CkColors.paper,
+                ),
+              ),
+            ),
+          ],
+          const Spacer(),
           if (jersey != null)
             Text('#$jersey',
                 style: CkType.mono(

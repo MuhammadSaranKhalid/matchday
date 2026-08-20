@@ -44,6 +44,30 @@ export function applyBall(
     return err("negative_runs", "Runs and extras must be non-negative");
   }
 
+  // ── Wide attribution: nothing off a wide is ever credited to the batter.
+  //    Under the Laws a wide is a penalty to the bowling side, and any runs
+  //    the batters then run are extras too — so `runsScored` must be 0 and
+  //    the whole lot (penalty + runs run) belongs in `extras`.
+  //
+  //    This is a real client bug the engine used to accept: the scoring
+  //    screen sent a wide's runs as `runsScored`, which kept the TEAM total
+  //    right but inflated the batter's individual score and understated the
+  //    extras column. The scoreboard looked fine; the scorecard was wrong.
+  //    Guarding here because the engine is the last line of defence, and
+  //    because the Laws make this unambiguous. ──
+  if (input.ballKind === "wide" && runs > 0) {
+    return err(
+      "wide_runs_to_batter",
+      "Runs off a wide are extras — send them in `extras`, not `runsScored`",
+    );
+  }
+  if (input.ballKind === "wide" && extras < 1) {
+    return err(
+      "wide_missing_penalty",
+      "A wide must carry at least the 1-run penalty in `extras`",
+    );
+  }
+
   // ── Bowler over-cap (B1): a bowler may bowl at most maxOversPerBowler overs
   //    = maxOversPerBowler * ballsPerOver legal balls. 0 = no cap. ──
   if (
@@ -78,13 +102,31 @@ export function applyBall(
     }
   }
 
-  // ── Strike rotation (record_ball parity) ──
-  // swap when an odd number of runs was run, XOR an odd number of bye/leg-bye
-  // runs on a legal delivery; then toggle once more if the ENDS just changed.
+  // ── Strike rotation ──
+  // The batters change ends when they physically RUN an odd number of runs.
+  // That is every run except the automatic penalty on a wide or no-ball,
+  // which is awarded, not run:
+  //
+  //   legal      ran = runsScored (off the bat) + extras (byes / leg-byes)
+  //   wide       ran = extras - 1        (the 1 is the wide penalty)
+  //   no-ball    ran = runsScored + extras - 1   (the 1 is the nb penalty)
+  //
+  // Boundaries fall out for free: 4 and 6 are even, so no swap.
+  //
+  // This replaces `(runs % 2) !== (isLegal && extras % 2)`, which only gave
+  // the right answer while the client mis-filed a wide's runs as `runsScored`.
+  // With the attribution corrected above, that old rule would have silently
+  // stopped rotating strike on a wide — so the guard and this had to land
+  // together.
+  const penalty = input.ballKind === "wide" || input.ballKind === "no_ball"
+    ? 1
+    : 0;
+  const runsRun = runs + extras - penalty;
+
   const endChangeBalls = format.endChangeBalls && format.endChangeBalls > 0
     ? format.endChangeBalls
     : ballsPerOver;
-  let swap = (runs % 2 === 1) !== (isLegal && extras % 2 === 1);
+  let swap = runsRun % 2 === 1;
   // A "set"/over boundary (a new bowler may come on) is every ballsPerOver. The
   // ENDS change (strike swaps) every endChangeBalls — equal to ballsPerOver for
   // normal cricket, but 10 for The Hundred (two 5-ball sets per end).

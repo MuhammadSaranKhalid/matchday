@@ -302,7 +302,29 @@ class MatchesRepositoryImpl implements MatchesRepository {
           .map((dto) => dto?.toEntity());
 
   @override
-  Future<Either<Failure, Ball>> recordBall(BallDraft d) async {
+  Future<Either<Failure, bool>> canScoreInnings({
+    required MatchId matchId,
+    required int inningsNumber,
+  }) async {
+    try {
+      final allowed = await _remote.canScoreInnings(
+        matchId: matchId.value,
+        inningsNumber: inningsNumber,
+      );
+      return Right(allowed);
+    } on UnauthorizedException {
+      // Not entitled is an answer, not an error — the screen renders the
+      // read-only scoreboard rather than an error state.
+      return const Right(false);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, BallOutcome>> recordBall(BallDraft d) async {
     // Cricket invariants the server also checks, but failing fast here gives
     // a clean ValidationFailure rather than a Postgres error.
     if (d.isWicket && d.wicketType == null) {
@@ -317,6 +339,18 @@ class MatchesRepositoryImpl implements MatchesRepository {
         d.runsScored != 0) {
       return const Left(
         ValidationFailure('Bye / leg-bye runs belong in extras'),
+      );
+    }
+    // A wide is a penalty against the bowling side — nothing off it reaches
+    // the batter's score, including runs the batters then run.
+    if (d.ballKind == BallKind.wide && d.runsScored != 0) {
+      return const Left(
+        ValidationFailure('Runs off a wide are extras, not the batter\'s'),
+      );
+    }
+    if (d.ballKind == BallKind.wide && d.extras < 1) {
+      return const Left(
+        ValidationFailure('A wide carries a 1-run penalty in extras'),
       );
     }
     try {
@@ -339,7 +373,10 @@ class MatchesRepositoryImpl implements MatchesRepository {
         // server's match_innings_state.version has advanced past it.
         if (d.expectedVersion != null) 'p_expected_version': d.expectedVersion,
       });
-      return Right(dto.toEntity());
+      return Right(BallOutcome(
+        ball: dto.ball.toEntity(),
+        innings: dto.innings?.toEntity(),
+      ));
     } on ConflictException catch (e) {
       // Another scorer advanced the version first. Benign: the realtime stream
       // already carries the fresh state, so the UI can refresh and retry.

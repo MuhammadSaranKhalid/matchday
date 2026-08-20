@@ -1527,3 +1527,28 @@ Wired 2026-06-08 for the profile **share** button. Host: `joinmatchday.com`.
 - In Xcode, add the **Associated Domains** capability to the Runner target (wires `CODE_SIGN_ENTITLEMENTS` to `Runner.entitlements` and registers the capability on the provisioning profile).
 
 Until both files are hosted, `share_plus` still works and the in-app route resolves — the link just opens the browser instead of the app. **Follow / Message** on a by-username profile are still inert (their own ticket).
+
+---
+
+## 18. Diagnostic logging
+
+Added 2026-08-18 alongside the match-start resilience work. Before this the codebase had **zero** logging in `lib/` — no `print`, no `debugPrint`, no `dart:developer`. This section is the pattern; follow it rather than reintroducing `print`.
+
+**Built on `dart:developer`, deliberately no package.** `logger` / `talker` are nicer to look at, but the pubspec has a documented three-way resolution conflict (§4) and this needs no dependency to solve. `developer.log(name:)` is also what DevTools' Logging view and `flutter logs` already consume, so channel names become filters for free.
+
+**Where it lives:**
+- `lib/core/log/ck_log.dart` — `CkLog.write(channel, event, data: {...})` / `CkLog.warn(...)`, plus `CkLogChannel` constants.
+- `lib/core/log/provider_logger.dart` — `CkProviderLogger`, a Riverpod `ProviderObserver` registered in `main.dart`'s `ProviderScope(observers: [...])`.
+
+**Rules:**
+- Logging is **debug-only** by default (`kDebugMode`). Set `CkLog.forceEnabled = true` to carry it into a profile build — necessary for on-ground testing, which is where the realtime failures actually happen.
+- **Never log names, emails, phone numbers or tokens.** Ids only; `CkLog` truncates uuids to 8 chars so rows can be correlated by eye.
+- Lines are stamped with seconds since process start, not wall clock — the questions being asked are "how long after the drop did the reconnect fire", and elapsed answers those readably.
+- `CkLog.recent` is a bounded (300) ring buffer of recent lines, so a debug screen can show a session's log with no debugger attached.
+- Channel names are constants on `CkLogChannel`, not string literals at call sites. `CkLog.mute` silences a channel without touching call sites.
+
+**Channels currently in use:** `match.rt` (realtime transport — subscribe, broadcast, replay, snapshot, poll, dedup), `match.start` (state machine — phase, role, selections, action outcomes), `match.rpc` (server calls with duration + SQLSTATE), `riverpod` (provider lifecycle, filtered to the match-start graph by `CkProviderLogger.defaultFilter`).
+
+`CkProviderLogger` extends a **`base`** class in Riverpod 3.x, so it must be declared `final class`. Its callbacks take a `ProviderObserverContext`, not the 2.x `(provider, container)` pair.
+
+Filter a running app with `flutter logs | grep match.rt`, or use the channel name in DevTools' Logging filter box.

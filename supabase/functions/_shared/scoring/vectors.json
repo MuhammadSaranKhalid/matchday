@@ -1,0 +1,376 @@
+{
+  "$comment": [
+    "GOLDEN VECTORS — the executable specification of the scoring engine.",
+    "",
+    "This file is the contract between the TypeScript engine (the authority, run",
+    "server-side in record-ball) and any other implementation of the same rules.",
+    "Both load THIS file and assert THESE outputs. Two implementations of cricket",
+    "scoring are only safe while one spec governs both.",
+    "",
+    "A CHANGE TO SCORING RULES IS A CHANGE TO THIS FILE FIRST. Add or amend the",
+    "vector, watch it fail in every implementation, then make each pass.",
+    "",
+    "SHAPE",
+    "  defaults   the baseline state / format / input / ctx every vector starts from",
+    "  vectors[]  each one overrides only what it cares about, and asserts only what",
+    "             it specifies — `expect` is a partial match, not a full equality.",
+    "             That keeps vectors additive: tightening one never forces a rewrite",
+    "             of the rest.",
+    "",
+    "IDS  'S' = striker, 'N' = non-striker, 'B' = bowler, so strike rotation is",
+    "     readable at a glance."
+  ],
+
+  "defaults": {
+    "state": {
+      "strikerId": "S",
+      "nonStrikerId": "N",
+      "bowlerId": "B",
+      "legalBallCount": 0,
+      "totalRuns": 0,
+      "totalWickets": 0,
+      "totalExtras": 0,
+      "isAllOut": false,
+      "isDeclared": false,
+      "target": null,
+      "version": 1
+    },
+    "format": {
+      "oversPerInnings": 20,
+      "playersPerTeam": 11,
+      "ballsPerOver": 6,
+      "maxOversPerBowler": 4,
+      "inningsPerSide": 1,
+      "ballType": "leather"
+    },
+    "input": {
+      "isLegalDelivery": true,
+      "ballKind": "legal",
+      "runsScored": 0,
+      "extras": 0,
+      "isWicket": false,
+      "wicketType": null,
+      "batsmanId": "S",
+      "nonStrikerId": "N",
+      "bowlerId": "B",
+      "fielderId": null,
+      "commentary": null
+    },
+    "ctx": { "prevNonWideKind": null }
+  },
+
+  "vectors": [
+    {
+      "name": "dot ball: counts, no swap, over not ended",
+      "category": "legal",
+      "expect": {
+        "ok": true,
+        "newState": { "legalBallCount": 1, "totalRuns": 0, "strikerId": "S", "nonStrikerId": "N" },
+        "ball": { "overNumber": 0, "ballInOver": 1 },
+        "events": { "overEnded": false }
+      }
+    },
+    {
+      "name": "single: striker and non-striker swap",
+      "category": "legal",
+      "input": { "runsScored": 1 },
+      "expect": {
+        "ok": true,
+        "newState": { "strikerId": "N", "nonStrikerId": "S", "totalRuns": 1 }
+      }
+    },
+    {
+      "name": "two: even runs, no swap",
+      "category": "legal",
+      "input": { "runsScored": 2 },
+      "expect": { "ok": true, "newState": { "strikerId": "S", "totalRuns": 2 } }
+    },
+    {
+      "name": "four: no swap",
+      "category": "legal",
+      "input": { "runsScored": 4 },
+      "expect": { "ok": true, "newState": { "strikerId": "S", "totalRuns": 4 } }
+    },
+    {
+      "name": "six: no swap",
+      "category": "legal",
+      "input": { "runsScored": 6 },
+      "expect": { "ok": true, "newState": { "strikerId": "S", "totalRuns": 6 } }
+    },
+
+    {
+      "name": "wide: no legal ball counted, +1 extra, no swap",
+      "category": "wide",
+      "input": { "isLegalDelivery": false, "ballKind": "wide", "runsScored": 0, "extras": 1 },
+      "expect": {
+        "ok": true,
+        "newState": { "legalBallCount": 0, "totalRuns": 1, "totalExtras": 1, "strikerId": "S" },
+        "ball": { "ballInOver": 0 }
+      }
+    },
+    {
+      "name": "wide: runs credited to the batter are rejected",
+      "category": "wide",
+      "input": { "isLegalDelivery": false, "ballKind": "wide", "runsScored": 1, "extras": 1 },
+      "expect": { "ok": false, "error": "wide_runs_to_batter" }
+    },
+    {
+      "name": "wide: the 1-run penalty is mandatory",
+      "category": "wide",
+      "input": { "isLegalDelivery": false, "ballKind": "wide", "extras": 0 },
+      "expect": { "ok": false, "error": "wide_missing_penalty" }
+    },
+    {
+      "name": "wide + 1 run: all extras, batter untouched, strike changes",
+      "category": "wide",
+      "input": { "isLegalDelivery": false, "ballKind": "wide", "extras": 2 },
+      "expect": {
+        "ok": true,
+        "ball": { "runsScored": 0 },
+        "newState": { "totalRuns": 2, "totalExtras": 2, "legalBallCount": 0, "strikerId": "N" }
+      }
+    },
+    {
+      "name": "wide + 2 runs: even, so strike stays",
+      "category": "wide",
+      "input": { "isLegalDelivery": false, "ballKind": "wide", "extras": 3 },
+      "expect": { "ok": true, "newState": { "totalRuns": 3, "strikerId": "S" } }
+    },
+
+    {
+      "name": "no-ball: +1 extra, not a legal ball",
+      "category": "no_ball",
+      "input": { "isLegalDelivery": false, "ballKind": "no_ball", "extras": 1 },
+      "expect": { "ok": true, "newState": { "legalBallCount": 0, "totalRuns": 1 } }
+    },
+    {
+      "name": "no-ball sets up a free hit for the next delivery",
+      "category": "free_hit",
+      "state": { "totalRuns": 1 },
+      "ctx": { "prevNonWideKind": "no_ball" },
+      "expect": { "ok": true, "ball": { "isFreeHit": true } }
+    },
+    {
+      "name": "no-ball still credits the bat, and rotates on odd",
+      "category": "no_ball",
+      "input": { "isLegalDelivery": false, "ballKind": "no_ball", "runsScored": 1, "extras": 1 },
+      "expect": {
+        "ok": true,
+        "ball": { "runsScored": 1 },
+        "newState": { "totalRuns": 2, "strikerId": "N" }
+      }
+    },
+    {
+      "name": "no-ball with four off the bat: even, no rotation",
+      "category": "no_ball",
+      "input": { "isLegalDelivery": false, "ballKind": "no_ball", "runsScored": 4, "extras": 1 },
+      "expect": { "ok": true, "newState": { "strikerId": "S" } }
+    },
+
+    {
+      "name": "no-ball carrying no penalty: runs run is negative, no rotation",
+      "category": "no_ball",
+      "$comment": [
+        "A PARITY GUARD, not an endorsement. The app always sends the 1-run",
+        "penalty on a no-ball, so this input is malformed — but the engine",
+        "accepts it, and `runsRun` then evaluates to -1.",
+        "",
+        "That is where JavaScript and Dart disagree: JS `%` keeps the sign of",
+        "the dividend (-1 % 2 === -1, so no swap) while Dart's `%` is Euclidean",
+        "and always non-negative (-1 % 2 == 1, so it WOULD swap). A naive port",
+        "silently rotates strike differently here.",
+        "",
+        "This vector fails any implementation that gets it wrong. If the",
+        "malformed input is ever rejected outright, replace this with the",
+        "rejection rather than deleting it."
+      ],
+      "input": { "isLegalDelivery": false, "ballKind": "no_ball", "runsScored": 0, "extras": 0 },
+      "expect": {
+        "ok": true,
+        "newState": { "strikerId": "S", "nonStrikerId": "N", "totalRuns": 0, "legalBallCount": 0 }
+      }
+    },
+    {
+      "name": "bye 1: legal ball, +1 extra, swap on odd byes",
+      "category": "bye",
+      "input": { "ballKind": "bye", "runsScored": 0, "extras": 1 },
+      "expect": {
+        "ok": true,
+        "newState": { "legalBallCount": 1, "totalExtras": 1, "strikerId": "N" }
+      }
+    },
+    {
+      "name": "leg-bye 2: legal ball, no swap on even",
+      "category": "leg_bye",
+      "input": { "ballKind": "leg_bye", "runsScored": 0, "extras": 2 },
+      "expect": { "ok": true, "newState": { "totalExtras": 2, "strikerId": "S" } }
+    },
+
+    {
+      "name": "wicket: striker cleared, wicket counted",
+      "category": "wicket",
+      "input": { "isWicket": true, "wicketType": "bowled" },
+      "expect": {
+        "ok": true,
+        "newState": { "totalWickets": 1, "strikerId": null, "legalBallCount": 1 }
+      }
+    },
+    {
+      "name": "validation: wicket without a type is rejected",
+      "category": "validation",
+      "input": { "isWicket": true },
+      "expect": { "ok": false, "error": "wicket_type_required" }
+    },
+    {
+      "name": "validation: wicket_type without isWicket is rejected",
+      "category": "validation",
+      "input": { "isWicket": false, "wicketType": "caught" },
+      "expect": { "ok": false, "error": "wicket_type_unexpected" }
+    },
+
+    {
+      "name": "end of over on a dot: bowler cleared, strikers swap",
+      "category": "over_end",
+      "state": { "legalBallCount": 5 },
+      "expect": {
+        "ok": true,
+        "newState": { "legalBallCount": 6, "bowlerId": null, "strikerId": "N" },
+        "events": { "overEnded": true }
+      }
+    },
+    {
+      "name": "end of over on a single: net no swap (ran 1, then changed ends)",
+      "category": "over_end",
+      "state": { "legalBallCount": 5 },
+      "input": { "runsScored": 1 },
+      "expect": {
+        "ok": true,
+        "newState": { "bowlerId": null, "strikerId": "S" },
+        "events": { "overEnded": true }
+      }
+    },
+    {
+      "name": "over/ball position derivation mid-over",
+      "category": "over_end",
+      "state": { "legalBallCount": 8 },
+      "expect": { "ok": true, "ball": { "overNumber": 1, "ballInOver": 3 } }
+    },
+
+    {
+      "name": "termination: a normal ball does NOT end the innings",
+      "category": "termination",
+      "expect": {
+        "ok": true,
+        "events": { "inningsEnded": false, "inningsEndReason": null }
+      }
+    },
+    {
+      "name": "termination: 10th wicket = all out (XI)",
+      "category": "termination",
+      "state": { "totalWickets": 9 },
+      "input": { "isWicket": true, "wicketType": "bowled" },
+      "expect": {
+        "ok": true,
+        "newState": { "totalWickets": 10 },
+        "events": { "allOut": true, "inningsEnded": true, "inningsEndReason": "all_out" }
+      }
+    },
+    {
+      "name": "termination: last legal ball of the over limit = overs complete",
+      "category": "termination",
+      "state": { "legalBallCount": 119 },
+      "expect": {
+        "ok": true,
+        "newState": { "legalBallCount": 120 },
+        "events": { "oversComplete": true, "inningsEnded": true, "inningsEndReason": "overs" }
+      }
+    },
+    {
+      "name": "termination: reaching the chase target ends the innings",
+      "category": "termination",
+      "state": { "target": 50, "totalRuns": 48 },
+      "input": { "runsScored": 2 },
+      "expect": {
+        "ok": true,
+        "newState": { "totalRuns": 50 },
+        "events": { "targetReached": true, "inningsEnded": true, "inningsEndReason": "target" }
+      }
+    },
+    {
+      "name": "termination: all-out scales with team size (6-a-side = 5 wkts)",
+      "category": "termination",
+      "format": { "playersPerTeam": 6 },
+      "state": { "totalWickets": 4 },
+      "input": { "isWicket": true, "wicketType": "lbw" },
+      "expect": {
+        "ok": true,
+        "events": { "allOut": true, "inningsEndReason": "all_out" }
+      }
+    },
+    {
+      "name": "termination: 9 down is NOT all out yet (XI)",
+      "category": "termination",
+      "state": { "totalWickets": 8 },
+      "input": { "isWicket": true, "wicketType": "bowled" },
+      "expect": {
+        "ok": true,
+        "newState": { "totalWickets": 9 },
+        "events": { "allOut": false, "inningsEnded": false }
+      }
+    },
+
+    {
+      "name": "bowler cap: the over-limit-th legal ball is rejected",
+      "category": "bowler_cap",
+      "ctx": { "prevNonWideKind": null, "bowlerLegalBalls": 24 },
+      "expect": { "ok": false, "error": "bowler_over_cap" }
+    },
+    {
+      "name": "bowler cap: one legal ball under the limit is fine",
+      "category": "bowler_cap",
+      "ctx": { "prevNonWideKind": null, "bowlerLegalBalls": 23 },
+      "expect": { "ok": true }
+    },
+    {
+      "name": "bowler cap: an illegal ball (wide) does not hit the cap",
+      "category": "bowler_cap",
+      "input": { "isLegalDelivery": false, "ballKind": "wide", "runsScored": 0, "extras": 1 },
+      "ctx": { "prevNonWideKind": null, "bowlerLegalBalls": 24 },
+      "expect": { "ok": true }
+    },
+
+    {
+      "name": "free hit: bowled is rejected",
+      "category": "free_hit",
+      "input": { "isWicket": true, "wicketType": "bowled" },
+      "ctx": { "prevNonWideKind": "no_ball" },
+      "expect": { "ok": false, "error": "free_hit_dismissal" }
+    },
+    {
+      "name": "free hit: run out is allowed",
+      "category": "free_hit",
+      "input": { "isWicket": true, "wicketType": "run_out" },
+      "ctx": { "prevNonWideKind": "no_ball" },
+      "expect": { "ok": true }
+    },
+
+    {
+      "name": "The Hundred: a set boundary prompts a bowler but does not change ends",
+      "category": "hundred",
+      "format": { "ballsPerOver": 5, "endChangeBalls": 10 },
+      "state": { "legalBallCount": 4 },
+      "expect": {
+        "ok": true,
+        "newState": { "bowlerId": null, "strikerId": "S" },
+        "events": { "overEnded": true }
+      }
+    },
+    {
+      "name": "The Hundred: ends change on the 10th ball",
+      "category": "hundred",
+      "format": { "ballsPerOver": 5, "endChangeBalls": 10 },
+      "state": { "legalBallCount": 9 },
+      "expect": { "ok": true, "newState": { "strikerId": "N" } }
+    }
+  ]
+}

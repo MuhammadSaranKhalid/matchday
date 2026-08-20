@@ -518,6 +518,7 @@ class _ReviewStepHost extends ConsumerWidget {
     return XiCandidate(
       id: r.member.playerId,
       name: r.displayName,
+      photoUrl: r.profilePhotoUrl,
       role: role,
       captain: r.member.role == MemberRole.captain,
     );
@@ -593,6 +594,7 @@ class _PickXiStep extends ConsumerWidget {
     return XiCandidate(
       id: r.member.playerId,
       name: r.displayName,
+      photoUrl: r.profilePhotoUrl,
       role: role,
       captain: r.member.role == MemberRole.captain,
     );

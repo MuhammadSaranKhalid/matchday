@@ -8,18 +8,30 @@ part of 'match_start_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Watches the match row in real time and exposes the Match Start
-/// state and actions.
+/// Watches the match row in real time and owns every Match Start decision:
+/// who the viewer is, which openers are selected, and the three writes
+/// (toss → openers → start).
+///
+/// Widgets read [MatchStartState] and call these methods; they never merge
+/// pending-vs-locked selections or translate between id spaces themselves.
 
 @ProviderFor(MatchStartController)
 final matchStartControllerProvider = MatchStartControllerFamily._();
 
-/// Watches the match row in real time and exposes the Match Start
-/// state and actions.
+/// Watches the match row in real time and owns every Match Start decision:
+/// who the viewer is, which openers are selected, and the three writes
+/// (toss → openers → start).
+///
+/// Widgets read [MatchStartState] and call these methods; they never merge
+/// pending-vs-locked selections or translate between id spaces themselves.
 final class MatchStartControllerProvider
     extends $AsyncNotifierProvider<MatchStartController, MatchStartState> {
-  /// Watches the match row in real time and exposes the Match Start
-  /// state and actions.
+  /// Watches the match row in real time and owns every Match Start decision:
+  /// who the viewer is, which openers are selected, and the three writes
+  /// (toss → openers → start).
+  ///
+  /// Widgets read [MatchStartState] and call these methods; they never merge
+  /// pending-vs-locked selections or translate between id spaces themselves.
   MatchStartControllerProvider._({
     required MatchStartControllerFamily super.from,
     required String super.argument,
@@ -57,10 +69,14 @@ final class MatchStartControllerProvider
 }
 
 String _$matchStartControllerHash() =>
-    r'7044996c883ca8663b890e0e75e2ff87208b28c1';
+    r'4098cbd8811d2defa42177f73d79ea3d679b704e';
 
-/// Watches the match row in real time and exposes the Match Start
-/// state and actions.
+/// Watches the match row in real time and owns every Match Start decision:
+/// who the viewer is, which openers are selected, and the three writes
+/// (toss → openers → start).
+///
+/// Widgets read [MatchStartState] and call these methods; they never merge
+/// pending-vs-locked selections or translate between id spaces themselves.
 
 final class MatchStartControllerFamily extends $Family
     with
@@ -80,8 +96,12 @@ final class MatchStartControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Watches the match row in real time and exposes the Match Start
-  /// state and actions.
+  /// Watches the match row in real time and owns every Match Start decision:
+  /// who the viewer is, which openers are selected, and the three writes
+  /// (toss → openers → start).
+  ///
+  /// Widgets read [MatchStartState] and call these methods; they never merge
+  /// pending-vs-locked selections or translate between id spaces themselves.
 
   MatchStartControllerProvider call(String matchId) =>
       MatchStartControllerProvider._(argument: matchId, from: this);
@@ -90,8 +110,12 @@ final class MatchStartControllerFamily extends $Family
   String toString() => r'matchStartControllerProvider';
 }
 
-/// Watches the match row in real time and exposes the Match Start
-/// state and actions.
+/// Watches the match row in real time and owns every Match Start decision:
+/// who the viewer is, which openers are selected, and the three writes
+/// (toss → openers → start).
+///
+/// Widgets read [MatchStartState] and call these methods; they never merge
+/// pending-vs-locked selections or translate between id spaces themselves.
 
 abstract class _$MatchStartController extends $AsyncNotifier<MatchStartState> {
   late final _$args = ref.$arg as String;

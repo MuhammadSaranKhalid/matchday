@@ -223,6 +223,12 @@ abstract class MatchesRepository {
     required int inningsNumber,
   });
 
+  /// One-shot list of deliveries for (match, innings), oldest-first.
+  Future<Either<Failure, List<Ball>>> listBalls(
+    MatchId matchId,
+    int inningsNumber,
+  );
+
   /// Live deliveries for (match, innings). Subscribes to the broadcast
   /// channel `match:<id>:balls` (per migration 0810) and emits the full
   /// list filtered to this innings, oldest-first. Initial hydration via a
@@ -240,4 +246,14 @@ abstract class MatchesRepository {
     required MatchId matchId,
     required int inningsNumber,
   });
+
+  /// Drains any pending offline scoring operations for (matchId, inningsNumber)
+  /// against the backend in sequential FIFO order.
+  Future<void> syncPendingOps({
+    required String matchId,
+    required int inningsNumber,
+  });
+
+  /// Total count of pending offline scoring operations across all matches.
+  Future<int> pendingOpsCount();
 }

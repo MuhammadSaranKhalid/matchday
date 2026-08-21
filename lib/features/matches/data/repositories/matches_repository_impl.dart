@@ -17,17 +17,27 @@ import '../datasources/match_requests_remote_datasource.dart';
 import '../datasources/matches_remote_datasource.dart';
 
 /// Online-only matches repository. The only place the remote data sources'
-/// raw exceptions become [Failure]s. Composes three focused data sources —
+import '../datasources/matches_local_datasource.dart';
+
+/// Concrete repository implementation. Wraps data sources and ensures that all
+/// raw exceptions become [Failure]s. Composes focused data sources —
 /// one repository per aggregate, several data sources behind it:
 ///  • [MatchesRemoteDataSource]        — match lifecycle + live scoring
 ///  • [MatchRequestsRemoteDataSource]  — the challenge handshake
 ///  • [FormatPresetsRemoteDataSource]  — the format catalog
+///  • [MatchesLocalDataSource]         — offline write-ahead log & snapshots
 class MatchesRepositoryImpl implements MatchesRepository {
-  MatchesRepositoryImpl(this._remote, this._requests, this._presets);
+  MatchesRepositoryImpl(
+    this._remote,
+    this._requests,
+    this._presets, [
+    this._local,
+  ]);
 
   final MatchesRemoteDataSource _remote;
   final MatchRequestsRemoteDataSource _requests;
   final FormatPresetsRemoteDataSource _presets;
+  final MatchesLocalDataSource? _local;
 
   @override
   Future<Either<Failure, List<FormatPreset>>> listFormatPresets() async {
@@ -325,67 +335,77 @@ class MatchesRepositoryImpl implements MatchesRepository {
 
   @override
   Future<Either<Failure, BallOutcome>> recordBall(BallDraft d) async {
-    // Cricket invariants the server also checks, but failing fast here gives
-    // a clean ValidationFailure rather than a Postgres error.
-    if (d.isWicket && d.wicketType == null) {
-      return const Left(ValidationFailure('A wicket needs a wicket type'));
-    }
-    if (d.runsScored < 0 || d.extras < 0) {
-      return const Left(
-        ValidationFailure('Runs and extras must be non-negative'),
-      );
-    }
     if ((d.ballKind == BallKind.bye || d.ballKind == BallKind.legBye) &&
         d.runsScored != 0) {
       return const Left(
         ValidationFailure('Bye / leg-bye runs belong in extras'),
       );
     }
-    // A wide is a penalty against the bowling side — nothing off it reaches
-    // the batter's score, including runs the batters then run.
-    if (d.ballKind == BallKind.wide && d.runsScored != 0) {
-      return const Left(
-        ValidationFailure('Runs off a wide are extras, not the batter\'s'),
-      );
+    final params = <String, dynamic>{
+      'p_match_id': d.matchId.value,
+      'p_innings_number': d.inningsNumber,
+      'p_is_legal_delivery': d.isLegalDelivery,
+      'p_ball_type': d.ballKind.wire,
+      'p_runs_scored': d.runsScored,
+      'p_extras': d.extras,
+      'p_is_wicket': d.isWicket,
+      if (d.wicketType != null) 'p_wicket_type': d.wicketType!.wire,
+      if (d.dismissedPlayerId != null)
+        'p_dismissed_player_id': d.dismissedPlayerId,
+      if (d.batsmanId != null) 'p_batsman_id': d.batsmanId,
+      if (d.nonStrikerId != null) 'p_non_striker_id': d.nonStrikerId,
+      if (d.bowlerId != null) 'p_bowler_id': d.bowlerId,
+      if (d.fielderId != null) 'p_fielder_id': d.fielderId,
+      if (d.commentary != null) 'p_commentary': d.commentary,
+      if (d.expectedVersion != null) 'p_expected_version': d.expectedVersion,
+    };
+
+    LocalScoringOp? localOp;
+    final local = _local;
+    if (local != null) {
+      try {
+        final opId = d.opId ??
+            '${d.matchId.value}_${d.inningsNumber}_${DateTime.now().microsecondsSinceEpoch}';
+        localOp = await local.appendOp(
+          opId: opId,
+          matchId: d.matchId.value,
+          inningsNumber: d.inningsNumber,
+          kind: 'ball',
+          payload: params,
+        );
+      } catch (_) {
+        // Continue to network even if local WAL write fails
+      }
     }
-    if (d.ballKind == BallKind.wide && d.extras < 1) {
-      return const Left(
-        ValidationFailure('A wide carries a 1-run penalty in extras'),
-      );
-    }
+
     try {
-      final dto = await _remote.recordBall({
-        'p_match_id': d.matchId.value,
-        'p_innings_number': d.inningsNumber,
-        'p_is_legal_delivery': d.isLegalDelivery,
-        'p_ball_type': d.ballKind.wire,
-        'p_runs_scored': d.runsScored,
-        'p_extras': d.extras,
-        'p_is_wicket': d.isWicket,
-        if (d.wicketType != null) 'p_wicket_type': d.wicketType!.wire,
-        if (d.batsmanId != null) 'p_batsman_id': d.batsmanId,
-        if (d.nonStrikerId != null) 'p_non_striker_id': d.nonStrikerId,
-        if (d.bowlerId != null) 'p_bowler_id': d.bowlerId,
-        if (d.fielderId != null) 'p_fielder_id': d.fielderId,
-        if (d.commentary != null) 'p_commentary': d.commentary,
-        // Optimistic-lock guard. Null skips the check (single-scorer mode);
-        // a non-null value asks the RPC to reject with 40001 when the
-        // server's match_innings_state.version has advanced past it.
-        if (d.expectedVersion != null) 'p_expected_version': d.expectedVersion,
-      });
+      final dto = await _remote.recordBall(params);
+      if (localOp != null && local != null) {
+        await local.markOpSynced(localOp.opId);
+      }
       return Right(BallOutcome(
         ball: dto.ball.toEntity(),
         innings: dto.innings?.toEntity(),
       ));
     } on ConflictException catch (e) {
-      // Another scorer advanced the version first. Benign: the realtime stream
-      // already carries the fresh state, so the UI can refresh and retry.
+      if (localOp != null && local != null) {
+        await local.discardOp(localOp.opId);
+      }
       return Left(ConflictFailure(e.message));
     } on UnauthorizedException catch (e) {
+      if (localOp != null && local != null) {
+        await local.discardOp(localOp.opId);
+      }
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
+      if (localOp != null && local != null) {
+        await local.markOpFailed(localOp.opId, e.message);
+      }
       return Left(ServerFailure(e.message));
     } catch (e) {
+      if (localOp != null && local != null) {
+        await local.markOpFailed(localOp.opId, e.toString());
+      }
       return Left(UnknownFailure(e.toString()));
     }
   }
@@ -395,6 +415,18 @@ class MatchesRepositoryImpl implements MatchesRepository {
     required MatchId matchId,
     required int inningsNumber,
   }) async {
+    final local = _local;
+    if (local != null) {
+      final pending = await local.pendingOps(
+        matchId: matchId.value,
+        inningsNumber: inningsNumber,
+      );
+      if (pending.isNotEmpty) {
+        final last = pending.last;
+        await local.discardOp(last.opId);
+        return const Right(true);
+      }
+    }
     try {
       final ok = await _remote.undoLastBall(
         matchId: matchId.value,
@@ -407,6 +439,60 @@ class MatchesRepositoryImpl implements MatchesRepository {
       return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<void> syncPendingOps({
+    required String matchId,
+    required int inningsNumber,
+  }) async {
+    final local = _local;
+    if (local == null) return;
+    final pending = await local.pendingOps(
+      matchId: matchId,
+      inningsNumber: inningsNumber,
+    );
+    for (final op in pending) {
+      if (op.kind == 'ball') {
+        try {
+          await _remote.recordBall(op.payload);
+          await local.markOpSynced(op.opId);
+        } on ConflictException {
+          // Version conflict with remote: halt drain
+          break;
+        } on UnauthorizedException {
+          await local.discardOp(op.opId);
+        } on ServerException catch (e) {
+          await local.markOpFailed(op.opId, e.message);
+          break;
+        } catch (e) {
+          await local.markOpFailed(op.opId, e.toString());
+          break;
+        }
+      }
+    }
+  }
+
+  @override
+  Future<int> pendingOpsCount() =>
+      _local?.pendingOpsCount() ?? Future.value(0);
+
+  @override
+  Future<Either<Failure, List<Ball>>> listBalls(
+    MatchId matchId,
+    int inningsNumber,
+  ) async {
+    try {
+      final dtos = await _remote.listBalls(
+        matchId: matchId.value,
+        inningsNumber: inningsNumber,
+      );
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on Exception catch (e) {
+      return Left(ServerFailure(e.toString()));
     }
   }
 

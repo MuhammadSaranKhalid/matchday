@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$MatchInningsStateDto {
 
-@JsonKey(name: 'match_id') String get matchId;@JsonKey(name: 'innings_number') int get inningsNumber;@JsonKey(name: 'striker_id') String? get strikerId;@JsonKey(name: 'non_striker_id') String? get nonStrikerId;@JsonKey(name: 'bowler_id') String? get bowlerId;@JsonKey(name: 'legal_ball_count') int get legalBallCount;@JsonKey(name: 'total_runs') int get totalRuns;@JsonKey(name: 'total_wickets') int get totalWickets;@JsonKey(name: 'total_extras') int get totalExtras;@JsonKey(name: 'is_declared') bool get isDeclared;@JsonKey(name: 'is_all_out') bool get isAllOut; int? get target; int get version;@JsonKey(name: 'updated_at') String get updatedAt;
+@JsonKey(name: 'match_id') String get matchId;@JsonKey(name: 'innings_number') int get inningsNumber;@JsonKey(name: 'striker_id') String? get strikerId;@JsonKey(name: 'non_striker_id') String? get nonStrikerId;@JsonKey(name: 'bowler_id') String? get bowlerId;@JsonKey(name: 'legal_ball_count') int get legalBallCount;@JsonKey(name: 'total_runs') int get totalRuns;@JsonKey(name: 'total_wickets') int get totalWickets;@JsonKey(name: 'total_extras') int get totalExtras;@JsonKey(name: 'is_declared') bool get isDeclared;@JsonKey(name: 'is_all_out') bool get isAllOut; int? get target;@JsonKey(fromJson: intFromWire) int get version;@JsonKey(name: 'updated_at') String get updatedAt;
 /// Create a copy of MatchInningsStateDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -48,7 +48,7 @@ abstract mixin class $MatchInningsStateDtoCopyWith<$Res>  {
   factory $MatchInningsStateDtoCopyWith(MatchInningsStateDto value, $Res Function(MatchInningsStateDto) _then) = _$MatchInningsStateDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'innings_number') int inningsNumber,@JsonKey(name: 'striker_id') String? strikerId,@JsonKey(name: 'non_striker_id') String? nonStrikerId,@JsonKey(name: 'bowler_id') String? bowlerId,@JsonKey(name: 'legal_ball_count') int legalBallCount,@JsonKey(name: 'total_runs') int totalRuns,@JsonKey(name: 'total_wickets') int totalWickets,@JsonKey(name: 'total_extras') int totalExtras,@JsonKey(name: 'is_declared') bool isDeclared,@JsonKey(name: 'is_all_out') bool isAllOut, int? target, int version,@JsonKey(name: 'updated_at') String updatedAt
+@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'innings_number') int inningsNumber,@JsonKey(name: 'striker_id') String? strikerId,@JsonKey(name: 'non_striker_id') String? nonStrikerId,@JsonKey(name: 'bowler_id') String? bowlerId,@JsonKey(name: 'legal_ball_count') int legalBallCount,@JsonKey(name: 'total_runs') int totalRuns,@JsonKey(name: 'total_wickets') int totalWickets,@JsonKey(name: 'total_extras') int totalExtras,@JsonKey(name: 'is_declared') bool isDeclared,@JsonKey(name: 'is_all_out') bool isAllOut, int? target,@JsonKey(fromJson: intFromWire) int version,@JsonKey(name: 'updated_at') String updatedAt
 });
 
 
@@ -166,7 +166,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'innings_number')  int inningsNumber, @JsonKey(name: 'striker_id')  String? strikerId, @JsonKey(name: 'non_striker_id')  String? nonStrikerId, @JsonKey(name: 'bowler_id')  String? bowlerId, @JsonKey(name: 'legal_ball_count')  int legalBallCount, @JsonKey(name: 'total_runs')  int totalRuns, @JsonKey(name: 'total_wickets')  int totalWickets, @JsonKey(name: 'total_extras')  int totalExtras, @JsonKey(name: 'is_declared')  bool isDeclared, @JsonKey(name: 'is_all_out')  bool isAllOut,  int? target,  int version, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'innings_number')  int inningsNumber, @JsonKey(name: 'striker_id')  String? strikerId, @JsonKey(name: 'non_striker_id')  String? nonStrikerId, @JsonKey(name: 'bowler_id')  String? bowlerId, @JsonKey(name: 'legal_ball_count')  int legalBallCount, @JsonKey(name: 'total_runs')  int totalRuns, @JsonKey(name: 'total_wickets')  int totalWickets, @JsonKey(name: 'total_extras')  int totalExtras, @JsonKey(name: 'is_declared')  bool isDeclared, @JsonKey(name: 'is_all_out')  bool isAllOut,  int? target, @JsonKey(fromJson: intFromWire)  int version, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MatchInningsStateDto() when $default != null:
 return $default(_that.matchId,_that.inningsNumber,_that.strikerId,_that.nonStrikerId,_that.bowlerId,_that.legalBallCount,_that.totalRuns,_that.totalWickets,_that.totalExtras,_that.isDeclared,_that.isAllOut,_that.target,_that.version,_that.updatedAt);case _:
@@ -187,7 +187,7 @@ return $default(_that.matchId,_that.inningsNumber,_that.strikerId,_that.nonStrik
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'innings_number')  int inningsNumber, @JsonKey(name: 'striker_id')  String? strikerId, @JsonKey(name: 'non_striker_id')  String? nonStrikerId, @JsonKey(name: 'bowler_id')  String? bowlerId, @JsonKey(name: 'legal_ball_count')  int legalBallCount, @JsonKey(name: 'total_runs')  int totalRuns, @JsonKey(name: 'total_wickets')  int totalWickets, @JsonKey(name: 'total_extras')  int totalExtras, @JsonKey(name: 'is_declared')  bool isDeclared, @JsonKey(name: 'is_all_out')  bool isAllOut,  int? target,  int version, @JsonKey(name: 'updated_at')  String updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'innings_number')  int inningsNumber, @JsonKey(name: 'striker_id')  String? strikerId, @JsonKey(name: 'non_striker_id')  String? nonStrikerId, @JsonKey(name: 'bowler_id')  String? bowlerId, @JsonKey(name: 'legal_ball_count')  int legalBallCount, @JsonKey(name: 'total_runs')  int totalRuns, @JsonKey(name: 'total_wickets')  int totalWickets, @JsonKey(name: 'total_extras')  int totalExtras, @JsonKey(name: 'is_declared')  bool isDeclared, @JsonKey(name: 'is_all_out')  bool isAllOut,  int? target, @JsonKey(fromJson: intFromWire)  int version, @JsonKey(name: 'updated_at')  String updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _MatchInningsStateDto():
 return $default(_that.matchId,_that.inningsNumber,_that.strikerId,_that.nonStrikerId,_that.bowlerId,_that.legalBallCount,_that.totalRuns,_that.totalWickets,_that.totalExtras,_that.isDeclared,_that.isAllOut,_that.target,_that.version,_that.updatedAt);case _:
@@ -207,7 +207,7 @@ return $default(_that.matchId,_that.inningsNumber,_that.strikerId,_that.nonStrik
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'innings_number')  int inningsNumber, @JsonKey(name: 'striker_id')  String? strikerId, @JsonKey(name: 'non_striker_id')  String? nonStrikerId, @JsonKey(name: 'bowler_id')  String? bowlerId, @JsonKey(name: 'legal_ball_count')  int legalBallCount, @JsonKey(name: 'total_runs')  int totalRuns, @JsonKey(name: 'total_wickets')  int totalWickets, @JsonKey(name: 'total_extras')  int totalExtras, @JsonKey(name: 'is_declared')  bool isDeclared, @JsonKey(name: 'is_all_out')  bool isAllOut,  int? target,  int version, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'match_id')  String matchId, @JsonKey(name: 'innings_number')  int inningsNumber, @JsonKey(name: 'striker_id')  String? strikerId, @JsonKey(name: 'non_striker_id')  String? nonStrikerId, @JsonKey(name: 'bowler_id')  String? bowlerId, @JsonKey(name: 'legal_ball_count')  int legalBallCount, @JsonKey(name: 'total_runs')  int totalRuns, @JsonKey(name: 'total_wickets')  int totalWickets, @JsonKey(name: 'total_extras')  int totalExtras, @JsonKey(name: 'is_declared')  bool isDeclared, @JsonKey(name: 'is_all_out')  bool isAllOut,  int? target, @JsonKey(fromJson: intFromWire)  int version, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _MatchInningsStateDto() when $default != null:
 return $default(_that.matchId,_that.inningsNumber,_that.strikerId,_that.nonStrikerId,_that.bowlerId,_that.legalBallCount,_that.totalRuns,_that.totalWickets,_that.totalExtras,_that.isDeclared,_that.isAllOut,_that.target,_that.version,_that.updatedAt);case _:
@@ -222,7 +222,7 @@ return $default(_that.matchId,_that.inningsNumber,_that.strikerId,_that.nonStrik
 @JsonSerializable()
 
 class _MatchInningsStateDto extends MatchInningsStateDto {
-  const _MatchInningsStateDto({@JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'innings_number') required this.inningsNumber, @JsonKey(name: 'striker_id') this.strikerId, @JsonKey(name: 'non_striker_id') this.nonStrikerId, @JsonKey(name: 'bowler_id') this.bowlerId, @JsonKey(name: 'legal_ball_count') this.legalBallCount = 0, @JsonKey(name: 'total_runs') this.totalRuns = 0, @JsonKey(name: 'total_wickets') this.totalWickets = 0, @JsonKey(name: 'total_extras') this.totalExtras = 0, @JsonKey(name: 'is_declared') this.isDeclared = false, @JsonKey(name: 'is_all_out') this.isAllOut = false, this.target, this.version = 0, @JsonKey(name: 'updated_at') required this.updatedAt}): super._();
+  const _MatchInningsStateDto({@JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'innings_number') required this.inningsNumber, @JsonKey(name: 'striker_id') this.strikerId, @JsonKey(name: 'non_striker_id') this.nonStrikerId, @JsonKey(name: 'bowler_id') this.bowlerId, @JsonKey(name: 'legal_ball_count') this.legalBallCount = 0, @JsonKey(name: 'total_runs') this.totalRuns = 0, @JsonKey(name: 'total_wickets') this.totalWickets = 0, @JsonKey(name: 'total_extras') this.totalExtras = 0, @JsonKey(name: 'is_declared') this.isDeclared = false, @JsonKey(name: 'is_all_out') this.isAllOut = false, this.target, @JsonKey(fromJson: intFromWire) this.version = 0, @JsonKey(name: 'updated_at') required this.updatedAt}): super._();
   factory _MatchInningsStateDto.fromJson(Map<String, dynamic> json) => _$MatchInningsStateDtoFromJson(json);
 
 @override@JsonKey(name: 'match_id') final  String matchId;
@@ -237,7 +237,7 @@ class _MatchInningsStateDto extends MatchInningsStateDto {
 @override@JsonKey(name: 'is_declared') final  bool isDeclared;
 @override@JsonKey(name: 'is_all_out') final  bool isAllOut;
 @override final  int? target;
-@override@JsonKey() final  int version;
+@override@JsonKey(fromJson: intFromWire) final  int version;
 @override@JsonKey(name: 'updated_at') final  String updatedAt;
 
 /// Create a copy of MatchInningsStateDto
@@ -273,7 +273,7 @@ abstract mixin class _$MatchInningsStateDtoCopyWith<$Res> implements $MatchInnin
   factory _$MatchInningsStateDtoCopyWith(_MatchInningsStateDto value, $Res Function(_MatchInningsStateDto) _then) = __$MatchInningsStateDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'innings_number') int inningsNumber,@JsonKey(name: 'striker_id') String? strikerId,@JsonKey(name: 'non_striker_id') String? nonStrikerId,@JsonKey(name: 'bowler_id') String? bowlerId,@JsonKey(name: 'legal_ball_count') int legalBallCount,@JsonKey(name: 'total_runs') int totalRuns,@JsonKey(name: 'total_wickets') int totalWickets,@JsonKey(name: 'total_extras') int totalExtras,@JsonKey(name: 'is_declared') bool isDeclared,@JsonKey(name: 'is_all_out') bool isAllOut, int? target, int version,@JsonKey(name: 'updated_at') String updatedAt
+@JsonKey(name: 'match_id') String matchId,@JsonKey(name: 'innings_number') int inningsNumber,@JsonKey(name: 'striker_id') String? strikerId,@JsonKey(name: 'non_striker_id') String? nonStrikerId,@JsonKey(name: 'bowler_id') String? bowlerId,@JsonKey(name: 'legal_ball_count') int legalBallCount,@JsonKey(name: 'total_runs') int totalRuns,@JsonKey(name: 'total_wickets') int totalWickets,@JsonKey(name: 'total_extras') int totalExtras,@JsonKey(name: 'is_declared') bool isDeclared,@JsonKey(name: 'is_all_out') bool isAllOut, int? target,@JsonKey(fromJson: intFromWire) int version,@JsonKey(name: 'updated_at') String updatedAt
 });
 
 

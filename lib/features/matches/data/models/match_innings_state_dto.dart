@@ -7,6 +7,28 @@ import '../../domain/entities/match_player.dart';
 part 'match_innings_state_dto.freezed.dart';
 part 'match_innings_state_dto.g.dart';
 
+/// Coerce a wire number that may arrive as a JSON string.
+///
+/// `version` is a Postgres `bigint`, and this row reaches the client by two
+/// different routes that serialise it differently:
+///
+///   * the realtime broadcast, built with `to_jsonb(new)` → a JSON **number**
+///   * the `record-ball` reply, read over a direct postgres.js connection,
+///     which renders bigint as a **string** to avoid JS precision loss
+///
+/// The DTO has to accept both. It did not, and the consequence was severe:
+/// parsing the reply threw `type 'String' is not a subtype of type 'num?'`,
+/// the repository turned that into a failure, and the delivery was rolled
+/// back — so every ball would have looked like a failed write while the
+/// server had in fact recorded it.
+int intFromWire(Object? v) => switch (v) {
+      null => 0,
+      final int i => i,
+      final num n => n.toInt(),
+      final String s => int.tryParse(s) ?? 0,
+      _ => 0,
+    };
+
 /// Wire-format `match_innings_state` row. One row per
 /// (match_id, innings_number). The on-field trio columns are
 /// match_player_ids — translation back to a profile or unclaimed
@@ -26,7 +48,7 @@ abstract class MatchInningsStateDto with _$MatchInningsStateDto {
     @JsonKey(name: 'is_declared') @Default(false) bool isDeclared,
     @JsonKey(name: 'is_all_out') @Default(false) bool isAllOut,
     int? target,
-    @Default(0) int version,
+    @JsonKey(fromJson: intFromWire) @Default(0) int version,
     @JsonKey(name: 'updated_at') required String updatedAt,
   }) = _MatchInningsStateDto;
 

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/ball.dart';
@@ -7,47 +9,8 @@ import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/match_player.dart';
 import '../../domain/scoring/scoring_adapter.dart';
 import '../../domain/scoring/scoring_engine.dart';
+import '../../domain/scoring/scoring_rules.dart';
 import 'match_start_state.dart';
-
-/// A batter's contribution so far this innings.
-class BatterStats extends Equatable {
-  const BatterStats({
-    this.runs = 0,
-    this.balls = 0,
-    this.fours = 0,
-    this.sixes = 0,
-  });
-
-  final int runs;
-  final int balls;
-  final int fours;
-  final int sixes;
-
-  static const none = BatterStats();
-
-  @override
-  List<Object?> get props => [runs, balls, fours, sixes];
-}
-
-/// A bowler's spell so far this innings.
-class BowlerSpell extends Equatable {
-  const BowlerSpell({
-    this.overs = 0,
-    this.ballsThisOver = 0,
-    this.runs = 0,
-    this.wickets = 0,
-  });
-
-  final int overs;
-  final int ballsThisOver;
-  final int runs;
-  final int wickets;
-
-  static const none = BowlerSpell();
-
-  @override
-  List<Object?> get props => [overs, ballsThisOver, runs, wickets];
-}
 
 /// One selectable person in a scoring sheet — a fielder, an incoming batter,
 /// the next bowler. Keyed by `match_player_id`, which is what every scoring
@@ -156,9 +119,23 @@ class ScoringState extends Equatable {
 
   // ── Score ────────────────────────────────────────────────────────────────
 
-  int get legalBalls => innings?.legalBallCount ?? 0;
-  int get totalRuns => innings?.totalRuns ?? 0;
-  int get totalWickets => innings?.totalWickets ?? 0;
+  int get legalBalls {
+    final ballsCount = balls.where((b) => b.isLegalDelivery).length;
+    final serverCount = innings?.legalBallCount ?? 0;
+    return math.max(serverCount, ballsCount);
+  }
+
+  int get totalRuns {
+    final ballsRuns = balls.fold<int>(0, (sum, b) => sum + b.totalRuns);
+    final serverRuns = innings?.totalRuns ?? 0;
+    return math.max(serverRuns, ballsRuns);
+  }
+
+  int get totalWickets {
+    final ballsWickets = balls.where((b) => b.isWicket).length;
+    final serverWickets = innings?.totalWickets ?? 0;
+    return math.max(serverWickets, ballsWickets);
+  }
 
   int get ballsPerOver =>
       match.format.ballsPerOver == 0 ? 6 : match.format.ballsPerOver;
@@ -288,13 +265,28 @@ class ScoringState extends Equatable {
   String get lastOverBowlerName =>
       nameOf(matchPlayers.playerRefIdOf(lastOverBowlerId));
 
+  /// Legal deliveries bowled by a given bowler this innings.
+  int bowlerLegalBalls(String? bowlerMatchPlayerId) {
+    if (bowlerMatchPlayerId == null) return 0;
+    return balls
+        .where((b) => b.bowlerId == bowlerMatchPlayerId && b.isLegalDelivery)
+        .length;
+  }
+
   /// Bowlers who may take the next over: the fielding side minus whoever just
-  /// bowled, since nobody bowls consecutive overs.
+  /// bowled (since nobody bowls consecutive overs) AND minus anyone who has
+  /// reached the max overs per bowler limit.
   List<ScoringPerson> get availableBowlers {
     final justBowled = innings?.bowlerId?.value ?? lastOverBowlerId;
+    final maxBalls = (match.format.maxOversPerBowler > 0)
+        ? match.format.maxOversPerBowler * ballsPerOver
+        : 0;
+
     return [
       for (final p in fieldingXi)
-        if (p.matchPlayerId != justBowled) p,
+        if (p.matchPlayerId != justBowled &&
+            (maxBalls == 0 || bowlerLegalBalls(p.matchPlayerId) < maxBalls))
+          p,
     ];
   }
 
@@ -312,66 +304,35 @@ class ScoringState extends Equatable {
     ];
   }
 
+  int? get target => innings?.target;
+  bool get isChase => target != null;
+  int get runsNeeded => target == null ? 0 : (target! - totalRuns).clamp(0, 1 << 30);
+
+  double? get requiredRunRate {
+    if (target == null || ballsRemaining <= 0) return null;
+    return (runsNeeded * ballsPerOver) / ballsRemaining;
+  }
+
   // ── Stats ────────────────────────────────────────────────────────────────
 
-  BatterStats get strikerStats =>
-      batterStats(innings?.strikerId?.value);
+  BatterStats get strikerStats => batterStats(innings?.strikerId?.value);
   BatterStats get nonStrikerStats =>
       batterStats(innings?.nonStrikerId?.value);
 
-  BatterStats batterStats(String? matchPlayerId) {
-    if (matchPlayerId == null) return BatterStats.none;
-    var runs = 0, faced = 0, fours = 0, sixes = 0;
-    for (final b in balls) {
-      if (b.batsmanId != matchPlayerId) continue;
-      runs += b.runsScored;
-      // NOTE: preserved from the original — balls faced counts only legal
-      // deliveries and excludes byes/leg-byes. Conventional scoring counts
-      // every delivery except wides (a no-ball and a bye are both faced).
-      // Left as-is so this refactor changes no numbers; see the review notes.
-      if (b.isLegalDelivery &&
-          b.ballKind != BallKind.bye &&
-          b.ballKind != BallKind.legBye) {
-        faced += 1;
-      }
-      if (b.ballKind == BallKind.legal && b.runsScored == 4) fours += 1;
-      if (b.ballKind == BallKind.legal && b.runsScored == 6) sixes += 1;
-    }
-    return BatterStats(runs: runs, balls: faced, fours: fours, sixes: sixes);
-  }
+  PartnershipStats get currentPartnership => currentPartnershipFor(
+        balls,
+        innings?.strikerId?.value,
+        innings?.nonStrikerId?.value,
+      );
 
-  BowlerSpell get bowlerSpell {
-    final id = innings?.bowlerId?.value;
-    if (id == null) return BowlerSpell.none;
-    var legal = 0, conceded = 0, wickets = 0;
-    for (final b in balls) {
-      if (b.bowlerId != id) continue;
-      if (b.isLegalDelivery) legal += 1;
-      // Byes and leg-byes are not charged to the bowler.
-      final chargeable =
-          b.ballKind != BallKind.bye && b.ballKind != BallKind.legBye;
-      conceded += b.runsScored + (chargeable ? b.extras : 0);
-      if (b.isWicket && _creditedToBowler(b.wicketType)) wickets += 1;
-    }
-    return BowlerSpell(
-      overs: legal ~/ ballsPerOver,
-      ballsThisOver: legal % ballsPerOver,
-      runs: conceded,
-      wickets: wickets,
-    );
-  }
+  BatterStats batterStats(String? matchPlayerId) =>
+      batterStatsFor(balls, matchPlayerId);
 
-  /// Run-outs and the like are not credited to the bowler.
-  static bool _creditedToBowler(WicketType? kind) => switch (kind) {
-        null => false,
-        WicketType.runOut ||
-        WicketType.obstructing ||
-        WicketType.handledBall ||
-        WicketType.retiredHurt ||
-        WicketType.timedOut =>
-          false,
-        _ => true,
-      };
+  BowlerSpell get bowlerSpell => bowlerSpellFor(
+        balls,
+        innings?.bowlerId?.value,
+        ballsPerOver: ballsPerOver,
+      );
 
   ScoringState copyWith({
     bool? isBusy,
@@ -402,21 +363,3 @@ class ScoringState extends Equatable {
         pendingCount,
       ];
 }
-
-/// How a delivery's runs split between the batter's score and the extras
-/// column.
-///
-/// This is the rule the wide bug lived in. A wide is a penalty against the
-/// bowling side: nothing off it ever reaches the batter, including runs the
-/// batters then run. A no-ball carries a 1-run penalty but runs off the bat
-/// are the batter's. Byes and leg-byes are all extras.
-///
-/// Pure and public so it can be tested directly — it could not be, when it
-/// was three lines inside a widget callback.
-({int runsScored, int extras}) splitExtraRuns(BallKind kind, int runs) =>
-    switch (kind) {
-      BallKind.wide => (runsScored: 0, extras: 1 + runs),
-      BallKind.noBall => (runsScored: runs, extras: 1),
-      BallKind.bye || BallKind.legBye => (runsScored: 0, extras: runs),
-      BallKind.legal => (runsScored: runs, extras: 0),
-    };

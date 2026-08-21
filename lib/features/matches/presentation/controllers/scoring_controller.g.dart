@@ -10,28 +10,28 @@ part of 'scoring_controller.dart';
 // ignore_for_file: type=lint, type=warning
 /// Owns live scoring: what the screen sees, and every write it can make.
 ///
-/// Extracted from `ScoringScreen`, which had grown to hold the on-field state,
-/// the cricket rules, and the RPC dispatch inside one 3,400-line widget. None
-/// of that was reachable from a unit test — which is how a wide-attribution
-/// bug that corrupted scorecards survived in it.
+/// Refactored strictly following Clean Architecture:
+/// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
+/// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
+///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
 
 @ProviderFor(ScoringController)
 final scoringControllerProvider = ScoringControllerFamily._();
 
 /// Owns live scoring: what the screen sees, and every write it can make.
 ///
-/// Extracted from `ScoringScreen`, which had grown to hold the on-field state,
-/// the cricket rules, and the RPC dispatch inside one 3,400-line widget. None
-/// of that was reachable from a unit test — which is how a wide-attribution
-/// bug that corrupted scorecards survived in it.
+/// Refactored strictly following Clean Architecture:
+/// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
+/// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
+///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
 final class ScoringControllerProvider
     extends $AsyncNotifierProvider<ScoringController, ScoringState> {
   /// Owns live scoring: what the screen sees, and every write it can make.
   ///
-  /// Extracted from `ScoringScreen`, which had grown to hold the on-field state,
-  /// the cricket rules, and the RPC dispatch inside one 3,400-line widget. None
-  /// of that was reachable from a unit test — which is how a wide-attribution
-  /// bug that corrupted scorecards survived in it.
+  /// Refactored strictly following Clean Architecture:
+  /// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
+  /// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
+  ///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
   ScoringControllerProvider._({
     required ScoringControllerFamily super.from,
     required (String, int) super.argument,
@@ -68,14 +68,14 @@ final class ScoringControllerProvider
   }
 }
 
-String _$scoringControllerHash() => r'4c4bd0e4207615053f10a0748b37c85cb1b0bc62';
+String _$scoringControllerHash() => r'96f0bebbb36db5245060095cb5208083d79b9a36';
 
 /// Owns live scoring: what the screen sees, and every write it can make.
 ///
-/// Extracted from `ScoringScreen`, which had grown to hold the on-field state,
-/// the cricket rules, and the RPC dispatch inside one 3,400-line widget. None
-/// of that was reachable from a unit test — which is how a wide-attribution
-/// bug that corrupted scorecards survived in it.
+/// Refactored strictly following Clean Architecture:
+/// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
+/// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
+///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
 
 final class ScoringControllerFamily extends $Family
     with
@@ -97,10 +97,10 @@ final class ScoringControllerFamily extends $Family
 
   /// Owns live scoring: what the screen sees, and every write it can make.
   ///
-  /// Extracted from `ScoringScreen`, which had grown to hold the on-field state,
-  /// the cricket rules, and the RPC dispatch inside one 3,400-line widget. None
-  /// of that was reachable from a unit test — which is how a wide-attribution
-  /// bug that corrupted scorecards survived in it.
+  /// Refactored strictly following Clean Architecture:
+  /// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
+  /// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
+  ///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
 
   ScoringControllerProvider call(String matchId, int inningsNumber) =>
       ScoringControllerProvider._(
@@ -114,10 +114,10 @@ final class ScoringControllerFamily extends $Family
 
 /// Owns live scoring: what the screen sees, and every write it can make.
 ///
-/// Extracted from `ScoringScreen`, which had grown to hold the on-field state,
-/// the cricket rules, and the RPC dispatch inside one 3,400-line widget. None
-/// of that was reachable from a unit test — which is how a wide-attribution
-/// bug that corrupted scorecards survived in it.
+/// Refactored strictly following Clean Architecture:
+/// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
+/// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
+///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
 
 abstract class _$ScoringController extends $AsyncNotifier<ScoringState> {
   late final _$args = ref.$arg as (String, int);

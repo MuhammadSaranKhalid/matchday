@@ -212,7 +212,52 @@
       "input": { "isWicket": true, "wicketType": "bowled" },
       "expect": {
         "ok": true,
-        "newState": { "totalWickets": 1, "strikerId": null, "legalBallCount": 1 }
+        "newState": { "totalWickets": 1, "strikerId": null, "nonStrikerId": "N", "legalBallCount": 1 }
+      }
+    },
+    {
+      "name": "wicket: non-striker run out (striker stays, non-striker cleared)",
+      "category": "wicket",
+      "input": { "isWicket": true, "wicketType": "run_out", "dismissedPlayerId": "N" },
+      "expect": {
+        "ok": true,
+        "newState": { "totalWickets": 1, "strikerId": "S", "nonStrikerId": null, "legalBallCount": 1 }
+      }
+    },
+    {
+      "name": "wicket: striker run out after 1 completed run (non-striker on strike, striker cleared)",
+      "category": "wicket",
+      "input": { "isWicket": true, "wicketType": "run_out", "runsScored": 1, "dismissedPlayerId": "S" },
+      "expect": {
+        "ok": true,
+        "newState": { "totalWickets": 1, "totalRuns": 1, "strikerId": "N", "nonStrikerId": null, "legalBallCount": 1 }
+      }
+    },
+    {
+      "name": "wicket: non-striker run out after 1 completed run (striker at non-striker end, striker slot vacant)",
+      "category": "wicket",
+      "input": { "isWicket": true, "wicketType": "run_out", "runsScored": 1, "dismissedPlayerId": "N" },
+      "expect": {
+        "ok": true,
+        "newState": { "totalWickets": 1, "totalRuns": 1, "strikerId": null, "nonStrikerId": "S", "legalBallCount": 1 }
+      }
+    },
+    {
+      "name": "wicket: run out on wide delivery",
+      "category": "wicket",
+      "input": { "isLegalDelivery": false, "ballKind": "wide", "extras": 1, "isWicket": true, "wicketType": "run_out", "dismissedPlayerId": "S" },
+      "expect": {
+        "ok": true,
+        "newState": { "totalWickets": 1, "totalExtras": 1, "totalRuns": 1, "strikerId": null, "nonStrikerId": "N", "legalBallCount": 0 }
+      }
+    },
+    {
+      "name": "wicket: run out on no-ball with 1 run completed",
+      "category": "wicket",
+      "input": { "isLegalDelivery": false, "ballKind": "no_ball", "runsScored": 1, "extras": 1, "isWicket": true, "wicketType": "run_out", "dismissedPlayerId": "S" },
+      "expect": {
+        "ok": true,
+        "newState": { "totalWickets": 1, "totalExtras": 1, "totalRuns": 2, "strikerId": "N", "nonStrikerId": null, "legalBallCount": 0 }
       }
     },
     {

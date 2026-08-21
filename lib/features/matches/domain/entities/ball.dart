@@ -21,6 +21,7 @@ class Ball extends Equatable {
     required this.isWicket,
     required this.isFreeHit,
     this.wicketType,
+    this.dismissedPlayerId,
     this.batsmanId,
     this.nonStrikerId,
     this.bowlerId,
@@ -59,6 +60,7 @@ class Ball extends Equatable {
   final bool isWicket;
   final bool isFreeHit;
   final WicketType? wicketType;
+  final String? dismissedPlayerId;
 
   /// Striker at the time of the delivery. Nullable because retired-hurt /
   /// timed-out paths can record a wicket without a batter on strike.
@@ -75,7 +77,7 @@ class Ball extends Equatable {
   bool get isSix => ballKind == BallKind.legal && runsScored == 6;
 
   @override
-  List<Object?> get props => [id, seq, isWicket, runsScored, extras];
+  List<Object?> get props => [id, seq, isWicket, runsScored, extras, dismissedPlayerId];
 }
 
 class BallId extends Equatable {
@@ -157,10 +159,12 @@ class BallDraft {
     required this.inningsNumber,
     required this.isLegalDelivery,
     required this.ballKind,
+    this.opId,
     this.runsScored = 0,
     this.extras = 0,
     this.isWicket = false,
     this.wicketType,
+    this.dismissedPlayerId,
     this.batsmanId,
     this.nonStrikerId,
     this.bowlerId,
@@ -169,6 +173,7 @@ class BallDraft {
     this.expectedVersion,
   });
 
+  final String? opId;
   final MatchId matchId;
   final int inningsNumber;
   final bool isLegalDelivery;
@@ -177,6 +182,7 @@ class BallDraft {
   final int extras;
   final bool isWicket;
   final WicketType? wicketType;
+  final String? dismissedPlayerId;
 
   /// Player ids — under the new schema these are `match_player_id`
   /// values (NOT profile uuids). The scoring screen looks them up from
@@ -192,6 +198,43 @@ class BallDraft {
   /// since the client read it — protecting against two scorers
   /// committing the same delivery. Pass NULL in single-scorer flows.
   final int? expectedVersion;
+
+  BallDraft copyWith({
+    String? opId,
+    MatchId? matchId,
+    int? inningsNumber,
+    bool? isLegalDelivery,
+    BallKind? ballKind,
+    int? runsScored,
+    int? extras,
+    bool? isWicket,
+    WicketType? wicketType,
+    String? dismissedPlayerId,
+    String? batsmanId,
+    String? nonStrikerId,
+    String? bowlerId,
+    String? fielderId,
+    String? commentary,
+    int? expectedVersion,
+  }) =>
+      BallDraft(
+        opId: opId ?? this.opId,
+        matchId: matchId ?? this.matchId,
+        inningsNumber: inningsNumber ?? this.inningsNumber,
+        isLegalDelivery: isLegalDelivery ?? this.isLegalDelivery,
+        ballKind: ballKind ?? this.ballKind,
+        runsScored: runsScored ?? this.runsScored,
+        extras: extras ?? this.extras,
+        isWicket: isWicket ?? this.isWicket,
+        wicketType: wicketType ?? this.wicketType,
+        dismissedPlayerId: dismissedPlayerId ?? this.dismissedPlayerId,
+        batsmanId: batsmanId ?? this.batsmanId,
+        nonStrikerId: nonStrikerId ?? this.nonStrikerId,
+        bowlerId: bowlerId ?? this.bowlerId,
+        fielderId: fielderId ?? this.fielderId,
+        commentary: commentary ?? this.commentary,
+        expectedVersion: expectedVersion ?? this.expectedVersion,
+      );
 }
 
 /// What the server produced from one recorded delivery: the persisted ball,

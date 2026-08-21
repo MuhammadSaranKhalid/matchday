@@ -7,7 +7,7 @@
 // painted in the card's corner saying the same thing.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:matchday/features/matches/presentation/state/scoring_state.dart';
+import 'package:matchday/features/matches/domain/scoring/scoring_rules.dart';
 import 'package:matchday/features/matches/presentation/widgets/scoring/scoring_board.dart';
 
 const _longName = 'muhammadsarankhalid';

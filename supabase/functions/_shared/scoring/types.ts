@@ -62,6 +62,7 @@ export interface BallInput {
   extras: number;
   isWicket: boolean;
   wicketType: WicketKind | null;
+  dismissedPlayerId?: string | null;
   batsmanId: string | null;
   nonStrikerId: string | null;
   bowlerId: string | null;
@@ -91,6 +92,7 @@ export interface ComputedBall {
   extras: number;
   isWicket: boolean;
   wicketType: WicketKind | null;
+  dismissedPlayerId?: string | null;
   batsmanId: string | null;
   nonStrikerId: string | null;
   bowlerId: string | null;

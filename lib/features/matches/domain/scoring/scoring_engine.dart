@@ -153,11 +153,23 @@ BallResult applyBall(
   final newLegal = state.legalBallCount + (isLegal ? 1 : 0);
   final newTotalRuns = state.totalRuns + runs + extras;
   final newTotalWickets = state.totalWickets + (input.isWicket ? 1 : 0);
+
+  final endAOccupant = swap ? state.nonStrikerId : state.strikerId;
+  final endBOccupant = swap ? state.strikerId : state.nonStrikerId;
+
+  final isNonStrikerOut = input.isWicket &&
+      input.dismissedPlayerId != null &&
+      input.dismissedPlayerId == state.nonStrikerId;
+  final dismissed = input.isWicket
+      ? (isNonStrikerOut ? state.nonStrikerId : state.strikerId)
+      : null;
+
   final newStriker = input.isWicket
-      ? null
-      : (swap ? state.nonStrikerId : state.strikerId);
-  final newNonStriker =
-      (swap && !input.isWicket) ? state.strikerId : state.nonStrikerId;
+      ? (endAOccupant == dismissed ? null : endAOccupant)
+      : endAOccupant;
+  final newNonStriker = input.isWicket
+      ? (endBOccupant == dismissed ? null : endBOccupant)
+      : endBOccupant;
   final newBowler = overEnded ? null : state.bowlerId;
 
   // ── Innings termination ───────────────────────────────────────────────────
@@ -186,6 +198,7 @@ BallResult applyBall(
       extras: extras,
       isWicket: input.isWicket,
       wicketType: input.wicketType,
+      dismissedPlayerId: input.dismissedPlayerId ?? (input.isWicket ? (isNonStrikerOut ? state.nonStrikerId : state.strikerId) : null),
       batsmanId: input.batsmanId,
       nonStrikerId: input.nonStrikerId,
       bowlerId: input.bowlerId,

@@ -54,7 +54,7 @@ final class MatchesRepositoryProvider
   }
 }
 
-String _$matchesRepositoryHash() => r'af41ad971f2a7de48219c4ba63974d49b2e3a4d4';
+String _$matchesRepositoryHash() => r'3d1a350c84e87c9d4f239d77bf5d38dd69bed1da';
 
 /// The active format presets from the backend catalog (the setup picker reads
 /// this instead of a hardcoded list).

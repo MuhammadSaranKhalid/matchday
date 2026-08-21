@@ -93,6 +93,7 @@ class EngineBallInput {
     this.extras = 0,
     this.isWicket = false,
     this.wicketType,
+    this.dismissedPlayerId,
     this.batsmanId,
     this.nonStrikerId,
     this.bowlerId,
@@ -106,6 +107,7 @@ class EngineBallInput {
   final int extras;
   final bool isWicket;
   final WicketType? wicketType;
+  final String? dismissedPlayerId;
   final String? batsmanId;
   final String? nonStrikerId;
   final String? bowlerId;
@@ -140,6 +142,7 @@ class ComputedBall {
     required this.extras,
     required this.isWicket,
     this.wicketType,
+    this.dismissedPlayerId,
     this.batsmanId,
     this.nonStrikerId,
     this.bowlerId,
@@ -161,6 +164,7 @@ class ComputedBall {
   final int extras;
   final bool isWicket;
   final WicketType? wicketType;
+  final String? dismissedPlayerId;
   final String? batsmanId;
   final String? nonStrikerId;
   final String? bowlerId;

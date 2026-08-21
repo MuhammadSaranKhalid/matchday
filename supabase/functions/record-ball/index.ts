@@ -239,6 +239,7 @@ Deno.serve(async (req) => {
         extras: num(body.p_extras, 0),
         isWicket: body.p_is_wicket === true,
         wicketType: (body.p_wicket_type as BallInput["wicketType"]) ?? null,
+        dismissedPlayerId: (body.p_dismissed_player_id as string) ?? null,
         batsmanId: (body.p_batsman_id as string) ?? null,
         nonStrikerId: (body.p_non_striker_id as string) ?? null,
         bowlerId: (body.p_bowler_id as string) ?? null,

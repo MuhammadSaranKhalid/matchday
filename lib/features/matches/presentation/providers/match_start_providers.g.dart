@@ -91,7 +91,7 @@ final class MatchStartLineupProvider
   }
 }
 
-String _$matchStartLineupHash() => r'ef77a146d3ae4d37ee816660af6f6f3dd7947562';
+String _$matchStartLineupHash() => r'ed61ecc470b240e09ef83c0f202f0bc1a05da88a';
 
 /// The batting side's XI as a tappable candidate list, in batting order as
 /// materialised in `match_players`.
@@ -198,7 +198,7 @@ final class MatchStartReadyProvider
   }
 }
 
-String _$matchStartReadyHash() => r'cc82266969d1644f42defb2d39226dfdf59df731';
+String _$matchStartReadyHash() => r'6cfdc8b2e16a8d748a42773ea70eea0a1b7c74a4';
 
 /// The Ready stage's screen-ready summary: team names, the toss line, the
 /// locked openers resolved to names, and the format line.

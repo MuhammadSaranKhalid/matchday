@@ -138,14 +138,23 @@ export function applyBall(
   const newLegal = state.legalBallCount + (isLegal ? 1 : 0);
   const newTotalRuns = state.totalRuns + runs + extras;
   const newTotalWickets = state.totalWickets + (input.isWicket ? 1 : 0);
+
+  const endAOccupant = swap ? state.nonStrikerId : state.strikerId;
+  const endBOccupant = swap ? state.strikerId : state.nonStrikerId;
+
+  const isNonStrikerOut = input.isWicket &&
+    input.dismissedPlayerId != null &&
+    input.dismissedPlayerId === state.nonStrikerId;
+  const dismissed = input.isWicket
+    ? (isNonStrikerOut ? state.nonStrikerId : state.strikerId)
+    : null;
+
   const newStriker = input.isWicket
-    ? null
-    : swap
-    ? state.nonStrikerId
-    : state.strikerId;
-  const newNonStriker = swap && !input.isWicket
-    ? state.strikerId
-    : state.nonStrikerId;
+    ? (endAOccupant === dismissed ? null : endAOccupant)
+    : endAOccupant;
+  const newNonStriker = input.isWicket
+    ? (endBOccupant === dismissed ? null : endBOccupant)
+    : endBOccupant;
   const newBowler = overEnded ? null : state.bowlerId;
 
   // ── Innings termination ──
@@ -183,6 +192,7 @@ export function applyBall(
       extras,
       isWicket: input.isWicket,
       wicketType: input.wicketType,
+      dismissedPlayerId: input.dismissedPlayerId ?? (input.isWicket ? (isNonStrikerOut ? state.nonStrikerId : state.strikerId) : null),
       batsmanId: input.batsmanId,
       nonStrikerId: input.nonStrikerId,
       bowlerId: input.bowlerId,

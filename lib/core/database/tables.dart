@@ -87,3 +87,84 @@ class MessageDrafts extends Table {
   @override
   Set<Column> get primaryKey => {chatId};
 }
+
+// ─── Scoring write-ahead log (offline scoring; design doc §10) ──────────────
+//
+// EXEMPTION from the online-only rule, scoped to LIVE SCORING ONLY. Unlike the
+// messages cache above — which is a read-through optimisation — this is an
+// offline WRITE path. A scorer on a ground with no signal must be able to keep
+// scoring, and nothing they enter may be lost.
+//
+// The design that makes this safe is in docs/offline-scoring-design.md §3:
+// scoring is single-writer, append-only, deterministic and bounded (~250
+// deliveries a match). Those four properties are why this needs no CRDT, no
+// vector clock, and no merge logic — it is a queue with an idempotency key,
+// not a sync engine. If anyone finds themselves writing merge logic here, the
+// design has been misread.
+//
+// Do NOT generalise this to other features.
+
+/// The log of deliveries the scorer has entered, whether or not the server has
+/// them yet.
+///
+/// Append-only. This records INTENT — the delivery as entered — not the
+/// engine's computed result. That distinction is what makes the log safe
+/// independently of whether the client engine is correct: the server recomputes
+/// every op authoritatively on sync, so a client-side rules bug can produce a
+/// wrong provisional *display* but can never lose or corrupt a delivery.
+@DataClassName('ScoringOpRow')
+class ScoringOps extends Table {
+  /// Client-generated uuid, created ONCE when the scorer taps and reused on
+  /// every retry. This is the idempotency key the server dedupes on, and it is
+  /// why "the server committed it but the reply was lost" is safe to retry.
+  TextColumn get opId => text()();
+
+  TextColumn get matchId => text()();
+  IntColumn get inningsNumber => integer()();
+
+  /// Monotonic per (match, innings) — the order the scorer entered them, which
+  /// is the order the server must receive them. Deliveries are sequential; out
+  /// of order they are meaningless.
+  IntColumn get localSeq => integer()();
+
+  /// 'ball' | 'undo'.
+  TextColumn get kind => text().withDefault(const Constant('ball'))();
+
+  /// The delivery as entered, JSON-encoded.
+  TextColumn get payload => text()();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  /// Null while the server still owes us this one. The outbox drains exactly
+  /// the null rows, in localSeq order.
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  TextColumn get lastError => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {opId};
+}
+
+/// Innings state at the last synced op, so resuming does not mean replaying an
+/// innings from ball one.
+///
+/// Local state is a fold of this snapshot plus the ops after it — recomputable
+/// at any moment, which is what turns crash recovery into an ordinary read
+/// rather than a special case.
+@DataClassName('ScoringSnapshotRow')
+class ScoringSnapshots extends Table {
+  TextColumn get matchId => text()();
+  IntColumn get inningsNumber => integer()();
+
+  /// JSON-encoded innings state as of [throughSeq].
+  TextColumn get state => text()();
+
+  /// The localSeq this snapshot already accounts for.
+  IntColumn get throughSeq => integer()();
+
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {matchId, inningsNumber};
+}

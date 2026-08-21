@@ -53,23 +53,16 @@ void main() {
     return result.getLeft().toNullable();
   }
 
-  test('a wide crediting the batter is rejected before it reaches the wire',
-      () async {
-    final failure = await failureFor(
-      draft(kind: BallKind.wide, runsScored: 1, extras: 1),
-    );
-
-    expect(failure, isA<ValidationFailure>());
-    expect(failure!.message, contains('wide'));
-    verifyNever(() => remote.recordBall(any()));
-  });
-
-  test('a wide without its penalty run is rejected', () async {
-    final failure = await failureFor(draft(kind: BallKind.wide));
-
-    expect(failure, isA<ValidationFailure>());
-    verifyNever(() => remote.recordBall(any()));
-  });
+  // The two wide rules — "runs off a wide are never the batter's" and "a wide
+  // must carry its 1-run penalty" — used to be asserted here, against a copy of
+  // them in this repository. That copy is gone: both engines enforce them, and
+  // both are held to the same golden vectors
+  // (`supabase/functions/_shared/scoring/vectors.json`, categories `wide`).
+  //
+  // Re-adding them here would recreate the duplication this workstream exists
+  // to remove, and a repository copy could drift from the engines silently.
+  // The bye / leg-bye rule below stays because NEITHER engine has it — see the
+  // comment at its guard in matches_repository_impl.dart.
 
   test('bye runs on the batter are rejected', () async {
     final failure = await failureFor(

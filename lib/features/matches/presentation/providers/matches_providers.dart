@@ -2,6 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/lifecycle/app_lifecycle_provider.dart';
+import '../../data/datasources/matches_local_datasource.dart';
 import '../../data/datasources/matches_datasource_providers.dart';
 import '../../data/repositories/matches_repository_impl.dart';
 import '../../domain/entities/ball.dart';
@@ -20,6 +21,7 @@ MatchesRepository matchesRepository(Ref ref) => MatchesRepositoryImpl(
       ref.watch(matchesRemoteDataSourceProvider),
       ref.watch(matchRequestsRemoteDataSourceProvider),
       ref.watch(formatPresetsRemoteDataSourceProvider),
+      ref.watch(matchesLocalDataSourceProvider),
     );
 
 /// The active format presets from the backend catalog (the setup picker reads

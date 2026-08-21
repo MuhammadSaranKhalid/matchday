@@ -32,14 +32,18 @@ class ScoringTopBar extends StatelessWidget {
     required this.onClose,
     required this.onMenuAction,
     this.menuActions = const [],
+    this.onUndo,
+    this.canUndo = false,
+    this.undoFlash = false,
   });
 
   final MatchType matchType;
   final VoidCallback onClose;
   final ValueChanged<ScoringMenuAction> onMenuAction;
-
-  /// Empty hides the overflow entirely rather than showing a dead control.
   final List<ScoringMenuAction> menuActions;
+  final VoidCallback? onUndo;
+  final bool canUndo;
+  final bool undoFlash;
 
   @override
   Widget build(BuildContext context) {
@@ -68,12 +72,71 @@ class ScoringTopBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          if (menuActions.isEmpty)
-            // Keeps the live pill optically centred without a dead affordance.
-            const SizedBox(width: 34)
-          else
-            _MoreMenu(actions: menuActions, onSelected: onMenuAction),
+          if (onUndo != null) ...[
+            _UndoButton(
+              onTap: canUndo ? onUndo! : null,
+              enabled: canUndo,
+              flashing: undoFlash,
+            ),
+            const SizedBox(width: 6),
+          ],
+          if (menuActions.isNotEmpty)
+            _MoreMenu(actions: menuActions, onSelected: onMenuAction)
+          else if (onUndo == null)
+            const SizedBox(width: 34),
         ],
+      ),
+    );
+  }
+}
+
+class _UndoButton extends StatelessWidget {
+  const _UndoButton({
+    required this.onTap,
+    required this.enabled,
+    required this.flashing,
+  });
+
+  final VoidCallback? onTap;
+  final bool enabled;
+  final bool flashing;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: flashing
+              ? CkColors.cream
+              : (enabled ? CkColors.paper2 : CkColors.paper),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: enabled ? CkColors.line : CkColors.hairline,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.undo,
+              size: 14,
+              color: enabled ? CkColors.ink : CkColors.muted,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Undo',
+              style: CkType.body(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: enabled ? CkColors.ink : CkColors.muted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

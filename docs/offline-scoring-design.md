@@ -487,9 +487,9 @@ Rule 7 and §14's reference table would need corresponding edits.
 | **S2** ✅ | Stage 1 wiring: local apply, background write, parity alarm on `match.parity` | **Built** — pad no longer blocks; alarm + category tagging live. Soak (S3) pending |
 | **S3** | *Soak.* Real matches on S2. No code | Agreed delivery volume, alarms triaged |
 | **S4** | Server: `applied_ops` idempotency inside the transaction | Replay test double-records nothing |
-| **S5** | Drift tables + migration + WAL append before UI apply | Kill-and-resume test passes |
-| **S6** | Outbox: ordered drain, backoff, connectivity + foreground triggers | Airplane-mode innings syncs intact |
-| **S7** | Undo across the boundary (§12); conflict UX (§13); sign-out guard (E6) | Edge catalogue covered |
+| **S5** ✅ | Drift tables + migration + WAL append before UI apply | **Met** — 120-delivery offline innings survives a DB reopen |
+| **S6** ✅ | Outbox: ordered drain, connectivity + foreground triggers | **Met** — offline over kept, drains in order on reconnect |
+| **S7** ◐ | Undo across the boundary (§12); conflict UX (§13); sign-out guard (E6). **Rule consolidation done early** | Edge catalogue covered |
 | **S8** | Spectator staleness indicator (§14); drop dead `record_ball` (D9); CLAUDE.md amendment | Docs true |
 
 S0–S3 deliver G1 and carry no offline risk. S4–S8 deliver G2.
@@ -770,28 +770,117 @@ So `getClaims()` verifies the JWT **locally against a cached JWKS** rather than
 calling the Auth server. The hop it replaces was real, and removing it is a real
 saving on every delivery — not merely a no-op with a safe fallback.
 
-#### Still unverified
+#### End-to-end execution — verified (2026-08-20)
 
-The function has **not been executed end to end**. The security mechanism, the
-typecheck and the client are all verified; what is not is the whole request path
-against a real match — `returning *` shaping the innings row, and the response
-reaching the client in the expected form. That needs a full fixture (auth user →
-team → match → match_players → innings state) plus a signed JWT.
+The function was then run for real against the local stack: a fixture match, a
+genuine signed-in scorer (created through the auth API, not a hand-rolled token),
+and live HTTP requests.
 
-**Do that before deploying to production.** The client degrades gracefully if the
-innings row is absent, so a bad deploy is not destructive — but it would leave the
-parity alarm's innings half dark, which is precisely the half worth watching.
+| Case | Result |
+|---|---|
+| Single off the bat | `ok`, ball written, **innings row returned**, strike rotated ✅ |
+| Wide | `ball_in_over: 0` sentinel, legal count unchanged, +1 extra ✅ |
+| Free-hit dismissal by `bowled` | rejected `free_hit_dismissal` ✅ — server agrees with the client |
+| `version` increment | default 0 → 1 → 2 across deliveries ✅ |
 
-### Next: S3 — soak
+#### A severe bug this caught, that code review would not have
 
-No code. Real matches on S2, watching `match.parity`, until §19.2's two conditions
-are met: ≥2,000 deliveries **and** every vector category observed, zero unexplained
-alarms.
+The reply serialises `version` (a Postgres `bigint`) as a **JSON string** — `"1"` —
+because the function reads it over a direct postgres.js connection, and postgres.js
+renders bigint as a string to avoid JS precision loss. The realtime broadcast, built
+with `to_jsonb(new)`, sends the same field as a **number**.
 
-Two prerequisites before the soak means anything:
+`MatchInningsStateDto` accepted only the number. Parsing the reply threw
+`type 'String' is not a subtype of type 'num?'`, the repository turned that into a
+failure, and the controller rolled the delivery back — so **every ball would have
+appeared to fail while the server had in fact recorded it**. The scorer would have
+seen their scorecard refuse every entry.
 
-1. **Deploy `record-ball`.** Without it the reply carries no innings row, so
-   `compareParity` skips the innings half — and that half is where strike rotation
-   lives, the exact failure the alarm exists to catch.
-2. **Get S1–S2 onto the device.** Nothing in this workstream has run on hardware
-   yet.
+Nothing in the type system, the analyzer, or the Dart test suite could see this: both
+sides were internally consistent, and the mismatch existed only on the wire between
+them. It took executing the real function against a real database.
+
+`version` now parses leniently (`intFromWire`), with tests covering both routes,
+their agreement — which the overlay's version comparison depends on — and graceful
+degradation to 0 rather than a throw.
+
+**223 Dart tests + 38 Deno.** The local fixture was removed afterwards; the
+development database is back as it was.
+
+#### Remaining gap
+
+Only the transaction-pooler path is untested: `supabase start` had stopped
+`supabase_pooler_crick`, so the direct connection was used locally where production
+goes through Supavisor with `prepare: false`. Worth watching on the first production
+deploy, though the `prepare: false` setting is already correct for that mode.
+
+### S5 + S6 — built (2026-08-21). Offline scoring works.
+
+**Re-sequenced.** These were scheduled after the S3 soak. That was wrong, on the
+owner's push-back and on the merits: the soak gates whether the Dart engine can be
+trusted to *display* a score offline, but the write-ahead log stores the scorer's
+**intent** and the server recomputes every op authoritatively on sync. A client
+rules bug can produce a wrong provisional display; it can never lose a delivery. So
+durability never depended on parity, and gating it behind a 2,000-delivery soak
+delayed the one thing the feature exists for.
+
+**What now happens when the signal drops:** the scorer keeps scoring. Each delivery
+is written to `scoring_ops` before it is painted and before it is sent. The outbox
+drains when it can. Nothing is lost.
+
+#### The contract changed
+
+A tap now returns success when the delivery is **durable**, not when the server has
+it. That is the whole point — and it is a real semantic change, which is why eleven
+controller tests were rewritten rather than patched.
+
+A failed write no longer rolls the delivery back off the screen. It stays, and is
+retried. Rollback-on-failure was the old behaviour and it was precisely the
+interruption this feature removes.
+
+#### Failure taxonomy — the distinction that matters
+
+| Outcome | Behaviour | Why |
+|---|---|---|
+| Could not send (network, server, unknown) | keep, retry forever | This is the offline path. Not an error state — the feature working |
+| Server **refused** (validation, not-found) | discard, remove from screen | It will be refused every time; retrying blocks every delivery behind it for the rest of the match |
+| **Conflict** (another scorer) | stop the drain, keep everything owed | §13. Reordering a scorecard is not software's decision |
+
+#### Bug found while wiring
+
+`drainOutbox` used a boolean re-entrancy guard, so a caller that awaited it was
+turned away whenever a tap had already fired one — making "wait until the outbox is
+empty" unanswerable, and silently truncating the drain. It now holds the in-flight
+future and joins it.
+
+#### Undo across the boundary (§12)
+
+Where the ball lives decides what undo means: still in the log → discard it, no
+server call; already accepted → ask the server; in flight → settle first. Racing a
+delete against an in-flight insert is how a scorecard gains a ball nobody can
+account for.
+
+#### Retry triggers
+
+New tap, connectivity returning, app foreground. The last two are what turn "saved"
+into "sent" without the scorer doing anything.
+
+#### Sign-out
+
+`AppDatabase.clear()` wipes the log with everything else — a privacy guarantee that
+must not be weakened. Unsent deliveries are now counted and logged before it runs.
+That is a last resort, not the guard: **the scoring screen should warn before a
+scorer reaches sign-out with a non-empty outbox, and that UI is not built yet.**
+
+**243 Dart tests + 38 Deno**, analyzer clean.
+
+### Still open
+
+1. **Sign-out warning UI** — the count exists; the dialog does not.
+2. **A visible "N unsent" indicator** on the scoring screen. `pendingCount` is on
+   the state and unused by the UI.
+3. **S4 client half** — the server-side `scoring_ops` idempotency table and edge
+   function are written; the client does not yet send `p_op_id`. Until it does, a
+   lost reply still risks a double-record on retry. **This is the most important
+   remaining gap**, because the outbox now retries where it previously gave up.
+4. **S3 soak** — still wants real matches, and still wants `record-ball` deployed.

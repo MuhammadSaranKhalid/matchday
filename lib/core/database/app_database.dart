@@ -5,10 +5,19 @@ import 'tables.dart';
 part 'app_database.g.dart';
 
 @DriftDatabase(
-  tables: [WizardDrafts, Chats, Messages, MessageDrafts],
+  tables: [WizardDrafts, Chats, Messages, MessageDrafts, ScoringOps,
+           ScoringSnapshots],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
+
+  /// An instance over a caller-supplied executor, for tests.
+  ///
+  /// The scoring write-ahead log is a durability guarantee, and a guarantee
+  /// asserted against a mock is not asserted at all — these tests run against
+  /// real SQLite so the transaction that allocates `local_seq` is genuinely
+  /// exercised.
+  AppDatabase.forTesting(super.executor);
 
   /// Schema history:
   /// - v1–v4 carried offline-first tables (`todos`, `pending_operations`,
@@ -19,8 +28,12 @@ class AppDatabase extends _$AppDatabase {
   ///   `messages`, `message_drafts`. Names mirror the Supabase schema 1:1.
   ///   Scoped to the messages feature only — other features remain
   ///   online-only.
+  /// - v7: scoring write-ahead log (`scoring_ops`, `scoring_snapshots`). The
+  ///   second exemption to online-only, and the first offline WRITE path —
+  ///   a scorer with no signal keeps scoring and loses nothing. See
+  ///   docs/offline-scoring-design.md.
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -33,6 +46,7 @@ class AppDatabase extends _$AppDatabase {
           // an index — every fresh user pays the full-scan cost forever.
           await m.createAll();
           await _createMessagesIndexes(m);
+          await _createScoringIndexes(m);
         },
         onUpgrade: (m, from, to) async {
           if (from < 5) {
@@ -86,8 +100,31 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(messageDrafts);
             await _createMessagesIndexes(m);
           }
+          if (from < 7) {
+            // Same partial-rerun safety as v6: not wrapped in an explicit
+            // transaction, so a kill mid-migration leaves schemaVersion at 6
+            // and re-runs this block.
+            await m.database
+                .customStatement('DROP TABLE IF EXISTS scoring_ops');
+            await m.database
+                .customStatement('DROP TABLE IF EXISTS scoring_snapshots');
+            await m.createTable(scoringOps);
+            await m.createTable(scoringSnapshots);
+            await _createScoringIndexes(m);
+          }
         },
       );
+
+  /// The outbox's only query is "unsynced ops for this innings, in order".
+  /// createAll() does not process raw CREATE INDEX, so fresh installs need this
+  /// explicitly too — the same trap ticket #28 documents for messages.
+  Future<void> _createScoringIndexes(Migrator m) async {
+    await m.database.customStatement(
+      'CREATE INDEX IF NOT EXISTS scoring_ops_pending '
+      'ON scoring_ops (match_id, innings_number, local_seq) '
+      'WHERE synced_at IS NULL',
+    );
+  }
 
   /// Hot-path indexes for the messages cache. Called from BOTH `onCreate`
   /// (fresh install) and `onUpgrade(from < 6)` because `m.createAll()` does
@@ -107,12 +144,30 @@ class AppDatabase extends _$AppDatabase {
   /// Wipe local drift state on sign-out so a different user on the same
   /// device never sees the previous user's data. Covers all messages cache
   /// tables in addition to wizard drafts.
+  /// Deliveries entered but never accepted by the server.
+  ///
+  /// Sign-out wipes the whole database, so this exists to let the caller ask
+  /// "is anything about to be thrown away?" BEFORE that happens. Discarding a
+  /// scorer's unsent overs without telling them would be the worst possible
+  /// way for this feature to fail.
+  Future<int> pendingScoringOps() async {
+    final rows = await (select(scoringOps)
+          ..where((t) => t.syncedAt.isNull()))
+        .get();
+    return rows.length;
+  }
+
   Future<void> clear() async {
     await batch((b) {
       b.deleteAll(wizardDrafts);
       b.deleteAll(chats);
       b.deleteAll(messages);
       b.deleteAll(messageDrafts);
+      // Unsynced deliveries belong to the scorer who entered them. Callers
+      // MUST warn before reaching here with a non-empty outbox — see
+      // pendingScoringOps — because this discards them irrecoverably.
+      b.deleteAll(scoringOps);
+      b.deleteAll(scoringSnapshots);
     });
   }
 }

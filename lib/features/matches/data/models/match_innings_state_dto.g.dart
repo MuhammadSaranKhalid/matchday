@@ -21,7 +21,7 @@ _MatchInningsStateDto _$MatchInningsStateDtoFromJson(
   isDeclared: json['is_declared'] as bool? ?? false,
   isAllOut: json['is_all_out'] as bool? ?? false,
   target: (json['target'] as num?)?.toInt(),
-  version: (json['version'] as num?)?.toInt() ?? 0,
+  version: json['version'] == null ? 0 : intFromWire(json['version']),
   updatedAt: json['updated_at'] as String,
 );
 

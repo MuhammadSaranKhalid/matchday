@@ -83,6 +83,7 @@ EngineBallInput engineInputFrom(BallDraft d) => EngineBallInput(
       extras: d.extras,
       isWicket: d.isWicket,
       wicketType: d.wicketType,
+      dismissedPlayerId: d.dismissedPlayerId,
       batsmanId: d.batsmanId,
       nonStrikerId: d.nonStrikerId,
       bowlerId: d.bowlerId,

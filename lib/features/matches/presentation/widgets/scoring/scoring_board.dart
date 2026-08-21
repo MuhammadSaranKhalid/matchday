@@ -1,5 +1,5 @@
 // The read-out half of the scoring screen: everything that displays state and
-// takes no input. Its counterpart is scoring_controls.dart.
+// takes no input. Its counterpart is the pad/ subsystem.
 //
 // Purely presentational — no Riverpod, no repository access. Anything that
 // renders lives here or in a sibling; the screen only composes and dispatches.
@@ -10,6 +10,7 @@ import '../../../../../core/util/initials.dart';
 import '../../../../../core/widgets/v2/v2_kit.dart';
 import '../../../domain/entities/ball.dart';
 import '../../../domain/entities/match_player.dart';
+import '../../../domain/scoring/scoring_rules.dart';
 import '../../state/scoring_state.dart';
 import 'ball_chip.dart';
 
@@ -101,6 +102,40 @@ class Scoreboard extends StatelessWidget {
                       color: CkColors.paper,
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'PARTNERSHIP ',
+                    style: CkType.mono(
+                      fontSize: 11,
+                      color: const Color(0x8CFDFAF4),
+                    ),
+                  ),
+                  Text(
+                    '${state.currentPartnership.runs} (${state.currentPartnership.balls})',
+                    style: CkType.mono(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: CkColors.paper,
+                    ),
+                  ),
+                  if (state.isChase) ...[
+                    const Spacer(),
+                    Text(
+                      'NEED ${state.runsNeeded} (${state.ballsRemaining}b) · RRR ',
+                      style: CkType.mono(
+                        fontSize: 11,
+                        color: const Color(0x8CFDFAF4),
+                      ),
+                    ),
+                    Text(
+                      state.requiredRunRate?.toStringAsFixed(2) ?? '—',
+                      style: CkType.mono(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: CkColors.amber,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -174,9 +209,18 @@ class _Stat extends StatelessWidget {
 
 /// The two batter cards plus the bowler strip and its six-ball dots.
 class BattersAndBowler extends StatelessWidget {
-  const BattersAndBowler({super.key, required this.state});
+  const BattersAndBowler({
+    super.key,
+    required this.state,
+    this.onTapBowler,
+    this.onTapStriker,
+    this.onTapNonStriker,
+  });
 
   final ScoringState state;
+  final VoidCallback? onTapBowler;
+  final VoidCallback? onTapStriker;
+  final VoidCallback? onTapNonStriker;
 
   @override
   Widget build(BuildContext context) {
@@ -199,73 +243,346 @@ class BattersAndBowler extends StatelessWidget {
                   photoUrl: state.strikerPhoto,
                   stats: state.strikerStats,
                   onStrike: true,
+                  onTap: state.canScore ? onTapStriker : null,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
                 child: BatterCard(
                   name: state.nonStrikerName,
                   photoUrl: state.nonStrikerPhoto,
                   stats: state.nonStrikerStats,
                   onStrike: false,
+                  onTap: state.canScore ? onTapNonStriker : null,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: CkColors.paper2,
+          Material(
+            color: CkColors.paper2,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: state.canScore ? onTapBowler : null,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: CkColors.hairline),
-            ),
-            child: Row(
-              children: [
-                Avatar(
-                  mono: personInitials(state.bowlerName),
-                  imageUrl: state.bowlerPhoto,
-                  size: 28,
-                  background: kBowlerBadgeColor,
-                  foreground: CkColors.paper,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: CkColors.hairline),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  children: [
+                    Avatar(
+                      mono: personInitials(state.bowlerName),
+                      imageUrl: state.bowlerPhoto,
+                      size: 28,
+                      background: kBowlerBadgeColor,
+                      foreground: CkColors.paper,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  state.bowlerName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: CkType.body(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              if (state.canScore) ...[
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.swap_horiz_rounded,
+                                  size: 14,
+                                  color: CkColors.muted,
+                                ),
+                              ],
+                            ],
+                          ),
+                          Text(
+                            '${spell.overs}.${spell.ballsThisOver} ov · '
+                            '${spell.maidens}m · '
+                            '${spell.runs}r · ${spell.wickets}w',
+                            style: CkType.mono(
+                              fontSize: 10,
+                              color: CkColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (var i = 0; i < 6; i++) ...[
+                          if (i > 0) const SizedBox(width: 4),
+                          if (i < chips.length)
+                            BallChip(chip: chips[i], size: 22)
+                          else
+                            const _EmptyBallSlot(),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Group of deliveries belonging to a single over.
+class OverGroup {
+  const OverGroup({
+    required this.overNumber,
+    required this.bowlerId,
+    required this.balls,
+    required this.totalRuns,
+    required this.totalWickets,
+  });
+
+  final int overNumber;
+  final String? bowlerId;
+  final List<Ball> balls;
+  final int totalRuns;
+  final int totalWickets;
+}
+
+List<OverGroup> groupBallsByOver(List<Ball> balls) {
+  if (balls.isEmpty) return const [];
+  final map = <int, List<Ball>>{};
+  for (final b in balls) {
+    map.putIfAbsent(b.overNumber, () => []).add(b);
+  }
+  final groups = <OverGroup>[];
+  final sortedOvers = map.keys.toList()..sort();
+  for (final overNum in sortedOvers) {
+    final overBalls = map[overNum]!;
+    String? bowlerId;
+    var runs = 0;
+    var wickets = 0;
+    for (final b in overBalls) {
+      bowlerId ??= b.bowlerId;
+      runs += (b.runsScored + b.extras);
+      if (b.isWicket) wickets += 1;
+    }
+    groups.add(OverGroup(
+      overNumber: overNum,
+      bowlerId: bowlerId,
+      balls: overBalls,
+      totalRuns: runs,
+      totalWickets: wickets,
+    ));
+  }
+  return groups;
+}
+
+/// The rolling list of deliveries grouped by over, newest over first.
+class BallLog extends StatelessWidget {
+  const BallLog({
+    super.key,
+    required this.balls,
+    this.nameOf,
+    this.matchPlayers = const [],
+  });
+
+  final List<Ball> balls;
+
+  /// Resolves a player ref id to a name.
+  final String Function(String?)? nameOf;
+
+  /// Needed to translate a ball's `match_player_id` into the ref id [nameOf] speaks.
+  final List<MatchPlayer> matchPlayers;
+
+  String? _name(String? matchPlayerId) {
+    if (nameOf == null || matchPlayerId == null) return null;
+    final refId = matchPlayers.playerRefIdOf(matchPlayerId);
+    if (refId == null) return null;
+    final resolved = nameOf!(refId);
+    return resolved == '—' ? null : resolved;
+  }
+
+  String _describe(Ball b) => describeBall(
+        b,
+        batterName: _name(b.dismissedPlayerId ?? b.batsmanId),
+        fielderName: _name(b.fielderId),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    if (balls.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            'No deliveries recorded yet',
+            style: CkType.body(fontSize: 13, color: CkColors.muted),
+          ),
+        ),
+      );
+    }
+
+    final overGroups = groupBallsByOver(balls).reversed.toList();
+    final latestBallId = balls.last.id;
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+      shrinkWrap: false,
+      itemCount: overGroups.length,
+      itemBuilder: (context, index) {
+        final group = overGroups[index];
+        final bowlerName = _name(group.bowlerId) ?? 'Bowler';
+        final isCurrentOver = index == 0;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isCurrentOver ? CkColors.surface : CkColors.paper2,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isCurrentOver ? CkColors.line : CkColors.hairline,
+                width: isCurrentOver ? 1.5 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Over Header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isCurrentOver
+                        ? CkColors.paper2
+                        : const Color(0x08000000),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(11),
+                    ),
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        state.bowlerName,
-                        overflow: TextOverflow.ellipsis,
-                        style: CkType.body(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isCurrentOver ? CkColors.ink : CkColors.muted,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'OVER ${group.overNumber + 1}',
+                          style: CkType.mono(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          bowlerName,
+                          overflow: TextOverflow.ellipsis,
+                          style: CkType.body(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: CkColors.ink,
+                          ),
                         ),
                       ),
                       Text(
-                        '${spell.overs}.${spell.ballsThisOver} ov · '
-                        '${spell.runs}r · ${spell.wickets}w',
+                        '${group.totalRuns} runs${group.totalWickets > 0 ? ' · ${group.totalWickets}w' : ''}',
                         style: CkType.mono(
-                          fontSize: 10,
-                          color: CkColors.muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: CkColors.ink2,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (var i = 0; i < 6; i++) ...[
-                      if (i > 0) const SizedBox(width: 4),
-                      if (i < chips.length)
-                        BallChip(chip: chips[i], size: 22)
-                      else
-                        const _EmptyBallSlot(),
+                // Deliveries in this over (reversed so newest in over is on top)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Column(
+                    children: [
+                      for (final ball in group.balls.reversed)
+                        BallLogRow(
+                          ball: ball,
+                          highlighted: ball.id == latestBallId,
+                          description: _describe(ball),
+                        ),
                     ],
-                  ],
+                  ),
                 ),
               ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class BallLogRow extends StatelessWidget {
+  const BallLogRow({
+    super.key,
+    required this.ball,
+    required this.highlighted,
+    required this.description,
+  });
+
+  final Ball ball;
+  final bool highlighted;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: highlighted ? CkColors.cream : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 32,
+            child: Text(
+              ballNumberLabel(ball),
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: CkColors.muted,
+              ),
+            ),
+          ),
+          BallChip(
+            chip: BallChipData(
+              label: ballChipLabel(ball),
+              kind: ballChipKind(ball),
+            ),
+            size: 22,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              description,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.body(
+                fontSize: 12,
+                color: CkColors.ink2,
+              ),
             ),
           ),
         ],
@@ -288,104 +605,19 @@ class _EmptyBallSlot extends StatelessWidget {
       );
 }
 
-/// The rolling list of deliveries, newest first.
-class BallLog extends StatelessWidget {
-  const BallLog({
-    super.key,
-    required this.balls,
-    this.limit = 12,
-    this.nameOf,
-    this.matchPlayers = const [],
-  });
-
-  final List<Ball> balls;
-  final int limit;
-
-  /// Resolves a player ref id to a name, so a wicket row can say who was out
-  /// rather than the anonymous "WICKET · caught". Optional: callers that
-  /// cannot resolve names still get a usable log.
-  final String Function(String?)? nameOf;
-
-  /// Needed to translate a ball's `match_player_id` into the ref id [nameOf]
-  /// speaks.
-  final List<MatchPlayer> matchPlayers;
-
-  String? _name(String? matchPlayerId) {
-    if (nameOf == null || matchPlayerId == null) return null;
-    final refId = matchPlayers.playerRefIdOf(matchPlayerId);
-    if (refId == null) return null;
-    final resolved = nameOf!(refId);
-    return resolved == '—' ? null : resolved;
-  }
-
-  String _describe(Ball b) => describeBall(
-        b,
-        batterName: _name(b.batsmanId),
-        fielderName: _name(b.fielderId),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    final newestFirst = balls.reversed.toList();
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(0, 10, 0, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    'BALL LOG',
-                    style: CkType.mono(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.1,
-                      color: CkColors.muted,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${balls.length} balls',
-                    style: CkType.mono(fontSize: 10, color: CkColors.muted),
-                  ),
-                ],
-              ),
-            ),
-            for (var i = 0; i < newestFirst.length && i < limit; i++)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: BallLogRow(
-                  ball: newestFirst[i],
-                  highlighted: i == 0,
-                  description: _describe(newestFirst[i]),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class BatterCard extends StatelessWidget {
-  const BatterCard({super.key, 
+  const BatterCard({
+    super.key,
     required this.name,
     required this.stats,
     required this.onStrike,
     this.photoUrl,
+    this.onTap,
   });
   final String name;
   final BatterStats stats;
   final bool onStrike;
+  final VoidCallback? onTap;
 
   /// Avatar URL, or null to render the monogram. Kept small (20px) — two of
   /// these sit side by side and the runs figure is what the scorer reads.
@@ -393,16 +625,21 @@ class BatterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: onStrike ? CkColors.surface : CkColors.paper2,
+    return Material(
+      color: onStrike ? CkColors.surface : CkColors.paper2,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: onStrike ? CkColors.ink : CkColors.hairline,
-          width: onStrike ? 1.5 : 1,
-        ),
-      ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: onStrike ? CkColors.ink : CkColors.hairline,
+              width: onStrike ? 1.5 : 1,
+            ),
+          ),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -481,7 +718,9 @@ class BatterCard extends StatelessWidget {
             ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 }
 
@@ -552,187 +791,6 @@ class FreeHitBanner extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: kFreeHitText,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class LastBallCard extends StatelessWidget {
-  const LastBallCard({super.key, 
-    required this.last,
-    required this.nameOf,
-    required this.matchPlayers,
-    required this.undoFlash,
-    required this.canUndo,
-    required this.onUndo,
-    this.busy = false,
-  });
-  final Ball? last;
-  final String Function(String?) nameOf;
-  final List<MatchPlayer> matchPlayers;
-  final bool undoFlash;
-  final bool canUndo;
-  final VoidCallback onUndo;
-
-  /// A delivery is being written. Shown explicitly so the disabled run pad
-  /// reads as "saving", not as a frozen screen.
-  final bool busy;
-
-  @override
-  Widget build(BuildContext context) {
-    final overLabel = last == null ? '—' : ballNumberLabel(last!);
-    final desc = last == null
-        ? 'No balls yet'
-        : describeBall(
-            last!,
-            batterName: nameOf(matchPlayers.playerRefIdOf(last!.batsmanId)),
-            fielderName: last!.fielderId == null
-                ? null
-                : nameOf(matchPlayers.playerRefIdOf(last!.fielderId)),
-          );
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: undoFlash ? CkColors.cream : CkColors.paper2,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Row(
-        children: [
-          if (last != null)
-            BallChip(
-              chip: BallChipData(
-                label: ballChipLabel(last!),
-                kind: ballChipKind(last!),
-              ),
-              size: 28,
-            )
-          else
-            const SizedBox(width: 28, height: 28),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  busy ? 'SAVING…' : 'LAST BALL · $overLabel',
-                  style: CkType.mono(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.08,
-                    color: CkColors.muted,
-                  ),
-                ),
-                Text(
-                  desc,
-                  overflow: TextOverflow.ellipsis,
-                  style: CkType.body(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: CkColors.ink2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (busy)
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: CkColors.muted,
-              ),
-            )
-          else
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: canUndo ? onUndo : null,
-              borderRadius: BorderRadius.circular(8),
-              child: Opacity(
-                opacity: canUndo ? 1 : 0.4,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: CkColors.line),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.undo,
-                          size: 12, color: CkColors.ink2),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Undo',
-                        style: CkType.body(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: CkColors.ink2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class BallLogRow extends StatelessWidget {
-  const BallLogRow({super.key, 
-    required this.ball,
-    required this.highlighted,
-    required this.description,
-  });
-  final Ball ball;
-  final bool highlighted;
-  final String description;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: highlighted ? CkColors.cream : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 36,
-            child: Text(
-              ballNumberLabel(ball),
-              style: CkType.mono(
-                fontSize: 10,
-                color: CkColors.muted,
-              ),
-            ),
-          ),
-          BallChip(
-            chip: BallChipData(label: ballChipLabel(ball), kind: ballChipKind(ball)),
-            size: 22,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              description,
-              overflow: TextOverflow.ellipsis,
-              style: CkType.body(
-                fontSize: 12,
-                color: CkColors.ink2,
               ),
             ),
           ),

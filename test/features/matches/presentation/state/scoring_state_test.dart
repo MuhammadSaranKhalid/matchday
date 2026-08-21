@@ -3,6 +3,7 @@ import 'package:matchday/features/matches/domain/entities/ball.dart';
 import 'package:matchday/features/matches/domain/entities/match.dart';
 import 'package:matchday/features/matches/domain/entities/match_innings_state.dart';
 import 'package:matchday/features/matches/domain/entities/match_player.dart';
+import 'package:matchday/features/matches/domain/scoring/scoring_rules.dart';
 import 'package:matchday/features/matches/presentation/state/scoring_state.dart';
 import 'package:matchday/features/teams/domain/entities/team.dart';
 
@@ -44,6 +45,8 @@ MatchInningsState _innings({
   int legalBalls = 0,
   int runs = 0,
   int wickets = 0,
+  int? target,
+  bool isDeclared = false,
 }) =>
     MatchInningsState(
       matchId: _matchId,
@@ -56,6 +59,8 @@ MatchInningsState _innings({
       legalBallCount: legalBalls,
       totalRuns: runs,
       totalWickets: wickets,
+      target: target,
+      isDeclared: isDeclared,
     );
 
 int _seq = 0;
@@ -206,6 +211,67 @@ void main() {
         canScore: true,
       );
       expect(s.inningsOver, isFalse);
+    });
+  });
+
+  group('innings termination — shared with the engine', () {
+    // These cover two ways the screen's hand-written copy of this rule had
+    // drifted from the engine's. Both are fixed by both sides calling
+    // evaluateTermination; both would fail against the old copy.
+
+    test('a chase that reaches its target is over', () {
+      // The most common way an innings ends, and the old copy did not check
+      // for it at all — it only looked at wickets and overs. On the client a
+      // won chase simply never registered.
+      final s = _state(
+        match: _match(overs: 20, players: 11),
+        innings: _innings(target: 50, runs: 50, wickets: 2, legalBalls: 60),
+      );
+      expect(s.inningsOver, isTrue);
+    });
+
+    test('a chase short of its target is not over', () {
+      final s = _state(
+        match: _match(overs: 20, players: 11),
+        innings: _innings(target: 50, runs: 49, wickets: 2, legalBalls: 60),
+      );
+      expect(s.inningsOver, isFalse);
+    });
+
+    test('a declared innings is over', () {
+      final s = _state(
+        match: _match(overs: 20, players: 11),
+        innings: _innings(isDeclared: true, runs: 120, legalBalls: 60),
+      );
+      expect(s.inningsOver, isTrue);
+    });
+
+    test('wicketsToAllOut: 0 disables all-out rather than triggering it', () {
+      // The sharper bug. The old copy guarded on `playersPerTeam > 0` instead
+      // of `wicketsToAllOut > 0`, so a format that explicitly disables all-out
+      // satisfied `0 wickets >= 0` and read as OVER from the very first ball —
+      // the screen would refuse to score a match that had not started.
+      final s = _state(
+        match: _match(overs: 20, players: 8, wicketsToAllOut: 0),
+        innings: _innings(wickets: 0, legalBalls: 0),
+      );
+      expect(s.inningsOver, isFalse);
+    });
+
+    test('all-out still ends the innings on the normal path', () {
+      final s = _state(
+        match: _match(players: 11),
+        innings: _innings(wickets: 10),
+      );
+      expect(s.inningsOver, isTrue);
+    });
+
+    test('the over limit still ends the innings', () {
+      final s = _state(
+        match: _match(overs: 20),
+        innings: _innings(legalBalls: 120),
+      );
+      expect(s.inningsOver, isTrue);
     });
   });
 

@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
+import '../../../location/presentation/widgets/place_autocomplete_field.dart';
 import '../../domain/entities/team.dart';
 import '../controllers/team_create_controller.dart';
 import '../state/team_create_state.dart';
@@ -1193,8 +1194,24 @@ class _StepHome extends StatelessWidget {
               ),
             ),
           ),
-          const TcLabel('City'),
-          TcInput(value: state.city, onChanged: controller.setCity),
+          // Resolving picker, not a free-text box: this is the ONLY place a
+          // team acquires coordinates, and without them it can never surface
+          // in a proximity search or a city facet chip.
+          PlaceAutocompleteField(
+            field: 'team_create_city',
+            label: 'City or village',
+            hintText: 'Lahore, Hair, Chak 47…',
+            initialText: state.city,
+            onResolved: controller.setResolvedPlace,
+          ),
+          if (state.hasCoordinates)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Nearby players will be able to find this team.',
+                style: CkType.body(fontSize: 11, color: CkColors.muted),
+              ),
+            ),
           const SizedBox(height: 14),
           const TcLabel('Area / mohalla / locality'),
           TcInput(

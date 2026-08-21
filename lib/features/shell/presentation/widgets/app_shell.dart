@@ -6,7 +6,7 @@ import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../management/presentation/widgets/management_sheet.dart';
 
 /// The authenticated app shell (v2 IA): hosts the five branch navigators
-/// (Home · Search · Matches · Pavilion · Profile) and renders the shared
+/// (Home · Search · Matches · Pool · Profile) and renders the shared
 /// persistent fixed [V2Header] at the top and [V2BottomNav] beneath them.
 ///
 /// Wired via [StatefulShellRoute] in `app_router.dart` with a custom
@@ -18,20 +18,22 @@ class AppShell extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  // Branch index ↔ tab identity: Home · Search · Matches · Pavilion · Profile.
+  // Branch index ↔ tab identity: Home · Explore · Matches · Pool · Profile.
+  // (Pavilion held slot 3 until 2026-08-21; it moved to the Management sheet
+  // as a full-screen route and the open match Pool took the slot.)
   static const _tabs = <V2Tab>[
     V2Tab.home,
-    V2Tab.search,
+    V2Tab.explore,
     V2Tab.matches,
-    V2Tab.pavilion,
+    V2Tab.pool,
     V2Tab.profile,
   ];
 
   static const _tabTitles = <String>[
     'Home',
-    'Search',
+    'Explore',
     'Matches',
-    'Pavilion',
+    'Pool',
     'Profile',
   ];
 

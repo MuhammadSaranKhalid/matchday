@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/database/database_provider.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/value_objects/team_name.dart';
+import '../../../location/domain/entities/geo_place.dart';
 import '../providers/teams_providers.dart';
 import '../state/team_create_state.dart';
 
@@ -43,6 +44,25 @@ class TeamCreateController extends _$TeamCreateController {
   void setTagline(String v) => _mutate((s) => s.copyWith(tagline: v));
   void setFoundedYear(String v) => _mutate((s) => s.copyWith(foundedYear: v));
   void setCity(String v) => _mutate((s) => s.copyWith(city: v));
+
+  /// Called by the place picker when the creator resolves (or clears) a
+  /// place. A [GeoPlace] with no coordinates (kept-as-typed) still lands, so
+  /// the label is preserved while lat/lng stay null.
+  void setResolvedPlace(GeoPlace? place) => _mutate(
+        (s) => s.copyWith(
+          // `city` holds the LOCALITY, not the full formatted address — the
+          // §8.0 capture contract. `label` keeps the human display string.
+          city: place?.city ?? place?.label ?? s.city,
+          locationLabel: place?.label,
+          district: place?.district,
+          province: place?.province,
+          postcode: place?.postcode,
+          placeId: place?.placeId,
+          latitude: place?.latitude,
+          longitude: place?.longitude,
+          countryCode: place?.countryCode,
+        ),
+      );
   void setArea(String v) => _mutate((s) => s.copyWith(area: v));
   void setHomeGround(String v) => _mutate((s) => s.copyWith(homeGround: v));
   void setColors(String primary, String secondary) =>
@@ -122,8 +142,19 @@ class TeamCreateController extends _$TeamCreateController {
           name: nameRes.getRight().toNullable()!,
           type: s.type,
           privacy: s.privacy,
-          city: _blankToNull(s.combinedCity),
+          // The locality alone, NOT the old "Area, City" composite — a
+          // combined string fragments the facet list and is what §8.0 calls
+          // the capture bug. The area survives as part of `label`.
+          city: _blankToNull(s.city),
           homeGround: _blankToNull(s.homeGround),
+          label: _blankToNull(s.locationLabel ?? s.combinedCity),
+          district: s.district,
+          province: s.province,
+          postcode: s.postcode,
+          placeId: s.placeId,
+          latitude: s.latitude,
+          longitude: s.longitude,
+          countryCode: s.countryCode,
           foundedYear: int.tryParse(s.foundedYear?.trim() ?? ''),
           primaryColor: s.primaryColor,
           secondaryColor: s.secondaryColor,

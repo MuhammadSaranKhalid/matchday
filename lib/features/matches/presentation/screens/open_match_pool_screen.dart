@@ -8,7 +8,13 @@ import '../../../teams/domain/entities/team.dart';
 import '../providers/match_pool_providers.dart';
 import '../providers/matches_feed_providers.dart';
 
-/// Dedicated Matchmaking & Open Pool Screen (`/matches/pool`).
+/// The Pool tab (`/pool`) — Matchmaking & Open Match Pool.
+///
+/// This is a bottom-nav destination (slot 3, taken over from Pavilion on
+/// 2026-08-21), so it renders as a bare tab body: [AppShell] already supplies
+/// the Scaffold, the [V2Header] titled "Pool" and the nav bar. Hence no
+/// Scaffold / AppBar / back button here — the "My broadcasts" drill-down that
+/// used to be an AppBar action is now a row beneath the broadcast banner.
 class OpenMatchPoolScreen extends ConsumerWidget {
   const OpenMatchPoolScreen({super.key});
 
@@ -18,56 +24,10 @@ class OpenMatchPoolScreen extends ConsumerWidget {
     final broadcastsAsync = ref.watch(myPoolBroadcastsProvider);
     final currentFilter = ref.watch(openMatchPoolFilterProvider);
 
-    return Scaffold(
-      backgroundColor: CkColors.paper,
-      appBar: AppBar(
-        backgroundColor: CkColors.paper,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: CkColors.ink),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          'Open Match Pool',
-          style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        actions: [
-          broadcastsAsync.when(
-            data: (myBroadcasts) {
-              final count = myBroadcasts.length;
-              return IconButton(
-                icon: Badge(
-                  isLabelVisible: count > 0,
-                  label: Text('$count'),
-                  backgroundColor: const Color(0xFFD97706),
-                  textColor: Colors.white,
-                  textStyle: CkType.mono(fontSize: 9.5, fontWeight: FontWeight.w800),
-                  child: const Icon(Icons.podcasts_rounded, color: CkColors.ink),
-                ),
-                tooltip: 'My Broadcasts ($count)',
-                onPressed: () => context.push('/matches/my-broadcasts'),
-              );
-            },
-            loading: () => IconButton(
-              icon: const Icon(Icons.podcasts_rounded, color: CkColors.muted),
-              tooltip: 'My Broadcasts',
-              onPressed: () => context.push('/matches/my-broadcasts'),
-            ),
-            error: (_, __) => IconButton(
-              icon: const Icon(Icons.podcasts_rounded, color: CkColors.ink),
-              tooltip: 'My Broadcasts',
-              onPressed: () => context.push('/matches/my-broadcasts'),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(color: CkColors.hairline, height: 1),
-        ),
-      ),
-      body: SafeArea(
+    return ColoredBox(
+      color: CkColors.paper,
+      child: SafeArea(
+        top: false,
         child: RefreshIndicator(
           color: CkColors.ink,
           backgroundColor: CkColors.paper,
@@ -134,6 +94,15 @@ class OpenMatchPoolScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // My broadcasts — the open fixtures you are hosting. Was an
+              // AppBar action before the Pool became a tab.
+              _MyBroadcastsRow(
+                count: broadcastsAsync.value?.length ?? 0,
+                onTap: () => context.push('/matches/my-broadcasts'),
               ),
 
               const SizedBox(height: 16),
@@ -230,6 +199,66 @@ class OpenMatchPoolScreen extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Entry to "My broadcasts" — the open fixtures you are hosting, with a live
+/// count. Rendered inline in the Pool tab body (there is no AppBar to hang an
+/// action off any more).
+class _MyBroadcastsRow extends StatelessWidget {
+  const _MyBroadcastsRow({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: CkColors.hairline),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.podcasts_rounded, size: 17, color: CkColors.ink),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'My Broadcasts',
+                style: CkType.body(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (count > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD97706),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$count',
+                  style: CkType.mono(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 13,
+              color: CkColors.muted,
+            ),
+          ],
         ),
       ),
     );

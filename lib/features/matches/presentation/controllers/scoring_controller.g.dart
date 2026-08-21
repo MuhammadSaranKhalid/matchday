@@ -68,7 +68,7 @@ final class ScoringControllerProvider
   }
 }
 
-String _$scoringControllerHash() => r'96f0bebbb36db5245060095cb5208083d79b9a36';
+String _$scoringControllerHash() => r'5104e95d6d852e703834f2f5de33d5e9bd75d98d';
 
 /// Owns live scoring: what the screen sees, and every write it can make.
 ///

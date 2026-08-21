@@ -21,6 +21,9 @@ abstract class TeamSearchResultDto with _$TeamSearchResultDto {
     Map<String, dynamic>? location,
     @JsonKey(name: 'is_verified') @Default(false) bool isVerified,
     @JsonKey(name: 'distance_km') double? distanceKm,
+    // Returned by `search-all` only; `search-teams` does not select them.
+    @JsonKey(name: 'founded_year') int? foundedYear,
+    @JsonKey(name: 'team_type') String? teamType,
     @Default(0.0) double score,
   }) = _TeamSearchResultDto;
 
@@ -40,5 +43,7 @@ abstract class TeamSearchResultDto with _$TeamSearchResultDto {
         city: location?['city'] as String?,
         isVerified: isVerified,
         distanceKm: distanceKm,
+        foundedYear: foundedYear,
+        teamType: teamType,
       );
 }

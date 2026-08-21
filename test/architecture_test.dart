@@ -83,6 +83,7 @@ void main() {
       freeze('cross_feature_data_imports', () {
         for (final feature in const [
           'auth',
+          'explore',
           'follows',
           'home',
           'location',

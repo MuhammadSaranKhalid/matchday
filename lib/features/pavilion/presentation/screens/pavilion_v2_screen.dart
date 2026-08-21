@@ -16,6 +16,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../matches/presentation/providers/my_matches_providers.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
@@ -106,66 +107,115 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
     final teamsAsync = ref.watch(myTeamsProvider);
     final matchesAsync = ref.watch(myMatchesViewProvider);
 
-    final pvTeams = pvTeamsFromTeams(teamsAsync.value ?? const [], userId: userId);
-    final meFallback = pvTeams.isNotEmpty ? pvTeams.first.crest : kPvUnknownCrest;
+    final pvTeams = pvTeamsFromTeams(
+      teamsAsync.value ?? const [],
+      userId: userId,
+    );
+    final meFallback =
+        pvTeams.isNotEmpty ? pvTeams.first.crest : kPvUnknownCrest;
 
     final view = matchesAsync.value;
-    final matches = view != null
-        ? pvMatchesFromView(view, meFallback: meFallback)
-        : const <PvMatch>[];
+    final matches =
+        view != null
+            ? pvMatchesFromView(view, meFallback: meFallback)
+            : const <PvMatch>[];
 
     final matchesBadge = view?.sent.length ?? 0;
     final toursBadge = _tours.fold<int>(0, (a, t) => a + t.needs);
 
-    return ColoredBox(
-      color: CkColors.paper,
-      child: Stack(
-        children: [
-          Column(
-            children: [
-              _segmented(matchesBadge: matchesBadge, toursBadge: toursBadge),
-              Expanded(
-                  child: switch (_seg) {
-                    PvSeg.matches => switch (matchesAsync) {
-                        AsyncError(:final error) => _errorView(
-                            error, () => ref.invalidate(myMatchesViewProvider)),
-                        AsyncData() => _matchesBody(matches),
-                        _ => _loading(),
-                      },
-                    PvSeg.teams => switch (teamsAsync) {
-                        AsyncError(:final error) => _errorView(
-                            error, () => ref.invalidate(myTeamsProvider)),
-                        AsyncData() => _teamsBody(pvTeams),
-                        _ => _loading(),
-                      },
-                    PvSeg.tournaments => _scroller(
-                        PvToursLane(
-                          tournaments: _tours,
-                          onOpen: (t) => _flash('Opening ${t.name}…'),
-                          onSchedule: (_) => _flash('Tournaments coming soon'),
-                        ),
-                      ),
-                  },
-                ),
-              ],
+    // Pavilion is a full-screen route over the shell (it gave up its nav tab
+    // to the Pool on 2026-08-21), so — unlike the other v2 tab screens — it
+    // owns its Scaffold and header. The bottom inset is handled by the FAB
+    // offset below rather than by SafeArea, so the lanes can scroll under it.
+    final double bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+
+    return Scaffold(
+      backgroundColor: CkColors.paper,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            V2Header(
+              title: 'Pavilion',
+              sub: 'Your workspace',
+              showBack: true,
+              // Pop back to whatever opened Pavilion (normally the Management
+              // sheet's caller); fall back to Home on a cold load / deep link
+              // where nothing is below, so this is never a dead end.
+              onBack:
+                  () => context.canPop() ? context.pop() : context.go('/home'),
+              showMessages: false,
+              showManagement: false,
+              onBell: () => context.push('/notifications'),
             ),
-          
+            Expanded(
+              child: Stack(
+                children: [
+                  Column(
+                    children: [
+                      _segmented(
+                        matchesBadge: matchesBadge,
+                        toursBadge: toursBadge,
+                      ),
+                      Expanded(
+                        child: switch (_seg) {
+                          PvSeg.matches => switch (matchesAsync) {
+                            AsyncError(:final error) => _errorView(
+                              error,
+                              () => ref.invalidate(myMatchesViewProvider),
+                            ),
+                            AsyncData() => _matchesBody(matches),
+                            _ => _loading(),
+                          },
+                          PvSeg.teams => switch (teamsAsync) {
+                            AsyncError(:final error) => _errorView(
+                              error,
+                              () => ref.invalidate(myTeamsProvider),
+                            ),
+                            AsyncData() => _teamsBody(pvTeams),
+                            _ => _loading(),
+                          },
+                          PvSeg.tournaments => _scroller(
+                            PvToursLane(
+                              tournaments: _tours,
+                              onOpen: (t) => _flash('Opening ${t.name}…'),
+                              onSchedule:
+                                  (_) => _flash('Tournaments coming soon'),
+                            ),
+                          ),
+                        },
+                      ),
+                    ],
+                  ),
 
-          Positioned(right: 16, bottom: 18, child: _fab()),
+                  Positioned(
+                    right: 16,
+                    bottom: 18 + bottomInset,
+                    child: _fab(),
+                  ),
 
-          if (_toast != null)
-            Positioned(left: 16, right: 16, bottom: 74, child: _toastPill(_toast!)),
-        ],
+                  if (_toast != null)
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 74 + bottomInset,
+                      child: _toastPill(_toast!),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   // ── bodies ──
   Widget _scroller(Widget child) => SingleChildScrollView(
-        controller: _scroll,
-        padding: const EdgeInsets.only(top: 10, bottom: 96),
-        child: child,
-      );
+    controller: _scroll,
+    padding: const EdgeInsets.only(top: 10, bottom: 96),
+    child: child,
+  );
 
   Widget _matchesBody(List<PvMatch> matches) {
     final hero = _heroOf(matches);
@@ -202,13 +252,22 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('No teams yet',
-                  style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(
+                'No teams yet',
+                style: CkType.display(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 6),
               Text(
                 'Create a club or village side, or accept a captain’s invite to '
                 'join one. Use ＋ Create team below.',
-                style: CkType.body(fontSize: 12.5, height: 1.45, color: CkColors.muted),
+                style: CkType.body(
+                  fontSize: 12.5,
+                  height: 1.45,
+                  color: CkColors.muted,
+                ),
               ),
             ],
           ),
@@ -225,11 +284,11 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
   }
 
   Widget _loading() => const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 64),
-          child: CircularProgressIndicator(),
-        ),
-      );
+    child: Padding(
+      padding: EdgeInsets.symmetric(vertical: 64),
+      child: CircularProgressIndicator(),
+    ),
+  );
 
   Widget _errorView(Object e, VoidCallback onRetry) {
     final message = e is FailureWrapper ? e.failure.message : e.toString();
@@ -238,10 +297,15 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Couldn't load this.",
-              style: CkType.display(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(
+            "Couldn't load this.",
+            style: CkType.display(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 6),
-          Text(message, style: CkType.body(fontSize: 12, color: CkColors.muted)),
+          Text(
+            message,
+            style: CkType.body(fontSize: 12, color: CkColors.muted),
+          ),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
         ],
@@ -252,10 +316,10 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
   // ── segmented control ──
   Widget _segmented({required int matchesBadge, required int toursBadge}) {
     int badge(PvSeg s) => switch (s) {
-          PvSeg.matches => matchesBadge,
-          PvSeg.teams => 0, // no team-invite backend yet
-          PvSeg.tournaments => toursBadge,
-        };
+      PvSeg.matches => matchesBadge,
+      PvSeg.teams => 0, // no team-invite backend yet
+      PvSeg.tournaments => toursBadge,
+    };
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Container(
@@ -267,7 +331,8 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
         ),
         child: Row(
           children: [
-            for (final s in PvSeg.values) Expanded(child: _segButton(s, badge(s))),
+            for (final s in PvSeg.values)
+              Expanded(child: _segButton(s, badge(s))),
           ],
         ),
       ),
@@ -284,15 +349,16 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
         decoration: BoxDecoration(
           color: on ? CkColors.paper : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          boxShadow: on
-              ? const [
-                  BoxShadow(
-                    color: Color(0x1A28200F),
-                    blurRadius: 3,
-                    offset: Offset(0, 1),
-                  ),
-                ]
-              : null,
+          boxShadow:
+              on
+                  ? const [
+                    BoxShadow(
+                      color: Color(0x1A28200F),
+                      blurRadius: 3,
+                      offset: Offset(0, 1),
+                    ),
+                  ]
+                  : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -316,8 +382,13 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
                   color: on ? CkColors.amber : Colors.transparent,
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text('$badge',
-                    style: pvMono(8.5, color: on ? CkColors.ink2 : CkColors.muted)),
+                child: Text(
+                  '$badge',
+                  style: pvMono(
+                    8.5,
+                    color: on ? CkColors.ink2 : CkColors.muted,
+                  ),
+                ),
               ),
             ],
           ],
@@ -349,11 +420,21 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const PvIcon(PvIcons.plus, size: 18, color: CkColors.paper, sw: 2.4),
+            const PvIcon(
+              PvIcons.plus,
+              size: 18,
+              color: CkColors.paper,
+              sw: 2.4,
+            ),
             const SizedBox(width: 8),
-            Text(_seg.createLabel,
-                style: CkType.body(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: CkColors.paper)),
+            Text(
+              _seg.createLabel,
+              style: CkType.body(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: CkColors.paper,
+              ),
+            ),
           ],
         ),
       ),
@@ -379,12 +460,22 @@ class _PavilionV2ScreenState extends ConsumerState<PavilionV2Screen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const PvIcon(PvIcons.check, size: 16, color: CkColors.paper, sw: 2.6),
+            const PvIcon(
+              PvIcons.check,
+              size: 16,
+              color: CkColors.paper,
+              sw: 2.6,
+            ),
             const SizedBox(width: 10),
             Flexible(
-              child: Text(message,
-                  style: CkType.body(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: CkColors.paper)),
+              child: Text(
+                message,
+                style: CkType.body(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: CkColors.paper,
+                ),
+              ),
             ),
           ],
         ),

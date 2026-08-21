@@ -25,6 +25,17 @@ abstract class TeamCreateState with _$TeamCreateState {
     String? foundedYear,
     @Default('') String city,
     @Default('') String area,
+    // Structured geo resolved by the place picker. Populated when the creator
+    // picks a prediction or uses GPS; all null when they keep typed text, in
+    // which case the team is name-findable but not proximity-findable.
+    String? locationLabel,
+    String? district,
+    String? province,
+    String? postcode,
+    String? placeId,
+    double? latitude,
+    double? longitude,
+    String? countryCode,
     @Default('') String homeGround,
     @Default('#338946') String primaryColor,
     @Default('#FDFAF4') String secondaryColor,
@@ -42,6 +53,10 @@ abstract class TeamCreateState with _$TeamCreateState {
 
   bool get canContinueBasics => TeamName.create(name).isRight();
   bool get canContinueHome => city.trim().isNotEmpty;
+
+  /// True once the team carries a real coordinate — the thing that makes it
+  /// discoverable by distance.
+  bool get hasCoordinates => latitude != null && longitude != null;
 
   /// 1–3 character crest monogram. User override wins (honoured as typed,
   /// up to the input field's maxLength); otherwise auto-derived from the

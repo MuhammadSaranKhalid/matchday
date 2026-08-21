@@ -16,6 +16,8 @@ _TeamSearchResultDto _$TeamSearchResultDtoFromJson(Map<String, dynamic> json) =>
       location: json['location'] as Map<String, dynamic>?,
       isVerified: json['is_verified'] as bool? ?? false,
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
+      foundedYear: (json['founded_year'] as num?)?.toInt(),
+      teamType: json['team_type'] as String?,
       score: (json['score'] as num?)?.toDouble() ?? 0.0,
     );
 
@@ -30,5 +32,7 @@ Map<String, dynamic> _$TeamSearchResultDtoToJson(
   'location': instance.location,
   'is_verified': instance.isVerified,
   'distance_km': instance.distanceKm,
+  'founded_year': instance.foundedYear,
+  'team_type': instance.teamType,
   'score': instance.score,
 };

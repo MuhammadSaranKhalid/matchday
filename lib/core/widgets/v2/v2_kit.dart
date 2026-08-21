@@ -52,7 +52,8 @@ abstract final class V2Icons {
   // home  : roof + walls + door (cleaner than the old single-path house).
   // matches: bat + ball (was a globe; the brief was explicit about a sport-
   //          coded glyph for a cricket app).
-  // pavilion: shield with an inner star, on-brand for the "club" frame.
+  // pavilion: shield with an inner star, on-brand for the "club" frame
+  //          (no longer a nav tab — Pavilion moved to the Management sheet).
   // messages: speech bubble with right-edge tail.
   static const home =
       '<path d="M4 11l8-7 8 7"/>'
@@ -65,6 +66,11 @@ abstract final class V2Icons {
   static const pavilion =
       '<path d="M12 3l7 3v5c0 4.2-3 7.4-7 8.5C8 18.4 5 15.2 5 11V6z"/>'
       '<path d="M12 8.4l1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z" stroke-width="1.4"/>';
+  // pool    : radar/crosshair — "find an opponent nearby", the open match pool.
+  static const pool =
+      '<circle cx="12" cy="12" r="8.5"/>'
+      '<circle cx="12" cy="12" r="3.4"/>'
+      '<path d="M12 1.6v3.6M12 18.8v3.6M1.6 12h3.6M18.8 12h3.6"/>';
   static const messages =
       '<path d="M20 14a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>';
   static const bell =
@@ -589,10 +595,13 @@ class _Badge extends StatelessWidget {
   }
 }
 
-/// The five v2 bottom-nav destinations: Home · Search · Matches · Pavilion · Profile.
-enum V2Tab { home, search, matches, pavilion, profile }
+/// The five v2 bottom-nav destinations: Home · Explore · Matches · Pool · Profile.
+///
+/// Pavilion held the fourth slot until 2026-08-21; it is now reached from the
+/// Management sheet and the open match Pool took its place in the bar.
+enum V2Tab { home, explore, matches, pool, profile }
 
-/// 5-tab bottom navigation — Home · Search · Matches · Pavilion · Profile.
+/// 5-tab bottom navigation — Home · Explore · Matches · Pool · Profile.
 class V2BottomNav extends StatelessWidget {
   const V2BottomNav({
     super.key,
@@ -618,9 +627,9 @@ class V2BottomNav extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _navItem(V2Tab.home, 'Home', V2Icons.home),
-            _navItem(V2Tab.search, 'Search', V2Icons.search),
+            _navItem(V2Tab.explore, 'Explore', V2Icons.search),
             _navItem(V2Tab.matches, 'Matches', V2Icons.matches),
-            _navItem(V2Tab.pavilion, 'Pavilion', V2Icons.pavilion),
+            _navItem(V2Tab.pool, 'Pool', V2Icons.pool),
             _navItem(V2Tab.profile, 'Profile', V2Icons.profile),
           ],
         ),

@@ -20,6 +20,9 @@ import '../features/teams/presentation/screens/add_unclaimed_player_screen.dart'
 import '../features/teams/presentation/screens/team_create_screen.dart';
 import '../features/teams/presentation/screens/team_page_screen.dart';
 import '../features/teams/presentation/screens/team_manage_screen.dart';
+import '../features/explore/domain/entities/explore_results.dart';
+import '../features/explore/presentation/screens/explore_screen.dart';
+import '../features/explore/presentation/screens/explore_see_all_screen.dart';
 import '../features/teams/presentation/screens/team_search_screen.dart';
 import '../features/teams/presentation/screens/teams_list_screen.dart';
 // Counter flow temporarily disabled — keep import commented for easy restore.
@@ -40,10 +43,10 @@ import '../features/posts/presentation/screens/composer_screen.dart';
 
 part 'app_router.g.dart';
 
-/// Root navigator key — lets Pavilion drill-downs (e.g. My matches) render
-/// full-screen over the shell while staying URL-nested under their tab, so the
-/// browser URL updates and a web refresh restores the page (with a working
-/// back) instead of an imperative push the URL never reflects.
+/// Root navigator key — the router's top-level navigator, above the shell.
+/// Full-screen routes (Teams, Pavilion, the match lifecycle) live here so they
+/// cover the tab bar, and they are declared as real routes rather than
+/// imperative pushes so the URL updates and a web refresh restores the page.
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Auth-aware router.
@@ -53,7 +56,8 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 /// the user accordingly.
 ///
 /// Authenticated users land in the five-tab shell (Home · Search · Matches ·
-/// Messages · Pavilion — D9 in docs/search-feature-design.md) via a
+/// Pool · Profile — D9 in docs/search-feature-design.md, amended 2026-08-21
+/// when Pool replaced Pavilion in the bar) via a
 /// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
 /// profile is a root-level route reached from the header avatar.
 /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
@@ -127,14 +131,55 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 1 · Search — team search & discovery (placeholder until search
-          // Slice 3 ships the real screen; see docs/search-feature-design.md).
+          // 1 · Explore — unified search + discovery over players, teams and
+          // matches (docs/explore-feature-design.md). v1 ships without the
+          // proximity surfaces: no coordinates are captured yet, so near-me
+          // and city facets would rank an empty dimension.
+          //
+          // `/search` is retained as a redirect: the path predates Explore and
+          // is referenced by the header search shortcut. TeamSearchScreen
+          // stays reachable at /search/teams until the geo capture lands and
+          // it can be retired into Explore's teams category.
           StatefulShellBranch(
             preload: true,
             routes: [
               GoRoute(
-                path: '/search',
-                builder: (_, __) => const TeamSearchScreen(),
+                path: '/explore',
+                builder: (context, _) => ExploreScreen(
+                  onOpenTeam: (teamId) => context.push('/teams/$teamId'),
+                  onOpenProfile: (username) => context.push('/u/$username'),
+                  onOpenMatch: (matchId) => context.push('/matches/$matchId/scorecard'),
+                  onCreateTeam: () => context.push('/teams/create'),
+                  onSeeAll: (query, category) => context.push(
+                    '/explore/all/${category.wireName}?q=${Uri.encodeQueryComponent(query)}',
+                  ),
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'all/:category',
+                    builder: (context, state) {
+                      final raw = state.pathParameters['category'];
+                      // Unknown category in a deep link degrades to teams
+                      // rather than throwing — the path is user-reachable.
+                      final category = ExploreCategory.values.firstWhere(
+                        (c) => c.wireName == raw,
+                        orElse: () => ExploreCategory.teams,
+                      );
+                      return ExploreSeeAllScreen(
+                        query: state.uri.queryParameters['q'] ?? '',
+                        category: category,
+                        onOpenTeam: (teamId) => context.push('/teams/$teamId'),
+                        onOpenProfile: (u) => context.push('/u/$u'),
+                        onOpenMatch: (matchId) =>
+                            context.push('/matches/$matchId/scorecard'),
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path: 'teams',
+                    builder: (_, __) => const TeamSearchScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -150,34 +195,17 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 3 · Pavilion — workspace (calendar + yours + create)
+          // 3 · Pool — the open match pool (matchmaking). Took this slot from
+          // Pavilion on 2026-08-21: browsing open fixtures is a daily,
+          // discovery-shaped activity that belongs in the bar, whereas
+          // Pavilion is a management workspace and now lives behind the
+          // Management sheet (a full-screen route — see below).
           StatefulShellBranch(
             preload: true,
             routes: [
               GoRoute(
-                path: '/pavilion',
-                builder: (_, __) => const PavilionV2Screen(),
-                routes: [
-                  // My matches — rendered full-screen over the shell (root
-                  // navigator), but URL-nested under /pavilion. Navigated with
-                  // `go`, so the address bar updates and a web refresh restores
-                  // [Pavilion → My matches] with a working back.
-                  GoRoute(
-                    path: 'my-matches',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    builder: (_, __) => const MyMatchesScreen(),
-                  ),
-                  // Match Detail — full-screen over the shell (root navigator),
-                  // URL-nested under /pavilion. Resolves the match by id, so a
-                  // refresh / deep link restores it with a working back.
-                  GoRoute(
-                    path: 'match/:id',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    builder: (_, state) => PavilionMatchDetailScreen(
-                      matchId: state.pathParameters['id']!,
-                    ),
-                  ),
-                ],
+                path: '/pool',
+                builder: (_, __) => const OpenMatchPoolScreen(),
               ),
             ],
           ),
@@ -190,6 +218,30 @@ GoRouter appRouter(Ref ref) {
                 builder: (_, __) => const MyProfileScreen(),
               ),
             ],
+          ),
+        ],
+      ),
+      // Pavilion — the management workspace. Full-screen over the shell
+      // (reached from the Management sheet) since it gave up its nav tab to
+      // the Pool. It renders its own back chevron, so arriving here via `go`
+      // (from a post-action redirect) is not a dead end.
+      GoRoute(
+        path: '/pavilion',
+        builder: (_, __) => const PavilionV2Screen(),
+        routes: [
+          // My matches — URL-nested under /pavilion so a web refresh restores
+          // [Pavilion → My matches] with a working back.
+          GoRoute(
+            path: 'my-matches',
+            builder: (_, __) => const MyMatchesScreen(),
+          ),
+          // Match Detail — resolves the match by id, so a refresh / deep link
+          // restores it with a working back.
+          GoRoute(
+            path: 'match/:id',
+            builder: (_, state) => PavilionMatchDetailScreen(
+              matchId: state.pathParameters['id']!,
+            ),
           ),
         ],
       ),
@@ -256,9 +308,10 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) =>
             ResultScreen(matchId: state.pathParameters['matchId']!),
       ),
+      // Legacy location of the pool, kept so older links / pushes still land.
       GoRoute(
         path: '/matches/pool',
-        builder: (_, __) => const OpenMatchPoolScreen(),
+        redirect: (_, __) => '/pool',
       ),
       GoRoute(
         path: '/matches/my-broadcasts',

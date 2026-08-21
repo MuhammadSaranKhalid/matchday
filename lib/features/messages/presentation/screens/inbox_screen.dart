@@ -686,7 +686,7 @@ class _EmptyList extends StatelessWidget {
           'No team chats yet',
           'Join or create a cricket team to coordinate matches and strategy.',
           'Discover Teams',
-          () => context.go('/search'),
+          () => context.go('/explore'),
         ),
       _InboxTab.dms => (
           V2Icons.messages,

@@ -154,6 +154,28 @@ class ManagementSheet extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   children: [
+                    // Section: Workspace
+                    //
+                    // Pavilion moved here from the bottom nav on 2026-08-21
+                    // (the Pool took its tab), so it leads the sheet.
+                    const _SectionHeader(
+                      title: 'Workspace',
+                      icon: Icons.hub_outlined,
+                    ),
+                    const SizedBox(height: 8),
+                    _ActionCard(
+                      title: 'Pavilion',
+                      subtitle:
+                          'Your workspace — matches, teams & tournaments in one place',
+                      icon: Icons.space_dashboard_outlined,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/pavilion');
+                      },
+                    ),
+
+                    const SizedBox(height: 24),
+
                     // Section: Matches & Fixtures
                     const _SectionHeader(
                       title: 'Matches & Fixtures',
@@ -206,24 +228,6 @@ class ManagementSheet extends ConsumerWidget {
 
                     const SizedBox(height: 24),
 
-                    // Section: Matchmaking & Challenges
-                    const _SectionHeader(
-                      title: 'Matchmaking & Open Pool',
-                      icon: Icons.travel_explore_rounded,
-                    ),
-                    const SizedBox(height: 8),
-                    _ActionCard(
-                      title: 'Find Opponent / Open Pool',
-                      subtitle: 'Browse local open requests or broadcast an open fixture',
-                      icon: Icons.explore_outlined,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        context.push('/matches/pool');
-                      },
-                    ),
-
-                    const SizedBox(height: 24),
-
                     // Section: Tournaments & Leagues
                     const _SectionHeader(
                       title: 'Tournaments & Leagues',
@@ -236,7 +240,7 @@ class ManagementSheet extends ConsumerWidget {
                       icon: Icons.account_tree_outlined,
                       onTap: () {
                         Navigator.of(context).pop();
-                        context.go('/pavilion');
+                        context.push('/pavilion');
                       },
                     ),
                   ],

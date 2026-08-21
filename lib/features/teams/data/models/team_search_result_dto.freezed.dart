@@ -15,7 +15,8 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TeamSearchResultDto {
 
-@JsonKey(name: 'team_id') String get teamId;@JsonKey(name: 'team_name') String get teamName;@JsonKey(name: 'logo_url') String? get logoUrl;@JsonKey(name: 'logo_monogram') String? get logoMonogram;@JsonKey(name: 'team_colors') Map<String, dynamic>? get teamColors; Map<String, dynamic>? get location;@JsonKey(name: 'is_verified') bool get isVerified;@JsonKey(name: 'distance_km') double? get distanceKm; double get score;
+@JsonKey(name: 'team_id') String get teamId;@JsonKey(name: 'team_name') String get teamName;@JsonKey(name: 'logo_url') String? get logoUrl;@JsonKey(name: 'logo_monogram') String? get logoMonogram;@JsonKey(name: 'team_colors') Map<String, dynamic>? get teamColors; Map<String, dynamic>? get location;@JsonKey(name: 'is_verified') bool get isVerified;@JsonKey(name: 'distance_km') double? get distanceKm;// Returned by `search-all` only; `search-teams` does not select them.
+@JsonKey(name: 'founded_year') int? get foundedYear;@JsonKey(name: 'team_type') String? get teamType; double get score;
 /// Create a copy of TeamSearchResultDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +29,16 @@ $TeamSearchResultDtoCopyWith<TeamSearchResultDto> get copyWith => _$TeamSearchRe
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TeamSearchResultDto&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.logoUrl, logoUrl) || other.logoUrl == logoUrl)&&(identical(other.logoMonogram, logoMonogram) || other.logoMonogram == logoMonogram)&&const DeepCollectionEquality().equals(other.teamColors, teamColors)&&const DeepCollectionEquality().equals(other.location, location)&&(identical(other.isVerified, isVerified) || other.isVerified == isVerified)&&(identical(other.distanceKm, distanceKm) || other.distanceKm == distanceKm)&&(identical(other.score, score) || other.score == score));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TeamSearchResultDto&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.logoUrl, logoUrl) || other.logoUrl == logoUrl)&&(identical(other.logoMonogram, logoMonogram) || other.logoMonogram == logoMonogram)&&const DeepCollectionEquality().equals(other.teamColors, teamColors)&&const DeepCollectionEquality().equals(other.location, location)&&(identical(other.isVerified, isVerified) || other.isVerified == isVerified)&&(identical(other.distanceKm, distanceKm) || other.distanceKm == distanceKm)&&(identical(other.foundedYear, foundedYear) || other.foundedYear == foundedYear)&&(identical(other.teamType, teamType) || other.teamType == teamType)&&(identical(other.score, score) || other.score == score));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,teamId,teamName,logoUrl,logoMonogram,const DeepCollectionEquality().hash(teamColors),const DeepCollectionEquality().hash(location),isVerified,distanceKm,score);
+int get hashCode => Object.hash(runtimeType,teamId,teamName,logoUrl,logoMonogram,const DeepCollectionEquality().hash(teamColors),const DeepCollectionEquality().hash(location),isVerified,distanceKm,foundedYear,teamType,score);
 
 @override
 String toString() {
-  return 'TeamSearchResultDto(teamId: $teamId, teamName: $teamName, logoUrl: $logoUrl, logoMonogram: $logoMonogram, teamColors: $teamColors, location: $location, isVerified: $isVerified, distanceKm: $distanceKm, score: $score)';
+  return 'TeamSearchResultDto(teamId: $teamId, teamName: $teamName, logoUrl: $logoUrl, logoMonogram: $logoMonogram, teamColors: $teamColors, location: $location, isVerified: $isVerified, distanceKm: $distanceKm, foundedYear: $foundedYear, teamType: $teamType, score: $score)';
 }
 
 
@@ -48,7 +49,7 @@ abstract mixin class $TeamSearchResultDtoCopyWith<$Res>  {
   factory $TeamSearchResultDtoCopyWith(TeamSearchResultDto value, $Res Function(TeamSearchResultDto) _then) = _$TeamSearchResultDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'team_name') String teamName,@JsonKey(name: 'logo_url') String? logoUrl,@JsonKey(name: 'logo_monogram') String? logoMonogram,@JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors, Map<String, dynamic>? location,@JsonKey(name: 'is_verified') bool isVerified,@JsonKey(name: 'distance_km') double? distanceKm, double score
+@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'team_name') String teamName,@JsonKey(name: 'logo_url') String? logoUrl,@JsonKey(name: 'logo_monogram') String? logoMonogram,@JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors, Map<String, dynamic>? location,@JsonKey(name: 'is_verified') bool isVerified,@JsonKey(name: 'distance_km') double? distanceKm,@JsonKey(name: 'founded_year') int? foundedYear,@JsonKey(name: 'team_type') String? teamType, double score
 });
 
 
@@ -65,7 +66,7 @@ class _$TeamSearchResultDtoCopyWithImpl<$Res>
 
 /// Create a copy of TeamSearchResultDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? teamId = null,Object? teamName = null,Object? logoUrl = freezed,Object? logoMonogram = freezed,Object? teamColors = freezed,Object? location = freezed,Object? isVerified = null,Object? distanceKm = freezed,Object? score = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? teamId = null,Object? teamName = null,Object? logoUrl = freezed,Object? logoMonogram = freezed,Object? teamColors = freezed,Object? location = freezed,Object? isVerified = null,Object? distanceKm = freezed,Object? foundedYear = freezed,Object? teamType = freezed,Object? score = null,}) {
   return _then(_self.copyWith(
 teamId: null == teamId ? _self.teamId : teamId // ignore: cast_nullable_to_non_nullable
 as String,teamName: null == teamName ? _self.teamName : teamName // ignore: cast_nullable_to_non_nullable
@@ -75,7 +76,9 @@ as String?,teamColors: freezed == teamColors ? _self.teamColors : teamColors // 
 as Map<String, dynamic>?,location: freezed == location ? _self.location : location // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,isVerified: null == isVerified ? _self.isVerified : isVerified // ignore: cast_nullable_to_non_nullable
 as bool,distanceKm: freezed == distanceKm ? _self.distanceKm : distanceKm // ignore: cast_nullable_to_non_nullable
-as double?,score: null == score ? _self.score : score // ignore: cast_nullable_to_non_nullable
+as double?,foundedYear: freezed == foundedYear ? _self.foundedYear : foundedYear // ignore: cast_nullable_to_non_nullable
+as int?,teamType: freezed == teamType ? _self.teamType : teamType // ignore: cast_nullable_to_non_nullable
+as String?,score: null == score ? _self.score : score // ignore: cast_nullable_to_non_nullable
 as double,
   ));
 }
@@ -161,10 +164,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  Map<String, dynamic>? location, @JsonKey(name: 'is_verified')  bool isVerified, @JsonKey(name: 'distance_km')  double? distanceKm,  double score)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  Map<String, dynamic>? location, @JsonKey(name: 'is_verified')  bool isVerified, @JsonKey(name: 'distance_km')  double? distanceKm, @JsonKey(name: 'founded_year')  int? foundedYear, @JsonKey(name: 'team_type')  String? teamType,  double score)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TeamSearchResultDto() when $default != null:
-return $default(_that.teamId,_that.teamName,_that.logoUrl,_that.logoMonogram,_that.teamColors,_that.location,_that.isVerified,_that.distanceKm,_that.score);case _:
+return $default(_that.teamId,_that.teamName,_that.logoUrl,_that.logoMonogram,_that.teamColors,_that.location,_that.isVerified,_that.distanceKm,_that.foundedYear,_that.teamType,_that.score);case _:
   return orElse();
 
 }
@@ -182,10 +185,10 @@ return $default(_that.teamId,_that.teamName,_that.logoUrl,_that.logoMonogram,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  Map<String, dynamic>? location, @JsonKey(name: 'is_verified')  bool isVerified, @JsonKey(name: 'distance_km')  double? distanceKm,  double score)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  Map<String, dynamic>? location, @JsonKey(name: 'is_verified')  bool isVerified, @JsonKey(name: 'distance_km')  double? distanceKm, @JsonKey(name: 'founded_year')  int? foundedYear, @JsonKey(name: 'team_type')  String? teamType,  double score)  $default,) {final _that = this;
 switch (_that) {
 case _TeamSearchResultDto():
-return $default(_that.teamId,_that.teamName,_that.logoUrl,_that.logoMonogram,_that.teamColors,_that.location,_that.isVerified,_that.distanceKm,_that.score);case _:
+return $default(_that.teamId,_that.teamName,_that.logoUrl,_that.logoMonogram,_that.teamColors,_that.location,_that.isVerified,_that.distanceKm,_that.foundedYear,_that.teamType,_that.score);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -202,10 +205,10 @@ return $default(_that.teamId,_that.teamName,_that.logoUrl,_that.logoMonogram,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  Map<String, dynamic>? location, @JsonKey(name: 'is_verified')  bool isVerified, @JsonKey(name: 'distance_km')  double? distanceKm,  double score)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  Map<String, dynamic>? location, @JsonKey(name: 'is_verified')  bool isVerified, @JsonKey(name: 'distance_km')  double? distanceKm, @JsonKey(name: 'founded_year')  int? foundedYear, @JsonKey(name: 'team_type')  String? teamType,  double score)?  $default,) {final _that = this;
 switch (_that) {
 case _TeamSearchResultDto() when $default != null:
-return $default(_that.teamId,_that.teamName,_that.logoUrl,_that.logoMonogram,_that.teamColors,_that.location,_that.isVerified,_that.distanceKm,_that.score);case _:
+return $default(_that.teamId,_that.teamName,_that.logoUrl,_that.logoMonogram,_that.teamColors,_that.location,_that.isVerified,_that.distanceKm,_that.foundedYear,_that.teamType,_that.score);case _:
   return null;
 
 }
@@ -217,7 +220,7 @@ return $default(_that.teamId,_that.teamName,_that.logoUrl,_that.logoMonogram,_th
 @JsonSerializable()
 
 class _TeamSearchResultDto extends TeamSearchResultDto {
-  const _TeamSearchResultDto({@JsonKey(name: 'team_id') required this.teamId, @JsonKey(name: 'team_name') required this.teamName, @JsonKey(name: 'logo_url') this.logoUrl, @JsonKey(name: 'logo_monogram') this.logoMonogram, @JsonKey(name: 'team_colors') final  Map<String, dynamic>? teamColors, final  Map<String, dynamic>? location, @JsonKey(name: 'is_verified') this.isVerified = false, @JsonKey(name: 'distance_km') this.distanceKm, this.score = 0.0}): _teamColors = teamColors,_location = location,super._();
+  const _TeamSearchResultDto({@JsonKey(name: 'team_id') required this.teamId, @JsonKey(name: 'team_name') required this.teamName, @JsonKey(name: 'logo_url') this.logoUrl, @JsonKey(name: 'logo_monogram') this.logoMonogram, @JsonKey(name: 'team_colors') final  Map<String, dynamic>? teamColors, final  Map<String, dynamic>? location, @JsonKey(name: 'is_verified') this.isVerified = false, @JsonKey(name: 'distance_km') this.distanceKm, @JsonKey(name: 'founded_year') this.foundedYear, @JsonKey(name: 'team_type') this.teamType, this.score = 0.0}): _teamColors = teamColors,_location = location,super._();
   factory _TeamSearchResultDto.fromJson(Map<String, dynamic> json) => _$TeamSearchResultDtoFromJson(json);
 
 @override@JsonKey(name: 'team_id') final  String teamId;
@@ -244,6 +247,9 @@ class _TeamSearchResultDto extends TeamSearchResultDto {
 
 @override@JsonKey(name: 'is_verified') final  bool isVerified;
 @override@JsonKey(name: 'distance_km') final  double? distanceKm;
+// Returned by `search-all` only; `search-teams` does not select them.
+@override@JsonKey(name: 'founded_year') final  int? foundedYear;
+@override@JsonKey(name: 'team_type') final  String? teamType;
 @override@JsonKey() final  double score;
 
 /// Create a copy of TeamSearchResultDto
@@ -259,16 +265,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TeamSearchResultDto&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.logoUrl, logoUrl) || other.logoUrl == logoUrl)&&(identical(other.logoMonogram, logoMonogram) || other.logoMonogram == logoMonogram)&&const DeepCollectionEquality().equals(other._teamColors, _teamColors)&&const DeepCollectionEquality().equals(other._location, _location)&&(identical(other.isVerified, isVerified) || other.isVerified == isVerified)&&(identical(other.distanceKm, distanceKm) || other.distanceKm == distanceKm)&&(identical(other.score, score) || other.score == score));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TeamSearchResultDto&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.logoUrl, logoUrl) || other.logoUrl == logoUrl)&&(identical(other.logoMonogram, logoMonogram) || other.logoMonogram == logoMonogram)&&const DeepCollectionEquality().equals(other._teamColors, _teamColors)&&const DeepCollectionEquality().equals(other._location, _location)&&(identical(other.isVerified, isVerified) || other.isVerified == isVerified)&&(identical(other.distanceKm, distanceKm) || other.distanceKm == distanceKm)&&(identical(other.foundedYear, foundedYear) || other.foundedYear == foundedYear)&&(identical(other.teamType, teamType) || other.teamType == teamType)&&(identical(other.score, score) || other.score == score));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,teamId,teamName,logoUrl,logoMonogram,const DeepCollectionEquality().hash(_teamColors),const DeepCollectionEquality().hash(_location),isVerified,distanceKm,score);
+int get hashCode => Object.hash(runtimeType,teamId,teamName,logoUrl,logoMonogram,const DeepCollectionEquality().hash(_teamColors),const DeepCollectionEquality().hash(_location),isVerified,distanceKm,foundedYear,teamType,score);
 
 @override
 String toString() {
-  return 'TeamSearchResultDto(teamId: $teamId, teamName: $teamName, logoUrl: $logoUrl, logoMonogram: $logoMonogram, teamColors: $teamColors, location: $location, isVerified: $isVerified, distanceKm: $distanceKm, score: $score)';
+  return 'TeamSearchResultDto(teamId: $teamId, teamName: $teamName, logoUrl: $logoUrl, logoMonogram: $logoMonogram, teamColors: $teamColors, location: $location, isVerified: $isVerified, distanceKm: $distanceKm, foundedYear: $foundedYear, teamType: $teamType, score: $score)';
 }
 
 
@@ -279,7 +285,7 @@ abstract mixin class _$TeamSearchResultDtoCopyWith<$Res> implements $TeamSearchR
   factory _$TeamSearchResultDtoCopyWith(_TeamSearchResultDto value, $Res Function(_TeamSearchResultDto) _then) = __$TeamSearchResultDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'team_name') String teamName,@JsonKey(name: 'logo_url') String? logoUrl,@JsonKey(name: 'logo_monogram') String? logoMonogram,@JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors, Map<String, dynamic>? location,@JsonKey(name: 'is_verified') bool isVerified,@JsonKey(name: 'distance_km') double? distanceKm, double score
+@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'team_name') String teamName,@JsonKey(name: 'logo_url') String? logoUrl,@JsonKey(name: 'logo_monogram') String? logoMonogram,@JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors, Map<String, dynamic>? location,@JsonKey(name: 'is_verified') bool isVerified,@JsonKey(name: 'distance_km') double? distanceKm,@JsonKey(name: 'founded_year') int? foundedYear,@JsonKey(name: 'team_type') String? teamType, double score
 });
 
 
@@ -296,7 +302,7 @@ class __$TeamSearchResultDtoCopyWithImpl<$Res>
 
 /// Create a copy of TeamSearchResultDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? teamId = null,Object? teamName = null,Object? logoUrl = freezed,Object? logoMonogram = freezed,Object? teamColors = freezed,Object? location = freezed,Object? isVerified = null,Object? distanceKm = freezed,Object? score = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? teamId = null,Object? teamName = null,Object? logoUrl = freezed,Object? logoMonogram = freezed,Object? teamColors = freezed,Object? location = freezed,Object? isVerified = null,Object? distanceKm = freezed,Object? foundedYear = freezed,Object? teamType = freezed,Object? score = null,}) {
   return _then(_TeamSearchResultDto(
 teamId: null == teamId ? _self.teamId : teamId // ignore: cast_nullable_to_non_nullable
 as String,teamName: null == teamName ? _self.teamName : teamName // ignore: cast_nullable_to_non_nullable
@@ -306,7 +312,9 @@ as String?,teamColors: freezed == teamColors ? _self._teamColors : teamColors //
 as Map<String, dynamic>?,location: freezed == location ? _self._location : location // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,isVerified: null == isVerified ? _self.isVerified : isVerified // ignore: cast_nullable_to_non_nullable
 as bool,distanceKm: freezed == distanceKm ? _self.distanceKm : distanceKm // ignore: cast_nullable_to_non_nullable
-as double?,score: null == score ? _self.score : score // ignore: cast_nullable_to_non_nullable
+as double?,foundedYear: freezed == foundedYear ? _self.foundedYear : foundedYear // ignore: cast_nullable_to_non_nullable
+as int?,teamType: freezed == teamType ? _self.teamType : teamType // ignore: cast_nullable_to_non_nullable
+as String?,score: null == score ? _self.score : score // ignore: cast_nullable_to_non_nullable
 as double,
   ));
 }

@@ -23,6 +23,8 @@ class TeamSearchResult extends Equatable {
     this.city,
     this.isVerified = false,
     this.distanceKm,
+    this.foundedYear,
+    this.teamType,
   });
 
   final TeamId teamId;
@@ -49,6 +51,27 @@ class TeamSearchResult extends Equatable {
   /// (city-centroid teams collide at distance ≈ 0; see §12).
   final double? distanceKm;
 
+  /// Year the team was founded. Rendered as "FD 2019" in the Explore result
+  /// row's meta line. Null from `search-teams`, which does not select it —
+  /// only `search-all` returns it.
+  final int? foundedYear;
+
+  /// Raw `team_type` enum value (e.g. `tape_ball`). Same nullability note as
+  /// [foundedYear].
+  final String? teamType;
+
+  /// The mono sub-line under the team name: "Lahore · FD 2019 · Tape-ball".
+  /// Composed here so the Explore row and the team-search row cannot drift.
+  String get metaLine {
+    final parts = <String>[
+      if (city != null && city!.isNotEmpty) city!,
+      if (foundedYear != null) 'FD $foundedYear',
+      if (teamType != null && teamType!.isNotEmpty)
+        teamType!.replaceAll('_', '-'),
+    ];
+    return parts.join(' · ');
+  }
+
   @override
   List<Object?> get props => [
         teamId,
@@ -61,5 +84,7 @@ class TeamSearchResult extends Equatable {
         city,
         isVerified,
         distanceKm,
+        foundedYear,
+        teamType,
       ];
 }

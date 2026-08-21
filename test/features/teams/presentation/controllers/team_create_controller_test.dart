@@ -91,6 +91,14 @@ void main() {
           secondaryColor: any(named: 'secondaryColor'),
           tagline: any(named: 'tagline'),
           logoMonogram: any(named: 'logoMonogram'),
+          label: any(named: 'label'),
+          district: any(named: 'district'),
+          province: any(named: 'province'),
+          postcode: any(named: 'postcode'),
+          placeId: any(named: 'placeId'),
+          latitude: any(named: 'latitude'),
+          longitude: any(named: 'longitude'),
+          countryCode: any(named: 'countryCode'),
         )).thenAnswer((_) async => Right(team));
 
     final container = makeContainer();
@@ -116,6 +124,14 @@ void main() {
           secondaryColor: any(named: 'secondaryColor'),
           tagline: any(named: 'tagline'),
           logoMonogram: any(named: 'logoMonogram'),
+          label: any(named: 'label'),
+          district: any(named: 'district'),
+          province: any(named: 'province'),
+          postcode: any(named: 'postcode'),
+          placeId: any(named: 'placeId'),
+          latitude: any(named: 'latitude'),
+          longitude: any(named: 'longitude'),
+          countryCode: any(named: 'countryCode'),
         )).called(1);
     verify(() => store.clear(any())).called(1);
   });

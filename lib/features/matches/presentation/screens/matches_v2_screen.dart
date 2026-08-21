@@ -998,7 +998,9 @@ class _BrowseBody extends StatelessWidget {
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
-                          context.push('/matches/pool');
+                          // Pool is a sibling bottom-nav tab now — switch to
+                          // it rather than pushing a copy over this one.
+                          context.go('/pool');
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 9),

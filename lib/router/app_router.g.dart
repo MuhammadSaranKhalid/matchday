@@ -15,7 +15,8 @@ part of 'app_router.dart';
 /// the user accordingly.
 ///
 /// Authenticated users land in the five-tab shell (Home · Search · Matches ·
-/// Messages · Pavilion — D9 in docs/search-feature-design.md) via a
+/// Pool · Profile — D9 in docs/search-feature-design.md, amended 2026-08-21
+/// when Pool replaced Pavilion in the bar) via a
 /// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
 /// profile is a root-level route reached from the header avatar.
 /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
@@ -31,7 +32,8 @@ final appRouterProvider = AppRouterProvider._();
 /// the user accordingly.
 ///
 /// Authenticated users land in the five-tab shell (Home · Search · Matches ·
-/// Messages · Pavilion — D9 in docs/search-feature-design.md) via a
+/// Pool · Profile — D9 in docs/search-feature-design.md, amended 2026-08-21
+/// when Pool replaced Pavilion in the bar) via a
 /// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
 /// profile is a root-level route reached from the header avatar.
 /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
@@ -47,7 +49,8 @@ final class AppRouterProvider
   /// the user accordingly.
   ///
   /// Authenticated users land in the five-tab shell (Home · Search · Matches ·
-  /// Messages · Pavilion — D9 in docs/search-feature-design.md) via a
+  /// Pool · Profile — D9 in docs/search-feature-design.md, amended 2026-08-21
+  /// when Pool replaced Pavilion in the bar) via a
   /// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
   /// profile is a root-level route reached from the header avatar.
   /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
@@ -85,4 +88,4 @@ final class AppRouterProvider
   }
 }
 
-String _$appRouterHash() => r'c8a83a867d82e7c2d0a80a0c6c5c8e0e0e1aeada';
+String _$appRouterHash() => r'667814d319fee0c7d5ef7c2493f1444488e9fa0b';

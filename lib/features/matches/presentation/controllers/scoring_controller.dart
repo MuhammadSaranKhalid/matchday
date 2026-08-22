@@ -14,6 +14,7 @@ import '../../domain/entities/match_innings_state.dart';
 import '../../domain/entities/match_player.dart';
 import '../../domain/scoring/scoring_adapter.dart';
 import '../../domain/scoring/scoring_engine.dart';
+import '../../domain/scoring/scoring_parity.dart';
 import '../../domain/scoring/scoring_rules.dart';
 import '../../domain/scoring/scoring_types.dart';
 import '../providers/matches_providers.dart';
@@ -83,7 +84,10 @@ class ScoringController extends _$ScoringController {
     );
     final canScore = canScoreResult.fold((f) => false, (c) => c);
 
-    final pendingCount = await repo.pendingOpsCount();
+    final pendingCount = await repo.pendingOpsCount(
+      matchId: MatchId(matchId),
+      inningsNumber: inningsNumber,
+    );
 
     // Trigger background sync on reconnect or app resume
     ref.listen<AsyncValue<bool>>(isOnlineProvider, (prev, next) {
@@ -97,6 +101,13 @@ class ScoringController extends _$ScoringController {
         unawaited(drainOutbox());
       }
     });
+
+    // Kick the queue once on open, rather than waiting for a reconnect or a
+    // resume. A device that scored through an outage arrives here holding
+    // deliveries that were never accepted; without this the scorer has to
+    // background the app to get them moving, and any that can never be
+    // accepted sit in the log forever, inflating the unsaved count.
+    unawaited(drainOutbox());
 
     return ScoringState(
       match: match,
@@ -124,7 +135,6 @@ class ScoringController extends _$ScoringController {
           batsmanId: s.innings?.strikerId?.value,
           nonStrikerId: s.innings?.nonStrikerId?.value,
           bowlerId: s.innings?.bowlerId?.value,
-          expectedVersion: s.innings?.version,
         ),
       );
 
@@ -146,7 +156,6 @@ class ScoringController extends _$ScoringController {
         batsmanId: s.innings?.strikerId?.value,
         nonStrikerId: s.innings?.nonStrikerId?.value,
         bowlerId: s.innings?.bowlerId?.value,
-        expectedVersion: s.innings?.version,
       ),
     );
   }
@@ -173,11 +182,10 @@ class ScoringController extends _$ScoringController {
           nonStrikerId: s.innings?.nonStrikerId?.value,
           bowlerId: s.innings?.bowlerId?.value,
           fielderId: fielderMatchPlayerId,
-          expectedVersion: s.innings?.version,
         ),
       );
 
-  /// Undo the last delivery.
+  /// Undo the last delivery — one step back, never further.
   Future<Either<Failure, Unit>> undoLastBall() async {
     final current = state.value;
     if (current == null || current.balls.isEmpty) {
@@ -186,34 +194,84 @@ class ScoringController extends _$ScoringController {
 
     return _busy(
       'undo',
-      () => _enqueueWrite(
-        () async {
-          final result = await ref.read(matchesRepositoryProvider).undoLastBall(
-                matchId: current.match.id,
-                inningsNumber: inningsNumber,
-              );
-          return result.fold(
-            (failure) => Left(failure),
-            (_) async {
-              final repo = ref.read(matchesRepositoryProvider);
-              final inningsResult = await repo.getMatchInningsState(
-                matchId: current.match.id,
-                inningsNumber: inningsNumber,
-              );
-              final ballsResult = await repo.listBalls(
-                current.match.id,
-                inningsNumber,
-              );
-              _update((st) => st.copyWith(
-                    innings: inningsResult.fold((_) => st.innings, (s) => s),
-                    balls: ballsResult.fold((_) => st.balls, (b) => b),
-                  ));
-              return const Right(unit);
-            },
-          );
-        },
-      ),
+      () => _enqueueWrite(() async {
+        // The last painted delivery is either still provisional — in which
+        // case its op id is embedded in the local ball id — or a row the
+        // server already holds. Only this side knows which.
+        final lastId = current.balls.last.id.value;
+        const localPrefix = 'local:';
+        final pendingOpId = lastId.startsWith(localPrefix)
+            ? lastId.substring(localPrefix.length)
+            : null;
+
+        final result = await ref.read(matchesRepositoryProvider).undoLastBall(
+              matchId: current.match.id,
+              inningsNumber: inningsNumber,
+              pendingOpId: pendingOpId,
+            );
+
+        final failure = result.getLeft().toNullable();
+        if (failure != null) return Left(failure);
+
+        final outcome = result.getRight().toNullable()!;
+        switch (outcome.kind) {
+          case UndoKind.discardedPending:
+            // The delivery never left the device, so this is purely local.
+            // Re-reading the ball list from the server here would erase every
+            // OTHER unsent delivery — the server has not seen any of them.
+            _undoPending(outcome.opId!);
+          case UndoKind.removedStored:
+            await _resyncFromServer();
+          case UndoKind.nothing:
+            break;
+        }
+        return const Right(unit);
+      }),
     );
+  }
+
+  /// Roll one queued delivery back out of the local projection.
+  ///
+  /// The trio is restored from the delivery being removed — every ball records
+  /// who was on strike and who was bowling when it was bowled, so undoing ball
+  /// N means putting back exactly what ball N stored. The totals are recounted
+  /// from what remains rather than subtracted, for the same reason the server
+  /// does it that way: there is no reversal arithmetic to get wrong.
+  void _undoPending(String opId) {
+    final localId = BallId('local:$opId');
+    _update((st) {
+      final removed = st.balls.where((b) => b.id == localId).firstOrNull;
+      final remaining = [
+        for (final b in st.balls)
+          if (b.id != localId) b,
+      ];
+      return st.copyWith(
+        balls: remaining,
+        pendingCount: (st.pendingCount - 1).clamp(0, 1 << 30),
+        innings: removed == null
+            ? st.innings
+            : st.innings?.copyWith(
+                legalBallCount:
+                    remaining.where((b) => b.isLegalDelivery).length,
+                totalRuns:
+                    remaining.fold<int>(0, (sum, b) => sum + b.totalRuns),
+                totalWickets: remaining.where((b) => b.isWicket).length,
+                strikerId: removed.batsmanId == null
+                    ? null
+                    : MatchPlayerId(removed.batsmanId!),
+                clearStriker: removed.batsmanId == null,
+                nonStrikerId: removed.nonStrikerId == null
+                    ? null
+                    : MatchPlayerId(removed.nonStrikerId!),
+                clearNonStriker: removed.nonStrikerId == null,
+                bowlerId: removed.bowlerId == null
+                    ? null
+                    : MatchPlayerId(removed.bowlerId!),
+                clearBowler: removed.bowlerId == null,
+              ),
+      );
+    });
+    _predictions.remove(opId);
   }
 
   // ── On-field changes ─────────────────────────────────────────────────────
@@ -241,6 +299,13 @@ class ScoringController extends _$ScoringController {
     if (striker.isEmpty || nonStriker.isEmpty) {
       return Future.value(const Left(ValidationFailure(
         'Both openers must be set before choosing a bowler.',
+      )));
+    }
+    if (s.lastOverBowlerId != null &&
+        bowlerMatchPlayerId == s.lastOverBowlerId &&
+        s.legalBalls % s.ballsPerOver == 0) {
+      return Future.value(const Left(ValidationFailure(
+        'A bowler cannot bowl two consecutive overs.',
       )));
     }
     return _setTrio(
@@ -334,15 +399,27 @@ class ScoringController extends _$ScoringController {
         ValidationFailure('Choose a bowler before recording a delivery.'),
       );
     }
+    // A wicket clears whichever end the dismissed batter was at. Recording a
+    // delivery before it is refilled credits it to nobody: a real innings
+    // reached 182/5 through four consecutive wickets and then logged a single
+    // with the non-striker's end empty. The pad now gates on this too; this is
+    // the backstop for every other route into a write.
+    if (!s.battersSet) {
+      return const Left(
+        ValidationFailure('Choose the next batter before recording a delivery.'),
+      );
+    }
 
     final rawDraft = build(s);
     final opId = _uuid.v4();
-    final draft = rawDraft.copyWith(opId: opId);
 
-    final input = engineInputFrom(draft);
+    final input = engineInputFrom(rawDraft);
     final format = engineFormatFrom(s.match.format);
 
-    // Predict state synchronously for instant 60fps UI
+    // The engine runs HERE and only here. This is not a prediction the server
+    // will check — the server has no engine (design doc D10). It is the answer,
+    // computed on the one device that can compute it during a signal gap, and
+    // the server stores it.
     final predicted = applyBall(
       engineStateFrom(s.innings),
       format,
@@ -362,11 +439,35 @@ class ScoringController extends _$ScoringController {
       ));
     }
 
+    final ball = predicted.ball!;
+    final next = predicted.newState!;
+    final events = predicted.events!;
+
+    // Everything the server needs and cannot work out for itself: where the
+    // delivery sat in the over, who is on strike now, and whether the innings
+    // is over. `opId` travels as the idempotency key so a retry after a
+    // dropped connection cannot record the delivery twice.
+    final draft = rawDraft.copyWith(
+      opId: opId,
+      computed: ComputedDelivery(
+        overNumber: ball.overNumber,
+        ballInOver: ball.ballInOver,
+        isFreeHit: ball.isFreeHit,
+        inningsEnded: events.inningsEnded,
+        isAllOut: events.allOut,
+        ballsPerOver: format.ballsPerOver,
+        strikerAfter: next.strikerId,
+        nonStrikerAfter: next.nonStrikerId,
+        bowlerAfter: next.bowlerId,
+        isBowlerCredited: creditedToBowler(ball.wicketType),
+      ),
+    );
+
     // Paint immediately on screen
-    final provisional = _provisionalBall(s, predicted.ball!, opId);
+    final provisional = _provisionalBall(s, ball, opId);
     _predictions[opId] = (predicted: predicted, input: input, format: format);
     _update((st) => st.copyWith(
-          innings: _projectInnings(st.innings, predicted.newState!),
+          innings: _projectInnings(st.innings, next),
           balls: [...st.balls, provisional],
           pendingCount: st.pendingCount + 1,
         ));
@@ -397,29 +498,41 @@ class ScoringController extends _$ScoringController {
       case ValidationFailure():
       case NotFoundFailure():
         _removeProvisional(opId);
-        final repo = ref.read(matchesRepositoryProvider);
-        final inningsResult = await repo.getMatchInningsState(
-          matchId: MatchId(matchId),
-          inningsNumber: inningsNumber,
-        );
-        final ballsResult = await repo.listBalls(
-          MatchId(matchId),
-          inningsNumber,
-        );
-        _update((st) => st.copyWith(
-              innings: inningsResult.fold((_) => st.innings, (s) => s),
-              balls: ballsResult.fold((_) => st.balls, (b) => b),
-            ));
+        await _resyncFromServer();
         break;
       case ConflictFailure():
-        CkLog.warn(CkLogChannel.matchStart, 'scoring·conflict', data: {
+        // A 409 no longer means "another scorer beat you" — the optimistic
+        // version lock is gone, because the batting side owns its innings
+        // outright (D12). It now means the innings is not open for writing:
+        // never started, or the match already closed. Neither is retryable,
+        // and leaving the delivery painted would show the scorer a ball that
+        // will never be recorded.
+        CkLog.warn(CkLogChannel.matchStart, 'scoring·refused', data: {
           'msg': f.message,
         });
+        _removeProvisional(opId);
+        await _resyncFromServer();
         break;
       default:
         // Offline / deferred: remains queued in Data Layer WAL
         break;
     }
+  }
+
+  /// Replace the local innings and ball log with the server's, after a write
+  /// was refused. The delivery is gone; showing the scorer anything other than
+  /// what was actually recorded is worse than showing them less.
+  Future<void> _resyncFromServer() async {
+    final repo = ref.read(matchesRepositoryProvider);
+    final inningsResult = await repo.getMatchInningsState(
+      matchId: MatchId(matchId),
+      inningsNumber: inningsNumber,
+    );
+    final ballsResult = await repo.listBalls(MatchId(matchId), inningsNumber);
+    _update((st) => st.copyWith(
+          innings: inningsResult.fold((_) => st.innings, (s) => s),
+          balls: ballsResult.fold((_) => st.balls, (b) => b),
+        ));
   }
 
   Ball _provisionalBall(ScoringState s, ComputedBall c, String opId) => Ball(
@@ -468,18 +581,64 @@ class ScoringController extends _$ScoringController {
       );
 
   void _settle({required String opId, required BallOutcome outcome}) {
-    _predictions.remove(opId);
+    final pred = _predictions.remove(opId);
+    if (pred != null && pred.predicted.ball != null && pred.predicted.newState != null) {
+      final parity = compareParity(
+        predictedBall: pred.predicted.ball!,
+        predictedState: pred.predicted.newState!,
+        actualBall: outcome.ball,
+        actualInnings: outcome.innings,
+      );
+      if (!parity.agrees) {
+        CkLog.warn(
+          CkLogChannel.rpc,
+          'parity·divergence',
+          data: {
+            'opId': opId,
+            'summary': parity.summary,
+          },
+        );
+      }
+    }
+
     final localId = BallId('local:$opId');
 
-    _update((st) => st.copyWith(
-          innings: outcome.innings,
-          pendingCount: (st.pendingCount - 1).clamp(0, 1 << 30),
-          balls: [
-            for (final b in st.balls)
-              if (b.id != localId && b.seq != outcome.ball.seq) b,
-            outcome.ball,
-          ]..sort((a, b) => a.seq.compareTo(b.seq)),
-        ));
+    _update((st) {
+      final remaining = (st.pendingCount - 1).clamp(0, 1 << 30);
+
+      // ── Do NOT rewind the innings while deliveries are still owed ────────
+      //
+      // `outcome.innings` is the server's row as of THIS delivery. When the
+      // scorer has already tapped further balls, the local count has moved
+      // past it, and adopting it wholesale drags the innings backwards.
+      //
+      // That produced duplicate ball numbers in a single over — 8.1, 8.2,
+      // 8.3, 8.4, 8.2, 8.3, 8.4 — because `over_number` and `ball_in_over`
+      // are derived from `legalBallCount` at tap time. Rewinding the count
+      // made the next tap recompute a position that had already been used.
+      // The delivery COUNT stayed correct throughout, which is why the score
+      // looked right while the over fell apart.
+      //
+      // The device owns the arithmetic (design doc D10), so the server's row
+      // is a confirmation, never a correction. Adopt it only once the queue
+      // has drained — at that point it reflects every delivery the device has
+      // and the two agree, so taking it costs nothing and refreshes `version`.
+      final caughtUp = remaining == 0;
+
+      return st.copyWith(
+        innings: caughtUp ? (outcome.innings ?? st.innings) : st.innings,
+        pendingCount: remaining,
+        balls: [
+          // Match on the provisional's own id ONLY. Matching on `seq` too
+          // used to discard a DIFFERENT delivery that was still pending:
+          // provisional seqs are local guesses, so they collide with the
+          // real ones the server hands back.
+          for (final b in st.balls)
+            if (b.id != localId) b,
+          outcome.ball,
+        ]..sort((a, b) => a.seq.compareTo(b.seq)),
+      );
+    });
   }
 
   void _removeProvisional(String opId) {

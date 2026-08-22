@@ -150,9 +150,19 @@ class AppDatabase extends _$AppDatabase {
   /// "is anything about to be thrown away?" BEFORE that happens. Discarding a
   /// scorer's unsent overs without telling them would be the worst possible
   /// way for this feature to fail.
-  Future<int> pendingScoringOps() async {
+  Future<int> pendingScoringOps({
+    String? matchId,
+    int? inningsNumber,
+  }) async {
     final rows = await (select(scoringOps)
-          ..where((t) => t.syncedAt.isNull()))
+          ..where((t) {
+            var w = t.syncedAt.isNull();
+            if (matchId != null) w = w & t.matchId.equals(matchId);
+            if (inningsNumber != null) {
+              w = w & t.inningsNumber.equals(inningsNumber);
+            }
+            return w;
+          }))
         .get();
     return rows.length;
   }

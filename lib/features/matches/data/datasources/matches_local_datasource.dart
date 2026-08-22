@@ -51,7 +51,15 @@ abstract class MatchesLocalDataSource {
     required int inningsNumber,
   });
 
-  Future<int> pendingOpsCount();
+  /// Unsent ops for ONE innings.
+  ///
+  /// Scoped deliberately. A device-wide count means a single op that will never
+  /// drain — a delivery the server refused months ago in another match — makes
+  /// every future innings look permanently unsaved, which disables undo forever.
+  Future<int> pendingOpsCount({
+    required String matchId,
+    required int inningsNumber,
+  });
 
   Future<void> markOpSynced(String opId);
 
@@ -141,7 +149,11 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
   }
 
   @override
-  Future<int> pendingOpsCount() => _db.pendingScoringOps();
+  Future<int> pendingOpsCount({
+    required String matchId,
+    required int inningsNumber,
+  }) =>
+      _db.pendingScoringOps(matchId: matchId, inningsNumber: inningsNumber);
 
   @override
   Future<void> markOpSynced(String opId) =>

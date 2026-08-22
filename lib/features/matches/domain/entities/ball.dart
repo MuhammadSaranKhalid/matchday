@@ -149,6 +149,60 @@ enum WicketType {
   }
 }
 
+/// What the device's scoring engine computed for one delivery.
+///
+/// The server stores every one of these values **as given** — it does not
+/// recompute them (see docs/offline-scoring-design.md D10). That is not
+/// laziness: the device has to compute an innings unaided while it has no
+/// signal, so it is the only thing that can be authoritative about the
+/// arithmetic, and a second implementation on the server could only agree or
+/// silently disagree.
+///
+/// Lives in this file rather than importing the engine's own types because
+/// `scoring_types.dart` imports *this* file for [BallKind] — the other
+/// direction would be a cycle.
+class ComputedDelivery {
+  const ComputedDelivery({
+    required this.overNumber,
+    required this.ballInOver,
+    required this.isFreeHit,
+    required this.inningsEnded,
+    required this.isAllOut,
+    required this.ballsPerOver,
+    this.strikerAfter,
+    this.nonStrikerAfter,
+    this.bowlerAfter,
+    this.isBowlerCredited = false,
+  });
+
+  /// Over this delivery belongs to, and its position within the over —
+  /// 1-based for legal deliveries, 0 for wides and no-balls.
+  final int overNumber;
+  final int ballInOver;
+
+  /// Whether THIS delivery was bowled as a free hit.
+  final bool isFreeHit;
+
+  /// The engine says this delivery ended the innings. The server decides what
+  /// that means for the match — a device may never render a result (§19.4).
+  final bool inningsEnded;
+
+  final bool isAllOut;
+
+  /// Needed only to place the fall-of-wicket in overs notation.
+  final int ballsPerOver;
+
+  /// The on-field trio AFTER this delivery: strike rotation applied, the
+  /// dismissed batter cleared, and the bowler cleared if the over ended.
+  /// Null means the slot is vacant and someone must be chosen.
+  final String? strikerAfter;
+  final String? nonStrikerAfter;
+  final String? bowlerAfter;
+
+  /// Whether the wicket (if any) is credited to the bowler.
+  final bool isBowlerCredited;
+}
+
 /// Input payload for the `record_ball` RPC. Built by [RecordBall] use case
 /// from a tap on the scoring keypad + any sheet selections (wicket type,
 /// fielder, etc.). Lives in the entity layer so the use case + repo can
@@ -170,7 +224,7 @@ class BallDraft {
     this.bowlerId,
     this.fielderId,
     this.commentary,
-    this.expectedVersion,
+    this.computed,
   });
 
   final String? opId;
@@ -193,11 +247,14 @@ class BallDraft {
   final String? fielderId;
   final String? commentary;
 
-  /// Optimistic-lock guard. When set, the [record_ball] RPC will reject
-  /// the call (40001) if `match_innings_state.version` has advanced
-  /// since the client read it — protecting against two scorers
-  /// committing the same delivery. Pass NULL in single-scorer flows.
-  final int? expectedVersion;
+  /// What the local engine made of this delivery. Set by the controller after
+  /// `applyBall` and sent with the write; the server stores it verbatim.
+  ///
+  /// Replaces the old `expectedVersion` optimistic lock, which is gone: the
+  /// batting side owns its innings outright (D12), so there is no second writer
+  /// to race. Gating on it caused a real bug — a scorer tapping a second ball
+  /// before the first reply landed sent a stale version and lost the delivery.
+  final ComputedDelivery? computed;
 
   BallDraft copyWith({
     String? opId,
@@ -215,7 +272,7 @@ class BallDraft {
     String? bowlerId,
     String? fielderId,
     String? commentary,
-    int? expectedVersion,
+    ComputedDelivery? computed,
   }) =>
       BallDraft(
         opId: opId ?? this.opId,
@@ -233,8 +290,46 @@ class BallDraft {
         bowlerId: bowlerId ?? this.bowlerId,
         fielderId: fielderId ?? this.fielderId,
         commentary: commentary ?? this.commentary,
-        expectedVersion: expectedVersion ?? this.expectedVersion,
+        computed: computed ?? this.computed,
       );
+}
+
+/// Which of undo's two paths was taken.
+enum UndoKind {
+  /// The delivery had never reached the server — the queued write was thrown
+  /// away and the server was not contacted.
+  discardedPending,
+
+  /// The stored delivery was removed on the server.
+  removedStored,
+
+  /// There was nothing to undo.
+  nothing,
+}
+
+/// What an undo actually did.
+///
+/// The caller MUST distinguish these. Discarding a queued write leaves the
+/// server untouched — it never saw that delivery — so re-reading the ball list
+/// from the server afterwards would erase every OTHER unsent delivery still
+/// waiting in the queue. Undo used to re-read unconditionally.
+class UndoOutcome extends Equatable {
+  const UndoOutcome.discardedPending(String this.opId)
+      : kind = UndoKind.discardedPending;
+  const UndoOutcome.removedStored()
+      : kind = UndoKind.removedStored,
+        opId = null;
+  const UndoOutcome.nothing()
+      : kind = UndoKind.nothing,
+        opId = null;
+
+  final UndoKind kind;
+
+  /// The discarded op, so the caller can drop exactly that painted delivery.
+  final String? opId;
+
+  @override
+  List<Object?> get props => [kind, opId];
 }
 
 /// What the server produced from one recorded delivery: the persisted ball,

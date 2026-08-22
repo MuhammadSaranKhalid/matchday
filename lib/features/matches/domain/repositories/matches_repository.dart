@@ -5,10 +5,13 @@ import '../entities/ball.dart';
 import '../entities/format_preset.dart';
 import '../entities/innings_summary.dart';
 import '../entities/match.dart';
+import '../entities/match_batsman_stats.dart';
+import '../entities/match_bowler_stats.dart';
 import '../entities/match_innings_state.dart';
 import '../entities/match_player.dart';
 import '../entities/match_pool_application.dart';
 import '../entities/match_request.dart';
+import '../entities/match_wicket.dart';
 
 /// Online-only matches contract. Reads/writes hit Supabase directly; no
 /// local mirror. The deployed schema has NO innings table — innings are
@@ -218,9 +221,18 @@ abstract class MatchesRepository {
   /// Delete the last delivery in (matchId, inningsNumber). The server-side
   /// RPC reverses any state changes the delivery caused. Returns true when
   /// a row was removed.
-  Future<Either<Failure, bool>> undoLastBall({
+  /// Undo the last delivery — one step back, never further.
+  ///
+  /// [pendingOpId] is the op id of the last delivery IF it is still unsent.
+  /// The caller supplies it because only the caller knows what is actually on
+  /// screen: the write-ahead log can hold ops that correspond to nothing
+  /// visible — deliveries the server refused, left behind by an older build —
+  /// and picking the newest of those would undo something the scorer cannot
+  /// see, while the delivery they meant to remove stayed put.
+  Future<Either<Failure, UndoOutcome>> undoLastBall({
     required MatchId matchId,
     required int inningsNumber,
+    String? pendingOpId,
   });
 
   /// One-shot list of deliveries for (match, innings), oldest-first.
@@ -255,5 +267,34 @@ abstract class MatchesRepository {
   });
 
   /// Total count of pending offline scoring operations across all matches.
-  Future<int> pendingOpsCount();
+  Future<int> pendingOpsCount({
+    required MatchId matchId,
+    required int inningsNumber,
+  });
+
+  // ─── Materialized Scorecards & Wickets ──────────────────────────────────
+
+  Future<Either<Failure, List<MatchBatsmanStats>>> getBatsmanStats(
+    String inningsId,
+  );
+
+  Future<Either<Failure, List<MatchBowlerStats>>> getBowlerStats(
+    String inningsId,
+  );
+
+  Future<Either<Failure, List<MatchWicket>>> getWickets(
+    String inningsId,
+  );
+
+  // ─── Scorer Lease ───────────────────────────────────────────────────────
+
+  Future<Either<Failure, Map<String, dynamic>>> acquireScorerLease({
+    required MatchId matchId,
+    required String deviceId,
+  });
+
+  Future<Either<Failure, Map<String, dynamic>>> heartbeatScorerLease({
+    required MatchId matchId,
+    required String deviceId,
+  });
 }

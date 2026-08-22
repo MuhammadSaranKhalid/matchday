@@ -115,6 +115,8 @@ Deno.serve(async (req) => {
       select m.*
         from matches m
        where m.created_by = ${actor}
+          or m.team_a_captain = ${actor}
+          or m.team_b_captain = ${actor}
           or exists (
             select 1 from team_members tm
              where tm.team_id in (m.team_a_id, m.team_b_id)
@@ -126,9 +128,9 @@ Deno.serve(async (req) => {
                and (t.owner_id = ${actor} or ${actor} = any(t.managers))
           )
           or exists (
-            select 1 from match_officials mo
-             where mo.match_id = m.match_id
-               and mo.user_id = ${actor}
+            select 1 from match_players mp
+             where mp.match_id = m.match_id
+               and mp.user_id = ${actor}
           )
        order by m.created_at desc`;
     return reply(200, { matches: rows });

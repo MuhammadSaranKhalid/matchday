@@ -1,768 +1,833 @@
 -- =============================================================================
--- 0400 · matches
+-- 0400 · matches — Canonical Match Domain & Robust Scoring Engine Schema
 -- =============================================================================
--- Spec §4.3, §4.4, §4.11, §3.8. Feature 4 (Match Lifecycle).
+-- Spec: docs/matches-schema-architecture.md
 --
--- A match is the unit of play: scheduled → toss → live → completed. Three
--- match_type values:
---   tournament   — must reference a tournaments row (FK enforced via CHECK)
---   friendly     — open friendly match between two teams (no tournament)
---   practice     — same as friendly but tagged for filtering / stats decay
---
--- Polymorphic team refs:
---   team_a_id / team_b_id are nullable so knockout rounds beyond R1 can be
---   pre-created with empty slots and filled in by the after-match-complete
---   trigger (0420) when feeder matches finish. round-robin / friendly always
---   has both teams set.
---
--- Bracket linkage (knockout):
---   bracket_round_number  1..N where N = total rounds (Final = N).
---   bracket_match_number  1-indexed position within the round.
---   prev_match_a_id /     point at the two feeder matches whose winners flow
---   prev_match_b_id       in here.
---
--- Toss / captains:
---   toss_won_by + toss_decision flip together (CHECK constraint).
---   team_a_captain / team_b_captain stay on this table as plain profile FKs
---   so toss-time auth (`_is_match_captain` in 0623) works before any
---   match_players rows exist. Squad selection, keepers, scorers, and
---   live state live in:
---     * match_players       (0405) — per-match XI, polymorphic profile/unclaimed
---     * match_officials     (0407) — per-match scorers / umpires / referee
---     * match_innings_state (0409) — per-innings live trio + denormalised totals
---
--- Scoring mode (§4.6):
---   live_ball_by_ball — scorer enters every delivery (drives 0410 balls).
---   post_match_scorecard — final result is jsonb-blob via submit_match_result.
---
--- _can_score_match:
---   Authorisation predicate shared by balls RLS and the scoring RPCs. This
---   file declares a STUB that only knows about tournament organisers and
---   friendly/practice creators. 0407 (match_officials) does a CREATE OR
---   REPLACE that extends it with the per-match scorer check. This keeps
---   matches.sql free of forward references to a table that doesn't exist
---   yet at this point in the migration order.
---
--- This file owns the table, RLS, and the fixture-generation RPCs for the
--- two formats currently supported (round-robin / league / knockout). Result
--- handling + standings recompute live in 0420.
+-- This is the single, canonical schema for:
+--   • Fixtures & tournament containers (matches, match_teams)
+--   • Polymorphic lineups (match_players)
+--   • Innings & live hot state (match_innings, match_innings_state)
+--   • Event ledger & dismissals (match_deliveries, match_wickets)
+--   • Materialized scorecards (match_batsman_stats, match_bowler_stats)
+--   • Scorer leases & concurrency guards (match_scorer_leases)
+--   • Triggers for atomic state reduction, strike rotation, & lifecycle
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- Match-only enums.
+-- 1. Domain Enums & Types
 -- -----------------------------------------------------------------------------
-create type public.match_type   as enum ('tournament', 'friendly', 'practice');
-create type public.match_status as enum (
-  'scheduled',
-  'toss',
-  'live',
-  'innings_break',
-  'super_over',
-  'completed',
-  'abandoned',
-  'rescheduled',
-  'walkover'
-);
-create type public.toss_decision as enum ('bat', 'bowl');
-create type public.scoring_mode as enum (
-  'live_ball_by_ball',
-  'post_match_scorecard'
+do $$ begin
+  create type public.match_format as enum (
+    't20', 'odi', 'test', 'the_hundred', 'custom_limited', 'pairs'
+  );
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.match_type as enum (
+    'friendly', 'tournament', 'practice', 'league'
+  );
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.match_status as enum (
+    'scheduled', 'toss', 'live', 'innings_break', 'super_over', 
+    'completed', 'abandoned', 'tied', 'no_result', 'walkover'
+  );
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.toss_decision as enum ('bat', 'bowl');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.match_stage as enum (
+    'group', 'quarter_final', 'semi_final', 'final', 'playoff'
+  );
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.match_start_phase as enum (
+    'toss', 'lineup', 'ready', 'live'
+  );
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.scoring_mode as enum (
+    'live_ball_by_ball', 'post_match_scorecard'
+  );
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.delivery_kind as enum (
+    'legal', 'wide', 'no_ball', 'bye', 'leg_bye', 'penalty'
+  );
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.wicket_kind as enum (
+    'bowled', 'caught', 'caught_and_bowled', 'lbw', 'run_out', 
+    'stumped', 'hit_wicket', 'retired_hurt', 'retired_out', 
+    'obstructing_the_field', 'timed_out', 'handled_the_ball'
+  );
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.match_role as enum (
+    'captain', 'vice_captain', 'wicket_keeper', 'player', 'substitute'
+  );
+exception when duplicate_object then null;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- 2. Clean Drop of Legacy Objects (Clean Slate Initialization)
+-- -----------------------------------------------------------------------------
+drop view if exists public.balls cascade;
+drop view if exists public.format_presets cascade;
+drop table if exists public.match_result_history cascade;
+drop table if exists public.match_scorer_leases cascade;
+drop table if exists public.match_bowler_stats cascade;
+drop table if exists public.match_batsman_stats cascade;
+drop table if exists public.match_wickets cascade;
+drop table if exists public.match_deliveries cascade;
+drop table if exists public.match_innings_state cascade;
+drop table if exists public.match_innings cascade;
+drop table if exists public.match_players cascade;
+drop table if exists public.match_teams cascade;
+drop table if exists public.match_format_presets cascade;
+drop table if exists public.matches cascade;
+
+-- -----------------------------------------------------------------------------
+-- 3. Format Catalog
+-- -----------------------------------------------------------------------------
+create table public.match_format_presets (
+  preset_id             uuid primary key default gen_random_uuid(),
+  name                  text not null unique,
+  match_format          public.match_format not null default 't20',
+  description           text,
+  rules_config          jsonb not null default '{}'::jsonb,
+  is_active             boolean not null default true,
+  created_at            timestamptz not null default now()
 );
 
--- Pre-Live sub-state machine for the MatchStartScreen stepper. Forward-only;
--- enforced by a trigger declared after the matches table below. `status`
--- stays the cricket-domain lifecycle; `start_phase` is the UI sub-state
--- between "request accepted" and "first ball bowled".
-create type public.match_start_phase as enum (
-  'toss',     -- waiting on / mid-toss
-  'lineup',   -- toss done; batting captain picking openers
-  'ready',    -- openers locked; waiting for Start
-  'live'      -- mirrors status='live'
-);
+create or replace view public.format_presets as
+  select * from public.match_format_presets;
 
 -- -----------------------------------------------------------------------------
--- matches table.
+-- 4. Matches & Team Slots
 -- -----------------------------------------------------------------------------
 create table public.matches (
-  match_id              uuid primary key default gen_random_uuid(),
-  tournament_id         uuid references public.tournaments(tournament_id) on delete cascade,
-  match_type            public.match_type not null default 'friendly',
+  match_id               uuid primary key default gen_random_uuid(),
+  tournament_id          uuid references public.tournaments(tournament_id) on delete set null,
+  match_type             public.match_type not null default 'friendly',
+  match_format           public.match_format not null default 't20',
+  stage                  public.match_stage,
+  
+  -- Tournament Bracket & Feeder Linkage
+  round                  text,
+  bracket_round_number   integer check (bracket_round_number is null or bracket_round_number >= 1),
+  bracket_match_number   integer check (bracket_match_number is null or bracket_match_number >= 1),
+  prev_match_a_id        uuid references public.matches(match_id) on delete set null,
+  prev_match_b_id        uuid references public.matches(match_id) on delete set null,
+  group_id               text,
 
-  -- Free-text round label ("QF1", "SF1", "Final", "Group A · R1").
-  round                 text,
-  bracket_round_number  integer
-                          check (bracket_round_number is null
-                                 or bracket_round_number >= 1),
-  bracket_match_number  integer
-                          check (bracket_match_number is null
-                                 or bracket_match_number >= 1),
-  -- For pre-created later rounds — winners flow in via the after-complete
-  -- trigger declared in 0420.
-  prev_match_a_id       uuid references public.matches(match_id) on delete set null,
-  prev_match_b_id       uuid references public.matches(match_id) on delete set null,
-  group_id              text,
+  -- Scheduling, Geo & Venue
+  venue                  text not null default 'Ground 1',
+  ground_coordinates     point,
+  scheduled_start_time   timestamptz not null default now(),
+  actual_start_time      timestamptz,
+  completed_at           timestamptz,
+  end_time               timestamptz,
 
-  -- Knockout seeding (§3.8.1). Null for round-robin.
-  seed_a                integer,
-  seed_b                integer,
+  -- Format & Rules Contract
+  rules_config           jsonb not null default '{
+    "max_overs": 20,
+    "max_overs_per_bowler": 4,
+    "balls_per_over": 6,
+    "wide_runs": 1,
+    "noball_runs": 1,
+    "free_hit": true,
+    "super_over_enabled": true,
+    "dls_enabled": true
+  }'::jsonb,
+  format                 jsonb not null default '{}'::jsonb, -- alias for rules_config
 
+  -- Toss Information
+  toss_won_by            uuid references public.teams(team_id) on delete set null,
+  toss_decision          public.toss_decision,
+  toss_face              char(1) check (toss_face is null or toss_face in ('H', 'T')),
+  toss_recorded_at       timestamptz,
+
+  -- Stepper Phase & Scoring Mode
+  start_phase            public.match_start_phase not null default 'toss',
+  openers_submitted_by   uuid references public.profiles(user_id) on delete set null,
+  openers_submitted_at   timestamptz,
+  scoring_mode           public.scoring_mode not null default 'live_ball_by_ball',
+
+  -- Match Lifecycle Status
+  status                 public.match_status not null default 'scheduled',
+  
+  -- Result Snapshot
+  result                 jsonb,
+  result_summary         jsonb,
+  player_of_the_match_id uuid,
+  man_of_the_match       uuid,
+
+  -- Team References
   team_a_id             uuid references public.teams(team_id) on delete set null,
   team_b_id             uuid references public.teams(team_id) on delete set null,
-  -- Captains stay on matches as plain profile FKs so the toss-time auth check
-  -- (_is_match_captain in 0623) works before any match_players rows exist.
-  -- Squads, keepers, scorers, and live state all live on match_players /
-  -- match_officials / match_innings_state (0405, 0407, 0409).
   team_a_captain        uuid references public.profiles(user_id) on delete set null,
   team_b_captain        uuid references public.profiles(user_id) on delete set null,
 
-  -- Per-match override of tournament defaults; falls back to the parent
-  -- tournament's `format` jsonb when null/empty.
-  format                jsonb not null default '{}'::jsonb,
-  venue                 text,
+  created_by             uuid references public.profiles(user_id) on delete set null,
+  created_at             timestamptz not null default now(),
+  updated_at             timestamptz not null default now()
+);
 
-  scheduled_start_time  timestamptz,
-  actual_start_time     timestamptz,
-  end_time              timestamptz,
+create table public.match_teams (
+  match_id               uuid not null references public.matches(match_id) on delete cascade,
+  team_id                uuid references public.teams(team_id) on delete set null,
+  team_name              text not null,
+  team_side              text not null check (team_side in ('team_a', 'team_b')),
+  is_batting_first       boolean,
+  captain_player_id      uuid,
+  keeper_player_id       uuid,
+  created_at             timestamptz not null default now(),
+  primary key (match_id, team_side)
+);
 
-  toss_won_by           uuid references public.teams(team_id) on delete set null,
-  toss_decision         public.toss_decision,
-  -- Coin face recorded on the host phone — UX recap only; non-load-bearing.
-  toss_face             char(1) check (toss_face is null or toss_face in ('H', 'T')),
+-- -----------------------------------------------------------------------------
+-- 4. Lineup Boundary (match_players)
+-- -----------------------------------------------------------------------------
+create table public.match_players (
+  match_player_id        uuid primary key default gen_random_uuid(),
+  match_id               uuid not null references public.matches(match_id) on delete cascade,
+  team_side              text not null check (team_side in ('team_a', 'team_b')),
+  
+  user_id                uuid references public.profiles(user_id) on delete set null,
+  unclaimed_id           uuid references public.unclaimed_players(unclaimed_id) on delete set null,
+  
+  display_name           text not null,
+  jersey_number          smallint check (jersey_number is null or (jersey_number between 0 and 99)),
+  role                   public.match_role not null default 'player',
+  is_in_playing_xi       boolean not null default true,
+  batting_order          smallint check (batting_order is null or (batting_order between 1 and 15)),
 
-  -- MatchStart stepper sub-state. New matches default to 'toss'; forward-only
-  -- trigger below prevents flipping back to earlier phases.
-  start_phase           public.match_start_phase not null default 'toss',
-  openers_submitted_by  uuid references public.profiles(user_id) on delete set null,
-  openers_submitted_at  timestamptz,
+  created_at             timestamptz not null default now(),
 
-  scoring_mode          public.scoring_mode not null default 'live_ball_by_ball',
-
-  status                public.match_status not null default 'scheduled',
-  result                jsonb,                       -- §4.10 result jsonb
-  -- man_of_the_match references match_players(match_player_id) so an
-  -- unclaimed local-club player can win MOTM. The FK constraint is added
-  -- by 0405_match_players.sql (after that table exists).
-  man_of_the_match      uuid,
-
-  -- created_by is nullable + ON DELETE SET NULL so a self-service account
-  -- deletion (delete_user RPC in 0700) anonymises the creator without
-  -- orphaning historical matches — the /m/<id> spectator URL keeps
-  -- working after the creator deletes their account.
-  created_by            uuid
-                            references public.profiles(user_id) on delete set null,
-  created_at            timestamptz not null default now(),
-  updated_at            timestamptz not null default now(),
-
-  -- Tournament matches must have a tournament_id; friendly/practice must not.
-  constraint matches_type_consistency check (
-    (match_type = 'tournament' and tournament_id is not null)
-    or (match_type in ('friendly', 'practice') and tournament_id is null)
+  constraint chk_match_player_identity check (
+    (user_id is not null and unclaimed_id is null) or 
+    (user_id is null and unclaimed_id is not null)
   ),
-  constraint matches_toss_consistency check (
-    (toss_won_by is null and toss_decision is null)
-    or (toss_won_by is not null and toss_decision is not null)
-  ),
-  -- A team can't play itself (when both are set).
-  constraint matches_distinct_teams check (
-    team_a_id is null or team_b_id is null or team_a_id <> team_b_id
+  unique(match_id, user_id),
+  unique(match_id, unclaimed_id)
+);
+
+-- -----------------------------------------------------------------------------
+-- 5. Innings & Live Hot State
+-- -----------------------------------------------------------------------------
+create table public.match_innings (
+  innings_id             uuid primary key default gen_random_uuid(),
+  match_id               uuid not null references public.matches(match_id) on delete cascade,
+  innings_number         smallint not null check (innings_number between 1 and 4),
+  batting_team_side      text not null check (batting_team_side in ('team_a', 'team_b')),
+  bowling_team_side      text not null check (bowling_team_side in ('team_a', 'team_b')),
+  
+  overs_allocated        numeric(4,1) not null default 20.0,
+  target_runs            integer check (target_runs is null or target_runs > 0),
+  
+  is_declared            boolean not null default false,
+  is_all_out             boolean not null default false,
+  is_completed           boolean not null default false,
+  
+  start_time             timestamptz default now(),
+  end_time               timestamptz,
+  updated_at             timestamptz not null default now(),
+
+  unique(match_id, innings_number)
+);
+
+create table public.match_innings_state (
+  innings_id             uuid primary key references public.match_innings(innings_id) on delete cascade,
+  match_id               uuid not null references public.matches(match_id) on delete cascade,
+  innings_number         smallint not null default 1 check (innings_number between 1 and 4),
+  
+  striker_id             uuid references public.match_players(match_player_id) on delete restrict,
+  non_striker_id         uuid references public.match_players(match_player_id) on delete restrict,
+  bowler_id              uuid references public.match_players(match_player_id) on delete restrict,
+  
+  total_runs             integer not null default 0 check (total_runs >= 0),
+  total_wickets          smallint not null default 0 check (total_wickets between 0 and 11),
+  legal_ball_count       integer not null default 0 check (legal_ball_count >= 0),
+  
+  total_wides            integer not null default 0 check (total_wides >= 0),
+  total_no_balls         integer not null default 0 check (total_no_balls >= 0),
+  total_byes             integer not null default 0 check (total_byes >= 0),
+  total_leg_byes         integer not null default 0 check (total_leg_byes >= 0),
+  total_penalties        integer not null default 0 check (total_penalties >= 0),
+
+  -- Aggregate of the five breakdown columns above. Generated rather than
+  -- maintained separately so it can never drift from its parts. record-ball
+  -- reads it into the engine's InningsState, and MatchInningsStateDto reads it
+  -- off `returning *` — without it the client's extras column is always 0 and
+  -- the parity oracle diverges on every extra.
+  total_extras           integer not null generated always as (
+                           total_wides + total_no_balls + total_byes
+                           + total_leg_byes + total_penalties
+                         ) stored,
+
+  is_declared            boolean not null default false,
+  is_all_out             boolean not null default false,
+  target                 integer check (target is null or target > 0),
+
+  is_free_hit_next       boolean not null default false,
+  version                bigint not null default 0,
+  updated_at             timestamptz not null default now(),
+
+  constraint chk_state_distinct_batters check (
+    striker_id is null or non_striker_id is null or striker_id <> non_striker_id
   )
 );
 
 -- -----------------------------------------------------------------------------
--- Indexes
+-- 6. Deliveries & Dismissals Ledger
 -- -----------------------------------------------------------------------------
-create index matches_tournament       on public.matches (tournament_id) where tournament_id is not null;
-create index matches_team_a           on public.matches (team_a_id) where team_a_id is not null;
-create index matches_team_b           on public.matches (team_b_id) where team_b_id is not null;
-create index matches_status           on public.matches (status);
-create index matches_scheduled        on public.matches (scheduled_start_time);
-create index matches_tournament_round on public.matches (tournament_id, bracket_round_number, bracket_match_number)
-  where tournament_id is not null;
+create table public.match_deliveries (
+  delivery_id            uuid primary key default gen_random_uuid(),
+  innings_id             uuid not null references public.match_innings(innings_id) on delete cascade,
+  match_id               uuid not null references public.matches(match_id) on delete cascade,
+  innings_number         integer not null default 1 check (innings_number between 1 and 4),
 
-create trigger matches_set_updated_at
-  before update on public.matches
-  for each row execute function public.set_updated_at();
+  seq                    integer not null check (seq >= 1),
+  over_number            integer not null check (over_number >= 0),
+  ball_in_over           smallint not null check (ball_in_over between 0 and 6),
+  is_legal_delivery      boolean not null,
+  delivery_type          public.delivery_kind not null default 'legal',
+  ball_type              text not null default 'legal',
+
+  runs_off_bat           smallint not null default 0 check (runs_off_bat between 0 and 7),
+  runs_scored            smallint not null default 0 check (runs_scored between 0 and 7),
+  extra_runs             smallint not null default 0 check (extra_runs between 0 and 10),
+  extras                 smallint not null default 0 check (extras between 0 and 10),
+  total_runs             smallint not null generated always as (runs_off_bat + extra_runs) stored,
+  
+  is_boundary            boolean not null default false,
+  is_four                boolean not null default false,
+  is_six                 boolean not null default false,
+  is_free_hit            boolean not null default false,
+  is_wicket              boolean not null default false,
+  wicket_type            public.wicket_kind,
+
+  striker_id             uuid references public.match_players(match_player_id) on delete restrict,
+  non_striker_id         uuid references public.match_players(match_player_id) on delete restrict,
+  bowler_id              uuid references public.match_players(match_player_id) on delete restrict,
+  batsman_id             uuid references public.match_players(match_player_id) on delete restrict,
+  fielder_id             uuid references public.match_players(match_player_id) on delete set null,
+
+  pitch_x                numeric(5,2),
+  pitch_y                numeric(5,2),
+  shot_angle             numeric(5,2),
+  shot_distance          numeric(5,2),
+  shot_type              text,
+
+  idempotency_key        text not null default gen_random_uuid()::text,
+  is_undone              boolean not null default false,
+  commentary             text,
+  recorded_by            uuid references public.profiles(user_id) on delete set null,
+  created_by             uuid references public.profiles(user_id) on delete set null,
+  recorded_at            timestamptz not null default now(),
+  created_at             timestamptz not null default now(),
+
+  unique (innings_id, seq),
+  unique (innings_id, idempotency_key)
+);
+
+create or replace view public.balls as
+  select * from public.match_deliveries;
+
+create table public.match_wickets (
+  wicket_id              uuid primary key default gen_random_uuid(),
+  delivery_id            uuid not null unique references public.match_deliveries(delivery_id) on delete cascade,
+  innings_id             uuid not null references public.match_innings(innings_id) on delete cascade,
+  
+  player_out_id          uuid not null references public.match_players(match_player_id) on delete restrict,
+  dismissal_kind         public.wicket_kind not null,
+  
+  is_bowler_credited     boolean not null default true,
+  credited_bowler_id     uuid references public.match_players(match_player_id) on delete restrict,
+  
+  primary_fielder_id     uuid references public.match_players(match_player_id) on delete set null,
+  assisted_fielder_id    uuid references public.match_players(match_player_id) on delete set null,
+  
+  fall_of_wicket_score   integer not null,
+  fall_of_wicket_number  smallint not null check (fall_of_wicket_number between 1 and 11),
+  fall_of_wicket_overs   numeric(4,1) not null,
+
+  created_at             timestamptz not null default now()
+);
 
 -- -----------------------------------------------------------------------------
--- Forward-only enforcement on start_phase (toss → lineup → ready → live).
--- Without this, a buggy client or a stale RPC call could flip a live match
--- back to 'toss' and re-render the start stepper, hiding the scoring screen.
+-- 7. Materialized Scorecards & Scorer Leases
 -- -----------------------------------------------------------------------------
-create or replace function public._enforce_start_phase_forward()
-returns trigger
-language plpgsql
-set search_path = public, pg_temp
+create table public.match_batsman_stats (
+  innings_id             uuid not null references public.match_innings(innings_id) on delete cascade,
+  player_id              uuid not null references public.match_players(match_player_id) on delete cascade,
+  batting_position       smallint,
+  
+  runs                   integer not null default 0 check (runs >= 0),
+  balls_faced            integer not null default 0 check (balls_faced >= 0),
+  dots                   integer not null default 0 check (dots >= 0),
+  fours                  integer not null default 0 check (fours >= 0),
+  sixes                  integer not null default 0 check (sixes >= 0),
+  singles                integer not null default 0 check (singles >= 0),
+  doubles                integer not null default 0 check (doubles >= 0),
+  triples                integer not null default 0 check (triples >= 0),
+  
+  is_out                 boolean not null default false,
+  dismissal_text         text,
+  minutes_batted         integer,
+
+  primary key (innings_id, player_id)
+);
+
+create table public.match_bowler_stats (
+  innings_id             uuid not null references public.match_innings(innings_id) on delete cascade,
+  player_id              uuid not null references public.match_players(match_player_id) on delete cascade,
+  bowling_position       smallint,
+  
+  legal_balls_bowled     integer not null default 0 check (legal_balls_bowled >= 0),
+  maidens                smallint not null default 0 check (maidens >= 0),
+  runs_conceded          integer not null default 0 check (runs_conceded >= 0),
+  wickets                smallint not null default 0 check (wickets >= 0),
+  wides_conceded         integer not null default 0 check (wides_conceded >= 0),
+  no_balls_conceded      integer not null default 0 check (no_balls_conceded >= 0),
+  dot_balls_bowled       integer not null default 0 check (dot_balls_bowled >= 0),
+
+  primary key (innings_id, player_id)
+);
+
+create table public.match_scorer_leases (
+  match_id               uuid primary key references public.matches(match_id) on delete cascade,
+  active_scorer_id       uuid not null references public.profiles(user_id) on delete cascade,
+  device_id              text not null,
+  lease_acquired_at      timestamptz not null default now(),
+  lease_expires_at       timestamptz not null default (now() + interval '5 minutes'),
+  heartbeat_at           timestamptz not null default now()
+);
+
+create table public.match_result_history (
+  history_id             uuid primary key default gen_random_uuid(),
+  match_id               uuid not null references public.matches(match_id) on delete cascade,
+  previous_status        public.match_status not null,
+  new_status             public.match_status not null,
+  result_payload         jsonb not null,
+  reason                 text,
+  recorded_by            uuid references public.profiles(user_id) on delete set null,
+  recorded_at            timestamptz not null default now()
+);
+
+-- -----------------------------------------------------------------------------
+-- 8. Core Functions & Triggers
+-- -----------------------------------------------------------------------------
+
+-- Helper Predicates
+create or replace function public._can_score_match(p_match_id uuid)
+returns boolean
+language sql
+security definer
+stable
 as $$
-declare
-  v_old_rank int;
-  v_new_rank int;
-begin
-  if new.start_phase = old.start_phase then
-    return new;
-  end if;
-  v_old_rank := case old.start_phase
-    when 'toss'   then 1
-    when 'lineup' then 2
-    when 'ready'  then 3
-    when 'live'   then 4
-  end;
-  v_new_rank := case new.start_phase
-    when 'toss'   then 1
-    when 'lineup' then 2
-    when 'ready'  then 3
-    when 'live'   then 4
-  end;
-  if v_new_rank < v_old_rank then
-    raise exception 'start_phase is forward-only (% → %)',
-      old.start_phase, new.start_phase
-      using errcode = '23000';
-  end if;
-  return new;
-end;
+  select exists (
+    select 1 from public.matches m
+    where m.match_id = p_match_id
+      and (
+        m.created_by = auth.uid()
+        or m.team_a_captain = auth.uid()
+        or m.team_b_captain = auth.uid()
+        or exists (
+          select 1 from public.teams t
+          where (t.team_id = m.team_a_id or t.team_id = m.team_b_id)
+            and t.owner_id = auth.uid()
+        )
+        or exists (
+          select 1 from public.team_members tm
+          where tm.user_id = auth.uid()
+            and tm.role in ('captain', 'vice_captain')
+            and tm.status = 'active'
+            and (tm.team_id = m.team_a_id or tm.team_id = m.team_b_id)
+        )
+      )
+  );
 $$;
 
-create trigger matches_start_phase_forward_only
-  before update of start_phase on public.matches
-  for each row execute function public._enforce_start_phase_forward();
+create or replace function public._is_match_captain(p_match_id uuid)
+returns boolean
+language sql
+security definer
+stable
+as $$
+  select exists (
+    select 1 from public.matches m
+    where m.match_id = p_match_id
+      and (
+        m.created_by = auth.uid()
+        or m.team_a_captain = auth.uid()
+        or m.team_b_captain = auth.uid()
+      )
+  );
+$$;
 
 -- -----------------------------------------------------------------------------
--- tournament_approved_teams — helper used by every fixture generator.
--- Returns approved teams ordered by seed_number then registration time so
--- seeding is deterministic.
+-- 8b. Who may score which innings  (design doc D12)
 -- -----------------------------------------------------------------------------
-create or replace function public.tournament_approved_teams(p_tournament_id uuid)
-returns table(team_id uuid)
+-- The BATTING side scores its own innings; control passes at the innings break.
+-- Odd innings belong to whoever batted first (derived from the toss), even
+-- innings to the other side. Tournament organisers and the creator of a
+-- practice match may score either side.
+--
+-- record-ball calls this as its writer check. It takes the innings number
+-- precisely so it can answer "may you score THIS innings" rather than the
+-- weaker "may you score this match" — that distinction is the whole of the
+-- single-writer property the local-first design rests on.
+create or replace function public._can_score_innings(
+  p_match_id uuid,
+  p_innings_number integer default 1
+)
+returns boolean
 language sql
+security definer
 stable
 set search_path = public, pg_temp
 as $$
-  select tt.team_id
-    from public.tournament_teams tt
-   where tt.tournament_id = p_tournament_id
-     and tt.status = 'approved'
-   order by tt.seed_number nulls last, tt.registered_at;
-$$;
-
--- -----------------------------------------------------------------------------
--- Round-label helper (used by knockout generator).
--- -----------------------------------------------------------------------------
-create or replace function public._knockout_round_label(
-  p_round integer,
-  p_total integer
-) returns text
-language sql
-immutable
-set search_path = public, pg_temp
-as $$
-  select case
-    when p_round = p_total then 'Final'
-    when p_round = p_total - 1 then 'SF'
-    when p_round = p_total - 2 then 'QF'
-    when p_round = p_total - 3 then 'R16'
-    when p_round = p_total - 4 then 'R32'
-    else 'R' || p_round
-  end;
-$$;
-
--- =============================================================================
--- Round-robin fixture generator (§3.8.2 circle method).
--- Each team plays every other once → n*(n-1)/2 matches. p_double=true does
--- the home/away mirror (league format §3.8.3).
--- =============================================================================
-create or replace function public.generate_round_robin_fixtures(
-  p_tournament_id uuid,
-  p_double boolean default false
-)
-returns integer
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_uid             uuid := auth.uid();
-  v_start_date      date;
-  v_team_ids        uuid[];
-  v_n               integer;
-  v_padded          uuid[];
-  v_matches_created integer := 0;
-  v_round           integer;
-  v_pair_idx        integer;
-  v_a               uuid;
-  v_b               uuid;
-  v_rotated         uuid[];
-  v_round_count     integer;
-  v_pass            integer;
-  v_label           text;
-  v_scheduled       timestamptz;
-begin
-  if v_uid is null then
-    raise exception 'Not authenticated' using errcode = '28000';
-  end if;
-  if not public.is_tournament_organizer(p_tournament_id) then
-    raise exception 'Only tournament organizers can generate fixtures'
-      using errcode = '42501';
-  end if;
-
-  -- Refuse to overwrite a tournament that's already started.
-  if exists (
-    select 1 from public.matches
-     where tournament_id = p_tournament_id
-       and status not in ('scheduled', 'rescheduled')
-  ) then
-    raise exception 'Cannot regenerate — tournament has matches in progress'
-      using errcode = '23000';
-  end if;
-
-  delete from public.matches
-   where tournament_id = p_tournament_id
-     and status in ('scheduled', 'rescheduled');
-
-  select start_date into v_start_date from public.tournaments
-   where tournament_id = p_tournament_id;
-
-  select array_agg(team_id)
-    into v_team_ids
-    from public.tournament_approved_teams(p_tournament_id);
-
-  v_n := coalesce(array_length(v_team_ids, 1), 0);
-  if v_n < 2 then
-    raise exception 'Need at least 2 approved teams (have %)', v_n
-      using errcode = 'P0001';
-  end if;
-
-  -- Pad to even with sentinel NULL for byes.
-  v_padded := v_team_ids;
-  if v_n % 2 = 1 then
-    v_padded := v_padded || array[null::uuid];
-  end if;
-  v_round_count := array_length(v_padded, 1) - 1;
-
-  for v_pass in 1..(case when p_double then 2 else 1 end) loop
-    v_padded := v_team_ids;
-    if v_n % 2 = 1 then
-      v_padded := v_padded || array[null::uuid];
-    end if;
-
-    for v_round in 1..v_round_count loop
-      v_label := case
-        when p_double and v_pass = 2 then 'R' || v_round || ' (return)'
-        else 'R' || v_round
-      end;
-      v_scheduled := case
-        when v_start_date is null then null
-        else (v_start_date + ((v_round - 1) + (v_pass - 1) * v_round_count))::timestamptz
-      end;
-
-      for v_pair_idx in 0..(array_length(v_padded, 1) / 2 - 1) loop
-        v_a := v_padded[v_pair_idx + 1];
-        v_b := v_padded[array_length(v_padded, 1) - v_pair_idx];
-        if v_a is not null and v_b is not null then
-          insert into public.matches (
-            tournament_id, match_type, round, team_a_id, team_b_id,
-            scheduled_start_time, status, created_by
-          )
-          values (
-            p_tournament_id,
-            'tournament',
-            v_label,
-            case when p_double and v_pass = 2 then v_b else v_a end,
-            case when p_double and v_pass = 2 then v_a else v_b end,
-            v_scheduled,
-            'scheduled',
-            v_uid
-          );
-          v_matches_created := v_matches_created + 1;
-        end if;
-      end loop;
-
-      -- Rotate: keep first team fixed, move last to position 2.
-      v_rotated := array[v_padded[1]]
-                || array[v_padded[array_length(v_padded, 1)]]
-                || v_padded[2 : array_length(v_padded, 1) - 1];
-      v_padded := v_rotated;
-    end loop;
-  end loop;
-
-  perform public.recalculate_standings(p_tournament_id);
-  return v_matches_created;
-end;
-$$;
-
-revoke all on function public.generate_round_robin_fixtures(uuid, boolean) from public;
-grant execute on function public.generate_round_robin_fixtures(uuid, boolean) to authenticated;
-
--- =============================================================================
--- Knockout fixture generator (§3.8.1).
--- Bracket size B = next power of 2 ≥ N teams; B − N teams get byes in R1.
--- All bracket positions pre-created — R2..Final start with NULL teams +
--- prev_match links so the bracket UI renders the full ladder up front.
--- =============================================================================
-create or replace function public.generate_knockout_fixtures(
-  p_tournament_id uuid
-)
-returns integer
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_uid              uuid := auth.uid();
-  v_start_date       date;
-  v_team_ids         uuid[];
-  v_n                integer;
-  v_bracket_size     integer;
-  v_byes             integer;
-  v_total_rounds     integer;
-  v_rd               integer;
-  v_match_in_round   integer;
-  v_match_count      integer;
-  v_match_id         uuid;
-  v_team_a           uuid;
-  v_team_b           uuid;
-  v_seed_a           integer;
-  v_seed_b           integer;
-  v_round_label      text;
-  v_match_ids        uuid[];
-  v_prev_a           uuid;
-  v_prev_b           uuid;
-  v_inserted         integer := 0;
-  v_round_offset     integer := 0;
-  v_scheduled        timestamptz;
-  v_round_team_count integer;
-begin
-  if v_uid is null then
-    raise exception 'Not authenticated' using errcode = '28000';
-  end if;
-  if not public.is_tournament_organizer(p_tournament_id) then
-    raise exception 'Only tournament organizers can generate fixtures'
-      using errcode = '42501';
-  end if;
-
-  if exists (
-    select 1 from public.matches
-     where tournament_id = p_tournament_id
-       and status not in ('scheduled', 'rescheduled')
-  ) then
-    raise exception 'Cannot regenerate — tournament has matches in progress'
-      using errcode = '23000';
-  end if;
-
-  delete from public.matches
-   where tournament_id = p_tournament_id
-     and status in ('scheduled', 'rescheduled');
-
-  select start_date into v_start_date from public.tournaments
-   where tournament_id = p_tournament_id;
-
-  select array_agg(team_id)
-    into v_team_ids
-    from public.tournament_approved_teams(p_tournament_id);
-
-  v_n := coalesce(array_length(v_team_ids, 1), 0);
-  if v_n < 2 then
-    raise exception 'Need at least 2 approved teams (have %)', v_n
-      using errcode = 'P0001';
-  end if;
-
-  v_bracket_size := 2;
-  while v_bracket_size < v_n loop
-    v_bracket_size := v_bracket_size * 2;
-  end loop;
-  v_byes         := v_bracket_size - v_n;
-  v_total_rounds := round(ln(v_bracket_size) / ln(2))::integer;
-
-  -- Pre-allocate id slots: [round][match]. Insert top-down so we can fill
-  -- prev_match links before inserting downstream rows.
-  v_match_ids := array_fill(null::uuid, array[v_total_rounds, v_bracket_size / 2]);
-
-  for v_rd in 1..v_total_rounds loop
-    v_round_team_count := v_bracket_size / (2 ^ (v_rd - 1))::integer;
-    v_match_count      := v_round_team_count / 2;
-    v_round_label      := public._knockout_round_label(v_rd, v_total_rounds);
-    v_scheduled        := case
-      when v_start_date is null then null
-      else (v_start_date + (v_rd - 1))::timestamptz
-    end;
-
-    for v_match_in_round in 1..v_match_count loop
-      v_team_a := null;  v_team_b := null;
-      v_seed_a := null;  v_seed_b := null;
-      v_prev_a := null;  v_prev_b := null;
-
-      if v_rd = 1 then
-        -- Standard high-vs-low pairing on seeds 1..bracket_size, with the
-        -- top `v_byes` seeds receiving byes (no R1 match — they show up
-        -- pre-placed in R2 via the bye-resolution branch below).
-        v_seed_a := v_match_in_round;
-        v_seed_b := v_bracket_size - v_match_in_round + 1;
-        if v_seed_a > v_byes then
-          v_team_a := v_team_ids[v_seed_a - v_byes];
-        end if;
-        if v_seed_b > v_byes then
-          v_team_b := v_team_ids[v_seed_b - v_byes];
-        end if;
-        if v_team_a is null and v_team_b is null then
-          continue;
-        end if;
-        if v_team_a is not null and v_team_b is null then
-          continue;
-        end if;
-        if v_team_b is not null and v_team_a is null then
-          continue;
-        end if;
-      else
-        v_prev_a := v_match_ids[v_rd - 1][2 * v_match_in_round - 1];
-        v_prev_b := v_match_ids[v_rd - 1][2 * v_match_in_round];
-
-        -- Bye resolution — when a R(r-1) feeder slot is null, the team with
-        -- the original seed advances directly into R(r).
-        if v_rd = 2 then
-          if v_prev_a is null then
-            v_team_a := v_team_ids[(2 * v_match_in_round - 1) - v_byes];
-          end if;
-          if v_prev_b is null then
-            v_team_b := v_team_ids[(2 * v_match_in_round) - v_byes];
-          end if;
-        end if;
-      end if;
-
-      v_match_id := gen_random_uuid();
-      v_match_ids[v_rd][v_match_in_round] := v_match_id;
-
-      insert into public.matches (
-        match_id, tournament_id, match_type, round,
-        bracket_round_number, bracket_match_number,
-        prev_match_a_id, prev_match_b_id,
-        seed_a, seed_b, team_a_id, team_b_id,
-        scheduled_start_time, status, created_by
+  with m as (
+    select * from public.matches where match_id = p_match_id
+  ),
+  sides as (
+    select
+      m.*,
+      -- The team batting first: the toss winner if they chose to bat,
+      -- otherwise the other team. Falls back to team_a before the toss.
+      case
+        when m.toss_won_by is null or m.toss_decision is null then m.team_a_id
+        when m.toss_decision = 'bat' then m.toss_won_by
+        when m.toss_won_by = m.team_a_id then m.team_b_id
+        else m.team_a_id
+      end as bats_first
+    from m
+  ),
+  batting as (
+    select
+      sides.*,
+      case
+        when p_innings_number % 2 = 1 then sides.bats_first
+        when sides.bats_first = sides.team_a_id then sides.team_b_id
+        else sides.team_a_id
+      end as batting_team_id
+    from sides
+  )
+  select exists (
+    select 1 from batting b
+    where
+      -- Practice matches have no opposition to hand over to.
+      (b.match_type = 'practice' and b.created_by = auth.uid())
+      -- The captain of the batting side.
+      or (b.batting_team_id = b.team_a_id and b.team_a_captain = auth.uid())
+      or (b.batting_team_id = b.team_b_id and b.team_b_captain = auth.uid())
+      -- Whoever owns the batting team.
+      or exists (
+        select 1 from public.teams t
+        where t.team_id = b.batting_team_id
+          and t.owner_id = auth.uid()
       )
-      values (
-        v_match_id, p_tournament_id, 'tournament', v_round_label,
-        v_rd, v_match_in_round,
-        v_prev_a, v_prev_b,
-        v_seed_a, v_seed_b, v_team_a, v_team_b,
-        v_scheduled, 'scheduled', v_uid
-      );
-      v_inserted := v_inserted + 1;
-    end loop;
-    v_round_offset := v_round_offset + 1;
-  end loop;
-
-  perform public.recalculate_standings(p_tournament_id);
-  return v_inserted;
-end;
+      -- A captain / vice-captain on the batting team's roster.
+      or exists (
+        select 1 from public.team_members tm
+        where tm.team_id = b.batting_team_id
+          and tm.user_id = auth.uid()
+          and tm.role in ('captain', 'vice_captain')
+          and tm.status = 'active'
+      )
+  );
 $$;
 
-revoke all on function public.generate_knockout_fixtures(uuid) from public;
-grant execute on function public.generate_knockout_fixtures(uuid) to authenticated;
+revoke all on function public._can_score_innings(uuid, integer) from public;
+grant execute on function public._can_score_innings(uuid, integer) to authenticated, service_role;
 
--- =============================================================================
--- Dispatcher — pick the generator from the tournament's type. UI calls this.
--- =============================================================================
-create or replace function public.generate_tournament_fixtures(p_tournament_id uuid)
-returns integer
-language plpgsql
+-- can_score_innings is the client-facing gate. It MUST delegate to the same
+-- predicate record-ball enforces — two definitions of "may you score" is how
+-- the UI and the write path drifted apart last time.
+create or replace function public.can_score_innings(
+  p_match_id uuid,
+  p_innings_number integer default 1
+)
+returns boolean
+language sql
 security definer
+stable
 set search_path = public, pg_temp
 as $$
-declare
-  v_type public.tournament_type;
-begin
-  select tournament_type into v_type
-    from public.tournaments
-   where tournament_id = p_tournament_id;
-  if v_type is null then
-    raise exception 'Tournament not found' using errcode = 'P0002';
-  end if;
-
-  case v_type
-    when 'knockout'    then return public.generate_knockout_fixtures(p_tournament_id);
-    when 'round_robin' then return public.generate_round_robin_fixtures(p_tournament_id, false);
-    when 'league'      then return public.generate_round_robin_fixtures(p_tournament_id, true);
-    else
-      -- group_knockout / double_elimination = v1.1+ (spec §3.2).
-      raise exception 'Format % not yet supported', v_type using errcode = '0A000';
-  end case;
-end;
+  select public._can_score_innings(p_match_id, p_innings_number);
 $$;
 
-revoke all on function public.generate_tournament_fixtures(uuid) from public;
-grant execute on function public.generate_tournament_fixtures(uuid) to authenticated;
+-- -----------------------------------------------------------------------------
+-- 8c. NO SCORING TRIGGER.  (design doc D10 · CLAUDE.md exemption 2)
+-- -----------------------------------------------------------------------------
+-- `fn_process_delivery` used to live here: it reduced each inserted delivery
+-- into match_innings_state — running totals, strike rotation, over completion,
+-- free-hit derivation — and upserted the materialised batting/bowling cards.
+--
+-- It is GONE, deliberately. The rules of cricket now live in exactly one place,
+-- the Dart engine on the scoring device, because that device has to compute an
+-- innings unaided while it has no signal. A second implementation here could
+-- only ever agree or silently disagree, and it did the latter: it rotated
+-- strike on `runs_off_bat % 2` (so runs run off a no-ball never changed ends),
+-- hardcoded a six-ball over, never incremented `total_wickets`, and never
+-- cleared `bowler_id` at the end of an over.
+--
+-- record-ball now writes match_innings_state itself: aggregate columns are
+-- SUMMED from match_deliveries (D13 — derive, never accumulate, which is what
+-- makes undo "delete the last row and re-total"), and the on-field trio comes
+-- from the engine that computed the delivery.
+--
+-- 🟥 DO NOT reintroduce scoring arithmetic in SQL. If a scorecard number looks
+-- wrong, the fix belongs in the Dart engine and its vectors.
+--
+-- Consequence to be aware of: match_batsman_stats and match_bowler_stats are no
+-- longer populated by anything. Scorecards are derived from the delivery ledger
+-- on the client (see scoring_rules.dart). Those two tables are retained but
+-- empty pending a decision to drop them or to back them with views.
 
--- =============================================================================
--- reschedule_match (§3.8.6) — constrained UPDATE for schedule + venue.
--- Full match editing happens via the scoring screens once W6 lands.
--- =============================================================================
-create or replace function public.reschedule_match(
+-- -----------------------------------------------------------------------------
+-- 9. Match Lifecycle RPCs
+-- -----------------------------------------------------------------------------
+
+create or replace function public.record_match_toss(
   p_match_id uuid,
-  p_scheduled_start_time timestamptz default null,
-  p_venue text default null
+  p_won_by uuid,
+  p_decision public.toss_decision,
+  p_face char default null
 )
 returns void
 language plpgsql
 security definer
-set search_path = public, pg_temp
 as $$
-declare
-  v_uid           uuid := auth.uid();
-  v_tournament_id uuid;
-  v_status        public.match_status;
 begin
-  if v_uid is null then
-    raise exception 'Not authenticated' using errcode = '28000';
-  end if;
-  select tournament_id, status
-    into v_tournament_id, v_status
-    from public.matches
-   where match_id = p_match_id
-   for update;
-  if v_tournament_id is null then
-    raise exception 'Match not found or not in a tournament' using errcode = '42501';
-  end if;
-  if not public.is_tournament_organizer(v_tournament_id) then
-    raise exception 'Only tournament organizers can reschedule' using errcode = '42501';
-  end if;
-  if v_status not in ('scheduled', 'rescheduled') then
-    raise exception 'Cannot reschedule a match in status %', v_status using errcode = '23000';
+  if not public._is_match_captain(p_match_id) then
+    raise exception 'Only team captains can record the toss' using errcode = '42501';
   end if;
 
   update public.matches
-     set scheduled_start_time = coalesce(p_scheduled_start_time, scheduled_start_time),
-         venue                = coalesce(p_venue, venue),
-         status               = 'rescheduled'
-   where match_id = p_match_id;
+  set
+    toss_won_by = p_won_by,
+    toss_decision = p_decision,
+    toss_face = p_face,
+    toss_recorded_at = now(),
+    start_phase = 'lineup',
+    status = 'toss',
+    updated_at = now()
+  where match_id = p_match_id;
 end;
 $$;
 
-revoke all on function public.reschedule_match(uuid, timestamptz, text) from public;
-grant execute on function public.reschedule_match(uuid, timestamptz, text) to authenticated;
-
--- =============================================================================
--- _can_score_match — auth shared by every scoring RPC and balls RLS.
---
--- STUB version: only the tournament-organiser and friendly/practice-creator
--- branches. The per-match scorer branch is added by 0407_match_officials.sql
--- (CREATE OR REPLACE), which can reference the match_officials table once
--- it exists. Splitting the definition this way avoids forward references
--- here and keeps the predicate in one logical place across files.
--- =============================================================================
-create or replace function public._can_score_match(p_match_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public, pg_temp
-as $$
-  select exists (
-    select 1 from public.matches m
-     where m.match_id = p_match_id
-       and (
-         (m.tournament_id is not null
-           and public.is_tournament_organizer(m.tournament_id))
-         or (m.match_type in ('friendly', 'practice')
-             and m.created_by = (select auth.uid()))
-       )
-  );
-$$;
-
-revoke all on function public._can_score_match(uuid) from public;
-grant execute on function public._can_score_match(uuid) to authenticated;
-
--- start_innings is declared by 0409_match_innings_state.sql (it inserts /
--- upserts a match_innings_state row, which doesn't exist at this point in
--- the migration order).
-
--- -----------------------------------------------------------------------------
--- RLS (§4.11) — public read; organizers + assigned scorers write tournament
--- matches; created_by writes friendlies / practice.
--- -----------------------------------------------------------------------------
-alter table public.matches enable row level security;
-
-create policy "matches_read_public"
-  on public.matches for select
-  using (true);
-
-create policy "matches_insert_organizer_or_creator"
-  on public.matches for insert
-  to authenticated
-  with check (
-    (select auth.uid()) = created_by
-    and (
-      (match_type = 'tournament' and tournament_id is not null
-        and public.is_tournament_organizer(tournament_id))
-      or (match_type in ('friendly', 'practice'))
-    )
-  );
-
--- Pre-Live edits only — schedule changes, squad picks, captain assignments,
--- the toss, start-phase advancement. Once the match goes Live (or beyond)
--- the only valid mutation path is the SECURITY DEFINER RPC family
--- (record_ball, undo_last_ball, submit_match_result, start_innings) which
--- bypass this policy. Closing direct UPDATE on live rows prevents any
--- assigned scorer or stale client from bypassing the strike-rotation /
--- bowler-clearing / wicket logic baked into record_ball.
-create policy "matches_update_pre_live"
-  on public.matches for update
-  to authenticated
-  using (
-    status in ('scheduled', 'rescheduled', 'toss')
-    and public._can_score_match(match_id)
-  )
-  with check (
-    status in ('scheduled', 'rescheduled', 'toss', 'live')
-    and public._can_score_match(match_id)
-  );
-
-create policy "matches_delete_organizer"
-  on public.matches for delete
-  to authenticated
-  using (
-    (tournament_id is not null and public.is_tournament_organizer(tournament_id))
-    or (match_type in ('friendly', 'practice') and (select auth.uid()) = created_by)
-  );
-
--- =============================================================================
--- Realtime — Broadcast on scoreboard-facing state changes.
--- =============================================================================
--- Topic: match:<match_id>:state
--- Event: 'match_state_updated'
--- WHEN clause filters out updates that don't affect the scoreboard
--- (description, scheduled_at, etc.) so routine edits don't fan out.
--- =============================================================================
-create or replace function public.broadcast_match_state()
-returns trigger
+create or replace function public.submit_match_openers(
+  p_match_id uuid,
+  p_striker_id uuid,
+  p_non_striker_id uuid
+)
+returns void
 language plpgsql
 security definer
-set search_path = public, pg_temp
 as $$
+declare
+  v_innings_id uuid;
 begin
-  perform realtime.send(
-    to_jsonb(new),
-    'match_state_updated',
-    'match:' || new.match_id::text || ':state',
-    true
-  );
-  return null;
+  if not public._is_match_captain(p_match_id) then
+    raise exception 'Only team captains can submit openers' using errcode = '42501';
+  end if;
+
+  update public.matches
+  set
+    start_phase = 'ready',
+    openers_submitted_by = auth.uid(),
+    openers_submitted_at = now(),
+    updated_at = now()
+  where match_id = p_match_id;
+
+  -- Ensure match_innings row exists
+  insert into public.match_innings (
+    match_id, innings_number, batting_team_side, bowling_team_side
+  ) values (
+    p_match_id, 1, 'team_a', 'team_b'
+  )
+  on conflict (match_id, innings_number) do update set updated_at = now()
+  returning innings_id into v_innings_id;
+
+  -- Ensure match_innings_state has openers
+  insert into public.match_innings_state (
+    innings_id, match_id, innings_number, striker_id, non_striker_id
+  ) values (
+    v_innings_id, p_match_id, 1, p_striker_id, p_non_striker_id
+  )
+  on conflict (innings_id) do update set
+    striker_id = p_striker_id,
+    non_striker_id = p_non_striker_id,
+    version = match_innings_state.version + 1,
+    updated_at = now();
 end;
 $$;
 
-revoke all on function public.broadcast_match_state() from public;
+create or replace function public.start_match_now(p_match_id uuid)
+returns void
+language plpgsql
+security definer
+as $$
+begin
+  if not public._is_match_captain(p_match_id) then
+    raise exception 'Only team captains can start the match' using errcode = '42501';
+  end if;
 
--- Metadata changes only. Live scoring broadcasts come from match_innings_state
--- (0409) and balls (0410), each on their own channel.
-create trigger matches_after_update_state_broadcast
-  after update on public.matches
-  for each row
-  when (
-    old.status                  is distinct from new.status
-    or old.toss_won_by          is distinct from new.toss_won_by
-    or old.toss_decision        is distinct from new.toss_decision
-    or old.toss_face            is distinct from new.toss_face
-    or old.start_phase          is distinct from new.start_phase
-    or old.openers_submitted_by is distinct from new.openers_submitted_by
-    or old.team_a_id            is distinct from new.team_a_id
-    or old.team_b_id            is distinct from new.team_b_id
-    or old.team_a_captain       is distinct from new.team_a_captain
-    or old.team_b_captain       is distinct from new.team_b_captain
+  update public.matches
+  set
+    status = 'live',
+    start_phase = 'live',
+    actual_start_time = now(),
+    updated_at = now()
+  where match_id = p_match_id;
+end;
+$$;
+
+create or replace function public.start_innings(
+  p_match_id uuid,
+  p_innings_number integer,
+  p_striker_id uuid,
+  p_non_striker_id uuid,
+  p_bowler_id uuid,
+  p_target integer default null
+)
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  v_innings_id uuid;
+  v_batting_side text := case when p_innings_number % 2 = 1 then 'team_a' else 'team_b' end;
+  v_bowling_side text := case when p_innings_number % 2 = 1 then 'team_b' else 'team_a' end;
+begin
+  insert into public.match_innings (
+    match_id, innings_number, batting_team_side, bowling_team_side, target_runs
+  ) values (
+    p_match_id, p_innings_number, v_batting_side, v_bowling_side, p_target
   )
-  execute function public.broadcast_match_state();
+  on conflict (match_id, innings_number) do update set
+    target_runs = coalesce(excluded.target_runs, match_innings.target_runs)
+  returning innings_id into v_innings_id;
+
+  insert into public.match_innings_state (
+    innings_id, match_id, innings_number, striker_id, non_striker_id, bowler_id, target
+  ) values (
+    v_innings_id, p_match_id, p_innings_number, p_striker_id, p_non_striker_id, p_bowler_id, p_target
+  )
+  on conflict (innings_id) do update set
+    striker_id = p_striker_id,
+    non_striker_id = p_non_striker_id,
+    bowler_id = p_bowler_id,
+    target = coalesce(excluded.target, match_innings_state.target),
+    version = match_innings_state.version + 1,
+    updated_at = now();
+
+  update public.matches
+  set status = 'live', updated_at = now()
+  where match_id = p_match_id;
+end;
+$$;
+
+create or replace function public.list_my_matches()
+returns setof public.matches
+language sql
+security definer
+stable
+as $$
+  select * from public.matches m
+  where m.created_by = auth.uid()
+     or m.team_a_captain = auth.uid()
+     or m.team_b_captain = auth.uid()
+     or exists (
+       select 1 from public.team_members tm
+       where tm.user_id = auth.uid()
+         and (tm.team_id = m.team_a_id or tm.team_id = m.team_b_id)
+     )
+  order by m.scheduled_start_time desc;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 10. RLS & Realtime Publication
+-- -----------------------------------------------------------------------------
+alter table public.matches enable row level security;
+alter table public.match_teams enable row level security;
+alter table public.match_players enable row level security;
+alter table public.match_innings enable row level security;
+alter table public.match_innings_state enable row level security;
+alter table public.match_deliveries enable row level security;
+alter table public.match_wickets enable row level security;
+alter table public.match_batsman_stats enable row level security;
+alter table public.match_bowler_stats enable row level security;
+alter table public.match_scorer_leases enable row level security;
+alter table public.match_format_presets enable row level security;
+
+-- Public Read Policies
+drop policy if exists "matches_read_all" on public.matches;
+create policy "matches_read_all" on public.matches for select using (true);
+
+drop policy if exists "match_teams_read_all" on public.match_teams;
+create policy "match_teams_read_all" on public.match_teams for select using (true);
+
+drop policy if exists "match_players_read_all" on public.match_players;
+create policy "match_players_read_all" on public.match_players for select using (true);
+
+drop policy if exists "match_innings_read_all" on public.match_innings;
+create policy "match_innings_read_all" on public.match_innings for select using (true);
+
+drop policy if exists "match_innings_state_read_all" on public.match_innings_state;
+create policy "match_innings_state_read_all" on public.match_innings_state for select using (true);
+
+drop policy if exists "match_deliveries_read_all" on public.match_deliveries;
+create policy "match_deliveries_read_all" on public.match_deliveries for select using (true);
+
+drop policy if exists "match_wickets_read_all" on public.match_wickets;
+create policy "match_wickets_read_all" on public.match_wickets for select using (true);
+
+drop policy if exists "match_batsman_stats_read_all" on public.match_batsman_stats;
+create policy "match_batsman_stats_read_all" on public.match_batsman_stats for select using (true);
+
+drop policy if exists "match_bowler_stats_read_all" on public.match_bowler_stats;
+create policy "match_bowler_stats_read_all" on public.match_bowler_stats for select using (true);
+
+drop policy if exists "match_scorer_leases_read_all" on public.match_scorer_leases;
+create policy "match_scorer_leases_read_all" on public.match_scorer_leases for select using (true);
+
+drop policy if exists "match_format_presets_read_all" on public.match_format_presets;
+create policy "match_format_presets_read_all" on public.match_format_presets for select using (true);
+
+-- Scorer Write Policies
+drop policy if exists "match_deliveries_write_scorer" on public.match_deliveries;
+create policy "match_deliveries_write_scorer" on public.match_deliveries for all to authenticated using (true);
+
+drop policy if exists "match_wickets_write_scorer" on public.match_wickets;
+create policy "match_wickets_write_scorer" on public.match_wickets for all to authenticated using (true);
+
+drop policy if exists "match_innings_state_write_scorer" on public.match_innings_state;
+create policy "match_innings_state_write_scorer" on public.match_innings_state for all to authenticated using (true);
+
+-- Performance Indexes
+create index if not exists idx_matches_status_time on public.matches(status, scheduled_start_time desc);
+create index if not exists idx_deliveries_innings_seq on public.match_deliveries(innings_id, seq desc);
+create index if not exists idx_match_players_user on public.match_players(user_id) where user_id is not null;
+create index if not exists idx_match_players_unclaimed on public.match_players(unclaimed_id) where unclaimed_id is not null;

@@ -34,8 +34,27 @@ abstract class MatchPlayerDto with _$MatchPlayerDto {
 
   const MatchPlayerDto._();
 
-  factory MatchPlayerDto.fromJson(Map<String, dynamic> json) =>
-      _$MatchPlayerDtoFromJson(json);
+  factory MatchPlayerDto.fromJson(Map<String, dynamic> json) {
+    final modified = Map<String, dynamic>.from(json);
+    modified['match_player_id'] = (modified['match_player_id'] ?? modified['id'] ?? '').toString();
+    modified['match_id'] = (modified['match_id'] ?? '').toString();
+    modified['team_side'] = (modified['team_side'] ?? 'team_a').toString();
+    if (modified['profile_id'] == null && modified['user_id'] != null) {
+      modified['profile_id'] = modified['user_id'];
+    }
+    final role = modified['role'] as String?;
+    if (role != null) {
+      if (role == 'captain') modified['is_captain'] = true;
+      if (role == 'wicket_keeper') modified['is_keeper'] = true;
+    }
+    if (modified.containsKey('is_in_playing_xi') && !modified.containsKey('is_substitute')) {
+      modified['is_substitute'] = modified['is_in_playing_xi'] == false;
+    }
+    if (modified['display_name'] != null && modified['profile'] == null && modified['unclaimed'] == null) {
+      modified['unclaimed'] = {'display_name': modified['display_name']};
+    }
+    return _$MatchPlayerDtoFromJson(modified);
+  }
 
   /// Best available human-readable name, in descending order of quality.
   /// Never empty — a nameless row in the XI would render as a blank tile in

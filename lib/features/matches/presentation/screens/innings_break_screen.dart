@@ -219,12 +219,17 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
 
   Future<void> _start(int target) async {
     setState(() => _busy = true);
+    // The target has to travel. Without it `match_innings_state.target` stays
+    // null, the engine's `targetReached` can never fire, and the chase runs to
+    // its full quota of overs even after the runs are knocked off — the most
+    // common way a limited-overs match ends simply would not register.
     final result = await ref.read(matchesRepositoryProvider).startInnings(
           matchId: MatchId(widget.matchId),
           inningsNumber: 2,
           strikerId: _strikerId!,
           nonStrikerId: _nonStrikerId!,
           bowlerId: _bowlerId!,
+          target: target,
         );
     if (!mounted) return;
     setState(() => _busy = false);

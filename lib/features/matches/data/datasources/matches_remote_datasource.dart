@@ -4,12 +4,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/log/ck_log.dart';
 import '../models/ball_dto.dart';
+import '../models/match_batsman_stats_dto.dart';
+import '../models/match_bowler_stats_dto.dart';
 import '../models/match_dto.dart';
 import '../models/match_innings_state_dto.dart';
 import '../models/match_player_dto.dart';
+import '../models/match_wicket_dto.dart';
 
 /// Talks to Supabase for the match-lifecycle tables — `matches`,
-/// `match_players`, `match_innings_state`, and `balls` — plus the match-start
+/// `match_players`, `match_innings_state`, and `match_deliveries` — plus the match-start
 /// and scoring RPCs / `record-ball` edge function. Returns DTOs / RPC result
 /// types, throws raw exceptions. RLS + SECURITY DEFINER RPCs scope
 /// reads/writes.
@@ -37,10 +40,14 @@ class MatchesRemoteDataSource {
   /// so the embed can still come back null for a suspended account. The DTO
   /// falls back accordingly.
   static const _matchPlayersSelect =
-      '*, profile:profiles!profile_id(display_name, username, profile_photo_url), '
+      '*, profile:profiles!user_id(display_name, username, profile_photo_url), '
       'unclaimed:unclaimed_players!unclaimed_id(display_name)';
   static const _matchInningsState = 'match_innings_state';
   static const _balls = 'match_deliveries';
+  static const _batsmanStats = 'match_batsman_stats';
+  static const _bowlerStats = 'match_bowler_stats';
+  static const _wickets = 'match_wickets';
+  static const _scorerLeases = 'match_scorer_leases';
 
   // ─── Realtime resilience knobs ──────────────────────────────────────────
   // See [watchMatch] for why these exist. Tuned for the match-start flow,
@@ -680,7 +687,11 @@ class MatchesRemoteDataSource {
           callback: (payload) {
             final data =
                 (payload['payload'] as Map<String, dynamic>?) ?? payload;
-            final deletedId = data['ball_id'] as String?;
+            // The removed row arrives as `to_jsonb(OLD)`, so its key is
+            // `delivery_id` — `ball_id` has not been a column since the schema
+            // reset, and reading only that quietly dropped every removal.
+            final deletedId =
+                (data['delivery_id'] ?? data['ball_id']) as String?;
             if (deletedId == null) return;
             current = current.where((b) => b.ballId != deletedId).toList();
             controller.add(List.unmodifiable(current));
@@ -786,8 +797,11 @@ class MatchesRemoteDataSource {
 
     switch (e.status) {
       case 409:
+        // Since the version lock was removed (D12: the batting side owns its
+        // innings), a 409 means the innings is not open for writing — never
+        // started, or the match already closed. It is not a race to retry.
         return ConflictException(
-          msg ?? 'Another scorer just updated this innings — refresh and retry',
+          msg ?? 'This innings is not open for scoring.',
         );
       case 401:
       case 403:
@@ -831,6 +845,98 @@ class MatchesRemoteDataSource {
       return d;
     }
     return null;
+  }
+
+  // ─── Materialized Scorecards & Wickets ──────────────────────────────────
+
+  Future<List<MatchBatsmanStatsDto>> listBatsmanStats(String inningsId) async {
+    try {
+      final rows = await _supabase
+          .from(_batsmanStats)
+          .select()
+          .eq('innings_id', inningsId)
+          .order('batting_position', ascending: true, nullsFirst: false);
+      return rows.map(MatchBatsmanStatsDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<List<MatchBowlerStatsDto>> listBowlerStats(String inningsId) async {
+    try {
+      final rows = await _supabase
+          .from(_bowlerStats)
+          .select()
+          .eq('innings_id', inningsId)
+          .order('bowling_position', ascending: true, nullsFirst: false);
+      return rows.map(MatchBowlerStatsDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<List<MatchWicketDto>> listWickets(String inningsId) async {
+    try {
+      final rows = await _supabase
+          .from(_wickets)
+          .select()
+          .eq('innings_id', inningsId)
+          .order('fall_of_wicket_number', ascending: true);
+      return rows.map(MatchWicketDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // ─── Scorer Lease ───────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> acquireScorerLease({
+    required String matchId,
+    required String deviceId,
+  }) async {
+    try {
+      final res = await _supabase.rpc<dynamic>(
+        'acquire_scorer_lease',
+        params: {
+          'p_match_id': matchId,
+          'p_device_id': deviceId,
+        },
+      );
+      return res is Map ? Map<String, dynamic>.from(res) : {'acquired': false};
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> heartbeatScorerLease({
+    required String matchId,
+    required String deviceId,
+  }) async {
+    try {
+      final res = await _supabase.rpc<dynamic>(
+        'heartbeat_scorer_lease',
+        params: {
+          'p_match_id': matchId,
+          'p_device_id': deviceId,
+        },
+      );
+      return res is Map ? Map<String, dynamic>.from(res) : {'valid': false};
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
+    }
+  }
+
+  Future<Map<String, dynamic>?> getScorerLease(String matchId) async {
+    try {
+      final row = await _supabase
+          .from(_scorerLeases)
+          .select()
+          .eq('match_id', matchId)
+          .maybeSingle();
+      return row;
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
   }
 
   /// Tag the auth-required guard on inserts that don't go through an RPC.

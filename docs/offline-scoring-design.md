@@ -17,6 +17,13 @@
 > ✅ **All decisions accepted 2026-08-20.** The owner delegated the open forks; §4 and
 > §19 now record the answers and the reasoning behind each. The plan below is the
 > agreed plan, not a set of options.
+>
+> 🔄 **REVISED 2026-08-22 — the server is no longer the authority on cricket.**
+> **D3** (two engines held together by golden vectors) and **D5/§19.3** (server wins
+> on disagreement) are **superseded**. The phone owns the arithmetic; `record-ball`
+> authorizes, de-duplicates, stores and totals, and does not recompute the delivery.
+> See [§19.7](#197--d10d12-the-phone-is-the-authority-2026-08-22) for the reasoning.
+> Sections 7, 8, 13 and 16 are rewritten to match; everything else stands.
 
 ---
 
@@ -29,15 +36,15 @@
 5. [Current state of the codebase](#5-current-state-of-the-codebase)
 6. [The engine duplication that already exists](#6-the-engine-duplication-that-already-exists)
 7. [Architecture overview](#7-architecture-overview)
-8. [Engine parity: the golden-vector contract](#8-engine-parity-the-golden-vector-contract)
+8. [The golden vectors: now the engine's specification](#8-the-golden-vectors-now-the-engines-specification)
 9. [Stage 1 — local engine, instant apply, still online](#9-stage-1--local-engine-instant-apply-still-online)
 10. [Stage 2 — the local write-ahead log and outbox](#10-stage-2--the-local-write-ahead-log-and-outbox)
 11. [Sync, idempotency and reconciliation](#11-sync-idempotency-and-reconciliation)
 12. [Undo across the offline boundary](#12-undo-across-the-offline-boundary)
-13. [Conflict, multi-scorer and the version guard](#13-conflict-multi-scorer-and-the-version-guard)
+13. [What the server checks](#13-what-the-server-checks)
 14. [What spectators see](#14-what-spectators-see)
 15. [Edge cases catalogue](#15-edge-cases-catalogue)
-16. [Proposed CLAUDE.md amendment](#16-proposed-claudemd-amendment)
+16. [CLAUDE.md amendment — applied](#16-claudemd-amendment--applied-2026-08-22)
 17. [Build plan](#17-build-plan)
 18. [Risks](#18-risks)
 19. [Decisions taken](#19-decisions-taken)
@@ -78,10 +85,18 @@ computed or stored.**
   disabled pad, in the normal case.
 - **G2.** A full innings can be scored with **no connectivity at all**, and syncs
   intact when the network returns.
-- **G3.** The server remains the **authority** on the scorecard. Local computation is
-  provisional until confirmed.
-- **G4.** Any divergence between the client's and the server's arithmetic is
-  **detected and surfaced**, never silently absorbed.
+- **G3.** ~~The server remains the **authority** on the scorecard.~~ **Revised
+  2026-08-22:** the **scoring device** is the authority on the arithmetic of the
+  innings it is scoring. The server authorizes the writer, rejects duplicates,
+  stores the deliveries and totals them. It does not recompute them. A *score* may
+  therefore be provisional only in the sense that it has not uploaded yet — not in
+  the sense that it may be corrected by a second opinion.
+- **G4.** ~~Any divergence between the client's and the server's arithmetic is
+  detected and surfaced.~~ **Revised 2026-08-22:** with one engine there is no
+  second arithmetic to diverge from. What must still be detected and surfaced is a
+  **delivery that cannot be stored** — rejected writer, finished match, or a queue
+  that will not drain. Silence is still not an option; the thing being watched has
+  changed.
 - **G5.** No regression in scorecard correctness. This is the bar everything else is
   subordinate to.
 
@@ -130,13 +145,17 @@ writing merge logic, the design has been misread.
 |---|---|---|---|---|
 | D1 | Amend the ONLINE-ONLY constraint for `matches` | **Yes**, scoped to the scoring write path | §1 is an unfixable problem without local computation and local durability | **Accepted** |
 | D2 | Port the scoring engine to Dart | **Yes** | A partial, uncontrolled duplicate already exists (§6). The choice is between an uncontrolled duplicate and a test-locked one | **Accepted** |
-| D3 | Engine parity mechanism | **Shared golden vectors** run against both implementations in CI | 30 vectors already exist in `engine.test.ts`. One executable spec governs both | **Accepted** |
+| D3 | Engine parity mechanism | ~~**Shared golden vectors** run against both implementations in CI~~ | ~~30 vectors already exist in `engine.test.ts`. One executable spec governs both~~ | **Superseded by D10** (2026-08-22) |
 | D4 | Stage 1 (instant, online) ships before Stage 2 (offline) | **Yes** | Every delivery in Stage 1 is a free production parity test while the server is still reachable and authoritative | **Accepted** |
-| D5 | Conflict resolution model | **Refuse and surface.** Server wins; scorer is told | Single writer means conflict is a genuine anomaly, not routine. Auto-merging a scorecard is worse than stopping | Recommended |
+| D5 | Conflict resolution model | ~~**Refuse and surface.** Server wins; scorer is told~~ | ~~Single writer means conflict is a genuine anomaly~~ | **Superseded by D11** (2026-08-22) |
 | D6 | Local store | **drift**, reusing `AppDatabase` | Already in the project for `WizardDrafts` + the messages cache. No new dependency | Recommended |
 | D7 | Idempotency key | **Client-generated uuid per delivery** | Makes replay safe when the network flaps mid-request. Standard outbox practice | Recommended |
 | D8 | Rust/WASM shared engine | **No** | Genuinely one implementation, but a whole toolchain for a 214-line pure function. Revisit only if D3 proves insufficient | Recommended |
 | D9 | Drop the dead `record_ball` plpgsql function | **Yes** | Superseded by the edge function but never dropped. Leaving it means *three* implementations | Recommended |
+| D10 | Where the rules of cricket live | **One engine, on the phone.** The server does no cricket arithmetic | The phone must compute unaided during a signal gap — that is the whole premise. A server that recomputes is a second opinion nobody asked for, and keeping two in step forever is the cost | **Accepted** 2026-08-22 |
+| D11 | What the server checks | **Writer, duplicate, liveness — never cricket.** Is this person permitted to score this innings; have I seen this delivery before; is this match still live | These are the three things a phone cannot be trusted on, and none of them need the Laws. Cheap, and they are what actually protects the data | **Accepted** 2026-08-22 |
+| D12 | Handover between innings | **Batting side scores its own innings**; control passes at the innings break, after the first innings has uploaded | Matches how a real match is scored, and gives the single-writer property a natural boundary rather than a policy | **Accepted** 2026-08-22 |
+| D13 | Totals on the server | **Derived by summing the stored deliveries**, not accumulated by a per-ball counter | Makes undo "remove the last row and re-total" instead of "carefully subtract", which is where the reversal bugs live. §12's invariant becomes trivial to honour | **Accepted** 2026-08-22 |
 
 ---
 
@@ -225,30 +244,49 @@ true regardless of whether offline ever ships.
            │ POST record-ball  (idempotency key)
            ▼
   ┌──────────────────┐
-  │  TS engine       │  AUTHORITY. validates, persists, broadcasts
+  │  record-ball     │  authorize · de-duplicate · store · total
+  │  (no cricket)    │  broadcasts on write
   └────────┬─────────┘
-           │ authoritative ball + innings
+           │ stored ball + innings totals (summed, not recomputed)
            ▼
-     reconcile ──► agree: mark synced
-                └► differ: PARITY ALARM (§8), server wins
+     mark synced
 ```
 
-Both engines are the same pure function in two languages, pinned to one shared
-spec. The client's answer is **provisional**; the server's is **final**. Every
-delivery is therefore a parity check.
+**Revised 2026-08-22 (D10/D11).** The engine runs in exactly one place: the phone.
+`record-ball` no longer recomputes the delivery — it checks the three things the
+phone cannot be trusted on (§13), writes the row, sums the innings, and broadcasts.
+It has no opinion about whether that was a wide.
+
+This is what the offline requirement already implied. During a signal gap the phone
+computes the innings unaided because nothing else can; a server that recomputes the
+same balls afterwards is a second opinion that must be kept in step forever, and
+the disagreements are silent when it drifts. One engine cannot disagree with itself.
+
+The client's answer is not "provisional pending recomputation" — it is the answer.
+What is provisional is only whether it has **reached** the server yet.
 
 ---
 
-## 8. Engine parity: the golden-vector contract
+## 8. The golden vectors: now the engine's specification
 
-This is the mechanism that makes D2 safe, and the part of the plan most worth
-attacking in review.
+> 🔄 **Revised 2026-08-22.** This section previously described a *parity contract*
+> between two engines. With D10 there is only one engine, so there is no parity to
+> keep. The vectors survive — and matter just as much — but their job has changed:
+> they are no longer a treaty between two implementations, they are **the executable
+> specification of the rules of cricket** for the single Dart engine.
+>
+> Everything below about density, purity and "a rule change is a vector change
+> first" stands unaltered. What is retired is the claim that CI must run them
+> against a second implementation, and the §7 runtime parity alarm — with one
+> engine there is nothing to compare a delivery against.
+>
+> **Do not delete `vectors.json`.** It is the only complete written statement of the
+> scoring rules in the project, and the Dart suite must keep executing it.
 
-**The contract.** Extract the cases in `engine.test.ts` into a language-neutral
-fixture — `supabase/functions/_shared/scoring/vectors.json` — each entry being
-`{name, state, format, input, ctx, expected}`. Both the Deno test suite and a Dart
-test suite load the *same* file and assert the *same* expected output. CI fails if
-either diverges.
+**The contract.** `supabase/functions/_shared/scoring/vectors.json` holds cases of
+the form `{name, state, format, input, ctx, expected}`. The Dart test suite loads it
+and asserts the expected output for every one. CI fails if the engine diverges from
+the spec.
 
 **Why this is sufficient.** `applyBall` is pure and total: no I/O, no clock, no
 randomness. A pure function is fully characterised by its input/output pairs, so a
@@ -386,7 +424,7 @@ states.
 | Ball state | Undo behaviour |
 |---|---|
 | Unsynced, still in the local WAL | Delete the op locally. Nothing was ever sent. No server call |
-| Synced | Append an `undo` op referencing the target `opId`; drains to the existing `undo_last_ball` path |
+| Synced | Append an `undo` op referencing the target `opId`; drains to a server call that **deletes the last stored delivery and re-totals** (D13). There is no reversal arithmetic to get wrong — the totals are a sum of what remains |
 | In flight | Block until the write settles, then take one of the two rows above. Do **not** race a delete against an in-flight insert |
 
 **Invariant:** undo only ever targets the last delivery. That is enforced today and
@@ -395,23 +433,34 @@ mutable document and forfeit everything in §3.
 
 ---
 
-## 13. Conflict, multi-scorer and the version guard
+## 13. What the server checks
 
-The `version` optimistic lock on `match_innings_state` already exists and is already
-sent as `p_expected_version`.
+> 🔄 **Rewritten 2026-08-22 (D11/D12).** This section previously described an
+> optimistic-lock conflict protocol built on `p_expected_version`. That machinery
+> guarded against a second scorer writing the same innings — which D12 now prevents
+> structurally rather than detecting after the fact.
 
-Offline widens the window in which a second scorer could write. Given N1 this is an
-anomaly, not routine, so the handling is deliberately blunt (**D5**):
+**The writer is decided by the match, not by a race.** The batting side scores its
+own innings; control passes at the innings break (D12). Exactly one device is
+entitled to write a given innings, and `_can_score_innings(match, innings)` — which
+takes the innings number precisely so it can answer this — is the rule.
 
-1. Server rejects with 409 on version mismatch.
-2. Client **stops draining** — it does not skip, retry-with-newer-version, or merge.
-3. The scorer is shown: *"Someone else has scored this innings. Your unsent
-   deliveries could not be applied."* with the count and the option to review them.
+So `record-ball` checks three things, none of which are cricket:
 
-Rebasing a local log onto a diverged server log is technically possible and I am
-recommending against it: it means reordering deliveries in a scorecard, and there is
-no reading of the Laws under which that is safe to do automatically. A human should
-decide.
+| Check | Question | Failure |
+|---|---|---|
+| **Writer** | Is this account permitted to score *this innings* of this match? | `403` — and it is a real error, not a race. Someone is scoring an innings that isn't theirs |
+| **Duplicate** | Have I already stored a delivery with this idempotency key (D7)? | `200`, returning the delivery already stored. A phone retrying after a dropped connection must not double-record |
+| **Liveness** | Is this match still live — not completed, abandoned or walked over? | `409`. The innings is closed; the queue should stop, not retry |
+
+**The version column is no longer a lock.** It survives as a change counter for
+readers, but nothing gates a write on it. A single entitled writer cannot race
+itself, and gating on it caused exactly one real bug: a scorer tapping a second ball
+before the first reply landed sent a stale expected-version and had the delivery
+refused.
+
+**If the writer check ever fails**, §19.3's rule still applies in full: the unsent
+deliveries must stay **visible, readable and exportable**. Never discard silently.
 
 ---
 
@@ -447,18 +496,26 @@ happening" and "the scorer is out of coverage."
 
 ---
 
-## 16. Proposed CLAUDE.md amendment
+## 16. CLAUDE.md amendment — ✅ APPLIED 2026-08-22
 
-Approving this document means replacing the ONLINE-ONLY banner's scope. Proposed
-text, to sit alongside the existing `messages` exemption:
+> **Applied.** §19.1 originally held this edit back until S8, on the reasoning that
+> a contract describing unbuilt behaviour misleads every future session. The owner
+> released it on 2026-08-22 because the machinery now exists in the tree — the Dart
+> engine, the drift WAL and the outbox are all built (see §21, S5+S6) — so the
+> amendment now describes what *is*, not what is planned. The text below was
+> corrected for D10/D11 before being written into CLAUDE.md: the earlier draft said
+> the server recomputes every delivery and overrides the client, which is no longer
+> true.
+
+Text as written into CLAUDE.md, alongside the existing `messages` exemption:
 
 > **EXEMPTION 2 (2026-08-20) — `matches` live scoring write path only.**
 > Ball-by-ball scoring is **local-first**. Deliveries are computed by a Dart port of
 > the scoring engine, appended to a drift-backed write-ahead log (`ScoringOps`,
 > `ScoringSnapshots`), applied to the UI immediately, and drained to Supabase by a
 > background outbox keyed on a client-generated idempotency uuid. The server remains
-> the **authority**: it recomputes every delivery with `_shared/scoring/engine.ts`
-> and its answer overrides the client's on any disagreement.
+> **not** recompute the delivery — it authorizes the writer, rejects duplicates by
+> idempotency key, stores the row and sums the innings.
 >
 > This exemption is **strictly scoped to recording deliveries in an already-started
 > innings.** Match creation, toss, lineup lock, challenges, and every read surface
@@ -466,10 +523,11 @@ text, to sit alongside the existing `messages` exemption:
 > service and NO LWW — the queue is single-writer and append-only, which is why it
 > needs neither.
 >
-> The two engines are held together by shared golden vectors
-> (`_shared/scoring/vectors.json`) executed by both the Deno and Dart test suites.
-> **A change to scoring rules is a change to the vectors first.** Do not modify
-> either engine without updating the vectors, and do not let the suites diverge.
+> The rules of cricket live in **exactly one place**: the Dart engine. Its
+> specification is `_shared/scoring/vectors.json`, executed by the Dart test suite.
+> **A change to scoring rules is a change to the vectors first.** Do not add cricket
+> arithmetic to the edge function or to a database trigger — that is how three
+> disagreeing implementations appeared once already.
 >
 > Do NOT generalise this to other features. The properties that make it safe here —
 > single writer, append-only, deterministic, bounded — do not hold elsewhere.
@@ -524,6 +582,11 @@ that describes unbuilt behaviour misleads every future session that reads it.
 The decision is recorded here now; CLAUDE.md changes when the code does, at **S8**,
 exactly as the build plan already sequences it.
 
+> **Superseded 2026-08-22.** The amendment has been applied — see §16. The reasoning
+> above was sound while the local-first machinery was unbuilt; S5+S6 (§21) shipped
+> it, so the banner now describes behaviour that exists. The text written into
+> CLAUDE.md is D10/D11-corrected, not the 2026-08-20 draft.
+
 ### 19.2 — Soak volume: **path coverage, not delivery count**
 
 Raw volume is the wrong gate. 2,000 dot balls prove almost nothing; twenty free hits
@@ -544,6 +607,11 @@ delivery fell into, so coverage is measurable rather than estimated. That is a s
 addition to S2 and should be built there, not retrofitted.
 
 ### 19.3 — §13 conflict: **refuse and surface**, and never discard
+
+> 🔄 **Partly superseded 2026-08-22.** The *conflict* this describes — two scorers
+> racing the same innings — is prevented structurally by D12 rather than detected by
+> a version guard, so the 409-on-mismatch protocol is gone (§13 rewritten). **The
+> never-discard rule below survives untouched and applies to any refused write.**
 
 Confirmed. No auto-rebase: reordering deliveries in a scorecard is not something
 software should decide.
@@ -574,6 +642,44 @@ Concretely: the spectator scoreboard shows `LIVE` when the last delivery arrived
 within the expected cadence, and `LIVE · updated 4m ago` once it has not. The
 threshold should be generous — overs genuinely take minutes — so this reads as
 information, not as an error state.
+
+### 19.7 — D10–D12: the phone is the authority (2026-08-22)
+
+The original plan had the server recompute every delivery and win any disagreement,
+with shared golden vectors keeping the two engines honest. That was coherent, and it
+is being overturned deliberately.
+
+**Why it changes.** The offline requirement was restated on the ground: signal at
+these grounds drops for minutes at a time and comes back. During those minutes the
+phone computes the innings unaided, because there is nothing else. So the phone is
+already the authority for part of every match — the question was only whether to
+admit it. Keeping a second engine to re-derive the same balls afterwards buys one
+thing (catching a buggy client) and costs three: two implementations that must agree
+forever, a parity alarm that must be watched, and a soak period before anyone can
+trust the result.
+
+**What made the trade tip.** D12. Once the batting side scores its own innings and
+control passes at the break, exactly one device is entitled to write a given innings
+and the entitlement is decided by the match rather than by a race. The scenarios a
+server recomputation would have caught are mostly scenarios that can no longer
+happen.
+
+**What is given up, stated plainly.** A phone that is buggy, tampered with, or
+running an old build can now write a wrong scorecard, and the server will store it.
+The mitigations are that the writer is authenticated and entitled, the log is
+append-only and attributable, and the rules have one tested implementation rather
+than three that drift. That is a real reduction in defence and it is accepted with
+open eyes.
+
+**What did not change.** §19.4 stands and is worth restating because it is the line
+this revision does *not* cross: the phone may show an innings as complete and
+awaiting confirmation, but it **may never declare a result**. A score can be
+provisional. A result cannot.
+
+**Also settled the same day:** undo remains one step back, the last delivery only
+(§12, unchanged — it was already the invariant). D13 makes it cheap.
+
+---
 
 ### 19.6 — Region: **unresolved, and a prerequisite for S4**
 
@@ -873,6 +979,320 @@ That is a last resort, not the guard: **the scoring screen should warn before a
 scorer reaches sign-out with a non-empty outbox, and that UI is not built yet.**
 
 **243 Dart tests + 38 Deno**, analyzer clean.
+
+### The cricket left the server — 2026-08-22
+
+D10/D11/D13 implemented. The rules of cricket now exist in exactly one place.
+
+**Database** (`20260101000400_matches.sql`)
+- `fn_process_delivery` and `trg_delivery_insert` **deleted**. That trigger was the
+  third implementation of the rules; it rotated strike on `runs_off_bat % 2` (so runs
+  run off a no-ball never changed ends), hardcoded a six-ball over, never incremented
+  `total_wickets` and never cleared `bowler_id` at the end of an over. A comment block
+  now stands where it was, saying why nothing may replace it.
+- `_can_score_innings(match, innings)` **written** — it was called by the edge
+  function and had never existed. Implements D12: the batting side (derived from the
+  toss) scores its own innings; organisers and a practice-match creator may score
+  either. `can_score_innings` now delegates to it, so the UI gate and the write path
+  cannot drift apart.
+- The trigger's `version = version + 1` is gone with it. It used to bump alongside the
+  edge function's own bump, advancing the row by 2 per delivery while the client
+  projected 1 — which refused the second of any two quick taps.
+- `total_extras` added as a generated column summing the five breakdown columns, so it
+  can never drift from its parts and `returning *` actually carries it.
+
+**Edge function** (`record-ball/index.ts`)
+- `applyBall` and the engine import **removed**. The function now does the four things
+  in §13: writer, liveness, duplicate, store — then re-derives the innings by SUMMING
+  `match_deliveries` (D13).
+- Duplicate handling is a single `on conflict (innings_id, idempotency_key) do nothing`;
+  a retry returns the delivery already stored with `200`, so a flapping connection
+  cannot double-record and cannot stall the queue either.
+- `p_idempotency_key` is now **required**. D7 was accepted on 2026-08-20 and never
+  implemented — the client sent nothing and the function minted a fresh uuid per
+  attempt, which defeated the unique constraint it was supposed to use.
+- Result computation **stays** here, per §19.4.
+
+**Second engine deleted** — `_shared/scoring/engine.ts` and `engine.test.ts` are gone;
+nothing imported them once the edge function stopped computing. `vectors.json` stays
+and is now executed by the Dart suite alone. A `README.md` in that directory records
+why there is no engine there and what must not be added back.
+
+**Client**
+- `ComputedDelivery` added to `BallDraft`: the over position, free-hit flag, resulting
+  trio, all-out and innings-ended flags. The controller fills it from `applyBall` and
+  the repository ships it; the server stores it verbatim.
+- `expectedVersion` **removed** end to end.
+- A `409` is no longer treated as a benign retry. It now means the innings is not open
+  for writing, so the provisional delivery is removed and the screen re-syncs — it used
+  to only log, leaving a ball painted that would never be recorded.
+
+**Verification.** `flutter analyze` clean; **265 tests pass** (two added: a draft that
+never ran the engine is refused before the wire, and the engine's answer plus the
+idempotency key reach it). The SQL and the edge function are **not runtime-verified** —
+no local Supabase stack was available in that session (Docker not running, Deno not
+installed), so both are reviewed but unexecuted. First run against a real project is
+the real test.
+
+### A match can be created and finished again — 2026-08-22
+
+Three faults found reviewing the path end to end, all of which stopped a match
+reaching a result. Fixed in `20260822110000_match_creation_and_format_fixes.sql`.
+
+- **`_normalize_match_format(jsonb)` written.** It was called by
+  `accept_pool_application` and had never been defined anywhere in this repo — not
+  in the current tree, not at HEAD. Every pool acceptance failed at runtime. It now
+  guarantees the full key set the client's `MatchDto` and the Dart engine read.
+- **`matches.format` no longer defaults to `{}`.** The sane defaults lived in
+  `rules_config` under *different* key names (`max_overs`, not `overs_per_innings`),
+  so a match created without an explicit format had `overs_per_innings = 0` — which
+  the engine reads as **unlimited**. An innings could not end on overs. The column
+  default is now the normalised shape, and existing rows are repaired in place.
+- **Both match-creation RPCs write the current `match_players` shape.** They were
+  still inserting `profile_id` / `is_captain` / `is_keeper` / `team_side = 'a'`, and
+  no `display_name` at all — which is NOT NULL. plpgsql bodies are not
+  column-checked at CREATE time, so both compiled and failed on first use: no match
+  ever got a lineup. Bodies were transformed from the existing sources rather than
+  retyped, so only the INSERT changed.
+  - Note a modelling loss worth knowing about: the new schema has one `role` enum
+    where the old one had independent `is_captain` / `is_keeper` booleans, so a
+    captain who also keeps wicket can no longer be recorded as both. Captain wins,
+    because that is the role carrying permissions.
+
+**Also closed while in the file:**
+
+- **`start_innings` had no authorization at all** — the only lifecycle RPC without
+  one. Any authenticated account could overwrite any match's on-field trio, and
+  because it set `status = 'live'` unconditionally it could resurrect a completed
+  match. Now gated on `_can_score_innings` (D12: starting an innings is the same act
+  as scoring it) and refuses a finished match.
+- **`start_innings` derived the batting side from `innings_number % 2`**, hardcoding
+  odd = team_a. Every match where team B batted first recorded both innings against
+  the wrong side. Now derived from the toss, matching `_can_score_innings` and the
+  client.
+- **The innings break never sent the chase target.** `innings_break_screen` computed
+  it, displayed it, passed it to `_start(target)` — and then called `startInnings`
+  without the argument. `target` stayed null, so `targetReached` could never fire and
+  a chase ran its full quota of overs after the runs were knocked off.
+
+**Verification.** `flutter analyze` clean, 265 tests pass, and the called-vs-defined
+sweep across all 42 migrations now reports no undefined functions. Still not
+runtime-verified — no local Supabase stack was available.
+
+### Undo works end to end — 2026-08-22
+
+§12's invariant (undo targets the last delivery, only ever) was already enforced
+client-side and the WAL path already handled an unsent delivery. What was missing
+was everything after it reached the server.
+
+- **`undo_last_ball` now exists.** It authorizes via `_can_score_innings`, deletes
+  the last delivery, and re-derives the innings totals from the remaining ledger —
+  D13 in action: nothing is subtracted, so there is no reversal arithmetic to get
+  wrong.
+- **The on-field trio is restored from the deleted row.** Each delivery stores the
+  striker, non-striker and bowler it was bowled to, so undoing ball N means putting
+  back what ball N recorded. That is reading a stored fact, not recomputing cricket
+  — the D10 line holds.
+- **The match transition is reversed.** If that delivery had ended the innings,
+  `record-ball` moved the match to `innings_break` or `completed` with a result.
+  Undo now puts it back to `live` and clears the result, otherwise the score says
+  the innings is live while the match row says it is over and everyone lands on a
+  result screen the scorecard no longer supports.
+  - 🟥 This is the one path that can **un-declare a result**. §19.4 forbids a
+    result being *rendered* from local computation and it still is not — the server
+    declared it. But a scorer who mis-taps the winning run must be able to take it
+    back, and a permanently wrong match is worse. Flagging it because it is the
+    closest anything comes to that line.
+- **`ball_deleted` is broadcast.** `watchBalls` has listened for it since it was
+  written and nothing ever sent it, so an undo corrected the score everywhere (via
+  the innings-state broadcast) while the removed delivery stayed in every
+  spectator's ball log. The client also read the removed row's `ball_id`, which has
+  not been a column since the reset; it reads `delivery_id` now.
+- **`search_path` pinned and privileges revoked** on the new functions, matching
+  every other security-definer function in the file.
+
+**And the reason undo was often unavailable even when it worked:** `pendingOpsCount`
+was **device-wide**. The scoring screen gates undo on it being zero, and a failed op
+is never pruned — `pruneOps` only removes *synced* ones. So a single delivery the
+server had permanently refused, in a different match, left every future innings
+reading as unsaved and undo greyed out forever. It is now scoped to
+(match, innings), with two tests covering it.
+
+**Verification.** `flutter analyze` clean, **267 tests** pass (two added). SQL still
+not runtime-verified.
+
+### Duplicate ball positions inside an over — fixed 2026-08-22
+
+Reported from a live session: over 9 recorded as `8.1, 8.2, 8.3, 8.4, 8.2, 8.3,
+8.4, 8.5, 8.6` — positions repeating inside one over — and the following over
+appearing to end after only two deliveries.
+
+**One bug, two symptoms.** `over_number` and `ball_in_over` are derived from
+`legalBallCount` at tap time. `_settle` adopted the server's innings row
+wholesale, but that row is only current as of the delivery it confirms. With
+further balls already tapped, adopting it dragged the local count backwards, and
+the next tap re-issued a position that had already been used. The short over is
+the same fault seen from the other end: four of its six deliveries were stamped
+with the previous over's numbers, so only two were left to display.
+
+Note what stayed correct throughout: the delivery **count**. Every ball
+incremented it by one, so the score, the run rate and the balls-remaining were
+all right while the over fell apart — which is why this reached a real match.
+
+**Fix.** `_settle` adopts `outcome.innings` only when that settle drains the
+queue. The device owns the arithmetic (D10), so the server's row is a
+confirmation, never a correction; once nothing is pending it reflects every
+delivery the device has and the two agree. It also stops matching provisional
+deliveries on `seq` when replacing them — provisional seqs are local guesses and
+collide with the real ones, which could discard a different pending ball.
+
+**On the test.** The first regression test written for this would have passed on
+the broken code. Three rapid taps all build their drafts before any reply lands,
+so they advance correctly with or without the bug; the count has to be dragged
+back *between* taps to reproduce it. The test now holds the first write open
+with a completer, lets exactly one reply land mid-sequence, then taps again. It
+was confirmed to fail on the unfixed controller with `[1, 2, 3, 2]` — the fourth
+delivery re-issuing position 2 — before being confirmed to pass on the fixed one.
+
+**Related, not fixed:** `ScoringState.legalBalls` (and `totalRuns`,
+`totalWickets`) still reconcile server and local with `math.max`. That masked
+this bug's effect on the score, and now that the device is authoritative and
+parity watches for drift, the max() is working against both. Worth removing.
+
+### A delivery could be recorded with an empty end — fixed 2026-08-22
+
+Reported from a live session: four consecutive wickets, the non-striker's card
+showing `—` with no player, and then a single recorded anyway.
+
+**Nothing stopped it.** The engine clears whichever end the dismissed batter was
+at, which is right, and the replacement is normally chosen inside the wicket
+sheet. But if that step was skipped — the sheet dismissed, or its bench empty —
+the slot stayed vacant and *nothing noticed*. There was a `bowlerSet` guard on
+the run pad and on `_record`, and no equivalent for batters.
+
+**Fixed in three places**, because one was not enough:
+
+- `ScoringState.battersSet` / `needsBatter` — the state can now answer it.
+- A `ScoringSurface.needsBatter` gate on the run pad, with a notice that
+  distinguishes *"choose someone"* from *"there is no one left"* — a side that
+  has run out of batters is not waiting on a tap.
+- A guard in `ScoringController._record`, as the backstop for every other route
+  into a write.
+
+Ordered after `needsBowler` so the gate agrees with the post-delivery prompt,
+which offers the bowler first. The batter picker is also reachable directly now;
+previously it existed only inside the wicket sheet, so a dismissed sheet left no
+way back.
+
+**Separately visible in the same screenshot, NOT fixed:** the innings should
+already have been over. The batting side had five players and five were out, but
+`wicketsToAllOut` defaults to `playersPerTeam - 1` and the match format says 11,
+so all-out never fired. Two readings — the format is wrong for the fixture, or
+the engine should derive the threshold from the actual XI rather than the
+nominal squad size. The second is more robust and would cover every short-handed
+match, but it is a **rules change**, so per §8 it starts with a vector, not with
+the engine. Not taken unilaterally.
+
+### Undo was disabled exactly when it was needed — fixed 2026-08-22
+
+Found immediately after the batter gate landed: with the pad correctly blocked,
+there was no way out, because Undo was greyed out too.
+
+**`canUndo` required `pendingCount == 0`.** The reasoning recorded on `isBusy`
+was that a delivery which has not been written has nothing to undo. That was
+never true — `MatchesRepositoryImpl.undoLastBall` has always handled an unsent
+delivery by discarding the queued write — and the gate meant nothing could ever
+reach that path. Worse, `pendingCount` only returns to zero when writes land, so
+the moment writes stopped landing (out of coverage, or a backend not yet
+deployed) undo was disabled **permanently**, at precisely the moment a scorer
+most needs to take a mis-tap back. §12 promised this case worked; the UI forbade
+it.
+
+**Undo's two paths are now distinct**, which they had to become before the gate
+could be opened safely:
+
+| Outcome | What happens |
+|---|---|
+| `discardedPending` | The delivery never left the device. The queued write is thrown away and **the server is not contacted** — asking it to delete *its* last delivery would remove a different ball entirely. |
+| `removedStored` | The stored delivery is deleted server-side and the screen re-syncs. |
+
+The controller used to re-read the ball list from the server after **any** undo.
+For a queued delivery that erased every *other* unsent ball from the screen,
+because the server has seen none of them. It now rolls the local projection back
+instead — restoring the trio from the delivery being removed (each ball records
+who was on strike and bowling when it was bowled) and recounting the totals from
+what remains, the same derive-don't-subtract shape the server uses.
+
+Three tests cover it: the gate holds while a write is queued, a queued undo never
+touches the server, and the stored path still delegates.
+
+### Undo targeted the wrong delivery — fixed 2026-08-22
+
+Reported after the migrations landed: Undo was now enabled but did nothing.
+
+**The repository chose between undo's two paths by looking at the write-ahead
+log alone.** If any op was unsent it discarded the newest and reported a local
+undo. That is right only while the log matches what is on screen — and it had
+stopped matching. Every delivery recorded before the migrations was refused by
+the server and left `pending` (`markOpFailed` does not clear an op, and
+`pruneOps` only removes *synced* ones). So the log held a pile of ops that
+corresponded to nothing visible, and Undo discarded one of those: the controller
+then looked for a painted ball with that op id, found none, and changed nothing.
+Silence, and the delivery the scorer wanted gone stayed put.
+
+**The caller now says which delivery is unsent.** Only the presentation side
+knows what is on screen: the last painted delivery is either provisional — its
+op id embedded in the local ball id — or a row the server already holds.
+`undoLastBall` takes `pendingOpId` and no longer guesses.
+
+**Un-replayable ops are discarded rather than retried.** An op recorded before
+the idempotency key became mandatory can never be accepted, and because a failed
+send halts the drain, one of them blocked everything queued behind it forever.
+`syncPendingOps` now drops them. The queue is also kicked once when the scoring
+screen opens, so a device that scored through an outage heals without the scorer
+having to background the app.
+
+### Lineup is not the roster — 2026-08-22 (behaviour, not a bug)
+
+Reported alongside: a player added to the team did not appear as an available
+batter. `availableBatters` derives from `match_players`, which is materialised
+from the roster **when the match is created**. Editing the team afterwards does
+not reach an existing match, by design — a lineup has to be stable once play
+starts or the scorecard means nothing.
+
+There is no substitute flow. Adding someone mid-match currently needs a direct
+insert into `match_players`. Worth building properly: injuries, late arrivals and
+short-handed sides are normal at this level.
+
+### Two plpgsql type errors reached production — 2026-08-22
+
+Both surfaced only when the function was called, because **Postgres does not
+typecheck a plpgsql body at CREATE time**. Both migrations applied cleanly and
+reported success.
+
+1. **`undo_last_ball`** used `coalesce(delivery_type, ball_type)`. `delivery_type`
+   is the `delivery_kind` enum, `ball_type` is `text`; no common type exists, so
+   every undo failed with *"COALESCE types delivery_kind and text cannot be
+   matched"*. Reported from the device.
+2. **`start_innings`** declared the batting side as `text`, assigned a `uuid`
+   into it, then compared it back against a uuid column — *"operator does not
+   exist: text = uuid"*. Found by re-reading after (1), not reported: it would
+   have broken "Start the chase" at the innings break **and** every bowler change
+   and incoming batter, since both route through that RPC.
+
+Repaired forward in `20260822130000_repair_scoring_rpcs.sql`, and at source so a
+fresh build is correct. Team ids and side labels are now separate variables of
+the right types, and the undo aggregate reads the real columns — matching the one
+`record-ball` uses, so the two agree about what an innings totals to.
+
+**The process lesson.** Five migrations and a rewritten edge function were
+authored without ever executing them, and that was stated each time — but the
+risk was described as generic. It is not: the specific hazard is that
+`CREATE FUNCTION` validates syntax and nothing else, so a plpgsql body can carry
+a type error through a clean migration run and fail on first call. A deliberate
+declare-vs-usage type sweep was run over every function written in this
+workstream after (1) was reported; it found (2). That sweep should happen before
+a push, not after a bug report.
 
 ### Still open
 

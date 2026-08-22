@@ -29,6 +29,9 @@ enum ScoringSurface {
   /// a new over).
   needsBowler,
 
+  /// A wicket left an end empty and a replacement batter is owed.
+  needsBatter,
+
   /// The pad is live.
   scoring;
 
@@ -41,6 +44,11 @@ enum ScoringSurface {
     if (!s.canScore) return ScoringSurface.readOnly;
     if (s.inningsOver) return ScoringSurface.inningsComplete;
     if (!s.bowlerSet) return ScoringSurface.needsBowler;
+    // A wicket clears an end. Until it is refilled the pad must not accept a
+    // delivery — one was recorded against an empty end in a real match.
+    // Ordered after needsBowler so it agrees with the post-delivery prompt,
+    // which offers the bowler first.
+    if (s.needsBatter) return ScoringSurface.needsBatter;
     return ScoringSurface.scoring;
   }
 }
@@ -54,6 +62,7 @@ class ScoringActionBar extends StatelessWidget {
     required this.onWicket,
     required this.onExtra,
     required this.onSelectBowler,
+    required this.onSelectBatter,
   });
 
   final ScoringState state;
@@ -65,6 +74,7 @@ class ScoringActionBar extends StatelessWidget {
   final VoidCallback onWicket;
   final ValueChanged<BallKind> onExtra;
   final VoidCallback onSelectBowler;
+  final VoidCallback onSelectBatter;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +93,12 @@ class ScoringActionBar extends StatelessWidget {
             SelectBowlerNotice(
               isOpening: state.balls.isEmpty,
               onSelect: onSelectBowler,
+            ),
+          ],
+          ScoringSurface.needsBatter => [
+            SelectBatterNotice(
+              onSelect: onSelectBatter,
+              anyAvailable: state.hasBatterAvailable,
             ),
           ],
           ScoringSurface.scoring => [

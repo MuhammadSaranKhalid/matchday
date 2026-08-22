@@ -95,7 +95,7 @@ class MatchPlayer extends Equatable {
   /// Whichever id is set — useful for identifying the same person whether
   /// they're claimed or not. The name and avatar are already resolved on
   /// [displayName] / [photoUrl]; this is for keying and lookups.
-  String get playerRefId => profileId ?? unclaimedId!;
+  String get playerRefId => profileId ?? unclaimedId ?? id.value;
 
   @override
   List<Object?> get props => [
@@ -181,6 +181,10 @@ enum MatchTeamSide {
   const MatchTeamSide(this.wire);
   final String wire;
 
-  static MatchTeamSide fromWire(String? w) =>
-      values.where((s) => s.wire == w).firstOrNull ?? MatchTeamSide.a;
+  static MatchTeamSide fromWire(String? w) {
+    if (w == null) return MatchTeamSide.a;
+    final clean = w.trim().toLowerCase();
+    if (clean == 'team_b' || clean == 'b') return MatchTeamSide.b;
+    return MatchTeamSide.a;
+  }
 }

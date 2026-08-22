@@ -87,6 +87,45 @@ void main() {
     });
   });
 
+  group('pendingOpsCount', () {
+    test('counts only the innings asked about', () async {
+      await ds.appendOp(
+        opId: 'a1', matchId: _match, inningsNumber: 1,
+        kind: 'ball', payload: _delivery(1),
+      );
+      await ds.appendOp(
+        opId: 'a2', matchId: _match, inningsNumber: 2,
+        kind: 'ball', payload: _delivery(1),
+      );
+      await ds.appendOp(
+        opId: 'b1', matchId: 'match-2', inningsNumber: 1,
+        kind: 'ball', payload: _delivery(1),
+      );
+
+      expect(
+        await ds.pendingOpsCount(matchId: _match, inningsNumber: 1),
+        1,
+      );
+    });
+
+    test('an op stuck in another match cannot disable undo here', () async {
+      // The scoring screen gates undo on this count being zero. When it was
+      // device-wide, one delivery the server had permanently refused — in a
+      // different match, possibly months earlier — left every future innings
+      // reading as unsaved, and undo was never available again.
+      await ds.appendOp(
+        opId: 'stuck', matchId: 'abandoned-match', inningsNumber: 1,
+        kind: 'ball', payload: _delivery(1),
+      );
+      await ds.markOpFailed('stuck', 'server refused, will never drain');
+
+      expect(
+        await ds.pendingOpsCount(matchId: _match, inningsNumber: 1),
+        0,
+      );
+    });
+  });
+
   group('sync lifecycle', () {
     test('a synced op stops being owed', () async {
       await ds.appendOp(

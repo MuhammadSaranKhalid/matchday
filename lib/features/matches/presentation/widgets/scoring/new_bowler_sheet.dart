@@ -12,12 +12,17 @@ class NewBowlerSheet extends StatefulWidget {
     required this.people,
     this.title = 'Next bowler?',
     this.kicker,
+    this.subtitle,
   });
   final int overNumber;
   final String? justBowled;
   final List<SheetPerson> people;
   final String title;
   final String? kicker;
+
+  /// Overrides the bowler-specific wording, so the same picker can choose an
+  /// incoming batter.
+  final String? subtitle;
   @override
   State<NewBowlerSheet> createState() => _NewBowlerSheetState();
 }
@@ -27,9 +32,10 @@ class _NewBowlerSheetState extends State<NewBowlerSheet> {
   @override
   Widget build(BuildContext context) {
     final kicker = widget.kicker ?? 'OVER ${widget.overNumber} COMPLETE';
-    final sub = widget.justBowled == null
-        ? 'Pick the player who will bowl the first over.'
-        : '${widget.justBowled} can\'t bowl two overs in a row.';
+    final sub = widget.subtitle ??
+        (widget.justBowled == null
+            ? 'Pick the player who will bowl the first over.'
+            : '${widget.justBowled} can\'t bowl two overs in a row.');
     return SheetScrim(
       child: SingleChildScrollView(
         child: Column(

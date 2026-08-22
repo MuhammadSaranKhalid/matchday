@@ -33,12 +33,21 @@ import '../widgets/scoring/scoring_top_bar.dart';
 // It is stated here because it was not obvious before: this file once held
 // 3,300 lines of all of the above, and a wide-attribution bug that corrupted
 // scorecards survived inside it precisely because nothing in a widget method
-// can be unit-tested. The action handlers were the last of that to leave.
+// can be unit-tested.
+//
+// FOLLOWING ONE TAP
+//
+//   this file        which callback a control fires
+//   scoring_actions  what that callback DOES (sheet, dialog, then the write)
+//   scoring_controller  the write itself
+//
+// Three hops, three files. It was five until 2026-08-22, when the four
+// single-method action handler classes were inlined into scoring_actions.
 //
 // WHERE THINGS LIVE
 //
 //   state/scoring_state.dart             derived state + the cricket rules
-//   controllers/scoring_controller.dart  the six writes
+//   controllers/scoring_controller.dart  the writes
 //   widgets/scoring/scoring_actions.dart   what every control DOES
 //   widgets/scoring/scoring_action_bar.dart the control surface + its gating
 //   widgets/scoring/scoring_board.dart      the read-out (score, batters, log)
@@ -187,7 +196,15 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                     ],
                     onMenuAction: (a) => _actions.handleMenuAction(context, a),
                     onUndo: () => _actions.undo(context),
-                    canUndo: s.canScore && s.balls.isNotEmpty && !s.hasPending,
+                    // NOT gated on `hasPending`. It used to be, on the
+                    // reasoning that an unwritten delivery has nothing to
+                    // undo — but the repository has always handled exactly
+                    // that case by discarding the queued write, and the gate
+                    // meant nothing could ever reach it. When writes stop
+                    // landing, `pendingCount` never returns to zero, so undo
+                    // was disabled permanently at the moment it was needed
+                    // most: out of coverage, having just mis-tapped.
+                    canUndo: s.canScore && s.balls.isNotEmpty,
                     undoFlash: _undoFlash,
                   ),
                   Scoreboard(state: s),
@@ -219,6 +236,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                       s,
                       opening: s.balls.isEmpty,
                     ),
+                    onSelectBatter: () => _actions.promptBatter(context, s),
                   ),
                 ],
               ),

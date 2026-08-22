@@ -54,8 +54,12 @@ abstract class MatchInningsStateDto with _$MatchInningsStateDto {
 
   const MatchInningsStateDto._();
 
-  factory MatchInningsStateDto.fromJson(Map<String, dynamic> json) =>
-      _$MatchInningsStateDtoFromJson(json);
+  factory MatchInningsStateDto.fromJson(Map<String, dynamic> json) {
+    final modified = Map<String, dynamic>.from(json);
+    modified['match_id'] = (modified['match_id'] ?? modified['id'] ?? '').toString();
+    modified['updated_at'] = (modified['updated_at'] ?? DateTime.now().toIso8601String()).toString();
+    return _$MatchInningsStateDtoFromJson(modified);
+  }
 
   MatchInningsState toEntity() => MatchInningsState(
         matchId: MatchId(matchId),

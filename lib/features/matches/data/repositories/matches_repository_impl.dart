@@ -7,10 +7,13 @@ import '../../domain/entities/ball.dart';
 import '../../domain/entities/format_preset.dart';
 import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
+import '../../domain/entities/match_batsman_stats.dart';
+import '../../domain/entities/match_bowler_stats.dart';
 import '../../domain/entities/match_innings_state.dart';
 import '../../domain/entities/match_player.dart';
 import '../../domain/entities/match_pool_application.dart';
 import '../../domain/entities/match_request.dart';
+import '../../domain/entities/match_wicket.dart';
 import '../../domain/repositories/matches_repository.dart';
 import '../datasources/format_presets_remote_datasource.dart';
 import '../datasources/match_requests_remote_datasource.dart';
@@ -341,9 +344,31 @@ class MatchesRepositoryImpl implements MatchesRepository {
         ValidationFailure('Bye / leg-bye runs belong in extras'),
       );
     }
+    final c = d.computed;
+    if (c == null) {
+      // Programming error, not a user error: the controller must run the
+      // engine and attach its answer before handing the draft over. The
+      // server stores what the device computed and computes nothing itself,
+      // so a draft without it cannot be recorded at all.
+      return const Left(ValidationFailure(
+        'Delivery was not computed before recording. This is a bug — reopen '
+        'the scoring screen and try again.',
+      ));
+    }
+
+    // The op id doubles as the idempotency key. It must be decided BEFORE the
+    // write-ahead log entry, because a replay from that log has to present the
+    // same key — that is the whole mechanism preventing a delivery from being
+    // recorded twice when the network drops mid-request.
+    final opId = d.opId ??
+        '${d.matchId.value}_${d.inningsNumber}_'
+            '${DateTime.now().microsecondsSinceEpoch}';
+
     final params = <String, dynamic>{
       'p_match_id': d.matchId.value,
       'p_innings_number': d.inningsNumber,
+      'p_idempotency_key': opId,
+      // The delivery as entered.
       'p_is_legal_delivery': d.isLegalDelivery,
       'p_ball_type': d.ballKind.wire,
       'p_runs_scored': d.runsScored,
@@ -357,15 +382,26 @@ class MatchesRepositoryImpl implements MatchesRepository {
       if (d.bowlerId != null) 'p_bowler_id': d.bowlerId,
       if (d.fielderId != null) 'p_fielder_id': d.fielderId,
       if (d.commentary != null) 'p_commentary': d.commentary,
-      if (d.expectedVersion != null) 'p_expected_version': d.expectedVersion,
+      // The delivery as the local engine computed it. The server stores these
+      // verbatim — it has no engine of its own (design doc D10).
+      'p_over_number': c.overNumber,
+      'p_ball_in_over': c.ballInOver,
+      'p_is_free_hit': c.isFreeHit,
+      'p_is_bowler_credited': c.isBowlerCredited,
+      'p_balls_per_over': c.ballsPerOver,
+      // The innings as it stands after this delivery. Aggregates are re-summed
+      // server-side from the ledger; these are the parts that are not sums.
+      'p_striker_after': c.strikerAfter,
+      'p_non_striker_after': c.nonStrikerAfter,
+      'p_bowler_after': c.bowlerAfter,
+      'p_is_all_out': c.isAllOut,
+      'p_innings_ended': c.inningsEnded,
     };
 
     LocalScoringOp? localOp;
     final local = _local;
     if (local != null) {
       try {
-        final opId = d.opId ??
-            '${d.matchId.value}_${d.inningsNumber}_${DateTime.now().microsecondsSinceEpoch}';
         localOp = await local.appendOp(
           opId: opId,
           matchId: d.matchId.value,
@@ -411,28 +447,33 @@ class MatchesRepositoryImpl implements MatchesRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> undoLastBall({
+  Future<Either<Failure, UndoOutcome>> undoLastBall({
     required MatchId matchId,
     required int inningsNumber,
+    String? pendingOpId,
   }) async {
+    // A delivery still sitting in the write-ahead log never reached the
+    // server, so undoing it is a purely local act — throw the queued write
+    // away and do not contact the server at all.
+    //
+    // Which op that is comes from the CALLER, not from the log. This used to
+    // take whatever was newest in the log, which is wrong whenever the log
+    // holds ops that correspond to nothing on screen: after a spell of failed
+    // writes it discarded one of those instead, so Undo appeared to do
+    // absolutely nothing while the delivery the scorer wanted gone stayed.
     final local = _local;
-    if (local != null) {
-      final pending = await local.pendingOps(
-        matchId: matchId.value,
-        inningsNumber: inningsNumber,
-      );
-      if (pending.isNotEmpty) {
-        final last = pending.last;
-        await local.discardOp(last.opId);
-        return const Right(true);
-      }
+    if (local != null && pendingOpId != null) {
+      await local.discardOp(pendingOpId);
+      return Right(UndoOutcome.discardedPending(pendingOpId));
     }
     try {
       final ok = await _remote.undoLastBall(
         matchId: matchId.value,
         inningsNumber: inningsNumber,
       );
-      return Right(ok);
+      return Right(
+        ok ? const UndoOutcome.removedStored() : const UndoOutcome.nothing(),
+      );
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
@@ -455,6 +496,14 @@ class MatchesRepositoryImpl implements MatchesRepository {
     );
     for (final op in pending) {
       if (op.kind == 'ball') {
+        // An op recorded before the idempotency key became mandatory can never
+        // be accepted — the server rejects it outright. Retrying it forever
+        // would also block everything queued behind it, since a failed send
+        // halts the drain. Discard rather than keep it.
+        if (op.payload['p_idempotency_key'] == null) {
+          await local.discardOp(op.opId);
+          continue;
+        }
         try {
           await _remote.recordBall(op.payload);
           await local.markOpSynced(op.opId);
@@ -475,8 +524,15 @@ class MatchesRepositoryImpl implements MatchesRepository {
   }
 
   @override
-  Future<int> pendingOpsCount() =>
-      _local?.pendingOpsCount() ?? Future.value(0);
+  Future<int> pendingOpsCount({
+    required MatchId matchId,
+    required int inningsNumber,
+  }) =>
+      _local?.pendingOpsCount(
+        matchId: matchId.value,
+        inningsNumber: inningsNumber,
+      ) ??
+      Future.value(0);
 
   @override
   Future<Either<Failure, List<Ball>>> listBalls(
@@ -827,6 +883,92 @@ class MatchesRepositoryImpl implements MatchesRepository {
         reason: reason,
       );
       return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  // ─── Materialized Scorecards & Wickets ──────────────────────────────────
+
+  @override
+  Future<Either<Failure, List<MatchBatsmanStats>>> getBatsmanStats(
+    String inningsId,
+  ) async {
+    try {
+      final dtos = await _remote.listBatsmanStats(inningsId);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<MatchBowlerStats>>> getBowlerStats(
+    String inningsId,
+  ) async {
+    try {
+      final dtos = await _remote.listBowlerStats(inningsId);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<MatchWicket>>> getWickets(
+    String inningsId,
+  ) async {
+    try {
+      final dtos = await _remote.listWickets(inningsId);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  // ─── Scorer Lease ───────────────────────────────────────────────────────
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> acquireScorerLease({
+    required MatchId matchId,
+    required String deviceId,
+  }) async {
+    try {
+      final result = await _remote.acquireScorerLease(
+        matchId: matchId.value,
+        deviceId: deviceId,
+      );
+      return Right(result);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> heartbeatScorerLease({
+    required MatchId matchId,
+    required String deviceId,
+  }) async {
+    try {
+      final result = await _remote.heartbeatScorerLease(
+        matchId: matchId.value,
+        deviceId: deviceId,
+      );
+      return Right(result);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {

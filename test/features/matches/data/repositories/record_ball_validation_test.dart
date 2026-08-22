@@ -41,6 +41,22 @@ void main() {
         batsmanId: 'mp1',
         nonStrikerId: 'mp2',
         bowlerId: 'mp3',
+        // Every real draft carries the local engine's answer — the server has
+        // no engine of its own and stores these verbatim (design doc D10), so
+        // the repository refuses a draft without one. The values here stand in
+        // for whatever `applyBall` returned; these tests are about the wire
+        // shape of the delivery, not about the arithmetic.
+        computed: const ComputedDelivery(
+          overNumber: 0,
+          ballInOver: 1,
+          isFreeHit: false,
+          inningsEnded: false,
+          isAllOut: false,
+          ballsPerOver: 6,
+          strikerAfter: 'mp1',
+          nonStrikerAfter: 'mp2',
+          bowlerAfter: 'mp3',
+        ),
       );
 
   setUp(() {
@@ -84,6 +100,50 @@ void main() {
     // It got past validation; the StateError proves the call was attempted.
     expect(failure, isA<UnknownFailure>());
     verify(() => remote.recordBall(any())).called(1);
+  });
+
+  test('a draft that never ran the engine is refused before the wire', () async {
+    // Guards D10 at the repository boundary: the server stores what the device
+    // computed and computes nothing itself, so an uncomputed draft is
+    // unrecordable rather than merely incomplete.
+    final failure = await failureFor(
+      const BallDraft(
+        matchId: MatchId('m1'),
+        inningsNumber: 1,
+        isLegalDelivery: true,
+        ballKind: BallKind.legal,
+        runsScored: 1,
+        batsmanId: 'mp1',
+        nonStrikerId: 'mp2',
+        bowlerId: 'mp3',
+      ),
+    );
+
+    expect(failure, isA<ValidationFailure>());
+    verifyNever(() => remote.recordBall(any()));
+  });
+
+  test('the engine answer and the idempotency key reach the wire', () async {
+    when(() => remote.recordBall(any())).thenAnswer(
+      (_) async => throw StateError('reached the wire — shape was accepted'),
+    );
+
+    await failureFor(draft(kind: BallKind.legal, runsScored: 1).copyWith(
+      opId: 'op-abc',
+    ));
+
+    final sent = verify(() => remote.recordBall(captureAny())).captured.single
+        as Map<String, dynamic>;
+    // Without this key a retry after a dropped connection records the
+    // delivery twice — the exact failure the offline queue makes likely.
+    expect(sent['p_idempotency_key'], 'op-abc');
+    expect(sent['p_over_number'], 0);
+    expect(sent['p_ball_in_over'], 1);
+    expect(sent['p_striker_after'], 'mp1');
+    expect(sent['p_bowler_after'], 'mp3');
+    expect(sent['p_innings_ended'], isFalse);
+    // The optimistic-lock guard is gone (D12: one writer per innings).
+    expect(sent.containsKey('p_expected_version'), isFalse);
   });
 
   test('a no-ball still credits runs off the bat', () async {

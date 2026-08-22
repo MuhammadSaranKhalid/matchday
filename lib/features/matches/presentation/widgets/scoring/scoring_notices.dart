@@ -199,6 +199,71 @@ class SelectBowlerNotice extends StatelessWidget {
   }
 }
 
+/// Shown when a wicket has left an end empty.
+///
+/// Distinguishes "choose someone" from "there is no one left": a side that has
+/// run out of batters is not waiting on a tap, and offering one would be a
+/// dead end.
+class SelectBatterNotice extends StatelessWidget {
+  const SelectBatterNotice({
+    super.key,
+    required this.onSelect,
+    required this.anyAvailable,
+  });
+
+  final VoidCallback onSelect;
+  final bool anyAvailable;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: anyAvailable ? onSelect : null,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+            decoration: BoxDecoration(
+              color: anyAvailable ? CkColors.amber : CkColors.cream,
+              borderRadius: BorderRadius.circular(16),
+              border: anyAvailable
+                  ? null
+                  : Border.all(color: CkColors.line),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  anyAvailable ? Icons.person_add_alt : Icons.block,
+                  size: 18,
+                  color: anyAvailable ? CkColors.ink : CkColors.muted,
+                ),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    anyAvailable
+                        ? 'Select the next batter to continue'
+                        : 'No batters left to come in',
+                    textAlign: TextAlign.center,
+                    style: CkType.body(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: anyAvailable ? CkColors.ink : CkColors.muted,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // Shown when the innings has ended (all out / overs done). The screen routes
 // to the innings break or result in the same frame, so this is a brief bridge
 // rather than the run pad / bowler gate — never offer to score a dead innings.

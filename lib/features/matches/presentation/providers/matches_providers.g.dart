@@ -951,3 +951,261 @@ final class PoolApplicationsFamily extends $Family
   @override
   String toString() => r'poolApplicationsProvider';
 }
+
+/// Materialized batting scorecard for an innings (O(1) fast paint).
+
+@ProviderFor(batsmanScorecard)
+final batsmanScorecardProvider = BatsmanScorecardFamily._();
+
+/// Materialized batting scorecard for an innings (O(1) fast paint).
+
+final class BatsmanScorecardProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<MatchBatsmanStats>>,
+          List<MatchBatsmanStats>,
+          FutureOr<List<MatchBatsmanStats>>
+        >
+    with
+        $FutureModifier<List<MatchBatsmanStats>>,
+        $FutureProvider<List<MatchBatsmanStats>> {
+  /// Materialized batting scorecard for an innings (O(1) fast paint).
+  BatsmanScorecardProvider._({
+    required BatsmanScorecardFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'batsmanScorecardProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$batsmanScorecardHash();
+
+  @override
+  String toString() {
+    return r'batsmanScorecardProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<MatchBatsmanStats>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<MatchBatsmanStats>> create(Ref ref) {
+    final argument = this.argument as String;
+    return batsmanScorecard(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is BatsmanScorecardProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$batsmanScorecardHash() => r'69805799e962542e3bb40c25babbf90dc30fdc25';
+
+/// Materialized batting scorecard for an innings (O(1) fast paint).
+
+final class BatsmanScorecardFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<MatchBatsmanStats>>, String> {
+  BatsmanScorecardFamily._()
+    : super(
+        retry: null,
+        name: r'batsmanScorecardProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Materialized batting scorecard for an innings (O(1) fast paint).
+
+  BatsmanScorecardProvider call(String inningsId) =>
+      BatsmanScorecardProvider._(argument: inningsId, from: this);
+
+  @override
+  String toString() => r'batsmanScorecardProvider';
+}
+
+/// Materialized bowling scorecard for an innings (O(1) fast paint).
+
+@ProviderFor(bowlerScorecard)
+final bowlerScorecardProvider = BowlerScorecardFamily._();
+
+/// Materialized bowling scorecard for an innings (O(1) fast paint).
+
+final class BowlerScorecardProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<MatchBowlerStats>>,
+          List<MatchBowlerStats>,
+          FutureOr<List<MatchBowlerStats>>
+        >
+    with
+        $FutureModifier<List<MatchBowlerStats>>,
+        $FutureProvider<List<MatchBowlerStats>> {
+  /// Materialized bowling scorecard for an innings (O(1) fast paint).
+  BowlerScorecardProvider._({
+    required BowlerScorecardFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'bowlerScorecardProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$bowlerScorecardHash();
+
+  @override
+  String toString() {
+    return r'bowlerScorecardProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<MatchBowlerStats>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<MatchBowlerStats>> create(Ref ref) {
+    final argument = this.argument as String;
+    return bowlerScorecard(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is BowlerScorecardProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$bowlerScorecardHash() => r'c1b7b161227c7f4a212304c328139d09c2fcafe6';
+
+/// Materialized bowling scorecard for an innings (O(1) fast paint).
+
+final class BowlerScorecardFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<MatchBowlerStats>>, String> {
+  BowlerScorecardFamily._()
+    : super(
+        retry: null,
+        name: r'bowlerScorecardProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Materialized bowling scorecard for an innings (O(1) fast paint).
+
+  BowlerScorecardProvider call(String inningsId) =>
+      BowlerScorecardProvider._(argument: inningsId, from: this);
+
+  @override
+  String toString() => r'bowlerScorecardProvider';
+}
+
+/// Wickets fallen for an innings (fall of wickets timeline).
+
+@ProviderFor(inningsWickets)
+final inningsWicketsProvider = InningsWicketsFamily._();
+
+/// Wickets fallen for an innings (fall of wickets timeline).
+
+final class InningsWicketsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<MatchWicket>>,
+          List<MatchWicket>,
+          FutureOr<List<MatchWicket>>
+        >
+    with
+        $FutureModifier<List<MatchWicket>>,
+        $FutureProvider<List<MatchWicket>> {
+  /// Wickets fallen for an innings (fall of wickets timeline).
+  InningsWicketsProvider._({
+    required InningsWicketsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'inningsWicketsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$inningsWicketsHash();
+
+  @override
+  String toString() {
+    return r'inningsWicketsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<MatchWicket>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<MatchWicket>> create(Ref ref) {
+    final argument = this.argument as String;
+    return inningsWickets(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is InningsWicketsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$inningsWicketsHash() => r'b6be0db0fd9c34f12576d50c68b37b308e3eb595';
+
+/// Wickets fallen for an innings (fall of wickets timeline).
+
+final class InningsWicketsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<MatchWicket>>, String> {
+  InningsWicketsFamily._()
+    : super(
+        retry: null,
+        name: r'inningsWicketsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Wickets fallen for an innings (fall of wickets timeline).
+
+  InningsWicketsProvider call(String inningsId) =>
+      InningsWicketsProvider._(argument: inningsId, from: this);
+
+  @override
+  String toString() => r'inningsWicketsProvider';
+}

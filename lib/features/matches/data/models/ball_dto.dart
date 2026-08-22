@@ -32,8 +32,15 @@ abstract class BallDto with _$BallDto {
 
   const BallDto._();
 
-  factory BallDto.fromJson(Map<String, dynamic> json) =>
-      _$BallDtoFromJson(json);
+  factory BallDto.fromJson(Map<String, dynamic> json) {
+    final modified = Map<String, dynamic>.from(json);
+    modified['ball_id'] = (modified['delivery_id'] ?? modified['ball_id'] ?? modified['id'] ?? '').toString();
+    modified['runs_scored'] = (modified['runs_off_bat'] ?? modified['runs_scored'] ?? 0);
+    modified['extras'] = (modified['extra_runs'] ?? modified['extras'] ?? 0);
+    modified['ball_type'] = (modified['delivery_type'] ?? modified['ball_type'] ?? 'legal').toString();
+    modified['batsman_id'] = modified['striker_id'] ?? modified['batsman_id'];
+    return _$BallDtoFromJson(modified);
+  }
 
   Ball toEntity() => Ball(
         id: BallId(ballId),

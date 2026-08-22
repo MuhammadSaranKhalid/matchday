@@ -38,8 +38,17 @@ abstract class MatchDto with _$MatchDto {
 
   const MatchDto._();
 
-  factory MatchDto.fromJson(Map<String, dynamic> json) =>
-      _$MatchDtoFromJson(json);
+  factory MatchDto.fromJson(Map<String, dynamic> json) {
+    final modified = Map<String, dynamic>.from(json);
+    modified['match_id'] = (modified['match_id'] ?? modified['id'] ?? '').toString();
+    modified['team_a_id'] = (modified['team_a_id'] ?? '').toString();
+    modified['team_b_id'] = (modified['team_b_id'] ?? '').toString();
+    modified['format'] = (modified['format'] as Map<String, dynamic>?) ??
+        (modified['rules_config'] as Map<String, dynamic>?) ??
+        <String, dynamic>{};
+    modified['created_at'] = (modified['created_at'] ?? DateTime.now().toIso8601String()).toString();
+    return _$MatchDtoFromJson(modified);
+  }
 
   Match toEntity() => Match(
         id: MatchId(matchId),

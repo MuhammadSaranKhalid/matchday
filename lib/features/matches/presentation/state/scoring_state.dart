@@ -117,6 +117,24 @@ class ScoringState extends Equatable {
   /// True when the opening bowler has never been chosen for this innings.
   bool get needsOpeningBowler => !bowlerSet && balls.isEmpty;
 
+  /// Both ends are occupied.
+  ///
+  /// A wicket clears whichever end the dismissed batter was at, and the slot
+  /// stays empty until a replacement is chosen. Nothing used to notice: the run
+  /// pad stayed live, and deliveries were recorded against an empty end — a
+  /// real innings reached 182/5 with four consecutive wickets and then a single
+  /// scored by nobody.
+  bool get battersSet =>
+      (innings?.strikerId?.value ?? '').isNotEmpty &&
+      (innings?.nonStrikerId?.value ?? '').isNotEmpty;
+
+  /// A replacement batter is owed before the next delivery.
+  bool get needsBatter => !battersSet && !inningsOver;
+
+  /// Whether anyone is left to send in. False means the side has run out of
+  /// batters, which is a finished innings rather than a pending choice.
+  bool get hasBatterAvailable => availableBatters.isNotEmpty;
+
   // ── Score ────────────────────────────────────────────────────────────────
 
   int get legalBalls {

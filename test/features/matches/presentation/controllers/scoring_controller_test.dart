@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:matchday/core/error/failures.dart';
 import 'package:matchday/features/matches/domain/entities/ball.dart';
 import 'package:matchday/features/matches/domain/entities/match.dart';
 import 'package:matchday/features/matches/domain/entities/match_innings_state.dart';
@@ -110,6 +113,19 @@ Ball _ball({int runs = 4, String? id}) => Ball(
       bowlerId: 'mp9',
     );
 
+MatchInningsState _inningsAt({required int legalBalls, int version = 2}) =>
+    MatchInningsState(
+      matchId: const MatchId(_matchId),
+      inningsNumber: 1,
+      version: version,
+      updatedAt: DateTime(2026),
+      strikerId: const MatchPlayerId('mp1'),
+      nonStrikerId: const MatchPlayerId('mp2'),
+      bowlerId: const MatchPlayerId('mp9'),
+      totalRuns: legalBalls,
+      legalBallCount: legalBalls,
+    );
+
 void main() {
   late _MockMatchesRepo repo;
 
@@ -128,7 +144,10 @@ void main() {
   setUp(() {
     repo = _MockMatchesRepo();
     _seq = 0;
-    when(() => repo.pendingOpsCount()).thenAnswer((_) async => 0);
+    when(() => repo.pendingOpsCount(
+          matchId: any(named: 'matchId'),
+          inningsNumber: any(named: 'inningsNumber'),
+        )).thenAnswer((_) async => 0);
     when(() => repo.syncPendingOps(
           matchId: any(named: 'matchId'),
           inningsNumber: any(named: 'inningsNumber'),
@@ -189,6 +208,99 @@ void main() {
       verify(() => repo.recordBall(any())).called(1);
     });
 
+    test('a settle landing mid-over does not rewind the over position', () async {
+      // Regression: over 9 was recorded as 8.1, 8.2, 8.3, 8.4, 8.2, 8.3, 8.4 —
+      // positions repeating inside one over — and the following over then
+      // appeared to end after two deliveries, because four of its six had been
+      // filed into the previous one.
+      //
+      // `over_number` and `ball_in_over` are derived from legalBallCount at tap
+      // time. Settling a delivery used to adopt the server's innings row
+      // wholesale, but that row is only current as of THAT delivery. With
+      // further balls already tapped it dragged the count backwards, and the
+      // next tap reused a position that had already been issued.
+      //
+      // The count has to be dragged back BETWEEN taps to reproduce it: three
+      // taps in a row all build their drafts before any reply lands, so they
+      // advance correctly whether or not the bug is present.
+      final container = makeContainer(innings: _innings(version: 1));
+      await load(container);
+
+      var stored = 0;
+      final gates = <Completer<void>>[];
+      when(() => repo.recordBall(any())).thenAnswer((_) async {
+        final gate = Completer<void>();
+        gates.add(gate);
+        await gate.future;
+        stored += 1;
+        return Right(BallOutcome(
+          ball: _ball(runs: 1, id: 'server-$stored'),
+          // A server that is accurate about what it holds, and therefore
+          // BEHIND the device, which has already taken more deliveries.
+          innings: _inningsAt(legalBalls: stored),
+        ));
+      });
+
+      Future<void> pump() async {
+        for (var i = 0; i < 8; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+      }
+
+      await notifier(container).recordRun(1);
+      await notifier(container).recordRun(1);
+      await notifier(container).recordRun(1);
+      await pump();
+
+      // Let ONLY the first write land. The device is now three deliveries in;
+      // the server's reply knows about one.
+      gates.first.complete();
+      await pump();
+
+      // The scorer taps again while the queue is still draining.
+      await notifier(container).recordRun(1);
+      await pump();
+
+      // Release the rest so every draft reaches the repository to be inspected.
+      // Index-based: the stub appends a new gate as each queued write starts,
+      // so the list grows while we are draining it.
+      for (var i = 0; i < gates.length; i++) {
+        if (!gates[i].isCompleted) gates[i].complete();
+        await pump();
+      }
+
+      final drafts = verify(() => repo.recordBall(captureAny()))
+          .captured
+          .cast<BallDraft>();
+
+      expect(drafts.length, 4);
+      expect(
+        drafts.map((d) => d.computed!.ballInOver).toList(),
+        [1, 2, 3, 4],
+        reason: 'a reply landing mid-over must not re-issue a used position',
+      );
+    });
+
+    test('a delivery is refused while an end is empty', () async {
+      // Regression: four consecutive wickets left the non-striker's end vacant,
+      // and the pad stayed live — a single was then recorded against nobody.
+      // There was a guard for a missing bowler and none for a missing batter.
+      final container = makeContainer(
+        innings: _innings(version: 1).copyWith(clearNonStriker: true),
+      );
+      await load(container);
+
+      final result = await notifier(container).recordRun(1);
+
+      expect(result.isLeft(), isTrue);
+      expect(
+        result.getLeft().toNullable(),
+        isA<ValidationFailure>(),
+        reason: 'nobody is at the non-striker end to run the single',
+      );
+      verifyNever(() => repo.recordBall(any()));
+    });
+
     test('an illegal delivery is refused before touching repository', () async {
       final container = makeContainer(
         innings: _innings(version: 1),
@@ -214,7 +326,7 @@ void main() {
       when(() => repo.undoLastBall(
             matchId: any(named: 'matchId'),
             inningsNumber: any(named: 'inningsNumber'),
-          )).thenAnswer((_) async => const Right(true));
+          )).thenAnswer((_) async => const Right(UndoOutcome.removedStored()));
 
       final result = await notifier(container).undoLastBall();
 
@@ -223,6 +335,97 @@ void main() {
             matchId: const MatchId(_matchId),
             inningsNumber: 1,
           )).called(1);
+    });
+
+    test('undo stays available while writes are queued', () async {
+      // Regression: `canUndo` required pendingCount == 0, so once writes stopped
+      // landing — out of coverage, exactly when a mis-tap most needs taking
+      // back — undo was disabled permanently. The repository had always
+      // handled an unsent delivery by discarding the queued write; nothing
+      // could reach that path.
+      final container = makeContainer(innings: _innings(version: 1));
+      await load(container);
+
+      final gate = Completer<void>();
+      when(() => repo.recordBall(any())).thenAnswer((_) async {
+        await gate.future;
+        return Right(BallOutcome(
+          ball: _ball(runs: 1, id: 'server-1'),
+          innings: _inningsAt(legalBalls: 1),
+        ));
+      });
+
+      await notifier(container).recordRun(1);
+      final painted = await load(container);
+      expect(painted.hasPending, isTrue, reason: 'the write has not landed');
+      expect(
+        painted.canScore && painted.balls.isNotEmpty,
+        isTrue,
+        reason: 'the screen gates undo on exactly this, and it must hold '
+            'while a delivery is still queued',
+      );
+
+      gate.complete();
+    });
+
+    test('a stored delivery is undone on the server, not locally', () async {
+      // Regression: the repository chose between the two undo paths by looking
+      // at the write-ahead log alone. After a spell of failed writes the log
+      // held ops matching nothing on screen, so Undo discarded one of those and
+      // appeared to do nothing at all — while the delivery the scorer wanted
+      // gone stayed exactly where it was.
+      final container = makeContainer(
+        innings: _innings(version: 2, runs: 4),
+        balls: [_ball(runs: 4, id: 'server-1')],
+      );
+      await load(container);
+      when(() => repo.undoLastBall(
+            matchId: any(named: 'matchId'),
+            inningsNumber: any(named: 'inningsNumber'),
+            pendingOpId: any(named: 'pendingOpId'),
+          )).thenAnswer((_) async => const Right(UndoOutcome.removedStored()));
+
+      await notifier(container).undoLastBall();
+
+      final captured = verify(() => repo.undoLastBall(
+            matchId: any(named: 'matchId'),
+            inningsNumber: any(named: 'inningsNumber'),
+            pendingOpId: captureAny(named: 'pendingOpId'),
+          )).captured.single;
+
+      expect(
+        captured,
+        isNull,
+        reason: 'the last delivery is a stored row, so there is no queued '
+            'write to discard — this must go to the server',
+      );
+    });
+
+    test('undoing a queued delivery does not re-read the server', () async {
+      // The server has never seen an unsent delivery, so its ball list omits
+      // every one of them. Re-reading after a purely local undo wiped the rest
+      // of the queue off the screen.
+      final container = makeContainer(
+        innings: _innings(version: 2, runs: 4),
+        balls: [_ball(runs: 4)],
+      );
+      await load(container);
+      when(() => repo.undoLastBall(
+            matchId: any(named: 'matchId'),
+            inningsNumber: any(named: 'inningsNumber'),
+          )).thenAnswer(
+        (_) async => const Right(UndoOutcome.discardedPending('op-1')),
+      );
+
+      clearInteractions(repo);
+      final result = await notifier(container).undoLastBall();
+
+      expect(result.isRight(), isTrue);
+      verifyNever(() => repo.listBalls(any(), any()));
+      verifyNever(() => repo.getMatchInningsState(
+            matchId: any(named: 'matchId'),
+            inningsNumber: any(named: 'inningsNumber'),
+          ));
     });
   });
 

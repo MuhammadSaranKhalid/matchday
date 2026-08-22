@@ -1,13 +1,21 @@
 # Novex Clean Architecture — Project Guide
 
-> **🟥 ARCHITECTURAL CONSTRAINT (2026-05-26, AMENDED 2026-06-07): This codebase is ONLINE-ONLY with one narrow exemption.**
+> **🟥 ARCHITECTURAL CONSTRAINT (2026-05-26, AMENDED 2026-06-07 and 2026-08-22): This codebase is ONLINE-ONLY with two scoped exemptions.**
 > The offline-first patterns described in some sections below (Rule 7, §6.4 Offline-First Sync, the offline variant of §5.2 / §7) are **NOT in use**. The `todos` reference feature, `lib/core/sync/` infrastructure, `pending_operations` queue, `TeamsLocalDataSource`, and all LWW machinery have been removed.
 >
-> **EXEMPTION (2026-06-07, ticket #23) — `messages` feature only.** Messages has a drift-backed **read-through cache** for the inbox (`messages_chats`) and threads (`messages_messages`), plus a tiny **composer drafts** table (`messages_drafts`). Writes still go to Supabase first; the cache is a cold-start / instant-paint optimisation. There is **still** NO pending-ops queue, NO sync service, NO LWW. Sign-out wipes everything via `AppDatabase.clear()`. The exemption is scoped to messages; other features (teams / posts / matches / pavilion / profile) remain online-only.
+> **EXEMPTION (2026-06-07, ticket #23) — `messages` feature only.** Messages has a drift-backed **read-through cache** for the inbox (`messages_chats`) and threads (`messages_messages`), plus a tiny **composer drafts** table (`messages_drafts`). Writes still go to Supabase first; the cache is a cold-start / instant-paint optimisation. There is **still** NO pending-ops queue, NO sync service, NO LWW. Sign-out wipes everything via `AppDatabase.clear()`. This exemption is scoped to messages.
 >
-> When adding ANY OTHER feature: follow the **online-only** variant. Repositories talk to Supabase directly via a remote data source; reads return `Future<Either<Failure, T>>` or wrap a Supabase real-time stream; writes call the remote and translate exceptions. No drift table (except `WizardDrafts` + the messages cache tables above), no pending ops, no SyncService.
+> **EXEMPTION 2 (2026-08-22) — the `matches` live-scoring write path only.** Ball-by-ball scoring is **local-first**. Deliveries are computed on-device by the Dart scoring engine (`lib/features/matches/domain/scoring/`), appended to a drift-backed write-ahead log (`ScoringOps`, `ScoringSnapshots`), applied to the UI immediately, and drained to Supabase by a background outbox keyed on a client-generated idempotency uuid. The scoring device is the **authority on the arithmetic** of the innings it is scoring; `record-ball` does **not** recompute the delivery — it authorizes the writer, rejects duplicates by idempotency key, stores the row and sums the innings.
 >
-> Do NOT generalise the messages cache to other features without explicit user agreement. Do NOT propose offline-first patterns "for resilience" or "for faster reads" in any other feature. This restriction holds until explicitly lifted.
+> The rules of cricket live in **exactly one place**: the Dart engine. Its specification is `supabase/functions/_shared/scoring/vectors.json`, executed by the Dart test suite. **A change to scoring rules is a change to the vectors first.** Do NOT add cricket arithmetic to an edge function or a database trigger — three disagreeing implementations appeared that way once already.
+>
+> Strictly scoped to **recording deliveries in an already-started innings**. Match creation, toss, lineup lock, challenges, the innings-break handover, and every read surface outside the scoring screen stay online-only. One scorer per innings — the batting side scores its own, control passes at the break — so there is still NO sync service, NO LWW and NO merge logic: it is a single-writer append-only queue with an idempotency key, which needs none of those. A score may be provisional; **a result may never be rendered from local computation.** Full rationale and decision log: `docs/offline-scoring-design.md`.
+>
+> Do NOT generalise this to other features. The properties that make it safe here — single writer, append-only, deterministic, bounded — do not hold elsewhere.
+>
+> When adding ANY OTHER feature: follow the **online-only** variant. Repositories talk to Supabase directly via a remote data source; reads return `Future<Either<Failure, T>>` or wrap a Supabase real-time stream; writes call the remote and translate exceptions. No drift table (except `WizardDrafts`, the messages cache tables, and the scoring WAL above), no pending ops, no SyncService.
+>
+> Do NOT generalise the messages cache or the scoring WAL to other features without explicit user agreement. Do NOT propose offline-first patterns "for resilience" or "for faster reads" in any other feature. This restriction holds until explicitly lifted.
 
 > **🟥 ARCHITECTURAL CONSTRAINT (2026-05-29): NO USE-CASE LAYER.**
 > The Use Case / Interactor layer described in §5.1 (`domain/usecases/<verb>.dart`), §7 Step 2.4, §8, and §9, plus `lib/core/usecase/usecase.dart` (the `UseCase` / `StreamUseCase` / `NoParams` contracts), have been **removed from this codebase**. Controllers and presentation providers depend on **repositories directly** via `ref.read(<feature>RepositoryProvider).method(...)`. Business rules and value-object validation live inside the repository implementation (so the controller hands raw inputs to the repo, which returns `Either<ValidationFailure, T>` or `Either<DomainFailure, T>`). Form-level input validation may still happen in the controller before the repo call (e.g. `Username.create(...)`).
@@ -22,7 +30,7 @@ The README.md is a human-readable overview of the same architecture. This file (
 
 ## 1. What this codebase is
 
-A **foundation** — not a product. It's a Flutter chassis built with Clean Architecture, Riverpod 3.x, and Supabase. As of 2026-05-26 it is **online-only** — every feature reads/writes directly against Supabase. The drift package is retained ONLY for the `WizardDrafts` table (transient multi-step form persistence); no other local DB usage exists.
+A **foundation** — not a product. It's a Flutter chassis built with Clean Architecture, Riverpod 3.x, and Supabase. As of 2026-05-26 it is **online-only by default** — every feature reads/writes directly against Supabase — with two scoped exemptions (see the banner): the `messages` read-through cache, and the `matches` local-first scoring write path added 2026-08-22. Drift backs `WizardDrafts`, the messages cache, and the scoring write-ahead log; nothing else is mirrored locally.
 
 History note: the codebase originally shipped with offline-first scaffolding (a `todos` reference feature, a `SyncService`, a `pending_operations` queue, LWW upserts, and a local mirror of teams). All of that was removed on 2026-05-26 per a deliberate architectural decision. Sections in this doc that describe offline-first patterns are kept as historical reference but are NOT applicable to new code — see the banner at the top.
 
@@ -88,9 +96,13 @@ Riverpod imports are FORBIDDEN in:
 
 If adding a new provider would create an import cycle between files, split the provider definitions into a separate "providers-only" file (see `lib/features/todos/data/datasources/todos_datasource_providers.dart` for the pattern). Never use forward declarations, late initialization hacks, or `late final` workarounds.
 
-### Rule 7 — All features are online-only
+### Rule 7 — Features are online-only unless the banner exempts them
 
-> **🟥 SUPERSEDED 2026-05-26.** The original Rule 7 described a split between offline-first and online-only features. As of 2026-05-26 there is no offline-first capability in this codebase. Every repository's read and write methods talk to the remote data source directly. No drift tables (except `WizardDrafts`), no pending ops, no sync service. The matches feature is the canonical online-only shape; teams was converted to match it.
+> **🟥 SUPERSEDED 2026-05-26, AMENDED 2026-08-22.** The original Rule 7 described a general split between offline-first and online-only features; that general capability is gone and must not return. Repositories talk to the remote data source directly. No `SyncService`, no `pending_operations` queue, no LWW anywhere.
+>
+> Two scoped exemptions exist, both listed in the banner at the top of this file and nowhere else: the `messages` read-through cache (2026-06-07) and the `matches` live-scoring write path (2026-08-22). Neither is a template. `teams` is the canonical online-only shape — read it, not `matches`, when building a new feature.
+>
+> Note the trap in reading `matches`: its **scoring write path** is local-first, and everything else about it (setup, toss, lineup, challenges, reads) is online-only. Do not infer the pattern from the feature; infer it from the banner.
 
 ---
 
@@ -105,7 +117,7 @@ lib/
 │   ├── supabase/
 │   │   └── supabase_client_provider.dart # SupabaseClient as a keepAlive provider
 │   ├── database/
-│   │   ├── tables.dart                   # ONLY WizardDrafts (transient form state — not domain data)
+│   │   ├── tables.dart                   # WizardDrafts + messages cache + scoring WAL (see banner)
 │   │   ├── app_database.dart             # @DriftDatabase class
 │   │   ├── wizard_draft_store.dart       # best-effort local persistence for multi-step wizard drafts
 │   │   └── database_provider.dart        # appDatabase + wizardDraftStore keepAlive providers
@@ -138,7 +150,7 @@ lib/
     ├── location/                         # FULL — Places autocomplete + GPS for profile geo
     ├── notifications/                    # FULL — match-event feed + bell badge
     ├── teams/                            # FULL — online-only teams (create/hub/manage)
-    ├── matches/                          # FULL — online-only match setup + live scoring
+    ├── matches/                          # FULL — online-only setup; LOCAL-FIRST scoring write path (banner, exemption 2)
     ├── posts/                            # FULL — online-only feed + photo composer
     └── <your_feature>/                   # online-only by default; see §7
 
@@ -170,7 +182,7 @@ test/
     └── presentation/controllers/<name>_test.dart   # Notifier tests with ProviderContainer.test() + overrideWithValue
 ```
 
-The only drift table in this codebase is `WizardDrafts` (transient form state for multi-step wizards). All domain data lives in Supabase; no domain entity is mirrored locally.
+Drift backs three things and nothing else: `WizardDrafts` (transient multi-step form state), the `messages` read-through cache, and the scoring write-ahead log (`ScoringOps`, `ScoringSnapshots`). Both caches are covered by named exemptions in the banner. No other domain entity is mirrored locally.
 
 ---
 
@@ -1462,7 +1474,7 @@ When any of these come up for the first time, follow Section 13's guidance: exte
 
 ## 14. Online-only reference features — quick map
 
-The `todos` reference feature and all offline-first wiring were removed on 2026-05-26. The current canonical online-only references are `matches` (one-shot reads + real-time streams for live data) and `teams` (real-time stream reads + direct write-through). When you need to see how a pattern is implemented in this codebase:
+The `todos` reference feature and all general offline-first wiring were removed on 2026-05-26. `teams` (real-time stream reads + direct write-through) is the reference to copy for a new feature. `matches` is a useful reference for its **online-only** surfaces only — its scoring write path is local-first under exemption 2 and is NOT the pattern for a new feature. When you need to see how a pattern is implemented in this codebase:
 
 | Concern | Where to look |
 |---|---|
@@ -1472,7 +1484,8 @@ The `todos` reference feature and all offline-first wiring were removed on 2026-
 | AsyncNotifier composing cross-feature providers (calls `matchesRepositoryProvider` directly) | `lib/features/teams/presentation/controllers/teams_list_controller.dart` |
 | Provider DI shape (no use-case providers — just `<feature>Repository` + intermediate `Stream`/`Future` views) | `lib/features/teams/presentation/providers/teams_providers.dart`, `lib/features/matches/presentation/providers/matches_providers.dart` |
 | Controller calling repo directly with value-object validation inlined | `lib/features/onboarding/presentation/controllers/onboarding_controller.dart` (`submit`), `lib/features/teams/presentation/controllers/add_unclaimed_player_controller.dart` (`submit`) |
-| Wizard draft persistence (the only drift use) | `lib/core/database/wizard_draft_store.dart` + `lib/core/database/tables.dart` |
+| Wizard draft persistence | `lib/core/database/wizard_draft_store.dart` + `lib/core/database/tables.dart` |
+| **Local-first write path (exemption 2 — do not copy without agreement)** | `lib/features/matches/data/datasources/matches_local_datasource.dart` (WAL + outbox), `lib/features/matches/presentation/controllers/scoring_controller.dart` (apply-locally-then-drain), `docs/offline-scoring-design.md` (rationale) |
 ---
 
 ## 15. Posts feature + image/media spec

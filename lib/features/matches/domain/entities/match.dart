@@ -98,6 +98,51 @@ class Match extends Equatable {
   /// [MatchStatus.isActive].
   bool get isActive => status.isActive;
 
+  Match copyWith({
+    MatchId? id,
+    TeamId? teamAId,
+    TeamId? teamBId,
+    MatchFormat? format,
+    MatchStatus? status,
+    MatchType? matchType,
+    String? createdBy,
+    DateTime? createdAt,
+    String? teamACaptain,
+    String? teamBCaptain,
+    Venue? venue,
+    DateTime? scheduledStartTime,
+    DateTime? actualStartTime,
+    String? resultDescription,
+    TeamId? tossWonBy,
+    TossDecision? tossDecision,
+    String? tossFace,
+    MatchStartPhase? startPhase,
+    String? openersSubmittedBy,
+    DateTime? openersSubmittedAt,
+  }) =>
+      Match(
+        id: id ?? this.id,
+        teamAId: teamAId ?? this.teamAId,
+        teamBId: teamBId ?? this.teamBId,
+        format: format ?? this.format,
+        status: status ?? this.status,
+        matchType: matchType ?? this.matchType,
+        createdBy: createdBy ?? this.createdBy,
+        createdAt: createdAt ?? this.createdAt,
+        teamACaptain: teamACaptain ?? this.teamACaptain,
+        teamBCaptain: teamBCaptain ?? this.teamBCaptain,
+        venue: venue ?? this.venue,
+        scheduledStartTime: scheduledStartTime ?? this.scheduledStartTime,
+        actualStartTime: actualStartTime ?? this.actualStartTime,
+        resultDescription: resultDescription ?? this.resultDescription,
+        tossWonBy: tossWonBy ?? this.tossWonBy,
+        tossDecision: tossDecision ?? this.tossDecision,
+        tossFace: tossFace ?? this.tossFace,
+        startPhase: startPhase ?? this.startPhase,
+        openersSubmittedBy: openersSubmittedBy ?? this.openersSubmittedBy,
+        openersSubmittedAt: openersSubmittedAt ?? this.openersSubmittedAt,
+      );
+
   @override
   List<Object?> get props => [
         id,

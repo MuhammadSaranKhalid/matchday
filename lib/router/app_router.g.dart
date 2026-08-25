@@ -14,11 +14,10 @@ part of 'app_router.dart';
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
 ///
-/// Authenticated users land in the five-tab shell (Home · Search · Matches ·
-/// Pool · Profile — D9 in docs/search-feature-design.md, amended 2026-08-21
-/// when Pool replaced Pavilion in the bar) via a
+/// Authenticated users land in the four-tab shell (Home · Explore · Matches ·
+/// Pool — N5 in docs/navigation-ia-design.md) via a
 /// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
-/// profile is a root-level route reached from the header avatar.
+/// profile is a root-level route reached from the drawer masthead.
 /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
 /// added in Feature 2 alongside the `profiles` table.
 
@@ -31,11 +30,10 @@ final appRouterProvider = AppRouterProvider._();
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
 ///
-/// Authenticated users land in the five-tab shell (Home · Search · Matches ·
-/// Pool · Profile — D9 in docs/search-feature-design.md, amended 2026-08-21
-/// when Pool replaced Pavilion in the bar) via a
+/// Authenticated users land in the four-tab shell (Home · Explore · Matches ·
+/// Pool — N5 in docs/navigation-ia-design.md) via a
 /// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
-/// profile is a root-level route reached from the header avatar.
+/// profile is a root-level route reached from the drawer masthead.
 /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
 /// added in Feature 2 alongside the `profiles` table.
 
@@ -48,11 +46,10 @@ final class AppRouterProvider
   /// When it flips (sign in / sign out), the router re-evaluates and moves
   /// the user accordingly.
   ///
-  /// Authenticated users land in the five-tab shell (Home · Search · Matches ·
-  /// Pool · Profile — D9 in docs/search-feature-design.md, amended 2026-08-21
-  /// when Pool replaced Pavilion in the bar) via a
+  /// Authenticated users land in the four-tab shell (Home · Explore · Matches ·
+  /// Pool — N5 in docs/navigation-ia-design.md) via a
   /// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
-  /// profile is a root-level route reached from the header avatar.
+  /// profile is a root-level route reached from the drawer masthead.
   /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
   /// added in Feature 2 alongside the `profiles` table.
   AppRouterProvider._()
@@ -88,4 +85,4 @@ final class AppRouterProvider
   }
 }
 
-String _$appRouterHash() => r'667814d319fee0c7d5ef7c2493f1444488e9fa0b';
+String _$appRouterHash() => r'9398ed374f56b6295219a6267a1ba2b6f48eee51';

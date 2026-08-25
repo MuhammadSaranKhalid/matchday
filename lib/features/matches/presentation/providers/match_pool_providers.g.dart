@@ -105,12 +105,12 @@ String _$openMatchPoolHash() => r'79d2c4c0f7f819e5e4d122d81d901c4a14a39caa';
 
 /// Active match pool challenges hosted by user's own teams.
 
-@ProviderFor(myPoolBroadcasts)
-final myPoolBroadcastsProvider = MyPoolBroadcastsProvider._();
+@ProviderFor(myPoolRequests)
+final myPoolRequestsProvider = MyPoolRequestsProvider._();
 
 /// Active match pool challenges hosted by user's own teams.
 
-final class MyPoolBroadcastsProvider
+final class MyPoolRequestsProvider
     extends
         $FunctionalProvider<
           AsyncValue<List<OpenMatchPoolItem>>,
@@ -121,19 +121,19 @@ final class MyPoolBroadcastsProvider
         $FutureModifier<List<OpenMatchPoolItem>>,
         $FutureProvider<List<OpenMatchPoolItem>> {
   /// Active match pool challenges hosted by user's own teams.
-  MyPoolBroadcastsProvider._()
+  MyPoolRequestsProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'myPoolBroadcastsProvider',
+        name: r'myPoolRequestsProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$myPoolBroadcastsHash();
+  String debugGetCreateSourceHash() => _$myPoolRequestsHash();
 
   @$internal
   @override
@@ -143,11 +143,11 @@ final class MyPoolBroadcastsProvider
 
   @override
   FutureOr<List<OpenMatchPoolItem>> create(Ref ref) {
-    return myPoolBroadcasts(ref);
+    return myPoolRequests(ref);
   }
 }
 
-String _$myPoolBroadcastsHash() => r'fd0f7a4377678bc172482ffec21f8c18bcc60efb';
+String _$myPoolRequestsHash() => r'f0538e27ab27012bce929d689c50ccde819f7afe';
 
 /// Applications for a specific match pool challenge.
 

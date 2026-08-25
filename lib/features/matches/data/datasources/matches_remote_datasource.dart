@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
-import '../../../../core/log/ck_log.dart';
 import '../models/ball_dto.dart';
 import '../models/match_batsman_stats_dto.dart';
 import '../models/match_bowler_stats_dto.dart';
@@ -154,19 +153,9 @@ class MatchesRemoteDataSource {
   /// having every one of them timestamped is what makes a two-phone session
   /// reconstructable after the fact.
   Future<void> _startRpc(String name, Map<String, dynamic> params) async {
-    final sw = Stopwatch()..start();
-    CkLog.write(CkLogChannel.rpc, '$name·call', data: params);
     try {
       await _supabase.rpc<void>(name, params: params);
-      CkLog.write(CkLogChannel.rpc, '$name·ok', data: {'took': sw.elapsed});
     } on PostgrestException catch (e) {
-      // The SQLSTATE is the part worth seeing — 42501 is an authorisation
-      // problem, 23000 a rule violation, and they need different responses.
-      CkLog.warn(CkLogChannel.rpc, '$name·fail', data: {
-        'took': sw.elapsed,
-        'code': e.code,
-        'msg': e.message,
-      });
       throw _rpcException(e);
     }
   }
@@ -243,39 +232,19 @@ class MatchesRemoteDataSource {
     // MatchDto is freezed, so `==` is a full value comparison. That makes
     // duplicate broadcasts, replayed frames and redundant polls free to drop.
     void emit(MatchDto? dto, String source) {
-      if (hasEmitted && dto == last) {
-        // Worth seeing: a dropped frame here is the dedup working, and its
-        // absence is how you spot the socket delivering nothing at all.
-        CkLog.write(CkLogChannel.realtime, 'dedup·drop',
-            data: {'match': matchId, 'via': source});
-        return;
-      }
+      if (hasEmitted && dto == last) return;
       hasEmitted = true;
       last = dto;
-      CkLog.write(CkLogChannel.realtime, 'emit', data: {
-        'match': matchId,
-        'via': source,
-        'phase': dto?.startPhase,
-        'status': dto?.status,
-      });
       if (!controller.isClosed) controller.add(dto);
     }
 
     Future<void> resnapshot(String reason) async {
       if (refreshing || controller.isClosed) return;
       refreshing = true;
-      final sw = Stopwatch()..start();
       try {
         final dto = await getById(matchId);
-        CkLog.write(CkLogChannel.realtime, 'snapshot',
-            data: {'match': matchId, 'why': reason, 'took': sw.elapsed});
         emit(dto, 'snapshot·$reason');
-      } catch (e, st) {
-        // A failed refresh is never fatal — the next trigger retries. Only
-        // surface an error if we have nothing at all to show yet.
-        CkLog.warn(CkLogChannel.realtime, 'snapshot·fail',
-            data: {'match': matchId, 'why': reason, 'took': sw.elapsed},
-            error: e, stackTrace: st);
+      } catch (e) {
         if (!hasEmitted && !controller.isClosed) {
           controller.addError(
             ServerException('Could not load match $matchId'),
@@ -300,39 +269,22 @@ class MatchesRemoteDataSource {
       ),
     );
 
-    CkLog.write(CkLogChannel.realtime, 'subscribe', data: {
-      'match': matchId,
-      'replay': '${_replayWindow.inMinutes}m/$_replayLimit',
-    });
-
     channel
         .onBroadcast(
           event: 'match_state_updated',
           callback: (payload) {
             try {
-              // `meta.replayed` marks a frame Supabase re-delivered rather
-              // than one that arrived live — the difference between "the
-              // socket is working" and "the socket dropped and recovered".
               final replayed = _wasReplayed(payload);
-              CkLog.write(CkLogChannel.realtime, 'broadcast',
-                  data: {'match': matchId, 'replayed': replayed});
               emit(
                 MatchDto.fromJson(_unwrapBroadcast(payload)),
                 replayed ? 'replay' : 'live',
               );
-            } catch (e, st) {
-              // Malformed frame — fall back to the row rather than erroring
-              // out a stream the whole screen depends on.
-              CkLog.warn(CkLogChannel.realtime, 'broadcast·bad',
-                  data: {'match': matchId}, error: e, stackTrace: st);
+            } catch (_) {
               resnapshot('bad-frame');
             }
           },
         )
         .subscribe((status, error) {
-          CkLog.write(CkLogChannel.realtime, 'channel',
-              data: {'match': matchId, 'status': status.name, 'err': error});
-          // Fires on the first connect AND on every reconnect.
           if (status == RealtimeSubscribeStatus.subscribed) {
             resnapshot('subscribed');
           }
@@ -345,7 +297,6 @@ class MatchesRemoteDataSource {
     final poll = Timer.periodic(_pollInterval, (_) => resnapshot('poll'));
 
     controller.onCancel = () async {
-      CkLog.write(CkLogChannel.realtime, 'close', data: {'match': matchId});
       poll.cancel();
       await _supabase.removeChannel(channel);
       await controller.close();
@@ -437,44 +388,22 @@ class MatchesRemoteDataSource {
     var refreshing = false;
 
     void emit(MatchInningsStateDto? dto, String source) {
-      if (hasEmitted && dto == last) {
-        CkLog.write(CkLogChannel.realtime, 'dedup·drop',
-            data: {'match': matchId, 'inns': inningsNumber, 'via': source});
-        return;
-      }
+      if (hasEmitted && dto == last) return;
       hasEmitted = true;
       last = dto;
-      CkLog.write(CkLogChannel.realtime, 'emit·inns', data: {
-        'match': matchId,
-        'inns': inningsNumber,
-        'via': source,
-        'striker': dto?.strikerId,
-        'nonStriker': dto?.nonStrikerId,
-        'ver': dto?.version,
-      });
       if (!controller.isClosed) controller.add(dto);
     }
 
     Future<void> resnapshot(String reason) async {
       if (refreshing || controller.isClosed) return;
       refreshing = true;
-      final sw = Stopwatch()..start();
       try {
         final dto = await getMatchInningsState(
           matchId: matchId,
           inningsNumber: inningsNumber,
         );
-        CkLog.write(CkLogChannel.realtime, 'snapshot·inns', data: {
-          'match': matchId,
-          'inns': inningsNumber,
-          'why': reason,
-          'took': sw.elapsed,
-        });
         emit(dto, 'snapshot·$reason');
-      } catch (e, st) {
-        CkLog.warn(CkLogChannel.realtime, 'snapshot·inns·fail',
-            data: {'match': matchId, 'inns': inningsNumber, 'why': reason},
-            error: e, stackTrace: st);
+      } catch (_) {
         if (!hasEmitted && !controller.isClosed) {
           controller.addError(
             ServerException('Could not load innings $inningsNumber'),
@@ -508,34 +437,14 @@ class MatchesRemoteDataSource {
               final dto =
                   MatchInningsStateDto.fromJson(_unwrapBroadcast(payload));
               // The topic carries every innings; ignore the others.
-              if (dto.inningsNumber != inningsNumber) {
-                CkLog.write(CkLogChannel.realtime, 'broadcast·other', data: {
-                  'match': matchId,
-                  'want': inningsNumber,
-                  'got': dto.inningsNumber,
-                });
-                return;
-              }
-              CkLog.write(CkLogChannel.realtime, 'broadcast·inns', data: {
-                'match': matchId,
-                'inns': inningsNumber,
-                'replayed': replayed,
-              });
+              if (dto.inningsNumber != inningsNumber) return;
               emit(dto, replayed ? 'replay' : 'live');
-            } catch (e, st) {
-              CkLog.warn(CkLogChannel.realtime, 'broadcast·inns·bad',
-                  data: {'match': matchId}, error: e, stackTrace: st);
+            } catch (_) {
               resnapshot('bad-frame');
             }
           },
         )
         .subscribe((status, error) {
-          CkLog.write(CkLogChannel.realtime, 'channel·inns', data: {
-            'match': matchId,
-            'inns': inningsNumber,
-            'status': status.name,
-            'err': error,
-          });
           if (status == RealtimeSubscribeStatus.subscribed) {
             resnapshot('subscribed');
           }
@@ -546,8 +455,6 @@ class MatchesRemoteDataSource {
     final poll = Timer.periodic(_pollInterval, (_) => resnapshot('poll'));
 
     controller.onCancel = () async {
-      CkLog.write(CkLogChannel.realtime, 'close·inns',
-          data: {'match': matchId, 'inns': inningsNumber});
       poll.cancel();
       await _supabase.removeChannel(channel);
       await controller.close();
@@ -572,27 +479,12 @@ class MatchesRemoteDataSource {
   /// that predates `returning *` on the innings update — the caller then falls
   /// back to the realtime broadcast, as it always used to.
   Future<RecordBallResult> recordBall(Map<String, dynamic> params) async {
-    final sw = Stopwatch()..start();
-    CkLog.write(CkLogChannel.rpc, 'record-ball·call', data: {
-      'match': params['p_match_id'],
-      'inns': params['p_innings_number'],
-      'runs': params['p_runs_scored'],
-      'extras': params['p_extras'],
-      'wicket': params['p_is_wicket'],
-      'ver': params['p_expected_version'],
-    });
     try {
       final res = await _supabase.functions.invoke('record-ball', body: params);
       final data = res.data;
       final ball = data is Map ? data['ball'] : null;
       if (ball is Map) {
         final innings = data is Map ? data['innings'] : null;
-        CkLog.write(CkLogChannel.rpc, 'record-ball·ok', data: {
-          'took': sw.elapsed,
-          // Whether the reply carried the new score, or we still have to wait
-          // for the broadcast. Worth seeing in a field log.
-          'inline': innings is Map,
-        });
         return RecordBallResult(
           ball: BallDto.fromJson(Map<String, dynamic>.from(ball)),
           innings: innings is Map
@@ -601,12 +493,6 @@ class MatchesRemoteDataSource {
               : null,
         );
       }
-      // A 200 with the wrong shape — the function ran but returned something
-      // unexpected. Log the body; the shape is the whole diagnosis.
-      CkLog.warn(CkLogChannel.rpc, 'record-ball·shape', data: {
-        'took': sw.elapsed,
-        'body': data?.toString(),
-      });
       throw ServerException('record-ball returned no ball row');
     } on FunctionException catch (e) {
       throw _functionException(e);
@@ -788,12 +674,6 @@ class MatchesRemoteDataSource {
   /// `{ conflict:true }`) body, surfaced on [FunctionException.details].
   Exception _functionException(FunctionException e) {
     final msg = _functionErrorMessage(e);
-
-    CkLog.warn(CkLogChannel.rpc, 'record-ball·fail', data: {
-      'status': e.status,
-      'msg': msg,
-      'details': e.details?.toString(),
-    });
 
     switch (e.status) {
       case 409:

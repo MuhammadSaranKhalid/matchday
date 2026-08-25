@@ -595,13 +595,13 @@ class _Badge extends StatelessWidget {
   }
 }
 
-/// The five v2 bottom-nav destinations: Home · Explore · Matches · Pool · Profile.
+/// The four v2 bottom-nav destinations: Home · Explore · Matches · Pool.
 ///
-/// Pavilion held the fourth slot until 2026-08-21; it is now reached from the
-/// Management sheet and the open match Pool took its place in the bar.
-enum V2Tab { home, explore, matches, pool, profile }
+/// Organising rule: Bottom nav is the world; side panel is you.
+/// Profile is now reached via the side panel's identity masthead.
+enum V2Tab { home, explore, matches, pool }
 
-/// 5-tab bottom navigation — Home · Explore · Matches · Pool · Profile.
+/// 4-tab bottom navigation — Home · Explore · Matches · Pool.
 class V2BottomNav extends StatelessWidget {
   const V2BottomNav({
     super.key,
@@ -630,7 +630,6 @@ class V2BottomNav extends StatelessWidget {
             _navItem(V2Tab.explore, 'Explore', V2Icons.search),
             _navItem(V2Tab.matches, 'Matches', V2Icons.matches),
             _navItem(V2Tab.pool, 'Pool', V2Icons.pool),
-            _navItem(V2Tab.profile, 'Profile', V2Icons.profile),
           ],
         ),
       ),

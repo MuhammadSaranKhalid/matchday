@@ -6,42 +6,77 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../domain/entities/match.dart';
 import '../controllers/match_start_controller.dart';
+import '../state/match_start_state.dart';
 import '../widgets/match_start/match_start_atoms.dart';
 import '../widgets/match_start/match_start_header.dart';
-import '../widgets/match_start/match_start_layout.dart';
+import '../widgets/match_start/stage_lineup.dart';
+import '../widgets/match_start/stage_toss.dart';
 
 /// Two-phone Match Start screen.
 ///
-/// A routing shell: it watches [matchStartControllerProvider], maps the
-/// [AsyncValue] to error / loading / redirect / data, and delegates the whole
-/// data UI to [MatchStartLayout].
+/// Sets up pre-match details (Toss -> Openers) and automatically
+/// transitions to the live scoring screen upon match commencement.
 class MatchStartScreen extends ConsumerWidget {
   const MatchStartScreen({super.key, required this.matchId});
 
   final String matchId;
 
+  void _handleRedirect(BuildContext context, MatchStartState state) {
+    final terminal = _terminalRoute(state.match);
+    if (terminal != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go(terminal);
+      });
+    } else if (state.phase == MatchStartPhase.live) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/matches/$matchId/score');
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(
+      matchStartControllerProvider(matchId),
+      (prev, next) {
+        final state = next.value;
+        if (state != null) _handleRedirect(context, state);
+      },
+    );
+
     final async = ref.watch(matchStartControllerProvider(matchId));
 
     return Scaffold(
       backgroundColor: CkColors.paper,
       body: SafeArea(
-        child: switch (async) {
-          AsyncError(:final error) => _ErrorView(message: failureMessageOf(error)),
-          // Terminal status wins over the setup phase: an abandoned match
-          // never advances `start_phase`, so without this the screen would
-          // strand the user on a Start button that can only error.
-          AsyncData(:final value) when _terminalRoute(value.match) != null =>
-            _Redirect(location: _terminalRoute(value.match)!),
-          // The match went live on the other phone (or was already live when
-          // we arrived) — hand over to the scoring screen.
-          AsyncData(:final value) when value.phase == MatchStartPhase.live =>
-            _Redirect(location: '/matches/$matchId/score'),
-          AsyncData(:final value) =>
-            MatchStartLayout(matchId: matchId, state: value),
-          _ => const MatchStartLoader(),
-        },
+        child: async.when(
+          data: (state) {
+            if (_terminalRoute(state.match) != null ||
+                state.phase == MatchStartPhase.live) {
+              _handleRedirect(context, state);
+              return const MatchStartLoader();
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                MatchStartHeader(state: state),
+                Expanded(
+                  child: switch (state.phase) {
+                    MatchStartPhase.toss =>
+                      MatchStartTossStage(matchId: matchId, state: state),
+                    MatchStartPhase.lineup ||
+                    MatchStartPhase.ready =>
+                      MatchStartLineupStage(matchId: matchId, state: state),
+                    MatchStartPhase.live => const SizedBox.shrink(),
+                  },
+                ),
+              ],
+            );
+          },
+          loading: () => const MatchStartLoader(),
+          error: (error, _) => _ErrorView(message: failureMessageOf(error)),
+        ),
       ),
     );
   }
@@ -81,32 +116,4 @@ class _ErrorView extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Navigates away once, on the first frame after the match leaves setup —
-/// either because it went live or because it reached a terminal status.
-///
-/// A widget rather than a post-frame callback in `build` so the redirect
-/// fires exactly once: it is only inserted when the condition holds, and
-/// `initState` runs once per insertion.
-class _Redirect extends StatefulWidget {
-  const _Redirect({required this.location});
-
-  final String location;
-
-  @override
-  State<_Redirect> createState() => _RedirectState();
-}
-
-class _RedirectState extends State<_Redirect> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.go(widget.location);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) => const MatchStartLoader();
 }

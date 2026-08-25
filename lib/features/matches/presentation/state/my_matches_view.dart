@@ -97,6 +97,10 @@ class MyMatchConfirmed {
   const MyMatchConfirmed({
     required this.id,
     required this.tag,
+    required this.homeTeamId,
+    required this.awayTeamId,
+    required this.oversPerInnings,
+    required this.ballsPerOver,
     required this.homeShort,
     required this.homeColor,
     required this.homeName,
@@ -116,6 +120,19 @@ class MyMatchConfirmed {
 
   final String id;
   final String tag;
+
+  /// Team ids, so a caller holding an innings row (which is keyed by
+  /// `batting_team_id`) can tell which of the two sides is at the crease.
+  /// Needed by the side panel's live card.
+  final String homeTeamId;
+  final String awayTeamId;
+
+  /// Format numbers carried through so a live score can be turned into a
+  /// target line ("Need 13 off 34") without re-fetching the match.
+  /// `oversPerInnings` is 0 for unlimited (Test / first-class).
+  final int oversPerInnings;
+  final int ballsPerOver;
+
   final String homeShort;
   final Color homeColor;
   final String homeName;

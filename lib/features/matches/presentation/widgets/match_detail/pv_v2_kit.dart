@@ -1,12 +1,8 @@
-// Pavilion v2 — shared atoms.
-//
-// Faithful port of the prototype's `Pill`, `SecLabel`, the rounded-line icon
-// set (`challenge-shared.jsx` PATHS), and the pulsing live dot. Rendering uses
-// the house [V2Svg] (raw inline SVG) and [CkColors]/[CkType]/[CkInk] tokens.
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../../core/widgets/v2/v2_kit.dart';
+import 'pv_v2_data.dart';
 
 // ── Icons (exact path data from challenge-shared.jsx `PATHS`) ────────────────
 
@@ -96,6 +92,15 @@ TextStyle pvMono(double size, {Color color = CkColors.muted, FontWeight weight =
 // ── Pill ────────────────────────────────────────────────────────────────────
 
 enum PvTone { red, amber, green, neutral }
+
+/// phase → (pill label, tone, live).
+(String, PvTone, bool) pvPhaseConf(PvPhase p) => switch (p) {
+      PvPhase.live => ('LIVE', PvTone.red, true),
+      PvPhase.startsSoon => ('STARTS SOON', PvTone.amber, false),
+      PvPhase.scheduled => ('SCHEDULED', PvTone.neutral, false),
+      PvPhase.awaitingReply => ('AWAITING REPLY', PvTone.amber, false),
+      PvPhase.completed => ('FINAL', PvTone.neutral, false),
+    };
 
 /// Mono status pill with a leading colour dot (pulses when [live]).
 class PvPill extends StatelessWidget {

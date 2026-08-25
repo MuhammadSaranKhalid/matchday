@@ -2,11 +2,11 @@ import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
-import '../../../../core/log/ck_log.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_player.dart';
+import '../../domain/repositories/matches_repository.dart';
 import '../providers/matches_providers.dart';
 import '../state/match_start_state.dart';
 
@@ -37,19 +37,6 @@ class MatchStartController extends _$MatchStartController {
     final previous = state.value;
     final batting = battingFirstTeam(match);
     final role = viewerRoleOnMatch(match, userId);
-
-    // The single most useful line when two phones disagree: it shows what
-    // this device believes about who it is and what it may do.
-    CkLog.write(CkLogChannel.matchStart, 'derive', data: {
-      'match': matchId,
-      'phase': match.startPhase.wire,
-      'status': match.status.wire,
-      'was': previous?.phase.wire,
-      'role': role.name,
-      'batting': batting?.value,
-      'xi': lineup.length,
-      'locked': lineup.playerRefIdOf(innings?.strikerId?.value) != null,
-    });
 
     return MatchStartState(
       match: match,
@@ -83,18 +70,38 @@ class MatchStartController extends _$MatchStartController {
         const Left(ValidationFailure('Please select toss winner and decision')),
       );
     }
+    final winner = current.pendingTossWinner!;
+    final decision = current.pendingDecision!;
+
     return _busy(
-      () => ref.read(matchesRepositoryProvider).recordMatchToss(
+      () => _repo.recordMatchToss(
             id: MatchId(matchId),
-            wonBy: current.pendingTossWinner!,
-            decision: current.pendingDecision!,
+            wonBy: winner,
+            decision: decision,
           ),
       label: 'submitToss',
-      // The recorded toss arrives back on the live row; drop the local copy.
-      reset: (s) => s.copyWith(
-        pendingTossWinner: () => null,
-        pendingDecision: () => null,
-      ),
+      // Optimistically update the state so the screen transitions to Lineup
+      // immediately without waiting for the Realtime stream roundtrip.
+      reset: (s) {
+        final batting = decision == TossDecision.bat
+            ? winner
+            : (winner == s.match.teamAId ? s.match.teamBId : s.match.teamAId);
+        final bowling =
+            batting == s.match.teamAId ? s.match.teamBId : s.match.teamAId;
+        final updatedMatch = s.match.copyWith(
+          tossWonBy: winner,
+          tossDecision: decision,
+          startPhase: MatchStartPhase.lineup,
+          status: MatchStatus.toss,
+        );
+        return s.copyWith(
+          match: updatedMatch,
+          battingTeamId: batting,
+          bowlingTeamId: bowling,
+          pendingTossWinner: () => null,
+          pendingDecision: () => null,
+        );
+      },
     );
   }
 
@@ -116,13 +123,6 @@ class MatchStartController extends _$MatchStartController {
         (_, null) => (striker == refId ? null : striker, refId),
         _ => (refId, nonStriker == refId ? striker : nonStriker),
       };
-
-      CkLog.write(CkLogChannel.matchStart, 'tapOpener', data: {
-        'tapped': refId,
-        'striker': '${CkLog.short(striker)}→${CkLog.short(nextStriker)}',
-        'nonStriker':
-            '${CkLog.short(nonStriker)}→${CkLog.short(nextNonStriker)}',
-      });
 
       return s.copyWith(
         pendingStriker: () => nextStriker,
@@ -153,7 +153,7 @@ class MatchStartController extends _$MatchStartController {
     }
 
     return _busy(
-      () => ref.read(matchesRepositoryProvider).submitMatchOpeners(
+      () => _repo.submitMatchOpeners(
             id: MatchId(matchId),
             strikerId: strikerId,
             nonStrikerId: nonStrikerId,
@@ -167,12 +167,57 @@ class MatchStartController extends _$MatchStartController {
     );
   }
 
+  /// Submits the chosen openers and immediately commences the match.
+  Future<Either<Failure, Unit>> submitOpenersAndStart() async {
+    final current = state.value;
+    if (current == null || !current.isLineupReady) {
+      return Future.value(
+        const Left(ValidationFailure('Please select both openers')),
+      );
+    }
+
+    final lineup =
+        ref.read(matchPlayersProvider(matchId)).value ?? const <MatchPlayer>[];
+    final strikerId = lineup.matchPlayerIdOf(current.striker);
+    final nonStrikerId = lineup.matchPlayerIdOf(current.nonStriker);
+    if (strikerId == null || nonStrikerId == null) {
+      return Future.value(
+        const Left(ValidationFailure(
+          "Selected player is not in this match's lineup. "
+          'Reopen the screen and try again.',
+        )),
+      );
+    }
+
+    return _busy(
+      () async {
+        final openerResult = await _repo.submitMatchOpeners(
+              id: MatchId(matchId),
+              strikerId: strikerId,
+              nonStrikerId: nonStrikerId,
+            );
+        return openerResult.fold(
+          Left.new,
+          (_) => _repo.startMatchNow(MatchId(matchId)),
+        );
+      },
+      label: 'submitOpenersAndStart',
+      reset: (s) => s.copyWith(
+        pendingStriker: () => null,
+        pendingNonStriker: () => null,
+      ),
+    );
+  }
+
+  MatchesRepository? _cachedRepo;
+
+  MatchesRepository get _repo =>
+      _cachedRepo ?? ref.read(matchesRepositoryProvider);
+
   // ── Start ────────────────────────────────────────────────────────────────
 
   Future<Either<Failure, Unit>> startMatchNow() => _busy(
-        () => ref
-            .read(matchesRepositoryProvider)
-            .startMatchNow(MatchId(matchId)),
+        () => _repo.startMatchNow(MatchId(matchId)),
         label: 'startMatch',
       );
 
@@ -180,6 +225,7 @@ class MatchStartController extends _$MatchStartController {
 
   /// Apply a synchronous edit to the loaded state. No-op while loading.
   void _update(MatchStartState Function(MatchStartState) edit) {
+    if (!ref.mounted) return;
     final current = state.value;
     if (current == null) return;
     state = AsyncData(edit(current));
@@ -195,18 +241,7 @@ class MatchStartController extends _$MatchStartController {
     MatchStartState Function(MatchStartState)? reset,
   }) async {
     _update((s) => s.copyWith(isBusy: true));
-    CkLog.write(CkLogChannel.matchStart, '$label·start',
-        data: {'match': matchId});
-
     final result = await action();
-
-    result.fold(
-      (f) => CkLog.warn(CkLogChannel.matchStart, '$label·fail',
-          data: {'match': matchId, 'failure': f.runtimeType, 'msg': f.message}),
-      (_) => CkLog.write(CkLogChannel.matchStart, '$label·ok',
-          data: {'match': matchId}),
-    );
-
     _update((s) {
       final settled = s.copyWith(isBusy: false);
       return reset == null ? settled : reset(settled);

@@ -30,7 +30,7 @@ class ComingSoonScreen extends StatelessWidget {
       title: showWordmark ? null : tab,
       hasUnread: showActions,
       onBell: showActions ? () => context.push('/notifications') : null,
-      onAvatar: showActions ? () => context.go('/pavilion') : null,
+      onAvatar: showActions ? () => context.go('/profile') : null,
       avatarInitials: showActions ? '·' : null,
       child: Center(
         child: Column(

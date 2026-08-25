@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
+import '../../../../../core/widgets/ck_button.dart';
 import '../../../../teams/presentation/providers/teams_providers.dart';
 import '../../../domain/entities/match.dart';
 import '../../controllers/match_start_controller.dart';
@@ -33,7 +34,8 @@ class MatchStartTossStage extends ConsumerWidget {
         child: MatchStartWaitingCard(
           eyebrow: 'WAITING ON THE OTHER PHONE',
           title: 'The coin is on the captain’s phone.',
-          body: 'Both captains watch the toss together on one device. '
+          body:
+              'Both captains watch the toss together on one device. '
               'You’ll see the result here the moment it lands.',
         ),
       );
@@ -43,54 +45,92 @@ class MatchStartTossStage extends ConsumerWidget {
     final teamA = ref.watch(teamProvider(match.teamAId.value)).value;
     final teamB = ref.watch(teamProvider(match.teamBId.value)).value;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
+    return Column(
       children: [
-        Center(child: MatchStartCoinTile(face: match.tossFace)),
-        const SizedBox(height: 22),
-        const ChSectionLabel('Who won the toss?'),
-        Row(
-          children: [
-            Expanded(
-              child: MatchStartChoiceTile(
-                label: teamA?.name ?? 'Team A',
-                selected: state.pendingTossWinner == match.teamAId,
-                onTap: () => _controller(ref).pickTossWinner(match.teamAId),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: MatchStartChoiceTile(
-                label: teamB?.name ?? 'Team B',
-                selected: state.pendingTossWinner == match.teamBId,
-                onTap: () => _controller(ref).pickTossWinner(match.teamBId),
-              ),
-            ),
-          ],
-        ),
-        if (state.pendingTossWinner != null) ...[
-          const SizedBox(height: 18),
-          const ChSectionLabel('Their call'),
-          Row(
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
             children: [
-              Expanded(
-                child: MatchStartChoiceTile(
-                  label: 'Bat first',
-                  selected: state.pendingDecision == TossDecision.bat,
-                  onTap: () => _controller(ref).pickTossDecision(TossDecision.bat),
-                ),
+              Center(child: MatchStartCoinTile(face: match.tossFace)),
+              const SizedBox(height: 22),
+              const ChSectionLabel('Who won the toss?'),
+              Row(
+                children: [
+                  Expanded(
+                    child: MatchStartChoiceTile(
+                      label: teamA?.name ?? 'Team A',
+                      selected: state.pendingTossWinner == match.teamAId,
+                      onTap:
+                          () => _controller(ref).pickTossWinner(match.teamAId),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: MatchStartChoiceTile(
+                      label: teamB?.name ?? 'Team B',
+                      selected: state.pendingTossWinner == match.teamBId,
+                      onTap:
+                          () => _controller(ref).pickTossWinner(match.teamBId),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: MatchStartChoiceTile(
-                  label: 'Bowl first',
-                  selected: state.pendingDecision == TossDecision.bowl,
-                  onTap: () => _controller(ref).pickTossDecision(TossDecision.bowl),
+              if (state.pendingTossWinner != null) ...[
+                const SizedBox(height: 18),
+                const ChSectionLabel('Their call'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: MatchStartChoiceTile(
+                        label: 'Bat first',
+                        selected: state.pendingDecision == TossDecision.bat,
+                        onTap:
+                            () => _controller(
+                              ref,
+                            ).pickTossDecision(TossDecision.bat),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: MatchStartChoiceTile(
+                        label: 'Bowl first',
+                        selected: state.pendingDecision == TossDecision.bowl,
+                        onTap:
+                            () => _controller(
+                              ref,
+                            ).pickTossDecision(TossDecision.bowl),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+              ],
             ],
           ),
-        ],
+        ),
+        Container(
+          decoration: const BoxDecoration(
+            color: CkColors.paper,
+            border: Border(top: BorderSide(color: CkColors.hairline)),
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+          child: CkButton(
+            label: 'Continue → lineup',
+            busy: state.isBusy,
+            onPressed:
+                state.isTossReady
+                    ? () async {
+                      final res = await _controller(ref).submitToss();
+                      if (!context.mounted) return;
+                      res.fold(
+                        (failure) => ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(failure.message)),
+                        ),
+                        (_) {},
+                      );
+                    }
+                    : null,
+          ),
+        ),
       ],
     );
   }
@@ -146,13 +186,15 @@ class _MatchStartCoinTileState extends State<MatchStartCoinTile>
       onTap: _flip,
       child: AnimatedBuilder(
         animation: _controller,
-        builder: (context, child) => Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.0015)
-            ..rotateY(_controller.value * 4 * 3.1415926535),
-          child: child,
-        ),
+        builder:
+            (context, child) => Transform(
+              alignment: Alignment.center,
+              transform:
+                  Matrix4.identity()
+                    ..setEntry(3, 2, 0.0015)
+                    ..rotateY(_controller.value * 4 * 3.1415926535),
+              child: child,
+            ),
         child: Container(
           width: 160,
           height: 160,

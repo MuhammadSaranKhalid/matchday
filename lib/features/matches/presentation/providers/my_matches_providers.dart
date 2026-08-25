@@ -9,6 +9,7 @@ import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_request.dart';
 import '../../domain/entities/match_role.dart';
+import '../state/live_panel_match.dart';
 import '../state/my_matches_view.dart';
 import 'matches_providers.dart';
 
@@ -190,6 +191,10 @@ MyMatchConfirmed _confirmedFor(
   return MyMatchConfirmed(
     id: m.id.value,
     tag: 'Friendly',
+    homeTeamId: m.teamAId.value,
+    awayTeamId: m.teamBId.value,
+    oversPerInnings: m.format.oversPerInnings,
+    ballsPerOver: m.format.ballsPerOver,
     homeShort: _short(home, fallback: 'A'),
     homeColor: _color(home?.primaryColor, fallback: const Color(0xFF7A746A)),
     homeName: home?.name ?? 'Team A',
@@ -398,4 +403,75 @@ bool _isUrgent(DateTime? scheduled, {required MatchStatus status}) {
   if (scheduled == null) return false;
   final delta = scheduled.difference(DateTime.now());
   return !delta.isNegative && delta.inHours < 24;
+}
+
+/// The one live match the side panel promotes into its hero card, with the
+/// current innings numbers attached. Null when nothing of the user's is live.
+///
+/// Autodispose: the drawer only builds while it is open (Flutter's
+/// `DrawerController` short-circuits its child when dismissed), so this
+/// resolves on open and is torn down on close.
+///
+/// Scope note (design open question 2): when more than one of the user's
+/// matches is live the panel shows a single card rather than growing — the
+/// rest stay counted on the My Matches row.
+@riverpod
+Future<LivePanelMatch?> livePanelMatch(Ref ref) async {
+  final view = await ref.watch(myMatchesViewProvider.future);
+  final live = view.confirmed.where((m) => m.live).toList();
+  if (live.isEmpty) return null;
+  final row = live.first;
+
+  final result = await ref
+      .watch(matchesRepositoryProvider)
+      .listInningsForMatches([MatchId(row.id)]);
+  final innings = result.fold<List<InningsSummary>>((_) => const [], (map) {
+    final list = [...?map[MatchId(row.id)]];
+    list.sort((a, b) => a.inningsNumber.compareTo(b.inningsNumber));
+    return list;
+  });
+  if (innings.isEmpty) return null;
+
+  final current = innings.last;
+  final battingIsHome = current.battingTeamId.value == row.homeTeamId;
+
+  // Whatever the other side has already put on the board. Absent in the first
+  // innings, where the design's second row reads as an em-dash.
+  final chased = innings
+      .where((i) => i.battingTeamId != current.battingTeamId)
+      .fold<InningsSummary?>(
+        null,
+        (acc, i) => acc == null || i.totalRuns > acc.totalRuns ? i : acc,
+      );
+
+  final bpo = row.ballsPerOver > 0 ? row.ballsPerOver : 6;
+  String overs(int balls) => '${balls ~/ bpo}.${balls % bpo}';
+
+  // Limited-overs only: an unlimited format has no ball budget to count down.
+  final ballsAllowed = row.oversPerInnings * bpo;
+  final ballsLeft = ballsAllowed - current.legalBallsFaced;
+
+  String? targetLine;
+  if (chased != null) {
+    final need = chased.totalRuns + 1 - current.totalRuns;
+    if (need > 0 && ballsAllowed > 0 && ballsLeft > 0) {
+      targetLine = 'Need $need off $ballsLeft';
+    }
+  } else if (ballsAllowed > 0 && ballsLeft > 0) {
+    targetLine = '${overs(ballsLeft)} overs left';
+  }
+
+  return LivePanelMatch(
+    matchId: row.id,
+    oversLabel: overs(current.legalBallsFaced),
+    battingShort: battingIsHome ? row.homeShort : row.awayShort,
+    battingColor: battingIsHome ? row.homeColor : row.awayColor,
+    battingName: battingIsHome ? row.homeName : row.awayName,
+    battingScore: '${current.totalRuns}/${current.totalWickets}',
+    opponentShort: battingIsHome ? row.awayShort : row.homeShort,
+    opponentColor: battingIsHome ? row.awayColor : row.homeColor,
+    opponentName: battingIsHome ? row.awayName : row.homeName,
+    opponentScore: chased == null ? '—' : '${chased.totalRuns}',
+    targetLine: targetLine,
+  );
 }

@@ -100,10 +100,9 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    // Hold both providers open. Without a listener the autodispose chain tears
+    // Hold the provider open. Without a listener the autodispose chain tears
     // down between `read` calls and the underlying streams never resolve.
     container.listen(matchStartLineupProvider(_matchId), (_, __) {});
-    container.listen(matchStartReadyProvider(_matchId), (_, __) {});
     return container;
   }
 
@@ -186,83 +185,6 @@ void main() {
           await container.read(matchStartLineupProvider(_matchId).future);
 
       expect(candidates.single.refId, 'p1');
-    });
-  });
-
-  group('matchStartReady', () {
-    test('resolves openers to names, not raw ids', () async {
-      // The regression this guards: the Ready summary rendered player UUIDs
-      // where names belong.
-      final container = makeContainer(
-        lineup: [
-          _player('mp1', 'p1', name: 'Imran'),
-          _player('mp2', 'p2', name: 'Wasim'),
-        ],
-        roster: [_roster('p1', 'Imran'), _roster('p2', 'Wasim')],
-        innings: MatchInningsState(
-          matchId: const MatchId(_matchId),
-          inningsNumber: 1,
-          version: 1,
-          updatedAt: DateTime(2026),
-          strikerId: const MatchPlayerId('mp1'),
-          nonStrikerId: const MatchPlayerId('mp2'),
-        ),
-      );
-
-      final view = await container.read(matchStartReadyProvider(_matchId).future);
-
-      expect(view.strikerName, 'Imran');
-      expect(view.nonStrikerName, 'Wasim');
-    });
-
-    test('uses real team names in the toss line', () async {
-      final container = makeContainer(
-        lineup: [_player('mp1', 'p1')],
-        roster: [_roster('p1', 'Imran')],
-      );
-
-      final view = await container.read(matchStartReadyProvider(_matchId).future);
-
-      expect(view.tossLine, contains('Kings XI'));
-      expect(view.tossLine, contains('bat'));
-      expect(view.battingTeamName, 'Kings XI');
-      expect(view.bowlingTeamName, 'Eagles');
-    });
-
-    test('names a guest opener rather than showing a blank', () async {
-      final container = makeContainer(
-        lineup: [
-          _player('mp1', 'guest-9', name: 'Guest Opener'),
-          _player('mp2', 'p2', name: 'Wasim'),
-        ],
-        roster: [_roster('p2', 'Wasim')],
-        innings: MatchInningsState(
-          matchId: const MatchId(_matchId),
-          inningsNumber: 1,
-          version: 1,
-          updatedAt: DateTime(2026),
-          strikerId: const MatchPlayerId('mp1'),
-          nonStrikerId: const MatchPlayerId('mp2'),
-        ),
-      );
-
-      final view = await container.read(matchStartReadyProvider(_matchId).future);
-
-      expect(view.strikerName, isNotNull);
-      expect(view.strikerName, isNotEmpty);
-      expect(view.nonStrikerName, 'Wasim');
-    });
-
-    test('leaves openers null before they are locked', () async {
-      final container = makeContainer(
-        lineup: [_player('mp1', 'p1')],
-        roster: [_roster('p1', 'Imran')],
-      );
-
-      final view = await container.read(matchStartReadyProvider(_matchId).future);
-
-      expect(view.strikerName, isNull);
-      expect(view.nonStrikerName, isNull);
     });
   });
 }

@@ -11,7 +11,6 @@ part of 'match_player_dto.dart';
 
 // dart format off
 T _$identity<T>(T value) => value;
-
 /// @nodoc
 mixin _$MatchPlayerDto {
 
@@ -22,8 +21,6 @@ mixin _$MatchPlayerDto {
 @pragma('vm:prefer-inline')
 $MatchPlayerDtoCopyWith<MatchPlayerDto> get copyWith => _$MatchPlayerDtoCopyWithImpl<MatchPlayerDto>(this as MatchPlayerDto, _$identity);
 
-  /// Serializes this MatchPlayerDto to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
@@ -31,7 +28,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchPlayerDto&&(identical(other.matchPlayerId, matchPlayerId) || other.matchPlayerId == matchPlayerId)&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamSide, teamSide) || other.teamSide == teamSide)&&(identical(other.profileId, profileId) || other.profileId == profileId)&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.battingOrder, battingOrder) || other.battingOrder == battingOrder)&&(identical(other.jerseyNumber, jerseyNumber) || other.jerseyNumber == jerseyNumber)&&(identical(other.isCaptain, isCaptain) || other.isCaptain == isCaptain)&&(identical(other.isKeeper, isKeeper) || other.isKeeper == isKeeper)&&(identical(other.isSubstitute, isSubstitute) || other.isSubstitute == isSubstitute)&&const DeepCollectionEquality().equals(other.profile, profile)&&const DeepCollectionEquality().equals(other.unclaimed, unclaimed));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,matchPlayerId,matchId,teamSide,profileId,unclaimedId,battingOrder,jerseyNumber,isCaptain,isKeeper,isSubstitute,const DeepCollectionEquality().hash(profile),const DeepCollectionEquality().hash(unclaimed));
 
@@ -217,11 +214,11 @@ return $default(_that.matchPlayerId,_that.matchId,_that.teamSide,_that.profileId
 }
 
 /// @nodoc
-@JsonSerializable()
+
 
 class _MatchPlayerDto extends MatchPlayerDto {
   const _MatchPlayerDto({@JsonKey(name: 'match_player_id') required this.matchPlayerId, @JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'team_side') required this.teamSide, @JsonKey(name: 'profile_id') this.profileId, @JsonKey(name: 'unclaimed_id') this.unclaimedId, @JsonKey(name: 'batting_order') this.battingOrder, @JsonKey(name: 'jersey_number') this.jerseyNumber, @JsonKey(name: 'is_captain') this.isCaptain = false, @JsonKey(name: 'is_keeper') this.isKeeper = false, @JsonKey(name: 'is_substitute') this.isSubstitute = false, @JsonKey(includeToJson: false) final  Map<String, dynamic>? profile, @JsonKey(includeToJson: false) final  Map<String, dynamic>? unclaimed}): _profile = profile,_unclaimed = unclaimed,super._();
-  factory _MatchPlayerDto.fromJson(Map<String, dynamic> json) => _$MatchPlayerDtoFromJson(json);
+  
 
 @override@JsonKey(name: 'match_player_id') final  String matchPlayerId;
 @override@JsonKey(name: 'match_id') final  String matchId;
@@ -258,17 +255,14 @@ class _MatchPlayerDto extends MatchPlayerDto {
 @pragma('vm:prefer-inline')
 _$MatchPlayerDtoCopyWith<_MatchPlayerDto> get copyWith => __$MatchPlayerDtoCopyWithImpl<_MatchPlayerDto>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$MatchPlayerDtoToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchPlayerDto&&(identical(other.matchPlayerId, matchPlayerId) || other.matchPlayerId == matchPlayerId)&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamSide, teamSide) || other.teamSide == teamSide)&&(identical(other.profileId, profileId) || other.profileId == profileId)&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.battingOrder, battingOrder) || other.battingOrder == battingOrder)&&(identical(other.jerseyNumber, jerseyNumber) || other.jerseyNumber == jerseyNumber)&&(identical(other.isCaptain, isCaptain) || other.isCaptain == isCaptain)&&(identical(other.isKeeper, isKeeper) || other.isKeeper == isKeeper)&&(identical(other.isSubstitute, isSubstitute) || other.isSubstitute == isSubstitute)&&const DeepCollectionEquality().equals(other._profile, _profile)&&const DeepCollectionEquality().equals(other._unclaimed, _unclaimed));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,matchPlayerId,matchId,teamSide,profileId,unclaimedId,battingOrder,jerseyNumber,isCaptain,isKeeper,isSubstitute,const DeepCollectionEquality().hash(_profile),const DeepCollectionEquality().hash(_unclaimed));
 

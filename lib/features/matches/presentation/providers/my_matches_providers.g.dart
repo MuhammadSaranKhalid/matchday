@@ -57,3 +57,74 @@ final class MyMatchesViewProvider
 }
 
 String _$myMatchesViewHash() => r'bdca5d2ff2d28b58b0d9cd5a3b7e48ddfbfcc8f6';
+
+/// The one live match the side panel promotes into its hero card, with the
+/// current innings numbers attached. Null when nothing of the user's is live.
+///
+/// Autodispose: the drawer only builds while it is open (Flutter's
+/// `DrawerController` short-circuits its child when dismissed), so this
+/// resolves on open and is torn down on close.
+///
+/// Scope note (design open question 2): when more than one of the user's
+/// matches is live the panel shows a single card rather than growing — the
+/// rest stay counted on the My Matches row.
+
+@ProviderFor(livePanelMatch)
+final livePanelMatchProvider = LivePanelMatchProvider._();
+
+/// The one live match the side panel promotes into its hero card, with the
+/// current innings numbers attached. Null when nothing of the user's is live.
+///
+/// Autodispose: the drawer only builds while it is open (Flutter's
+/// `DrawerController` short-circuits its child when dismissed), so this
+/// resolves on open and is torn down on close.
+///
+/// Scope note (design open question 2): when more than one of the user's
+/// matches is live the panel shows a single card rather than growing — the
+/// rest stay counted on the My Matches row.
+
+final class LivePanelMatchProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<LivePanelMatch?>,
+          LivePanelMatch?,
+          FutureOr<LivePanelMatch?>
+        >
+    with $FutureModifier<LivePanelMatch?>, $FutureProvider<LivePanelMatch?> {
+  /// The one live match the side panel promotes into its hero card, with the
+  /// current innings numbers attached. Null when nothing of the user's is live.
+  ///
+  /// Autodispose: the drawer only builds while it is open (Flutter's
+  /// `DrawerController` short-circuits its child when dismissed), so this
+  /// resolves on open and is torn down on close.
+  ///
+  /// Scope note (design open question 2): when more than one of the user's
+  /// matches is live the panel shows a single card rather than growing — the
+  /// rest stay counted on the My Matches row.
+  LivePanelMatchProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'livePanelMatchProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$livePanelMatchHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<LivePanelMatch?> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<LivePanelMatch?> create(Ref ref) {
+    return livePanelMatch(ref);
+  }
+}
+
+String _$livePanelMatchHash() => r'2e50b486046b380ec05540bfcbd2298ee1a4708a';

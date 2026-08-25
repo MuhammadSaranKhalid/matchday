@@ -28,38 +28,3 @@ class MatchStartLineupCandidate extends Equatable {
   @override
   List<Object?> get props => [refId, name, photoUrl, jersey];
 }
-
-/// Everything the Ready stage prints, already resolved to display strings.
-class MatchStartReadyView extends Equatable {
-  const MatchStartReadyView({
-    required this.battingTeamName,
-    required this.bowlingTeamName,
-    required this.tossLine,
-    required this.formatLine,
-    this.strikerName,
-    this.nonStrikerName,
-  });
-
-  final String battingTeamName;
-  final String bowlingTeamName;
-
-  /// e.g. `Kings XI · chose to bat`. Empty before the toss is recorded.
-  final String tossLine;
-
-  /// e.g. `T20 · 11-a-side · leather ball`.
-  final String formatLine;
-
-  /// Locked openers, resolved to names. Null until they are submitted.
-  final String? strikerName;
-  final String? nonStrikerName;
-
-  @override
-  List<Object?> get props => [
-        battingTeamName,
-        bowlingTeamName,
-        tossLine,
-        formatLine,
-        strikerName,
-        nonStrikerName,
-      ];
-}

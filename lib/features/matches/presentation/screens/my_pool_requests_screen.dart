@@ -9,13 +9,13 @@ import '../../../teams/domain/entities/team.dart';
 import '../providers/match_pool_providers.dart';
 import '../providers/matches_feed_providers.dart';
 
-/// Dedicated screen for managing the user's active Open Match Pool broadcasts.
-class MyPoolBroadcastsScreen extends ConsumerWidget {
-  const MyPoolBroadcastsScreen({super.key});
+/// Dedicated screen for managing the user's active Open Match Pool requests.
+class MyPoolRequestsScreen extends ConsumerWidget {
+  const MyPoolRequestsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final broadcastsAsync = ref.watch(myPoolBroadcastsProvider);
+    final requestsAsync = ref.watch(myPoolRequestsProvider);
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -25,16 +25,17 @@ class MyPoolBroadcastsScreen extends ConsumerWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: CkColors.ink),
-          onPressed: () => context.pop(),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/home'),
         ),
         title: Text(
-          'My Broadcasts',
+          'My Pool Requests',
           style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.add_rounded, color: CkColors.ink),
-            tooltip: 'Broadcast New Challenge',
+            tooltip: 'Post a pool request',
             onPressed: () => context.push('/matches/send-challenge'),
           ),
           const SizedBox(width: 8),
@@ -49,9 +50,9 @@ class MyPoolBroadcastsScreen extends ConsumerWidget {
           color: CkColors.ink,
           backgroundColor: CkColors.paper,
           onRefresh: () async {
-            ref.invalidate(myPoolBroadcastsProvider);
+            ref.invalidate(myPoolRequestsProvider);
           },
-          child: broadcastsAsync.when(
+          child: requestsAsync.when(
             loading: () => const Center(
               child: Padding(
                 padding: EdgeInsets.all(40),
@@ -61,12 +62,14 @@ class MyPoolBroadcastsScreen extends ConsumerWidget {
             error: (e, _) => Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('Failed to load broadcasts: $e', style: CkType.body(fontSize: 12)),
+                child: Text(
+                  'Failed to load pool requests: $e',
+                  style: CkType.body(fontSize: 12),
+                ),
               ),
             ),
-            data: (myBroadcasts) {
-
-              if (myBroadcasts.isEmpty) {
+            data: (myRequests) {
+              if (myRequests.isEmpty) {
                 return ListView(
                   padding: const EdgeInsets.all(24),
                   children: [
@@ -81,7 +84,7 @@ class MyPoolBroadcastsScreen extends ConsumerWidget {
                           border: Border.all(color: CkColors.hairline),
                         ),
                         child: const Icon(
-                          Icons.podcasts_rounded,
+                          Icons.radar_rounded,
                           size: 32,
                           color: CkColors.muted,
                         ),
@@ -89,20 +92,27 @@ class MyPoolBroadcastsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'No Active Broadcasts',
+                      'No Active Pool Requests',
                       textAlign: TextAlign.center,
-                      style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
+                      style: CkType.display(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'You do not have any open match pool requests right now. Broadcast a challenge to receive match proposals from local teams.',
+                      'You do not have any open match pool requests right now. Post a request to receive match proposals from local teams.',
                       textAlign: TextAlign.center,
-                      style: CkType.body(fontSize: 13, color: CkColors.muted, height: 1.4),
+                      style: CkType.body(
+                        fontSize: 13,
+                        color: CkColors.muted,
+                        height: 1.4,
+                      ),
                     ),
                     const SizedBox(height: 28),
                     Center(
                       child: CkButton(
-                        label: '+ Broadcast Open Challenge',
+                        label: '+ Post a pool request',
                         onPressed: () {
                           context.push('/matches/send-challenge');
                         },
@@ -114,13 +124,13 @@ class MyPoolBroadcastsScreen extends ConsumerWidget {
 
               return ListView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                itemCount: myBroadcasts.length + 1,
+                itemCount: myRequests.length + 1,
                 itemBuilder: (context, idx) {
                   if (idx == 0) {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: Text(
-                        'OPEN CHALLENGES HOSTED BY YOUR TEAMS (${myBroadcasts.length})',
+                        'OPEN POOL REQUESTS HOSTED BY YOUR TEAMS (${myRequests.length})',
                         style: CkType.mono(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -130,8 +140,8 @@ class MyPoolBroadcastsScreen extends ConsumerWidget {
                       ),
                     );
                   }
-                  final item = myBroadcasts[idx - 1];
-                  return _MyBroadcastItem(
+                  final item = myRequests[idx - 1];
+                  return _MyPoolRequestItem(
                     item: item,
                     onTap: () {
                       context.push('/challenges/${item.request.id.value}');
@@ -147,8 +157,8 @@ class MyPoolBroadcastsScreen extends ConsumerWidget {
   }
 }
 
-class _MyBroadcastItem extends ConsumerWidget {
-  const _MyBroadcastItem({required this.item, required this.onTap});
+class _MyPoolRequestItem extends ConsumerWidget {
+  const _MyPoolRequestItem({required this.item, required this.onTap});
 
   final OpenMatchPoolItem item;
   final VoidCallback onTap;
@@ -180,9 +190,11 @@ class _MyBroadcastItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final from = item.fromTeam;
-    final appsAsync = ref.watch(challengePoolApplicationsProvider(item.request.id.value));
+    final appsAsync =
+        ref.watch(challengePoolApplicationsProvider(item.request.id.value));
     final applications = appsAsync.value ?? const [];
-    final pendingCount = applications.where((a) => a.status.name == 'pending').length;
+    final pendingCount =
+        applications.where((a) => a.status.name == 'pending').length;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -241,7 +253,10 @@ class _MyBroadcastItem extends ConsumerWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: CkColors.paper2,
                         borderRadius: BorderRadius.circular(8),
@@ -274,7 +289,10 @@ class _MyBroadcastItem extends ConsumerWidget {
                 ),
                 const SizedBox(height: 14),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: pendingCount > 0
                         ? const Color(0xFFFEF3C7)
@@ -302,7 +320,7 @@ class _MyBroadcastItem extends ConsumerWidget {
                         child: Text(
                           pendingCount > 0
                               ? '$pendingCount team proposal${pendingCount > 1 ? 's' : ''} waiting for review'
-                              : 'Broadcast is live. Waiting for applicant teams...',
+                              : 'Request is live. Waiting for applicant teams...',
                           style: CkType.mono(
                             fontSize: 11,
                             fontWeight: pendingCount > 0

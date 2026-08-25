@@ -21,7 +21,6 @@ class OpenMatchPoolScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final poolAsync = ref.watch(filteredOpenMatchPoolProvider);
-    final broadcastsAsync = ref.watch(myPoolBroadcastsProvider);
     final currentFilter = ref.watch(openMatchPoolFilterProvider);
 
     return ColoredBox(
@@ -33,12 +32,11 @@ class OpenMatchPoolScreen extends ConsumerWidget {
           backgroundColor: CkColors.paper,
           onRefresh: () async {
             ref.invalidate(openMatchPoolProvider);
-            ref.invalidate(myPoolBroadcastsProvider);
           },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
-              // Compact Broadcast Banner
+              // Contextual "Post a pool request" Banner
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
@@ -52,7 +50,7 @@ class OpenMatchPoolScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Host an Open Fixture',
+                            'Post a pool request',
                             style: CkType.display(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -85,7 +83,7 @@ class OpenMatchPoolScreen extends ConsumerWidget {
                         context.push('/matches/send-challenge');
                       },
                       child: Text(
-                        '+ Broadcast',
+                        '+ Post',
                         style: CkType.mono(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
@@ -94,15 +92,6 @@ class OpenMatchPoolScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-              ),
-
-              const SizedBox(height: 10),
-
-              // My broadcasts — the open fixtures you are hosting. Was an
-              // AppBar action before the Pool became a tab.
-              _MyBroadcastsRow(
-                count: broadcastsAsync.value?.length ?? 0,
-                onTap: () => context.push('/matches/my-broadcasts'),
               ),
 
               const SizedBox(height: 16),
@@ -199,66 +188,6 @@ class OpenMatchPoolScreen extends ConsumerWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Entry to "My broadcasts" — the open fixtures you are hosting, with a live
-/// count. Rendered inline in the Pool tab body (there is no AppBar to hang an
-/// action off any more).
-class _MyBroadcastsRow extends StatelessWidget {
-  const _MyBroadcastsRow({required this.count, required this.onTap});
-
-  final int count;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: CkColors.hairline),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.podcasts_rounded, size: 17, color: CkColors.ink),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'My Broadcasts',
-                style: CkType.body(fontSize: 13, fontWeight: FontWeight.w700),
-              ),
-            ),
-            if (count > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD97706),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '$count',
-                  style: CkType.mono(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 13,
-              color: CkColors.muted,
-            ),
-          ],
         ),
       ),
     );

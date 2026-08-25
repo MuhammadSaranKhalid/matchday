@@ -7,14 +7,13 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/connectivity/connectivity_provider.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/lifecycle/app_lifecycle_provider.dart';
-import '../../../../core/log/ck_log.dart';
 import '../../domain/entities/ball.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_innings_state.dart';
 import '../../domain/entities/match_player.dart';
+import '../../domain/repositories/matches_repository.dart';
 import '../../domain/scoring/scoring_adapter.dart';
 import '../../domain/scoring/scoring_engine.dart';
-import '../../domain/scoring/scoring_parity.dart';
 import '../../domain/scoring/scoring_rules.dart';
 import '../../domain/scoring/scoring_types.dart';
 import '../providers/matches_providers.dart';
@@ -32,33 +31,45 @@ part 'scoring_controller.g.dart';
 class ScoringController extends _$ScoringController {
   /// What the local engine predicted for each unsent delivery, kept so the
   /// server's answer can be compared against it when the write settles.
-  final Map<String, ({BallResult predicted, EngineBallInput input, EngineFormat format})>
-      _predictions = {};
+  final Map<
+    String,
+    ({BallResult predicted, EngineBallInput input, EngineFormat format})
+  >
+  _predictions = {};
 
   Future<void>? _syncInFlight;
   Future<void>? _writeQueue;
+  MatchesRepository? _cachedRepo;
+
+  MatchesRepository get _repo {
+    if (_cachedRepo != null) return _cachedRepo!;
+    return ref.read(matchesRepositoryProvider);
+  }
 
   static const _uuid = Uuid();
 
   Future<T> _enqueueWrite<T>(Future<T> Function() action) {
     final completer = Completer<T>();
     final prev = _writeQueue ?? Future.value();
-    _writeQueue = prev.then((_) async {
-      try {
-        final result = await action();
-        completer.complete(result);
-      } catch (e, st) {
-        completer.completeError(e, st);
-      }
-    }).catchError((Object _) {
-      // If previous failed, still execute subsequent actions in queue
-    });
+    _writeQueue = prev
+        .then((_) async {
+          try {
+            final result = await action();
+            completer.complete(result);
+          } catch (e, st) {
+            completer.completeError(e, st);
+          }
+        })
+        .catchError((Object _) {
+          // If previous failed, still execute subsequent actions in queue
+        });
     return completer.future;
   }
 
   @override
   Future<ScoringState> build(String matchId, int inningsNumber) async {
-    final repo = ref.watch(matchesRepositoryProvider);
+    _cachedRepo = ref.watch(matchesRepositoryProvider);
+    final repo = _repo;
 
     final matchResult = await repo.getMatch(MatchId(matchId));
     final match = matchResult.fold((f) => throw FailureWrapper(f), (m) => m);
@@ -102,6 +113,49 @@ class ScoringController extends _$ScoringController {
       }
     });
 
+    // Real-time broadcast listeners:
+    // Only subscribe to live score & delivery streams if this device is NOT the active scorer.
+    // The active scorer (canScore == true) is the local-first authority and manages state directly
+    // through optimistic prediction and _settle().
+    if (!canScore) {
+      // 1. Live Innings State (total runs, wickets, overs, current striker/bowler)
+      ref.listen<AsyncValue<MatchInningsState?>>(
+        liveInningsStateProvider(matchId, inningsNumber),
+        (prev, next) {
+          final newInnings = next.value;
+          if (newInnings == null) return;
+          _update((s) => s.copyWith(innings: newInnings));
+        },
+      );
+
+      // 2. Live Ball-by-ball deliveries
+      ref.listen<AsyncValue<List<Ball>>>(
+        liveBallsProvider(matchId, inningsNumber),
+        (prev, next) {
+          final serverBalls = next.value;
+          if (serverBalls == null) return;
+          _update((s) => s.copyWith(balls: serverBalls));
+        },
+      );
+    }
+
+    // 3. Live Match Status and Phase updates
+    ref.listen<AsyncValue<Match?>>(liveMatchProvider(matchId), (prev, next) {
+      final updatedMatch = next.value;
+      if (updatedMatch == null) return;
+      _update((s) => s.copyWith(match: updatedMatch));
+    });
+
+    // 4. Live Match Players (squad changes / keeper / subs)
+    ref.listen<AsyncValue<List<MatchPlayer>>>(matchPlayersProvider(matchId), (
+      prev,
+      next,
+    ) {
+      final updatedPlayers = next.value;
+      if (updatedPlayers == null) return;
+      _update((s) => s.copyWith(matchPlayers: updatedPlayers));
+    });
+
     // Kick the queue once on open, rather than waiting for a reconnect or a
     // resume. A device that scored through an outage arrives here holding
     // deliveries that were never accepted; without this the scorer has to
@@ -125,8 +179,9 @@ class ScoringController extends _$ScoringController {
 
   /// A normal delivery off the bat (0/1/2/3/4/6).
   Future<Either<Failure, Unit>> recordRun(int runs) => _record(
-        label: 'run',
-        build: (s) => BallDraft(
+    label: 'run',
+    build:
+        (s) => BallDraft(
           matchId: s.match.id,
           inningsNumber: inningsNumber,
           isLegalDelivery: true,
@@ -136,7 +191,7 @@ class ScoringController extends _$ScoringController {
           nonStrikerId: s.innings?.nonStrikerId?.value,
           bowlerId: s.innings?.bowlerId?.value,
         ),
-      );
+  );
 
   /// A wide, no-ball, bye or leg-bye.
   Future<Either<Failure, Unit>> recordExtra({
@@ -146,17 +201,18 @@ class ScoringController extends _$ScoringController {
     final split = splitExtraRuns(kind, runs);
     return _record(
       label: 'extra·${kind.wire}',
-      build: (s) => BallDraft(
-        matchId: s.match.id,
-        inningsNumber: inningsNumber,
-        isLegalDelivery: kind != BallKind.wide && kind != BallKind.noBall,
-        ballKind: kind,
-        runsScored: split.runsScored,
-        extras: split.extras,
-        batsmanId: s.innings?.strikerId?.value,
-        nonStrikerId: s.innings?.nonStrikerId?.value,
-        bowlerId: s.innings?.bowlerId?.value,
-      ),
+      build:
+          (s) => BallDraft(
+            matchId: s.match.id,
+            inningsNumber: inningsNumber,
+            isLegalDelivery: kind != BallKind.wide && kind != BallKind.noBall,
+            ballKind: kind,
+            runsScored: split.runsScored,
+            extras: split.extras,
+            batsmanId: s.innings?.strikerId?.value,
+            nonStrikerId: s.innings?.nonStrikerId?.value,
+            bowlerId: s.innings?.bowlerId?.value,
+          ),
     );
   }
 
@@ -165,10 +221,10 @@ class ScoringController extends _$ScoringController {
     int runsBefore = 0,
     String? dismissedMatchPlayerId,
     String? fielderMatchPlayerId,
-  }) =>
-      _record(
-        label: 'wicket·${type.wire}',
-        build: (s) => BallDraft(
+  }) => _record(
+    label: 'wicket·${type.wire}',
+    build:
+        (s) => BallDraft(
           matchId: s.match.id,
           inningsNumber: inningsNumber,
           isLegalDelivery: true,
@@ -183,7 +239,7 @@ class ScoringController extends _$ScoringController {
           bowlerId: s.innings?.bowlerId?.value,
           fielderId: fielderMatchPlayerId,
         ),
-      );
+  );
 
   /// Undo the last delivery — one step back, never further.
   Future<Either<Failure, Unit>> undoLastBall() async {
@@ -200,15 +256,16 @@ class ScoringController extends _$ScoringController {
         // server already holds. Only this side knows which.
         final lastId = current.balls.last.id.value;
         const localPrefix = 'local:';
-        final pendingOpId = lastId.startsWith(localPrefix)
-            ? lastId.substring(localPrefix.length)
-            : null;
+        final pendingOpId =
+            lastId.startsWith(localPrefix)
+                ? lastId.substring(localPrefix.length)
+                : null;
 
-        final result = await ref.read(matchesRepositoryProvider).undoLastBall(
-              matchId: current.match.id,
-              inningsNumber: inningsNumber,
-              pendingOpId: pendingOpId,
-            );
+        final result = await _repo.undoLastBall(
+          matchId: current.match.id,
+          inningsNumber: inningsNumber,
+          pendingOpId: pendingOpId,
+        );
 
         final failure = result.getLeft().toNullable();
         if (failure != null) return Left(failure);
@@ -248,27 +305,33 @@ class ScoringController extends _$ScoringController {
       return st.copyWith(
         balls: remaining,
         pendingCount: (st.pendingCount - 1).clamp(0, 1 << 30),
-        innings: removed == null
-            ? st.innings
-            : st.innings?.copyWith(
-                legalBallCount:
-                    remaining.where((b) => b.isLegalDelivery).length,
-                totalRuns:
-                    remaining.fold<int>(0, (sum, b) => sum + b.totalRuns),
-                totalWickets: remaining.where((b) => b.isWicket).length,
-                strikerId: removed.batsmanId == null
-                    ? null
-                    : MatchPlayerId(removed.batsmanId!),
-                clearStriker: removed.batsmanId == null,
-                nonStrikerId: removed.nonStrikerId == null
-                    ? null
-                    : MatchPlayerId(removed.nonStrikerId!),
-                clearNonStriker: removed.nonStrikerId == null,
-                bowlerId: removed.bowlerId == null
-                    ? null
-                    : MatchPlayerId(removed.bowlerId!),
-                clearBowler: removed.bowlerId == null,
-              ),
+        innings:
+            removed == null
+                ? st.innings
+                : st.innings?.copyWith(
+                  legalBallCount:
+                      remaining.where((b) => b.isLegalDelivery).length,
+                  totalRuns: remaining.fold<int>(
+                    0,
+                    (sum, b) => sum + b.totalRuns,
+                  ),
+                  totalWickets: remaining.where((b) => b.isWicket).length,
+                  strikerId:
+                      removed.batsmanId == null
+                          ? null
+                          : MatchPlayerId(removed.batsmanId!),
+                  clearStriker: removed.batsmanId == null,
+                  nonStrikerId:
+                      removed.nonStrikerId == null
+                          ? null
+                          : MatchPlayerId(removed.nonStrikerId!),
+                  clearNonStriker: removed.nonStrikerId == null,
+                  bowlerId:
+                      removed.bowlerId == null
+                          ? null
+                          : MatchPlayerId(removed.bowlerId!),
+                  clearBowler: removed.bowlerId == null,
+                ),
       );
     });
     _predictions.remove(opId);
@@ -297,16 +360,22 @@ class ScoringController extends _$ScoringController {
       }
     }
     if (striker.isEmpty || nonStriker.isEmpty) {
-      return Future.value(const Left(ValidationFailure(
-        'Both openers must be set before choosing a bowler.',
-      )));
+      return Future.value(
+        const Left(
+          ValidationFailure(
+            'Both openers must be set before choosing a bowler.',
+          ),
+        ),
+      );
     }
     if (s.lastOverBowlerId != null &&
         bowlerMatchPlayerId == s.lastOverBowlerId &&
         s.legalBalls % s.ballsPerOver == 0) {
-      return Future.value(const Left(ValidationFailure(
-        'A bowler cannot bowl two consecutive overs.',
-      )));
+      return Future.value(
+        const Left(
+          ValidationFailure('A bowler cannot bowl two consecutive overs.'),
+        ),
+      );
     }
     return _setTrio(
       label: 'setBowler',
@@ -324,17 +393,21 @@ class ScoringController extends _$ScoringController {
     if (s == null) {
       return Future.value(const Left(ValidationFailure('Not ready')));
     }
-    final striker = forNonStriker
-        ? (s.innings?.strikerId?.value ?? '')
-        : batterMatchPlayerId;
-    final nonStriker = forNonStriker
-        ? batterMatchPlayerId
-        : (s.innings?.nonStrikerId?.value ?? '');
+    final striker =
+        forNonStriker
+            ? (s.innings?.strikerId?.value ?? '')
+            : batterMatchPlayerId;
+    final nonStriker =
+        forNonStriker
+            ? batterMatchPlayerId
+            : (s.innings?.nonStrikerId?.value ?? '');
     final bowler = s.innings?.bowlerId?.value ?? '';
     if (striker.isEmpty || nonStriker.isEmpty || bowler.isEmpty) {
-      return Future.value(const Left(ValidationFailure(
-        'Set the bowler and both batters before resuming.',
-      )));
+      return Future.value(
+        const Left(
+          ValidationFailure('Set the bowler and both batters before resuming.'),
+        ),
+      );
     }
     return _setTrio(
       label: 'bringInBatter',
@@ -356,27 +429,29 @@ class ScoringController extends _$ScoringController {
     }
 
     // Update trio locally immediately
-    _update((st) => st.copyWith(
-          innings: st.innings?.copyWith(
-            strikerId: striker.isEmpty ? null : MatchPlayerId(striker),
-            clearStriker: striker.isEmpty,
-            nonStrikerId: nonStriker.isEmpty ? null : MatchPlayerId(nonStriker),
-            clearNonStriker: nonStriker.isEmpty,
-            bowlerId: bowler.isEmpty ? null : MatchPlayerId(bowler),
-            clearBowler: bowler.isEmpty,
-          ),
-        ));
+    _update(
+      (st) => st.copyWith(
+        innings: st.innings?.copyWith(
+          strikerId: striker.isEmpty ? null : MatchPlayerId(striker),
+          clearStriker: striker.isEmpty,
+          nonStrikerId: nonStriker.isEmpty ? null : MatchPlayerId(nonStriker),
+          clearNonStriker: nonStriker.isEmpty,
+          bowlerId: bowler.isEmpty ? null : MatchPlayerId(bowler),
+          clearBowler: bowler.isEmpty,
+        ),
+      ),
+    );
 
     return _busy(
       label,
       () => _enqueueWrite(
-        () => ref.read(matchesRepositoryProvider).startInnings(
-              matchId: s.match.id,
-              inningsNumber: inningsNumber,
-              strikerId: striker,
-              nonStrikerId: nonStriker,
-              bowlerId: bowler,
-            ),
+        () => _repo.startInnings(
+          matchId: s.match.id,
+          inningsNumber: inningsNumber,
+          strikerId: striker,
+          nonStrikerId: nonStriker,
+          bowlerId: bowler,
+        ),
       ),
     );
   }
@@ -406,7 +481,9 @@ class ScoringController extends _$ScoringController {
     // the backstop for every other route into a write.
     if (!s.battersSet) {
       return const Left(
-        ValidationFailure('Choose the next batter before recording a delivery.'),
+        ValidationFailure(
+          'Choose the next batter before recording a delivery.',
+        ),
       );
     }
 
@@ -424,19 +501,15 @@ class ScoringController extends _$ScoringController {
       engineStateFrom(s.innings),
       format,
       input,
-      engineContextFrom(
-        balls: s.balls,
-        bowlerId: s.innings?.bowlerId?.value,
-      ),
+      engineContextFrom(balls: s.balls, bowlerId: s.innings?.bowlerId?.value),
     );
 
     if (!predicted.ok) {
-      CkLog.warn(CkLogChannel.matchStart, 'scoring·$label·refused', data: {
-        'code': predicted.error?.code,
-      });
-      return Left(ValidationFailure(
-        predicted.error?.message ?? 'That delivery is not legal.',
-      ));
+      return Left(
+        ValidationFailure(
+          predicted.error?.message ?? 'That delivery is not legal.',
+        ),
+      );
     }
 
     final ball = predicted.ball!;
@@ -466,11 +539,13 @@ class ScoringController extends _$ScoringController {
     // Paint immediately on screen
     final provisional = _provisionalBall(s, ball, opId);
     _predictions[opId] = (predicted: predicted, input: input, format: format);
-    _update((st) => st.copyWith(
-          innings: _projectInnings(st.innings, next),
-          balls: [...st.balls, provisional],
-          pendingCount: st.pendingCount + 1,
-        ));
+    _update(
+      (st) => st.copyWith(
+        innings: _projectInnings(st.innings, next),
+        balls: [...st.balls, provisional],
+        pendingCount: st.pendingCount + 1,
+      ),
+    );
 
     // Asynchronously dispatch to repository in FIFO write queue
     unawaited(_dispatchToRepo(draft, opId));
@@ -479,8 +554,7 @@ class ScoringController extends _$ScoringController {
 
   Future<void> _dispatchToRepo(BallDraft draft, String opId) =>
       _enqueueWrite(() async {
-        final result =
-            await ref.read(matchesRepositoryProvider).recordBall(draft);
+        final result = await _repo.recordBall(draft);
         result.fold(
           (failure) => _onSendFailed(opId, failure),
           (outcome) => _settle(opId: opId, outcome: outcome),
@@ -488,8 +562,7 @@ class ScoringController extends _$ScoringController {
       });
 
   Future<void> drainOutbox() =>
-      _syncInFlight ??= ref
-          .read(matchesRepositoryProvider)
+      _syncInFlight ??= _repo
           .syncPendingOps(matchId: matchId, inningsNumber: inningsNumber)
           .whenComplete(() => _syncInFlight = null);
 
@@ -501,15 +574,6 @@ class ScoringController extends _$ScoringController {
         await _resyncFromServer();
         break;
       case ConflictFailure():
-        // A 409 no longer means "another scorer beat you" — the optimistic
-        // version lock is gone, because the batting side owns its innings
-        // outright (D12). It now means the innings is not open for writing:
-        // never started, or the match already closed. Neither is retryable,
-        // and leaving the delivery painted would show the scorer a ball that
-        // will never be recorded.
-        CkLog.warn(CkLogChannel.matchStart, 'scoring·refused', data: {
-          'msg': f.message,
-        });
         _removeProvisional(opId);
         await _resyncFromServer();
         break;
@@ -523,84 +587,61 @@ class ScoringController extends _$ScoringController {
   /// was refused. The delivery is gone; showing the scorer anything other than
   /// what was actually recorded is worse than showing them less.
   Future<void> _resyncFromServer() async {
-    final repo = ref.read(matchesRepositoryProvider);
-    final inningsResult = await repo.getMatchInningsState(
+    final inningsResult = await _repo.getMatchInningsState(
       matchId: MatchId(matchId),
       inningsNumber: inningsNumber,
     );
-    final ballsResult = await repo.listBalls(MatchId(matchId), inningsNumber);
-    _update((st) => st.copyWith(
-          innings: inningsResult.fold((_) => st.innings, (s) => s),
-          balls: ballsResult.fold((_) => st.balls, (b) => b),
-        ));
+    final ballsResult = await _repo.listBalls(MatchId(matchId), inningsNumber);
+    _update(
+      (st) => st.copyWith(
+        innings: inningsResult.fold((_) => st.innings, (s) => s),
+        balls: ballsResult.fold((_) => st.balls, (b) => b),
+      ),
+    );
   }
 
   Ball _provisionalBall(ScoringState s, ComputedBall c, String opId) => Ball(
-        id: BallId('local:$opId'),
-        matchId: s.match.id,
-        inningsNumber: inningsNumber,
-        seq: (s.balls.isEmpty ? 0 : s.balls.last.seq) + 1,
-        overNumber: c.overNumber,
-        ballInOver: c.ballInOver,
-        isLegalDelivery: c.isLegalDelivery,
-        ballKind: c.ballKind,
-        runsScored: c.runsScored,
-        extras: c.extras,
-        isWicket: c.isWicket,
-        isFreeHit: c.isFreeHit,
-        wicketType: c.wicketType,
-        dismissedPlayerId: c.dismissedPlayerId,
-        batsmanId: c.batsmanId,
-        nonStrikerId: c.nonStrikerId,
-        bowlerId: c.bowlerId,
-        fielderId: c.fielderId,
-        commentary: c.commentary,
-      );
+    id: BallId('local:$opId'),
+    matchId: s.match.id,
+    inningsNumber: inningsNumber,
+    seq: (s.balls.isEmpty ? 0 : s.balls.last.seq) + 1,
+    overNumber: c.overNumber,
+    ballInOver: c.ballInOver,
+    isLegalDelivery: c.isLegalDelivery,
+    ballKind: c.ballKind,
+    runsScored: c.runsScored,
+    extras: c.extras,
+    isWicket: c.isWicket,
+    isFreeHit: c.isFreeHit,
+    wicketType: c.wicketType,
+    dismissedPlayerId: c.dismissedPlayerId,
+    batsmanId: c.batsmanId,
+    nonStrikerId: c.nonStrikerId,
+    bowlerId: c.bowlerId,
+    fielderId: c.fielderId,
+    commentary: c.commentary,
+  );
 
   MatchInningsState? _projectInnings(
     MatchInningsState? current,
     NewInningsState next,
-  ) =>
-      current?.copyWith(
-        legalBallCount: next.legalBallCount,
-        totalRuns: next.totalRuns,
-        totalWickets: next.totalWickets,
-        totalExtras: next.totalExtras,
-        strikerId: next.strikerId == null
-            ? null
-            : MatchPlayerId(next.strikerId!),
-        clearStriker: next.strikerId == null,
-        nonStrikerId: next.nonStrikerId == null
-            ? null
-            : MatchPlayerId(next.nonStrikerId!),
-        clearNonStriker: next.nonStrikerId == null,
-        bowlerId:
-            next.bowlerId == null ? null : MatchPlayerId(next.bowlerId!),
-        clearBowler: next.bowlerId == null,
-        version: current.version + 1,
-      );
+  ) => current?.copyWith(
+    legalBallCount: next.legalBallCount,
+    totalRuns: next.totalRuns,
+    totalWickets: next.totalWickets,
+    totalExtras: next.totalExtras,
+    strikerId: next.strikerId == null ? null : MatchPlayerId(next.strikerId!),
+    clearStriker: next.strikerId == null,
+    nonStrikerId:
+        next.nonStrikerId == null ? null : MatchPlayerId(next.nonStrikerId!),
+    clearNonStriker: next.nonStrikerId == null,
+    bowlerId: next.bowlerId == null ? null : MatchPlayerId(next.bowlerId!),
+    clearBowler: next.bowlerId == null,
+    version: current.version + 1,
+  );
 
   void _settle({required String opId, required BallOutcome outcome}) {
-    final pred = _predictions.remove(opId);
-    if (pred != null && pred.predicted.ball != null && pred.predicted.newState != null) {
-      final parity = compareParity(
-        predictedBall: pred.predicted.ball!,
-        predictedState: pred.predicted.newState!,
-        actualBall: outcome.ball,
-        actualInnings: outcome.innings,
-      );
-      if (!parity.agrees) {
-        CkLog.warn(
-          CkLogChannel.rpc,
-          'parity·divergence',
-          data: {
-            'opId': opId,
-            'summary': parity.summary,
-          },
-        );
-      }
-    }
-
+    _predictions.remove(opId);
     final localId = BallId('local:$opId');
 
     _update((st) {
@@ -644,16 +685,19 @@ class ScoringController extends _$ScoringController {
   void _removeProvisional(String opId) {
     _predictions.remove(opId);
     final localId = BallId('local:$opId');
-    _update((st) => st.copyWith(
-          pendingCount: (st.pendingCount - 1).clamp(0, 1 << 30),
-          balls: [
-            for (final b in st.balls)
-              if (b.id != localId) b,
-          ],
-        ));
+    _update(
+      (st) => st.copyWith(
+        pendingCount: (st.pendingCount - 1).clamp(0, 1 << 30),
+        balls: [
+          for (final b in st.balls)
+            if (b.id != localId) b,
+        ],
+      ),
+    );
   }
 
   void _update(ScoringState Function(ScoringState) edit) {
+    if (!ref.mounted) return;
     final current = state.value;
     if (current == null) return;
     state = AsyncData(edit(current));

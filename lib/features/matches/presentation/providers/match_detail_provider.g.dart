@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'pavilion_match_detail_provider.dart';
+part of 'match_detail_provider.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,30 +9,30 @@ part of 'pavilion_match_detail_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(pavilionMatchDetail)
-final pavilionMatchDetailProvider = PavilionMatchDetailFamily._();
+@ProviderFor(matchDetail)
+final matchDetailProvider = MatchDetailFamily._();
 
-final class PavilionMatchDetailProvider
+final class MatchDetailProvider
     extends
         $FunctionalProvider<AsyncValue<PvMatch?>, PvMatch?, FutureOr<PvMatch?>>
     with $FutureModifier<PvMatch?>, $FutureProvider<PvMatch?> {
-  PavilionMatchDetailProvider._({
-    required PavilionMatchDetailFamily super.from,
+  MatchDetailProvider._({
+    required MatchDetailFamily super.from,
     required String super.argument,
   }) : super(
          retry: null,
-         name: r'pavilionMatchDetailProvider',
+         name: r'matchDetailProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$pavilionMatchDetailHash();
+  String debugGetCreateSourceHash() => _$matchDetailHash();
 
   @override
   String toString() {
-    return r'pavilionMatchDetailProvider'
+    return r'matchDetailProvider'
         ''
         '($argument)';
   }
@@ -45,12 +45,12 @@ final class PavilionMatchDetailProvider
   @override
   FutureOr<PvMatch?> create(Ref ref) {
     final argument = this.argument as String;
-    return pavilionMatchDetail(ref, argument);
+    return matchDetail(ref, argument);
   }
 
   @override
   bool operator ==(Object other) {
-    return other is PavilionMatchDetailProvider && other.argument == argument;
+    return other is MatchDetailProvider && other.argument == argument;
   }
 
   @override
@@ -59,23 +59,22 @@ final class PavilionMatchDetailProvider
   }
 }
 
-String _$pavilionMatchDetailHash() =>
-    r'db4e02cbedfe212720e90100af6b112fcb34ed6d';
+String _$matchDetailHash() => r'57f36b498f8ac4d074537e581aac60baf3278f0d';
 
-final class PavilionMatchDetailFamily extends $Family
+final class MatchDetailFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<PvMatch?>, String> {
-  PavilionMatchDetailFamily._()
+  MatchDetailFamily._()
     : super(
         retry: null,
-        name: r'pavilionMatchDetailProvider',
+        name: r'matchDetailProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  PavilionMatchDetailProvider call(String matchId) =>
-      PavilionMatchDetailProvider._(argument: matchId, from: this);
+  MatchDetailProvider call(String matchId) =>
+      MatchDetailProvider._(argument: matchId, from: this);
 
   @override
-  String toString() => r'pavilionMatchDetailProvider';
+  String toString() => r'matchDetailProvider';
 }

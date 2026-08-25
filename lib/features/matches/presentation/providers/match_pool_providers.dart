@@ -82,7 +82,7 @@ Future<List<OpenMatchPoolItem>> openMatchPool(Ref ref) async {
 
 /// Active match pool challenges hosted by user's own teams.
 @riverpod
-Future<List<OpenMatchPoolItem>> myPoolBroadcasts(Ref ref) async {
+Future<List<OpenMatchPoolItem>> myPoolRequests(Ref ref) async {
   final repo = ref.watch(matchPoolRepositoryProvider);
   final myTeams = (await ref.watch(myTeamsProvider.future));
   final myTeamIds = myTeams.map((t) => t.id).toSet();

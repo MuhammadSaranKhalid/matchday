@@ -1,21 +1,9 @@
-// Pavilion v2 — mappers: real feature view-models → Pv* widget models.
-//
-// This is the ONE place the Pavilion (a presentation-only aggregation view,
-// CLAUDE.md §6.6) adapts other features' shapes into the widget models. It
-// reads cross-feature *presentation* types only (the matches `MyMatchesView`
-// and the teams `Team` + its relationship extension), never their data layers.
-//
-// Honesty notes (per the agreed wiring plan):
-//   • lineupSet / live score / format spec / RSVP / head-to-head have no
-//     surfaced source — left null / placeholder.
-//   • Teams: record / next-fixture / invites / "needs" have no backend — the
-//     subtitle carries the real type + city instead, needs is empty.
-import '../../../../matches/domain/entities/match_role.dart';
-import '../../../../matches/presentation/state/my_matches_view.dart';
 import '../../../../profile/domain/entities/player_profile.dart';
 import '../../../../teams/domain/entities/team.dart';
 import '../../../../teams/domain/entities/team_relationship.dart';
 import '../../../../teams/presentation/utils/team_display.dart';
+import '../../../domain/entities/match_role.dart';
+import '../../state/my_matches_view.dart';
 import 'pv_v2_data.dart';
 
 // ── Crests ──────────────────────────────────────────────────────────────────
@@ -31,7 +19,7 @@ PvCrest crestFromTeam(Team t) => PvCrest(
 
 // ── Matches ─────────────────────────────────────────────────────────────────
 
-/// Flatten the composed [MyMatchesView] into the Pavilion's match cards.
+/// Flatten the composed [MyMatchesView] into the match cards.
 /// [meFallback] stands in for the user's own crest on outbound challenges
 /// (the request view carries only the opponent).
 List<PvMatch> pvMatchesFromView(MyMatchesView v, {required PvCrest meFallback}) {
@@ -94,9 +82,8 @@ List<PvMatch> pvMatchesFromView(MyMatchesView v, {required PvCrest meFallback}) 
 // ── Teams ───────────────────────────────────────────────────────────────────
 
 /// Map the user's teams (owner/manager teams — the only ones `watchMyTeams`
-/// returns) into Pavilion team cards. Role comes from the canonical
-/// [TeamRelationship]; subtitle is the real type + city. Record / next-fixture
-/// / invites / needs have no backend and are intentionally omitted.
+/// returns) into team cards. Role comes from the canonical
+/// [TeamRelationship]; subtitle is the real type + city.
 List<PvTeam> pvTeamsFromTeams(List<Team> teams, {required String? userId}) {
   return [
     for (final t in teams)

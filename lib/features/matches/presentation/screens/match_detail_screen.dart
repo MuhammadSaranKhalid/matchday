@@ -1,32 +1,31 @@
-// Match Detail — its own full-screen route (`/pavilion/match/:id`), mounted
+// Match Detail — its own full-screen route (`/matches/:matchId`), mounted
 // over the shell so the system back gesture works and the bottom nav is
-// covered. Resolves the match by id from the same workspace providers the
-// Pavilion renders (`myMatchesViewProvider` + `myTeams`), so it survives a
-// refresh / deep link rather than depending on in-memory screen state.
+// covered. Resolves the match by id from workspace providers (`myMatchesViewProvider` + `myTeams`),
+// so it survives a refresh / deep link rather than depending on in-memory screen state.
 //
 // All per-match actions live here. Navigating into a sub-flow (scoring / start
 // / scorecard) invalidates the view on return; withdrawing a challenge goes
-// through [PavilionController] and pops back to the Pavilion.
+// through [MatchDetailController] and pops back.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../matches/presentation/providers/my_matches_providers.dart';
-import '../../../matches/presentation/widgets/withdraw_sheet.dart';
-import '../controllers/pavilion_controller.dart';
-import '../providers/pavilion_match_detail_provider.dart';
-import '../widgets/pavilion_v2/pv_v2_match_detail.dart';
+import '../controllers/match_detail_controller.dart';
+import '../providers/match_detail_provider.dart';
+import '../providers/my_matches_providers.dart';
+import '../widgets/match_detail/pv_v2_match_detail.dart';
+import '../widgets/withdraw_sheet.dart';
 
-class PavilionMatchDetailScreen extends ConsumerWidget {
-  const PavilionMatchDetailScreen({super.key, required this.matchId});
+class MatchDetailScreen extends ConsumerWidget {
+  const MatchDetailScreen({super.key, required this.matchId});
 
   final String matchId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(pavilionMatchDetailProvider(matchId));
+    final detailAsync = ref.watch(matchDetailProvider(matchId));
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -34,12 +33,12 @@ class PavilionMatchDetailScreen extends ConsumerWidget {
         AsyncError(:final error) => _error(
             context,
             error is FailureWrapper ? error.failure.message : error.toString(),
-            () => ref.invalidate(pavilionMatchDetailProvider(matchId)),
+            () => ref.invalidate(matchDetailProvider(matchId)),
           ),
         _ when detailAsync.hasValue && detailAsync.value != null => PvMatchDetail(
             m: detailAsync.value!,
             onBack: () =>
-                context.canPop() ? context.pop() : context.go('/pavilion'),
+                context.canPop() ? context.pop() : context.go('/my/matches'),
             onAction: (id, action) => _onAction(context, ref, id, action),
           ),
         AsyncLoading() => const Center(child: CircularProgressIndicator()),
@@ -102,7 +101,7 @@ class PavilionMatchDetailScreen extends ConsumerWidget {
     );
     if (result == null || !context.mounted) return;
     final res = await ref
-        .read(pavilionControllerProvider.notifier)
+        .read(matchDetailControllerProvider.notifier)
         .withdraw(requestId: requestId, note: result.note);
     if (!context.mounted) return;
     res.fold(
@@ -128,10 +127,10 @@ class PavilionMatchDetailScreen extends ConsumerWidget {
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () =>
-                  context.canPop() ? context.pop() : context.go('/pavilion'),
+                  context.canPop() ? context.pop() : context.go('/my/matches'),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('← Pavilion',
+                child: Text('← My Matches',
                     style: CkType.body(fontSize: 14, fontWeight: FontWeight.w600)),
               ),
             ),
@@ -157,10 +156,10 @@ class PavilionMatchDetailScreen extends ConsumerWidget {
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () =>
-                  context.canPop() ? context.pop() : context.go('/pavilion'),
+                  context.canPop() ? context.pop() : context.go('/my/matches'),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('← Pavilion',
+                child: Text('← My Matches',
                     style: CkType.body(fontSize: 14, fontWeight: FontWeight.w600)),
               ),
             ),

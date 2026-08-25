@@ -91,7 +91,6 @@ void main() {
           'messages',
           'notifications',
           'onboarding',
-          'pavilion',
           'posts',
           'profile',
           'shell',

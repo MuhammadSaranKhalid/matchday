@@ -1,22 +1,22 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../auth/presentation/providers/auth_providers.dart';
-import '../../../matches/presentation/providers/matches_providers.dart';
-import '../../../matches/presentation/providers/my_matches_providers.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
-import '../widgets/pavilion_v2/pv_v2_data.dart';
-import '../widgets/pavilion_v2/pv_v2_map.dart';
+import '../widgets/match_detail/pv_v2_data.dart';
+import '../widgets/match_detail/pv_v2_map.dart';
+import 'matches_providers.dart';
+import 'my_matches_providers.dart';
 
-part 'pavilion_match_detail_provider.g.dart';
+part 'match_detail_provider.g.dart';
 
 @riverpod
-Future<PvMatch?> pavilionMatchDetail(
+Future<PvMatch?> matchDetail(
   Ref ref,
   String matchId,
 ) async {
   // Listen for realtime match updates. If the underlying match row changes
   // (e.g. status goes from scheduled to toss), invalidate the workspace provider
-  // so the Pavilion fetches the fresh state.
+  // so the screen fetches the fresh state.
   ref.listen(liveMatchProvider(matchId), (prev, next) {
     if (next.hasValue && next.value != null && prev?.value != next.value) {
       ref.invalidate(myMatchesViewProvider);

@@ -11,9 +11,9 @@ import '../features/messages/presentation/screens/message_thread_screen.dart';
 import '../features/profile/presentation/screens/my_profile_screen.dart';
 import '../features/profile/presentation/screens/public_profile_screen.dart';
 import '../features/messages/presentation/screens/inbox_screen.dart';
-import '../features/pavilion/presentation/screens/my_matches_screen.dart';
-import '../features/pavilion/presentation/screens/pavilion_match_detail_screen.dart';
-import '../features/pavilion/presentation/screens/pavilion_v2_screen.dart';
+import '../features/matches/presentation/screens/match_detail_screen.dart';
+import '../features/matches/presentation/screens/my_matches_screen.dart';
+import '../features/shell/presentation/screens/coming_soon_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
 import '../features/shell/presentation/widgets/swipeable_branch_view.dart';
 import '../features/teams/presentation/screens/add_unclaimed_player_screen.dart';
@@ -31,7 +31,7 @@ import '../features/matches/presentation/screens/challenge_detail_screen.dart';
 import '../features/matches/presentation/screens/challenge_send_screen.dart';
 import '../features/matches/presentation/screens/challenge_sent_screen.dart';
 import '../features/matches/presentation/screens/match_start_screen.dart';
-import '../features/matches/presentation/screens/my_pool_broadcasts_screen.dart';
+import '../features/matches/presentation/screens/my_pool_requests_screen.dart';
 import '../features/matches/presentation/screens/open_match_pool_screen.dart';
 import '../features/matches/presentation/screens/scoring_screen.dart';
 import '../features/matches/presentation/screens/innings_break_screen.dart';
@@ -44,7 +44,7 @@ import '../features/posts/presentation/screens/composer_screen.dart';
 part 'app_router.g.dart';
 
 /// Root navigator key — the router's top-level navigator, above the shell.
-/// Full-screen routes (Teams, Pavilion, the match lifecycle) live here so they
+/// Full-screen routes (Teams, the match lifecycle, profile) live here so they
 /// cover the tab bar, and they are declared as real routes rather than
 /// imperative pushes so the URL updates and a web refresh restores the page.
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -55,11 +55,10 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 /// When it flips (sign in / sign out), the router re-evaluates and moves
 /// the user accordingly.
 ///
-/// Authenticated users land in the five-tab shell (Home · Search · Matches ·
-/// Pool · Profile — D9 in docs/search-feature-design.md, amended 2026-08-21
-/// when Pool replaced Pavilion in the bar) via a
+/// Authenticated users land in the four-tab shell (Home · Explore · Matches ·
+/// Pool — N5 in docs/navigation-ia-design.md) via a
 /// [StatefulShellRoute] so each tab keeps its own navigation stack. Own
-/// profile is a root-level route reached from the header avatar.
+/// profile is a root-level route reached from the drawer masthead.
 /// The onboarding gate (signed-in but profile incomplete → /onboarding) is
 /// added in Feature 2 alongside the `profiles` table.
 @Riverpod(keepAlive: true)
@@ -103,7 +102,7 @@ GoRouter appRouter(Ref ref) {
       StatefulShellRoute(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
-        // Lay the five branch navigators out in a PageView so the tabs can be
+        // Lay the four branch navigators out in a PageView so the tabs can be
         // swiped through with a smooth, finger-tracking transition (the
         // default .indexedStack snaps instantly). See SwipeableBranchView.
         navigatorContainerBuilder: (context, navigationShell, children) =>
@@ -132,14 +131,7 @@ GoRouter appRouter(Ref ref) {
             ],
           ),
           // 1 · Explore — unified search + discovery over players, teams and
-          // matches (docs/explore-feature-design.md). v1 ships without the
-          // proximity surfaces: no coordinates are captured yet, so near-me
-          // and city facets would rank an empty dimension.
-          //
-          // `/search` is retained as a redirect: the path predates Explore and
-          // is referenced by the header search shortcut. TeamSearchScreen
-          // stays reachable at /search/teams until the geo capture lands and
-          // it can be retired into Explore's teams category.
+          // matches (docs/explore-feature-design.md).
           StatefulShellBranch(
             preload: true,
             routes: [
@@ -183,9 +175,7 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 2 · Matches — Live · Upcoming · Recent · Browse (the open match
-          // pool lands here as the primary sub-tab; see
-          // docs/match-pool-feature-design.md D10).
+          // 2 · Matches — Live · Upcoming · Recent · Browse
           StatefulShellBranch(
             preload: true,
             routes: [
@@ -195,11 +185,7 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 3 · Pool — the open match pool (matchmaking). Took this slot from
-          // Pavilion on 2026-08-21: browsing open fixtures is a daily,
-          // discovery-shaped activity that belongs in the bar, whereas
-          // Pavilion is a management workspace and now lives behind the
-          // Management sheet (a full-screen route — see below).
+          // 3 · Pool — the open match pool (matchmaking).
           StatefulShellBranch(
             preload: true,
             routes: [
@@ -209,46 +195,59 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 4 · Profile — own profile tab
-          StatefulShellBranch(
-            preload: true,
-            routes: [
-              GoRoute(
-                path: '/profile',
-                builder: (_, __) => const MyProfileScreen(),
-              ),
-            ],
-          ),
         ],
       ),
-      // Pavilion — the management workspace. Full-screen over the shell
-      // (reached from the Management sheet) since it gave up its nav tab to
-      // the Pool. It renders its own back chevron, so arriving here via `go`
-      // (from a post-action redirect) is not a dead end.
+      // Own profile (root-level push route over the shell, reached from drawer)
+      GoRoute(
+        path: '/profile',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, __) => const MyProfileScreen(),
+      ),
+      // Side panel destinations under `/my/...`
+      GoRoute(
+        path: '/my/matches',
+        builder: (_, __) => const MyMatchesScreen(),
+      ),
+      GoRoute(
+        path: '/my/teams',
+        builder: (_, __) => const TeamsListScreen(),
+      ),
+      GoRoute(
+        path: '/my/pool-requests',
+        builder: (_, __) => const MyPoolRequestsScreen(),
+      ),
+      // Side panel · Account zone. Both rows are drawn live in the Side Panel
+      // design; neither destination is built yet. `Saved` has mock UI inside
+      // posts but no screen of its own, and `Settings` still has to be built
+      // before store review (notification prefs, privacy, blocked users,
+      // account deletion, legal links).
+      GoRoute(
+        path: '/saved',
+        builder: (_, __) => const ComingSoonScreen(tab: 'Saved'),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (_, __) => const ComingSoonScreen(tab: 'Settings'),
+      ),
+      // Legacy redirects for Pavilion and old paths
       GoRoute(
         path: '/pavilion',
-        builder: (_, __) => const PavilionV2Screen(),
+        redirect: (_, __) => '/my/matches',
         routes: [
-          // My matches — URL-nested under /pavilion so a web refresh restores
-          // [Pavilion → My matches] with a working back.
           GoRoute(
             path: 'my-matches',
-            builder: (_, __) => const MyMatchesScreen(),
+            redirect: (_, __) => '/my/matches',
           ),
-          // Match Detail — resolves the match by id, so a refresh / deep link
-          // restores it with a working back.
           GoRoute(
             path: 'match/:id',
-            builder: (_, state) => PavilionMatchDetailScreen(
-              matchId: state.pathParameters['id']!,
-            ),
+            redirect: (_, state) => '/matches/${state.pathParameters['id']}',
           ),
         ],
       ),
-      // Teams (full-screen, pushed over the shell). Gated by the redirect.
+      // Teams redirects & full-screen routes
       GoRoute(
         path: '/teams',
-        builder: (_, __) => const TeamsListScreen(),
+        redirect: (_, __) => '/my/teams',
       ),
       GoRoute(
         path: '/teams/create',
@@ -271,6 +270,11 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) => AddUnclaimedPlayerScreen(
           teamId: state.pathParameters['teamId']!,
         ),
+      ),
+      GoRoute(
+        path: '/matches/:matchId',
+        builder: (_, state) =>
+            MatchDetailScreen(matchId: state.pathParameters['matchId']!),
       ),
       GoRoute(
         path: '/matches/:matchId/start',
@@ -315,7 +319,7 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/matches/my-broadcasts',
-        builder: (_, __) => const MyPoolBroadcastsScreen(),
+        redirect: (_, __) => '/my/pool-requests',
       ),
       GoRoute(
         path: '/challenge',

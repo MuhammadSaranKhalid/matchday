@@ -2,9 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../teams/domain/entities/roster_member.dart';
-import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
-import '../../domain/entities/match.dart';
 import '../../domain/entities/match_player.dart';
 import '../state/match_start_state.dart';
 import '../state/match_start_views.dart';
@@ -62,56 +60,3 @@ Future<List<MatchStartLineupCandidate>> matchStartLineup(
         ),
   ];
 }
-
-/// The Ready stage's screen-ready summary: team names, the toss line, the
-/// locked openers resolved to names, and the format line.
-@riverpod
-Future<MatchStartReadyView> matchStartReady(Ref ref, String matchId) async {
-  final match = await ref.watch(liveMatchProvider(matchId).future);
-  if (match == null) {
-    throw const FailureWrapper(NotFoundFailure('Match not found'));
-  }
-
-  final teamA = await ref.watch(teamProvider(match.teamAId.value).future);
-  final teamB = await ref.watch(teamProvider(match.teamBId.value).future);
-  String? teamNameOf(TeamId? id) {
-    if (id == null) return null;
-    if (id == match.teamAId) return teamA?.name;
-    if (id == match.teamBId) return teamB?.name;
-    return null;
-  }
-
-  final batting = battingFirstTeam(match);
-  final bowling = batting == null
-      ? null
-      : (batting == match.teamAId ? match.teamBId : match.teamAId);
-
-  // Openers are persisted on match_innings_state for innings 1 as
-  // match_player_ids; resolve them back through the lineup, which already
-  // carries each player's name — including guests, who have no roster row.
-  final matchPlayers = await ref.watch(matchPlayersProvider(matchId).future);
-  final innings = await ref.watch(liveInningsStateProvider(matchId, 1).future);
-
-  String? openerName(String? matchPlayerId) =>
-      matchPlayers.byMatchPlayerId(matchPlayerId)?.displayName;
-
-  return MatchStartReadyView(
-    battingTeamName: teamNameOf(batting) ?? 'Batting',
-    bowlingTeamName: teamNameOf(bowling) ?? 'Bowling',
-    tossLine: _tossLine(match, teamNameOf(match.tossWonBy)),
-    formatLine: _formatLine(match.format),
-    strikerName: openerName(innings?.strikerId?.value),
-    nonStrikerName: openerName(innings?.nonStrikerId?.value),
-  );
-}
-
-String _tossLine(Match m, String? winnerName) {
-  final decision = m.tossDecision;
-  if (decision == null || m.tossWonBy == null) return '';
-  final winner = winnerName ??
-      (m.tossWonBy == m.teamAId ? 'Team A' : 'Team B');
-  return '$winner · chose to ${decision == TossDecision.bat ? 'bat' : 'bowl'}';
-}
-
-String _formatLine(MatchFormat f) =>
-    'T${f.oversPerInnings} · ${f.playersPerTeam}-a-side · ${f.ballType.name} ball';

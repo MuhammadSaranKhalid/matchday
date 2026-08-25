@@ -18,9 +18,9 @@ enum MatchStartViewerRole {
   spectator,
 }
 
-/// Visible steps in the Match Start progress bar: toss → lineup → ready.
+/// Visible steps in the Match Start progress bar: toss → lineup.
 /// [MatchStartPhase.live] is the exit, not a step, so it is not counted.
-const int matchStartStepCount = 3;
+const int matchStartStepCount = 2;
 
 /// View state of a match in the Match Start flow.
 ///
@@ -71,13 +71,12 @@ class MatchStartState extends Equatable {
   /// [Match.startPhase] for convenience.
   MatchStartPhase get phase => match.startPhase;
 
-  /// Zero-based index into the [matchStartStepCount] progress bar. `live`
-  /// pins to the last step so the bar doesn't jump during the redirect.
+  /// Zero-based index into the [matchStartStepCount] progress bar.
   int get stepIndex => switch (phase) {
         MatchStartPhase.toss => 0,
-        MatchStartPhase.lineup => 1,
-        MatchStartPhase.ready => 2,
-        MatchStartPhase.live => 2,
+        MatchStartPhase.lineup ||
+        MatchStartPhase.ready ||
+        MatchStartPhase.live => 1,
       };
 
   bool get isViewerBattingCaptain =>

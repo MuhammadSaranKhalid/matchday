@@ -69,7 +69,7 @@ final class MatchStartControllerProvider
 }
 
 String _$matchStartControllerHash() =>
-    r'4098cbd8811d2defa42177f73d79ea3d679b704e';
+    r'957588c55ae66116e6dfaad39db0da052d13a934';
 
 /// Watches the match row in real time and owns every Match Start decision:
 /// who the viewer is, which openers are selected, and the three writes

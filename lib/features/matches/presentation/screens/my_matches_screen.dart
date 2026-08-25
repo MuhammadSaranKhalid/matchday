@@ -1,7 +1,3 @@
-// "My matches" — promoted out of the Pavilion god-screen into its own route at
-// `/pavilion/my-matches`. Same widget tree the Pavilion sub-view used to host;
-// now pushed over the Pavilion shell branch so the system back gesture works
-// and the screen has its own go_router entry.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,11 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
-import '../../../matches/domain/entities/match_request.dart';
-import '../../../matches/presentation/providers/matches_providers.dart';
-import '../../../matches/presentation/providers/my_matches_providers.dart';
-import '../../../matches/presentation/state/my_matches_view.dart';
-import '../../../matches/presentation/widgets/withdraw_sheet.dart';
+import '../../domain/entities/match_request.dart';
+import '../providers/matches_providers.dart';
+import '../providers/my_matches_providers.dart';
+import '../state/my_matches_view.dart';
+import '../widgets/withdraw_sheet.dart';
 
 class MyMatchesScreen extends ConsumerStatefulWidget {
   const MyMatchesScreen({super.key});
@@ -36,11 +32,8 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
           children: [
             _Header(
               title: 'My matches',
-              // Pop back to Pavilion when there's a stack (normal in-app
-              // navigation); fall back to /pavilion on a cold web load / deep
-              // link where nothing is below.
               onBack: () =>
-                  context.canPop() ? context.pop() : context.go('/pavilion'),
+                  context.canPop() ? context.pop() : context.go('/home'),
               right: const _ChallengeButton(),
             ),
             Expanded(
@@ -1045,7 +1038,7 @@ class _ConfirmedCard extends StatelessWidget {
   }
 
   void _openMatchDetail(BuildContext context) {
-    context.push('/pavilion/match/${v.id}');
+    context.push('/matches/${v.id}');
   }
 
   void _openScoring(BuildContext context) {

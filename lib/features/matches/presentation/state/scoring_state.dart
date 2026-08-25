@@ -353,18 +353,22 @@ class ScoringState extends Equatable {
       );
 
   ScoringState copyWith({
-    bool? isBusy,
-    int? pendingCount,
+    Match? match,
+    int? inningsNumber,
     MatchInningsState? innings,
     List<Ball>? balls,
+    List<MatchPlayer>? matchPlayers,
+    bool? canScore,
+    bool? isBusy,
+    int? pendingCount,
   }) =>
       ScoringState(
-        match: match,
-        inningsNumber: inningsNumber,
+        match: match ?? this.match,
+        inningsNumber: inningsNumber ?? this.inningsNumber,
         innings: innings ?? this.innings,
         balls: balls ?? this.balls,
-        matchPlayers: matchPlayers,
-        canScore: canScore,
+        matchPlayers: matchPlayers ?? this.matchPlayers,
+        canScore: canScore ?? this.canScore,
         isBusy: isBusy ?? this.isBusy,
         pendingCount: pendingCount ?? this.pendingCount,
       );

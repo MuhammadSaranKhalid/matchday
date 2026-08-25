@@ -79,7 +79,7 @@ class _ChallengeDetailScreenState
       children: [
         _Header(
           onBack: () =>
-              context.canPop() ? context.pop() : context.go('/pavilion/my-matches'),
+              context.canPop() ? context.pop() : context.go('/my/matches'),
           kicker: viewerIsSender
               ? (isOpenPool ? 'OPEN CHALLENGE POSTED' : 'CHALLENGE SENT')
               : (isOpenPool ? 'OPEN MATCH POOL' : 'INCOMING CHALLENGE'),
@@ -430,7 +430,7 @@ class _ChallengeDetailScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Match created successfully!')),
         );
-        context.go('/pavilion/match/${matchId.value}');
+        context.go('/matches/${matchId.value}');
       },
     );
   }
@@ -492,7 +492,7 @@ class _ChallengeDetailScreenState
         ref.invalidate(myMatchChallengesProvider);
         ref.invalidate(myMatchesViewProvider);
         ref.invalidate(matchesFeedProvider);
-        context.go('/pavilion');
+        context.go('/my/matches');
       },
     );
   }
@@ -522,7 +522,7 @@ class _ChallengeDetailScreenState
       ),
       (_) {
         ref.invalidate(myMatchChallengesProvider);
-        context.go('/pavilion');
+        context.go('/my/matches');
       },
     );
   }
@@ -558,7 +558,7 @@ class _ChallengeDetailScreenState
         ref.invalidate(matchChallengeProvider(widget.requestId));
         context.canPop()
             ? context.pop()
-            : context.go('/pavilion/my-matches');
+            : context.go('/my/matches');
       },
     );
   }

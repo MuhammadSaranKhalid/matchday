@@ -11,7 +11,6 @@ part of 'match_innings_state_dto.dart';
 
 // dart format off
 T _$identity<T>(T value) => value;
-
 /// @nodoc
 mixin _$MatchInningsStateDto {
 
@@ -22,8 +21,6 @@ mixin _$MatchInningsStateDto {
 @pragma('vm:prefer-inline')
 $MatchInningsStateDtoCopyWith<MatchInningsStateDto> get copyWith => _$MatchInningsStateDtoCopyWithImpl<MatchInningsStateDto>(this as MatchInningsStateDto, _$identity);
 
-  /// Serializes this MatchInningsStateDto to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
@@ -31,7 +28,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchInningsStateDto&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.inningsNumber, inningsNumber) || other.inningsNumber == inningsNumber)&&(identical(other.strikerId, strikerId) || other.strikerId == strikerId)&&(identical(other.nonStrikerId, nonStrikerId) || other.nonStrikerId == nonStrikerId)&&(identical(other.bowlerId, bowlerId) || other.bowlerId == bowlerId)&&(identical(other.legalBallCount, legalBallCount) || other.legalBallCount == legalBallCount)&&(identical(other.totalRuns, totalRuns) || other.totalRuns == totalRuns)&&(identical(other.totalWickets, totalWickets) || other.totalWickets == totalWickets)&&(identical(other.totalExtras, totalExtras) || other.totalExtras == totalExtras)&&(identical(other.isDeclared, isDeclared) || other.isDeclared == isDeclared)&&(identical(other.isAllOut, isAllOut) || other.isAllOut == isAllOut)&&(identical(other.target, target) || other.target == target)&&(identical(other.version, version) || other.version == version)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,matchId,inningsNumber,strikerId,nonStrikerId,bowlerId,legalBallCount,totalRuns,totalWickets,totalExtras,isDeclared,isAllOut,target,version,updatedAt);
 
@@ -219,11 +216,11 @@ return $default(_that.matchId,_that.inningsNumber,_that.strikerId,_that.nonStrik
 }
 
 /// @nodoc
-@JsonSerializable()
+
 
 class _MatchInningsStateDto extends MatchInningsStateDto {
   const _MatchInningsStateDto({@JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'innings_number') required this.inningsNumber, @JsonKey(name: 'striker_id') this.strikerId, @JsonKey(name: 'non_striker_id') this.nonStrikerId, @JsonKey(name: 'bowler_id') this.bowlerId, @JsonKey(name: 'legal_ball_count') this.legalBallCount = 0, @JsonKey(name: 'total_runs') this.totalRuns = 0, @JsonKey(name: 'total_wickets') this.totalWickets = 0, @JsonKey(name: 'total_extras') this.totalExtras = 0, @JsonKey(name: 'is_declared') this.isDeclared = false, @JsonKey(name: 'is_all_out') this.isAllOut = false, this.target, @JsonKey(fromJson: intFromWire) this.version = 0, @JsonKey(name: 'updated_at') required this.updatedAt}): super._();
-  factory _MatchInningsStateDto.fromJson(Map<String, dynamic> json) => _$MatchInningsStateDtoFromJson(json);
+  
 
 @override@JsonKey(name: 'match_id') final  String matchId;
 @override@JsonKey(name: 'innings_number') final  int inningsNumber;
@@ -246,17 +243,14 @@ class _MatchInningsStateDto extends MatchInningsStateDto {
 @pragma('vm:prefer-inline')
 _$MatchInningsStateDtoCopyWith<_MatchInningsStateDto> get copyWith => __$MatchInningsStateDtoCopyWithImpl<_MatchInningsStateDto>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$MatchInningsStateDtoToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchInningsStateDto&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.inningsNumber, inningsNumber) || other.inningsNumber == inningsNumber)&&(identical(other.strikerId, strikerId) || other.strikerId == strikerId)&&(identical(other.nonStrikerId, nonStrikerId) || other.nonStrikerId == nonStrikerId)&&(identical(other.bowlerId, bowlerId) || other.bowlerId == bowlerId)&&(identical(other.legalBallCount, legalBallCount) || other.legalBallCount == legalBallCount)&&(identical(other.totalRuns, totalRuns) || other.totalRuns == totalRuns)&&(identical(other.totalWickets, totalWickets) || other.totalWickets == totalWickets)&&(identical(other.totalExtras, totalExtras) || other.totalExtras == totalExtras)&&(identical(other.isDeclared, isDeclared) || other.isDeclared == isDeclared)&&(identical(other.isAllOut, isAllOut) || other.isAllOut == isAllOut)&&(identical(other.target, target) || other.target == target)&&(identical(other.version, version) || other.version == version)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,matchId,inningsNumber,strikerId,nonStrikerId,bowlerId,legalBallCount,totalRuns,totalWickets,totalExtras,isDeclared,isAllOut,target,version,updatedAt);
 

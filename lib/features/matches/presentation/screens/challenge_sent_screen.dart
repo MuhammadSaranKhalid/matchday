@@ -556,7 +556,7 @@ class _Footer extends StatelessWidget {
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () => context.go('/pavilion/my-matches'),
+              onTap: () => context.go('/my/matches'),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 alignment: Alignment.center,

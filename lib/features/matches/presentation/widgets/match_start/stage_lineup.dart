@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../../core/error/failures.dart';
 import '../../../../../core/theme/circk_theme.dart';
+import '../../../../../core/widgets/ck_button.dart';
 import '../../controllers/match_start_controller.dart';
 import '../../providers/match_start_providers.dart';
 import '../../state/match_start_state.dart';
@@ -29,7 +31,8 @@ class MatchStartLineupStage extends ConsumerWidget {
         child: MatchStartWaitingCard(
           eyebrow: 'WAITING ON THE BATTING CAPTAIN',
           title: 'They’re picking their openers.',
-          body: 'When ball 1 is bowled, the scoring screen prompts whoever '
+          body:
+              'When ball 1 is bowled, the scoring screen prompts whoever '
               'has the ball. You don’t pre-pick a bowler.',
         ),
       );
@@ -39,20 +42,20 @@ class MatchStartLineupStage extends ConsumerWidget {
 
     return switch (candidates) {
       AsyncError(:final error) => Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              failureMessageOf(error),
-              textAlign: TextAlign.center,
-              style: CkType.body(fontSize: 13, color: CkColors.muted),
-            ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            failureMessageOf(error),
+            textAlign: TextAlign.center,
+            style: CkType.body(fontSize: 13, color: CkColors.muted),
           ),
         ),
+      ),
       AsyncData(:final value) => _Picker(
-          matchId: matchId,
-          state: state,
-          candidates: value,
-        ),
+        matchId: matchId,
+        state: state,
+        candidates: value,
+      ),
       _ => const MatchStartLoader(),
     };
   }
@@ -79,6 +82,8 @@ class _Picker extends ConsumerWidget {
       return null;
     }
 
+    final controller = ref.read(matchStartControllerProvider(matchId).notifier);
+
     return Column(
       children: [
         _SlotsRow(
@@ -100,11 +105,33 @@ class _Picker extends ConsumerWidget {
                   final id when id == state.nonStriker => 'NS',
                   _ => null,
                 },
-                onTap: () => ref
-                    .read(matchStartControllerProvider(matchId).notifier)
-                    .tapOpener(candidate.refId),
+                onTap: () => controller.tapOpener(candidate.refId),
               );
             },
+          ),
+        ),
+        Container(
+          decoration: const BoxDecoration(
+            color: CkColors.paper,
+            border: Border(top: BorderSide(color: CkColors.hairline)),
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+          child: CkButton(
+            label: 'Start match — first ball',
+            busy: state.isBusy,
+            onPressed:
+                state.isLineupReady
+                    ? () async {
+                      final res = await controller.submitOpenersAndStart();
+                      if (!context.mounted) return;
+                      res.fold(
+                        (failure) => ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(failure.message)),
+                        ),
+                        (_) => context.go('/matches/$matchId/score'),
+                      );
+                    }
+                    : null,
           ),
         ),
       ],
@@ -137,10 +164,7 @@ class _SlotsRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: LineupSlotCard(
-              label: 'NON-STRIKER',
-              value: nonStrikerLabel,
-            ),
+            child: LineupSlotCard(label: 'NON-STRIKER', value: nonStrikerLabel),
           ),
         ],
       ),

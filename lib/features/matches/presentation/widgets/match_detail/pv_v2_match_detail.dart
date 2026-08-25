@@ -10,7 +10,6 @@ import '../../../../../core/theme/circk_theme.dart';
 import '../../../../../core/widgets/v2/v2_kit.dart';
 import 'pv_v2_data.dart';
 import 'pv_v2_kit.dart';
-import 'pv_v2_lanes.dart' show pvPhaseConf;
 
 class _FooterAction {
   const _FooterAction(this.action, this.label,

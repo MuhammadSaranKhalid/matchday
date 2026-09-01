@@ -106,6 +106,14 @@ class AuthController extends _$AuthController {
   // ─── Sign out ───────────────────────────────────────────────────────────
 
   Future<void> signOut() async {
+    // Resolve the repository BEFORE the first await. Sign-out is triggered from
+    // the app drawer, which pops itself immediately — that removes the only
+    // listener on this autodispose provider, so `ref` is dead by the time the
+    // unregister() gap below resumes. Reading it late threw
+    // "Cannot use the Ref of authControllerProvider after it has been
+    // disposed", which aborted sign-out entirely.
+    final repository = ref.read(authRepositoryProvider);
+
     // Revoke this device's push token while still authenticated (the RLS
     // delete on device_tokens needs auth.uid()). Best-effort — never block
     // sign-out on it.
@@ -113,7 +121,11 @@ class AuthController extends _$AuthController {
       await ref.read(pushRegistrarProvider.notifier).unregister();
     } catch (_) {/* ignore — stale tokens self-heal on next sign-in */}
 
-    final result = await ref.read(authRepositoryProvider).signOut();
+    final result = await repository.signOut();
+    // Same reason: this notifier may already be gone. The redirect is driven by
+    // the auth stream, not by this state, so dropping the write is harmless —
+    // a rebuilt controller starts at AuthInitial anyway.
+    if (!ref.mounted) return;
     state = result.fold(
       AuthFailed.new,
       (_) => const AuthInitial(),

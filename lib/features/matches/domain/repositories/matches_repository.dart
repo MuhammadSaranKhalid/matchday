@@ -194,6 +194,10 @@ abstract class MatchesRepository {
   /// inserting balls. Used for the opener pick at ball 1 of innings 1
   /// and for opening the chase at innings 2.
   ///
+  /// Online-only, like the rest of the innings-break handover. Trio changes
+  /// made DURING an innings are a scoring write and go through
+  /// `ScoringSession`, which queues them.
+  ///
   /// IDs are match_player_id values — look them up from
   /// [listMatchPlayers] before calling.
   Future<Either<Failure, Unit>> startInnings({
@@ -206,33 +210,6 @@ abstract class MatchesRepository {
     /// The chase target for this innings (first-innings runs + 1). Only set when
     /// opening the second innings; null preserves any existing target.
     int? target,
-  });
-
-  /// Persist one delivery via the `record-ball` edge function. The server also
-  /// advances the on-field trio (strike rotation, end-of-over swap) based on
-  /// the delivery's kind and runs, so the client doesn't have to mirror that
-  /// logic.
-  ///
-  /// Returns the ball together with the innings row it produced, so the caller
-  /// can render the new score straight from the reply instead of waiting for
-  /// the realtime broadcast to carry it back.
-  Future<Either<Failure, BallOutcome>> recordBall(BallDraft draft);
-
-  /// Delete the last delivery in (matchId, inningsNumber). The server-side
-  /// RPC reverses any state changes the delivery caused. Returns true when
-  /// a row was removed.
-  /// Undo the last delivery — one step back, never further.
-  ///
-  /// [pendingOpId] is the op id of the last delivery IF it is still unsent.
-  /// The caller supplies it because only the caller knows what is actually on
-  /// screen: the write-ahead log can hold ops that correspond to nothing
-  /// visible — deliveries the server refused, left behind by an older build —
-  /// and picking the newest of those would undo something the scorer cannot
-  /// see, while the delivery they meant to remove stayed put.
-  Future<Either<Failure, UndoOutcome>> undoLastBall({
-    required MatchId matchId,
-    required int inningsNumber,
-    String? pendingOpId,
   });
 
   /// One-shot list of deliveries for (match, innings), oldest-first.
@@ -255,19 +232,6 @@ abstract class MatchesRepository {
   /// client instead produced a narrower rule that locked assigned scorers out
   /// of matches they were entitled to score.
   Future<Either<Failure, bool>> canScoreInnings({
-    required MatchId matchId,
-    required int inningsNumber,
-  });
-
-  /// Drains any pending offline scoring operations for (matchId, inningsNumber)
-  /// against the backend in sequential FIFO order.
-  Future<void> syncPendingOps({
-    required String matchId,
-    required int inningsNumber,
-  });
-
-  /// Total count of pending offline scoring operations across all matches.
-  Future<int> pendingOpsCount({
     required MatchId matchId,
     required int inningsNumber,
   });

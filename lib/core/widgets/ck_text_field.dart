@@ -23,6 +23,7 @@ class CkTextField extends StatelessWidget {
     this.autofocus = false,
     this.enabled = true,
     this.maxLength,
+    this.maxLines = 1,
     this.inputFormatters,
     this.suffix,
     this.onChanged,
@@ -40,6 +41,7 @@ class CkTextField extends StatelessWidget {
   final bool autofocus;
   final bool enabled;
   final int? maxLength;
+  final int? maxLines;
   final List<TextInputFormatter>? inputFormatters;
   final Widget? suffix;
   final ValueChanged<String>? onChanged;
@@ -69,6 +71,7 @@ class CkTextField extends StatelessWidget {
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           maxLength: maxLength,
+          maxLines: maxLines,
           inputFormatters: inputFormatters,
           onChanged: onChanged,
           onSubmitted: onSubmitted,

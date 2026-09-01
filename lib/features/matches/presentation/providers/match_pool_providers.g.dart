@@ -241,15 +241,15 @@ final class ChallengePoolApplicationsFamily extends $Family
   String toString() => r'challengePoolApplicationsProvider';
 }
 
-/// Selected format filter for the Open Match Pool screen.
+/// Selected facet on the Pool board.
 
 @ProviderFor(OpenMatchPoolFilter)
 final openMatchPoolFilterProvider = OpenMatchPoolFilterProvider._();
 
-/// Selected format filter for the Open Match Pool screen.
+/// Selected facet on the Pool board.
 final class OpenMatchPoolFilterProvider
-    extends $NotifierProvider<OpenMatchPoolFilter, String> {
-  /// Selected format filter for the Open Match Pool screen.
+    extends $NotifierProvider<OpenMatchPoolFilter, PoolFacet> {
+  /// Selected facet on the Pool board.
   OpenMatchPoolFilterProvider._()
     : super(
         from: null,
@@ -269,30 +269,30 @@ final class OpenMatchPoolFilterProvider
   OpenMatchPoolFilter create() => OpenMatchPoolFilter();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(String value) {
+  Override overrideWithValue(PoolFacet value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<String>(value),
+      providerOverride: $SyncValueProvider<PoolFacet>(value),
     );
   }
 }
 
 String _$openMatchPoolFilterHash() =>
-    r'bf3d1d4df3149a96145f5ccd61e00ec89728f468';
+    r'a518321f10296e0ace86ad5945fae21362d050a4';
 
-/// Selected format filter for the Open Match Pool screen.
+/// Selected facet on the Pool board.
 
-abstract class _$OpenMatchPoolFilter extends $Notifier<String> {
-  String build();
+abstract class _$OpenMatchPoolFilter extends $Notifier<PoolFacet> {
+  PoolFacet build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<String, String>;
+    final ref = this.ref as $Ref<PoolFacet, PoolFacet>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<String, String>,
-              String,
+              AnyNotifier<PoolFacet, PoolFacet>,
+              PoolFacet,
               Object?,
               Object?
             >;
@@ -300,12 +300,12 @@ abstract class _$OpenMatchPoolFilter extends $Notifier<String> {
   }
 }
 
-/// Filtered open match pool items strictly derived from domain & filter state.
+/// The board's contents — open challenges narrowed by the selected facet.
 
 @ProviderFor(filteredOpenMatchPool)
 final filteredOpenMatchPoolProvider = FilteredOpenMatchPoolProvider._();
 
-/// Filtered open match pool items strictly derived from domain & filter state.
+/// The board's contents — open challenges narrowed by the selected facet.
 
 final class FilteredOpenMatchPoolProvider
     extends
@@ -317,7 +317,7 @@ final class FilteredOpenMatchPoolProvider
     with
         $FutureModifier<List<OpenMatchPoolItem>>,
         $FutureProvider<List<OpenMatchPoolItem>> {
-  /// Filtered open match pool items strictly derived from domain & filter state.
+  /// The board's contents — open challenges narrowed by the selected facet.
   FilteredOpenMatchPoolProvider._()
     : super(
         from: null,
@@ -345,4 +345,54 @@ final class FilteredOpenMatchPoolProvider
 }
 
 String _$filteredOpenMatchPoolHash() =>
-    r'0bd992aa11dc80f5c2a5abbf9a089677e09a486c';
+    r'e7d5fa9a84bc6ae34de43b346953620c6a9dd7c8';
+
+/// Whether the viewer manages a team, and so may post or apply.
+///
+/// False puts the board behind artboard 05's paper gate: still readable, but
+/// no card is actionable. Membership alone is not enough — the design says
+/// "only team managers can post challenges or apply to play".
+
+@ProviderFor(viewerManagesTeam)
+final viewerManagesTeamProvider = ViewerManagesTeamProvider._();
+
+/// Whether the viewer manages a team, and so may post or apply.
+///
+/// False puts the board behind artboard 05's paper gate: still readable, but
+/// no card is actionable. Membership alone is not enough — the design says
+/// "only team managers can post challenges or apply to play".
+
+final class ViewerManagesTeamProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, FutureOr<bool>>
+    with $FutureModifier<bool>, $FutureProvider<bool> {
+  /// Whether the viewer manages a team, and so may post or apply.
+  ///
+  /// False puts the board behind artboard 05's paper gate: still readable, but
+  /// no card is actionable. Membership alone is not enough — the design says
+  /// "only team managers can post challenges or apply to play".
+  ViewerManagesTeamProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'viewerManagesTeamProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$viewerManagesTeamHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<bool> create(Ref ref) {
+    return viewerManagesTeam(ref);
+  }
+}
+
+String _$viewerManagesTeamHash() => r'2a6b68b4dc48b2045a3e6d4e4e140a076714776b';

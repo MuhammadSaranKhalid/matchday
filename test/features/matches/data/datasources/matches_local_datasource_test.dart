@@ -159,6 +159,58 @@ void main() {
       expect(await ds.pendingOps(matchId: _match, inningsNumber: 1), isEmpty);
     });
 
+    test('a refused op stops being owed but is still stored', () async {
+      await ds.appendOp(
+        opId: 'op-1', matchId: _match, inningsNumber: 1,
+        kind: 'ball', payload: _delivery(4),
+      );
+      await ds.markOpRefused('op-1', 'Innings already closed');
+
+      // Out of the queue: it will never drain, so counting it as unsent
+      // would leave the screen claiming unsaved work forever — which is
+      // what disabled undo.
+      expect(await ds.pendingOps(matchId: _match, inningsNumber: 1), isEmpty);
+      expect(
+        await ds.pendingOpsCount(matchId: _match, inningsNumber: 1),
+        0,
+      );
+
+      // Still readable: design doc §19.3 forbids discarding a refused write.
+      final refused = await ds.refusedOps(matchId: _match, inningsNumber: 1);
+      expect(refused, hasLength(1));
+      expect(refused.single.payload['runsScored'], 4);
+      expect(refused.single.lastError, 'Innings already closed');
+      expect(refused.single.isRefused, isTrue);
+      expect(refused.single.isPending, isFalse);
+    });
+
+    test('a refused op does not block the ops queued behind it', () async {
+      for (var i = 1; i <= 3; i++) {
+        await ds.appendOp(
+          opId: 'op-$i', matchId: _match, inningsNumber: 1,
+          kind: 'ball', payload: _delivery(i),
+        );
+      }
+      await ds.markOpRefused('op-2', 'rule violation');
+
+      final pending = await ds.pendingOps(matchId: _match, inningsNumber: 1);
+      expect(pending.map((o) => o.opId), ['op-1', 'op-3']);
+    });
+
+    test('pruneOps keeps refused ops', () async {
+      await ds.appendOp(
+        opId: 'refused', matchId: _match, inningsNumber: 1,
+        kind: 'ball', payload: _delivery(6),
+      );
+      await ds.markOpRefused('refused', 'match already finished');
+
+      await ds.pruneOps(matchId: _match, inningsNumber: 1);
+
+      final refused = await ds.refusedOps(matchId: _match, inningsNumber: 1);
+      expect(refused, hasLength(1),
+          reason: 'a refused delivery must remain readable after pruning');
+    });
+
     test('pruneOps drops synced ops only', () async {
       await ds.appendOp(
         opId: 'synced', matchId: _match, inningsNumber: 1,

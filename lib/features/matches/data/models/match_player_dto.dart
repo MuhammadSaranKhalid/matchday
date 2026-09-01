@@ -56,6 +56,8 @@ abstract class MatchPlayerDto with _$MatchPlayerDto {
     return _$MatchPlayerDtoFromJson(modified);
   }
 
+  Map<String, dynamic> toJson() => _$MatchPlayerDtoToJson(this as _MatchPlayerDto);
+
   /// Best available human-readable name, in descending order of quality.
   /// Never empty — a nameless row in the XI would render as a blank tile in
   /// the bowler/batter pickers, which is worse than a placeholder.

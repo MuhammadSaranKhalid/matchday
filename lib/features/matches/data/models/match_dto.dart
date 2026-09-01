@@ -50,6 +50,8 @@ abstract class MatchDto with _$MatchDto {
     return _$MatchDtoFromJson(modified);
   }
 
+  Map<String, dynamic> toJson() => _$MatchDtoToJson(this as _MatchDto);
+
   Match toEntity() => Match(
         id: MatchId(matchId),
         teamAId: TeamId(teamAId),

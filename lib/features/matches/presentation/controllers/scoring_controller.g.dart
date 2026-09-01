@@ -8,30 +8,33 @@ part of 'scoring_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Owns live scoring: what the screen sees, and every write it can make.
+/// What the scoring screen sees, and every write it can make.
 ///
-/// Refactored strictly following Clean Architecture:
-/// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
-/// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
-///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
+/// Deliberately thin. Everything about HOW a delivery reaches the server — the
+/// queue, the write-ahead log, retries, what is provisional and what is
+/// confirmed — belongs to [ScoringSession] in the data layer. This class turns
+/// taps into drafts, applies the guards whose failure the scorer needs to read
+/// as a sentence, and republishes the session's projection as screen state.
 
 @ProviderFor(ScoringController)
 final scoringControllerProvider = ScoringControllerFamily._();
 
-/// Owns live scoring: what the screen sees, and every write it can make.
+/// What the scoring screen sees, and every write it can make.
 ///
-/// Refactored strictly following Clean Architecture:
-/// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
-/// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
-///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
+/// Deliberately thin. Everything about HOW a delivery reaches the server — the
+/// queue, the write-ahead log, retries, what is provisional and what is
+/// confirmed — belongs to [ScoringSession] in the data layer. This class turns
+/// taps into drafts, applies the guards whose failure the scorer needs to read
+/// as a sentence, and republishes the session's projection as screen state.
 final class ScoringControllerProvider
     extends $AsyncNotifierProvider<ScoringController, ScoringState> {
-  /// Owns live scoring: what the screen sees, and every write it can make.
+  /// What the scoring screen sees, and every write it can make.
   ///
-  /// Refactored strictly following Clean Architecture:
-  /// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
-  /// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
-  ///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
+  /// Deliberately thin. Everything about HOW a delivery reaches the server — the
+  /// queue, the write-ahead log, retries, what is provisional and what is
+  /// confirmed — belongs to [ScoringSession] in the data layer. This class turns
+  /// taps into drafts, applies the guards whose failure the scorer needs to read
+  /// as a sentence, and republishes the session's projection as screen state.
   ScoringControllerProvider._({
     required ScoringControllerFamily super.from,
     required (String, int) super.argument,
@@ -68,14 +71,15 @@ final class ScoringControllerProvider
   }
 }
 
-String _$scoringControllerHash() => r'45a7dd556f18a8308455abde937b2e9290448fad';
+String _$scoringControllerHash() => r'8b375ae46d2ee23c65f29036f8b84fac9fcbe8b0';
 
-/// Owns live scoring: what the screen sees, and every write it can make.
+/// What the scoring screen sees, and every write it can make.
 ///
-/// Refactored strictly following Clean Architecture:
-/// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
-/// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
-///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
+/// Deliberately thin. Everything about HOW a delivery reaches the server — the
+/// queue, the write-ahead log, retries, what is provisional and what is
+/// confirmed — belongs to [ScoringSession] in the data layer. This class turns
+/// taps into drafts, applies the guards whose failure the scorer needs to read
+/// as a sentence, and republishes the session's projection as screen state.
 
 final class ScoringControllerFamily extends $Family
     with
@@ -95,12 +99,13 @@ final class ScoringControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Owns live scoring: what the screen sees, and every write it can make.
+  /// What the scoring screen sees, and every write it can make.
   ///
-  /// Refactored strictly following Clean Architecture:
-  /// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
-  /// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
-  ///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
+  /// Deliberately thin. Everything about HOW a delivery reaches the server — the
+  /// queue, the write-ahead log, retries, what is provisional and what is
+  /// confirmed — belongs to [ScoringSession] in the data layer. This class turns
+  /// taps into drafts, applies the guards whose failure the scorer needs to read
+  /// as a sentence, and republishes the session's projection as screen state.
 
   ScoringControllerProvider call(String matchId, int inningsNumber) =>
       ScoringControllerProvider._(
@@ -112,12 +117,13 @@ final class ScoringControllerFamily extends $Family
   String toString() => r'scoringControllerProvider';
 }
 
-/// Owns live scoring: what the screen sees, and every write it can make.
+/// What the scoring screen sees, and every write it can make.
 ///
-/// Refactored strictly following Clean Architecture:
-/// - Presentation Layer knows only the Domain Repository contract (`MatchesRepository`).
-/// - All SQLite persistence, write-ahead logging (WAL), and outbox queuing live
-///   exclusively inside the Data Layer (`MatchesLocalDataSource` + `MatchesRepositoryImpl`).
+/// Deliberately thin. Everything about HOW a delivery reaches the server — the
+/// queue, the write-ahead log, retries, what is provisional and what is
+/// confirmed — belongs to [ScoringSession] in the data layer. This class turns
+/// taps into drafts, applies the guards whose failure the scorer needs to read
+/// as a sentence, and republishes the session's projection as screen state.
 
 abstract class _$ScoringController extends $AsyncNotifier<ScoringState> {
   late final _$args = ref.$arg as (String, int);

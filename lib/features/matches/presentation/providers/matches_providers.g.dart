@@ -56,6 +56,137 @@ final class MatchesRepositoryProvider
 
 String _$matchesRepositoryHash() => r'3d1a350c84e87c9d4f239d77bf5d38dd69bed1da';
 
+/// Live scoring for one innings.
+///
+/// A stateful, long-lived object with a lifecycle, unlike the repositories
+/// beside it — those are stateless request/response. It sits at the same level
+/// rather than behind [matchesRepositoryProvider] so that difference stays
+/// visible in the wiring instead of being hidden by an interface that does not
+/// describe it. (Documented as a sanctioned variation; see CLAUDE.md §19.)
+///
+/// Autodispose: leaving the scoring screen cancels its retry timer, and the
+/// queue is restored from the write-ahead log on the way back in.
+
+@ProviderFor(scoringSession)
+final scoringSessionProvider = ScoringSessionFamily._();
+
+/// Live scoring for one innings.
+///
+/// A stateful, long-lived object with a lifecycle, unlike the repositories
+/// beside it — those are stateless request/response. It sits at the same level
+/// rather than behind [matchesRepositoryProvider] so that difference stays
+/// visible in the wiring instead of being hidden by an interface that does not
+/// describe it. (Documented as a sanctioned variation; see CLAUDE.md §19.)
+///
+/// Autodispose: leaving the scoring screen cancels its retry timer, and the
+/// queue is restored from the write-ahead log on the way back in.
+
+final class ScoringSessionProvider
+    extends $FunctionalProvider<ScoringSession, ScoringSession, ScoringSession>
+    with $Provider<ScoringSession> {
+  /// Live scoring for one innings.
+  ///
+  /// A stateful, long-lived object with a lifecycle, unlike the repositories
+  /// beside it — those are stateless request/response. It sits at the same level
+  /// rather than behind [matchesRepositoryProvider] so that difference stays
+  /// visible in the wiring instead of being hidden by an interface that does not
+  /// describe it. (Documented as a sanctioned variation; see CLAUDE.md §19.)
+  ///
+  /// Autodispose: leaving the scoring screen cancels its retry timer, and the
+  /// queue is restored from the write-ahead log on the way back in.
+  ScoringSessionProvider._({
+    required ScoringSessionFamily super.from,
+    required (String, int) super.argument,
+  }) : super(
+         retry: null,
+         name: r'scoringSessionProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$scoringSessionHash();
+
+  @override
+  String toString() {
+    return r'scoringSessionProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<ScoringSession> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  ScoringSession create(Ref ref) {
+    final argument = this.argument as (String, int);
+    return scoringSession(ref, argument.$1, argument.$2);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ScoringSession value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ScoringSession>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ScoringSessionProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$scoringSessionHash() => r'9f601c7c086214c13e398a382ed6c33c454c3d6c';
+
+/// Live scoring for one innings.
+///
+/// A stateful, long-lived object with a lifecycle, unlike the repositories
+/// beside it — those are stateless request/response. It sits at the same level
+/// rather than behind [matchesRepositoryProvider] so that difference stays
+/// visible in the wiring instead of being hidden by an interface that does not
+/// describe it. (Documented as a sanctioned variation; see CLAUDE.md §19.)
+///
+/// Autodispose: leaving the scoring screen cancels its retry timer, and the
+/// queue is restored from the write-ahead log on the way back in.
+
+final class ScoringSessionFamily extends $Family
+    with $FunctionalFamilyOverride<ScoringSession, (String, int)> {
+  ScoringSessionFamily._()
+    : super(
+        retry: null,
+        name: r'scoringSessionProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Live scoring for one innings.
+  ///
+  /// A stateful, long-lived object with a lifecycle, unlike the repositories
+  /// beside it — those are stateless request/response. It sits at the same level
+  /// rather than behind [matchesRepositoryProvider] so that difference stays
+  /// visible in the wiring instead of being hidden by an interface that does not
+  /// describe it. (Documented as a sanctioned variation; see CLAUDE.md §19.)
+  ///
+  /// Autodispose: leaving the scoring screen cancels its retry timer, and the
+  /// queue is restored from the write-ahead log on the way back in.
+
+  ScoringSessionProvider call(String matchId, int inningsNumber) =>
+      ScoringSessionProvider._(argument: (matchId, inningsNumber), from: this);
+
+  @override
+  String toString() => r'scoringSessionProvider';
+}
+
 /// The active format presets from the backend catalog (the setup picker reads
 /// this instead of a hardcoded list).
 

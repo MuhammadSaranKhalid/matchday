@@ -29,7 +29,7 @@ class MyPoolRequestsScreen extends ConsumerWidget {
               context.canPop() ? context.pop() : context.go('/home'),
         ),
         title: Text(
-          'My Pool Requests',
+          'My challenges',
           style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
         ),
         actions: [

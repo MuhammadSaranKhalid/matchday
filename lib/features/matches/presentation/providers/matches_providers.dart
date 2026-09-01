@@ -5,6 +5,7 @@ import '../../../../core/lifecycle/app_lifecycle_provider.dart';
 import '../../data/datasources/matches_local_datasource.dart';
 import '../../data/datasources/matches_datasource_providers.dart';
 import '../../data/repositories/matches_repository_impl.dart';
+import '../../data/scoring/scoring_session.dart';
 import '../../domain/entities/ball.dart';
 import '../../domain/entities/format_preset.dart';
 import '../../domain/entities/match.dart';
@@ -26,6 +27,29 @@ MatchesRepository matchesRepository(Ref ref) => MatchesRepositoryImpl(
       ref.watch(formatPresetsRemoteDataSourceProvider),
       ref.watch(matchesLocalDataSourceProvider),
     );
+
+/// Live scoring for one innings.
+///
+/// A stateful, long-lived object with a lifecycle, unlike the repositories
+/// beside it — those are stateless request/response. It sits at the same level
+/// rather than behind [matchesRepositoryProvider] so that difference stays
+/// visible in the wiring instead of being hidden by an interface that does not
+/// describe it. (Documented as a sanctioned variation; see CLAUDE.md §19.)
+///
+/// Autodispose: leaving the scoring screen cancels its retry timer, and the
+/// queue is restored from the write-ahead log on the way back in.
+@riverpod
+ScoringSession scoringSession(Ref ref, String matchId, int inningsNumber) {
+  final session = ScoringSession(
+    repository: ref.watch(matchesRepositoryProvider),
+    remote: ref.watch(matchesRemoteDataSourceProvider),
+    local: ref.watch(matchesLocalDataSourceProvider),
+    matchId: matchId,
+    inningsNumber: inningsNumber,
+  );
+  ref.onDispose(session.dispose);
+  return session;
+}
 
 /// The active format presets from the backend catalog (the setup picker reads
 /// this instead of a hardcoded list).

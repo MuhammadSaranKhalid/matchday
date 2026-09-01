@@ -17,6 +17,7 @@ abstract final class CkColors {
   static const paper = Color(0xFFFBFAF6);
   static const paper2 = Color(0xFFF3F0E9);
   static const surface = Color(0xFFFFFFFF);
+  static const canvas = Color(0xFFE5E0D6);
 
   // Lines
   static const line = Color(0xFFE6E2D9);
@@ -25,11 +26,40 @@ abstract final class CkColors {
   // Accents — Cricket Red is the one earned accent; Seam Cream is the ball seam
   static const red = Color(0xFFDC4D32); // Cricket Red
   static const redSoft = Color(0xFFF7E6E1);
-  static const green = Color(0xFF338946); // status only (not in brand sheet)
+  static const redInk = Color(0xFFB23A22);
+  static const redSurface = Color(0xFFFBECE9);
+  static const redBorder = Color(0xFFF0C4BC);
+
+  static const green = Color(0xFF338946); // status only
+  static const greenInk = Color(0xFF276B34);
   static const greenSoft = Color(0xFFCFEED2); // status only
+  static const greenSurface = Color(0xFFEAF4EC);
+  static const greenBorder = Color(0xFFC4E2C9);
+
   static const amber = Color(0xFFE6AC3D); // status only
+  static const amberInk = Color(0xFF8A6E2E);
+  static const amberDark = Color(0xFF6B5414);
   static const cream = Color(0xFFF4ECDD); // Seam Cream
   static const creamBorder = Color(0xFFDED0AC);
+
+  // The Champion Moment (artboard 34) — the one dark surface in the app.
+  //
+  // The ground is `ink` itself, not a separate near-black: the canvas builds
+  // the finale out of the same ink the rest of the app is drawn in, raising
+  // fills and hairlines off it rather than introducing a new base hue.
+  static const championGround = ink; // #29251E
+  static const championRaised = Color(0xFF332E26);
+  static const championHairline = ink2; // #4A4339
+  static const championGold = amberInk; // #8A6E2E
+
+  // Dark-theme ink ramp, with the contrast the canvas measured against the
+  // ink ground: white 15.2:1, cream 13.0:1, creamBorder 10.0:1, tertiary 7.0:1.
+  // The tertiary is deliberately NOT `muted` — on ink that measures 3.96:1 and
+  // fails AA at 10–14px, the mirror of the ruling that darkened the status inks.
+  static const onDarkPrimary = Color(0xFFFFFFFF);
+  static const onDarkFigures = cream; // #F4ECDD
+  static const onDarkSecondary = creamBorder; // #DED0AC
+  static const onDarkTertiary = Color(0xFFC4B9A4);
 }
 
 /// Radii from styles.css (`--r-*`).
@@ -130,7 +160,7 @@ ThemeData buildCirckTheme() {
         foregroundColor: CkColors.paper,
         disabledBackgroundColor: CkColors.ink.withValues(alpha: 0.35),
         disabledForegroundColor: CkColors.paper.withValues(alpha: 0.9),
-        minimumSize: const Size.fromHeight(52),
+        minimumSize: const Size(0, 52),
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         shape: RoundedRectangleBorder(
@@ -147,7 +177,7 @@ ThemeData buildCirckTheme() {
       style: OutlinedButton.styleFrom(
         backgroundColor: CkColors.paper,
         foregroundColor: CkColors.ink,
-        minimumSize: const Size.fromHeight(52),
+        minimumSize: const Size(0, 52),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         side: const BorderSide(color: CkColors.line),
         shape: RoundedRectangleBorder(

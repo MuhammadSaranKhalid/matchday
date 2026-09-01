@@ -61,6 +61,8 @@ abstract class MatchInningsStateDto with _$MatchInningsStateDto {
     return _$MatchInningsStateDtoFromJson(modified);
   }
 
+  Map<String, dynamic> toJson() => _$MatchInningsStateDtoToJson(this as _MatchInningsStateDto);
+
   MatchInningsState toEntity() => MatchInningsState(
         matchId: MatchId(matchId),
         inningsNumber: inningsNumber,

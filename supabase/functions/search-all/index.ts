@@ -67,7 +67,10 @@ Deno.serve(async (req) => {
   // against a literal allow-list — never interpolated into SQL.
   const kindRaw = typeof body.kind === "string" ? (body.kind as string) : null;
   const kind =
-    kindRaw === "players" || kindRaw === "teams" || kindRaw === "matches"
+    kindRaw === "players" ||
+    kindRaw === "teams" ||
+    kindRaw === "matches" ||
+    kindRaw === "tournaments"
       ? kindRaw
       : null;
 
@@ -100,17 +103,19 @@ async function search(sql: any, q: string, kind: string | null, limit: number) {
   const wantPlayers = kind === null || kind === "players";
   const wantTeams = kind === null || kind === "teams";
   const wantMatches = kind === null || kind === "matches";
+  const wantTournaments = kind === null || kind === "tournaments";
 
   // Fire the groups concurrently — they are independent reads and the pool
-  // is sized for it (max 3). Sequential awaits would triple latency on the
+  // is sized for it. Sequential awaits would multiply latency on the
   // debounced keystroke path.
-  const [players, teams, matches] = await Promise.all([
+  const [players, teams, matches, tournaments] = await Promise.all([
     wantPlayers ? searchPlayers(sql, q, limit) : Promise.resolve([]),
     wantTeams ? searchTeams(sql, q, limit) : Promise.resolve([]),
     wantMatches ? searchMatches(sql, q, limit) : Promise.resolve([]),
+    wantTournaments ? searchTournaments(sql, q, limit) : Promise.resolve([]),
   ]);
 
-  return { players, teams, matches };
+  return { players, teams, matches, tournaments };
 }
 
 // Registered profiles + unclaimed players in one ranked list.
@@ -228,16 +233,40 @@ function searchMatches(sql: any, q: string, limit: number) {
     limit ${limit}`;
 }
 
+// Name-only tournament search. Trigram index over tournament_name.
+// deno-lint-ignore no-explicit-any
+function searchTournaments(sql: any, q: string, limit: number) {
+  return sql`
+    select
+      tr.tournament_id,
+      tr.tournament_name,
+      tr.tournament_type::text as tournament_type,
+      tr.status::text as status,
+      tr.banner_image_url,
+      tr.logo_url,
+      tr.start_date,
+      tr.end_date,
+      tr.location,
+      tr.entry_fee,
+      tr.max_teams,
+      (select count(*)::int from public.tournament_teams tt where tt.tournament_id = tr.tournament_id and tt.status = 'approved') as approved_teams_count,
+      coalesce(word_similarity(${q}, tr.tournament_name), 0)::float8 as score
+    from public.tournaments tr
+    where tr.privacy = 'public'
+      and tr.status <> 'draft'
+      and (tr.tournament_name like ${q} || '%' or ${q} <% tr.tournament_name)
+    order by (tr.status = 'live') desc, (tr.status = 'registration') desc, score desc, tr.start_date desc nulls last, tr.tournament_id asc
+    limit ${limit}`;
+}
+
 // ─── BROWSE ──────────────────────────────────────────────────────────────────
 
 // No query: the discovery state. v1 leads with live matches (real data, and
-// the most compelling thing in the app), then recently-active teams and new
-// players. This deliberately replaces the design's proximity sections
-// ("Teams near you") until coordinates exist — a distance-ordered list of an
-// empty dimension would be a lie.
+// the most compelling thing in the app), then recently-active teams, new
+// players, and active tournaments.
 // deno-lint-ignore no-explicit-any
 async function browse(sql: any, actor: string) {
-  const [live, teams, players] = await Promise.all([
+  const [live, teams, players, tournaments] = await Promise.all([
     sql`
       ${matchProjection(sql)}
       where m.status in ('live', 'innings_break', 'super_over')
@@ -290,9 +319,29 @@ async function browse(sql: any, actor: string) {
         and p.user_id <> ${actor}::uuid
       order by p.is_verified desc, p.last_active_at desc nulls last, p.user_id asc
       limit ${BROWSE_PLAYER_LIMIT}`,
+    sql`
+      select
+        tr.tournament_id,
+        tr.tournament_name,
+        tr.tournament_type::text as tournament_type,
+        tr.status::text as status,
+        tr.banner_image_url,
+        tr.logo_url,
+        tr.start_date,
+        tr.end_date,
+        tr.location,
+        tr.entry_fee,
+        tr.max_teams,
+        (select count(*)::int from public.tournament_teams tt where tt.tournament_id = tr.tournament_id and tt.status = 'approved') as approved_teams_count,
+        0::float8 as score
+      from public.tournaments tr
+      where tr.privacy = 'public'
+        and tr.status in ('registration', 'upcoming', 'live')
+      order by (tr.status = 'live') desc, (tr.status = 'registration') desc, tr.start_date desc nulls last, tr.tournament_id asc
+      limit 10`,
   ]);
 
-  return { live, teams, players, matches: [] };
+  return { live, teams, players, matches: [], tournaments };
 }
 
 // ─── shared match projection ─────────────────────────────────────────────────

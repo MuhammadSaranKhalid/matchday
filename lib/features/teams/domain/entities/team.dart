@@ -19,6 +19,7 @@ class Team {
     this.tagline,
     this.logoUrl,
     this.logoMonogram,
+    this.isVerified = false,
   });
 
   final TeamId id;
@@ -47,6 +48,10 @@ class Team {
   /// at render time.
   final String? logoMonogram;
 
+  /// Mirrors `teams.is_verified`. Renders the tick beside the team name on
+  /// the Pool board and anywhere else a crest carries its name.
+  final bool isVerified;
+
   bool isManagedBy(String userId) =>
       ownerId == userId || managers.contains(userId);
 
@@ -68,6 +73,7 @@ class Team {
           other.tagline == tagline &&
           other.logoUrl == logoUrl &&
           other.logoMonogram == logoMonogram &&
+          other.isVerified == isVerified &&
           other.createdAt == createdAt &&
           other.updatedAt == updatedAt &&
           _sameManagers(other.managers, managers);
@@ -84,7 +90,8 @@ class Team {
   int get hashCode => Object.hash(
         id, ownerId, name, type, privacy, description, homeGround, city,
         foundedYear, primaryColor, secondaryColor, tagline, logoUrl,
-        logoMonogram, createdAt, updatedAt, Object.hashAll(managers),
+        logoMonogram, isVerified, createdAt, updatedAt,
+        Object.hashAll(managers),
       );
 }
 

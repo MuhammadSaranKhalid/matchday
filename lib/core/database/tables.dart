@@ -139,6 +139,19 @@ class ScoringOps extends Table {
   /// the null rows, in localSeq order.
   DateTimeColumn get syncedAt => dateTime().nullable()();
 
+  /// Set when the server REFUSED this op — it answered, and the answer was no
+  /// (a rule violation, a closed innings, a match already finished). Distinct
+  /// from a transport failure, which leaves both timestamps null so the outbox
+  /// retries.
+  ///
+  /// A refusal is terminal: no amount of retrying changes a no. The row is
+  /// kept rather than deleted because design doc §19.3 forbids discarding a
+  /// refused write — the scorer must still be able to read what could not be
+  /// applied. Excluding it from `pendingOps` is what stops one permanently
+  /// refused delivery from blocking the queue behind it (and, via
+  /// `pendingOpsCount`, disabling undo forever).
+  DateTimeColumn get refusedAt => dateTime().nullable()();
+
   IntColumn get attempts => integer().withDefault(const Constant(0))();
   TextColumn get lastError => text().nullable()();
 
@@ -168,3 +181,40 @@ class ScoringSnapshots extends Table {
   @override
   Set<Column> get primaryKey => {matchId, inningsNumber};
 }
+
+// ─── Offline Match Hydration Cache ──────────────────────────────────────────
+
+/// Caches match metadata (format, teams, toss, status) locally for offline cold-start.
+@DataClassName('CachedMatchRow')
+class CachedMatches extends Table {
+  TextColumn get matchId => text()();
+  TextColumn get payload => text()(); // JSON-encoded MatchDto
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {matchId};
+}
+
+/// Caches the playing XI (match_players) locally for offline cold-start.
+@DataClassName('CachedMatchPlayersRow')
+class CachedMatchPlayers extends Table {
+  TextColumn get matchId => text()();
+  TextColumn get payload => text()(); // JSON-encoded List<MatchPlayerDto>
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {matchId};
+}
+
+/// Caches running match innings state locally for offline cold-start.
+@DataClassName('CachedInningsStateRow')
+class CachedInningsStates extends Table {
+  TextColumn get matchId => text()();
+  IntColumn get inningsNumber => integer()();
+  TextColumn get payload => text()(); // JSON-encoded MatchInningsStateDto
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {matchId, inningsNumber};
+}
+

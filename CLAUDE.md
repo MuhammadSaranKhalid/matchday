@@ -1357,10 +1357,17 @@ dart run build_runner build --delete-conflicting-outputs
 flutter create . --org studio.novex --project-name novex_clean_arch
 
 # Run with all required compile-time config.
-# Real values live in dart_define.json (gitignored); the committed
-# dart_define.example.json is the template. Copy it once and fill in values:
-#   cp dart_define.example.json dart_define.json
-flutter run --dart-define-from-file=dart_define.json
+# Per-environment files live in config/ and are COMMITTED — they hold only
+# publishable values (`sb_publishable_*` anon keys, OAuth client ids), never a
+# service-role key. Put nothing secret in them.
+flutter run --dart-define-from-file=config/dev.json     # local Supabase (127.0.0.1:55321)
+# flutter run --dart-define-from-file=config/staging.json
+# flutter run --dart-define-from-file=config/prod.json
+#
+# Corrected 2026-08-31: this block previously documented a gitignored
+# `dart_define.json` plus a `dart_define.example.json` template. Neither file
+# exists any more; config/ replaced them. `--dart-define-from-file=dart_define.json`
+# fails with "Did not find the file passed to --dart-define-from-file".
 
 # (Equivalent long form, still valid — flags merge with the file:)
 # flutter run \

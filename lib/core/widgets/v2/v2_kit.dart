@@ -619,80 +619,55 @@ class V2BottomNav extends StatelessWidget {
         color: CkColors.surface,
         border: Border(top: BorderSide(color: CkColors.hairline)),
       ),
-      padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       child: SafeArea(
         top: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _navItem(V2Tab.home, 'Home', V2Icons.home),
-            _navItem(V2Tab.explore, 'Explore', V2Icons.search),
-            _navItem(V2Tab.matches, 'Matches', V2Icons.matches),
-            _navItem(V2Tab.pool, 'Pool', V2Icons.pool),
+            _navItem(V2Tab.home, V2Icons.home),
+            _navItem(V2Tab.explore, V2Icons.search),
+            _navItem(V2Tab.matches, V2Icons.matches),
+            _navItem(V2Tab.pool, V2Icons.pool),
           ],
         ),
       ),
     );
   }
 
-  Widget _navItem(V2Tab id, String label, String icon, {int? badge}) {
+  Widget _navItem(V2Tab id, String icon, {int? badge}) {
     final isActive = id == active;
-
-    // Icon tabs: 40×32 rounded tile. Tile fill swaps transparent → red on
-    // active; SVG inside resizes 23 → 21 and swaps soft → white.
-    final Widget glyph = AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      width: 40,
-      height: 32,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: isActive ? CkColors.red : Colors.transparent,
-        borderRadius: BorderRadius.circular(11),
-      ),
-      child: V2Svg(
-        icon,
-        size: isActive ? 21 : 23,
-        color: isActive ? CkColors.surface : CkColors.soft,
-        strokeWidth: 2.0,
-      ),
-    );
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onSelect(id),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 32,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  glyph,
-                  if (badge != null && badge > 0)
-                    Positioned(
-                      top: -2,
-                      right: 0,
-                      child: _Badge(text: '$badge'),
-                    ),
-                ],
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: SizedBox(
+          height: 32,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              AnimatedScale(
+                scale: isActive ? 1.08 : 1.0,
+                duration: const Duration(milliseconds: 150),
+                child: V2Svg(
+                  icon,
+                  size: 24,
+                  color: isActive ? CkColors.red : CkColors.soft,
+                  strokeWidth: isActive ? 2.2 : 1.8,
+                ),
               ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              label,
-              style: CkType.body(
-                fontSize: 9.5,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
-                letterSpacing: 0.01,
-                color: isActive ? CkColors.ink : CkColors.muted,
-              ),
-            ),
-          ],
+              if (badge != null && badge > 0)
+                Positioned(
+                  top: -2,
+                  right: -6,
+                  child: _Badge(text: '$badge'),
+                ),
+            ],
+          ),
         ),
       ),
     );

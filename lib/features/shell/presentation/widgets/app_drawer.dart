@@ -298,15 +298,27 @@ class AppDrawer extends ConsumerWidget {
                           ),
                           _NavRow(
                             glyph: _Glyphs.pool,
-                            label: 'My Pool Requests',
+                            label: 'My challenges',
                             empty: firstRun,
-                            subtitle: 'Open fixtures you posted',
+                            subtitle: 'Challenges you posted',
                             badge:
                                 (poolCount ?? 0) > 0 ? '$poolCount open' : null,
                             skeletonWidth: 38,
                             loading: countsLoading,
                             current: here.startsWith('/my/pool-requests'),
                             route: '/my/pool-requests',
+                          ),
+                          _NavRow(
+                            glyph: _Glyphs.trophy,
+                            label: 'My Tournaments',
+                            empty: firstRun,
+                            subtitle: 'Cups & leagues you organize or follow',
+                            skeletonWidth: 38,
+                            loading: countsLoading,
+                            current:
+                                here.startsWith('/my/tournaments') ||
+                                here.startsWith('/tournaments'),
+                            route: '/my/tournaments',
                           ),
 
                           const _GroupRule(),
@@ -331,12 +343,6 @@ class AppDrawer extends ConsumerWidget {
 
                           const _GroupRule(),
                           const _Eyebrow('Not built yet'),
-                          const _NavRow(
-                            glyph: _Glyphs.trophy,
-                            label: 'Tournaments',
-                            inert: true,
-                            roadmap: true,
-                          ),
                           const _NavRow(
                             glyph: _Glyphs.clubs,
                             label: 'Clubs',

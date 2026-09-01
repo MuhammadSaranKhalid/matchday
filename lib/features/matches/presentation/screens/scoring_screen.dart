@@ -2,14 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/error/failures.dart';
+import '../../../../core/theme/circk_theme.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
-import '../../domain/entities/match.dart';
 import '../controllers/scoring_controller.dart';
-import '../providers/matches_providers.dart';
 import '../state/scoring_state.dart';
 import '../widgets/scoring/scoring_action_bar.dart';
 import '../widgets/scoring/scoring_actions.dart';
@@ -114,21 +111,6 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Lifecycle navigation: record-ball flips the match to innings_break /
-    // completed and broadcasts it; route to the matching screen.
-    ref.listen(liveMatchProvider(widget.matchId), (prev, next) {
-      switch (next.value?.status) {
-        case MatchStatus.inningsBreak:
-          context.go('/matches/${widget.matchId}/innings-break');
-        case MatchStatus.completed:
-        case MatchStatus.abandoned:
-        case MatchStatus.walkover:
-          context.go('/matches/${widget.matchId}/result');
-        case _:
-          break;
-      }
-    });
-
     ref.listen(
       scoringControllerProvider(widget.matchId, widget.inningsNumber),
       (prev, next) {
@@ -196,6 +178,7 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                     ],
                     onMenuAction: (a) => _actions.handleMenuAction(context, a),
                     onUndo: () => _actions.undo(context),
+                    pendingCount: s.pendingCount,
                     // NOT gated on `hasPending`. It used to be, on the
                     // reasoning that an unwritten delivery has nothing to
                     // undo — but the repository has always handled exactly

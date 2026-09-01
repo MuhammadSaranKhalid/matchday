@@ -35,6 +35,7 @@ class ScoringTopBar extends StatelessWidget {
     this.onUndo,
     this.canUndo = false,
     this.undoFlash = false,
+    this.pendingCount = 0,
   });
 
   final MatchType matchType;
@@ -44,6 +45,7 @@ class ScoringTopBar extends StatelessWidget {
   final VoidCallback? onUndo;
   final bool canUndo;
   final bool undoFlash;
+  final int pendingCount;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +62,10 @@ class ScoringTopBar extends StatelessWidget {
             icon: const Icon(Icons.close, size: 22, color: CkColors.ink),
           ),
           const Spacer(),
-          const _LivePill(),
+          if (pendingCount > 0)
+            _PendingSyncPill(count: pendingCount)
+          else
+            const _LivePill(),
           const SizedBox(width: 8),
           Text(
             matchType.label,
@@ -137,6 +142,42 @@ class _UndoButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PendingSyncPill extends StatelessWidget {
+  const _PendingSyncPill({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: CkColors.amber,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.cloud_off_rounded,
+            size: 12,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            'SAVED · $count QUEUED',
+            style: CkType.mono(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.06,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -64,6 +64,7 @@ dependencies:
   flutter_blurhash: ^0.9.1
   photo_view: ^0.15.0
   equatable: ^2.0.8
+  meta: ^1.16.0
   firebase_core: ^4.10.0
   firebase_messaging: ^16.3.0
   flutter_local_notifications: ^18.0.1

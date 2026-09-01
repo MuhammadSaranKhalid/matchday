@@ -124,7 +124,7 @@ void main() {
     // YOURS — personal destinations.
     expect(find.text('My Matches'), findsOneWidget);
     expect(find.text('My Teams'), findsOneWidget);
-    expect(find.text('My Pool Requests'), findsOneWidget);
+    expect(find.text('My challenges'), findsOneWidget);
 
     // ACCOUNT — built out per §5.1 of the brief.
     expect(find.text('Saved'), findsOneWidget);
@@ -153,7 +153,7 @@ void main() {
     expect(find.text('YOUR SIDE OF MATCHDAY'), findsOneWidget);
     expect(find.text('Fixtures you are playing in'), findsOneWidget);
     expect(find.text('Squads you own or belong to'), findsOneWidget);
-    expect(find.text('Open fixtures you posted'), findsOneWidget);
+    expect(find.text('Challenges you posted'), findsOneWidget);
 
     // Em-dash in each of the three badge slots.
     expect(find.text('—'), findsNWidgets(3));

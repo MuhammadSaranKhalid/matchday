@@ -45,6 +45,25 @@ class WizardDraftStore {
     }
   }
 
+  /// Streams the decoded draft for [key], or null if absent / cleared.
+  Stream<Map<String, dynamic>?> watch(String key) {
+    try {
+      return (_db.select(_db.wizardDrafts)..where((t) => t.key.equals(key)))
+          .watchSingleOrNull()
+          .map((row) {
+        if (row == null) return null;
+        try {
+          final decoded = jsonDecode(row.payload);
+          return decoded is Map<String, dynamic> ? decoded : null;
+        } catch (_) {
+          return null;
+        }
+      });
+    } catch (_) {
+      return Stream.value(null);
+    }
+  }
+
   Future<void> clear(String key) async {
     try {
       await (_db.delete(_db.wizardDrafts)..where((t) => t.key.equals(key))).go();

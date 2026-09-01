@@ -90,6 +90,44 @@ class OpenMatchPoolItem {
   final String venue;
   final String shareCode;
   final String timeLabel;
+
+  // ── Pool board projections (Pool.dc.html artboards 01 / 05) ──────────────
+  //
+  // Derived rather than passed in: every one of these already lives on
+  // [request], and the board needs them shaped differently from the terser
+  // [formatLabel] / [venue] / [timeLabel] the My-challenges list renders.
+
+  /// Ball type, for the board's Tape-ball / Leather facets.
+  MatchBallType get ballType =>
+      request.proposedFormat?.ballType ?? MatchBallType.tape;
+
+  /// Proposed start. Null = the host left it open, and the card drops its
+  /// whole meta block rather than printing a placeholder.
+  DateTime? get startTime => request.proposedStartTime;
+
+  /// Proposed ground. Null = omitted from the meta block.
+  String? get ground {
+    final v = request.proposedVenue?.trim();
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  /// When the challenge leaves the board. Null = no footer row.
+  DateTime? get expiresAt => request.proposalExpiresAt;
+
+  /// The card's format line — "12 overs · Tape-ball · 11-a-side". Rendered
+  /// uppercase by the card; kept sentence-cased here so it reads in logs.
+  String get formatLine {
+    final parts = <String>[];
+    final overs = request.proposedFormat?.oversPerInnings;
+    if (overs != null && overs > 0) parts.add('$overs overs');
+    parts.add(switch (ballType) {
+      MatchBallType.tape => 'Tape-ball',
+      MatchBallType.leather => 'Leather',
+      MatchBallType.tennis => 'Tennis-ball',
+    });
+    parts.add('${request.playersPerSide}-a-side');
+    return parts.join(' \u00B7 ');
+  }
 }
 
 /// Aggregated state container for the main Matches Tab.

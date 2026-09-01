@@ -2149,6 +2149,17 @@ class $ScoringOpsTable extends ScoringOps
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _refusedAtMeta = const VerificationMeta(
+    'refusedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> refusedAt = GeneratedColumn<DateTime>(
+    'refused_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _attemptsMeta = const VerificationMeta(
     'attempts',
   );
@@ -2182,6 +2193,7 @@ class $ScoringOpsTable extends ScoringOps
     payload,
     createdAt,
     syncedAt,
+    refusedAt,
     attempts,
     lastError,
   ];
@@ -2260,6 +2272,12 @@ class $ScoringOpsTable extends ScoringOps
         syncedAt.isAcceptableOrUnknown(data['synced_at']!, _syncedAtMeta),
       );
     }
+    if (data.containsKey('refused_at')) {
+      context.handle(
+        _refusedAtMeta,
+        refusedAt.isAcceptableOrUnknown(data['refused_at']!, _refusedAtMeta),
+      );
+    }
     if (data.containsKey('attempts')) {
       context.handle(
         _attemptsMeta,
@@ -2320,6 +2338,10 @@ class $ScoringOpsTable extends ScoringOps
         DriftSqlType.dateTime,
         data['${effectivePrefix}synced_at'],
       ),
+      refusedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}refused_at'],
+      ),
       attempts:
           attachedDatabase.typeMapping.read(
             DriftSqlType.int,
@@ -2361,6 +2383,19 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
   /// Null while the server still owes us this one. The outbox drains exactly
   /// the null rows, in localSeq order.
   final DateTime? syncedAt;
+
+  /// Set when the server REFUSED this op — it answered, and the answer was no
+  /// (a rule violation, a closed innings, a match already finished). Distinct
+  /// from a transport failure, which leaves both timestamps null so the outbox
+  /// retries.
+  ///
+  /// A refusal is terminal: no amount of retrying changes a no. The row is
+  /// kept rather than deleted because design doc §19.3 forbids discarding a
+  /// refused write — the scorer must still be able to read what could not be
+  /// applied. Excluding it from `pendingOps` is what stops one permanently
+  /// refused delivery from blocking the queue behind it (and, via
+  /// `pendingOpsCount`, disabling undo forever).
+  final DateTime? refusedAt;
   final int attempts;
   final String? lastError;
   const ScoringOpRow({
@@ -2372,6 +2407,7 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
     required this.payload,
     required this.createdAt,
     this.syncedAt,
+    this.refusedAt,
     required this.attempts,
     this.lastError,
   });
@@ -2387,6 +2423,9 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || syncedAt != null) {
       map['synced_at'] = Variable<DateTime>(syncedAt);
+    }
+    if (!nullToAbsent || refusedAt != null) {
+      map['refused_at'] = Variable<DateTime>(refusedAt);
     }
     map['attempts'] = Variable<int>(attempts);
     if (!nullToAbsent || lastError != null) {
@@ -2408,6 +2447,10 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
           syncedAt == null && nullToAbsent
               ? const Value.absent()
               : Value(syncedAt),
+      refusedAt:
+          refusedAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(refusedAt),
       attempts: Value(attempts),
       lastError:
           lastError == null && nullToAbsent
@@ -2430,6 +2473,7 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
       payload: serializer.fromJson<String>(json['payload']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       syncedAt: serializer.fromJson<DateTime?>(json['syncedAt']),
+      refusedAt: serializer.fromJson<DateTime?>(json['refusedAt']),
       attempts: serializer.fromJson<int>(json['attempts']),
       lastError: serializer.fromJson<String?>(json['lastError']),
     );
@@ -2446,6 +2490,7 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
       'payload': serializer.toJson<String>(payload),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'syncedAt': serializer.toJson<DateTime?>(syncedAt),
+      'refusedAt': serializer.toJson<DateTime?>(refusedAt),
       'attempts': serializer.toJson<int>(attempts),
       'lastError': serializer.toJson<String?>(lastError),
     };
@@ -2460,6 +2505,7 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
     String? payload,
     DateTime? createdAt,
     Value<DateTime?> syncedAt = const Value.absent(),
+    Value<DateTime?> refusedAt = const Value.absent(),
     int? attempts,
     Value<String?> lastError = const Value.absent(),
   }) => ScoringOpRow(
@@ -2471,6 +2517,7 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
     payload: payload ?? this.payload,
     createdAt: createdAt ?? this.createdAt,
     syncedAt: syncedAt.present ? syncedAt.value : this.syncedAt,
+    refusedAt: refusedAt.present ? refusedAt.value : this.refusedAt,
     attempts: attempts ?? this.attempts,
     lastError: lastError.present ? lastError.value : this.lastError,
   );
@@ -2487,6 +2534,7 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
       payload: data.payload.present ? data.payload.value : this.payload,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       syncedAt: data.syncedAt.present ? data.syncedAt.value : this.syncedAt,
+      refusedAt: data.refusedAt.present ? data.refusedAt.value : this.refusedAt,
       attempts: data.attempts.present ? data.attempts.value : this.attempts,
       lastError: data.lastError.present ? data.lastError.value : this.lastError,
     );
@@ -2503,6 +2551,7 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
           ..write('payload: $payload, ')
           ..write('createdAt: $createdAt, ')
           ..write('syncedAt: $syncedAt, ')
+          ..write('refusedAt: $refusedAt, ')
           ..write('attempts: $attempts, ')
           ..write('lastError: $lastError')
           ..write(')'))
@@ -2519,6 +2568,7 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
     payload,
     createdAt,
     syncedAt,
+    refusedAt,
     attempts,
     lastError,
   );
@@ -2534,6 +2584,7 @@ class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
           other.payload == this.payload &&
           other.createdAt == this.createdAt &&
           other.syncedAt == this.syncedAt &&
+          other.refusedAt == this.refusedAt &&
           other.attempts == this.attempts &&
           other.lastError == this.lastError);
 }
@@ -2547,6 +2598,7 @@ class ScoringOpsCompanion extends UpdateCompanion<ScoringOpRow> {
   final Value<String> payload;
   final Value<DateTime> createdAt;
   final Value<DateTime?> syncedAt;
+  final Value<DateTime?> refusedAt;
   final Value<int> attempts;
   final Value<String?> lastError;
   final Value<int> rowid;
@@ -2559,6 +2611,7 @@ class ScoringOpsCompanion extends UpdateCompanion<ScoringOpRow> {
     this.payload = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.syncedAt = const Value.absent(),
+    this.refusedAt = const Value.absent(),
     this.attempts = const Value.absent(),
     this.lastError = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2572,6 +2625,7 @@ class ScoringOpsCompanion extends UpdateCompanion<ScoringOpRow> {
     required String payload,
     required DateTime createdAt,
     this.syncedAt = const Value.absent(),
+    this.refusedAt = const Value.absent(),
     this.attempts = const Value.absent(),
     this.lastError = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2590,6 +2644,7 @@ class ScoringOpsCompanion extends UpdateCompanion<ScoringOpRow> {
     Expression<String>? payload,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? syncedAt,
+    Expression<DateTime>? refusedAt,
     Expression<int>? attempts,
     Expression<String>? lastError,
     Expression<int>? rowid,
@@ -2603,6 +2658,7 @@ class ScoringOpsCompanion extends UpdateCompanion<ScoringOpRow> {
       if (payload != null) 'payload': payload,
       if (createdAt != null) 'created_at': createdAt,
       if (syncedAt != null) 'synced_at': syncedAt,
+      if (refusedAt != null) 'refused_at': refusedAt,
       if (attempts != null) 'attempts': attempts,
       if (lastError != null) 'last_error': lastError,
       if (rowid != null) 'rowid': rowid,
@@ -2618,6 +2674,7 @@ class ScoringOpsCompanion extends UpdateCompanion<ScoringOpRow> {
     Value<String>? payload,
     Value<DateTime>? createdAt,
     Value<DateTime?>? syncedAt,
+    Value<DateTime?>? refusedAt,
     Value<int>? attempts,
     Value<String?>? lastError,
     Value<int>? rowid,
@@ -2631,6 +2688,7 @@ class ScoringOpsCompanion extends UpdateCompanion<ScoringOpRow> {
       payload: payload ?? this.payload,
       createdAt: createdAt ?? this.createdAt,
       syncedAt: syncedAt ?? this.syncedAt,
+      refusedAt: refusedAt ?? this.refusedAt,
       attempts: attempts ?? this.attempts,
       lastError: lastError ?? this.lastError,
       rowid: rowid ?? this.rowid,
@@ -2664,6 +2722,9 @@ class ScoringOpsCompanion extends UpdateCompanion<ScoringOpRow> {
     if (syncedAt.present) {
       map['synced_at'] = Variable<DateTime>(syncedAt.value);
     }
+    if (refusedAt.present) {
+      map['refused_at'] = Variable<DateTime>(refusedAt.value);
+    }
     if (attempts.present) {
       map['attempts'] = Variable<int>(attempts.value);
     }
@@ -2687,6 +2748,7 @@ class ScoringOpsCompanion extends UpdateCompanion<ScoringOpRow> {
           ..write('payload: $payload, ')
           ..write('createdAt: $createdAt, ')
           ..write('syncedAt: $syncedAt, ')
+          ..write('refusedAt: $refusedAt, ')
           ..write('attempts: $attempts, ')
           ..write('lastError: $lastError, ')
           ..write('rowid: $rowid')
@@ -3078,6 +3140,884 @@ class ScoringSnapshotsCompanion extends UpdateCompanion<ScoringSnapshotRow> {
   }
 }
 
+class $CachedMatchesTable extends CachedMatches
+    with TableInfo<$CachedMatchesTable, CachedMatchRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedMatchesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _matchIdMeta = const VerificationMeta(
+    'matchId',
+  );
+  @override
+  late final GeneratedColumn<String> matchId = GeneratedColumn<String>(
+    'match_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [matchId, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_matches';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedMatchRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('match_id')) {
+      context.handle(
+        _matchIdMeta,
+        matchId.isAcceptableOrUnknown(data['match_id']!, _matchIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_matchIdMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {matchId};
+  @override
+  CachedMatchRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedMatchRow(
+      matchId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}match_id'],
+          )!,
+      payload:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}payload'],
+          )!,
+      updatedAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}updated_at'],
+          )!,
+    );
+  }
+
+  @override
+  $CachedMatchesTable createAlias(String alias) {
+    return $CachedMatchesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedMatchRow extends DataClass implements Insertable<CachedMatchRow> {
+  final String matchId;
+  final String payload;
+  final DateTime updatedAt;
+  const CachedMatchRow({
+    required this.matchId,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['match_id'] = Variable<String>(matchId);
+    map['payload'] = Variable<String>(payload);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  CachedMatchesCompanion toCompanion(bool nullToAbsent) {
+    return CachedMatchesCompanion(
+      matchId: Value(matchId),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CachedMatchRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedMatchRow(
+      matchId: serializer.fromJson<String>(json['matchId']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'matchId': serializer.toJson<String>(matchId),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  CachedMatchRow copyWith({
+    String? matchId,
+    String? payload,
+    DateTime? updatedAt,
+  }) => CachedMatchRow(
+    matchId: matchId ?? this.matchId,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CachedMatchRow copyWithCompanion(CachedMatchesCompanion data) {
+    return CachedMatchRow(
+      matchId: data.matchId.present ? data.matchId.value : this.matchId,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedMatchRow(')
+          ..write('matchId: $matchId, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(matchId, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedMatchRow &&
+          other.matchId == this.matchId &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CachedMatchesCompanion extends UpdateCompanion<CachedMatchRow> {
+  final Value<String> matchId;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const CachedMatchesCompanion({
+    this.matchId = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedMatchesCompanion.insert({
+    required String matchId,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : matchId = Value(matchId),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<CachedMatchRow> custom({
+    Expression<String>? matchId,
+    Expression<String>? payload,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (matchId != null) 'match_id': matchId,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedMatchesCompanion copyWith({
+    Value<String>? matchId,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedMatchesCompanion(
+      matchId: matchId ?? this.matchId,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (matchId.present) {
+      map['match_id'] = Variable<String>(matchId.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedMatchesCompanion(')
+          ..write('matchId: $matchId, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedMatchPlayersTable extends CachedMatchPlayers
+    with TableInfo<$CachedMatchPlayersTable, CachedMatchPlayersRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedMatchPlayersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _matchIdMeta = const VerificationMeta(
+    'matchId',
+  );
+  @override
+  late final GeneratedColumn<String> matchId = GeneratedColumn<String>(
+    'match_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [matchId, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_match_players';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedMatchPlayersRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('match_id')) {
+      context.handle(
+        _matchIdMeta,
+        matchId.isAcceptableOrUnknown(data['match_id']!, _matchIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_matchIdMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {matchId};
+  @override
+  CachedMatchPlayersRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedMatchPlayersRow(
+      matchId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}match_id'],
+          )!,
+      payload:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}payload'],
+          )!,
+      updatedAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}updated_at'],
+          )!,
+    );
+  }
+
+  @override
+  $CachedMatchPlayersTable createAlias(String alias) {
+    return $CachedMatchPlayersTable(attachedDatabase, alias);
+  }
+}
+
+class CachedMatchPlayersRow extends DataClass
+    implements Insertable<CachedMatchPlayersRow> {
+  final String matchId;
+  final String payload;
+  final DateTime updatedAt;
+  const CachedMatchPlayersRow({
+    required this.matchId,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['match_id'] = Variable<String>(matchId);
+    map['payload'] = Variable<String>(payload);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  CachedMatchPlayersCompanion toCompanion(bool nullToAbsent) {
+    return CachedMatchPlayersCompanion(
+      matchId: Value(matchId),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CachedMatchPlayersRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedMatchPlayersRow(
+      matchId: serializer.fromJson<String>(json['matchId']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'matchId': serializer.toJson<String>(matchId),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  CachedMatchPlayersRow copyWith({
+    String? matchId,
+    String? payload,
+    DateTime? updatedAt,
+  }) => CachedMatchPlayersRow(
+    matchId: matchId ?? this.matchId,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CachedMatchPlayersRow copyWithCompanion(CachedMatchPlayersCompanion data) {
+    return CachedMatchPlayersRow(
+      matchId: data.matchId.present ? data.matchId.value : this.matchId,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedMatchPlayersRow(')
+          ..write('matchId: $matchId, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(matchId, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedMatchPlayersRow &&
+          other.matchId == this.matchId &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CachedMatchPlayersCompanion
+    extends UpdateCompanion<CachedMatchPlayersRow> {
+  final Value<String> matchId;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const CachedMatchPlayersCompanion({
+    this.matchId = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedMatchPlayersCompanion.insert({
+    required String matchId,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : matchId = Value(matchId),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<CachedMatchPlayersRow> custom({
+    Expression<String>? matchId,
+    Expression<String>? payload,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (matchId != null) 'match_id': matchId,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedMatchPlayersCompanion copyWith({
+    Value<String>? matchId,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedMatchPlayersCompanion(
+      matchId: matchId ?? this.matchId,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (matchId.present) {
+      map['match_id'] = Variable<String>(matchId.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedMatchPlayersCompanion(')
+          ..write('matchId: $matchId, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedInningsStatesTable extends CachedInningsStates
+    with TableInfo<$CachedInningsStatesTable, CachedInningsStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedInningsStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _matchIdMeta = const VerificationMeta(
+    'matchId',
+  );
+  @override
+  late final GeneratedColumn<String> matchId = GeneratedColumn<String>(
+    'match_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _inningsNumberMeta = const VerificationMeta(
+    'inningsNumber',
+  );
+  @override
+  late final GeneratedColumn<int> inningsNumber = GeneratedColumn<int>(
+    'innings_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    matchId,
+    inningsNumber,
+    payload,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_innings_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedInningsStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('match_id')) {
+      context.handle(
+        _matchIdMeta,
+        matchId.isAcceptableOrUnknown(data['match_id']!, _matchIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_matchIdMeta);
+    }
+    if (data.containsKey('innings_number')) {
+      context.handle(
+        _inningsNumberMeta,
+        inningsNumber.isAcceptableOrUnknown(
+          data['innings_number']!,
+          _inningsNumberMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_inningsNumberMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {matchId, inningsNumber};
+  @override
+  CachedInningsStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedInningsStateRow(
+      matchId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}match_id'],
+          )!,
+      inningsNumber:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}innings_number'],
+          )!,
+      payload:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}payload'],
+          )!,
+      updatedAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}updated_at'],
+          )!,
+    );
+  }
+
+  @override
+  $CachedInningsStatesTable createAlias(String alias) {
+    return $CachedInningsStatesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedInningsStateRow extends DataClass
+    implements Insertable<CachedInningsStateRow> {
+  final String matchId;
+  final int inningsNumber;
+  final String payload;
+  final DateTime updatedAt;
+  const CachedInningsStateRow({
+    required this.matchId,
+    required this.inningsNumber,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['match_id'] = Variable<String>(matchId);
+    map['innings_number'] = Variable<int>(inningsNumber);
+    map['payload'] = Variable<String>(payload);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  CachedInningsStatesCompanion toCompanion(bool nullToAbsent) {
+    return CachedInningsStatesCompanion(
+      matchId: Value(matchId),
+      inningsNumber: Value(inningsNumber),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CachedInningsStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedInningsStateRow(
+      matchId: serializer.fromJson<String>(json['matchId']),
+      inningsNumber: serializer.fromJson<int>(json['inningsNumber']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'matchId': serializer.toJson<String>(matchId),
+      'inningsNumber': serializer.toJson<int>(inningsNumber),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  CachedInningsStateRow copyWith({
+    String? matchId,
+    int? inningsNumber,
+    String? payload,
+    DateTime? updatedAt,
+  }) => CachedInningsStateRow(
+    matchId: matchId ?? this.matchId,
+    inningsNumber: inningsNumber ?? this.inningsNumber,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CachedInningsStateRow copyWithCompanion(CachedInningsStatesCompanion data) {
+    return CachedInningsStateRow(
+      matchId: data.matchId.present ? data.matchId.value : this.matchId,
+      inningsNumber:
+          data.inningsNumber.present
+              ? data.inningsNumber.value
+              : this.inningsNumber,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedInningsStateRow(')
+          ..write('matchId: $matchId, ')
+          ..write('inningsNumber: $inningsNumber, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(matchId, inningsNumber, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedInningsStateRow &&
+          other.matchId == this.matchId &&
+          other.inningsNumber == this.inningsNumber &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CachedInningsStatesCompanion
+    extends UpdateCompanion<CachedInningsStateRow> {
+  final Value<String> matchId;
+  final Value<int> inningsNumber;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const CachedInningsStatesCompanion({
+    this.matchId = const Value.absent(),
+    this.inningsNumber = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedInningsStatesCompanion.insert({
+    required String matchId,
+    required int inningsNumber,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : matchId = Value(matchId),
+       inningsNumber = Value(inningsNumber),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<CachedInningsStateRow> custom({
+    Expression<String>? matchId,
+    Expression<int>? inningsNumber,
+    Expression<String>? payload,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (matchId != null) 'match_id': matchId,
+      if (inningsNumber != null) 'innings_number': inningsNumber,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedInningsStatesCompanion copyWith({
+    Value<String>? matchId,
+    Value<int>? inningsNumber,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedInningsStatesCompanion(
+      matchId: matchId ?? this.matchId,
+      inningsNumber: inningsNumber ?? this.inningsNumber,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (matchId.present) {
+      map['match_id'] = Variable<String>(matchId.value);
+    }
+    if (inningsNumber.present) {
+      map['innings_number'] = Variable<int>(inningsNumber.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedInningsStatesCompanion(')
+          ..write('matchId: $matchId, ')
+          ..write('inningsNumber: $inningsNumber, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3089,6 +4029,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ScoringSnapshotsTable scoringSnapshots = $ScoringSnapshotsTable(
     this,
   );
+  late final $CachedMatchesTable cachedMatches = $CachedMatchesTable(this);
+  late final $CachedMatchPlayersTable cachedMatchPlayers =
+      $CachedMatchPlayersTable(this);
+  late final $CachedInningsStatesTable cachedInningsStates =
+      $CachedInningsStatesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3100,6 +4045,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     messageDrafts,
     scoringOps,
     scoringSnapshots,
+    cachedMatches,
+    cachedMatchPlayers,
+    cachedInningsStates,
   ];
 }
 
@@ -4144,6 +5092,7 @@ typedef $$ScoringOpsTableCreateCompanionBuilder =
       required String payload,
       required DateTime createdAt,
       Value<DateTime?> syncedAt,
+      Value<DateTime?> refusedAt,
       Value<int> attempts,
       Value<String?> lastError,
       Value<int> rowid,
@@ -4158,6 +5107,7 @@ typedef $$ScoringOpsTableUpdateCompanionBuilder =
       Value<String> payload,
       Value<DateTime> createdAt,
       Value<DateTime?> syncedAt,
+      Value<DateTime?> refusedAt,
       Value<int> attempts,
       Value<String?> lastError,
       Value<int> rowid,
@@ -4209,6 +5159,11 @@ class $$ScoringOpsTableFilterComposer
 
   ColumnFilters<DateTime> get syncedAt => $composableBuilder(
     column: $table.syncedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get refusedAt => $composableBuilder(
+    column: $table.refusedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4272,6 +5227,11 @@ class $$ScoringOpsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get refusedAt => $composableBuilder(
+    column: $table.refusedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get attempts => $composableBuilder(
     column: $table.attempts,
     builder: (column) => ColumnOrderings(column),
@@ -4317,6 +5277,9 @@ class $$ScoringOpsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get syncedAt =>
       $composableBuilder(column: $table.syncedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get refusedAt =>
+      $composableBuilder(column: $table.refusedAt, builder: (column) => column);
 
   GeneratedColumn<int> get attempts =>
       $composableBuilder(column: $table.attempts, builder: (column) => column);
@@ -4364,6 +5327,7 @@ class $$ScoringOpsTableTableManager
                 Value<String> payload = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> syncedAt = const Value.absent(),
+                Value<DateTime?> refusedAt = const Value.absent(),
                 Value<int> attempts = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -4376,6 +5340,7 @@ class $$ScoringOpsTableTableManager
                 payload: payload,
                 createdAt: createdAt,
                 syncedAt: syncedAt,
+                refusedAt: refusedAt,
                 attempts: attempts,
                 lastError: lastError,
                 rowid: rowid,
@@ -4390,6 +5355,7 @@ class $$ScoringOpsTableTableManager
                 required String payload,
                 required DateTime createdAt,
                 Value<DateTime?> syncedAt = const Value.absent(),
+                Value<DateTime?> refusedAt = const Value.absent(),
                 Value<int> attempts = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -4402,6 +5368,7 @@ class $$ScoringOpsTableTableManager
                 payload: payload,
                 createdAt: createdAt,
                 syncedAt: syncedAt,
+                refusedAt: refusedAt,
                 attempts: attempts,
                 lastError: lastError,
                 rowid: rowid,
@@ -4666,6 +5633,576 @@ typedef $$ScoringSnapshotsTableProcessedTableManager =
       ScoringSnapshotRow,
       PrefetchHooks Function()
     >;
+typedef $$CachedMatchesTableCreateCompanionBuilder =
+    CachedMatchesCompanion Function({
+      required String matchId,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedMatchesTableUpdateCompanionBuilder =
+    CachedMatchesCompanion Function({
+      Value<String> matchId,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedMatchesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedMatchesTable> {
+  $$CachedMatchesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get matchId => $composableBuilder(
+    column: $table.matchId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedMatchesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedMatchesTable> {
+  $$CachedMatchesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get matchId => $composableBuilder(
+    column: $table.matchId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedMatchesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedMatchesTable> {
+  $$CachedMatchesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get matchId =>
+      $composableBuilder(column: $table.matchId, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$CachedMatchesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedMatchesTable,
+          CachedMatchRow,
+          $$CachedMatchesTableFilterComposer,
+          $$CachedMatchesTableOrderingComposer,
+          $$CachedMatchesTableAnnotationComposer,
+          $$CachedMatchesTableCreateCompanionBuilder,
+          $$CachedMatchesTableUpdateCompanionBuilder,
+          (
+            CachedMatchRow,
+            BaseReferences<_$AppDatabase, $CachedMatchesTable, CachedMatchRow>,
+          ),
+          CachedMatchRow,
+          PrefetchHooks Function()
+        > {
+  $$CachedMatchesTableTableManager(_$AppDatabase db, $CachedMatchesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$CachedMatchesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer:
+              () =>
+                  $$CachedMatchesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer:
+              () => $$CachedMatchesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> matchId = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedMatchesCompanion(
+                matchId: matchId,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String matchId,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedMatchesCompanion.insert(
+                matchId: matchId,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedMatchesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedMatchesTable,
+      CachedMatchRow,
+      $$CachedMatchesTableFilterComposer,
+      $$CachedMatchesTableOrderingComposer,
+      $$CachedMatchesTableAnnotationComposer,
+      $$CachedMatchesTableCreateCompanionBuilder,
+      $$CachedMatchesTableUpdateCompanionBuilder,
+      (
+        CachedMatchRow,
+        BaseReferences<_$AppDatabase, $CachedMatchesTable, CachedMatchRow>,
+      ),
+      CachedMatchRow,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedMatchPlayersTableCreateCompanionBuilder =
+    CachedMatchPlayersCompanion Function({
+      required String matchId,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedMatchPlayersTableUpdateCompanionBuilder =
+    CachedMatchPlayersCompanion Function({
+      Value<String> matchId,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedMatchPlayersTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedMatchPlayersTable> {
+  $$CachedMatchPlayersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get matchId => $composableBuilder(
+    column: $table.matchId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedMatchPlayersTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedMatchPlayersTable> {
+  $$CachedMatchPlayersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get matchId => $composableBuilder(
+    column: $table.matchId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedMatchPlayersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedMatchPlayersTable> {
+  $$CachedMatchPlayersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get matchId =>
+      $composableBuilder(column: $table.matchId, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$CachedMatchPlayersTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedMatchPlayersTable,
+          CachedMatchPlayersRow,
+          $$CachedMatchPlayersTableFilterComposer,
+          $$CachedMatchPlayersTableOrderingComposer,
+          $$CachedMatchPlayersTableAnnotationComposer,
+          $$CachedMatchPlayersTableCreateCompanionBuilder,
+          $$CachedMatchPlayersTableUpdateCompanionBuilder,
+          (
+            CachedMatchPlayersRow,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedMatchPlayersTable,
+              CachedMatchPlayersRow
+            >,
+          ),
+          CachedMatchPlayersRow,
+          PrefetchHooks Function()
+        > {
+  $$CachedMatchPlayersTableTableManager(
+    _$AppDatabase db,
+    $CachedMatchPlayersTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$CachedMatchPlayersTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer:
+              () => $$CachedMatchPlayersTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$CachedMatchPlayersTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> matchId = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedMatchPlayersCompanion(
+                matchId: matchId,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String matchId,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedMatchPlayersCompanion.insert(
+                matchId: matchId,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedMatchPlayersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedMatchPlayersTable,
+      CachedMatchPlayersRow,
+      $$CachedMatchPlayersTableFilterComposer,
+      $$CachedMatchPlayersTableOrderingComposer,
+      $$CachedMatchPlayersTableAnnotationComposer,
+      $$CachedMatchPlayersTableCreateCompanionBuilder,
+      $$CachedMatchPlayersTableUpdateCompanionBuilder,
+      (
+        CachedMatchPlayersRow,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedMatchPlayersTable,
+          CachedMatchPlayersRow
+        >,
+      ),
+      CachedMatchPlayersRow,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedInningsStatesTableCreateCompanionBuilder =
+    CachedInningsStatesCompanion Function({
+      required String matchId,
+      required int inningsNumber,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedInningsStatesTableUpdateCompanionBuilder =
+    CachedInningsStatesCompanion Function({
+      Value<String> matchId,
+      Value<int> inningsNumber,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedInningsStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedInningsStatesTable> {
+  $$CachedInningsStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get matchId => $composableBuilder(
+    column: $table.matchId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get inningsNumber => $composableBuilder(
+    column: $table.inningsNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedInningsStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedInningsStatesTable> {
+  $$CachedInningsStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get matchId => $composableBuilder(
+    column: $table.matchId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get inningsNumber => $composableBuilder(
+    column: $table.inningsNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedInningsStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedInningsStatesTable> {
+  $$CachedInningsStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get matchId =>
+      $composableBuilder(column: $table.matchId, builder: (column) => column);
+
+  GeneratedColumn<int> get inningsNumber => $composableBuilder(
+    column: $table.inningsNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$CachedInningsStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedInningsStatesTable,
+          CachedInningsStateRow,
+          $$CachedInningsStatesTableFilterComposer,
+          $$CachedInningsStatesTableOrderingComposer,
+          $$CachedInningsStatesTableAnnotationComposer,
+          $$CachedInningsStatesTableCreateCompanionBuilder,
+          $$CachedInningsStatesTableUpdateCompanionBuilder,
+          (
+            CachedInningsStateRow,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedInningsStatesTable,
+              CachedInningsStateRow
+            >,
+          ),
+          CachedInningsStateRow,
+          PrefetchHooks Function()
+        > {
+  $$CachedInningsStatesTableTableManager(
+    _$AppDatabase db,
+    $CachedInningsStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$CachedInningsStatesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer:
+              () => $$CachedInningsStatesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$CachedInningsStatesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> matchId = const Value.absent(),
+                Value<int> inningsNumber = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedInningsStatesCompanion(
+                matchId: matchId,
+                inningsNumber: inningsNumber,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String matchId,
+                required int inningsNumber,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedInningsStatesCompanion.insert(
+                matchId: matchId,
+                inningsNumber: inningsNumber,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedInningsStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedInningsStatesTable,
+      CachedInningsStateRow,
+      $$CachedInningsStatesTableFilterComposer,
+      $$CachedInningsStatesTableOrderingComposer,
+      $$CachedInningsStatesTableAnnotationComposer,
+      $$CachedInningsStatesTableCreateCompanionBuilder,
+      $$CachedInningsStatesTableUpdateCompanionBuilder,
+      (
+        CachedInningsStateRow,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedInningsStatesTable,
+          CachedInningsStateRow
+        >,
+      ),
+      CachedInningsStateRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4682,4 +6219,10 @@ class $AppDatabaseManager {
       $$ScoringOpsTableTableManager(_db, _db.scoringOps);
   $$ScoringSnapshotsTableTableManager get scoringSnapshots =>
       $$ScoringSnapshotsTableTableManager(_db, _db.scoringSnapshots);
+  $$CachedMatchesTableTableManager get cachedMatches =>
+      $$CachedMatchesTableTableManager(_db, _db.cachedMatches);
+  $$CachedMatchPlayersTableTableManager get cachedMatchPlayers =>
+      $$CachedMatchPlayersTableTableManager(_db, _db.cachedMatchPlayers);
+  $$CachedInningsStatesTableTableManager get cachedInningsStates =>
+      $$CachedInningsStatesTableTableManager(_db, _db.cachedInningsStates);
 }

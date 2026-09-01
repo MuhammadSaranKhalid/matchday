@@ -40,6 +40,15 @@ import '../features/matches/presentation/screens/result_screen.dart';
 import '../features/notifications/presentation/screens/notifications_screen.dart';
 import '../features/posts/domain/entities/post.dart';
 import '../features/posts/presentation/screens/composer_screen.dart';
+import '../features/tournaments/presentation/screens/my_tournaments_screen.dart';
+import '../features/tournaments/presentation/screens/tournament_announce_screen.dart';
+import '../features/tournaments/presentation/screens/tournament_people_screen.dart';
+import '../features/tournaments/presentation/screens/tournament_published_screen.dart';
+import '../features/tournaments/presentation/screens/tournament_settings_screen.dart';
+import '../features/tournaments/presentation/screens/organizer_console_screen.dart';
+import '../features/tournaments/presentation/screens/team_registration_sheet.dart';
+import '../features/tournaments/presentation/screens/tournament_create_wizard_screen.dart';
+import '../features/tournaments/presentation/screens/tournament_detail_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -215,6 +224,69 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/my/pool-requests',
         builder: (_, __) => const MyPoolRequestsScreen(),
+      ),
+      GoRoute(
+        path: '/my/tournaments',
+        builder: (_, __) => const MyTournamentsScreen(),
+      ),
+      GoRoute(
+        path: '/tournaments',
+        redirect: (_, __) => '/my/tournaments',
+      ),
+      GoRoute(
+        path: '/tournaments/create',
+        builder: (_, __) => const TournamentCreateWizardScreen(),
+      ),
+      GoRoute(
+        path: '/tournaments/:tournamentId',
+        builder: (_, state) => TournamentDetailScreen(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/tournaments/:tournamentId/manage',
+        builder: (_, state) => OrganizerConsoleScreen(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/tournaments/:tournamentId/console',
+        builder: (_, state) => OrganizerConsoleScreen(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
+      // Artboard 22 — the post-publish screen. pushReplacement'd from the
+      // wizard, so Back does not re-enter step 6.
+      GoRoute(
+        path: '/tournaments/:tournamentId/published',
+        builder: (_, state) => TournamentPublishedScreen(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
+      // The three destinations behind the console ⋮ menu (artboards 27d–f).
+      GoRoute(
+        path: '/tournaments/:tournamentId/settings',
+        builder: (_, state) => TournamentSettingsScreen(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/tournaments/:tournamentId/announce',
+        builder: (_, state) => TournamentAnnounceScreen(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/tournaments/:tournamentId/people',
+        builder: (_, state) => TournamentPeopleScreen(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/tournaments/:tournamentId/register',
+        builder: (_, state) => TeamRegistrationSheet(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
       ),
       // Side panel · Account zone. Both rows are drawn live in the Side Panel
       // design; neither destination is built yet. `Saved` has mock UI inside

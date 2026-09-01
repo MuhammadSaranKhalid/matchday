@@ -68,6 +68,21 @@ class ProfileView extends ConsumerWidget {
                                 child: _avatar(context),
                               ),
                             ),
+                            if (context.canPop() || !isSelf)
+                              Positioned(
+                                top: 12,
+                                left: 14,
+                                child: _buildNavCircle(
+                                  icon: Icons.arrow_back,
+                                  onTap: () {
+                                    if (context.canPop()) {
+                                      context.pop();
+                                    } else {
+                                      context.go('/home');
+                                    }
+                                  },
+                                ),
+                              ),
                           ],
                         ),
 
@@ -554,6 +569,39 @@ class ProfileView extends ConsumerWidget {
               ),
     );
   }
+
+  Widget _buildNavCircle({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color iconColor = CkColors.ink,
+  }) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: CkColors.paper.withValues(alpha: 0.92),
+        shape: BoxShape.circle,
+        border: Border.all(color: CkColors.hairline),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(0, 0, 0, 0.08),
+            offset: Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Center(
+            child: Icon(icon, size: 20, color: iconColor),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Loading skeleton view for profile.
@@ -563,13 +611,49 @@ class ProfileLoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: CkColors.paper,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            Expanded(
+            if (context.canPop() || !isSelf)
+              Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: CkColors.paper2,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: CkColors.hairline),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/home');
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(999),
+                        child: const Center(
+                          child: Icon(
+                            Icons.arrow_back,
+                            size: 20,
+                            color: CkColors.ink,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            const Expanded(
               child: SingleChildScrollView(
                 physics: NeverScrollableScrollPhysics(),
                 child: _IdentityHeroSkeleton(),
@@ -588,38 +672,46 @@ class ProfileNotFoundView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: CkColors.paper,
-      body: SafeArea(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: CkColors.ink),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+        ),
+      ),
+      body: const SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      V2Svg(V2Icons.pin, size: 28, color: CkColors.muted),
-                      SizedBox(height: 12),
-                      Text(
-                        "We couldn't find that profile.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, color: CkColors.ink),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'The link may be broken or the account is no longer active.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12.5, color: CkColors.muted),
-                      ),
-                    ],
-                  ),
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                V2Svg(V2Icons.pin, size: 28, color: CkColors.muted),
+                SizedBox(height: 12),
+                Text(
+                  "We couldn't find that profile.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: CkColors.ink),
                 ),
-              ),
+                SizedBox(height: 4),
+                Text(
+                  'The link may be broken or the account is no longer active.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12.5, color: CkColors.muted),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

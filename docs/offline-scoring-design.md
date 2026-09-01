@@ -1304,3 +1304,53 @@ a push, not after a bug report.
    lost reply still risks a double-record on retry. **This is the most important
    remaining gap**, because the outbox now retries where it previously gave up.
 4. **S3 soak** — still wants real matches, and still wants `record-ball` deployed.
+
+### "Offline" and "refused" were the same code path — fixed 2026-08-30
+
+`MatchesRemoteDataSource` translated every failure into `ServerException`. It
+never threw `NetworkException`, so the repository had no way to ask the question
+the write path turns on: **did the server never hear us, or did it hear us and
+say no?**
+
+Three consequences, in increasing order of severity:
+
+1. `startInnings` caught `ServerException`, commented it "Offline / network
+   failure", and returned `Right(unit)`. A rule violation — the one failure that
+   is definitely *not* offline — was reported to the scorer as **success**.
+2. Both write paths called `markOpFailed` on a refusal, leaving the op pending
+   forever. `pendingOpsCount` never returned to zero, and §21's own note about a
+   stuck count disabling undo describes exactly this.
+3. The drain loop `break`ed on `ServerException`. One permanently refused
+   delivery stalled **every op queued behind it** for the rest of the match.
+
+**The fix.** A refusal is now a distinct terminal state, `scoring_ops.refused_at`
+(schema v9):
+
+| Outcome | WAL | Returned |
+|---|---|---|
+| Transport failure (`NetworkException`) | stays pending, `attempts++` | `Right` for `startInnings`, `NetworkFailure` for `recordBall` |
+| Server refused (server/conflict/auth) | `markOpRefused` — leaves the queue, row kept | `Left(<Failure>)` |
+
+The data source now throws `NetworkException` for `SocketException` /
+`http.ClientException` / `TimeoutException`, mirroring the precedent already set
+in `messages_remote_datasource.dart`.
+
+Two properties are deliberate:
+
+- **Refused rows are kept, never deleted** (§19.3). `pruneOps` skips them and
+  `refusedOps(match, innings)` reads them back, so "what could not be applied"
+  stays answerable. The previous code *discarded* on auth failure and conflict,
+  which §19.3 forbids — a scorer who lost their lease silently lost their
+  deliveries.
+- **The drain `continue`s past a refusal** instead of breaking. It still breaks
+  on a transport failure, because the ops behind must not overtake the one that
+  did not land.
+
+Covered by `test/features/matches/data/repositories/scoring_write_failure_taxonomy_test.dart`
+(real SQLite — a durability claim asserted against a mock is not asserted) and
+three cases in `matches_local_datasource_test.dart`.
+
+**Still open, unchanged by this:** the refused list has no UI. `refusedOps` is
+readable but nothing reads it, so §19.3's "visible, readable and exportable"
+is still only half-satisfied — it is now durable, not yet visible. That joins
+items 1 and 2 in *Still open* above; all three are the same missing surface.

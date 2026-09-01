@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io' show SocketException;
 
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/ball_dto.dart';
@@ -315,18 +317,20 @@ class MatchesRemoteDataSource {
     required String bowlerId,
     int? target,
   }) async {
-    try {
-      await _supabase.rpc<void>('start_innings', params: {
-        'p_match_id': matchId,
-        'p_innings_number': inningsNumber,
-        'p_striker_id': strikerId,
-        'p_non_striker_id': nonStrikerId,
-        'p_bowler_id': bowlerId,
-        if (target != null) 'p_target': target,
-      });
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
-    }
+    await _transport(() async {
+      try {
+        await _supabase.rpc<void>('start_innings', params: {
+          'p_match_id': matchId,
+          'p_innings_number': inningsNumber,
+          'p_striker_id': strikerId,
+          'p_non_striker_id': nonStrikerId,
+          'p_bowler_id': bowlerId,
+          if (target != null) 'p_target': target,
+        });
+      } on PostgrestException catch (e) {
+        throw _rpcException(e);
+      }
+    });
   }
 
   // ─── match_players ───────────────────────────────────────────────────────
@@ -478,44 +482,47 @@ class MatchesRemoteDataSource {
   /// [RecordBallResult.innings] is null against a deployment of the function
   /// that predates `returning *` on the innings update — the caller then falls
   /// back to the realtime broadcast, as it always used to.
-  Future<RecordBallResult> recordBall(Map<String, dynamic> params) async {
-    try {
-      final res = await _supabase.functions.invoke('record-ball', body: params);
-      final data = res.data;
-      final ball = data is Map ? data['ball'] : null;
-      if (ball is Map) {
-        final innings = data is Map ? data['innings'] : null;
-        return RecordBallResult(
-          ball: BallDto.fromJson(Map<String, dynamic>.from(ball)),
-          innings: innings is Map
-              ? MatchInningsStateDto.fromJson(
-                  Map<String, dynamic>.from(innings))
-              : null,
-        );
-      }
-      throw ServerException('record-ball returned no ball row');
-    } on FunctionException catch (e) {
-      throw _functionException(e);
-    }
-  }
+  Future<RecordBallResult> recordBall(Map<String, dynamic> params) =>
+      _transport(() async {
+        try {
+          final res =
+              await _supabase.functions.invoke('record-ball', body: params);
+          final data = res.data;
+          final ball = data is Map ? data['ball'] : null;
+          if (ball is Map) {
+            final innings = data is Map ? data['innings'] : null;
+            return RecordBallResult(
+              ball: BallDto.fromJson(Map<String, dynamic>.from(ball)),
+              innings: innings is Map
+                  ? MatchInningsStateDto.fromJson(
+                      Map<String, dynamic>.from(innings))
+                  : null,
+            );
+          }
+          throw ServerException('record-ball returned no ball row');
+        } on FunctionException catch (e) {
+          throw _functionException(e);
+        }
+      });
 
   Future<bool> undoLastBall({
     required String matchId,
     required int inningsNumber,
-  }) async {
-    try {
-      final result = await _supabase.rpc<dynamic>(
-        'undo_last_ball',
-        params: {
-          'p_match_id': matchId,
-          'p_innings_number': inningsNumber,
-        },
-      );
-      return result == true;
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
-    }
-  }
+  }) =>
+      _transport(() async {
+        try {
+          final result = await _supabase.rpc<dynamic>(
+            'undo_last_ball',
+            params: {
+              'p_match_id': matchId,
+              'p_innings_number': inningsNumber,
+            },
+          );
+          return result == true;
+        } on PostgrestException catch (e) {
+          throw _rpcException(e);
+        }
+      });
 
   /// Initial-hydration GET for balls in (match, innings) — feeds the
   /// broadcast stream's first emission.
@@ -617,6 +624,32 @@ class MatchesRemoteDataSource {
   /// for a developer reading a log, not for a captain standing on a pitch. The
   /// codes are stable, so they translate to sentences here rather than leaking
   /// `errcode` strings into a snackbar.
+  /// True when the call never reached the server — DNS, socket, or timeout.
+  ///
+  /// This distinction is load-bearing for the scoring write path, not
+  /// cosmetic. The repository queues an op for retry on a transport failure
+  /// and marks it terminally refused on a server answer; conflating the two
+  /// meant a rule violation was reported to the scorer as success and then
+  /// retried forever. Mirrors the precedent in
+  /// `messages_remote_datasource.dart`.
+  static bool _isTransportFailure(Object e) =>
+      e is SocketException || e is http.ClientException || e is TimeoutException;
+
+  /// Wraps a call so transport failures surface as [NetworkException] while
+  /// everything else keeps whatever the inner `on` clauses already threw.
+  static Future<T> _transport<T>(Future<T> Function() body) async {
+    try {
+      return await body();
+    } catch (e) {
+      if (_isTransportFailure(e)) {
+        throw NetworkException(
+          e is SocketException ? e.message : 'No internet connection',
+        );
+      }
+      rethrow;
+    }
+  }
+
   Exception _rpcException(PostgrestException e) {
     switch (e.code) {
       case '28000':

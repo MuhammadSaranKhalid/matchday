@@ -22,6 +22,7 @@ abstract class TeamDto with _$TeamDto {
     String? tagline,
     @JsonKey(name: 'logo_url') String? logoUrl,
     @JsonKey(name: 'logo_monogram') String? logoMonogram,
+    @JsonKey(name: 'is_verified') @Default(false) bool isVerified,
     @JsonKey(name: 'created_at') required String createdAt,
     @JsonKey(name: 'updated_at') required String updatedAt,
   }) = _TeamDto;
@@ -47,6 +48,7 @@ abstract class TeamDto with _$TeamDto {
         tagline: tagline,
         logoUrl: logoUrl,
         logoMonogram: logoMonogram,
+        isVerified: isVerified,
         createdAt: DateTime.parse(createdAt),
         updatedAt: DateTime.parse(updatedAt),
       );

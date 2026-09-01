@@ -42,53 +42,72 @@ class TeamsListScreen extends ConsumerWidget {
                   children: [
                     Column(
                       children: [
-                        // ── Header — back chevron, title, and + Create action ─
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(6, 6, 16, 8),
+                        // ── Header — exact same styling as My Tournaments ──
+                        Container(
+                          height: 56,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(color: CkColors.hairline),
+                            ),
+                          ),
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               InkWell(
                                 onTap: () => context.pop(),
-                                borderRadius: BorderRadius.circular(999),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(8),
-                                  child: Icon(
-                                    Icons.chevron_left_rounded,
-                                    size: 26,
+                                customBorder: const CircleBorder(),
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: const BoxDecoration(
+                                    color: CkColors.paper2,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_back,
+                                    size: 18,
                                     color: CkColors.ink,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   'My Teams',
-                                  style: CkType.display(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.02,
-                                  ),
+                                  style: CkType.display(fontSize: 17),
                                 ),
                               ),
-                              ElevatedButton.icon(
-                                onPressed: () => context.push('/teams/create'),
-                                icon: const Icon(Icons.add_rounded, size: 16),
-                                label: const Text('Create Team'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: CkColors.ink,
-                                  foregroundColor: CkColors.paper,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                              Material(
+                                color: CkColors.ink,
+                                borderRadius: BorderRadius.circular(999),
+                                child: InkWell(
+                                  onTap: () => context.push('/teams/create'),
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 13,
+                                      vertical: 9,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.add,
+                                          size: 12,
+                                          color: CkColors.paper,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'CREATE',
+                                          style: CkType.mono(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.10,
+                                            color: CkColors.paper,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),

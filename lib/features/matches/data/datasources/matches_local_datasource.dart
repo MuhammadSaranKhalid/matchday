@@ -5,6 +5,9 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_provider.dart';
+import '../models/match_dto.dart';
+import '../models/match_innings_state_dto.dart';
+import '../models/match_player_dto.dart';
 
 part 'matches_local_datasource.g.dart';
 
@@ -19,6 +22,7 @@ class LocalScoringOp {
     required this.payload,
     required this.createdAt,
     this.syncedAt,
+    this.refusedAt,
     this.attempts = 0,
     this.lastError,
   });
@@ -31,10 +35,17 @@ class LocalScoringOp {
   final Map<String, dynamic> payload;
   final DateTime createdAt;
   final DateTime? syncedAt;
+  final DateTime? refusedAt;
   final int attempts;
   final String? lastError;
 
-  bool get isPending => syncedAt == null;
+  /// Still owed to the server. A refused op is NOT pending — the server
+  /// answered, and retrying a no produces another no.
+  bool get isPending => syncedAt == null && refusedAt == null;
+
+  /// The server answered and rejected this one. Terminal, and kept rather
+  /// than deleted so the scorer can still read what did not apply.
+  bool get isRefused => refusedAt != null;
 }
 
 abstract class MatchesLocalDataSource {
@@ -63,7 +74,21 @@ abstract class MatchesLocalDataSource {
 
   Future<void> markOpSynced(String opId);
 
+  /// A transport failure: bump the attempt count and keep the op queued.
+  /// Use ONLY when the server never answered — a refusal is [markOpRefused].
   Future<void> markOpFailed(String opId, String error);
+
+  /// The server answered and said no. Terminal: the op leaves the queue but
+  /// stays in the table so it remains readable (design doc §19.3 — a refused
+  /// write is never discarded).
+  Future<void> markOpRefused(String opId, String reason);
+
+  /// Ops the server refused, oldest first. Feeds any surface that shows the
+  /// scorer what could not be applied.
+  Future<List<LocalScoringOp>> refusedOps({
+    required String matchId,
+    required int inningsNumber,
+  });
 
   Future<void> discardOp(String opId);
 
@@ -83,6 +108,23 @@ abstract class MatchesLocalDataSource {
     required String matchId,
     required int inningsNumber,
   });
+
+  // ── Match Hydration Cache (Offline-First) ────────────────────────────────
+
+  Future<void> cacheMatch(MatchDto match);
+
+  Future<MatchDto?> getCachedMatch(String matchId);
+
+  Future<void> cacheMatchPlayers(String matchId, List<MatchPlayerDto> players);
+
+  Future<List<MatchPlayerDto>> getCachedMatchPlayers(String matchId);
+
+  Future<void> cacheInningsState(String matchId, MatchInningsStateDto state);
+
+  Future<MatchInningsStateDto?> getCachedInningsState({
+    required String matchId,
+    required int inningsNumber,
+  });
 }
 
 class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
@@ -98,6 +140,7 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
         payload: jsonDecode(r.payload) as Map<String, dynamic>,
         createdAt: r.createdAt,
         syncedAt: r.syncedAt,
+        refusedAt: r.refusedAt,
         attempts: r.attempts,
         lastError: r.lastError,
       );
@@ -142,7 +185,23 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
           ..where((t) =>
               t.matchId.equals(matchId) &
               t.inningsNumber.equals(inningsNumber) &
-              t.syncedAt.isNull())
+              t.syncedAt.isNull() &
+              t.refusedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.asc(t.localSeq)]))
+        .get();
+    return rows.map(_toOp).toList();
+  }
+
+  @override
+  Future<List<LocalScoringOp>> refusedOps({
+    required String matchId,
+    required int inningsNumber,
+  }) async {
+    final rows = await (_db.select(_db.scoringOps)
+          ..where((t) =>
+              t.matchId.equals(matchId) &
+              t.inningsNumber.equals(inningsNumber) &
+              t.refusedAt.isNotNull())
           ..orderBy([(t) => OrderingTerm.asc(t.localSeq)]))
         .get();
     return rows.map(_toOp).toList();
@@ -172,6 +231,14 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
       lastError: Value(error),
     ));
   }
+
+  @override
+  Future<void> markOpRefused(String opId, String reason) =>
+      (_db.update(_db.scoringOps)..where((t) => t.opId.equals(opId)))
+          .write(ScoringOpsCompanion(
+        refusedAt: Value(DateTime.now()),
+        lastError: Value(reason),
+      ));
 
   @override
   Future<void> discardOp(String opId) =>
@@ -212,6 +279,9 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
   }
 
   @override
+  /// Drops ops the server has confirmed. Refused ops survive pruning — they
+  /// are the record of what could not be applied, and §19.3 forbids
+  /// discarding them.
   Future<void> pruneOps({
     required String matchId,
     required int inningsNumber,
@@ -223,8 +293,99 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
               t.syncedAt.isNotNull()))
         .go();
   }
+
+  // ── Match Hydration Cache Implementation ──────────────────────────────────
+
+  @override
+  Future<void> cacheMatch(MatchDto match) =>
+      _db.into(_db.cachedMatches).insertOnConflictUpdate(
+            CachedMatchRow(
+              matchId: match.matchId,
+              payload: jsonEncode(match.toJson()),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+  @override
+  Future<MatchDto?> getCachedMatch(String matchId) async {
+    final row = await (_db.select(_db.cachedMatches)
+          ..where((t) => t.matchId.equals(matchId)))
+        .getSingleOrNull();
+    if (row == null) return null;
+    try {
+      return MatchDto.fromJson(
+        jsonDecode(row.payload) as Map<String, dynamic>,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> cacheMatchPlayers(
+    String matchId,
+    List<MatchPlayerDto> players,
+  ) =>
+      _db.into(_db.cachedMatchPlayers).insertOnConflictUpdate(
+            CachedMatchPlayersRow(
+              matchId: matchId,
+              payload: jsonEncode(players.map((p) => p.toJson()).toList()),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+  @override
+  Future<List<MatchPlayerDto>> getCachedMatchPlayers(String matchId) async {
+    final row = await (_db.select(_db.cachedMatchPlayers)
+          ..where((t) => t.matchId.equals(matchId)))
+        .getSingleOrNull();
+    if (row == null) return const [];
+    try {
+      final list = jsonDecode(row.payload) as List<dynamic>;
+      return list
+          .map((item) => MatchPlayerDto.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  @override
+  Future<void> cacheInningsState(
+    String matchId,
+    MatchInningsStateDto state,
+  ) =>
+      _db.into(_db.cachedInningsStates).insertOnConflictUpdate(
+            CachedInningsStateRow(
+              matchId: matchId,
+              inningsNumber: state.inningsNumber,
+              payload: jsonEncode(state.toJson()),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+  @override
+  Future<MatchInningsStateDto?> getCachedInningsState({
+    required String matchId,
+    required int inningsNumber,
+  }) async {
+    final row = await (_db.select(_db.cachedInningsStates)
+          ..where((t) =>
+              t.matchId.equals(matchId) &
+              t.inningsNumber.equals(inningsNumber)))
+        .getSingleOrNull();
+    if (row == null) return null;
+    try {
+      return MatchInningsStateDto.fromJson(
+        jsonDecode(row.payload) as Map<String, dynamic>,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 @Riverpod(keepAlive: true)
 MatchesLocalDataSource matchesLocalDataSource(Ref ref) =>
     MatchesLocalDataSourceImpl(ref.watch(appDatabaseProvider));
+

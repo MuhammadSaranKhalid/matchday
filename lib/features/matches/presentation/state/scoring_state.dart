@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 
 import 'package:equatable/equatable.dart';
 
@@ -137,23 +136,27 @@ class ScoringState extends Equatable {
 
   // ── Score ────────────────────────────────────────────────────────────────
 
-  int get legalBalls {
-    final ballsCount = balls.where((b) => b.isLegalDelivery).length;
-    final serverCount = innings?.legalBallCount ?? 0;
-    return math.max(serverCount, ballsCount);
-  }
+  // The innings row is the score. It arrives already carrying every queued
+  // delivery, because the projection replays them onto it before this state is
+  // built — see `domain/scoring/scoring_replay.dart`.
+  //
+  // These used to be `math.max(row, count-of-balls)`. That was reconciliation
+  // between two sources that disagreed: the row was being patched by one code
+  // path and the ball list by another, and taking the larger hid the gap. With
+  // one fold producing both, there is nothing to reconcile — and a score that
+  // can only ever be revised upward is not a score, it is a high-water mark.
+  //
+  // The ball list is still the fallback for an innings with no row yet, where
+  // it is the only thing there is to count.
+  int get legalBalls =>
+      innings?.legalBallCount ??
+      balls.where((b) => b.isLegalDelivery).length;
 
-  int get totalRuns {
-    final ballsRuns = balls.fold<int>(0, (sum, b) => sum + b.totalRuns);
-    final serverRuns = innings?.totalRuns ?? 0;
-    return math.max(serverRuns, ballsRuns);
-  }
+  int get totalRuns =>
+      innings?.totalRuns ?? balls.fold<int>(0, (sum, b) => sum + b.totalRuns);
 
-  int get totalWickets {
-    final ballsWickets = balls.where((b) => b.isWicket).length;
-    final serverWickets = innings?.totalWickets ?? 0;
-    return math.max(serverWickets, ballsWickets);
-  }
+  int get totalWickets =>
+      innings?.totalWickets ?? balls.where((b) => b.isWicket).length;
 
   int get ballsPerOver =>
       match.format.ballsPerOver == 0 ? 6 : match.format.ballsPerOver;

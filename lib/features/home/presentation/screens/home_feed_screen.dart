@@ -33,7 +33,7 @@ import 'package:matchday/features/posts/presentation/widgets/post_card_skeleton.
 // below so re-enabling is a one-line change. They are referenced from the
 // const-false branches below, which keeps the analyzer's unused-element
 // check happy.
-const bool _kShowLiveCards = true;
+const bool _kShowLiveCards = false;
 const bool _kShowFeedFilters = true;
 
 class HomeFeedScreen extends ConsumerStatefulWidget {

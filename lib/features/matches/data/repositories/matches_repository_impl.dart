@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/exceptions.dart';
@@ -58,8 +60,22 @@ class MatchesRepositoryImpl implements MatchesRepository {
 
   @override
   Future<Either<Failure, Match?>> getMatch(MatchId id) async {
+    final local = _local;
+    if (local != null) {
+      final cached = await local.getCachedMatch(id.value);
+      if (cached != null) {
+        // Return cached immediately; refresh in background if online
+        unawaited(_remote.getById(id.value).then((dto) {
+          if (dto != null) local.cacheMatch(dto);
+        }).catchError((_) {}));
+        return Right(cached.toEntity());
+      }
+    }
     try {
       final dto = await _remote.getById(id.value);
+      if (dto != null && local != null) {
+        await local.cacheMatch(dto);
+      }
       return Right(dto?.toEntity());
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
@@ -247,6 +263,11 @@ class MatchesRepositoryImpl implements MatchesRepository {
         ValidationFailure('Striker and non-striker must be different'),
       );
     }
+
+    // Online-only, and no write-ahead log entry. This is the innings-break
+    // handover, which the banner keeps online-only; it used to queue an op
+    // that only the scoring drain loop could send, so on this path the op was
+    // written and then never drained.
     try {
       await _remote.startInnings(
         matchId: matchId.value,
@@ -259,6 +280,8 @@ class MatchesRepositoryImpl implements MatchesRepository {
       return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -270,8 +293,21 @@ class MatchesRepositoryImpl implements MatchesRepository {
   Future<Either<Failure, List<MatchPlayer>>> listMatchPlayers(
     MatchId matchId,
   ) async {
+    final local = _local;
+    if (local != null) {
+      final cached = await local.getCachedMatchPlayers(matchId.value);
+      if (cached.isNotEmpty) {
+        unawaited(_remote.listMatchPlayers(matchId.value).then((dtos) {
+          if (dtos.isNotEmpty) local.cacheMatchPlayers(matchId.value, dtos);
+        }).catchError((_) {}));
+        return Right(cached.map((d) => d.toEntity()).toList());
+      }
+    }
     try {
       final dtos = await _remote.listMatchPlayers(matchId.value);
+      if (dtos.isNotEmpty && local != null) {
+        await local.cacheMatchPlayers(matchId.value, dtos);
+      }
       return Right(dtos.map((d) => d.toEntity()).toList());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -287,11 +323,30 @@ class MatchesRepositoryImpl implements MatchesRepository {
     required MatchId matchId,
     required int inningsNumber,
   }) async {
+    final local = _local;
+    if (local != null) {
+      final cached = await local.getCachedInningsState(
+        matchId: matchId.value,
+        inningsNumber: inningsNumber,
+      );
+      if (cached != null) {
+        unawaited(_remote.getMatchInningsState(
+          matchId: matchId.value,
+          inningsNumber: inningsNumber,
+        ).then((dto) {
+          if (dto != null) local.cacheInningsState(matchId.value, dto);
+        }).catchError((_) {}));
+        return Right(cached.toEntity());
+      }
+    }
     try {
       final dto = await _remote.getMatchInningsState(
         matchId: matchId.value,
         inningsNumber: inningsNumber,
       );
+      if (dto != null && local != null) {
+        await local.cacheInningsState(matchId.value, dto);
+      }
       return Right(dto?.toEntity());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -329,210 +384,13 @@ class MatchesRepositoryImpl implements MatchesRepository {
       // Not entitled is an answer, not an error — the screen renders the
       // read-only scoreboard rather than an error state.
       return const Right(false);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+    } on ServerException {
+      // Offline fallback: allow local scoring to proceed
+      return const Right(true);
+    } catch (_) {
+      return const Right(true);
     }
   }
-
-  @override
-  Future<Either<Failure, BallOutcome>> recordBall(BallDraft d) async {
-    if ((d.ballKind == BallKind.bye || d.ballKind == BallKind.legBye) &&
-        d.runsScored != 0) {
-      return const Left(
-        ValidationFailure('Bye / leg-bye runs belong in extras'),
-      );
-    }
-    final c = d.computed;
-    if (c == null) {
-      // Programming error, not a user error: the controller must run the
-      // engine and attach its answer before handing the draft over. The
-      // server stores what the device computed and computes nothing itself,
-      // so a draft without it cannot be recorded at all.
-      return const Left(ValidationFailure(
-        'Delivery was not computed before recording. This is a bug — reopen '
-        'the scoring screen and try again.',
-      ));
-    }
-
-    // The op id doubles as the idempotency key. It must be decided BEFORE the
-    // write-ahead log entry, because a replay from that log has to present the
-    // same key — that is the whole mechanism preventing a delivery from being
-    // recorded twice when the network drops mid-request.
-    final opId = d.opId ??
-        '${d.matchId.value}_${d.inningsNumber}_'
-            '${DateTime.now().microsecondsSinceEpoch}';
-
-    final params = <String, dynamic>{
-      'p_match_id': d.matchId.value,
-      'p_innings_number': d.inningsNumber,
-      'p_idempotency_key': opId,
-      // The delivery as entered.
-      'p_is_legal_delivery': d.isLegalDelivery,
-      'p_ball_type': d.ballKind.wire,
-      'p_runs_scored': d.runsScored,
-      'p_extras': d.extras,
-      'p_is_wicket': d.isWicket,
-      if (d.wicketType != null) 'p_wicket_type': d.wicketType!.wire,
-      if (d.dismissedPlayerId != null)
-        'p_dismissed_player_id': d.dismissedPlayerId,
-      if (d.batsmanId != null) 'p_batsman_id': d.batsmanId,
-      if (d.nonStrikerId != null) 'p_non_striker_id': d.nonStrikerId,
-      if (d.bowlerId != null) 'p_bowler_id': d.bowlerId,
-      if (d.fielderId != null) 'p_fielder_id': d.fielderId,
-      if (d.commentary != null) 'p_commentary': d.commentary,
-      // The delivery as the local engine computed it. The server stores these
-      // verbatim — it has no engine of its own (design doc D10).
-      'p_over_number': c.overNumber,
-      'p_ball_in_over': c.ballInOver,
-      'p_is_free_hit': c.isFreeHit,
-      'p_is_bowler_credited': c.isBowlerCredited,
-      'p_balls_per_over': c.ballsPerOver,
-      // The innings as it stands after this delivery. Aggregates are re-summed
-      // server-side from the ledger; these are the parts that are not sums.
-      'p_striker_after': c.strikerAfter,
-      'p_non_striker_after': c.nonStrikerAfter,
-      'p_bowler_after': c.bowlerAfter,
-      'p_is_all_out': c.isAllOut,
-      'p_innings_ended': c.inningsEnded,
-    };
-
-    LocalScoringOp? localOp;
-    final local = _local;
-    if (local != null) {
-      try {
-        localOp = await local.appendOp(
-          opId: opId,
-          matchId: d.matchId.value,
-          inningsNumber: d.inningsNumber,
-          kind: 'ball',
-          payload: params,
-        );
-      } catch (_) {
-        // Continue to network even if local WAL write fails
-      }
-    }
-
-    try {
-      final dto = await _remote.recordBall(params);
-      if (localOp != null && local != null) {
-        await local.markOpSynced(localOp.opId);
-      }
-      return Right(BallOutcome(
-        ball: dto.ball.toEntity(),
-        innings: dto.innings?.toEntity(),
-      ));
-    } on ConflictException catch (e) {
-      if (localOp != null && local != null) {
-        await local.discardOp(localOp.opId);
-      }
-      return Left(ConflictFailure(e.message));
-    } on UnauthorizedException catch (e) {
-      if (localOp != null && local != null) {
-        await local.discardOp(localOp.opId);
-      }
-      return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
-      if (localOp != null && local != null) {
-        await local.markOpFailed(localOp.opId, e.message);
-      }
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      if (localOp != null && local != null) {
-        await local.markOpFailed(localOp.opId, e.toString());
-      }
-      return Left(UnknownFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, UndoOutcome>> undoLastBall({
-    required MatchId matchId,
-    required int inningsNumber,
-    String? pendingOpId,
-  }) async {
-    // A delivery still sitting in the write-ahead log never reached the
-    // server, so undoing it is a purely local act — throw the queued write
-    // away and do not contact the server at all.
-    //
-    // Which op that is comes from the CALLER, not from the log. This used to
-    // take whatever was newest in the log, which is wrong whenever the log
-    // holds ops that correspond to nothing on screen: after a spell of failed
-    // writes it discarded one of those instead, so Undo appeared to do
-    // absolutely nothing while the delivery the scorer wanted gone stayed.
-    final local = _local;
-    if (local != null && pendingOpId != null) {
-      await local.discardOp(pendingOpId);
-      return Right(UndoOutcome.discardedPending(pendingOpId));
-    }
-    try {
-      final ok = await _remote.undoLastBall(
-        matchId: matchId.value,
-        inningsNumber: inningsNumber,
-      );
-      return Right(
-        ok ? const UndoOutcome.removedStored() : const UndoOutcome.nothing(),
-      );
-    } on UnauthorizedException catch (e) {
-      return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(UnknownFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<void> syncPendingOps({
-    required String matchId,
-    required int inningsNumber,
-  }) async {
-    final local = _local;
-    if (local == null) return;
-    final pending = await local.pendingOps(
-      matchId: matchId,
-      inningsNumber: inningsNumber,
-    );
-    for (final op in pending) {
-      if (op.kind == 'ball') {
-        // An op recorded before the idempotency key became mandatory can never
-        // be accepted — the server rejects it outright. Retrying it forever
-        // would also block everything queued behind it, since a failed send
-        // halts the drain. Discard rather than keep it.
-        if (op.payload['p_idempotency_key'] == null) {
-          await local.discardOp(op.opId);
-          continue;
-        }
-        try {
-          await _remote.recordBall(op.payload);
-          await local.markOpSynced(op.opId);
-        } on ConflictException {
-          // Version conflict with remote: halt drain
-          break;
-        } on UnauthorizedException {
-          await local.discardOp(op.opId);
-        } on ServerException catch (e) {
-          await local.markOpFailed(op.opId, e.message);
-          break;
-        } catch (e) {
-          await local.markOpFailed(op.opId, e.toString());
-          break;
-        }
-      }
-    }
-  }
-
-  @override
-  Future<int> pendingOpsCount({
-    required MatchId matchId,
-    required int inningsNumber,
-  }) =>
-      _local?.pendingOpsCount(
-        matchId: matchId.value,
-        inningsNumber: inningsNumber,
-      ) ??
-      Future.value(0);
 
   @override
   Future<Either<Failure, List<Ball>>> listBalls(
@@ -546,6 +404,60 @@ class MatchesRepositoryImpl implements MatchesRepository {
       );
       return Right(dtos.map((d) => d.toEntity()).toList());
     } on ServerException catch (e) {
+      final local = _local;
+      if (local != null) {
+        final pending = await local.pendingOps(
+          matchId: matchId.value,
+          inningsNumber: inningsNumber,
+        );
+        if (pending.isNotEmpty) {
+          final balls = <Ball>[];
+          for (final op in pending) {
+            if (op.kind == 'ball') {
+              final p = op.payload;
+              final rawRuns = p['runs_scored'] ?? p['p_runs_scored'];
+              final int runsScored = rawRuns is num ? rawRuns.toInt() : 0;
+              final rawExtras = p['extras'] ?? p['p_extras'];
+              final int extras = rawExtras is num ? rawExtras.toInt() : 0;
+              final isWicket = (p['is_wicket'] ?? p['p_is_wicket']) == true;
+              final rawWicket = (p['wicket_type'] ?? p['p_wicket_type']) as String?;
+              final wicketType = rawWicket != null
+                  ? WicketType.values.where((w) => w.wire == rawWicket).firstOrNull
+                  : null;
+              final isLegal = (p['is_legal_delivery'] ?? p['p_is_legal_delivery']) == true;
+              final rawKind = (p['ball_type'] ?? p['p_ball_type'] ?? 'legal') as String;
+              final ballKind = BallKind.values.where((k) => k.wire == rawKind).firstOrNull ?? BallKind.legal;
+              final rawOver = p['over_number'] ?? p['p_over_number'];
+              final int overNumber = rawOver is num ? rawOver.toInt() : 0;
+              final rawBallInOver = p['ball_in_over'] ?? p['p_ball_in_over'];
+              final int ballInOver = rawBallInOver is num ? rawBallInOver.toInt() : 0;
+
+              balls.add(Ball(
+                id: BallId('local:${op.opId}'),
+                matchId: matchId,
+                inningsNumber: inningsNumber,
+                seq: op.localSeq,
+                overNumber: overNumber,
+                ballInOver: ballInOver,
+                isLegalDelivery: isLegal,
+                ballKind: ballKind,
+                runsScored: runsScored,
+                extras: extras,
+                isWicket: isWicket,
+                isFreeHit: (p['is_free_hit'] ?? p['p_is_free_hit']) == true,
+                wicketType: wicketType,
+                dismissedPlayerId: (p['dismissed_player_id'] ?? p['p_dismissed_player_id']) as String?,
+                batsmanId: (p['batsman_id'] ?? p['p_batsman_id']) as String?,
+                nonStrikerId: (p['non_striker_id'] ?? p['p_non_striker_id']) as String?,
+                bowlerId: (p['bowler_id'] ?? p['p_bowler_id']) as String?,
+                fielderId: (p['fielder_id'] ?? p['p_fielder_id']) as String?,
+                commentary: (p['commentary'] ?? p['p_commentary']) as String?,
+              ));
+            }
+          }
+          return Right(balls);
+        }
+      }
       return Left(ServerFailure(e.message));
     } on Exception catch (e) {
       return Left(ServerFailure(e.toString()));

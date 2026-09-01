@@ -5,8 +5,17 @@ import 'tables.dart';
 part 'app_database.g.dart';
 
 @DriftDatabase(
-  tables: [WizardDrafts, Chats, Messages, MessageDrafts, ScoringOps,
-           ScoringSnapshots],
+  tables: [
+    WizardDrafts,
+    Chats,
+    Messages,
+    MessageDrafts,
+    ScoringOps,
+    ScoringSnapshots,
+    CachedMatches,
+    CachedMatchPlayers,
+    CachedInningsStates,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -32,8 +41,15 @@ class AppDatabase extends _$AppDatabase {
   ///   second exemption to online-only, and the first offline WRITE path —
   ///   a scorer with no signal keeps scoring and loses nothing. See
   ///   docs/offline-scoring-design.md.
+  /// - v8: match hydration cache (`cached_matches`, `cached_match_players`,
+  ///   `cached_innings_states`) for offline cold-start of the scoring screen.
+  /// - v9: `scoring_ops.refused_at` — a terminal state for ops the server
+  ///   ANSWERED and rejected, as opposed to ops it never received. Without it
+  ///   a refused delivery stays pending forever, blocking every op queued
+  ///   behind it and holding `pendingOpsCount` above zero (which disables
+  ///   undo). Refused rows are kept, never deleted — design doc §19.3.
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -112,6 +128,28 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(scoringSnapshots);
             await _createScoringIndexes(m);
           }
+          if (from < 8) {
+            await m.database
+                .customStatement('DROP TABLE IF EXISTS cached_matches');
+            await m.database
+                .customStatement('DROP TABLE IF EXISTS cached_match_players');
+            await m.database
+                .customStatement('DROP TABLE IF EXISTS cached_innings_states');
+            await m.createTable(cachedMatches);
+            await m.createTable(cachedMatchPlayers);
+            await m.createTable(cachedInningsStates);
+          }
+          if (from < 9) {
+            // Additive and nullable, so no data migration: every existing row
+            // reads as "not refused", which is the correct interpretation of
+            // a row written before the distinction existed.
+            await m.addColumn(scoringOps, scoringOps.refusedAt);
+            // The partial index in _createScoringIndexes now needs to exclude
+            // refused rows too, so rebuild it.
+            await m.database
+                .customStatement('DROP INDEX IF EXISTS scoring_ops_pending');
+            await _createScoringIndexes(m);
+          }
         },
       );
 
@@ -122,7 +160,7 @@ class AppDatabase extends _$AppDatabase {
     await m.database.customStatement(
       'CREATE INDEX IF NOT EXISTS scoring_ops_pending '
       'ON scoring_ops (match_id, innings_number, local_seq) '
-      'WHERE synced_at IS NULL',
+      'WHERE synced_at IS NULL AND refused_at IS NULL',
     );
   }
 
@@ -156,7 +194,10 @@ class AppDatabase extends _$AppDatabase {
   }) async {
     final rows = await (select(scoringOps)
           ..where((t) {
-            var w = t.syncedAt.isNull();
+            // Refused ops are excluded: they are still owed to nobody. The
+            // server answered and said no, so counting them as "unsent" would
+            // keep the screen claiming unsaved work that will never save.
+            var w = t.syncedAt.isNull() & t.refusedAt.isNull();
             if (matchId != null) w = w & t.matchId.equals(matchId);
             if (inningsNumber != null) {
               w = w & t.inningsNumber.equals(inningsNumber);
@@ -178,6 +219,9 @@ class AppDatabase extends _$AppDatabase {
       // pendingScoringOps — because this discards them irrecoverably.
       b.deleteAll(scoringOps);
       b.deleteAll(scoringSnapshots);
+      b.deleteAll(cachedMatches);
+      b.deleteAll(cachedMatchPlayers);
+      b.deleteAll(cachedInningsStates);
     });
   }
 }

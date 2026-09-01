@@ -29,6 +29,12 @@ class Match extends Equatable {
     this.startPhase = MatchStartPhase.toss,
     this.openersSubmittedBy,
     this.openersSubmittedAt,
+    this.tournamentId,
+    this.round,
+    this.bracketRoundNumber,
+    this.bracketMatchNumber,
+    this.prevMatchAId,
+    this.prevMatchBId,
   });
 
   final MatchId id;
@@ -56,6 +62,14 @@ class Match extends Equatable {
 
   /// Human-readable outcome once the match is completed (e.g. the final score).
   final String? resultDescription;
+
+  // Tournament metadata
+  final String? tournamentId;
+  final String? round;
+  final int? bracketRoundNumber;
+  final int? bracketMatchNumber;
+  final String? prevMatchAId;
+  final String? prevMatchBId;
 
   // ── Match-start state (mirrors deployed `matches` row) ─────────────────────
 

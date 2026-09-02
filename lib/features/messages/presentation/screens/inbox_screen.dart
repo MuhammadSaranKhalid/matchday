@@ -23,10 +23,16 @@ enum _InboxTab { all, teams, dms, requests }
 const bool _kShowInboxTabs = true;
 
 class InboxScreen extends ConsumerStatefulWidget {
-  const InboxScreen({super.key, this.onBell, this.showBack = false});
+  const InboxScreen({
+    super.key,
+    this.onBell,
+    this.showBack = false,
+    this.showHeader = true,
+  });
 
   final VoidCallback? onBell;
   final bool showBack;
+  final bool showHeader;
 
   @override
   ConsumerState<InboxScreen> createState() => _InboxScreenState();
@@ -84,6 +90,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               onTabChanged: (t) => setState(() => _tab = t),
               onBell: widget.onBell,
               showBack: widget.showBack,
+              showHeader: widget.showHeader,
               searchController: _searchController,
               searchQuery: _searchQuery,
               onSearchChanged: (q) => setState(() => _searchQuery = q),
@@ -101,6 +108,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               title: 'Messages',
               onBell: widget.onBell,
               showBack: widget.showBack,
+              showHeader: widget.showHeader,
               message: _messageFor(error),
               onRetry: () {
                 setState(() => _refreshing = true);
@@ -111,6 +119,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               title: 'Messages',
               onBell: widget.onBell,
               showBack: widget.showBack,
+              showHeader: widget.showHeader,
               tab: _tab,
               onTabChanged: (t) => setState(() => _tab = t),
             ),
@@ -139,6 +148,7 @@ class _Loaded extends StatelessWidget {
     required this.onRefresh,
     this.refreshing = false,
     this.showBack = false,
+    this.showHeader = true,
   });
 
   final List<Chat> chats;
@@ -151,6 +161,7 @@ class _Loaded extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final bool refreshing;
   final bool showBack;
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context) {
@@ -188,13 +199,14 @@ class _Loaded extends StatelessWidget {
 
     return Column(
       children: [
-        V2Header(
-          title: 'Messages',
-          onBell: onBell,
-          refreshing: refreshing,
-          showMessages: false,
-          showBack: showBack,
-        ),
+        if (showHeader)
+          V2Header(
+            title: 'Messages',
+            onBell: onBell,
+            refreshing: refreshing,
+            showMessages: false,
+            showBack: showBack,
+          ),
         InboxSearchBar(
           controller: searchController,
           onChanged: onSearchChanged,
@@ -592,6 +604,7 @@ class _Skeleton extends StatelessWidget {
     required this.tab,
     required this.onTabChanged,
     this.showBack = false,
+    this.showHeader = true,
   });
 
   final String title;
@@ -599,17 +612,19 @@ class _Skeleton extends StatelessWidget {
   final _InboxTab tab;
   final ValueChanged<_InboxTab> onTabChanged;
   final bool showBack;
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        V2Header(
-          title: title,
-          onBell: onBell,
-          showMessages: false,
-          showBack: showBack,
-        ),
+        if (showHeader)
+          V2Header(
+            title: title,
+            onBell: onBell,
+            showMessages: false,
+            showBack: showBack,
+          ),
         InboxSearchBar(
           controller: TextEditingController(),
           onChanged: (_) {},
@@ -787,6 +802,7 @@ class _ErrorView extends StatelessWidget {
     required this.message,
     required this.onRetry,
     this.showBack = false,
+    this.showHeader = true,
   });
 
   final String title;
@@ -794,18 +810,20 @@ class _ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
   final bool showBack;
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        V2Header(
-          title: title,
-          sub: 'something went wrong',
-          onBell: onBell,
-          showMessages: false,
-          showBack: showBack,
-        ),
+        if (showHeader)
+          V2Header(
+            title: title,
+            sub: 'something went wrong',
+            onBell: onBell,
+            showMessages: false,
+            showBack: showBack,
+          ),
         Expanded(
           child: Center(
             child: Padding(

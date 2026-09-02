@@ -32,14 +32,23 @@ class MatchPoolRepositoryImpl implements MatchPoolRepository {
   Future<Either<Failure, List<MatchRequest>>> getMyPoolBroadcasts({
     required Set<TeamId> myTeamIds,
   }) async {
+    final all = await getMyPoolChallenges(myTeamIds: myTeamIds);
+    return all.map(
+      (list) => list.where((r) => r.status == MatchRequestStatus.pending).toList(),
+    );
+  }
+
+  @override
+  Future<Either<Failure, List<MatchRequest>>> getMyPoolChallenges({
+    required Set<TeamId> myTeamIds,
+  }) async {
     try {
       final dtos = await _requests.listMyMatchChallenges();
       final myTeamIdStrings = myTeamIds.map((t) => t.value).toSet();
-      final myBroadcastDtos = dtos.where((d) =>
-          d.toTeamId == null &&
-          d.status == 'pending' &&
-          myTeamIdStrings.contains(d.fromTeamId));
-      return Right(myBroadcastDtos.map((d) => d.toEntity()).toList());
+      final mine = dtos.where(
+        (d) => d.toTeamId == null && myTeamIdStrings.contains(d.fromTeamId),
+      );
+      return Right(mine.map((d) => d.toEntity()).toList());
     } on Exception catch (e) {
       return Left(ServerFailure(e.toString()));
     }

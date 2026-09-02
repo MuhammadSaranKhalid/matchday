@@ -103,3 +103,12 @@ FollowTarget _targetFromWire(String targetTypeWire, String targetId) {
       return TournamentFollowTarget(targetId);
   }
 }
+
+/// Team ids the signed-in user follows — half of the Matches board's
+/// "For you" rule (the other half is tournaments you are in).
+@riverpod
+Future<Set<String>> followedTeamIds(Ref ref) async {
+  final result =
+      await ref.watch(followsRepositoryProvider).listFollowedTeamIds();
+  return result.fold((_) => <String>{}, (ids) => ids.toSet());
+}

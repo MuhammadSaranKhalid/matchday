@@ -52,6 +52,19 @@ class FollowsRepositoryImpl implements FollowsRepository {
   }
 
   @override
+  Future<Either<Failure, List<String>>> listFollowedTeamIds() async {
+    try {
+      return Right(await _remote.listFollowedTeamIds());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, bool>> isFollowing(FollowTarget target) async {
     try {
       final result = await _remote.isFollowing(target);

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Hosts the four branch [Navigator]s of the app shell inside a [PageView] so
+/// Hosts the five branch [Navigator]s of the app shell inside a [PageView] so
 /// the tabs can be swiped through with a smooth, finger-tracking transition
-/// (Home ⇄ Explore ⇄ Matches ⇄ Pool).
+/// (Home ⇄ Matches ⇄ Pool ⇄ Messages ⇄ Menu).
 ///
 /// Wired as the `navigatorContainerBuilder` of the [StatefulShellRoute] in
 /// `app_router.dart`, replacing the default `IndexedStack` container. The

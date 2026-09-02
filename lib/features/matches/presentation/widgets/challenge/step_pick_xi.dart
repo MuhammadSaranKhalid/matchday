@@ -1,492 +1,313 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
-import '../../../../../core/util/initials.dart';
-import '../../../../../core/widgets/v2/v2_kit.dart';
-import 'ch_icons.dart';
-import 'ch_role_pill.dart';
-import 'ch_section_label.dart';
+import '../../../../teams/domain/entities/roster_member.dart';
+import '../../../../teams/domain/entities/team_member.dart';
+import '../pool/pool_icons.dart';
 
-/// One row in the Pick XI roster list. Lightweight view shape so the
-/// widget stays independent of the domain's `RosterMember` (callers map
-/// their roster to this at the boundary).
-class XiCandidate {
-  const XiCandidate({
-    required this.id,
-    required this.name,
-    required this.role,
-    this.photoUrl,
-    this.subStyle,
-    this.captain = false,
-    this.guest = false,
-    this.unclaimed = false,
-  });
-
-  /// Stable id used for XI / keeper lookups (typically `playerId`).
-  final String id;
-  final String name;
-  final ChPlayingRole role;
-
-  /// Avatar URL, or null to fall back to the player's monogram. Unclaimed
-  /// placeholders never have one.
-  final String? photoUrl;
-
-  /// Optional second line, e.g. "RHB · RM".
-  final String? subStyle;
-
-  /// Renders the "C" badge when true.
-  final bool captain;
-
-  /// Renders the amber "GUEST" tag (borrowed from another team).
-  final bool guest;
-
-  /// Renders the muted "NEW" tag (unclaimed placeholder).
-  final bool unclaimed;
-}
-
-/// "Pick for this match" — the Pick-XI step.
+/// Pick your XI — `Pool.dc.html` artboard 09.
 ///
-/// Reproduces `StepXI` from `challenge-send.jsx` lines 463–534:
-/// counter strip + AUTO/CLEAR mini buttons + progress bar; horizontal
-/// keeper picker chip strip (currently-picked players only, glove glyph);
-/// roster list with checkbox + Avatar + name + role pill + captain / WK /
-/// guest / new badges.
+/// Ruled rows rather than cards: this is a list to run down, not a set of
+/// things to consider individually. Selected players lift to the top under
+/// "Selected · N", everyone else falls to the bench, so the shape of the list
+/// tells you how far along you are without reading the count.
 ///
-/// State is owned by the caller (callbacks below). The widget itself only
-/// renders + dims rows that would over-select the XI.
+/// C and WK are set from the row itself. A player must be in the XI to wear
+/// either, which is why the toggles only appear on selected rows.
 class StepPickXi extends StatelessWidget {
   const StepPickXi({
     super.key,
     required this.roster,
-    required this.playersNeeded,
-    required this.xi,
+    required this.selected,
+    required this.captainId,
     required this.keeperId,
     required this.onToggle,
+    required this.onCaptain,
     required this.onKeeper,
-    required this.onAutoFill,
-    required this.onClear,
   });
 
-  /// Full effective roster (active members + any guests/unclaimed extras).
-  final List<XiCandidate> roster;
+  final List<RosterMember> roster;
 
-  /// XI target — usually the format's `playersPerTeam`.
-  final int playersNeeded;
-
-  /// Currently-picked player ids.
-  final Set<String> xi;
-
-  /// Currently-picked keeper id (must be in [xi]).
+  /// Player ids in selection order.
+  final List<String> selected;
+  final String? captainId;
   final String? keeperId;
-
-  /// Toggles [playerId] in/out of the XI. The widget refuses taps that
-  /// would push the count past [playersNeeded] (the row is dimmed).
   final ValueChanged<String> onToggle;
-
-  /// Sets the keeper. Pass null to clear (e.g. when a chip is tapped while
-  /// already active).
-  final ValueChanged<String?> onKeeper;
-
-  /// Fired by the AUTO button. Caller decides the policy (first N + first
-  /// WK as keeper, per the JSX default).
-  final VoidCallback onAutoFill;
-
-  /// Fired by the CLEAR button.
-  final VoidCallback onClear;
+  final ValueChanged<String> onCaptain;
+  final ValueChanged<String> onKeeper;
 
   @override
   Widget build(BuildContext context) {
-    final picked = roster.where((p) => xi.contains(p.id)).toList();
-    final full = xi.length >= playersNeeded;
-    return Column(
-      children: [
-        _CounterStrip(
-          count: xi.length,
-          total: playersNeeded,
-          onAuto: onAutoFill,
-          onClear: onClear,
-        ),
-        Expanded(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
-                child: ChSectionLabel(
-                  'Wicket-keeper',
-                  hint: keeperId == null ? 'Required' : '',
-                ),
-              ),
-              if (picked.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(18, 0, 18, 6),
-                  child: Text(
-                    'Pick players first, then choose your keeper.',
-                    style: TextStyle(fontSize: 12, color: CkColors.muted),
-                  ),
-                )
-              else
-                SizedBox(
-                  height: 38,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
-                    itemCount: picked.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 6),
-                    itemBuilder: (_, i) {
-                      final p = picked[i];
-                      final on = keeperId == p.id;
-                      return _KeeperChip(
-                        firstName: p.name.split(' ').first,
-                        selected: on,
-                        onTap: () => onKeeper(on ? null : p.id),
-                      );
-                    },
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 8, 18, 6),
-                child: Text(
-                  'SQUAD · ${roster.length}',
-                  style: CkType.mono(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.10,
-                    color: CkColors.muted,
-                  ),
-                ),
-              ),
-              for (var i = 0; i < roster.length; i++)
-                _PlayerRow(
-                  index: i,
-                  player: roster[i],
-                  selected: xi.contains(roster[i].id),
-                  isKeeper: keeperId == roster[i].id,
-                  disabled: !xi.contains(roster[i].id) && full,
-                  onTap: () => onToggle(roster[i].id),
-                ),
-              const SizedBox(height: 16),
-            ],
+    if (roster.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            'This team has no players on its roster yet.',
+            textAlign: TextAlign.center,
+            style: CkType.body(fontSize: 13, color: CkColors.muted),
           ),
         ),
+      );
+    }
+
+    final byId = {for (final m in roster) m.member.playerId: m};
+    final picked = [
+      for (final id in selected)
+        if (byId[id] case final m?) m,
+    ];
+    final bench =
+        roster.where((m) => !selected.contains(m.member.playerId)).toList();
+
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 8),
+      children: [
+        _Label('Selected · ${picked.length}', top: 14),
+        for (final m in picked)
+          _PlayerRow(
+            member: m,
+            selected: true,
+            isCaptain: m.member.playerId == captainId,
+            isKeeper: m.member.playerId == keeperId,
+            onToggle: () => onToggle(m.member.playerId),
+            onCaptain: () => onCaptain(m.member.playerId),
+            onKeeper: () => onKeeper(m.member.playerId),
+          ),
+        if (bench.isNotEmpty) ...[
+          const _Label('Bench · not playing', top: 16),
+          for (final m in bench)
+            _PlayerRow(
+              member: m,
+              selected: false,
+              isCaptain: false,
+              isKeeper: false,
+              onToggle: () => onToggle(m.member.playerId),
+              onCaptain: () {},
+              onKeeper: () {},
+            ),
+        ],
       ],
     );
   }
 }
 
-class _CounterStrip extends StatelessWidget {
-  const _CounterStrip({
-    required this.count,
-    required this.total,
-    required this.onAuto,
-    required this.onClear,
-  });
+class _Label extends StatelessWidget {
+  const _Label(this.text, {required this.top});
 
-  final int count;
-  final int total;
-  final VoidCallback onAuto;
-  final VoidCallback onClear;
+  final String text;
+  final double top;
 
   @override
-  Widget build(BuildContext context) {
-    final full = count >= total;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      decoration: const BoxDecoration(
-        color: CkColors.paper,
-        border: Border(bottom: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            'XI · $count/$total',
-            style: CkType.mono(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.10,
-              color: full ? CkColors.green : CkColors.ink2,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: SizedBox(
-                height: 4,
-                child: Stack(
-                  children: [
-                    Container(color: CkColors.paper2),
-                    FractionallySizedBox(
-                      widthFactor: total == 0
-                          ? 0
-                          : (count / total).clamp(0.0, 1.0),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        color: full ? CkColors.green : CkColors.ink,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          _MiniButton(label: 'AUTO', onTap: onAuto),
-          const SizedBox(width: 6),
-          _MiniButton(label: 'CLEAR', onTap: onClear),
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniButton extends StatelessWidget {
-  const _MiniButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: CkColors.hairline),
-        ),
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.fromLTRB(16, top, 16, 4),
         child: Text(
-          label,
+          text.toUpperCase(),
           style: CkType.mono(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
             letterSpacing: 0.10,
-            color: CkColors.ink2,
+            color: CkColors.muted,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _KeeperChip extends StatelessWidget {
-  const _KeeperChip({
-    required this.firstName,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String firstName;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = selected ? CkColors.red : CkColors.paper;
-    final fg = selected ? CkColors.paper : CkColors.ink2;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected ? CkColors.red : CkColors.hairline,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            V2Svg(
-              ChIcons.glove,
-              size: 13,
-              color: selected ? CkColors.paper : CkColors.muted,
-              strokeWidth: 1.8,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              firstName,
-              style: CkType.body(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: fg,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+      );
 }
 
 class _PlayerRow extends StatelessWidget {
   const _PlayerRow({
-    required this.index,
-    required this.player,
+    required this.member,
     required this.selected,
+    required this.isCaptain,
     required this.isKeeper,
-    required this.disabled,
-    required this.onTap,
+    required this.onToggle,
+    required this.onCaptain,
+    required this.onKeeper,
   });
 
-  final int index;
-  final XiCandidate player;
+  final RosterMember member;
   final bool selected;
+  final bool isCaptain;
   final bool isKeeper;
-  final bool disabled;
-  final VoidCallback onTap;
+  final VoidCallback onToggle;
+  final VoidCallback onCaptain;
+  final VoidCallback onKeeper;
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: disabled ? 0.45 : 1.0,
-      child: GestureDetector(
-        onTap: disabled ? null : onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? CkColors.paper : Colors.transparent,
-            border: Border(
-              top: index == 0
-                  ? BorderSide.none
-                  : const BorderSide(color: CkColors.hairline),
+    final row = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: CkColors.hairline)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              shape: BoxShape.circle,
+              border: Border.all(color: CkColors.hairline),
+            ),
+            child: Text(
+              _initials(member.displayName),
+              style: CkType.display(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? CkColors.ink2 : CkColors.muted,
+                letterSpacing: 0,
+              ),
             ),
           ),
-          child: Row(
-            children: [
-              _Checkbox(on: selected),
-              const SizedBox(width: 12),
-              Avatar(
-                mono: personInitials(player.name),
-                imageUrl: player.photoUrl,
-                size: 34,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 6,
-                      runSpacing: 2,
-                      children: [
-                        Text(
-                          player.name,
-                          style: CkType.display(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -0.02,
-                          ),
-                        ),
-                        ChRolePill(role: player.role),
-                        if (player.guest) _MiniBadge.guest(),
-                        if (player.unclaimed) _MiniBadge.unclaimed(),
-                        if (player.captain) _MiniBadge.captain(),
-                        if (isKeeper) _MiniBadge.keeper(),
-                      ],
-                    ),
-                    if (player.subStyle != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          player.subStyle!,
-                          style: CkType.mono(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.10,
-                            color: CkColors.muted,
-                          ),
-                        ),
-                      ),
-                  ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  member.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CkType.display(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    color: selected ? CkColors.ink : CkColors.ink2,
+                    letterSpacing: -0.01,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _role(member).toUpperCase(),
+                  style: CkType.mono(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.05,
+                    color: CkColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          if (selected) ...[
+            _Marks(
+              isCaptain: isCaptain,
+              isKeeper: isKeeper,
+              onCaptain: onCaptain,
+              onKeeper: onKeeper,
+            ),
+            const SizedBox(width: 10),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onToggle,
+              child: const PoolIcon(PoolIcons.checkFilled, size: 22),
+            ),
+          ] else
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onToggle,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: CkColors.soft, width: 1.6),
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
-  }
-}
 
-class _Checkbox extends StatelessWidget {
-  const _Checkbox({required this.on});
-  final bool on;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 24,
-      height: 24,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: on ? CkColors.ink : CkColors.paper,
-        borderRadius: BorderRadius.circular(7),
-        border: on
-            ? null
-            : Border.all(color: CkColors.soft, width: 1.5),
-      ),
-      child: on
-          ? const V2Svg(
-              ChIcons.check,
-              size: 13,
-              color: CkColors.paper,
-              strokeWidth: 3,
-            )
-          : null,
+    // The whole row is the hit target — these are ruled list rows to run
+    // down, not cards with a control in the corner. The armband toggle sits
+    // on top and swallows its own taps.
+    final tappable = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onToggle,
+      child: row,
     );
+    return selected ? tappable : Opacity(opacity: 0.7, child: tappable);
   }
+
+  static String _initials(String name) {
+    final words =
+        name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    if (words.isEmpty) return '—';
+    if (words.length == 1) {
+      final one = words.first;
+      return (one.length >= 2 ? one.substring(0, 2) : one).toUpperCase();
+    }
+    return '${words[0][0]}${words[1][0]}'.toUpperCase();
+  }
+
+  static String _role(RosterMember m) => switch (m.member.role) {
+        MemberRole.captain => 'Captain',
+        MemberRole.viceCaptain => 'Vice-captain',
+        MemberRole.wicketKeeper => 'Wicket-keeper',
+        MemberRole.player => 'Player',
+      };
 }
 
-class _MiniBadge extends StatelessWidget {
-  const _MiniBadge._({
-    required this.text,
-    required this.bg,
-    required this.fg,
-    this.border,
+/// Either the badge the player wears, or the "C · WK" affordance to give them
+/// one. Tapping cycles C → WK → neither, which keeps both marks reachable
+/// from a single hit target on a crowded row.
+class _Marks extends StatelessWidget {
+  const _Marks({
+    required this.isCaptain,
+    required this.isKeeper,
+    required this.onCaptain,
+    required this.onKeeper,
   });
 
-  factory _MiniBadge.captain() =>
-      const _MiniBadge._(text: 'C', bg: CkColors.ink, fg: CkColors.paper);
-
-  factory _MiniBadge.keeper() =>
-      const _MiniBadge._(text: 'WK', bg: CkColors.red, fg: CkColors.paper);
-
-  factory _MiniBadge.guest() =>
-      const _MiniBadge._(text: 'GUEST', bg: CkColors.cream, fg: CkInk.amber);
-
-  factory _MiniBadge.unclaimed() => const _MiniBadge._(
-        text: 'NEW',
-        bg: CkColors.paper2,
-        fg: CkColors.muted,
-        border: CkColors.hairline,
-      );
-
-  final String text;
-  final Color bg;
-  final Color fg;
-  final Color? border;
+  final bool isCaptain;
+  final bool isKeeper;
+  final VoidCallback onCaptain;
+  final VoidCallback onKeeper;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(3),
-        border: border != null ? Border.all(color: border!) : null,
-      ),
-      child: Text(
-        text,
-        style: CkType.mono(
-          fontSize: 8,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.08,
-          color: fg,
+    if (isCaptain || isKeeper) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: isCaptain ? onKeeper : onCaptain,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+          decoration: BoxDecoration(
+            color: CkColors.ink,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            isCaptain ? 'C' : 'WK',
+            style: CkType.mono(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.04,
+              color: CkColors.paper,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onCaptain,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: CkColors.line),
+        ),
+        child: Text(
+          'C · WK',
+          style: CkType.mono(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.04,
+            color: CkColors.muted,
+          ),
         ),
       ),
     );

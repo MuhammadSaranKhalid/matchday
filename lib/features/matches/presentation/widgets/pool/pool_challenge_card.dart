@@ -66,7 +66,7 @@ class PoolChallengeCard extends StatelessWidget {
               _metaRow(
                 PoolIcons.clock,
                 Text(
-                  _startLabel(start),
+                  poolStartLabel(start),
                   style: CkType.display(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
@@ -210,7 +210,10 @@ Color teamCrestColor(Team? team) {
 }
 
 /// "Today · 4:30 PM", "Tomorrow · 9:00 AM", else "Sat, Sep 6 · 9:00 AM".
-String _startLabel(DateTime dt) {
+///
+/// Shared with the host's own surfaces so a challenge reads identically on
+/// the public board and on the list of the challenges you posted.
+String poolStartLabel(DateTime dt) {
   final now = DateTime.now();
   final day = DateTime(dt.year, dt.month, dt.day);
   final today = DateTime(now.year, now.month, now.day);

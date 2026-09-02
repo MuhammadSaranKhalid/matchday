@@ -455,3 +455,50 @@ final class FollowCountsFamily extends $Family
   @override
   String toString() => r'followCountsProvider';
 }
+
+/// Team ids the signed-in user follows — half of the Matches board's
+/// "For you" rule (the other half is tournaments you are in).
+
+@ProviderFor(followedTeamIds)
+final followedTeamIdsProvider = FollowedTeamIdsProvider._();
+
+/// Team ids the signed-in user follows — half of the Matches board's
+/// "For you" rule (the other half is tournaments you are in).
+
+final class FollowedTeamIdsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Set<String>>,
+          Set<String>,
+          FutureOr<Set<String>>
+        >
+    with $FutureModifier<Set<String>>, $FutureProvider<Set<String>> {
+  /// Team ids the signed-in user follows — half of the Matches board's
+  /// "For you" rule (the other half is tournaments you are in).
+  FollowedTeamIdsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'followedTeamIdsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$followedTeamIdsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<Set<String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<Set<String>> create(Ref ref) {
+    return followedTeamIds(ref);
+  }
+}
+
+String _$followedTeamIdsHash() => r'e4c85e3df87878ce224fa6c1ab58398fa55bf352';

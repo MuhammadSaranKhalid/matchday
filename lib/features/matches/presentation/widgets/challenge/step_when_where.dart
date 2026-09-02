@@ -1,262 +1,179 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
-import '../../../../../core/widgets/v2/v2_kit.dart';
-import 'ch_chip.dart';
-import 'ch_icons.dart';
-import 'ch_section_label.dart';
+import '../pool/pool_icons.dart';
+import '../wizard/wizard_kit.dart';
 
-/// A previously-used venue surfaced as a quick-pick row on Step 4.
-class RecentVenue {
-  const RecentVenue({
-    required this.id,
-    required this.name,
-    required this.sub,
-  });
-
-  final String id;
-  final String name;
-
-  /// Free-form line like "5 km · 2 pitches · last Mar 14".
-  final String sub;
-}
-
-/// "When & where" — date + time + venue picker.
+/// When & where — `Pool.dc.html` artboard 08.
 ///
-/// Reproduces `StepWhen` from `challenge-send.jsx` lines 354–458:
-/// horizontal day strip (today + 7 + Pick) → time chips grouped by
-/// Morning / Afternoon / Evening → recent-venue cards + free-text input
-/// + a decorative map-preview tile once a venue is resolved.
-///
-/// State is owned by the caller; this widget is a controlled component.
+/// Two of the three answers here may be absent, and the design says so out
+/// loud: the venue is explicitly optional, and Flexible drops the start time
+/// so the card reads "Flexible" rather than committing to an hour nobody
+/// agreed. That is why the board's card renders its meta block conditionally.
 class StepWhenWhere extends StatelessWidget {
   const StepWhenWhere({
     super.key,
-    required this.selectedDay,
-    required this.selectedTime,
-    required this.venue,
-    required this.onDayPicked,
-    required this.onTimePicked,
-    required this.onVenueChanged,
-    this.recentVenues = const [],
-    this.times = _defaultTimes,
+    required this.day,
+    required this.time,
+    required this.flexible,
+    required this.venueController,
+    required this.onDay,
+    required this.onTime,
+    required this.onFlexible,
   });
 
-  /// The day the user picked. Date-only — time-of-day is irrelevant here.
-  final DateTime? selectedDay;
+  /// The chosen calendar day, time-of-day stripped.
+  final DateTime? day;
 
-  /// "HH:mm" 24h, e.g. "17:30".
-  final String? selectedTime;
-
-  /// Currently-typed or picked venue name.
-  final String venue;
-
-  final ValueChanged<DateTime> onDayPicked;
-  final ValueChanged<String> onTimePicked;
-  final ValueChanged<String> onVenueChanged;
-
-  /// Quick-pick venue rows. Empty by default — caller wires this up to a
-  /// server query when one exists.
-  final List<RecentVenue> recentVenues;
-
-  /// Time slots to show. Defaults to the design's 17-slot catalogue from
-  /// `challenge-data.jsx`. Override to pin a different set.
-  final List<String> times;
-
-  /// The design's sparse 30-min catalogue: 08:00–10:00 + 14:00–16:30 +
-  /// 17:00–19:30. Source: `challenge-data.jsx` line 49.
-  static const _defaultTimes = [
-    '08:00', '08:30', '09:00', '09:30', '10:00',
-    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
-    '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
-  ];
-
-  static const _dow = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-  static const _mon = [
-    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
-  ];
+  /// Minutes since midnight. Null until picked.
+  final int? time;
+  final bool flexible;
+  final TextEditingController venueController;
+  final ValueChanged<DateTime> onDay;
+  final ValueChanged<int> onTime;
+  final ValueChanged<bool> onFlexible;
 
   @override
   Widget build(BuildContext context) {
-    final today = DateUtils.dateOnly(DateTime.now());
-    final days = List.generate(8, (i) => today.add(Duration(days: i)));
-    final selectedIsCustom = selectedDay != null &&
-        !days.any((d) => _sameDay(d, selectedDay!));
-
-    final periods = <_Period>[
-      _Period('Morning',
-          times.where((t) => int.parse(t.split(':')[0]) < 12).toList()),
-      _Period(
-        'Afternoon',
-        times.where((t) {
-          final h = int.parse(t.split(':')[0]);
-          return h >= 12 && h < 17;
-        }).toList(),
-      ),
-      _Period('Evening',
-          times.where((t) => int.parse(t.split(':')[0]) >= 17).toList()),
-    ].where((p) => p.items.isNotEmpty).toList();
+    final today = DateTime.now();
+    final t0 = DateTime(today.year, today.month, today.day);
+    final t1 = t0.add(const Duration(days: 1));
+    final isToday = day != null && _sameDay(day!, t0);
+    final isTomorrow = day != null && _sameDay(day!, t1);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 18),
-          child: ChSectionLabel('Date', hint: 'Tap a day'),
+        const WizardHeading('When & where'),
+        const SizedBox(height: 20),
+        const WizardFieldLabel('Day'),
+        const SizedBox(height: 11),
+        Row(
+          children: [
+            _DayChip(
+              label: 'Today',
+              selected: isToday,
+              onTap: () => onDay(t0),
+            ),
+            const SizedBox(width: 8),
+            _DayChip(
+              label: 'Tomorrow',
+              selected: isTomorrow,
+              onTap: () => onDay(t1),
+            ),
+            const SizedBox(width: 8),
+            _DayChip(
+              label: day != null && !isToday && !isTomorrow
+                  ? _shortDate(day!)
+                  : 'Pick',
+              selected: day != null && !isToday && !isTomorrow,
+              icon: PoolIcons.calendar,
+              onTap: () => _pickDay(context, t0),
+            ),
+          ],
         ),
-        SizedBox(
-          height: 84,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
-            itemCount: days.length + 1,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (_, i) {
-              if (i == days.length) {
-                return _PickDayTile(
-                  selected: selectedIsCustom,
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDay ?? today,
-                      firstDate: today,
-                      lastDate: today.add(const Duration(days: 365)),
-                    );
-                    if (picked != null) onDayPicked(picked);
-                  },
-                );
-              }
-              return _DayPill(
-                day: days[i],
-                isToday: i == 0,
-                selected: selectedDay != null && _sameDay(days[i], selectedDay!),
-                onTap: () => onDayPicked(days[i]),
-              );
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const ChSectionLabel('Start time', hint: '30-min slots'),
-              for (final period in periods) ...[
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 7),
-                  child: Text(
-                    period.label.toUpperCase(),
-                    style: CkType.mono(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.10,
-                      color: CkColors.muted,
-                    ),
-                  ),
-                ),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final t in period.items)
-                      ChChip(
-                        label: t,
-                        active: selectedTime == t,
-                        onTap: () => onTimePicked(t),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-              ],
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 6, 18, 0),
-          child: _VenueSection(
-            venue: venue,
-            recentVenues: recentVenues,
-            onVenueChanged: onVenueChanged,
-          ),
+        const SizedBox(height: 22),
+        WizardFieldLabel(
+          'Start time',
+          trailing: _FlexibleToggle(value: flexible, onChanged: onFlexible),
         ),
         const SizedBox(height: 12),
+        _TimeField(
+          minutes: time,
+          disabled: flexible,
+          onTap: () => _pickTime(context),
+        ),
+        const SizedBox(height: 22),
+        const WizardFieldLabel('Venue', optional: true),
+        const SizedBox(height: 11),
+        _VenueField(controller: venueController),
+        const SizedBox(height: 9),
+        Text(
+          "Leave blank if you'll agree the ground with your opponent later.",
+          style: CkType.body(fontSize: 11.5, height: 1.4, color: CkColors.muted),
+        ),
       ],
     );
   }
 
-  static bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
+  Future<void> _pickDay(BuildContext context, DateTime today) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: day ?? today,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 120)),
+    );
+    if (picked != null) onDay(DateTime(picked.year, picked.month, picked.day));
+  }
 
-  // Expose to inner widgets via a static helper.
-  static String dowOf(DateTime d, {required bool isToday}) =>
-      isToday ? 'TODAY' : _dow[d.weekday - 1];
-  static String monOf(DateTime d) => _mon[d.month - 1];
+  Future<void> _pickTime(BuildContext context) async {
+    if (flexible) return;
+    final initial = time == null
+        ? const TimeOfDay(hour: 16, minute: 30)
+        : TimeOfDay(hour: time! ~/ 60, minute: time! % 60);
+    final picked = await showTimePicker(context: context, initialTime: initial);
+    if (picked != null) onTime(picked.hour * 60 + picked.minute);
+  }
 }
 
-class _Period {
-  const _Period(this.label, this.items);
-  final String label;
-  final List<String> items;
+bool _sameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+String _shortDate(DateTime d) {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${months[d.month - 1]} ${d.day}';
 }
 
-class _DayPill extends StatelessWidget {
-  const _DayPill({
-    required this.day,
-    required this.isToday,
+/// "4:30 PM" from minutes since midnight.
+String clockLabel(int minutes) {
+  final h24 = minutes ~/ 60;
+  final h = h24 % 12 == 0 ? 12 : h24 % 12;
+  final m = (minutes % 60).toString().padLeft(2, '0');
+  return '$h:$m ${h24 >= 12 ? 'PM' : 'AM'}';
+}
+
+class _DayChip extends StatelessWidget {
+  const _DayChip({
+    required this.label,
     required this.selected,
     required this.onTap,
+    this.icon,
   });
 
-  final DateTime day;
-  final bool isToday;
+  final String label;
   final bool selected;
   final VoidCallback onTap;
+  final String? icon;
 
   @override
   Widget build(BuildContext context) {
-    final fg = selected ? CkColors.paper : CkColors.ink;
-    final bg = selected ? CkColors.ink : CkColors.paper;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        width: 60,
-        padding: const EdgeInsets.symmetric(vertical: 11),
+        padding: EdgeInsets.symmetric(horizontal: icon == null ? 16 : 14, vertical: 10),
         decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? CkColors.ink : CkColors.hairline,
-          ),
+          color: selected ? CkColors.ink : CkColors.paper,
+          borderRadius: BorderRadius.circular(12),
+          border: selected ? null : Border.all(color: CkColors.line),
         ),
-        child: Column(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (icon != null && !selected) ...[
+              PoolIcon(icon!, size: 15),
+              const SizedBox(width: 7),
+            ],
             Text(
-              StepWhenWhere.dowOf(day, isToday: isToday),
-              style: CkType.mono(
-                fontSize: 8,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.10,
-                color: fg.withValues(alpha: selected ? 0.85 : 0.55),
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '${day.day}',
+              label,
               style: CkType.display(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.03,
-                color: fg,
-              ),
-            ),
-            Text(
-              StepWhenWhere.monOf(day),
-              style: CkType.body(
-                fontSize: 8.5,
-                color: fg.withValues(alpha: 0.6),
-                letterSpacing: 0.04,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? CkColors.paper : CkColors.ink2,
+                letterSpacing: 0,
               ),
             ),
           ],
@@ -266,48 +183,105 @@ class _DayPill extends StatelessWidget {
   }
 }
 
-class _PickDayTile extends StatelessWidget {
-  const _PickDayTile({required this.selected, required this.onTap});
-  final bool selected;
+class _FlexibleToggle extends StatelessWidget {
+  const _FlexibleToggle({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChanged(!value),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'FLEXIBLE',
+            style: CkType.mono(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.05,
+              color: value ? CkColors.ink : CkColors.muted,
+            ),
+          ),
+          const SizedBox(width: 9),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            width: 38,
+            height: 22,
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: value ? CkColors.ink : CkColors.line,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Align(
+              alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: const BoxDecoration(
+                  color: CkColors.paper,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimeField extends StatelessWidget {
+  const _TimeField({
+    required this.minutes,
+    required this.disabled,
+    required this.onTap,
+  });
+
+  final int? minutes;
+  final bool disabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final fg = selected ? CkColors.paper : CkColors.muted;
     return GestureDetector(
-      onTap: onTap,
-      child: CustomPaint(
-        // JSX: `1px dashed` border (`var(--line)` when off, `ink` when on).
-        // Flutter's BoxDecoration only paints solid borders, so the dashed
-        // outline is hand-painted here.
-        painter: _DashedBorderPainter(
-          color: selected ? CkColors.ink : CkColors.line,
-          radius: 14,
-          dashWidth: 4,
-          dashGap: 3,
-          strokeWidth: 1,
-        ),
+      behavior: HitTestBehavior.opaque,
+      onTap: disabled ? null : onTap,
+      child: Opacity(
+        opacity: disabled ? 0.45 : 1,
         child: Container(
-          width: 60,
-          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           decoration: BoxDecoration(
-            color: selected ? CkColors.ink : CkColors.paper,
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: CkColors.line),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              V2Svg(ChIcons.cal, size: 16, color: fg, strokeWidth: 1.8),
-              const SizedBox(height: 5),
               Text(
-                'Pick',
-                style: CkType.body(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  color: fg,
+                disabled
+                    ? 'Flexible'
+                    : (minutes == null ? 'Pick a time' : clockLabel(minutes!)),
+                // A placeholder set at the value's own size and weight reads
+                // as a value. Empty steps down to body scale so the field
+                // looks unanswered rather than answered with words.
+                style: CkType.display(
+                  fontSize: minutes == null && !disabled ? 15 : 20,
+                  fontWeight: minutes == null && !disabled
+                      ? FontWeight.w500
+                      : FontWeight.w700,
+                  color: minutes == null && !disabled
+                      ? CkColors.soft
+                      : CkColors.ink,
+                  letterSpacing: -0.01,
+                ).copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
+              const PoolIcon(PoolIcons.clockMuted, size: 16),
             ],
           ),
         ),
@@ -316,364 +290,43 @@ class _PickDayTile extends StatelessWidget {
   }
 }
 
-/// Paints a dashed rounded-rectangle stroke around a child. Used by the
-/// "Pick" day tile and the open-challenge crest placeholder on Review.
-class _DashedBorderPainter extends CustomPainter {
-  const _DashedBorderPainter({
-    required this.color,
-    required this.radius,
-    required this.dashWidth,
-    required this.dashGap,
-    required this.strokeWidth,
-  });
+class _VenueField extends StatelessWidget {
+  const _VenueField({required this.controller});
 
-  final Color color;
-  final double radius;
-  final double dashWidth;
-  final double dashGap;
-  final double strokeWidth;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..color = color
-      ..strokeWidth = strokeWidth;
-    final rrect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        strokeWidth / 2,
-        strokeWidth / 2,
-        size.width - strokeWidth,
-        size.height - strokeWidth,
-      ),
-      Radius.circular(radius),
-    );
-    final path = Path()..addRRect(rrect);
-    final metrics = path.computeMetrics();
-    for (final metric in metrics) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final next = (distance + dashWidth).clamp(0.0, metric.length);
-        canvas.drawPath(metric.extractPath(distance, next), paint);
-        distance = next + dashGap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedBorderPainter old) =>
-      old.color != color ||
-      old.radius != radius ||
-      old.dashWidth != dashWidth ||
-      old.dashGap != dashGap ||
-      old.strokeWidth != strokeWidth;
-}
-
-class _VenueSection extends StatefulWidget {
-  const _VenueSection({
-    required this.venue,
-    required this.recentVenues,
-    required this.onVenueChanged,
-  });
-
-  final String venue;
-  final List<RecentVenue> recentVenues;
-  final ValueChanged<String> onVenueChanged;
-
-  @override
-  State<_VenueSection> createState() => _VenueSectionState();
-}
-
-class _VenueSectionState extends State<_VenueSection> {
-  late final TextEditingController _ctrl =
-      TextEditingController(text: widget.venue);
-
-  @override
-  void didUpdateWidget(covariant _VenueSection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Sync external changes (e.g. tapping a recent-venue card) into the field.
-    if (widget.venue != _ctrl.text) {
-      _ctrl.value = TextEditingValue(
-        text: widget.venue,
-        selection: TextSelection.collapsed(offset: widget.venue.length),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
+  final TextEditingController controller;
 
   @override
   Widget build(BuildContext context) {
-    final resolved = widget.venue.trim().isNotEmpty;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const ChSectionLabel('Venue', hint: 'Recent'),
-        if (widget.recentVenues.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Column(
-              children: [
-                for (final v in widget.recentVenues) ...[
-                  _VenueRow(
-                    venue: v,
-                    selected: widget.venue == v.name,
-                    onTap: () => widget.onVenueChanged(v.name),
-                  ),
-                  const SizedBox(height: 6),
-                ],
-              ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 15),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: CkColors.line),
+      ),
+      child: Row(
+        children: [
+          const PoolIcon(PoolIcons.pinInk, size: 16),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              cursorColor: CkColors.red,
+              cursorWidth: 1.5,
+              style: CkType.body(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: CkColors.ink,
+              ),
+              decoration: bareInput(
+                hintText: 'Ground name',
+                hintStyle: CkType.body(fontSize: 14, color: CkColors.soft),
+              ).copyWith(
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
             ),
           ),
-        TextField(
-          controller: _ctrl,
-          onChanged: widget.onVenueChanged,
-          style: CkType.body(fontSize: 14, color: CkColors.ink),
-          decoration: InputDecoration(
-            hintText: 'Or type a new venue…',
-            hintStyle: CkType.body(fontSize: 14, color: CkColors.soft),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: CkColors.hairline),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: CkColors.hairline),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: CkColors.ink, width: 1.5),
-            ),
-          ),
-        ),
-        if (resolved) ...[
-          const SizedBox(height: 12),
-          _MapPreview(label: widget.venue.trim()),
         ],
-      ],
-    );
-  }
-}
-
-class _VenueRow extends StatelessWidget {
-  const _VenueRow({
-    required this.venue,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final RecentVenue venue;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: selected ? CkColors.paper2 : CkColors.paper,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? CkColors.ink : CkColors.hairline,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: CkColors.paper2,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: CkColors.hairline),
-              ),
-              child: const V2Svg(
-                ChIcons.pin,
-                size: 15,
-                color: CkColors.ink,
-                strokeWidth: 1.8,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    venue.name,
-                    style: CkType.body(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 1),
-                    child: Text(
-                      venue.sub,
-                      style:
-                          CkType.body(fontSize: 11, color: CkColors.muted),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (selected)
-              const V2Svg(
-                ChIcons.check,
-                size: 16,
-                color: CkColors.ink,
-                strokeWidth: 2.4,
-              ),
-          ],
-        ),
       ),
     );
   }
-}
-
-/// Decorative map placeholder — diagonal-stripe background under a stylised
-/// pitch motif (horizontal popping crease, vertical line, centre circle),
-/// matching `StepWhen`'s map block in `challenge-send.jsx` (lines 435–453).
-/// The pin glyph overlays the centre. Replace with a real map embed when
-/// the venue lookup ships.
-class _MapPreview extends StatelessWidget {
-  const _MapPreview({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: CkColors.hairline),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: 100,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(painter: _PitchPainter()),
-                  ),
-                  const Positioned(
-                    left: 0,
-                    right: 0,
-                    top: 26,
-                    child: Center(
-                      child: V2Svg(
-                        ChIcons.pin,
-                        size: 28,
-                        color: CkColors.red,
-                        strokeWidth: 2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              color: CkColors.paper,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  const V2Svg(
-                    ChIcons.pin,
-                    size: 13,
-                    color: CkColors.muted,
-                    strokeWidth: 2,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          CkType.body(fontSize: 12, color: CkColors.ink2),
-                    ),
-                  ),
-                  Text(
-                    'MAP PREVIEW',
-                    style: CkType.mono(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.10,
-                      color: CkColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Paints the diagonal-stripe `paper2 ↔ paper` background + a stylised
-/// pitch motif at 50% opacity, per the JSX `<svg>` block.
-class _PitchPainter extends CustomPainter {
-  static const _stripePeriod = 28.0; // 14px of paper2 + 14px of paper
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Base fill — paper.
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = CkColors.paper,
-    );
-
-    // Diagonal stripes (45°), alternating paper2 over paper.
-    final stripe = Paint()..color = CkColors.paper2;
-    final diag = size.width + size.height;
-    for (var d = -size.height; d < diag; d += _stripePeriod) {
-      final path = Path()
-        ..moveTo(d, 0)
-        ..lineTo(d + 14, 0)
-        ..lineTo(d + 14 + size.height, size.height)
-        ..lineTo(d + size.height, size.height)
-        ..close();
-      canvas.drawPath(path, stripe);
-    }
-
-    // Pitch motif at 50% opacity.
-    final lineColor = CkColors.line.withValues(alpha: 0.5);
-    final h = Paint()
-      ..style = PaintingStyle.stroke
-      ..color = lineColor
-      ..strokeWidth = 6;
-    canvas.drawLine(const Offset(0, 64), Offset(size.width, 64), h);
-
-    final v = Paint()
-      ..style = PaintingStyle.stroke
-      ..color = lineColor
-      ..strokeWidth = 4;
-    canvas.drawLine(const Offset(130, 0), const Offset(130, 100), v);
-
-    final c = Paint()
-      ..style = PaintingStyle.stroke
-      ..color = lineColor
-      ..strokeWidth = 2;
-    canvas.drawCircle(const Offset(130, 64), 26, c);
-  }
-
-  @override
-  bool shouldRepaint(covariant _PitchPainter old) => false;
 }

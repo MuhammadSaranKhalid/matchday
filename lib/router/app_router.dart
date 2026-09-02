@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../core/theme/circk_theme.dart';
 import '../features/auth/presentation/providers/auth_providers.dart';
 import '../features/auth/presentation/screens/sign_in_screen.dart';
 import '../features/onboarding/presentation/providers/onboarding_providers.dart';
@@ -14,6 +15,7 @@ import '../features/messages/presentation/screens/inbox_screen.dart';
 import '../features/matches/presentation/screens/match_detail_screen.dart';
 import '../features/matches/presentation/screens/my_matches_screen.dart';
 import '../features/shell/presentation/screens/coming_soon_screen.dart';
+import '../features/shell/presentation/screens/menu_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
 import '../features/shell/presentation/widgets/swipeable_branch_view.dart';
 import '../features/teams/presentation/screens/add_unclaimed_player_screen.dart';
@@ -27,6 +29,7 @@ import '../features/teams/presentation/screens/team_search_screen.dart';
 import '../features/teams/presentation/screens/teams_list_screen.dart';
 // Counter flow temporarily disabled — keep import commented for easy restore.
 // import '../features/matches/presentation/screens/challenge_counter_screen.dart';
+import '../features/matches/presentation/screens/applicant_detail_screen.dart';
 import '../features/matches/presentation/screens/challenge_detail_screen.dart';
 import '../features/matches/presentation/screens/challenge_send_screen.dart';
 import '../features/matches/presentation/screens/challenge_sent_screen.dart';
@@ -139,52 +142,7 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 1 · Explore — unified search + discovery over players, teams and
-          // matches (docs/explore-feature-design.md).
-          StatefulShellBranch(
-            preload: true,
-            routes: [
-              GoRoute(
-                path: '/explore',
-                builder: (context, _) => ExploreScreen(
-                  onOpenTeam: (teamId) => context.push('/teams/$teamId'),
-                  onOpenProfile: (username) => context.push('/u/$username'),
-                  onOpenMatch: (matchId) => context.push('/matches/$matchId/scorecard'),
-                  onCreateTeam: () => context.push('/teams/create'),
-                  onSeeAll: (query, category) => context.push(
-                    '/explore/all/${category.wireName}?q=${Uri.encodeQueryComponent(query)}',
-                  ),
-                ),
-                routes: [
-                  GoRoute(
-                    path: 'all/:category',
-                    builder: (context, state) {
-                      final raw = state.pathParameters['category'];
-                      // Unknown category in a deep link degrades to teams
-                      // rather than throwing — the path is user-reachable.
-                      final category = ExploreCategory.values.firstWhere(
-                        (c) => c.wireName == raw,
-                        orElse: () => ExploreCategory.teams,
-                      );
-                      return ExploreSeeAllScreen(
-                        query: state.uri.queryParameters['q'] ?? '',
-                        category: category,
-                        onOpenTeam: (teamId) => context.push('/teams/$teamId'),
-                        onOpenProfile: (u) => context.push('/u/$u'),
-                        onOpenMatch: (matchId) =>
-                            context.push('/matches/$matchId/scorecard'),
-                      );
-                    },
-                  ),
-                  GoRoute(
-                    path: 'teams',
-                    builder: (_, __) => const TeamSearchScreen(),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          // 2 · Matches — Live · Upcoming · Recent · Browse
+          // 1 · Matches — Live · Upcoming · Recent · Browse
           StatefulShellBranch(
             preload: true,
             routes: [
@@ -194,7 +152,7 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 3 · Pool — the open match pool (matchmaking).
+          // 2 · Pool — the open match pool (matchmaking).
           StatefulShellBranch(
             preload: true,
             routes: [
@@ -203,6 +161,82 @@ GoRouter appRouter(Ref ref) {
                 builder: (_, __) => const OpenMatchPoolScreen(),
               ),
             ],
+          ),
+          // 3 · Messages inbox — team chats and direct messages.
+          StatefulShellBranch(
+            preload: true,
+            routes: [
+              GoRoute(
+                path: '/messages',
+                builder: (context, _) => InboxScreen(
+                  onBell: () => _openBell(context),
+                  showBack: false,
+                  showHeader: false,
+                ),
+              ),
+            ],
+          ),
+          // 4 · Menu — the "you" surface (was the AppDrawer side panel).
+          // Deliberately NOT preloaded: it is the one branch a session may
+          // never open, and its body watches profile, matches, teams and pool
+          // at once. The other four earn their preload by being swiped to.
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/menu',
+                builder: (_, __) => const MenuScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
+      // Explore — unified search + discovery over players, teams and matches
+      // Opened full-screen over the shell via the header search bar.
+      GoRoute(
+        path: '/explore',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, _) => Scaffold(
+          backgroundColor: CkColors.paper,
+          body: SafeArea(
+            bottom: false,
+            child: ExploreScreen(
+              onOpenTeam: (teamId) => context.push('/teams/$teamId'),
+              onOpenProfile: (username) => context.push('/u/$username'),
+              onOpenMatch: (matchId) =>
+                  context.push('/matches/$matchId/scorecard'),
+              onCreateTeam: () => context.push('/teams/create'),
+              onSeeAll: (query, category) => context.push(
+                '/explore/all/${category.wireName}?q=${Uri.encodeQueryComponent(query)}',
+              ),
+            ),
+          ),
+        ),
+        routes: [
+          GoRoute(
+            path: 'all/:category',
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (context, state) {
+              final raw = state.pathParameters['category'];
+              // Unknown category in a deep link degrades to teams
+              // rather than throwing — the path is user-reachable.
+              final category = ExploreCategory.values.firstWhere(
+                (c) => c.wireName == raw,
+                orElse: () => ExploreCategory.teams,
+              );
+              return ExploreSeeAllScreen(
+                query: state.uri.queryParameters['q'] ?? '',
+                category: category,
+                onOpenTeam: (teamId) => context.push('/teams/$teamId'),
+                onOpenProfile: (u) => context.push('/u/$u'),
+                onOpenMatch: (matchId) =>
+                    context.push('/matches/$matchId/scorecard'),
+              );
+            },
+          ),
+          GoRoute(
+            path: 'teams',
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (_, __) => const TeamSearchScreen(),
           ),
         ],
       ),
@@ -343,6 +377,27 @@ GoRouter appRouter(Ref ref) {
           teamId: state.pathParameters['teamId']!,
         ),
       ),
+      // Literal /matches/<word> routes MUST be declared before
+      // '/matches/:matchId'. go_router matches in declaration order, so with
+      // the parameterised route first these were being read as a match id and
+      // rendering "Match not available" instead of the screen they name.
+      GoRoute(
+        path: '/matches/send-challenge',
+        // ?mode=open comes from the pool surfaces, where the open-vs-direct
+        // fork is already answered and should not be asked again.
+        builder: (_, state) => ChallengeSendScreen(
+          openOnly: state.uri.queryParameters['mode'] == 'open',
+        ),
+      ),
+      // Legacy locations, kept so older links / pushes still land.
+      GoRoute(
+        path: '/matches/pool',
+        redirect: (_, __) => '/pool',
+      ),
+      GoRoute(
+        path: '/matches/my-broadcasts',
+        redirect: (_, __) => '/my/pool-requests',
+      ),
       GoRoute(
         path: '/matches/:matchId',
         builder: (_, state) =>
@@ -384,21 +439,8 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) =>
             ResultScreen(matchId: state.pathParameters['matchId']!),
       ),
-      // Legacy location of the pool, kept so older links / pushes still land.
-      GoRoute(
-        path: '/matches/pool',
-        redirect: (_, __) => '/pool',
-      ),
-      GoRoute(
-        path: '/matches/my-broadcasts',
-        redirect: (_, __) => '/my/pool-requests',
-      ),
       GoRoute(
         path: '/challenge',
-        builder: (_, __) => const ChallengeSendScreen(),
-      ),
-      GoRoute(
-        path: '/matches/send-challenge',
         builder: (_, __) => const ChallengeSendScreen(),
       ),
       GoRoute(
@@ -411,6 +453,13 @@ GoRouter appRouter(Ref ref) {
         path: '/challenges/:requestId',
         builder: (_, state) => ChallengeDetailScreen(
           requestId: state.pathParameters['requestId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/challenges/:requestId/applicants/:applicationId',
+        builder: (_, state) => ApplicantDetailScreen(
+          requestId: state.pathParameters['requestId']!,
+          applicationId: state.pathParameters['applicationId']!,
         ),
       ),
       GoRoute(
@@ -430,23 +479,13 @@ GoRouter appRouter(Ref ref) {
         path: '/notifications',
         builder: (_, __) => const NotificationsScreen(),
       ),
-      // Messages inbox — full-screen over the shell, opened from the header
-      // messages button in [V2Header].
+      // Message thread — rendered full-screen over the shell
       GoRoute(
-        path: '/messages',
+        path: '/messages/:chatId',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, _) =>
-            InboxScreen(onBell: () => _openBell(context), showBack: true),
-        routes: [
-          // Message thread — rendered full-screen over the shell
-          GoRoute(
-            path: ':chatId',
-            parentNavigatorKey: _rootNavigatorKey,
-            builder: (_, state) => MessageThreadScreen(
-              chatId: state.pathParameters['chatId']!,
-            ),
-          ),
-        ],
+        builder: (_, state) => MessageThreadScreen(
+          chatId: state.pathParameters['chatId']!,
+        ),
       ),
       // Public profile by @username — the landing for a shared
       // `joinmatchday.com/u/<username>` link (universal/app link) and for

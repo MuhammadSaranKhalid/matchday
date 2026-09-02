@@ -3,20 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/ck_button.dart';
-import '../../../../core/widgets/v2/v2_kit.dart';
-import '../../../teams/domain/entities/roster_member.dart';
 import '../../../teams/domain/entities/team.dart';
-import '../../../teams/domain/entities/team_member.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
-import '../../domain/entities/format_preset.dart';
 import '../../domain/entities/match.dart';
 import '../providers/matches_providers.dart';
-import '../widgets/challenge/ch_role_pill.dart';
 import '../widgets/challenge/step_format.dart';
-import '../widgets/challenge/step_pick_xi.dart';
 import '../widgets/challenge/step_review.dart';
 import '../widgets/challenge/step_when_where.dart';
+import '../widgets/wizard/step_open_or_direct.dart';
+import '../widgets/wizard/wizard_kit.dart';
 
 /// Sender side of the challenge handshake. 6 steps on one screen, matching
 /// the Match Challenge Flow design:
@@ -30,18 +25,30 @@ import '../widgets/challenge/step_when_where.dart';
 /// Entry is the `+ Challenge` button on My Matches → `/challenge`
 /// (no preselected team) or `/teams/:teamId/challenge` for a deep link.
 class ChallengeSendScreen extends ConsumerStatefulWidget {
-  const ChallengeSendScreen({super.key, this.fromTeamId});
+  const ChallengeSendScreen({
+    super.key,
+    this.fromTeamId,
+    this.openOnly = false,
+  });
 
   /// Optional preselected team. When null the screen renders the team-pick
   /// step first; when set it skips straight to the opponent picker.
   final String? fromTeamId;
+
+  /// Entered from a pool surface (My challenges → New challenge), where the
+  /// open-vs-direct question is already answered. The opponent step is then
+  /// dropped from the flow entirely rather than shown pre-answered: a step
+  /// whose only outcome is the one you already chose is not a step.
+  final bool openOnly;
 
   @override
   ConsumerState<ChallengeSendScreen> createState() =>
       _ChallengeSendScreenState();
 }
 
-enum _Step { team, opponent, format, whenWhere, xi, review }
+/// Scheduling only. Locking an XI is deliberately NOT part of posting a
+/// challenge — see [_steps].
+enum _Step { team, opponent, format, whenWhere, review }
 
 class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   late _Step _step;
@@ -53,31 +60,91 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   bool _isOpenChallenge = false;
   String _opponentSearch = '';
 
-  // Format — preset id + the snapshotted MatchFormat that ships.
-  String? _presetId;
+  // Format — the three questions artboard 07 asks, plus the engine defaults
+  // that ride along unchanged.
   int _overs = 20;
   int _playersPerSide = 11;
   MatchBallType _ball = MatchBallType.tape;
-  int _maxOversPerBowler = 4;
-  int _ballsPerOver = 6;
-  int _inningsPerSide = 1;
-  int? _endChangeBalls;
+  // Engine knobs the design does not expose. They ride along at their
+  // defaults so the format the challenge ships is still complete.
+  final int _maxOversPerBowler = 4;
+  final int _ballsPerOver = 6;
+  final int _inningsPerSide = 1;
+  final int? _endChangeBalls = null;
 
   // When & where — day + time as separate state, combined for send.
   DateTime? _pickedDay;
   String? _pickedTime; // 'HH:mm'
 
-  // Pick XI — selected player ids + the keeper id.
-  final Set<String> _xi = <String>{};
-  String? _keeperId;
+  // When & where — Flexible drops the time so the card reads "Flexible".
+  bool _flexible = false;
+
 
   final _venueCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
 
+  /// The steps this run actually walks, in order. Both the team step and the
+  /// opponent step drop out depending on how the wizard was entered, so
+  /// everything downstream — progress, "step N of M", next/back — counts off
+  /// this list rather than the enum.
+  ///
+  /// Posting a challenge is **scheduling**, not team selection: it settles
+  /// when, where and what format. Who actually plays is decided at the ground,
+  /// on the match-start lineup screen, where a captain can still add the two
+  /// lads who turned up. Committing an XI here would freeze a squad days early
+  /// and make every late change a re-post.
+  ///
+  /// The server already expects this — `send_match_request` defaults
+  /// `from_team_xi` to empty, and `accept_match_request` then materialises the
+  /// full active roster (migration 20260529142241), which the lineup screen
+  /// narrows on the day. Tournament fixtures are a different matter: their
+  /// squads are locked to the registration list, and they are not created
+  /// through this wizard.
+  List<_Step> get _steps => [
+        if (widget.fromTeamId == null) _Step.team,
+        if (!widget.openOnly) _Step.opponent,
+        _Step.format,
+        _Step.whenWhere,
+        _Step.review,
+      ];
+
   @override
   void initState() {
     super.initState();
-    _step = widget.fromTeamId == null ? _Step.team : _Step.opponent;
+    _isOpenChallenge = widget.openOnly;
+    _step = _steps.first;
+    _seedWhen();
+  }
+
+  /// Open the When & where step already answered, the way artboard 08 draws
+  /// it — a day chip lit and a time in the field. A wizard that opens with a
+  /// disabled Continue makes the captain do setup before it will let them
+  /// start, and the common case really is "a couple of hours from now".
+  ///
+  /// Rounded to the next half hour, and rolled to tomorrow morning if that
+  /// would land after the evening.
+  void _seedWhen() {
+    final soon = DateTime.now().add(const Duration(hours: 2));
+    final rounded = DateTime(
+      soon.year,
+      soon.month,
+      soon.day,
+      soon.hour,
+      soon.minute <= 30 ? 30 : 0,
+    ).add(soon.minute <= 30 ? Duration.zero : const Duration(hours: 1));
+
+    final tooLate = rounded.hour >= 21 || rounded.day != DateTime.now().day;
+    final start = tooLate
+        ? DateTime(
+            DateTime.now().year,
+            DateTime.now().month,
+            DateTime.now().day,
+          ).add(const Duration(days: 1, hours: 9))
+        : rounded;
+
+    _pickedDay = DateTime(start.year, start.month, start.day);
+    _pickedTime = '${start.hour.toString().padLeft(2, '0')}:'
+        '${start.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -92,6 +159,9 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   DateTime? get _startTime {
     final d = _pickedDay;
     final t = _pickedTime;
+    // Flexible posts the day with no committed hour; the card then renders
+    // "Flexible" rather than a time both captains would have to honour.
+    if (d != null && _flexible) return DateTime(d.year, d.month, d.day);
     if (d == null || t == null) return null;
     final parts = t.split(':');
     final h = int.tryParse(parts.first) ?? 0;
@@ -100,21 +170,20 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   }
 
   bool get _canContinue {
+    if (_busy) return false;
     switch (_step) {
       case _Step.team:
         return _fromTeam != null;
       case _Step.opponent:
+        // Open needs nothing further; Direct has to name its opponent.
         return _isOpenChallenge || _opponent != null;
       case _Step.format:
-        // Preset always selected (seeded to first preset on load).
         return _overs > 0 && _playersPerSide >= 5 && _playersPerSide <= 15;
       case _Step.whenWhere:
-        final start = _startTime;
-        return start != null && _venueCtrl.text.trim().isNotEmpty;
-      case _Step.xi:
-        return _xi.length == _playersPerSide &&
-            _keeperId != null &&
-            _xi.contains(_keeperId);
+        // The venue is explicitly optional (artboard 08), and Flexible stands
+        // in for a time nobody has agreed yet — so a day is all this step
+        // actually requires.
+        return _pickedDay != null && (_flexible || _pickedTime != null);
       case _Step.review:
         return true;
     }
@@ -132,16 +201,24 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _Header(step: _step, onBack: _onBack),
+            WizardTopBar(
+              title: _barTitle,
+              onBack: _onBack,
+              trailing: _barTrailing,
+            ),
+            WizardProgress(
+              index: _steps.indexOf(_step),
+              total: _steps.length,
+            ),
             Expanded(child: _body()),
-            _Footer(
+            WizardFooter(
               label: _ctaLabel,
-              enabled: _canContinue && !_busy,
+              enabled: _canContinue,
               busy: _busy,
               hint: _step == _Step.format
                   ? 'Both captains can change format up to 12h before the toss.'
                   : null,
-              onPressed: () => _advance(),
+              onPressed: _advance,
             ),
           ],
         ),
@@ -149,71 +226,31 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
     );
   }
 
+  /// Most steps are "New challenge"; the two that are really their own screen
+  /// say what they are.
+  String get _barTitle =>
+      _step == _Step.review ? 'Review' : 'New challenge';
+
+  Widget get _barTrailing => WizardStepCount(
+        index: _steps.indexOf(_step),
+        total: _steps.length,
+      );
+
   String get _ctaLabel {
-    if (_step == _Step.review) {
-      return _isOpenChallenge ? 'Broadcast open challenge' : 'Send challenge';
-    }
-    if (_step == _Step.team && _fromTeam != null) {
-      return 'Continue as ${_fromTeam!.name} →';
-    }
-    if (_step == _Step.opponent) {
-      if (_isOpenChallenge) return 'Continue with Open Challenge →';
-      if (_opponent != null) return 'Continue vs ${_opponent!.name} →';
-    }
-    if (_step == _Step.format) {
-      final label = _presetLabel ?? 'T$_overs';
-      return 'Continue · $label · $_playersPerSide/side';
-    }
-    if (_step == _Step.whenWhere && _startTime != null) {
-      final venue = _venueCtrl.text.trim();
-      final whenLabel = _whenShort(_startTime!);
-      if (venue.isEmpty) return 'Continue · $whenLabel →';
-      return 'Continue · $whenLabel · ${_venueShort(venue)} →';
-    }
-    if (_step == _Step.xi) {
-      if (_xi.length < _playersPerSide) {
-        return 'Pick ${_playersPerSide - _xi.length} more';
-      }
-      if (_keeperId == null) return 'Choose a keeper';
-      return 'Continue';
-    }
-    return 'Continue →';
-  }
-
-  /// Display label for the currently-picked preset. The screen doesn't keep
-  /// the preset's label in state (only the id + the snapshotted knobs), so
-  /// this looks it up from the cached `formatPresetsProvider` value.
-  String? get _presetLabel {
-    if (_presetId == null) return null;
-    final presets =
-        ref.read(formatPresetsProvider).value ?? const <FormatPreset>[];
-    for (final p in presets) {
-      if (p.id == _presetId) return p.label;
-    }
-    return null;
-  }
-
-  String _whenShort(DateTime t) {
-    final dow =
-        const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][t.weekday - 1];
-    final hh = t.hour.toString().padLeft(2, '0');
-    final mm = t.minute.toString().padLeft(2, '0');
-    return '$dow $hh:$mm';
-  }
-
-  String _venueShort(String v) {
-    // Strip everything after the first " · " so the CTA stays tight.
-    final i = v.indexOf(' · ');
-    return i == -1 ? v : v.substring(0, i);
+    // Artboard 06–09 all read plainly "Continue"; only the commit names what
+    // it does. The old screen restated the current selection on every button,
+    // which made the CTA a status line rather than an action.
+    if (_step != _Step.review) return 'Continue';
+    return _isOpenChallenge ? 'Post to the pool' : 'Send challenge';
   }
 
   void _onBack() {
-    final atFirst =
-        _step == _Step.team || (_step == _Step.opponent && widget.fromTeamId != null);
-    if (atFirst) {
+    final steps = _steps;
+    final i = steps.indexOf(_step);
+    if (i <= 0) {
       context.pop();
     } else {
-      setState(() => _step = _Step.values[_step.index - 1]);
+      setState(() => _step = steps[i - 1]);
     }
   }
 
@@ -222,37 +259,11 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
       _send();
       return;
     }
-    // Leaving When & where → Pick XI: try to auto-skip when the roster size
-    // exactly matches the format (no choice for the captain to make).
-    if (_step == _Step.whenWhere) {
-      final teamId = _resolvedFromTeamId;
-      final rosterSize = teamId == null
-          ? 0
-          : ref.read(rosterProvider(teamId)).value?.length ?? 0;
-      if (rosterSize > 0 && rosterSize == _playersPerSide) {
-        final roster = ref.read(rosterProvider(teamId!)).value!;
-        _xi
-          ..clear()
-          ..addAll(roster.map((r) => r.member.playerId));
-        _keeperId = _pickKeeperId(roster);
-        setState(() => _step = _Step.review);
-        return;
-      }
+    final steps = _steps;
+    final i = steps.indexOf(_step);
+    if (i >= 0 && i < steps.length - 1) {
+      setState(() => _step = steps[i + 1]);
     }
-    setState(() => _step = _Step.values[_step.index + 1]);
-  }
-
-  /// Default keeper pick — first WK-role row, else row 2, else row 1.
-  /// Mirrors `StepXI` line 170 in the JSX.
-  String? _pickKeeperId(List<RosterMember> roster) {
-    final slice = roster.take(_playersPerSide).toList();
-    if (slice.isEmpty) return null;
-    for (final r in slice) {
-      if (r.member.role == MemberRole.wicketKeeper) return r.member.playerId;
-    }
-    return slice.length >= 2
-        ? slice[1].member.playerId
-        : slice.first.member.playerId;
   }
 
   Future<void> _send() async {
@@ -279,8 +290,10 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
               ? null
               : _messageCtrl.text.trim(),
           playersPerSide: _playersPerSide,
-          fromTeamXi: _xi.toList(),
-          fromTeamKeeperId: _keeperId,
+          // Empty by design: the accept RPC fills the match with the full
+          // active roster, and the lineup screen picks the XI at the ground.
+          fromTeamXi: const [],
+          fromTeamKeeperId: null,
         );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -293,25 +306,6 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
         context.go('/challenges/${id.value}/sent');
       },
     );
-  }
-
-  /// Apply a format preset — snapshots every knob from the chosen format
-  /// (see CRICKET_FORMATS.md). Resets the XI because `playersPerTeam` may
-  /// have changed; the captain re-picks on the next step.
-  void _applyPreset(FormatPreset p) {
-    setState(() {
-      final f = p.format;
-      _presetId = p.id;
-      _overs = f.oversPerInnings;
-      _playersPerSide = f.playersPerTeam;
-      _ball = f.ballType;
-      _ballsPerOver = f.ballsPerOver;
-      _inningsPerSide = f.inningsPerSide;
-      _maxOversPerBowler = f.maxOversPerBowler;
-      _endChangeBalls = f.endChangeBalls;
-      _xi.clear();
-      _keeperId = null;
-    });
   }
 
   Widget _body() {
@@ -338,69 +332,46 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           return const Center(
               child: Text('Pick a team to issue the challenge as.'));
         }
-        return _OpponentStep(
-          query: _opponentSearch,
-          selected: _opponent,
+        return StepOpenOrDirect(
           isOpen: _isOpenChallenge,
-          fromTeamId: TeamId(fromId),
-          onSearch: (q) => setState(() => _opponentSearch = q),
-          onPick: (t) => setState(() {
-            _opponent = t;
-            _isOpenChallenge = false;
+          onSelect: (bool open) => setState(() {
+            _isOpenChallenge = open;
+            if (open) _opponent = null;
           }),
-          onPickOpen: () => setState(() {
-            _opponent = null;
-            _isOpenChallenge = true;
-          }),
+          // The design draws only the fork, because its Open card is selected.
+          // Direct has to name a team somewhere and the flow is six steps
+          // either way, so the picker unfolds under the card that asked for it
+          // rather than becoming a seventh step.
+          directContent: _OpponentPicker(
+            query: _opponentSearch,
+            selected: _opponent,
+            fromTeamId: TeamId(fromId),
+            onSearch: (q) => setState(() => _opponentSearch = q),
+            onPick: (t) => setState(() => _opponent = t),
+          ),
         );
       case _Step.format:
         return StepFormat(
-          selectedPresetId: _presetId,
-          onPicked: _applyPreset,
+          overs: _overs,
+          ball: _ball,
+          playersPerSide: _playersPerSide,
+          onOvers: (v) => setState(() => _overs = v),
+          onBall: (b) => setState(() => _ball = b),
+          onPlayers: (n) => setState(() => _playersPerSide = n),
         );
       case _Step.whenWhere:
         return StepWhenWhere(
-          selectedDay: _pickedDay,
-          selectedTime: _pickedTime,
-          venue: _venueCtrl.text,
-          onDayPicked: (d) => setState(() => _pickedDay = d),
-          onTimePicked: (t) => setState(() => _pickedTime = t),
-          onVenueChanged: (v) {
-            // Keep the controller and state in sync so back/forward
-            // navigation through the wizard never strands the text field.
-            if (_venueCtrl.text != v) _venueCtrl.text = v;
-            setState(() {});
-          },
-        );
-      case _Step.xi:
-        return _PickXiStep(
-          fromTeamId: _resolvedFromTeamId,
-          playersNeeded: _playersPerSide,
-          xi: _xi,
-          keeperId: _keeperId,
-          onToggle: (id) => setState(() {
-            if (_xi.contains(id)) {
-              _xi.remove(id);
-              if (_keeperId == id) _keeperId = null;
-            } else {
-              _xi.add(id);
-            }
+          day: _pickedDay,
+          time: _minutesFromHhmm(_pickedTime),
+          flexible: _flexible,
+          venueController: _venueCtrl,
+          onDay: (d) => setState(() => _pickedDay = d),
+          onTime: (m) => setState(() {
+            _pickedTime =
+                '${(m ~/ 60).toString().padLeft(2, '0')}:'
+                '${(m % 60).toString().padLeft(2, '0')}';
           }),
-          onKeeper: (id) => setState(() => _keeperId = id),
-          onAutoFill: (roster) {
-            setState(() {
-              _xi
-                ..clear()
-                ..addAll(
-                  roster.take(_playersPerSide).map((r) => r.member.playerId),
-                );
-              _keeperId = _pickKeeperId(roster);
-            });
-          },
-          onClear: () => setState(() {
-            _xi.clear();
-            _keeperId = null;
-          }),
+          onFlexible: (v) => setState(() => _flexible = v),
         );
       case _Step.review:
         return _ReviewStepHost(
@@ -408,394 +379,96 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           fromTeamId: _resolvedFromTeamId,
           opponent: _opponent,
           isOpen: _isOpenChallenge,
-          startTime: _startTime!,
+          day: _pickedDay,
+          timeLabel: _flexible
+              ? 'Flexible'
+              : (_pickedTime == null
+                  ? 'Not set'
+                  : clockLabel(_minutesFromHhmm(_pickedTime)!)),
           venue: _venueCtrl.text.trim(),
-          format: MatchFormat(
-            oversPerInnings: _overs,
-            playersPerTeam: _playersPerSide,
-            ballType: _ball,
-            maxOversPerBowler: _maxOversPerBowler,
-            ballsPerOver: _ballsPerOver,
-            inningsPerSide: _inningsPerSide,
-            endChangeBalls: _endChangeBalls,
+          formatLine: formatSpecLine(
+            overs: _overs,
+            ball: _ball,
+            playersPerSide: _playersPerSide,
           ),
-          presetLabel: _presetLabel ?? 'Custom',
-          pickedXiIds: _xi,
-          keeperId: _keeperId,
-          messageController: _messageCtrl,
-          // Rebuild on every keystroke so the "X LEFT" counter + section
-          // hint stay in sync as the message grows.
-          onMessageChanged: () => setState(() {}),
+          noteController: _messageCtrl,
+          onEdit: (s) => setState(() => _step = s),
         );
     }
+  }
+
+  /// 'HH:mm' → minutes since midnight, the shape artboard 08's field speaks.
+  static int? _minutesFromHhmm(String? hhmm) {
+    if (hhmm == null) return null;
+    final parts = hhmm.split(':');
+    final h = int.tryParse(parts.first);
+    if (h == null) return null;
+    final m = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    return h * 60 + m;
   }
 }
 
 /// Bridges the screen's `_fromTeam` + roster (via `rosterProvider`) into
 /// the domain-agnostic [StepReview] view shape. Kept here for the same
 /// reason as [_PickXiStep] — the widget stays portable.
+/// Bridges the screen's team + roster into artboard 10's summary lines.
 class _ReviewStepHost extends ConsumerWidget {
   const _ReviewStepHost({
     required this.fromTeam,
     required this.fromTeamId,
     required this.opponent,
     required this.isOpen,
-    required this.startTime,
+    required this.day,
+    required this.timeLabel,
     required this.venue,
-    required this.format,
-    required this.presetLabel,
-    required this.pickedXiIds,
-    required this.keeperId,
-    required this.messageController,
-    required this.onMessageChanged,
+    required this.formatLine,
+    required this.noteController,
+    required this.onEdit,
   });
 
   final Team? fromTeam;
   final String? fromTeamId;
   final Team? opponent;
   final bool isOpen;
-  final DateTime startTime;
+  final DateTime? day;
+  final String timeLabel;
   final String venue;
-  final MatchFormat format;
-  final String presetLabel;
-  final Set<String> pickedXiIds;
-  final String? keeperId;
-  final TextEditingController messageController;
-  final VoidCallback onMessageChanged;
+  final String formatLine;
+  final TextEditingController noteController;
+  final ValueChanged<_Step> onEdit;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Resolve the from-team — when the wizard was deep-linked via
-    // `/teams/:teamId/challenge`, `_fromTeam` is null because the team-pick
-    // step was skipped; fall back to looking the team up from myTeams.
-    final resolvedFromTeam = fromTeam ?? _lookupFromTeam(ref);
-    if (resolvedFromTeam == null) {
-      return const Center(child: CircularProgressIndicator(color: CkColors.ink));
-    }
-
-    // Map the picked roster ids to XiCandidates for the chip strip.
-    final picked = fromTeamId == null
-        ? const <XiCandidate>[]
-        : ref.watch(rosterProvider(fromTeamId!)).maybeWhen(
-              data: (roster) => roster
-                  .where((r) => pickedXiIds.contains(r.member.playerId))
-                  .map(_toCandidate)
-                  .toList(growable: false),
-              orElse: () => const <XiCandidate>[],
-            );
-
     return StepReview(
-      fromTeam: resolvedFromTeam,
-      opponent: opponent,
-      isOpen: isOpen,
-      format: format,
-      presetLabel: presetLabel,
-      startTime: startTime,
-      venue: venue,
-      pickedXi: picked,
-      keeperId: keeperId,
-      messageController: messageController,
-      onMessageChanged: onMessageChanged,
-    );
-  }
-
-  Team? _lookupFromTeam(WidgetRef ref) {
-    if (fromTeamId == null) return null;
-    final teams = ref.watch(myTeamsProvider).maybeWhen(
-          data: (t) => t,
-          orElse: () => const <Team>[],
-        );
-    for (final t in teams) {
-      if (t.id.value == fromTeamId) return t;
-    }
-    return null;
-  }
-
-  static XiCandidate _toCandidate(RosterMember r) {
-    final role = r.member.role == MemberRole.wicketKeeper
-        ? ChPlayingRole.wk
-        : ChPlayingRole.bat;
-    return XiCandidate(
-      id: r.member.playerId,
-      name: r.displayName,
-      photoUrl: r.profilePhotoUrl,
-      role: role,
-      captain: r.member.role == MemberRole.captain,
+      team: isOpen ? fromTeam : (opponent ?? fromTeam),
+      formatLine: formatLine,
+      whenLine: day == null ? 'Not set' : '${_dayLabel(day!)} · $timeLabel',
+      whereLine: venue.isEmpty ? 'To be agreed' : venue,
+      noteController: noteController,
+      onEditFormat: () => onEdit(_Step.format),
+      onEditWhen: () => onEdit(_Step.whenWhere),
+      onEditWhere: () => onEdit(_Step.whenWhere),
     );
   }
 }
 
-// ─── Pick XI bridge ───────────────────────────────────────────────────────
-
-/// Bridges `rosterProvider` → `StepPickXi`'s [XiCandidate] view shape.
-///
-/// Lives here (instead of inside `step_pick_xi.dart`) so the widget itself
-/// stays domain-agnostic and easy to integrate elsewhere.
-class _PickXiStep extends ConsumerWidget {
-  const _PickXiStep({
-    required this.fromTeamId,
-    required this.playersNeeded,
-    required this.xi,
-    required this.keeperId,
-    required this.onToggle,
-    required this.onKeeper,
-    required this.onAutoFill,
-    required this.onClear,
-  });
-
-  final String? fromTeamId;
-  final int playersNeeded;
-  final Set<String> xi;
-  final String? keeperId;
-  final ValueChanged<String> onToggle;
-  final ValueChanged<String?> onKeeper;
-  final ValueChanged<List<RosterMember>> onAutoFill;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (fromTeamId == null) {
-      return const Center(child: Text('Pick a team first.'));
-    }
-    final async = ref.watch(rosterProvider(fromTeamId!));
-    return async.when(
-      loading: () =>
-          const Center(child: CircularProgressIndicator(color: CkColors.ink)),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          e.toString(),
-          style: CkType.body(fontSize: 12, color: CkColors.muted),
-        ),
-      ),
-      data: (roster) {
-        if (roster.length < playersNeeded) {
-          return _NotEnoughPlayers(have: roster.length, need: playersNeeded);
-        }
-        final candidates = roster.map(_toCandidate).toList(growable: false);
-        return StepPickXi(
-          roster: candidates,
-          playersNeeded: playersNeeded,
-          xi: xi,
-          keeperId: keeperId,
-          onToggle: onToggle,
-          onKeeper: onKeeper,
-          onAutoFill: () => onAutoFill(roster),
-          onClear: onClear,
-        );
-      },
-    );
-  }
-
-  XiCandidate _toCandidate(RosterMember r) {
-    final role = r.member.role == MemberRole.wicketKeeper
-        ? ChPlayingRole.wk
-        : ChPlayingRole.bat;
-    return XiCandidate(
-      id: r.member.playerId,
-      name: r.displayName,
-      photoUrl: r.profilePhotoUrl,
-      role: role,
-      captain: r.member.role == MemberRole.captain,
-    );
-  }
-}
-
-class _NotEnoughPlayers extends StatelessWidget {
-  const _NotEnoughPlayers({required this.have, required this.need});
-  final int have;
-  final int need;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: CkColors.cream,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              'NEEDS ${need - have} MORE',
-              style: CkType.mono(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.10,
-                color: CkInk.amber,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Not enough players',
-            style: CkType.display(fontSize: 19, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 280),
-            child: Text(
-              'This format needs $need a side. Your squad has $have. Go back and pick a smaller format, or add players from your team page.',
-              textAlign: TextAlign.center,
-              style: CkType.body(
-                fontSize: 13,
-                color: CkColors.ink2,
-                height: 1.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+/// "Today" / "Tomorrow" / "Sat, Sep 6" for the review's When row.
+String _dayLabel(DateTime d) {
+  final now = DateTime.now();
+  final delta = DateTime(d.year, d.month, d.day)
+      .difference(DateTime(now.year, now.month, now.day))
+      .inDays;
+  if (delta == 0) return 'Today';
+  if (delta == 1) return 'Tomorrow';
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${days[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}';
 }
 
 // ─── Header / Footer ──────────────────────────────────────────────────────
-
-class _Header extends StatelessWidget {
-  const _Header({required this.step, required this.onBack});
-  final _Step step;
-  final VoidCallback onBack;
-
-  String get _title => switch (step) {
-        _Step.team => "Who's playing?",
-        _Step.opponent => 'Who do you want to play?',
-        _Step.format => 'How will we play?',
-        _Step.whenWhere => 'When and where?',
-        _Step.xi => 'Pick for this match.',
-        _Step.review => 'Review & send.',
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    final i = step.index;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
-      decoration: const BoxDecoration(
-        color: CkColors.paper,
-        border: Border(bottom: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            IconButton(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              onPressed: onBack,
-              icon: const Icon(Icons.chevron_left_rounded, color: CkColors.ink),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'STEP ${i + 1} OF ${_Step.values.length} · CHALLENGE',
-              style: CkType.mono(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.1,
-                color: CkColors.muted,
-              ),
-            ),
-          ]),
-          const SizedBox(height: 8),
-          Row(
-            children: List.generate(_Step.values.length, (j) {
-              final past = j < i;
-              final current = j == i;
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: j == _Step.values.length - 1 ? 0 : 4),
-                  child: Container(
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: past
-                          ? CkColors.green
-                          : current
-                              ? CkColors.ink
-                              : const Color(0x1A14120E),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            _title,
-            style: CkType.display(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.025,
-              height: 1.05,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Footer extends StatelessWidget {
-  const _Footer({
-    required this.label,
-    required this.enabled,
-    required this.busy,
-    required this.onPressed,
-    this.hint,
-  });
-
-  final String label;
-  final bool enabled;
-  final bool busy;
-  final VoidCallback onPressed;
-
-  /// Optional hint line shown above the primary CTA. Used on the Format
-  /// step to explain "Both captains can change format up to 12h before
-  /// the toss." per the design.
-  final String? hint;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-      decoration: const BoxDecoration(
-        color: CkColors.paper,
-        border: Border(top: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (hint != null) ...[
-            Center(
-              child: Text(
-                hint!,
-                textAlign: TextAlign.center,
-                style: CkType.body(
-                  fontSize: 11,
-                  color: CkColors.muted,
-                  height: 1.4,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          CkButton(
-            label: label,
-            busy: busy,
-            onPressed: enabled ? onPressed : null,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Step 1 · Team (which side of mine sends?) ────────────────────────────
 
 /// Per-row role on the team-pick step. Pulled from the user's relationship
 /// to the team (owner/manager/captain via team_members). v1 simplification:
@@ -1094,161 +767,78 @@ class _InfoCard extends StatelessWidget {
 
 // ─── Step 2 · Opponent ────────────────────────────────────────────────────
 
-class _OpponentStep extends ConsumerWidget {
-  const _OpponentStep({
+/// Artboard 06's Direct branch — search + the teams you can challenge.
+class _OpponentPicker extends ConsumerWidget {
+  const _OpponentPicker({
     required this.query,
     required this.selected,
-    required this.isOpen,
     required this.fromTeamId,
     required this.onSearch,
     required this.onPick,
-    required this.onPickOpen,
   });
 
   final String query;
   final Team? selected;
-  final bool isOpen;
   final TeamId fromTeamId;
   final ValueChanged<String> onSearch;
   final ValueChanged<Team> onPick;
-  final VoidCallback onPickOpen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allAsync = ref.watch(allTeamsProvider);
-    return allAsync.when(
-      loading: () =>
-          const Center(child: CircularProgressIndicator(color: CkColors.ink)),
-      error: (e, _) => Center(child: Text(e.toString())),
-      data: (teams) {
-        final q = query.trim().toLowerCase();
-        final visible = teams
-            .where((t) => t.id != fromTeamId)
-            .where((t) =>
-                q.isEmpty || t.name.toLowerCase().contains(q))
-            .toList();
-        return ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-          children: [
-            // Option 1: Broadcast as Open Pool Challenge with Share Code
-            InkWell(
-              onTap: onPickOpen,
+    final all = ref.watch(allTeamsProvider).value ?? const <Team>[];
+    final q = query.trim().toLowerCase();
+    final visible = all
+        .where((t) => t.id != fromTeamId)
+        .where((t) => q.isEmpty || t.name.toLowerCase().contains(q))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          onChanged: onSearch,
+          style: CkType.body(fontSize: 14, color: CkColors.ink),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'Search teams',
+            hintStyle: CkType.body(fontSize: 14, color: CkColors.soft),
+            prefixIcon: const Icon(Icons.search, size: 18, color: CkColors.muted),
+            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isOpen ? CkColors.paper2 : CkColors.paper,
-                  border: Border.all(
-                    color: isOpen ? CkColors.ink : CkColors.hairline,
-                    width: isOpen ? 2 : 1,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: isOpen ? CkColors.ink : CkColors.paper2,
-                        borderRadius: BorderRadius.circular(11),
-                        border: Border.all(color: CkColors.hairline),
-                      ),
-                      child: Icon(
-                        Icons.public,
-                        size: 22,
-                        color: isOpen ? CkColors.paper : CkColors.ink,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Open Challenge',
-                                style: CkType.display(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Pill(label: 'BROADCAST', tone: PillTone.green),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Post to match pool & generate 6-digit share code',
-                            style: CkType.body(fontSize: 11.5, color: CkColors.muted),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isOpen)
-                      Container(
-                        width: 22,
-                        height: 22,
-                        alignment: Alignment.center,
-                        decoration: const BoxDecoration(
-                          color: CkColors.ink,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.check, size: 14, color: CkColors.paper),
-                      ),
-                  ],
-                ),
+              borderSide: const BorderSide(color: CkColors.line),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: CkColors.line),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: CkColors.ink),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (visible.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text(
+              'No teams match that search.',
+              textAlign: TextAlign.center,
+              style: CkType.body(fontSize: 13, color: CkColors.muted),
+            ),
+          )
+        else
+          for (final t in visible)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _TeamRow(
+                team: t,
+                selected: selected?.id == t.id,
+                onTap: () => onPick(t),
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Expanded(child: Divider(color: CkColors.hairline)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(
-                    'OR DIRECT 1-ON-1 CHALLENGE',
-                    style: CkType.mono(fontSize: 9.5, fontWeight: FontWeight.w700, color: CkColors.muted),
-                  ),
-                ),
-                const Expanded(child: Divider(color: CkColors.hairline)),
-              ],
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search specific opponent team',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: CkColors.hairline),
-                ),
-                prefixIcon: const Icon(Icons.search, size: 18),
-                isDense: true,
-              ),
-              onChanged: onSearch,
-            ),
-            const SizedBox(height: 12),
-            for (final t in visible)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: _TeamRow(
-                  team: t,
-                  selected: selected?.id == t.id && !isOpen,
-                  onTap: () => onPick(t),
-                ),
-              ),
-            if (visible.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Text('No teams match your search.',
-                    textAlign: TextAlign.center),
-              ),
-          ],
-        );
-      },
+      ],
     );
   }
 }

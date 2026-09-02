@@ -118,6 +118,38 @@ class MatchesRemoteDataSource {
   /// Matches the signed-in user actually participates in — they created it, a
   /// team they're a member of is playing, or they're an assigned official —
   /// newest first.
+  /// Every match in [statuses], optionally windowed by scheduled start.
+  ///
+  /// A plain read, not `list_my_matches`: the Matches tab is the world's
+  /// board, and `matches_read_all` is `using (true)`, so the whole fixture
+  /// list is public. Narrowing it to the viewer is what the side panel does.
+  Future<List<MatchDto>> listPublic({
+    required Iterable<String> statuses,
+    DateTime? from,
+    DateTime? to,
+    bool newestFirst = false,
+    int limit = 200,
+  }) async {
+    try {
+      var query = _supabase
+          .from(_matches)
+          .select()
+          .inFilter('status', statuses.toList());
+      if (from != null) {
+        query = query.gte('scheduled_start_time', from.toIso8601String());
+      }
+      if (to != null) {
+        query = query.lte('scheduled_start_time', to.toIso8601String());
+      }
+      final rows = await query
+          .order('scheduled_start_time', ascending: !newestFirst)
+          .limit(limit);
+      return rows.map(MatchDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
   Future<List<MatchDto>> list() async {
     try {
       final rows = await _supabase.rpc<List<dynamic>>('list_my_matches');

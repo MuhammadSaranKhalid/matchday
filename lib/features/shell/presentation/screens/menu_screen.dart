@@ -17,7 +17,7 @@ import '../../../profile/domain/entities/player_profile.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 
-// ─── Panel glyph set ────────────────────────────────────────────────────────
+// ─── Menu glyph set ─────────────────────────────────────────────────────────
 //
 // The Side Panel design redraws the house glyphs on a 24 viewBox at stroke 1.8
 // with round caps and joins. Five are new to the app (settings, help, trophy,
@@ -62,23 +62,12 @@ abstract final class _Glyphs {
       '<path d="M17 8.6l3.4 3.4-3.4 3.4"/>'
       '<path d="M20.4 12h-8.2"/>';
   static const chevronRight = '<path d="M9.5 5.5l6.5 6.5-6.5 6.5"/>';
-  static const close = '<path d="M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8"/>';
 }
-
-/// `shadow-2` — the app's larger of two shadow tokens. Replaces the Material
-/// elevation-16 the drawer used to carry, which reads far too heavy on paper.
-const _shadow2 = <BoxShadow>[
-  BoxShadow(color: Color(0x12281E0F), offset: Offset(0, 8), blurRadius: 28),
-  BoxShadow(color: Color(0x0A281E0F), offset: Offset(0, 2), blurRadius: 6),
-];
 
 /// Hairline inside the live card. One step of the existing ramp, sitting
 /// between `redSoft` (#F7E6E1) and the red ink — a plain `hairline` is a cool
 /// grey and reads as dirt on the red tint.
 const _redSoftHairline = Color(0xFFEFD8D2);
-
-/// The outer (right) edge of the panel is the only rounded one.
-const _panelRadius = BorderRadius.horizontal(right: Radius.circular(20));
 
 /// Row metrics track the OS text scale, so a row keeps its proportions rather
 /// than having a fixed-size glyph float in a growing box: at 120% the design's
@@ -116,14 +105,19 @@ String _playerRoleLabel(PlayerRole? r) => switch (r) {
   null => '',
 };
 
-/// The authenticated side navigation panel.
+/// The **Menu** tab — the "you" half of the app's navigation.
 ///
-/// Organising principle: "Bottom nav is the world; side panel is you." The
-/// panel is **nouns only, no verbs** — every destination owns its own create
-/// button one tap deeper.
+/// Organising principle: "Bottom nav is the world; Menu is you." The screen is
+/// **nouns only, no verbs** — every destination owns its own create button one
+/// tap deeper.
 ///
-/// Ported from the Side Panel canvas (Claude Design project "Matchday mobile
-/// app design", `Side Panel.dc.html`). It draws five states off the same tree:
+/// Was `AppDrawer`, a `Scaffold.drawer` side panel, until it became the fifth
+/// shell branch (`/menu`). The move killed the edge-drag's gesture fight with
+/// [SwipeableBranchView]'s horizontal tab pager and put the entry point in the
+/// thumb-reachable bottom nav instead of the top-left corner. Everything below
+/// the container is the original Side Panel canvas (Claude Design project
+/// "Matchday mobile app design", `Side Panel.dc.html`), unchanged — it still
+/// draws five states off the same tree:
 ///
 /// * **A · Default** — populated, with the current destination carrying the
 ///   place marker (paper2 fill + a 3×20 red rail).
@@ -136,8 +130,8 @@ String _playerRoleLabel(PlayerRole? r) => switch (r) {
 ///   real; only account-scoped values shim, so nothing jumps on resolve.
 /// * **E · Overflow** — rows are min-height, not height, so 120% text scale
 ///   grows them (56 → 67) instead of clipping.
-class AppDrawer extends ConsumerWidget {
-  const AppDrawer({super.key});
+class MenuScreen extends ConsumerWidget {
+  const MenuScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -214,158 +208,120 @@ class AppDrawer extends ConsumerWidget {
         (poolCount ?? 0) == 0;
 
     final here = GoRouter.of(context).state.uri.path;
-    final width = clampDouble(
-      MediaQuery.sizeOf(context).width * 0.86,
-      320,
-      420,
-    );
 
-    return Semantics(
-      scopesRoute: true,
-      namesRoute: true,
-      explicitChildNodes: true,
-      label: MaterialLocalizations.of(context).drawerLabel,
-      // Sized exactly as Material's own Drawer does. An `Align` here would
-      // report the full screen width to the DrawerController, whose reveal
-      // animation is a `widthFactor` on this child — the panel would then
-      // slide across the whole screen instead of its own 335.
-      child: ConstrainedBox(
-        constraints: BoxConstraints.expand(width: width),
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            color: CkColors.paper,
-            borderRadius: _panelRadius,
-            boxShadow: _shadow2,
+    // No Scaffold and no SafeArea: [AppShell] owns both, plus the shared
+    // V2Header above and V2BottomNav below. This is a branch body, not a route
+    // with its own chrome.
+    return Material(
+      color: CkColors.paper,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Identity(
+            loading: identityLoading,
+            name: displayName,
+            subline: subline,
+            avatarUrl: profile?.avatarUrl,
+            postsCount: postsCount,
+            followersCount: followersCount,
           ),
-          child: ClipRRect(
-            borderRadius: _panelRadius,
-            child: Material(
-              color: CkColors.paper,
-              child: SafeArea(
-                right: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _Identity(
-                      loading: identityLoading,
-                      name: displayName,
-                      subline: subline,
-                      avatarUrl: profile?.avatarUrl,
-                      postsCount: postsCount,
-                      followersCount: followersCount,
-                    ),
-                    const Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: CkColors.hairline,
-                    ),
+          const Divider(height: 1, thickness: 1, color: CkColors.hairline),
 
-                    // B · the hero state.
-                    if (live != null) _LiveCard(match: live),
+          // B · the hero state.
+          if (live != null) _LiveCard(match: live),
 
-                    // C · one sentence that states the rule of the panel.
-                    if (firstRun) const _OrientationNote(),
+          // C · one sentence that states the rule of the panel.
+          if (firstRun) const _OrientationNote(),
 
-                    Expanded(
-                      child: ListView(
-                        padding: EdgeInsets.zero,
-                        children: [
-                          const _Eyebrow('Yours'),
-                          _NavRow(
-                            glyph: _Glyphs.matches,
-                            label: 'My Matches',
-                            empty: firstRun,
-                            subtitle: 'Fixtures you are playing in',
-                            badge: matchBadge,
-                            badgeTone: matchTone,
-                            skeletonWidth: 46,
-                            loading: countsLoading,
-                            current: here.startsWith('/my/matches'),
-                            route: '/my/matches',
-                          ),
-                          _NavRow(
-                            glyph: _Glyphs.teams,
-                            label: 'My Teams',
-                            empty: firstRun,
-                            subtitle: 'Squads you own or belong to',
-                            badge: (teamCount ?? 0) > 0 ? '$teamCount' : null,
-                            skeletonWidth: 22,
-                            loading: countsLoading,
-                            current:
-                                here.startsWith('/my/teams') ||
-                                here.startsWith('/teams'),
-                            route: '/my/teams',
-                          ),
-                          _NavRow(
-                            glyph: _Glyphs.pool,
-                            label: 'My challenges',
-                            empty: firstRun,
-                            subtitle: 'Challenges you posted',
-                            badge:
-                                (poolCount ?? 0) > 0 ? '$poolCount open' : null,
-                            skeletonWidth: 38,
-                            loading: countsLoading,
-                            current: here.startsWith('/my/pool-requests'),
-                            route: '/my/pool-requests',
-                          ),
-                          _NavRow(
-                            glyph: _Glyphs.trophy,
-                            label: 'My Tournaments',
-                            empty: firstRun,
-                            subtitle: 'Cups & leagues you organize or follow',
-                            skeletonWidth: 38,
-                            loading: countsLoading,
-                            current:
-                                here.startsWith('/my/tournaments') ||
-                                here.startsWith('/tournaments'),
-                            route: '/my/tournaments',
-                          ),
-
-                          const _GroupRule(),
-                          const _Eyebrow('Account'),
-                          _NavRow(
-                            glyph: _Glyphs.bookmark,
-                            label: 'Saved',
-                            current: here.startsWith('/saved'),
-                            route: '/saved',
-                          ),
-                          _NavRow(
-                            glyph: _Glyphs.settings,
-                            label: 'Settings',
-                            current: here.startsWith('/settings'),
-                            route: '/settings',
-                          ),
-                          const _NavRow(
-                            glyph: _Glyphs.help,
-                            label: 'Help & Support',
-                            inert: true,
-                          ),
-
-                          const _GroupRule(),
-                          const _Eyebrow('Not built yet'),
-                          const _NavRow(
-                            glyph: _Glyphs.clubs,
-                            label: 'Clubs',
-                            inert: true,
-                            roadmap: true,
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                      ),
-                    ),
-
-                    const Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: CkColors.hairline,
-                    ),
-                    const _Footer(),
-                  ],
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                const _Eyebrow('Yours'),
+                _NavRow(
+                  glyph: _Glyphs.matches,
+                  label: 'My Matches',
+                  empty: firstRun,
+                  subtitle: 'Fixtures you are playing in',
+                  badge: matchBadge,
+                  badgeTone: matchTone,
+                  skeletonWidth: 46,
+                  loading: countsLoading,
+                  current: here.startsWith('/my/matches'),
+                  route: '/my/matches',
                 ),
-              ),
+                _NavRow(
+                  glyph: _Glyphs.teams,
+                  label: 'My Teams',
+                  empty: firstRun,
+                  subtitle: 'Squads you own or belong to',
+                  badge: (teamCount ?? 0) > 0 ? '$teamCount' : null,
+                  skeletonWidth: 22,
+                  loading: countsLoading,
+                  current:
+                      here.startsWith('/my/teams') || here.startsWith('/teams'),
+                  route: '/my/teams',
+                ),
+                _NavRow(
+                  glyph: _Glyphs.pool,
+                  label: 'My Challenges',
+                  empty: firstRun,
+                  subtitle: 'Challenges you posted',
+                  badge: (poolCount ?? 0) > 0 ? '$poolCount open' : null,
+                  skeletonWidth: 38,
+                  loading: countsLoading,
+                  current: here.startsWith('/my/pool-requests'),
+                  route: '/my/pool-requests',
+                ),
+                _NavRow(
+                  glyph: _Glyphs.trophy,
+                  label: 'My Tournaments',
+                  empty: firstRun,
+                  subtitle: 'Cups & leagues you organize or follow',
+                  skeletonWidth: 38,
+                  loading: countsLoading,
+                  current:
+                      here.startsWith('/my/tournaments') ||
+                      here.startsWith('/tournaments'),
+                  route: '/my/tournaments',
+                ),
+
+                const _GroupRule(),
+                const _Eyebrow('Account'),
+                _NavRow(
+                  glyph: _Glyphs.bookmark,
+                  label: 'Saved',
+                  current: here.startsWith('/saved'),
+                  route: '/saved',
+                ),
+                _NavRow(
+                  glyph: _Glyphs.settings,
+                  label: 'Settings',
+                  current: here.startsWith('/settings'),
+                  route: '/settings',
+                ),
+                const _NavRow(
+                  glyph: _Glyphs.help,
+                  label: 'Help & Support',
+                  inert: true,
+                ),
+
+                const _GroupRule(),
+                const _Eyebrow('Not built yet'),
+                const _NavRow(
+                  glyph: _Glyphs.clubs,
+                  label: 'Clubs',
+                  inert: true,
+                  roadmap: true,
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
           ),
-        ),
+
+          const Divider(height: 1, thickness: 1, color: CkColors.hairline),
+          const _Footer(),
+        ],
       ),
     );
   }
@@ -392,23 +348,23 @@ class _Identity extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final close = _CloseButton(onTap: () => Navigator.of(context).pop());
-
     if (loading) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+      // Fully const since the close button left with the drawer — the whole
+      // skeleton is now static.
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(18, 14, 14, 14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const CkShimmer(
+            CkShimmer(
               child: CkShimmerBox(
                 width: 48,
                 height: 48,
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 14),
-            const Expanded(
+            SizedBox(width: 14),
+            Expanded(
               child: Padding(
                 padding: EdgeInsets.only(top: 3),
                 child: CkShimmer(
@@ -425,8 +381,6 @@ class _Identity extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 14),
-            close,
           ],
         ),
       );
@@ -440,10 +394,7 @@ class _Identity extends StatelessWidget {
             : '$postsCount POSTS · $followersCount FOLLOWERS';
 
     return _Pressable(
-      onTap: () {
-        Navigator.of(context).pop();
-        context.push('/profile');
-      },
+      onTap: () => context.push('/profile'),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
         child: Row(
@@ -495,49 +446,7 @@ class _Identity extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 14),
-            close,
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 36dp disc inside a 44dp tap target — the old 30dp button was under the
-/// minimum. The −4 margin keeps the disc's optical edge on the 14dp padding.
-class _CloseButton extends StatelessWidget {
-  const _CloseButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.translate(
-      offset: const Offset(4, -4),
-      child: Semantics(
-        button: true,
-        label: MaterialLocalizations.of(context).closeButtonTooltip,
-        child: GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: SizedBox(
-            width: 44,
-            height: 44,
-            child: Center(
-              child: Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: CkColors.paper2,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: CkColors.hairline),
-                ),
-                child: const V2Svg(_Glyphs.close, size: 17),
-              ),
-            ),
-          ),
         ),
       ),
     );
@@ -559,10 +468,7 @@ class _LiveCard extends StatelessWidget {
         radius: BorderRadius.circular(14),
         pressedColor: _redSoftHairline,
         restColor: CkColors.redSoft,
-        onTap: () {
-          Navigator.of(context).pop();
-          context.push('/matches/${match.matchId}');
-        },
+        onTap: () => context.push('/matches/${match.matchId}'),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
           child: Column(
@@ -1020,13 +926,7 @@ class _NavRow extends StatelessWidget {
       children: [
         _Pressable(
           restColor: current ? CkColors.paper2 : null,
-          onTap:
-              route == null
-                  ? null
-                  : () {
-                    Navigator.of(context).pop();
-                    context.push(route!);
-                  },
+          onTap: route == null ? null : () => context.push(route!),
           child: body,
         ),
         // Place marker: 3 × 20 rail at x = 0, vertically centred. One row max.
@@ -1170,7 +1070,6 @@ class _Footer extends ConsumerWidget {
                 ),
                 onTap: () async {
                   Navigator.of(dialogCtx).pop();
-                  Navigator.of(context).pop();
                   await ref.read(authControllerProvider.notifier).signOut();
                 },
               ),

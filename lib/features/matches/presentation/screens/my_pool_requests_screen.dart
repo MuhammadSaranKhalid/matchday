@@ -3,378 +3,191 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/ck_button.dart';
-import '../../../../core/widgets/v2/v2_kit.dart';
-import '../../../teams/domain/entities/team.dart';
+import '../../../../core/widgets/ck_push_nav.dart';
 import '../providers/match_pool_providers.dart';
-import '../providers/matches_feed_providers.dart';
+import '../widgets/host/host_kit.dart';
+import '../widgets/host/my_challenge_card.dart';
+import '../widgets/pool/pool_icons.dart';
+import '../widgets/pool/pool_states.dart';
 
-/// Dedicated screen for managing the user's active Open Match Pool requests.
+/// My challenges (`/my/pool-requests`) — `Pool.dc.html` artboards 12 and 13.
+///
+/// The host's own fixtures. This is a you-noun, so it is reached from the side
+/// panel rather than the bottom nav, and unlike the Pool board it *does*
+/// create: posting starts here.
 class MyPoolRequestsScreen extends ConsumerWidget {
   const MyPoolRequestsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final requestsAsync = ref.watch(myPoolRequestsProvider);
+    final view = ref.watch(myChallengesProvider);
+
+    // This screen is the pool's own surface, so both CTAs post an open
+    // challenge. The wizard drops its open-vs-direct step accordingly.
+    void post() => context.push('/matches/send-challenge?mode=open');
 
     return Scaffold(
       backgroundColor: CkColors.paper,
-      appBar: AppBar(
-        backgroundColor: CkColors.paper,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: CkColors.ink),
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/home'),
-        ),
-        title: Text(
-          'My challenges',
-          style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_rounded, color: CkColors.ink),
-            tooltip: 'Post a pool request',
-            onPressed: () => context.push('/matches/send-challenge'),
+      body: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: CkPushNav(
+              title: 'My Challenges',
+              onBack: () =>
+                  context.canPop() ? context.pop() : context.go('/pool'),
+              // The create action stays pinned at the bottom (artboard 12), so
+              // the nav's trailing slot carries the live count instead.
+              action: switch (view) {
+                AsyncData(value: final v) when v.live.isNotEmpty =>
+                  CkNavCount('${v.live.length} live'),
+                _ => null,
+              },
+            ),
           ),
-          const SizedBox(width: 8),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(color: CkColors.hairline, height: 1),
-        ),
-      ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: CkColors.ink,
-          backgroundColor: CkColors.paper,
-          onRefresh: () async {
-            ref.invalidate(myPoolRequestsProvider);
-          },
-          child: requestsAsync.when(
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator(color: CkColors.ink),
-              ),
-            ),
-            error: (e, _) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Failed to load pool requests: $e',
-                  style: CkType.body(fontSize: 12),
+          Expanded(
+            child: switch (view) {
+              AsyncLoading() => const _Scroll(child: PoolLoadingState()),
+              AsyncError(:final error) => Center(
+                  child: PoolErrorState(
+                    onRetry: () => ref.invalidate(myChallengesProvider),
+                    code: error.toString(),
+                  ),
                 ),
-              ),
-            ),
-            data: (myRequests) {
-              if (myRequests.isEmpty) {
-                return ListView(
-                  padding: const EdgeInsets.all(24),
-                  children: [
-                    const SizedBox(height: 48),
-                    Center(
-                      child: Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          color: CkColors.paper2,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: CkColors.hairline),
-                        ),
-                        child: const Icon(
-                          Icons.radar_rounded,
-                          size: 32,
-                          color: CkColors.muted,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'No Active Pool Requests',
-                      textAlign: TextAlign.center,
-                      style: CkType.display(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'You do not have any open match pool requests right now. Post a request to receive match proposals from local teams.',
-                      textAlign: TextAlign.center,
-                      style: CkType.body(
-                        fontSize: 13,
-                        color: CkColors.muted,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Center(
-                      child: CkButton(
-                        label: '+ Post a pool request',
-                        onPressed: () {
-                          context.push('/matches/send-challenge');
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                itemCount: myRequests.length + 1,
-                itemBuilder: (context, idx) {
-                  if (idx == 0) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(
-                        'OPEN POOL REQUESTS HOSTED BY YOUR TEAMS (${myRequests.length})',
-                        style: CkType.mono(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.1,
-                          color: CkColors.muted,
-                        ),
-                      ),
-                    );
-                  }
-                  final item = myRequests[idx - 1];
-                  return _MyPoolRequestItem(
-                    item: item,
-                    onTap: () {
-                      context.push('/challenges/${item.request.id.value}');
-                    },
-                  );
-                },
-              );
+              AsyncData(value: final v) when v.isEmpty =>
+                _Empty(onPost: post),
+              AsyncData(value: final v) => _List(view: v),
             },
           ),
-        ),
+          if (view.value?.isEmpty == false)
+            HostBottomBar(
+              child: HostActionButton(
+                label: 'New challenge',
+                icon: PoolIcons.plusPaper,
+                onTap: post,
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
-class _MyPoolRequestItem extends ConsumerWidget {
-  const _MyPoolRequestItem({required this.item, required this.onTap});
+/// Artboard 12 — live challenges, then the settled ledger.
+class _List extends ConsumerWidget {
+  const _List({required this.view});
 
-  final OpenMatchPoolItem item;
-  final VoidCallback onTap;
-
-  String _teamShort(Team? team) {
-    if (team == null) return 'TM';
-    if (team.logoMonogram != null && team.logoMonogram!.isNotEmpty) {
-      return team.logoMonogram!;
-    }
-    final name = team.name;
-    if (name.length >= 2) {
-      final parts = name.split(' ');
-      if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
-        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-      }
-      return name.substring(0, 2).toUpperCase();
-    }
-    return name.toUpperCase();
-  }
-
-  Color _teamColor(Team? team) {
-    if (team == null || team.primaryColor == null) return CkColors.red;
-    final hex = team.primaryColor!.replaceAll('#', '');
-    final val = int.tryParse(hex, radix: 16);
-    if (val == null) return CkColors.red;
-    return Color(0xFF000000 | val);
-  }
+  final MyChallengesView view;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final from = item.fromTeam;
-    final appsAsync =
-        ref.watch(challengePoolApplicationsProvider(item.request.id.value));
-    final applications = appsAsync.value ?? const [];
-    final pendingCount =
-        applications.where((a) => a.status.name == 'pending').length;
+    void open(String id) => context.push('/challenges/$id');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Crest(
-                      short: _teamShort(from),
-                      color: _teamColor(from),
-                      size: 42,
-                      radius: 12,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  from?.name ?? 'Your Team',
-                                  style: CkType.display(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Pill(label: 'HOSTING', tone: PillTone.amber),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${item.formatLabel} · ${item.venue}',
-                            style: CkType.body(fontSize: 12.5, color: CkColors.ink2),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: CkColors.paper2,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: CkColors.hairline),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'CODE',
-                            style: CkType.mono(
-                              fontSize: 8,
-                              fontWeight: FontWeight.w700,
-                              color: CkColors.muted,
-                            ),
-                          ),
-                          Text(
-                            item.shareCode,
-                            style: CkType.mono(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.14,
-                              color: CkColors.ink,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: pendingCount > 0
-                        ? const Color(0xFFFEF3C7)
-                        : CkColors.paper2,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: pendingCount > 0
-                          ? const Color(0xFFFCD34D)
-                          : CkColors.hairline,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        pendingCount > 0
-                            ? Icons.group_outlined
-                            : Icons.hourglass_empty_rounded,
-                        size: 16,
-                        color: pendingCount > 0
-                            ? const Color(0xFF92400E)
-                            : CkColors.muted,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          pendingCount > 0
-                              ? '$pendingCount team proposal${pendingCount > 1 ? 's' : ''} waiting for review'
-                              : 'Request is live. Waiting for applicant teams...',
-                          style: CkType.mono(
-                            fontSize: 11,
-                            fontWeight: pendingCount > 0
-                                ? FontWeight.w700
-                                : FontWeight.w600,
-                            color: pendingCount > 0
-                                ? const Color(0xFF92400E)
-                                : CkColors.ink2,
-                          ),
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 18,
-                        color: CkColors.ink,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.access_time_rounded,
-                      size: 13.5,
-                      color: CkColors.muted,
-                    ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        item.timeLabel,
-                        style: CkType.body(
-                          fontSize: 11.5,
-                          color: CkColors.muted,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Review Applications →',
-                      style: CkType.body(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: CkColors.ink,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+    return RefreshIndicator(
+      color: CkColors.ink,
+      backgroundColor: CkColors.paper,
+      onRefresh: () async {
+        ref.invalidate(myChallengesProvider);
+        await ref.read(myChallengesProvider.future);
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+        children: [
+          for (final row in view.live) ...[
+            MyChallengeCard(
+              row: row,
+              onTap: () => open(row.request.id.value),
             ),
-          ),
-        ),
+            const SizedBox(height: 13),
+          ],
+          if (view.past.isNotEmpty) ...[
+            const HostSectionLabel(
+              'Past · closed',
+              padding: EdgeInsets.symmetric(vertical: 4),
+            ),
+            const SizedBox(height: 4),
+            for (final row in view.past) ...[
+              PastChallengeRow(
+                row: row,
+                onTap: () => open(row.request.id.value),
+              ),
+              const SizedBox(height: 13),
+            ],
+          ],
+        ],
       ),
     );
   }
+}
+
+/// Artboard 13 — nothing posted yet. Unlike the Pool board's empty state this
+/// one *does* route into the wizard: creating is what this screen is for.
+class _Empty extends StatelessWidget {
+  const _Empty({required this.onPost});
+
+  final VoidCallback onPost;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(34, 0, 34, 40),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: CkColors.line),
+            ),
+            child: const PoolIcon(PoolIcons.silentBoardMuted, size: 26),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'No challenges yet',
+            textAlign: TextAlign.center,
+            style: CkType.display(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: CkColors.ink,
+              letterSpacing: -0.01,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 270,
+            child: Text(
+              'Post an open challenge to the pool and any team can apply. '
+              "You'll manage applicants right here.",
+              textAlign: TextAlign.center,
+              style: CkType.body(
+                fontSize: 13,
+                height: 1.6,
+                color: CkColors.muted,
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            width: double.infinity,
+            child: HostActionButton(label: 'Post a challenge', onTap: onPost),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Scroll extends StatelessWidget {
+  const _Scroll({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      SingleChildScrollView(child: child);
 }

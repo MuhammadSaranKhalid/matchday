@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/widgets/ck_push_nav.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../domain/entities/my_tournament_entry.dart';
 import '../../domain/entities/tournament_live_match.dart';
@@ -136,67 +137,15 @@ class _Nav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        children: [
-          InkWell(
-            onTap: () => context.pop(),
-            customBorder: const CircleBorder(),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: CkColors.paper2,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.arrow_back, size: 18, color: CkColors.ink),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'My Tournaments',
-              style: CkType.display(fontSize: 17),
-            ),
-          ),
-          if (showCreate)
-            Material(
-              color: CkColors.ink,
-              borderRadius: BorderRadius.circular(999),
-              child: InkWell(
-                onTap: () => context.push('/tournaments/create'),
-                borderRadius: BorderRadius.circular(999),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 13,
-                    vertical: 9,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.add, size: 12, color: CkColors.paper),
-                      const SizedBox(width: 6),
-                      Text(
-                        'CREATE',
-                        style: CkType.mono(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.10,
-                          color: CkColors.paper,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+    return CkPushNav(
+      title: 'My Tournaments',
+      onBack: () => context.pop(),
+      action: showCreate
+          ? CkNavPill(
+              label: 'Create',
+              onTap: () => context.push('/tournaments/create'),
+            )
+          : null,
     );
   }
 }

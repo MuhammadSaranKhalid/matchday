@@ -26,6 +26,18 @@ abstract class MatchesRepository {
   /// Matches involving any team the user owns/manages.
   Future<Either<Failure, List<Match>>> listMyMatches();
 
+  /// Every match in [statuses], for the Matches tab's public board.
+  ///
+  /// Distinct from [listMyMatches] on purpose: the bottom nav shows the world,
+  /// the side panel shows you. Windowed by scheduled start so "Upcoming" and
+  /// "Finished" stay to a week either side rather than the whole archive.
+  Future<Either<Failure, List<Match>>> listPublicMatches({
+    required Set<MatchStatus> statuses,
+    DateTime? from,
+    DateTime? to,
+    bool newestFirst = false,
+  });
+
   /// Per-team innings totals (runs/wickets/overs) for a set of matches,
   /// aggregated from the `balls` table. Used by My Matches past tiles.
   /// Matches with no balls return an empty list. Returns a map keyed by

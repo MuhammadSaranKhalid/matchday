@@ -115,6 +115,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             onSubmitted: (_) => notifier.commitCurrentQuery(),
             loading: state.loading,
             statusMuted: state.loading,
+            showBack: true,
+            onBack: () {
+              _focus.unfocus();
+              Navigator.of(context).maybePop();
+            },
           ),
           Expanded(
             child: RefreshIndicator(

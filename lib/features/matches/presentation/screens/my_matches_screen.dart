@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/widgets/ck_push_nav.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../domain/entities/match_request.dart';
 import '../providers/matches_providers.dart';
@@ -30,11 +31,14 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
         bottom: false,
         child: Column(
           children: [
-            _Header(
-              title: 'My matches',
+            CkPushNav(
+              title: 'My Matches',
               onBack: () =>
                   context.canPop() ? context.pop() : context.go('/home'),
-              right: const _ChallengeButton(),
+              action: CkNavPill(
+                label: 'Challenge',
+                onTap: () => context.push('/challenge'),
+              ),
             ),
             Expanded(
               child: async.when(
@@ -192,73 +196,6 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
 // ═══════════════════════════════════════════════════════════════════════════
 // Header
 // ═══════════════════════════════════════════════════════════════════════════
-
-/// Back chevron + title + optional right widget. Matches the in-Pavilion
-/// `_PvHeader` look so the visual transition from Pavilion → this screen is
-/// invisible.
-class _Header extends StatelessWidget {
-  const _Header({required this.title, this.onBack, this.right});
-
-  final String title;
-  final VoidCallback? onBack;
-  final Widget? right;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (onBack != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 2, right: 8),
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onBack,
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: V2Svg(
-                    V2Icons.chevronLeft,
-                    size: 22,
-                    color: CkColors.ink,
-                    strokeWidth: 2,
-                  ),
-                ),
-              ),
-            ),
-          Expanded(child: Text(title, style: _display(22))),
-          if (right != null) ...[const SizedBox(width: 12), right!],
-        ],
-      ),
-    );
-  }
-}
-
-class _ChallengeButton extends StatelessWidget {
-  const _ChallengeButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => context.push('/challenge'),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: CkColors.hairline),
-        ),
-        child: Text('+ Challenge',
-            style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600)),
-      ),
-    );
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // State views (loading / error / empty)
@@ -1340,11 +1277,3 @@ TextStyle _monoLabel({Color color = CkColors.muted}) => CkType.mono(
       color: color,
     );
 
-/// display(size): Inter Tight 700 / -0.025em / line-height 1.05.
-TextStyle _display(double size, {Color color = CkColors.ink}) => CkType.display(
-      fontSize: size,
-      fontWeight: FontWeight.w700,
-      letterSpacing: -0.025,
-      height: 1.05,
-      color: color,
-    );

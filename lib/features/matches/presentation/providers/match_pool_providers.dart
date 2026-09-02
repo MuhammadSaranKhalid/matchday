@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../data/datasources/matches_datasource_providers.dart';
 import '../../data/repositories/match_pool_repository_impl.dart';
@@ -113,6 +114,103 @@ Future<List<OpenMatchPoolItem>> myPoolRequests(Ref ref) async {
   }
 
   return items;
+}
+
+/// One row on the host's My-challenges screen — `Pool.dc.html` artboard 12.
+class MyChallengeRow {
+  const MyChallengeRow({
+    required this.item,
+    required this.pendingApplicants,
+    this.opponent,
+  });
+
+  final OpenMatchPoolItem item;
+
+  /// Pending applications only. This is the one place the count appears.
+  final int pendingApplicants;
+
+  /// The team that was accepted, on a settled row. Null while the challenge
+  /// is still live, or if it closed without a match.
+  final Team? opponent;
+
+  MatchRequest get request => item.request;
+  bool get isLive => request.status == MatchRequestStatus.pending;
+
+  /// The "Past · closed" pill: a settled challenge either produced a match or
+  /// simply ran out.
+  bool get matched => request.status == MatchRequestStatus.accepted;
+}
+
+/// The host's own challenges, split live / settled.
+class MyChallengesView {
+  const MyChallengesView({required this.live, required this.past});
+
+  final List<MyChallengeRow> live;
+  final List<MyChallengeRow> past;
+
+  bool get isEmpty => live.isEmpty && past.isEmpty;
+}
+
+@riverpod
+Future<MyChallengesView> myChallenges(Ref ref) async {
+  final repo = ref.watch(matchPoolRepositoryProvider);
+  final myTeams = await ref.watch(myTeamsProvider.future);
+  final myTeamIds = myTeams.map((t) => t.id).toSet();
+  if (myTeamIds.isEmpty) {
+    return const MyChallengesView(live: [], past: []);
+  }
+
+  final result = await repo.getMyPoolChallenges(myTeamIds: myTeamIds);
+  final challenges = result.fold<List<MatchRequest>>(
+    (failure) => throw Exception(failure.message),
+    (list) => list,
+  );
+
+  final rows = <MyChallengeRow>[];
+  for (final req in challenges) {
+    final fromTeam = await ref.watch(teamProvider(req.fromTeamId.value).future);
+
+    // The applications carry both the pending count the card shows and, once
+    // settled, the opponent it settled on — so one read serves both.
+    final apps = (await repo.listPoolApplications(req.id)).getOrElse((_) => const []);
+    final accepted = apps
+        .where((a) => a.status == PoolApplicationStatus.accepted)
+        .firstOrNull;
+    final opponent = accepted == null
+        ? null
+        : await ref.watch(teamProvider(accepted.applicantTeamId.value).future);
+
+    rows.add(
+      MyChallengeRow(
+        item: OpenMatchPoolItem(
+          request: req,
+          fromTeam: fromTeam,
+          formatLabel: '',
+          venue: req.proposedVenue ?? '',
+          shareCode: req.shareCode ?? '',
+          timeLabel: '',
+        ),
+        pendingApplicants:
+            apps.where((a) => a.status == PoolApplicationStatus.pending).length,
+        opponent: opponent,
+      ),
+    );
+  }
+
+  int byStart(MyChallengeRow a, MyChallengeRow b) {
+    final x = a.item.startTime;
+    final y = b.item.startTime;
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return x.compareTo(y);
+  }
+
+  final live = rows.where((r) => r.isLive).toList()..sort(byStart);
+  final past = rows.where((r) => !r.isLive).toList()
+    ..sort((a, b) => b.request.updatedAt.compareTo(a.request.updatedAt));
+
+  return MyChallengesView(live: live, past: past);
 }
 
 /// Applications for a specific match pool challenge.

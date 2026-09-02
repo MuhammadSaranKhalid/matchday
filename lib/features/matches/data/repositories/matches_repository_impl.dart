@@ -97,6 +97,30 @@ class MatchesRepositoryImpl implements MatchesRepository {
   }
 
   @override
+  Future<Either<Failure, List<Match>>> listPublicMatches({
+    required Set<MatchStatus> statuses,
+    DateTime? from,
+    DateTime? to,
+    bool newestFirst = false,
+  }) async {
+    try {
+      final dtos = await _remote.listPublic(
+        statuses: statuses.map((s) => s.wire),
+        from: from,
+        to: to,
+        newestFirst: newestFirst,
+      );
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, Map<MatchId, List<InningsSummary>>>>
       listInningsForMatches(Iterable<MatchId> matchIds) async {
     try {

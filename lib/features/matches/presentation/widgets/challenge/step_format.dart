@@ -1,328 +1,364 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
-import '../../../../../core/widgets/v2/v2_kit.dart';
-import '../../../domain/entities/format_preset.dart';
 import '../../../domain/entities/match.dart';
-import '../../providers/matches_providers.dart';
-import 'ch_icons.dart';
-import 'ch_section_label.dart';
+import '../wizard/wizard_kit.dart';
 
-/// "How will we play" — match-format picker.
+/// Match format — `Pool.dc.html` artboard 07.
 ///
-/// 2-col tile grid of every active [FormatPreset] from the backend catalog
-/// + a read-only DETAIL strip + the "SAME FORMAT FOR BOTH TEAMS" caption.
-/// Per the final landing in `chat1.md`, there are NO knob overrides — the
-/// preset's [MatchFormat] snapshot is what ships.
-///
-/// API:
-/// * [selectedPresetId] — the currently-picked preset's id (or null on first
-///   render; the tile grid simply shows nothing selected).
-/// * [onPicked] — fired when the user taps a tile. Forwards the whole
-///   [FormatPreset] so callers can both store the id and snapshot the
-///   format jsonb.
-class StepFormat extends ConsumerWidget {
+/// Replaces the preset grid this step used to show. The design asks the three
+/// questions directly — overs, ball, side count — because that is what a
+/// captain is actually deciding, and previews the exact spec string that will
+/// land on the challenge card so there is no gap between what you set and what
+/// other teams read.
+class StepFormat extends StatelessWidget {
   const StepFormat({
     super.key,
-    required this.selectedPresetId,
-    required this.onPicked,
+    required this.overs,
+    required this.ball,
+    required this.playersPerSide,
+    required this.onOvers,
+    required this.onBall,
+    required this.onPlayers,
   });
 
-  final String? selectedPresetId;
-  final ValueChanged<FormatPreset> onPicked;
+  final int overs;
+  final MatchBallType ball;
+  final int playersPerSide;
+  final ValueChanged<int> onOvers;
+  final ValueChanged<MatchBallType> onBall;
+  final ValueChanged<int> onPlayers;
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(formatPresetsProvider);
-    return async.when(
-      loading: () =>
-          const Center(child: CircularProgressIndicator(color: CkColors.ink)),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          e.toString(),
-          style: CkType.body(fontSize: 12, color: CkColors.muted),
-        ),
-      ),
-      data: (presets) => _Body(
-        presets: presets,
-        selectedPresetId: selectedPresetId,
-        onPicked: onPicked,
-      ),
-    );
-  }
-}
-
-class _Body extends StatelessWidget {
-  const _Body({
-    required this.presets,
-    required this.selectedPresetId,
-    required this.onPicked,
-  });
-
-  final List<FormatPreset> presets;
-  final String? selectedPresetId;
-  final ValueChanged<FormatPreset> onPicked;
+  /// The board's own two ball types. Tennis stays reachable through "Other"
+  /// side counts only — the design offers this binary.
+  static const _balls = {
+    MatchBallType.tape: 'Tape-ball',
+    MatchBallType.leather: 'Leather',
+  };
 
   @override
   Widget build(BuildContext context) {
-    final selected = _findSelected();
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       children: [
-        const ChSectionLabel('Choose a format', hint: 'One tap sets it all'),
-        _PresetGrid(
-          presets: presets,
-          selectedPresetId: selectedPresetId,
-          onPicked: onPicked,
+        const WizardHeading('Match format'),
+        const SizedBox(height: 22),
+        const WizardFieldLabel('Overs per innings'),
+        const SizedBox(height: 12),
+        _OversStepper(value: overs, onChanged: onOvers),
+        const SizedBox(height: 24),
+        const WizardFieldLabel('Ball type'),
+        const SizedBox(height: 12),
+        WizardSegmented<MatchBallType>(
+          options: _balls,
+          selected: _balls.containsKey(ball) ? ball : null,
+          onSelect: onBall,
         ),
-        const SizedBox(height: 16),
-        if (selected != null) _DetailStrip(preset: selected),
-        const SizedBox(height: 14),
-        Center(
-          child: Text(
-            'SAME FORMAT FOR BOTH TEAMS',
-            style: CkType.mono(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.10,
-              color: CkColors.muted,
-            ),
+        const SizedBox(height: 24),
+        const WizardFieldLabel('Players per side'),
+        const SizedBox(height: 12),
+        _PlayersRow(value: playersPerSide, onChanged: onPlayers),
+        const SizedBox(height: 26),
+        _OnTheCard(
+          spec: formatSpecLine(
+            overs: overs,
+            ball: ball,
+            playersPerSide: playersPerSide,
           ),
         ),
-        const SizedBox(height: 12),
       ],
     );
   }
-
-  FormatPreset? _findSelected() {
-    if (selectedPresetId == null) return null;
-    for (final p in presets) {
-      if (p.id == selectedPresetId) return p;
-    }
-    return null;
-  }
 }
 
-/// 2-col preset grid. Uses `IntrinsicHeight` per row so the tiles within a
-/// row share a height (the taller of the two), but each row sizes
-/// independently — mirroring the JSX `grid-template-columns: 1fr 1fr` flow.
-/// `GridView`'s `childAspectRatio` is fixed and would force every tile to
-/// the same height, which makes the row too tall vs. the design.
-class _PresetGrid extends StatelessWidget {
-  const _PresetGrid({
-    required this.presets,
-    required this.selectedPresetId,
-    required this.onPicked,
-  });
+/// "12 overs · Tape-ball · 11-a-side" — the one spec string, built in one
+/// place so the preview here and the card on the board cannot drift apart.
+String formatSpecLine({
+  required int overs,
+  required MatchBallType ball,
+  required int playersPerSide,
+}) {
+  final parts = <String>[
+    if (overs > 0) '$overs overs',
+    switch (ball) {
+      MatchBallType.tape => 'Tape-ball',
+      MatchBallType.leather => 'Leather',
+      MatchBallType.tennis => 'Tennis-ball',
+    },
+    '$playersPerSide-a-side',
+  ];
+  return parts.join(' · ');
+}
 
-  final List<FormatPreset> presets;
-  final String? selectedPresetId;
-  final ValueChanged<FormatPreset> onPicked;
+class _OversStepper extends StatelessWidget {
+  const _OversStepper({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  /// Limited-overs range. 5 is the shortest thing anyone plays; 50 is an ODI.
+  static const _min = 1;
+  static const _max = 50;
 
   @override
   Widget build(BuildContext context) {
-    final rows = <Widget>[];
-    for (var i = 0; i < presets.length; i += 2) {
-      final left = presets[i];
-      final right = i + 1 < presets.length ? presets[i + 1] : null;
-      rows.add(
-        Padding(
-          padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: _PresetTile(
-                    preset: left,
-                    selected: left.id == selectedPresetId,
-                    onTap: () => onPicked(left),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: right == null
-                      ? const SizedBox.shrink()
-                      : _PresetTile(
-                          preset: right,
-                          selected: right.id == selectedPresetId,
-                          onTap: () => onPicked(right),
-                        ),
-                ),
-              ],
-            ),
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: CkColors.line),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _Nub(
+            glyph: '−',
+            filled: false,
+            enabled: value > _min,
+            onTap: () => onChanged(value - 1),
           ),
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: rows,
+          Text(
+            '$value',
+            style: CkType.display(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: CkColors.ink,
+              letterSpacing: -0.02,
+            ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+          ),
+          _Nub(
+            glyph: '+',
+            filled: true,
+            enabled: value < _max,
+            onTap: () => onChanged(value + 1),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _PresetTile extends StatelessWidget {
-  const _PresetTile({
-    required this.preset,
-    required this.selected,
+class _Nub extends StatelessWidget {
+  const _Nub({
+    required this.glyph,
+    required this.filled,
+    required this.enabled,
     required this.onTap,
   });
 
-  final FormatPreset preset;
-  final bool selected;
+  final String glyph;
+  final bool filled;
+  final bool enabled;
   final VoidCallback onTap;
-
-  /// JSX dot colors (`challenge-send.jsx` line 317):
-  /// leather → `#a8332e`, tape → `#d8a85e`, tennis → `#cdd64a`.
-  Color get _dotColor {
-    switch (preset.format.ballType) {
-      case MatchBallType.leather:
-        return const Color(0xFFA8332E);
-      case MatchBallType.tape:
-        return const Color(0xFFD8A85E);
-      case MatchBallType.tennis:
-        return const Color(0xFFCDD64A);
-    }
-  }
-
-  String get _ballLabel {
-    switch (preset.format.ballType) {
-      case MatchBallType.leather:
-        return 'Hardball';
-      case MatchBallType.tape:
-        return 'Tape';
-      case MatchBallType.tennis:
-        return 'Tennis';
-    }
-  }
-
-  String get _overText {
-    final f = preset.format;
-    if (f.ballsPerOver != 6) {
-      return '${f.oversPerInnings * f.ballsPerOver} balls';
-    }
-    return '${f.oversPerInnings} overs';
-  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: selected ? CkColors.paper2 : CkColors.paper,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? CkColors.ink : CkColors.hairline,
-            width: 1.5,
+      behavior: HitTestBehavior.opaque,
+      onTap: enabled ? onTap : null,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.4,
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: filled ? CkColors.ink : CkColors.paper2,
+            borderRadius: BorderRadius.circular(10),
+            border: filled ? null : Border.all(color: CkColors.line),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: _dotColor,
-                    shape: BoxShape.circle,
-                    border: preset.format.ballType == MatchBallType.tennis
-                        ? null
-                        : Border.all(
-                            color: const Color(0x1F000000),
-                            width: 1,
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: Text(
-                    preset.label,
-                    overflow: TextOverflow.ellipsis,
-                    style: CkType.display(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.02,
-                    ),
-                  ),
-                ),
-                if (selected)
-                  const V2Svg(
-                    ChIcons.check,
-                    size: 14,
-                    color: CkColors.ink,
-                    strokeWidth: 2.6,
-                  ),
-              ],
+          child: Text(
+            glyph,
+            style: CkType.display(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: filled ? CkColors.paper : CkColors.muted,
+              letterSpacing: 0,
             ),
-            const SizedBox(height: 9),
-            Text(
-              '$_overText · ${preset.format.playersPerTeam}/side',
-              style: CkType.mono(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.10,
-                color: CkColors.muted,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              '$_ballLabel · ${preset.format.maxOversPerBowler} max/bow',
-              style: CkType.body(fontSize: 11, color: CkColors.ink2),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _DetailStrip extends StatelessWidget {
-  const _DetailStrip({required this.preset});
-  final FormatPreset preset;
+/// 8 · 11 · Other. "Other" opens a small picker rather than a free field —
+/// the server caps a side at 5–15, so an open input would only invite invalid
+/// numbers.
+class _PlayersRow extends StatelessWidget {
+  const _PlayersRow({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  static const _min = 5;
+  static const _max = 15;
 
   @override
   Widget build(BuildContext context) {
-    final f = preset.format;
-    final detail = StringBuffer()
-      ..write('${f.ballsPerOver}-ball overs · ')
-      ..write('${f.inningsPerSide} innings per side');
-    if (f.endChangeBalls != null) {
-      detail.write(' · ends change every ${f.endChangeBalls} balls');
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: CkColors.paper2,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: CkColors.hairline),
+    final isPreset = value == 8 || value == 11;
+
+    return Row(
+      children: [
+        Expanded(child: _Tile(label: '8', selected: value == 8, onTap: () => onChanged(8))),
+        const SizedBox(width: 9),
+        Expanded(child: _Tile(label: '11', selected: value == 11, onTap: () => onChanged(11))),
+        const SizedBox(width: 9),
+        Expanded(
+          child: _Tile(
+            label: isPreset ? 'Other' : '$value',
+            selected: !isPreset,
+            muted: isPreset,
+            onTap: () => _pickOther(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickOther(BuildContext context) async {
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: CkColors.paper,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const WizardFieldLabel('Players per side'),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 9,
+                runSpacing: 9,
+                children: [
+                  for (var n = _min; n <= _max; n++)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => Navigator.of(context).pop(n),
+                      child: Container(
+                        width: 52,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        decoration: BoxDecoration(
+                          color: n == value ? CkColors.ink : CkColors.paper,
+                          borderRadius: BorderRadius.circular(14),
+                          border: n == value
+                              ? null
+                              : Border.all(color: CkColors.line),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$n',
+                            style: CkType.display(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: n == value
+                                  ? CkColors.paper
+                                  : CkColors.ink2,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${preset.label.toUpperCase()} · DETAIL',
-            style: CkType.mono(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.10,
-              color: CkColors.muted,
+    );
+    if (picked != null) onChanged(picked);
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.muted = false,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          color: selected ? CkColors.ink : CkColors.paper,
+          borderRadius: BorderRadius.circular(14),
+          border: selected ? null : Border.all(color: CkColors.line),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: CkType.display(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: selected
+                  ? CkColors.paper
+                  : (muted ? CkColors.muted : CkColors.ink2),
+              letterSpacing: 0,
             ),
           ),
-          const SizedBox(height: 4),
+        ),
+      ),
+    );
+  }
+}
+
+/// The live preview of the spec string other captains will read.
+class _OnTheCard extends StatelessWidget {
+  const _OnTheCard({required this.spec});
+
+  final String spec;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: CkColors.cream,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: CkColors.creamBorder),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
           Text(
-            detail.toString(),
-            style: CkType.body(
-              fontSize: 12,
-              color: CkColors.ink2,
-              height: 1.5,
+            'ON THE CARD',
+            style: CkType.mono(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.08,
+              color: CkColors.amberInk,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              spec.toUpperCase(),
+              textAlign: TextAlign.right,
+              style: CkType.mono(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.04,
+                color: CkColors.ink,
+              ),
             ),
           ),
         ],

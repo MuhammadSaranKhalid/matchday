@@ -135,13 +135,13 @@ lib/
 │       ├── ck_screen_scaffold.dart       # paper Scaffold + top bar (matchday wordmark / title / bell / avatar)
 │       └── v2/                           # v2 IA kit — feed/profile/composer widgets, CkFeedImage, shimmer
 ├── router/
-│   └── app_router.dart                   # go_router; auth redirect + StatefulShellRoute (4-tab shell)
+│   └── app_router.dart                   # go_router; auth redirect + StatefulShellRoute (5-tab shell)
 ├── app.dart                              # MaterialApp.router + DB clear on sign-out + push registrar
 ├── main.dart                             # Supabase.initialize + GoogleSignIn.initialize + ProviderScope
 └── features/
     ├── auth/                             # PERMANENT — email OTP + native Google OAuth (full layered)
     ├── onboarding/                       # PERMANENT — first-run profile wizard (full layered)
-    ├── shell/                            # PERMANENT — authenticated 4-tab shell + side drawer (presentation-only)
+    ├── shell/                            # PERMANENT — authenticated 5-tab shell; tab 5 is MenuScreen, the "you" surface (presentation-only)
     ├── home/                             # PRESENTATION-ONLY — feed tab (composes posts providers)
     ├── profile/                          # PRESENTATION-ONLY — profile detail view
     ├── messages/                         # PRESENTATION-ONLY — messages tab

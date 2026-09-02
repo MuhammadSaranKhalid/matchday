@@ -19,7 +19,7 @@ import 'package:matchday/features/matches/presentation/state/my_matches_view.dar
 import 'package:matchday/features/profile/domain/entities/player_profile.dart';
 import 'package:matchday/features/profile/domain/entities/profile.dart';
 import 'package:matchday/features/profile/presentation/providers/profile_providers.dart';
-import 'package:matchday/features/shell/presentation/widgets/app_drawer.dart';
+import 'package:matchday/features/shell/presentation/screens/menu_screen.dart';
 import 'package:matchday/features/teams/domain/entities/team.dart';
 import 'package:matchday/features/teams/presentation/providers/teams_providers.dart';
 import 'package:mocktail/mocktail.dart';
@@ -55,9 +55,12 @@ MyMatchConfirmed _row({required String id, required bool live}) =>
       live: live,
     );
 
-/// The drawer reads the current location off go_router, so it has to be
+/// The menu reads the current location off go_router, so it has to be
 /// pumped inside a router rather than a bare MaterialApp.
-Future<void> _pumpDrawer(
+///
+/// Pumped bare, without [AppShell]: this is the branch body, and the header /
+/// bottom nav around it are the shell's, covered by their own tests.
+Future<void> _pumpMenu(
   WidgetTester tester, {
   MyMatchesView view = const MyMatchesView.empty(),
   List<Team> teams = const [],
@@ -73,8 +76,8 @@ Future<void> _pumpDrawer(
     displayName: 'Saran Khalid',
   );
 
-  // The design's artboard viewport. The panel's row list scrolls, so the
-  // default 800×600 test surface would push the account zone below the fold.
+  // The design's artboard viewport. The row list scrolls, so the default
+  // 800×600 test surface would push the account zone below the fold.
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -88,7 +91,7 @@ Future<void> _pumpDrawer(
     routes: [
       GoRoute(
         path: '/',
-        builder: (_, __) => const Scaffold(body: AppDrawer()),
+        builder: (_, __) => const Scaffold(body: MenuScreen()),
       ),
     ],
   );
@@ -113,9 +116,10 @@ Future<void> _pumpDrawer(
 }
 
 void main() {
-  testWidgets('identity, the three YOURS rows, the account zone and sign out',
-      (tester) async {
-    await _pumpDrawer(tester);
+  testWidgets('identity, the three YOURS rows, the account zone and sign out', (
+    tester,
+  ) async {
+    await _pumpMenu(tester);
 
     // Identity block.
     expect(find.text('Saran Khalid'), findsOneWidget);
@@ -124,7 +128,8 @@ void main() {
     // YOURS — personal destinations.
     expect(find.text('My Matches'), findsOneWidget);
     expect(find.text('My Teams'), findsOneWidget);
-    expect(find.text('My challenges'), findsOneWidget);
+    expect(find.text('My Challenges'), findsOneWidget);
+    expect(find.text('My Tournaments'), findsOneWidget);
 
     // ACCOUNT — built out per §5.1 of the brief.
     expect(find.text('Saved'), findsOneWidget);
@@ -132,21 +137,22 @@ void main() {
     expect(find.text('Help & Support'), findsOneWidget);
 
     // NOT BUILT YET — roadmap rows live in their own group now, so an empty
-    // account never reads as a broken one.
+    // account never reads as a broken one. Tournaments graduated out of this
+    // group when the feature shipped; Clubs is the last one left.
     expect(find.text('NOT BUILT YET'), findsOneWidget);
-    expect(find.text('Tournaments'), findsOneWidget);
     expect(find.text('Clubs'), findsOneWidget);
 
-    // Help + the two roadmap rows are all honestly inert.
-    expect(find.text('SOON'), findsNWidgets(3));
+    // Help & Support + the one roadmap row are both honestly inert.
+    expect(find.text('SOON'), findsNWidgets(2));
 
     expect(find.text('Sign out'), findsOneWidget);
     expect(find.text('MATCHDAY · v2.0'), findsOneWidget);
   });
 
-  testWidgets('first run furnishes empty rows instead of leaving them bare',
-      (tester) async {
-    await _pumpDrawer(tester);
+  testWidgets('first run furnishes empty rows instead of leaving them bare', (
+    tester,
+  ) async {
+    await _pumpMenu(tester);
 
     // One orientation note that states the rule of the panel — a sentence,
     // not a button. Nouns only: no create action appears.
@@ -154,13 +160,15 @@ void main() {
     expect(find.text('Fixtures you are playing in'), findsOneWidget);
     expect(find.text('Squads you own or belong to'), findsOneWidget);
     expect(find.text('Challenges you posted'), findsOneWidget);
+    expect(find.text('Cups & leagues you organize or follow'), findsOneWidget);
 
-    // Em-dash in each of the three badge slots.
-    expect(find.text('—'), findsNWidgets(3));
+    // Em-dash in each of the four badge slots.
+    expect(find.text('—'), findsNWidgets(4));
   });
 
-  testWidgets('a live match is promoted into the hero card, not duplicated',
-      (tester) async {
+  testWidgets('a live match is promoted into the hero card, not duplicated', (
+    tester,
+  ) async {
     final repo = _MockMatchesRepo();
     when(() => repo.listInningsForMatches(any())).thenAnswer(
       (_) async => Right<Failure, Map<MatchId, List<InningsSummary>>>({
@@ -185,14 +193,11 @@ void main() {
       }),
     );
 
-    await _pumpDrawer(
+    await _pumpMenu(
       tester,
       matchesRepo: repo,
       view: MyMatchesView(
-        confirmed: [
-          _row(id: 'm1', live: true),
-          _row(id: 'm2', live: false),
-        ],
+        confirmed: [_row(id: 'm1', live: true), _row(id: 'm2', live: false)],
         past: const [],
         totalPastCount: 0,
         pendingRequestsCount: 0,
@@ -214,9 +219,10 @@ void main() {
     expect(find.text('1 UPCOMING'), findsOneWidget);
   });
 
-  testWidgets('overflow: 28-char name, long subline and 120% text scale',
-      (tester) async {
-    await _pumpDrawer(
+  testWidgets('overflow: 28-char name, long subline and 120% text scale', (
+    tester,
+  ) async {
+    await _pumpMenu(
       tester,
       textScale: 1.2,
       profile: const Profile(

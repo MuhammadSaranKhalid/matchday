@@ -21,6 +21,25 @@ class FollowsRemoteDataSource {
 
   static const _table = 'follows';
 
+  /// Ids of the teams the signed-in user follows.
+  ///
+  /// `follows` is polymorphic — target_type ∈ {user, team, tournament} — and
+  /// the rest of this data source only ever asks about users, so this is the
+  /// one read that filters on the team arm.
+  Future<List<String>> listFollowedTeamIds() async {
+    try {
+      final rows = await _supabase
+          .from(_table)
+          .select('target_id')
+          .eq('follower_id', _requireUid())
+          .eq('target_type', 'team')
+          .eq('status', 'active');
+      return rows.map((r) => r['target_id'] as String).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
     if (id == null) throw UnauthorizedException('Must be signed in');

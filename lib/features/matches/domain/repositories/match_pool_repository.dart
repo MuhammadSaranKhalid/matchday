@@ -15,6 +15,15 @@ abstract class MatchPoolRepository {
     required Set<TeamId> myTeamIds,
   });
 
+  /// Every open challenge hosted by [myTeamIds], whatever its status.
+  ///
+  /// [getMyPoolBroadcasts] narrows this to the live ones for the side-panel
+  /// badge; the My-challenges screen needs the settled ones too so it can
+  /// draw its "Past · closed" section.
+  Future<Either<Failure, List<MatchRequest>>> getMyPoolChallenges({
+    required Set<TeamId> myTeamIds,
+  });
+
   /// Find a match challenge by 6-digit share code.
   Future<Either<Failure, MatchRequest?>> findChallengeByCode(String code);
 

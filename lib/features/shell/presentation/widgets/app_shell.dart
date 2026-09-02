@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
-import 'app_drawer.dart';
 
-/// The authenticated app shell (v2 IA): hosts the four branch navigators
-/// (Home · Explore · Matches · Pool) and renders the shared persistent fixed
-/// [V2Header] at the top and [V2BottomNav] beneath them.
+/// The authenticated app shell (v2 IA): hosts the five branch navigators
+/// (Home · Matches · Pool · Messages · Menu) and renders the shared persistent
+/// fixed [V2Header] at the top and [V2BottomNav] beneath them.
 ///
-/// The side panel (You) is mounted as [Scaffold.drawer] ([AppDrawer]) and opened
-/// from the left by the management icon in [V2Header].
+/// The "you" surface ([MenuScreen]) is the fifth branch, reached from the
+/// avatar in the bottom nav. It used to be a [Scaffold.drawer] side panel
+/// opened by a management icon in the header; that lost on two counts — its
+/// edge-drag competed with [SwipeableBranchView]'s horizontal tab pager for the
+/// left edge, and its only reliable entry point was the top-left corner, the
+/// worst thumb-reach on a phone. As a branch it also keeps its own navigator,
+/// so there is no menu screen stranded in the back stack behind a destination.
 ///
 /// Wired via [StatefulShellRoute] in `app_router.dart` with a custom
 /// `navigatorContainerBuilder` ([SwipeableBranchView]) that lays the branches
@@ -22,58 +25,49 @@ class AppShell extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  // Branch index ↔ tab identity: Home · Explore · Matches · Pool.
-  // (Organising rule: Bottom nav is the world; side panel is you.)
+  // Branch index ↔ tab identity: Home · Matches · Pool · Messages · Menu.
+  // (Organising rule: bottom nav is the world; Menu is you.)
   static const _tabs = <V2Tab>[
     V2Tab.home,
-    V2Tab.explore,
     V2Tab.matches,
     V2Tab.pool,
+    V2Tab.messages,
+    V2Tab.menu,
   ];
 
   static const _tabTitles = <String>[
     'Home',
-    'Explore',
     'Matches',
     'Pool',
+    'Messages',
+    'Menu',
   ];
 
   @override
   Widget build(BuildContext context) {
     final int index = navigationShell.currentIndex;
-    final String title = (index >= 0 && index < _tabTitles.length)
-        ? _tabTitles[index]
-        : 'Home';
+    final String title =
+        (index >= 0 && index < _tabTitles.length) ? _tabTitles[index] : 'Home';
 
     return Scaffold(
       backgroundColor: CkColors.paper,
-      drawer: const AppDrawer(),
-      drawerEdgeDragWidth: 20.0,
-      // Scrim is flat ink @ 32% — no blur. Material's default black54 is both
-      // too dark and the wrong hue against warm paper.
-      drawerScrimColor: CkColors.ink.withValues(alpha: 0.32),
       body: SafeArea(
         bottom: false,
-        child: Builder(
-          builder: (scaffoldContext) => Column(
-            children: [
-              V2Header(
-                title: title,
-                onBell: () => context.push('/notifications'),
-                onManagement: () {
-                  HapticFeedback.mediumImpact();
-                  Scaffold.of(scaffoldContext).openDrawer();
-                },
-              ),
-              Expanded(child: navigationShell),
-            ],
-          ),
+        child: Column(
+          children: [
+            V2Header(
+              title: title,
+              showSearch: index == 0,
+              onSearchTap: () => context.push('/explore'),
+              onBell: () => context.push('/notifications'),
+            ),
+            Expanded(child: navigationShell),
+          ],
         ),
       ),
       bottomNavigationBar: V2BottomNav(
-        active: (index >= 0 && index < _tabs.length)
-            ? _tabs[index]
-            : V2Tab.home,
+        active:
+            (index >= 0 && index < _tabs.length) ? _tabs[index] : V2Tab.home,
         onSelect: (tab) {
           final targetIndex = _tabs.indexOf(tab);
           if (targetIndex != -1) {
@@ -88,5 +82,3 @@ class AppShell extends StatelessWidget {
     );
   }
 }
-
-

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
@@ -13,6 +14,9 @@ import '../providers/match_pool_providers.dart';
 import '../providers/matches_feed_providers.dart';
 import '../providers/matches_providers.dart';
 import '../providers/my_matches_providers.dart';
+import '../widgets/host/host_detail_view.dart';
+import '../widgets/host/host_sheets.dart';
+import '../widgets/pool/pool_challenge_card.dart';
 import '../widgets/withdraw_sheet.dart';
 
 /// Receiver-side detail. Shows the sender's proposed terms, the head-to-head
@@ -67,6 +71,24 @@ class _ChallengeDetailScreenState
         : const AsyncValue.data(<MatchPoolApplication>[]);
 
     final applications = appsAsync.value ?? const <MatchPoolApplication>[];
+
+    // The host's own open challenge is `Pool.dc.html` artboards 14 / 15 — a
+    // screen of its own shape, not this one with different copy. The applicant
+    // side still renders below until section D is ported.
+    if (isOpenPool && viewerIsSender) {
+      return HostDetailView(
+        request: req,
+        applications: applications,
+        onBack: () =>
+            context.canPop() ? context.pop() : context.go('/my/pool-requests'),
+        onShare: () => _onShareCode(req),
+        onWithdraw: () => _onWithdrawChallenge(req, applications),
+        onOpenApplicant: (app) => context.push(
+          '/challenges/${req.id.value}/applicants/${app.id}',
+        ),
+      );
+    }
+
     final myAppliedTeamIds = myTeams.map((t) => t.id).toSet();
     final hasAlreadyApplied = applications.any(
       (app) =>
@@ -523,6 +545,70 @@ class _ChallengeDetailScreenState
       (_) {
         ref.invalidate(myMatchChallengesProvider);
         context.go('/my/matches');
+      },
+    );
+  }
+
+  /// Artboard 14/15 header action — hand the code to a captain directly.
+  Future<void> _onShareCode(MatchRequest req) async {
+    final code = req.shareCode;
+    if (code == null || code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This challenge has no share code.')),
+      );
+      return;
+    }
+    await SharePlus.instance.share(
+      ShareParams(
+        text: 'Join our match on matchday — share code $code',
+      ),
+    );
+  }
+
+  /// Artboard 19. Distinct from [_onWithdraw]: that sheet is the sender
+  /// withdrawing a *targeted* challenge, this one pulls an open challenge off
+  /// the board and has to say how many applicants it strands.
+  Future<void> _onWithdrawChallenge(
+    MatchRequest req,
+    List<MatchPoolApplication> applications,
+  ) async {
+    final hostTeam = ref.read(teamProvider(req.fromTeamId.value)).value;
+    final pending = applications
+        .where((a) => a.status == PoolApplicationStatus.pending)
+        .length;
+
+    final summary = [
+      if (req.proposedFormat?.oversPerInnings case final o? when o > 0)
+        '$o ov',
+      if (req.proposedStartTime case final start?)
+        poolStartLabel(start).replaceFirst(' · ', ' '),
+      if (pending > 0) '$pending pending',
+    ].join(' · ');
+
+    final confirmed = await showWithdrawChallengeSheet(
+      context,
+      hostTeam: hostTeam,
+      summary: summary,
+      pendingApplicants: pending,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _busy = true);
+    final res = await ref
+        .read(matchesRepositoryProvider)
+        .withdrawMatchChallenge(requestId: req.id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    res.fold(
+      (f) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(f.message)),
+      ),
+      (_) {
+        ref.invalidate(myMatchChallengesProvider);
+        ref.invalidate(myChallengesProvider);
+        ref.invalidate(matchChallengeProvider(widget.requestId));
+        context.canPop() ? context.pop() : context.go('/my/pool-requests');
       },
     );
   }

@@ -20,6 +20,7 @@ import 'package:go_router/go_router.dart';
 import '../../theme/circk_theme.dart';
 import '../../../features/messages/presentation/providers/messages_providers.dart';
 import '../../../features/notifications/presentation/providers/notifications_providers.dart';
+import '../../../features/profile/presentation/providers/profile_providers.dart';
 
 /// `Color` → `#RRGGBB` for embedding in raw SVG markup.
 String ckHex(Color c) {
@@ -79,6 +80,7 @@ abstract final class V2Icons {
   static const search = '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>';
   static const chevronRight = '<path d="M9 6l6 6-6 6"/>';
   static const chevronLeft = '<path d="M14 6l-6 6 6 6"/>';
+  static const chevronDown = '<path d="M6 9.3l6 5.4 6-5.4"/>';
   static const heart =
       '<path d="M20.8 8.3a5.5 5.5 0 0 0-9.3-3 5.5 5.5 0 0 0-9.3 6.3l8.4 8.7a1.3 1.3 0 0 0 1.8 0l8.4-8.7c1-1 1-2 0-3.3z"/>';
   static const comment = '<path d="M21 12a9 9 0 0 1-13 8L3 21l1-5A9 9 0 1 1 21 12z"/>';
@@ -348,11 +350,14 @@ class V2Header extends ConsumerWidget {
     this.onMessages,
     this.onManagement,
     this.refreshing = false,
-    this.showMessages = true,
+    this.showMessages = false,
     this.showManagement = true,
     this.showAvatar = false,
     this.showBack = false,
     this.onBack,
+    this.showSearch = false,
+    this.searchHint = 'Search players, teams, matches…',
+    this.onSearchTap,
   });
 
   final String title;
@@ -375,6 +380,11 @@ class V2Header extends ConsumerWidget {
   /// Whether to render a back chevron on the left.
   final bool showBack;
   final VoidCallback? onBack;
+
+  /// Whether to render a search pill in the header instead of the title.
+  final bool showSearch;
+  final String searchHint;
+  final VoidCallback? onSearchTap;
 
   final bool refreshing;
 
@@ -413,38 +423,74 @@ class V2Header extends ConsumerWidget {
             ),
           ] else if (showManagement && onManagement != null) ...[
             _ManagementButton(onTap: onManagement),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
           ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(title, style: CkType.display(fontSize: 26)),
-                if (sub != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      sub!,
-                      style: CkType.body(fontSize: 12, color: CkColors.muted),
-                    ),
-                  )
-                else if (refreshing)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6),
-                    child: SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.2,
+          if (showSearch)
+            Expanded(
+              child: GestureDetector(
+                onTap: onSearchTap,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: CkColors.paper2,
+                    borderRadius: BorderRadius.circular(CkRadii.md),
+                    border: Border.all(color: CkColors.line),
+                  ),
+                  child: Row(
+                    children: [
+                      const V2Svg(
+                        V2Icons.search,
+                        size: 15,
                         color: CkColors.muted,
+                        strokeWidth: 1.6,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          searchHint,
+                          style: CkType.body(fontSize: 13, color: CkColors.soft),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: CkType.display(fontSize: 26)),
+                  if (sub != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        sub!,
+                        style: CkType.body(fontSize: 12, color: CkColors.muted),
+                      ),
+                    )
+                  else if (refreshing)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.2,
+                          color: CkColors.muted,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           _BellButton(count: bellCount, onTap: onBell),
           if (showMessages) ...[
             const SizedBox(width: 8),
@@ -459,12 +505,36 @@ class V2Header extends ConsumerWidget {
   }
 }
 
-class _ManagementButton extends StatelessWidget {
+class _ManagementButton extends ConsumerWidget {
   const _ManagementButton({this.onTap});
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(myProfileProvider).value;
+    final displayName = profile?.displayName ?? profile?.username ?? '';
+    final avatarUrl = profile?.avatarUrl;
+
+    String initials = '';
+    if (displayName.trim().isNotEmpty) {
+      final parts = displayName
+          .trim()
+          .split(RegExp(r'\s+'))
+          .where((s) => s.isNotEmpty)
+          .toList();
+      if (parts.length == 1) {
+        initials = parts.first
+            .substring(0, parts.first.length >= 2 ? 2 : 1)
+            .toUpperCase();
+      } else if (parts.isNotEmpty) {
+        initials = (parts.first[0] + parts.last[0]).toUpperCase();
+      }
+    }
+
+    final bool hasProfileData =
+        (avatarUrl != null && avatarUrl.trim().isNotEmpty) ||
+        initials.isNotEmpty;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -476,11 +546,19 @@ class _ManagementButton extends StatelessWidget {
           shape: BoxShape.circle,
           border: Border.all(color: CkColors.hairline),
         ),
-        child: const V2Svg(
-          V2Icons.management,
-          size: 17,
-          color: CkColors.ink,
-        ),
+        clipBehavior: Clip.antiAlias,
+        child: hasProfileData
+            ? Avatar(
+                mono: initials.isNotEmpty ? initials : '·',
+                imageUrl: avatarUrl,
+                size: 36,
+                tone: AvatarTone.paper,
+              )
+            : const V2Svg(
+                V2Icons.management,
+                size: 17,
+                color: CkColors.ink,
+              ),
       ),
     );
   }
@@ -595,14 +673,19 @@ class _Badge extends StatelessWidget {
   }
 }
 
-/// The four v2 bottom-nav destinations: Home · Explore · Matches · Pool.
+/// The four v2 bottom-nav destinations: Home · Matches · Pool · Messages.
 ///
 /// Organising rule: Bottom nav is the world; side panel is you.
-/// Profile is now reached via the side panel's identity masthead.
-enum V2Tab { home, explore, matches, pool }
+/// Profile is reached via the side panel's identity masthead.
+enum V2Tab { home, matches, pool, messages, explore, menu }
 
-/// 4-tab bottom navigation — Home · Explore · Matches · Pool.
-class V2BottomNav extends StatelessWidget {
+/// 5-tab bottom navigation — Home · Matches · Pool · Messages · Menu.
+///
+/// The fifth slot is the signed-in user's avatar, opening the `/menu` branch
+/// ([MenuScreen]). It replaced the old top-left drawer trigger: a thumb-reach
+/// target that doesn't fight [SwipeableBranchView]'s horizontal tab pager for
+/// the screen edge.
+class V2BottomNav extends ConsumerWidget {
   const V2BottomNav({
     super.key,
     required this.active,
@@ -613,7 +696,10 @@ class V2BottomNav extends StatelessWidget {
   final ValueChanged<V2Tab> onSelect;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadMessages = ref.watch(unreadMessagesCountProvider);
+    final profile = ref.watch(myProfileProvider).value;
+
     return Container(
       decoration: const BoxDecoration(
         color: CkColors.surface,
@@ -627,9 +713,14 @@ class V2BottomNav extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _navItem(V2Tab.home, V2Icons.home),
-            _navItem(V2Tab.explore, V2Icons.search),
             _navItem(V2Tab.matches, V2Icons.matches),
             _navItem(V2Tab.pool, V2Icons.pool),
+            _navItem(V2Tab.messages, V2Icons.messages, badge: unreadMessages),
+            _avatarItem(
+              V2Tab.menu,
+              imageUrl: profile?.avatarUrl,
+              mono: _monogram(profile?.displayName ?? profile?.username),
+            ),
           ],
         ),
       ),
@@ -672,6 +763,61 @@ class V2BottomNav extends StatelessWidget {
       ),
     );
   }
+
+  /// The Menu slot. An avatar rather than a hamburger: it is the most legible
+  /// "this is you" affordance there is, and it matches the rule the whole tab
+  /// row is built on — the other four are places, this one is a person.
+  ///
+  /// Sized 24 like the glyphs, so the row's optical rhythm holds. Active state
+  /// is a 2dp red ring instead of the glyphs' colour swap, since an avatar
+  /// carries its own colour and cannot be recoloured.
+  Widget _avatarItem(V2Tab id, {String? imageUrl, required String mono}) {
+    final isActive = id == active;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onSelect(id),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: SizedBox(
+          height: 32,
+          child: Center(
+            child: AnimatedScale(
+              scale: isActive ? 1.08 : 1.0,
+              duration: const Duration(milliseconds: 150),
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isActive ? CkColors.red : Colors.transparent,
+                    width: 2,
+                  ),
+                ),
+                child: Avatar(mono: mono, imageUrl: imageUrl, size: 24),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Two-letter initials for the nav avatar's fallback.
+String _monogram(String? name) {
+  final parts = (name ?? '')
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((s) => s.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return '·';
+  if (parts.length == 1) {
+    return parts.first
+        .substring(0, parts.first.length >= 2 ? 2 : 1)
+        .toUpperCase();
+  }
+  return (parts.first[0] + parts.last[0]).toUpperCase();
 }
 
 /// Per-post action bar — Like · Comment · Share, optional RSVP text, Save.

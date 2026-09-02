@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/widgets/ck_push_nav.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../controllers/teams_list_controller.dart';
 import '../state/my_teams_view.dart';
@@ -42,76 +43,12 @@ class TeamsListScreen extends ConsumerWidget {
                   children: [
                     Column(
                       children: [
-                        // ── Header — exact same styling as My Tournaments ──
-                        Container(
-                          height: 56,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: const BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(color: CkColors.hairline),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              InkWell(
-                                onTap: () => context.pop(),
-                                customBorder: const CircleBorder(),
-                                child: Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: const BoxDecoration(
-                                    color: CkColors.paper2,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.arrow_back,
-                                    size: 18,
-                                    color: CkColors.ink,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'My Teams',
-                                  style: CkType.display(fontSize: 17),
-                                ),
-                              ),
-                              Material(
-                                color: CkColors.ink,
-                                borderRadius: BorderRadius.circular(999),
-                                child: InkWell(
-                                  onTap: () => context.push('/teams/create'),
-                                  borderRadius: BorderRadius.circular(999),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 13,
-                                      vertical: 9,
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.add,
-                                          size: 12,
-                                          color: CkColors.paper,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'CREATE',
-                                          style: CkType.mono(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: 0.10,
-                                            color: CkColors.paper,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                        CkPushNav(
+                          title: 'My Teams',
+                          onBack: () => context.pop(),
+                          action: CkNavPill(
+                            label: 'Create',
+                            onTap: () => context.push('/teams/create'),
                           ),
                         ),
                         Expanded(

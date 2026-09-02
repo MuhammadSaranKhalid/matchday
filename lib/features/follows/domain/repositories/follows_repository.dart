@@ -25,6 +25,11 @@ abstract class FollowsRepository {
   /// Returns true if the signed-in user currently follows [target].
   Future<Either<Failure, bool>> isFollowing(FollowTarget target);
 
+  /// Team ids the signed-in user follows. Drives the Matches board's
+  /// "For you" cut, which is defined as a followed team playing, or a
+  /// tournament you are in.
+  Future<Either<Failure, List<String>>> listFollowedTeamIds();
+
   /// Returns a paginated list of a user's followers or following accounts.
   ///
   /// [userId]    — the profile being inspected (NOT necessarily the signed-in

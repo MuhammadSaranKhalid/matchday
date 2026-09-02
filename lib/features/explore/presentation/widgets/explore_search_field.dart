@@ -23,6 +23,8 @@ class ExploreSearchField extends StatelessWidget {
     this.statusMuted = false,
     this.loading = false,
     this.readOnly = false,
+    this.showBack = false,
+    this.onBack,
     this.below,
   });
 
@@ -33,6 +35,10 @@ class ExploreSearchField extends StatelessWidget {
   final VoidCallback onCancel;
   final ValueChanged<String> onSubmitted;
   final bool focused;
+
+  /// Whether to render a back chevron button to the left of the search bar.
+  final bool showBack;
+  final VoidCallback? onBack;
 
   /// Mono line under the field, e.g. `6 RESULTS FOR “LAH” · ALL`.
   final String? statusLine;
@@ -64,20 +70,44 @@ class ExploreSearchField extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 13),
-            decoration: BoxDecoration(
-              color: (focused || hasText) ? CkColors.surface : CkColors.paper2,
-              borderRadius: BorderRadius.circular(CkRadii.md),
-              border: Border.all(
-                color: inkBorder ? CkColors.ink : CkColors.line,
-                width: inkBorder ? 1.5 : 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                V2Svg(
-                  V2Icons.search,
+          Row(
+            children: [
+              if (showBack) ...[
+                GestureDetector(
+                  onTap: onBack ?? () => Navigator.of(context).maybePop(),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    margin: const EdgeInsets.only(right: 10),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: CkColors.paper,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: CkColors.hairline),
+                    ),
+                    child: const V2Svg(
+                      V2Icons.chevronLeft,
+                      size: 18,
+                      color: CkColors.ink,
+                    ),
+                  ),
+                ),
+              ],
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 13),
+                  decoration: BoxDecoration(
+                    color: (focused || hasText) ? CkColors.surface : CkColors.paper2,
+                    borderRadius: BorderRadius.circular(CkRadii.md),
+                    border: Border.all(
+                      color: inkBorder ? CkColors.ink : CkColors.line,
+                      width: inkBorder ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      V2Svg(
+                        V2Icons.search,
                   size: 16,
                   color: (focused || hasText) ? CkColors.ink : CkColors.muted,
                   strokeWidth: 1.6,
@@ -153,6 +183,9 @@ class ExploreSearchField extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ],
+    ),
           if (statusLine != null)
             Padding(
               padding: const EdgeInsets.only(top: 9),

@@ -149,6 +149,45 @@ final class MyPoolRequestsProvider
 
 String _$myPoolRequestsHash() => r'f0538e27ab27012bce929d689c50ccde819f7afe';
 
+@ProviderFor(myChallenges)
+final myChallengesProvider = MyChallengesProvider._();
+
+final class MyChallengesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<MyChallengesView>,
+          MyChallengesView,
+          FutureOr<MyChallengesView>
+        >
+    with $FutureModifier<MyChallengesView>, $FutureProvider<MyChallengesView> {
+  MyChallengesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'myChallengesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$myChallengesHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<MyChallengesView> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<MyChallengesView> create(Ref ref) {
+    return myChallenges(ref);
+  }
+}
+
+String _$myChallengesHash() => r'5742f843a5de1a25c683d44be6d01e9822ec5683';
+
 /// Applications for a specific match pool challenge.
 
 @ProviderFor(challengePoolApplications)

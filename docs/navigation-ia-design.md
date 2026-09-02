@@ -3,6 +3,9 @@
 > **Document Type:** Design & Decision Record
 > **Status:** Proposed — three decisions pending sign-off (see [§10](#10-open-questions))
 > **Snapshot Date:** 2026-08-23
+> **Amended:** 2026-09-02 — **N3 and N5 are superseded by N12.** The side panel is now
+> the fifth bottom-nav branch (`/menu`, `MenuScreen`), not a `Scaffold.drawer`. Risk
+> **R1** is what decided it; see [§3](#3-decisions-log) and [§11](#11-risks).
 > **Supersedes:** `match-pool-feature-design.md` **D10** (nav placement), `search-feature-design.md` **D9** (nav ordering, in part)
 > **Touches:** `lib/features/shell/`, `lib/features/management/`, `lib/features/pavilion/`, `lib/core/widgets/v2/v2_kit.dart`, `lib/router/app_router.dart`
 
@@ -89,6 +92,7 @@ You go to a place; the place knows how to make one.
 | **N8** | Panel item form | **Rows, not cards.** Prose subtitles replaced by live state on the right | The panel is a place you pass *through*, not a dashboard you read. `"Upcoming fixtures, live scoreboards, match challenges & history"` conveys less at a glance than `2 upcoming`. |
 | **N9** | My Pool Requests | **A first-class panel destination** — the existing `MyPoolBroadcastsScreen`, renamed | "Post a pool request" was never a CREATE item; it is the `+` button *inside* this screen, which already exists. Same shape as every other row. |
 | **N10** | Naming | **One word: "pool request"**, across UI, routes, screens and providers | The codebase currently calls one object three things: `myPoolBroadcastsProvider` / "My Broadcasts", "Host an Open Fixture", and "pool request". Three names for one object is how a feature becomes unbuildable-on. |
+| **N12** | Panel implementation, *revised* | **A fifth `StatefulShellBranch` (`/menu`), reached from an avatar in the bottom nav.** Supersedes **N3** (drawer) and **N5** (four tabs) | **R1 came true.** The drawer's edge-drag and the tab `PageView` want the same pixels, and mitigating it means crippling one of them. Worse, the drawer's only reliable trigger was the top-left corner — the worst thumb-reach on a phone — so the surface was both hard to reach and hard to discover. As a branch it keeps its own navigator, so no menu screen is ever stranded in the back stack behind a destination. The contents are unchanged: N1, N4, N7, N8, N9 and N11 all still hold, and the organising rule now reads "bottom nav is the world; **Menu** is you." |
 | **N11** ⚠️ **PENDING** | Tournaments & Clubs rows | **Shown as disabled "Soon" rows** | Neither is built, but Clubs is an *approved* 68KB spec (`club-feature-design.md`, pre-implementation) — this is signposting a committed roadmap, not an empty promise. Hiding them makes their later arrival a surprise. |
 | **N12** | Sign out | **Becomes real, in the panel footer** | It is currently wired to nothing: `pv_v2_account.dart:119` fires a toast reading "Signed out" and does nothing. `authController.signOut()` has no UI caller anywhere. |
 | **N13** | Route namespace | **`/my/...` for panel destinations**, with redirects from the old paths | Makes the rule legible in the URL bar and in the router file. Redirects follow the precedent already in `app_router.dart:312` (`/matches/pool` → `/pool`). |
@@ -353,11 +357,15 @@ only from the panel? *Recommendation: keep the banner as a contextual escape hat
 
 ## 11. Risks
 
-**R1 — Drawer edge-drag vs. page swipe.** Tabs are laid out in a `PageView`
+**R1 — Drawer edge-drag vs. page swipe.** ✅ **RESOLVED 2026-09-02 — by removing the
+drawer (N12), not by tuning it.** Tabs are laid out in a `PageView`
 (`swipeable_branch_view.dart`) for swipe navigation. Flutter's `DrawerController` claims a
-~20dp left-edge gesture, and both want the same pixels on tab 0. Mitigation: set
-`drawerEdgeDragWidth` explicitly and, if needed, stop the `PageView` consuming horizontal
-drags originating in that strip. **This needs verification on a device, not reasoning.**
+~20dp left-edge gesture, and both want the same pixels on tab 0. The mitigation on the
+table — set `drawerEdgeDragWidth` explicitly, and stop the `PageView` consuming horizontal
+drags in that strip — works, but only by making one of the two gestures worse: either the
+drawer is undiscoverable or the leftmost tab is hard to swipe out of. Since the edge-drag
+was the drawer's main affordance and the header trigger was in the worst corner for reach,
+the surface was better off as a tab. See **N12**.
 
 **R2 — `pvPhaseConf` lives in a file being deleted.** Relocate it into `pv_v2_kit.dart`
 in the same commit that deletes `pv_v2_lanes.dart`, or Phase 4 fails to compile.
@@ -379,12 +387,12 @@ and 4. Phase 0's portion is provably dead; Phase 4's is not, and deserves the cl
 
 Checked against `CLAUDE.md` so `architecture-reviewer` has no surprises:
 
-- **The drawer is presentation-only**, living in `shell` — a presentation-only feature per
+- **The menu is presentation-only**, living in `shell` — a presentation-only feature per
   §6.6. It gains no domain or data layer.
 - **It reads other features through their `presentation/providers`** (`myProfileProvider`,
   `myTeamsProvider`, `myMatchesViewProvider`, `myPoolRequestsProvider`) — the sanctioned
   Presentation → Presentation seam in §6.6. It touches no other feature's `data/` layer.
-- **Sign out** goes `panel → authControllerProvider → authRepository`, matching the
+- **Sign out** goes `menu → authControllerProvider → authRepository`, matching the
   no-use-case-layer amendment of 2026-05-29.
 - **No new drift tables, no offline anything.** This work is entirely online-only and does
   not approach either banner exemption.

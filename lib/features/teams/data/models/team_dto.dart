@@ -23,6 +23,7 @@ abstract class TeamDto with _$TeamDto {
     @JsonKey(name: 'logo_url') String? logoUrl,
     @JsonKey(name: 'logo_monogram') String? logoMonogram,
     @JsonKey(name: 'is_verified') @Default(false) bool isVerified,
+    @Default('active') String status,
     @JsonKey(name: 'created_at') required String createdAt,
     @JsonKey(name: 'updated_at') required String updatedAt,
   }) = _TeamDto;
@@ -49,6 +50,7 @@ abstract class TeamDto with _$TeamDto {
         logoUrl: logoUrl,
         logoMonogram: logoMonogram,
         isVerified: isVerified,
+        status: TeamStatus.fromWire(status),
         createdAt: DateTime.parse(createdAt),
         updatedAt: DateTime.parse(updatedAt),
       );

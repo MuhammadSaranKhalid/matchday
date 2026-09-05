@@ -1,83 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:go_router/go_router.dart';
-import 'package:matchday/core/error/failures.dart';
 import 'package:matchday/features/auth/domain/entities/user.dart';
 import 'package:matchday/features/auth/domain/value_objects/email.dart';
 import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
-import 'package:matchday/features/matches/domain/entities/innings_summary.dart';
-import 'package:matchday/features/matches/domain/entities/match.dart';
-import 'package:matchday/features/matches/domain/entities/match_role.dart';
-import 'package:matchday/features/matches/domain/repositories/matches_repository.dart';
-import 'package:matchday/features/matches/presentation/providers/match_pool_providers.dart';
-import 'package:matchday/features/matches/presentation/providers/matches_feed_providers.dart';
-import 'package:matchday/features/matches/presentation/providers/matches_providers.dart';
-import 'package:matchday/features/matches/presentation/providers/my_matches_providers.dart';
-import 'package:matchday/features/matches/presentation/state/my_matches_view.dart';
-import 'package:matchday/features/profile/domain/entities/player_profile.dart';
 import 'package:matchday/features/profile/domain/entities/profile.dart';
 import 'package:matchday/features/profile/presentation/providers/profile_providers.dart';
 import 'package:matchday/features/shell/presentation/screens/menu_screen.dart';
-import 'package:matchday/features/teams/domain/entities/team.dart';
-import 'package:matchday/features/teams/presentation/providers/teams_providers.dart';
-import 'package:mocktail/mocktail.dart';
-
-class _MockMatchesRepo extends Mock implements MatchesRepository {}
 
 const _profile = Profile(
   userId: ProfileUserId('u1'),
   username: 'saran',
-  displayName: 'Saran Khalid',
+  displayName: 'Muhammad Saran',
+  city: 'Lahore',
 );
 
-MyMatchConfirmed _row({required String id, required bool live}) =>
-    MyMatchConfirmed(
-      id: id,
-      tag: 'Friendly',
-      homeTeamId: 'tA',
-      awayTeamId: 'tB',
-      oversPerInnings: 20,
-      ballsPerOver: 6,
-      homeShort: 'LL',
-      homeColor: const Color(0xFF7A2E2E),
-      homeName: 'Lahore Lions',
-      awayShort: 'GG',
-      awayColor: const Color(0xFF2E5D57),
-      awayName: 'Gulberg Giants',
-      when: 'Today',
-      venue: 'Model Town',
-      role: 'Captain · Live',
-      roleKind: MatchRoleKind.captain,
-      countdown: 'Now',
-      urgent: true,
-      live: live,
-    );
-
-/// The menu reads the current location off go_router, so it has to be
-/// pumped inside a router rather than a bare MaterialApp.
-///
-/// It is a full-screen route, so it brings its own [Scaffold] and [V2Header] —
-/// nothing wraps it here.
+/// The menu is a full-screen route, so it brings its own [Scaffold] and header
+/// — nothing wraps it here. It reads two things and only two: the profile (for
+/// the name and avatar) and the signed-in user (for the email).
 Future<void> _pumpMenu(
   WidgetTester tester, {
-  MyMatchesView view = const MyMatchesView.empty(),
-  List<Team> teams = const [],
-  List<OpenMatchPoolItem> pool = const [],
-  MatchesRepository? matchesRepo,
-  Profile profile = _profile,
+  Profile? profile = _profile,
   double textScale = 1.0,
 }) async {
-  final email = Email.create('saran@example.com').toOption().toNullable()!;
   final user = User(
     id: const UserId('u1'),
-    email: email,
-    displayName: 'Saran Khalid',
+    email: Email.create('saran@gmail.com').toOption().toNullable()!,
+    displayName: 'Muhammad Saran',
   );
 
-  // The design's artboard viewport. The row list scrolls, so the default
-  // 800×600 test surface would push the account zone below the fold.
+  // The artboard's viewport.
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -88,12 +41,7 @@ Future<void> _pumpMenu(
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
   final router = GoRouter(
-    routes: [
-      GoRoute(
-        path: '/',
-        builder: (_, __) => const MenuScreen(),
-      ),
-    ],
+    routes: [GoRoute(path: '/', builder: (_, __) => const MenuScreen())],
   );
   addTearDown(router.dispose);
 
@@ -102,11 +50,6 @@ Future<void> _pumpMenu(
       overrides: [
         currentUserStreamProvider.overrideWith((ref) => Stream.value(user)),
         myProfileProvider.overrideWith((ref) => Future.value(profile)),
-        myTeamsProvider.overrideWith((ref) => Stream.value(teams)),
-        myMatchesViewProvider.overrideWith((ref) => Future.value(view)),
-        myPoolRequestsProvider.overrideWith((ref) => Future.value(pool)),
-        if (matchesRepo != null)
-          matchesRepositoryProvider.overrideWithValue(matchesRepo),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),
@@ -116,155 +59,149 @@ Future<void> _pumpMenu(
 }
 
 void main() {
-  testWidgets('identity, the three YOURS rows, the account zone and sign out', (
-    tester,
-  ) async {
-    await _pumpMenu(tester);
+  group('MenuScreen — artboard 2b, "Nothing on the right"', () {
+    testWidgets('three groups, nine rows, in the canvas order', (tester) async {
+      await _pumpMenu(tester);
 
-    // Identity block.
-    expect(find.text('Saran Khalid'), findsOneWidget);
-    expect(find.text('@saran'), findsOneWidget);
+      expect(find.text('Menu'), findsOneWidget);
 
-    // YOURS — personal destinations.
-    expect(find.text('My Matches'), findsOneWidget);
-    expect(find.text('My Teams'), findsOneWidget);
-    expect(find.text('My Challenges'), findsOneWidget);
-    expect(find.text('My Tournaments'), findsOneWidget);
+      expect(find.text('YOURS'), findsOneWidget);
+      expect(find.text('My Matches'), findsOneWidget);
+      expect(find.text('My Teams'), findsOneWidget);
+      expect(find.text('My Challenges'), findsOneWidget);
+      expect(find.text('My Tournaments'), findsOneWidget);
 
-    // The footer is pinned outside the scrolling list, so it is on screen
-    // whatever the row list is doing.
-    expect(find.text('Sign out'), findsOneWidget);
-    expect(find.text('MATCHDAY · v2.0'), findsOneWidget);
+      expect(find.text('ACTIVITY'), findsOneWidget);
+      expect(find.text('Invites & requests'), findsOneWidget);
+      expect(find.text('Notifications'), findsOneWidget);
+      expect(find.text('Saved'), findsOneWidget);
 
-    // The account zone sits below the fold once the page carries its own
-    // header, and the list builds lazily — so scroll to it rather than
-    // widening the viewport until the assertion happens to pass.
-    await tester.drag(find.byType(ListView), const Offset(0, -400));
-    await tester.pumpAndSettle();
+      expect(find.text('ACCOUNT'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Help & Support'), findsOneWidget);
 
-    // ACCOUNT — built out per §5.1 of the brief.
-    expect(find.text('Saved'), findsOneWidget);
-    expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Help & Support'), findsOneWidget);
+      // The whole panel fits the artboard viewport, so nothing needs scrolling
+      // to reach — including the pinned footer.
+      expect(find.text('Sign out'), findsOneWidget);
+    });
 
-    // NOT BUILT YET — roadmap rows live in their own group now, so an empty
-    // account never reads as a broken one. Tournaments graduated out of this
-    // group when the feature shipped; Clubs is the last one left.
-    expect(find.text('NOT BUILT YET'), findsOneWidget);
-    expect(find.text('Clubs'), findsOneWidget);
+    testWidgets('nothing on the right: no badge, no subtitle, no live card',
+        (tester) async {
+      await _pumpMenu(tester);
 
-    // Help & Support + the one roadmap row are both honestly inert.
-    expect(find.text('SOON'), findsNWidgets(2));
-  });
+      // The counts the panel used to carry. They live on the screens that own
+      // them now, one tap deeper.
+      expect(find.textContaining('upcoming'), findsNothing);
+      expect(find.textContaining('pending'), findsNothing);
+      expect(find.textContaining('open'), findsNothing);
+      expect(find.text('Live now'), findsNothing);
+      expect(find.text('LIVE'), findsNothing);
 
-  testWidgets('first run furnishes empty rows instead of leaving them bare', (
-    tester,
-  ) async {
-    await _pumpMenu(tester);
+      // The prose subtitles that used to sit under each label.
+      expect(find.text('Fixtures you are playing in'), findsNothing);
+      expect(find.text('Squads you own or belong to'), findsNothing);
+      expect(find.text('Challenges you posted'), findsNothing);
 
-    // One orientation note that states the rule of the panel — a sentence,
-    // not a button. Nouns only: no create action appears.
-    expect(find.text('YOUR SIDE OF MATCHDAY'), findsOneWidget);
-    expect(find.text('Fixtures you are playing in'), findsOneWidget);
-    expect(find.text('Squads you own or belong to'), findsOneWidget);
-    expect(find.text('Challenges you posted'), findsOneWidget);
-    expect(find.text('Cups & leagues you organize or follow'), findsOneWidget);
+      // And the roadmap group, which 2b drops entirely.
+      expect(find.text('NOT BUILT YET'), findsNothing);
+      expect(find.text('Clubs'), findsNothing);
 
-    // Em-dash in each of the four badge slots.
-    expect(find.text('—'), findsNWidgets(4));
-  });
+      // The version stamp went with the rest of the furniture.
+      expect(find.text('MATCHDAY · v2.0'), findsNothing);
+    });
 
-  testWidgets('a live match is promoted into the hero card, not duplicated', (
-    tester,
-  ) async {
-    final repo = _MockMatchesRepo();
-    when(() => repo.listInningsForMatches(any())).thenAnswer(
-      (_) async => Right<Failure, Map<MatchId, List<InningsSummary>>>({
-        const MatchId('m1'): const [
-          InningsSummary(
-            matchId: MatchId('m1'),
-            inningsNumber: 1,
-            battingTeamId: TeamId('tB'),
-            totalRuns: 154,
-            totalWickets: 8,
-            legalBallsFaced: 120,
-          ),
-          InningsSummary(
-            matchId: MatchId('m1'),
-            inningsNumber: 2,
-            battingTeamId: TeamId('tA'),
-            totalRuns: 142,
-            totalWickets: 6,
-            legalBallsFaced: 86,
-          ),
-        ],
-      }),
-    );
+    testWidgets('the identity block names the account, not the profile',
+        (tester) async {
+      await _pumpMenu(tester);
 
-    await _pumpMenu(
-      tester,
-      matchesRepo: repo,
-      view: MyMatchesView(
-        confirmed: [_row(id: 'm1', live: true), _row(id: 'm2', live: false)],
-        past: const [],
-        totalPastCount: 0,
-        pendingRequestsCount: 0,
-        sent: const [],
-      ),
-    );
+      expect(find.text('Muhammad Saran'), findsOneWidget);
+      expect(find.text('saran@gmail.com'), findsOneWidget);
 
-    expect(find.text('LIVE'), findsOneWidget);
-    expect(find.text('14.2 OV'), findsOneWidget);
-    expect(find.text('142/6'), findsOneWidget);
-    expect(find.text('154'), findsOneWidget);
-    // 155 to win, 142 scored, 120 - 86 balls left.
-    expect(find.text('NEED 13 OFF 34'), findsOneWidget);
+      // 2b replaces "@handle · role · city" and the posts/followers line with
+      // the one fact the block is for: which account this is.
+      expect(find.text('@saran'), findsNothing);
+      expect(find.textContaining('Followers'), findsNothing);
+      expect(find.textContaining('Posts'), findsNothing);
+      expect(find.textContaining('Lahore'), findsNothing);
+    });
 
-    // The live state is promoted, not duplicated: My Matches drops back to
-    // its upcoming count rather than also shouting LIVE NOW. The promoted
-    // match is not counted there — it is in progress, not upcoming.
-    expect(find.text('LIVE NOW'), findsNothing);
-    expect(find.text('1 UPCOMING'), findsOneWidget);
-  });
+    testWidgets('Help & Support is the one row wearing a pill, not a chevron',
+        (tester) async {
+      await _pumpMenu(tester);
 
-  testWidgets('overflow: 28-char name, long subline and 120% text scale', (
-    tester,
-  ) async {
-    await _pumpMenu(
-      tester,
-      textScale: 1.2,
-      profile: const Profile(
-        userId: ProfileUserId('u1'),
-        username: 'a_very_long_username',
-        displayName: 'Muhammad Abdul-Rehman Q.',
-        city: 'Muzaffargarh',
-        playerProfile: PlayerProfile(role: PlayerRole.wicketKeeper),
-      ),
-      view: MyMatchesView(
-        confirmed: [for (var i = 0; i < 12; i++) _row(id: 'm$i', live: false)],
-        past: const [],
-        totalPastCount: 0,
-        pendingRequestsCount: 0,
-        sent: const [],
-      ),
-    );
+      expect(find.text('SOON'), findsOneWidget);
 
-    // Nothing overflows: no RenderFlex assertion anywhere in the panel.
-    expect(tester.takeException(), isNull);
+      // It is inert: the row is drawn, but it is not a destination.
+      final row = find.ancestor(
+        of: find.text('Help & Support'),
+        matching: find.byType(InkWell),
+      );
+      expect(tester.widget<InkWell>(row.first).onTap, isNull);
+    });
 
-    // The label yields; the badge never shrinks or wraps.
-    expect(find.text('12 UPCOMING'), findsOneWidget);
+    testWidgets('sign out asks before it signs out', (tester) async {
+      await _pumpMenu(tester);
 
-    // Rows are min-height, not height — 56 at 1x grows past 60 at 1.2x
-    // instead of clipping.
-    final rowBox = tester.getSize(
-      find
-          .ancestor(
-            of: find.text('My Matches'),
-            matching: find.byType(Container),
-          )
-          .first,
-    );
-    expect(rowBox.height, greaterThan(60));
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Are you sure you want to sign out of Matchday?'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Are you sure you want to sign out of Matchday?'),
+          findsNothing);
+    });
+
+    testWidgets('a profile that has not loaded still renders the navigation',
+        (tester) async {
+      await _pumpMenu(tester, profile: null);
+
+      // The rows are the point; the identity block degrades to empty strings
+      // rather than taking the page down with it.
+      expect(find.text('My Matches'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('saran@gmail.com'), findsOneWidget);
+    });
+
+    // Regression: CkType.display and CkType.mono take letterSpacing in *em*
+    // and multiply it by fontSize (circk_theme.dart). The canvas states its
+    // tracking in px ("letter-spacing:-.5px"), so copying those numbers across
+    // verbatim yields -0.5 * 25 = -12.5px and every glyph lands on top of the
+    // one before it. find.text() still passes in that state — it reads the
+    // widget, not the paint — so the band has to be asserted directly.
+    testWidgets('tracking stays in em, never raw canvas px', (tester) async {
+      await _pumpMenu(tester);
+
+      final texts = tester.widgetList<Text>(find.byType(Text));
+      expect(texts, isNotEmpty);
+
+      for (final t in texts) {
+        final style = t.style;
+        final size = style?.fontSize;
+        final spacing = style?.letterSpacing;
+        if (style == null || size == null || spacing == null) continue;
+
+        expect(
+          spacing.abs(),
+          lessThanOrEqualTo(size * 0.25),
+          reason: '"${t.data}" is tracked ${spacing}px on a ${size}px face — '
+              'that reads as an em value passed where px were meant, or the '
+              'reverse.',
+        );
+      }
+    });
+
+    testWidgets('survives 120% OS text scale without overflowing',
+        (tester) async {
+      await _pumpMenu(tester, textScale: 1.2);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('My Tournaments'), findsOneWidget);
+      expect(find.text('Sign out'), findsOneWidget);
+    });
   });
 }

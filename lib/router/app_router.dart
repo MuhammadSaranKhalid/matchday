@@ -10,6 +10,7 @@ import '../features/home/presentation/screens/home_feed_screen.dart';
 import '../features/matches/presentation/screens/matches_v2_screen.dart';
 import '../features/messages/presentation/screens/message_thread_screen.dart';
 import '../features/profile/presentation/screens/my_profile_screen.dart';
+import '../features/profile/presentation/screens/profile_edit_screen.dart';
 import '../features/profile/presentation/screens/public_profile_screen.dart';
 import '../features/messages/presentation/screens/inbox_screen.dart';
 import '../features/matches/presentation/screens/match_detail_screen.dart';
@@ -54,6 +55,8 @@ import '../features/tournaments/presentation/screens/organizer_console_screen.da
 import '../features/tournaments/presentation/screens/team_registration_sheet.dart';
 import '../features/tournaments/presentation/screens/tournament_create_wizard_screen.dart';
 import '../features/tournaments/presentation/screens/tournament_detail_screen.dart';
+import '../features/tournaments/presentation/screens/tournament_registration_status_screen.dart';
+import '../features/tournaments/presentation/screens/tournament_requests_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -249,6 +252,14 @@ GoRouter appRouter(Ref ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (_, __) => const MyProfileScreen(),
       ),
+      // Artboard 1a. A real route rather than a raw Navigator.push, so the
+      // screen's own back handling (the discard guard) pops the router stack
+      // it was actually pushed onto.
+      GoRoute(
+        path: '/profile/edit',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, __) => const ProfileEditScreen(),
+      ),
       // Menu destinations under `/my/...`
       GoRoute(
         path: '/my/matches',
@@ -334,9 +345,23 @@ GoRouter appRouter(Ref ref) {
           matchId: state.pathParameters['matchId']!,
         ),
       ),
+      // Artboard 24f — requests as a pushed page.
+      GoRoute(
+        path: '/tournaments/:tournamentId/requests',
+        builder: (_, state) => TournamentRequestsScreen(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
       GoRoute(
         path: '/tournaments/:tournamentId/register',
         builder: (_, state) => TeamRegistrationSheet(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
+      // Artboard 33 — status tracker + outcomes.
+      GoRoute(
+        path: '/tournaments/:tournamentId/register/status',
+        builder: (_, state) => TournamentRegistrationStatusScreen(
           tournamentId: state.pathParameters['tournamentId']!,
         ),
       ),
@@ -387,6 +412,9 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) => TeamManageScreen(
           teamId: state.pathParameters['teamId']!,
           justCreated: state.uri.queryParameters['justCreated'] == 'true',
+          // The team page's ⋯ menu sends "Edit team" / "Team settings" and
+          // "Invite players" to different tabs of the same console.
+          initialTab: state.uri.queryParameters['tab'],
         ),
       ),
       GoRoute(

@@ -30,19 +30,27 @@ abstract class ProfileRepository {
     String? avatarFilePath,
   });
 
-  /// Update an existing profile (the edit screen). Only [displayName] and
-  /// [city] are required; pass [username] only when it actually changed (the
-  /// server enforces a 30-day change cooldown). If [avatar] is non-null it is
-  /// uploaded to the `avatars` bucket and its URL stored on the row.
+  /// Update an existing profile (the edit screen). Only [displayName] is
+  /// required; pass [username] only when it actually changed (the server
+  /// enforces a change cooldown). [avatar] and [cover] are uploaded to the
+  /// `avatars` bucket and their URLs stored on the row.
+  ///
+  /// [city] and the geo fields are **optional and untouched when omitted**.
+  /// Artboard 1a removes location from the edit form entirely — no field, no
+  /// GPS button, no permission prompt — so the screen has nothing to send.
+  /// A null city leaves whatever is already on the row alone rather than
+  /// clearing it: city is still set elsewhere (teams, tournaments), and an
+  /// edit form that silently wiped it would be a data-loss bug.
   Future<Either<Failure, Profile>> updateProfile({
     required DisplayName displayName,
     Username? username,
     String? bio,
-    required City city,
+    City? city,
     String? placeId,
     double? latitude,
     double? longitude,
     String? countryCode,
     File? avatar,
+    File? cover,
   });
 }

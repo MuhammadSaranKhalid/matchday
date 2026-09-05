@@ -24,6 +24,7 @@ _TeamDto _$TeamDtoFromJson(Map<String, dynamic> json) => _TeamDto(
   logoUrl: json['logo_url'] as String?,
   logoMonogram: json['logo_monogram'] as String?,
   isVerified: json['is_verified'] as bool? ?? false,
+  status: json['status'] as String? ?? 'active',
   createdAt: json['created_at'] as String,
   updatedAt: json['updated_at'] as String,
 );
@@ -44,6 +45,7 @@ Map<String, dynamic> _$TeamDtoToJson(_TeamDto instance) => <String, dynamic>{
   'logo_url': instance.logoUrl,
   'logo_monogram': instance.logoMonogram,
   'is_verified': instance.isVerified,
+  'status': instance.status,
   'created_at': instance.createdAt,
   'updated_at': instance.updatedAt,
 };

@@ -1,18 +1,24 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
+import '../../../../../core/util/surface_mode.dart';
 import '../../../../follows/presentation/controllers/follow_toggle_controller.dart';
-import '../../../domain/entities/team_member.dart';
-import '../../providers/teams_providers.dart';
+import '../../utils/team_display.dart';
+import '../team_crest.dart';
 import 'tp_atoms.dart';
+import 'tp_join_request_sheet.dart';
 import 'tp_view.dart';
 
-/// Hero header — primary-color background with cricket-ground motif, status bar
-/// overlay, back/share/dots icons, crest tile + name + tagline, optional
-/// badges row, optional W/L strip, action row.
+/// Hero header — the team's own colour, a circular crest, and the chrome that
+/// sits on top of it.
+///
+/// The ground here is **data, not brand**: `teams.team_colors.primary` is one
+/// of twelve owner-chosen swatches spanning near-black to pale cream. White
+/// chrome fails on the pale two, so the whole hero carries an ink ramp that
+/// flips on the ground's WCAG luminance ([surfaceModeFor]) rather than
+/// assuming a dark backdrop.
 class TpHero extends StatelessWidget {
   const TpHero({
     super.key,
@@ -33,87 +39,127 @@ class TpHero extends StatelessWidget {
   final VoidCallback? onShare;
   final VoidCallback? onOptions;
 
-  Color get _heroColor =>
-      team.archived != null ? const Color(0xFF6A6356) : team.primary;
+  bool get _archived => team.archived != null;
 
   @override
   Widget build(BuildContext context) {
-    final dim = team.archived != null;
-    final color = _heroColor;
+    final color = team.primary;
+    final mode = surfaceModeFor(color);
+    final ink = mode.isInk;
+
+    // The whole ramp derives from the two lines below; nothing downstream
+    // hard-codes white.
+    final primaryInk = ink ? CkColors.ink : Colors.white;
+    final secondaryInk =
+        ink ? CkColors.ink2 : Colors.white.withValues(alpha: 0.85);
+
     return ColoredBox(
       color: color,
       child: Stack(
         children: [
-          // Cricket-ground motif painted at the top-right corner.
-          const Positioned(
-            right: -30,
-            top: -10,
-            child: Opacity(
-              opacity: 0.10,
+          Positioned(
+            top: -96,
+            right: -118,
+            child: IgnorePointer(
               child: CustomPaint(
-                size: Size(320, 200),
-                painter: TpCricketGroundPainter(),
+                size: const Size(340, 250),
+                painter: TpCricketGroundPainter(
+                  color: ink
+                      ? CkColors.ink.withValues(alpha: 0.07)
+                      : Colors.white.withValues(alpha: 0.10),
+                ),
               ),
             ),
           ),
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 18),
+              padding: const EdgeInsets.only(bottom: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Button row: laid out at 10px so the 44pt hit boxes inset
+                  // 4px inside themselves and the discs still land on the
+                  // hero's 14px optical margin.
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        TpIconBtn(
-                          icon: Icons.arrow_back,
-                          onColor: true,
-                          onTap: onBack,
-                        ),
-                        Row(
-                          children: [
-                            TpIconBtn(
-                              icon: Icons.ios_share,
-                              onColor: true,
-                              onTap: onShare,
-                            ),
-                            const SizedBox(width: 6),
-                            TpIconBtn(
-                              icon: Icons.more_horiz,
-                              onColor: true,
-                              onTap: onOptions,
-                            ),
-                          ],
-                        ),
-                      ],
+                    padding: const EdgeInsets.fromLTRB(10, 2, 10, 0),
+                    child: SizedBox(
+                      height: 44,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TpIconBtn(
+                            icon: Icons.arrow_back,
+                            onColor: true,
+                            mode: mode,
+                            onTap: onBack,
+                            tooltip: 'Back',
+                          ),
+                          Row(
+                            children: [
+                              TpIconBtn(
+                                icon: Icons.ios_share,
+                                onColor: true,
+                                mode: mode,
+                                onTap: onShare,
+                                tooltip: 'Share team',
+                              ),
+                              TpIconBtn(
+                                icon: Icons.more_horiz,
+                                onColor: true,
+                                mode: mode,
+                                onTap: onOptions,
+                                tooltip: 'More',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 12),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    child: _Identity(team: team, heroColor: color, dim: dim),
-                  ),
-                  if (badges.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-                      child: _BadgesRow(badges: badges),
-                    ),
-                  if (team.record != null)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
-                      child: _RecordStrip(record: team.record!),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-                    child: TpActionRow(
-                      teamId: teamId,
-                      viewer: viewer,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: _Identity(
                       team: team,
-                      heroColor: color,
+                      mode: mode,
+                      primaryInk: primaryInk,
+                      secondaryInk: secondaryInk,
                     ),
                   ),
+
+                  // An archived team is a record: the rows that invite action
+                  // are removed, not disabled, and the way back is named.
+                  if (_archived)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                      child: _ArchivedStrip(
+                        archived: team.archived!,
+                        mode: mode,
+                        canRestore: viewer == TeamPageViewer.owner,
+                      ),
+                    )
+                  else ...[
+                    if (badges.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                        child: _BadgesRow(badges: badges, mode: mode),
+                      ),
+                    if (team.record != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                        child: _RecordStrip(record: team.record!, mode: mode),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                      child: TpActionRow(
+                        teamId: teamId,
+                        viewer: viewer,
+                        team: team,
+                        mode: mode,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -127,70 +173,100 @@ class TpHero extends StatelessWidget {
 class _Identity extends StatelessWidget {
   const _Identity({
     required this.team,
-    required this.heroColor,
-    required this.dim,
+    required this.mode,
+    required this.primaryInk,
+    required this.secondaryInk,
   });
+
   final TpTeam team;
-  final Color heroColor;
-  final bool dim;
+  final CkSurfaceMode mode;
+  final Color primaryInk;
+  final Color secondaryInk;
+
+  /// The name never wraps — a second line pushes the tagline into the badges.
+  /// It steps down twice, then ellipsises.
+  double _nameSize(String name) {
+    if (name.length <= 16) return 28;
+    if (name.length <= 20) return 24;
+    return 21;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final hasTagline = team.tagline != null && team.tagline!.trim().isNotEmpty;
+    final eyebrow = [
+      team.type.toUpperCase(),
+      if (team.area.trim().isNotEmpty) team.area.toUpperCase(),
+      if (team.city.trim().isNotEmpty) team.city.toUpperCase(),
+    ].join(' · ');
+
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _HeroCrest(team: team, heroColor: heroColor),
+        TeamCrest(
+          name: team.name,
+          primaryColor: hexOf(team.primary),
+          logoUrl: team.logoUrl,
+          monogram: team.mono,
+          size: 72,
+          onLightSurface: mode.isInk,
+        ),
         const SizedBox(width: 14),
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      '${team.type.toUpperCase()} · '
-                      '${team.area.toUpperCase()}${team.area.isNotEmpty ? ', ' : ''}${team.city.toUpperCase()}',
-                      style: tpMono(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      eyebrow,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: CkType.mono(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.82),
+                        letterSpacing: 0.14,
+                        color: secondaryInk,
                       ),
                     ),
-                    if (team.verified && !dim) const TpVerifiedTick(),
+                  ),
+                  if (team.verified) ...[
+                    const SizedBox(width: 6),
+                    TpVerifiedTick(color: primaryInk),
                   ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  team.name,
-                  style: CkType.display(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.025,
-                    height: 1,
-                    color: Colors.white,
-                  ),
-                ),
-                if (team.tagline != null &&
-                    team.tagline!.trim().isNotEmpty &&
-                    !dim) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    '“${team.tagline}”',
-                    style: CkType.display(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: -0.01,
-                      color: Colors.white.withValues(alpha: 0.85),
-                    ).copyWith(fontStyle: FontStyle.italic),
-                  ),
                 ],
+              ),
+              // With no tagline the stack loses its counterweight, so the
+              // eyebrow tucks closer to the name.
+              SizedBox(height: hasTagline ? 3 : 4),
+              Text(
+                team.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: CkType.display(
+                  fontSize: _nameSize(team.name),
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.03,
+                  height: 1.05,
+                  color: primaryInk,
+                ),
+              ),
+              if (hasTagline) ...[
+                const SizedBox(height: 3),
+                Text(
+                  '“${team.tagline}”',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: CkType.body(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: secondaryInk,
+                  ).copyWith(fontStyle: FontStyle.italic),
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ],
@@ -198,100 +274,126 @@ class _Identity extends StatelessWidget {
   }
 }
 
-class _HeroCrest extends StatelessWidget {
-  const _HeroCrest({required this.team, required this.heroColor});
-  final TpTeam team;
-  final Color heroColor;
+class _ArchivedStrip extends StatelessWidget {
+  const _ArchivedStrip({
+    required this.archived,
+    required this.mode,
+    required this.canRestore,
+  });
 
-  Widget _mono() => Container(
-    width: 72,
-    height: 72,
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.95),
-      borderRadius: BorderRadius.circular(18),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.18),
-          offset: const Offset(0, 4),
-          blurRadius: 16,
-        ),
-      ],
-    ),
-    alignment: Alignment.center,
-    child: Text(
-      team.mono,
-      style: CkType.display(
-        fontSize: 30,
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.04,
-        color: heroColor,
-      ),
-    ),
-  );
+  final String archived;
+  final CkSurfaceMode mode;
+  final bool canRestore;
 
   @override
   Widget build(BuildContext context) {
-    final url = team.logoUrl;
-    if (url == null || url.isEmpty) return _mono();
-    final memW = (72 * MediaQuery.devicePixelRatioOf(context)).round();
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        width: 72,
-        height: 72,
-        color: Colors.white,
-        padding: const EdgeInsets.all(8),
-        child: CachedNetworkImage(
-          imageUrl: url,
-          fit: BoxFit.contain,
-          memCacheWidth: memW,
-          errorWidget: (_, __, ___) => _mono(),
-          placeholder: (_, __) => _mono(),
+    final ink = mode.isInk;
+    final label = ink ? CkColors.ink : Colors.white;
+    final sub = ink ? CkColors.ink2 : Colors.white.withValues(alpha: 0.82);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(8, 5, 9, 5),
+          decoration: BoxDecoration(
+            color: ink
+                ? CkColors.ink.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(6),
+            border: ink
+                ? Border.all(color: CkColors.ink.withValues(alpha: 0.14))
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.archive_outlined, size: 12, color: label),
+              const SizedBox(width: 5),
+              Text(
+                'ARCHIVED · READ-ONLY',
+                style: CkType.mono(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.10,
+                  color: label,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        Text(
+          canRestore
+              ? 'Archived $archived · you can restore it from ⋯'
+              : 'Archived $archived · this page is kept as a record',
+          style: CkType.body(fontSize: 12.5, color: sub),
+        ),
+      ],
     );
   }
 }
 
 class _BadgesRow extends StatelessWidget {
-  const _BadgesRow({required this.badges});
+  const _BadgesRow({required this.badges, required this.mode});
+
   final List<TpHeroBadge> badges;
+  final CkSurfaceMode mode;
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
       spacing: 6,
       runSpacing: 6,
-      children: [for (final b in badges) _Badge(badge: b)],
+      children: [for (final b in badges) _Badge(badge: b, mode: mode)],
     );
   }
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({required this.badge});
+  const _Badge({required this.badge, required this.mode});
+
   final TpHeroBadge badge;
+  final CkSurfaceMode mode;
 
   @override
   Widget build(BuildContext context) {
+    final ink = mode.isInk;
+    final isRed = badge.tone == TpHeroBadgeTone.red;
+    // The red pill keeps its own ground in both modes — it is a status, not
+    // chrome, and white on Cricket Red holds either way.
+    final label = isRed
+        ? Colors.white
+        : ink
+            ? CkColors.ink2
+            : Colors.white;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
       decoration: BoxDecoration(
-        color:
-            badge.tone == TpHeroBadgeTone.red
-                ? CkColors.red
+        color: isRed
+            ? CkColors.red
+            : ink
+                ? CkColors.ink.withValues(alpha: 0.06)
                 : Colors.white.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(6),
+        border: (ink && !isRed)
+            ? Border.all(color: CkColors.ink.withValues(alpha: 0.14))
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (badge.pulse) ...[const TpLivePulse(), const SizedBox(width: 5)],
+          if (badge.pulse) ...[
+            TpLivePulse(color: label),
+            const SizedBox(width: 5),
+          ],
           Text(
             badge.label.toUpperCase(),
             style: tpMono(
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: label,
             ),
           ),
         ],
@@ -301,26 +403,40 @@ class _Badge extends StatelessWidget {
 }
 
 class _RecordStrip extends StatelessWidget {
-  const _RecordStrip({required this.record});
+  const _RecordStrip({required this.record, required this.mode});
+
   final TpRecord record;
+  final CkSurfaceMode mode;
 
   @override
   Widget build(BuildContext context) {
+    final ink = mode.isInk;
+    final figures = ink ? CkColors.ink : Colors.white;
+    final labels =
+        ink ? CkColors.ink2 : Colors.white.withValues(alpha: 0.72);
+    final divider = ink
+        ? CkColors.ink.withValues(alpha: 0.10)
+        : Colors.white.withValues(alpha: 0.14);
+
     final cells = <(String, String)>[
       ('PLAYED', '${record.played}'),
       ('WON', '${record.won}'),
       ('LOST', '${record.lost}'),
       ('WIN %', '${record.winPct}'),
     ];
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(12),
+        color: ink
+            ? CkColors.ink.withValues(alpha: 0.06)
+            : Colors.black.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(CkRadii.md),
+        border: ink ? Border.all(color: divider) : null,
       ),
       child: IntrinsicHeight(
         child: Row(
           children: [
-            for (var i = 0; i < cells.length; i++) ...[
+            for (var i = 0; i < cells.length; i++)
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -328,14 +444,9 @@ class _RecordStrip extends StatelessWidget {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    border:
-                        i == 0
-                            ? null
-                            : Border(
-                              left: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.14),
-                              ),
-                            ),
+                    border: i == 0
+                        ? null
+                        : Border(left: BorderSide(color: divider)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,7 +457,7 @@ class _RecordStrip extends StatelessWidget {
                         style: tpMono(
                           fontSize: 9,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.72),
+                          color: labels,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -355,14 +466,13 @@ class _RecordStrip extends StatelessWidget {
                         style: CkType.display(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          color: figures,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ],
           ],
         ),
       ),
@@ -376,21 +486,15 @@ class TpActionRow extends ConsumerWidget {
     required this.teamId,
     required this.viewer,
     required this.team,
-    required this.heroColor,
+    required this.mode,
   });
 
   final String teamId;
   final TeamPageViewer viewer;
   final TpTeam team;
-  final Color heroColor;
+  final CkSurfaceMode mode;
 
   List<_Action> _actionsFor(BuildContext context, WidgetRef ref) {
-    if (team.archived != null) {
-      return const [
-        _Action(label: 'Read-only archive', icon: Icons.access_time),
-        _Action(icon: Icons.ios_share, iconOnly: true),
-      ];
-    }
     switch (viewer) {
       case TeamPageViewer.owner:
       case TeamPageViewer.captain:
@@ -432,169 +536,34 @@ class TpActionRow extends ConsumerWidget {
           const _Action(label: 'Notify', icon: Icons.notifications_none),
         ];
       case TeamPageViewer.strangerPrivate:
-        return [
-          _joinAction(context, ref, primary: true),
-        ];
+        return [_joinAction(context, primary: true)];
       case TeamPageViewer.stranger:
-        return [
-          _followAction(ref),
-          _joinAction(context, ref, primary: false),
-        ];
+        return [_followAction(ref), _joinAction(context, primary: false)];
     }
   }
 
-  _Action _joinAction(BuildContext context, WidgetRef ref, {bool primary = false}) {
+  _Action _joinAction(BuildContext context, {bool primary = false}) {
     return _Action(
       label: 'Request to join',
       icon: Icons.add_rounded,
       primary: primary,
-      onTap: () => _showJoinRequestModal(context, ref),
-    );
-  }
-
-  void _showJoinRequestModal(BuildContext context, WidgetRef ref) {
-    final msgController = TextEditingController();
-    String selectedRole = 'player';
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: CkColors.paper,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            16,
-            20,
-            MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: CkColors.hairline,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Text(
-                'Join ${team.name}',
-                style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Send a join request to the team managers.',
-                style: CkType.body(fontSize: 12.5, color: CkColors.muted),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'PLAYING ROLE',
-                style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, color: CkColors.muted),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final r in [
-                    (id: 'player', label: 'Squad Player'),
-                    (id: 'wicket_keeper', label: 'Wicket-keeper'),
-                  ])
-                    ChoiceChip(
-                      label: Text(r.label),
-                      selected: selectedRole == r.id,
-                      onSelected: (_) => setState(() => selectedRole = r.id),
-                      selectedColor: CkColors.ink,
-                      backgroundColor: CkColors.paper2,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: selectedRole == r.id ? CkColors.paper : CkColors.ink,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'NOTE / MESSAGE (OPTIONAL)',
-                style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, color: CkColors.muted),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: msgController,
-                maxLines: 3,
-                style: CkType.body(fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: 'e.g. Right-arm fast bowler, available on weekends...',
-                  hintStyle: const TextStyle(fontSize: 12.5, color: CkColors.muted),
-                  filled: true,
-                  fillColor: CkColors.paper2,
-                  contentPadding: const EdgeInsets.all(12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: CkColors.hairline),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    Navigator.of(ctx).pop();
-                    final roleEnum = MemberRole.fromWire(selectedRole);
-                    final res = await ref.read(teamsRepositoryProvider).requestToJoinTeam(
-                          teamId: teamId,
-                          role: roleEnum,
-                          message: msgController.text.trim().isNotEmpty ? msgController.text.trim() : null,
-                        );
-                    if (context.mounted) {
-                      res.fold(
-                        (failure) => ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to send request: ${failure.message}')),
-                        ),
-                        (_) => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Join request sent to team managers!')),
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: CkColors.ink,
-                    foregroundColor: CkColors.paper,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Send Request', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                ),
-              ),
-            ],
-          ),
-        ),
+      onTap: () => showTeamJoinRequestSheet(
+        context,
+        teamId: teamId,
+        teamName: team.name,
       ),
     );
   }
 
   _Action _followAction(WidgetRef ref) {
-    final following = ref.watch(
-      followToggleProvider('team', teamId),
-    );
+    final following = ref.watch(followToggleProvider('team', teamId));
     final isFollowing = following.value ?? false;
     return _Action(
       label: isFollowing ? 'Following' : 'Follow',
       icon: isFollowing ? Icons.check : Icons.add,
       primary: true,
-      onTap: () => ref
-          .read(followToggleProvider('team', teamId).notifier)
-          .toggle(),
+      onTap: () =>
+          ref.read(followToggleProvider('team', teamId).notifier).toggle(),
     );
   }
 
@@ -605,7 +574,11 @@ class TpActionRow extends ConsumerWidget {
       children: [
         for (var i = 0; i < actions.length; i++) ...[
           if (i > 0) const SizedBox(width: 8),
-          _ActionButton(action: actions[i], heroColor: heroColor),
+          _ActionButton(
+            action: actions[i],
+            heroColor: team.primary,
+            mode: mode,
+          ),
         ],
       ],
     );
@@ -617,61 +590,81 @@ class _Action {
     this.label,
     this.icon,
     this.primary = false,
-    this.iconOnly = false,
     this.onTap,
   });
+
   final String? label;
   final IconData? icon;
   final bool primary;
-  final bool iconOnly;
   final VoidCallback? onTap;
 }
 
 class _ActionButton extends StatelessWidget {
-  const _ActionButton({required this.action, required this.heroColor});
+  const _ActionButton({
+    required this.action,
+    required this.heroColor,
+    required this.mode,
+  });
+
   final _Action action;
   final Color heroColor;
+  final CkSurfaceMode mode;
 
   @override
   Widget build(BuildContext context) {
+    final ink = mode.isInk;
     final primary = action.primary;
+
+    // On a pale hero a white button is invisible, so the fill inverts to ink
+    // and the outline thickens to hold its edge.
+    final Color fill = primary
+        ? (ink ? CkColors.ink : Colors.white)
+        : Colors.transparent;
+    final Color foreground = primary
+        ? (ink ? CkColors.paper : heroColor)
+        : (ink ? CkColors.ink : Colors.white);
+    final Border? border = primary
+        ? null
+        : Border.all(
+            color: ink
+                ? CkColors.ink.withValues(alpha: 0.24)
+                : Colors.white.withValues(alpha: 0.42),
+            width: ink ? 1.5 : 1,
+          );
+
     final body = Container(
       height: 44,
-      padding: EdgeInsets.symmetric(
-        horizontal: action.iconOnly ? 14 : (primary ? 0 : 14),
-      ),
+      padding: EdgeInsets.symmetric(horizontal: primary ? 0 : 14),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: primary ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(11),
-        border:
-            primary
-                ? null
-                : Border.all(color: Colors.white.withValues(alpha: 0.42)),
+        color: fill,
+        borderRadius: BorderRadius.circular(CkRadii.md),
+        border: border,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (action.icon != null)
-            Icon(
-              action.icon,
-              size: 14,
-              color: primary ? heroColor : Colors.white,
-            ),
+            Icon(action.icon, size: 14, color: foreground),
           if (action.icon != null && action.label != null)
             const SizedBox(width: 6),
           if (action.label != null)
-            Text(
-              action.label!,
-              style: CkType.body(
-                fontSize: 13,
-                fontWeight: primary ? FontWeight.w700 : FontWeight.w600,
-                color: primary ? heroColor : Colors.white,
+            Flexible(
+              child: Text(
+                action.label!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: CkType.body(
+                  fontSize: 13,
+                  fontWeight: primary ? FontWeight.w700 : FontWeight.w600,
+                  color: foreground,
+                ),
               ),
             ),
         ],
       ),
     );
+
     final tapped = action.onTap == null
         ? body
         : GestureDetector(
@@ -679,43 +672,49 @@ class _ActionButton extends StatelessWidget {
             onTap: action.onTap,
             child: body,
           );
-    if (primary || (!action.iconOnly && action.label != null)) {
-      return Expanded(child: tapped);
-    }
-    return tapped;
+
+    return Expanded(child: tapped);
   }
 }
 
+/// The cricket-ground motif that bleeds off the hero's top-right corner.
 class TpCricketGroundPainter extends CustomPainter {
-  const TpCricketGroundPainter();
+  const TpCricketGroundPainter({this.color = Colors.white});
+
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
     final c = Offset(size.width / 2, size.height / 2);
+
+    // Outer ring is a broad band, not a hairline — at 10% opacity a thin
+    // stroke disappears against a mid-tone primary.
     canvas.drawOval(
-      Rect.fromCenter(
-        center: c,
-        width: size.width * 0.95,
-        height: size.height * 0.85,
-      ),
-      paint,
+      Rect.fromCenter(center: c, width: 340 - 22, height: 250 - 22),
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 22,
     );
+
+    final thin = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
     canvas.drawOval(
-      Rect.fromCenter(
-        center: c,
-        width: size.width * 0.55,
-        height: size.height * 0.5,
-      ),
-      paint,
+      Rect.fromCenter(center: c, width: 224, height: 158),
+      thin,
     );
-    canvas.drawRect(Rect.fromCenter(center: c, width: 16, height: 60), paint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: c, width: 26, height: 96),
+        const Radius.circular(3),
+      ),
+      thin,
+    );
   }
 
   @override
-  bool shouldRepaint(_) => false;
+  bool shouldRepaint(TpCricketGroundPainter old) => old.color != color;
 }

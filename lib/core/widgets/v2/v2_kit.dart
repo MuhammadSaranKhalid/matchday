@@ -81,8 +81,16 @@ abstract final class V2Icons {
   static const chevronRight = '<path d="M9 6l6 6-6 6"/>';
   static const chevronLeft = '<path d="M14 6l-6 6 6 6"/>';
   static const chevronDown = '<path d="M6 9.3l6 5.4 6-5.4"/>';
+  // All cubics, symmetric about x=12. The previous path drew each lobe
+  // differently — the right as an arc plus a trailing cubic, the left as an
+  // arc whose chord (11.23) was longer than its own diameter (11.0). SVG
+  // requires a renderer to scale an impossible radius up until the arc fits,
+  // so that lobe silently came out a different curve from its partner and the
+  // heart rendered lopsided. Béziers cannot fail that way.
   static const heart =
-      '<path d="M20.8 8.3a5.5 5.5 0 0 0-9.3-3 5.5 5.5 0 0 0-9.3 6.3l8.4 8.7a1.3 1.3 0 0 0 1.8 0l8.4-8.7c1-1 1-2 0-3.3z"/>';
+      '<path d="M12 20.5C6.5 16.5 2.5 13.2 2.5 9.2 2.5 6.3 4.8 4 7.7 4 '
+      '9.5 4 11.1 4.9 12 6.3 12.9 4.9 14.5 4 16.3 4 19.2 4 21.5 6.3 '
+      '21.5 9.2 21.5 13.2 17.5 16.5 12 20.5z"/>';
   static const comment = '<path d="M21 12a9 9 0 0 1-13 8L3 21l1-5A9 9 0 1 1 21 12z"/>';
   static const share = '<path d="M4 12l16-8-6 16-2-6-8-2z"/>';
   static const bookmark = '<path d="M6 4h12v17l-6-4-6 4z"/>';

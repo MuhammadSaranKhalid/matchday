@@ -390,6 +390,39 @@ class TeamsRepositoryImpl implements TeamsRepository {
   }
 
   @override
+  Future<Either<Failure, Team>> setTeamStatus({
+    required TeamId teamId,
+    required TeamStatus status,
+  }) async {
+    try {
+      final dto = await _remote.updateTeam(teamId.value, {
+        'status': status.wire,
+      });
+      return Right(dto.toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> leaveTeam(MembershipId membershipId) async {
+    try {
+      await _remote.leaveTeam(membershipId.value);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, String>> uploadTeamLogo({
     required TeamId teamId,
     required List<int> bytes,

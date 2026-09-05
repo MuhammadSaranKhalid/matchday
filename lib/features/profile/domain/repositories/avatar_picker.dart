@@ -5,4 +5,9 @@ import 'dart:io';
 /// controller depends only on this abstraction. Returns null if cancelled.
 abstract class AvatarPicker {
   Future<File?> pickSquare();
+
+  /// Picks + 3:1-crops + resizes a cover image (artboard 1a). The profile
+  /// header shows a cover, so the edit screen has to own it — otherwise the
+  /// placeholder on the profile is unreachable. Returns null if cancelled.
+  Future<File?> pickCover();
 }

@@ -1,225 +1,43 @@
-import 'dart:ui' show FontFeature, clampDouble;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/ck_push_nav.dart';
-import '../../../../core/widgets/v2/ck_shimmer.dart';
-import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
-import '../../../follows/presentation/providers/follows_providers.dart';
-import '../../../matches/presentation/providers/match_pool_providers.dart';
-import '../../../matches/presentation/providers/my_matches_providers.dart';
-import '../../../matches/presentation/state/live_panel_match.dart';
-import '../../../posts/presentation/providers/posts_providers.dart';
-import '../../../profile/domain/entities/player_profile.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
-import '../../../teams/presentation/providers/teams_providers.dart';
 
-// ─── Menu glyph set ─────────────────────────────────────────────────────────
-//
-// The Side Panel design redraws the house glyphs on a 24 viewBox at stroke 1.8
-// with round caps and joins. Five are new to the app (settings, help, trophy,
-// clubs, sign-out); the other six are refinements of `V2Icons` entries that are
-// deliberately NOT changed there — `V2Icons.matches` and friends are the bottom
-// nav's glyphs and must stay as drawn for that surface. Promote any of these to
-// `V2Icons` the first time a second screen needs one.
-abstract final class _Glyphs {
-  static const matches =
-      '<path d="M14.5 4.2l5.3 5.3-7.4 7.4-5.3-5.3z"/>'
-      '<path d="M6.6 12.2L4 14.8l4.4 4.4 2.6-2.6"/>'
-      '<circle cx="6.2" cy="6.2" r="2.3"/>';
-  static const teams =
-      '<path d="M12 3.2l7.2 2.6v5.6c0 4.3-3 7-7.2 8.4-4.2-1.4-7.2-4.1-7.2-8.4V5.8z"/>'
-      '<circle cx="12" cy="11" r="2.2"/>';
-  static const pool =
-      '<circle cx="12" cy="12" r="8.2"/>'
-      '<circle cx="12" cy="12" r="3.4"/>'
-      '<path d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3"/>';
-  static const bookmark =
-      '<path d="M6.2 4.4a1.6 1.6 0 0 1 1.6-1.6h8.4a1.6 1.6 0 0 1 1.6 1.6v16.8L12 16.6l-5.8 4.6z"/>';
-  static const settings =
-      '<path d="M4 7.5h10M18 7.5h2M4 16.5h6M14 16.5h6"/>'
-      '<circle cx="16" cy="7.5" r="2.2"/>'
-      '<circle cx="12" cy="16.5" r="2.2"/>';
-  static const help =
-      '<circle cx="12" cy="12" r="9"/>'
-      '<path d="M9.4 9.4a2.7 2.7 0 1 1 3.8 2.5c-.8.4-1.2 1-1.2 1.9"/>'
-      '<path d="M12 17.2h.01"/>';
-  static const trophy =
-      '<path d="M8 4h8v4.5a4 4 0 0 1-8 0z"/>'
-      '<path d="M8 5.6H5.4v1.6c0 1.7 1.4 3.1 3.1 3.1"/>'
-      '<path d="M16 5.6h2.6v1.6c0 1.7-1.4 3.1-3.1 3.1"/>'
-      '<path d="M12 12.6V16M9 20h6l-.7-4H9.7z"/>';
-  static const clubs =
-      '<path d="M5 20V6.4l7-3.2 7 3.2V20"/>'
-      '<path d="M3.2 20h17.6"/>'
-      '<path d="M9.4 20v-5.2h5.2V20"/>'
-      '<path d="M9.4 9.6h1.6M13 9.6h1.6"/>';
-  static const signOut =
-      '<path d="M14.5 4.2H7.6A2.4 2.4 0 0 0 5.2 6.6v10.8a2.4 2.4 0 0 0 2.4 2.4h6.9"/>'
-      '<path d="M17 8.6l3.4 3.4-3.4 3.4"/>'
-      '<path d="M20.4 12h-8.2"/>';
-  static const chevronRight = '<path d="M9.5 5.5l6.5 6.5-6.5 6.5"/>';
-}
-
-/// Hairline inside the live card. One step of the existing ramp, sitting
-/// between `redSoft` (#F7E6E1) and the red ink — a plain `hairline` is a cool
-/// grey and reads as dirt on the red tint.
-const _redSoftHairline = Color(0xFFEFD8D2);
-
-/// Row metrics track the OS text scale, so a row keeps its proportions rather
-/// than having a fixed-size glyph float in a growing box: at 120% the design's
-/// row is `min-height 67` with a 26 glyph and a 21 chevron — 56 / 22 / 18 all
-/// scaled by the same factor. Capped at 1.3; past that the glyph starts to
-/// crowd the 20dp side padding.
-double _scaled(BuildContext context, double base) =>
-    base * clampDouble(MediaQuery.textScalerOf(context).scale(1), 1.0, 1.3);
-
-TextStyle _tabular(TextStyle s) =>
-    s.copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
-
-/// Two-letter initials from a display name (for the avatar fallback).
-String _initialsOf(String? name) {
-  final parts =
-      (name ?? '')
-          .trim()
-          .split(RegExp(r'\s+'))
-          .where((s) => s.isNotEmpty)
-          .toList();
-  if (parts.isEmpty) return '·';
-  if (parts.length == 1) {
-    return parts.first
-        .substring(0, parts.first.length >= 2 ? 2 : 1)
-        .toUpperCase();
-  }
-  return (parts.first[0] + parts.last[0]).toUpperCase();
-}
-
-String _playerRoleLabel(PlayerRole? r) => switch (r) {
-  PlayerRole.batter => 'Batter',
-  PlayerRole.bowler => 'Bowler',
-  PlayerRole.allRounder => 'All-rounder',
-  PlayerRole.wicketKeeper => 'Wicket-keeper',
-  null => '',
-};
-
-/// The **Menu** page — the "you" half of the app's navigation.
+/// The "you" surface — artboard **2b · Nothing on the right**.
 ///
-/// Organising principle: "Bottom nav is the world; Menu is you." The screen is
-/// **nouns only, no verbs** — every destination owns its own create button one
-/// tap deeper.
+/// > Pure navigation. Every row is icon, label, chevron — no state at all.
 ///
-/// Was `AppDrawer`, a `Scaffold.drawer` side panel, until it became a
-/// full-screen route (`/menu`) pushed by the avatar at the header's left edge.
-/// The trigger did not move — that avatar opened the drawer too — but the
-/// surface it opens did: a pushed page defends no gesture of its own, so
-/// [SwipeableBranchView]'s tab pager gets the whole left edge back instead of
-/// splitting it with a `DrawerController`. Everything below the container is
-/// the original Side Panel canvas (Claude Design project "Matchday mobile app
-/// design", `Side Panel.dc.html`), unchanged — it still draws five states off
-/// the same tree:
+/// That sentence is the whole specification, and it is a deliberate reversal:
+/// the panel used to carry a live-match card, per-row subtitles, and badges
+/// counting upcoming fixtures, open challenges and squads. All of it is gone.
+/// A menu that reports is a menu you have to *read*; this one you only have to
+/// aim at. The counts still exist — they live on the screens that own them,
+/// one tap deeper.
 ///
-/// * **A · Default** — populated, with the current destination carrying the
-///   place marker (paper2 fill + a 3×20 red rail).
-/// * **B · Live** — a live match is promoted out of the badge into a redSoft
-///   card pinned under identity. My Matches drops back to its upcoming count,
-///   so the live state is promoted rather than duplicated.
-/// * **C · First run** — count rows fall back to an em-dash plus a one-line
-///   subtitle, and a cream orientation note states the rule of the panel.
-/// * **D · Loading** — a content-shaped shimmer. Chrome, glyphs and labels are
-///   real; only account-scoped values shim, so nothing jumps on resolve.
-/// * **E · Overflow** — rows are min-height, not height, so 120% text scale
-///   grows them (56 → 67) instead of clipping.
+/// The glyphs are the canvas's own, drawn to one family: a 24 optical box,
+/// 1.9 stroke, round caps and joins, outline only, no fills. They are rendered
+/// from the artboard's exact path data rather than redrawn as Flutter icons,
+/// because "same optical box, same stroke, same corner language" is a property
+/// of the set — approximating any one glyph breaks the family.
 class MenuScreen extends ConsumerWidget {
   const MenuScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profileAsync = ref.watch(myProfileProvider);
-    final profile = profileAsync.value;
+    final profile = ref.watch(myProfileProvider).value;
+    final user = ref.watch(currentUserStreamProvider).value;
 
-    // D · Loading. `isLoading && !hasValue` rather than `value == null`, so a
-    // provider that fails (or legitimately resolves to null) drops out of the
-    // skeleton instead of shimmering forever.
-    final identityLoading = profileAsync.isLoading && !profileAsync.hasValue;
+    final name = profile?.displayName ?? profile?.username ?? '';
+    // The canvas puts the email under the name, not "@handle · role · city".
+    // It is the one line that says *which account you are signed into*, which
+    // is the question this block exists to answer.
+    final email = user?.email.value ?? '';
 
-    final displayName = profile?.displayName ?? profile?.username ?? '';
-    final roleLabel = _playerRoleLabel(profile?.playerProfile?.role);
-    final subline = [
-      if (profile?.username != null && profile!.username!.isNotEmpty)
-        '@${profile.username}',
-      if (roleLabel.isNotEmpty) roleLabel,
-      if (profile?.city != null && profile!.city!.isNotEmpty) profile.city!,
-    ].join(' · ');
-
-    final uid = profile?.userId.value;
-    final postsCount =
-        uid != null
-            ? ref.watch(authorPostsProvider(uid)).value?.length ?? 0
-            : 0;
-    final followersCount =
-        uid != null
-            ? ref.watch(followCountsProvider(uid)).value?.followers ?? 0
-            : 0;
-
-    final live = ref.watch(livePanelMatchProvider).value;
-    final matchesAsync = ref.watch(myMatchesViewProvider);
-    final teamsAsync = ref.watch(myTeamsProvider);
-    final poolAsync = ref.watch(myPoolRequestsProvider);
-
-    final myMatches = matchesAsync.value;
-    final teamCount = teamsAsync.value?.length;
-    final poolCount = poolAsync.value?.length;
-
-    // The three count rows shim on their own providers: chrome, glyphs and
-    // labels stay real, and the badge slot holds a pre-sized block so nothing
-    // jumps when a value lands.
-    final countsLoading =
-        (matchesAsync.isLoading && !matchesAsync.hasValue) ||
-        (teamsAsync.isLoading && !teamsAsync.hasValue) ||
-        (poolAsync.isLoading && !poolAsync.hasValue);
-
-    // My Matches badge precedence: live > upcoming > pending. The live badge
-    // only appears when the live card is NOT shown — otherwise the panel would
-    // say the same thing twice.
-    final (String? matchBadge, _BadgeTone matchTone) = switch (myMatches) {
-      null => (null, _BadgeTone.neutral),
-      final v when v.confirmed.any((m) => m.live) && live == null => (
-        'Live now',
-        _BadgeTone.live,
-      ),
-      final v when v.confirmed.where((m) => !m.live).isNotEmpty => (
-        '${v.confirmed.where((m) => !m.live).length} upcoming',
-        _BadgeTone.neutral,
-      ),
-      final v when v.pendingRequestsCount > 0 => (
-        '${v.pendingRequestsCount} pending',
-        _BadgeTone.pending,
-      ),
-      _ => (null, _BadgeTone.neutral),
-    };
-
-    // C · First run — everything has resolved and the account is empty.
-    final firstRun =
-        !identityLoading &&
-        !countsLoading &&
-        (myMatches?.isEmpty ?? false) &&
-        (teamCount ?? 0) == 0 &&
-        (poolCount ?? 0) == 0;
-
-    final here = GoRouter.of(context).state.uri.path;
-
-    // A full-screen route over the shell, so it wears push chrome, not shell
-    // chrome: [CkPushNav], the same 56dp back bar every other pushed route uses
-    // (`my_matches_screen.dart`, `teams_list_screen.dart`). Not [V2Header] —
-    // that is the *shell's* header, and wearing it here made the page read as a
-    // fifth tab rather than somewhere you had navigated to.
-    //
-    // No trailing action: N7 — the Menu is nouns only, and every destination
-    // owns its own create button one tap deeper.
     return Scaffold(
       backgroundColor: CkColors.paper,
       body: SafeArea(
@@ -227,116 +45,84 @@ class MenuScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            CkPushNav(
-              title: 'Menu',
+            _Header(
               onBack: () =>
                   context.canPop() ? context.pop() : context.go('/home'),
             ),
+            const _Hairline(),
             _Identity(
-              loading: identityLoading,
-              name: displayName,
-              subline: subline,
+              name: name,
+              email: email,
               avatarUrl: profile?.avatarUrl,
-              postsCount: postsCount,
-              followersCount: followersCount,
+              onTap: () => context.push('/profile'),
             ),
-            const Divider(height: 1, thickness: 1, color: CkColors.hairline),
-
-            // B · the hero state.
-            if (live != null) _LiveCard(match: live),
-
-            // C · one sentence that states the rule of the panel.
-            if (firstRun) const _OrientationNote(),
-
+            const _Hairline(),
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
-                children: [
-                  const _Eyebrow('Yours'),
-                  _NavRow(
-                    glyph: _Glyphs.matches,
+                children: const [
+                  _Eyebrow('Yours'),
+                  _MenuRow(
+                    icon: _MenuGlyphs.matches,
                     label: 'My Matches',
-                    empty: firstRun,
-                    subtitle: 'Fixtures you are playing in',
-                    badge: matchBadge,
-                    badgeTone: matchTone,
-                    skeletonWidth: 46,
-                    loading: countsLoading,
-                    current: here.startsWith('/my/matches'),
                     route: '/my/matches',
                   ),
-                  _NavRow(
-                    glyph: _Glyphs.teams,
+                  _MenuRow(
+                    icon: _MenuGlyphs.teams,
                     label: 'My Teams',
-                    empty: firstRun,
-                    subtitle: 'Squads you own or belong to',
-                    badge: (teamCount ?? 0) > 0 ? '$teamCount' : null,
-                    skeletonWidth: 22,
-                    loading: countsLoading,
-                    current:
-                        here.startsWith('/my/teams') ||
-                        here.startsWith('/teams'),
                     route: '/my/teams',
                   ),
-                  _NavRow(
-                    glyph: _Glyphs.pool,
+                  _MenuRow(
+                    icon: _MenuGlyphs.challenges,
                     label: 'My Challenges',
-                    empty: firstRun,
-                    subtitle: 'Challenges you posted',
-                    badge: (poolCount ?? 0) > 0 ? '$poolCount open' : null,
-                    skeletonWidth: 38,
-                    loading: countsLoading,
-                    current: here.startsWith('/my/pool-requests'),
                     route: '/my/pool-requests',
                   ),
-                  _NavRow(
-                    glyph: _Glyphs.trophy,
+                  _MenuRow(
+                    icon: _MenuGlyphs.tournaments,
                     label: 'My Tournaments',
-                    empty: firstRun,
-                    subtitle: 'Cups & leagues you organize or follow',
-                    skeletonWidth: 38,
-                    loading: countsLoading,
-                    current:
-                        here.startsWith('/my/tournaments') ||
-                        here.startsWith('/tournaments'),
                     route: '/my/tournaments',
                   ),
 
-                  const _GroupRule(),
-                  const _Eyebrow('Account'),
-                  _NavRow(
-                    glyph: _Glyphs.bookmark,
+                  _GroupRule(),
+                  _Eyebrow('Activity'),
+                  // TODO(menu): no screen behind this row yet — see the note
+                  // in the PR. It is drawn live in 2b, so it is drawn live
+                  // here, but it has nowhere to go until that surface exists.
+                  _MenuRow(
+                    icon: _MenuGlyphs.invites,
+                    label: 'Invites & requests',
+                  ),
+                  _MenuRow(
+                    icon: _MenuGlyphs.notifications,
+                    label: 'Notifications',
+                    route: '/notifications',
+                  ),
+                  _MenuRow(
+                    icon: _MenuGlyphs.saved,
                     label: 'Saved',
-                    current: here.startsWith('/saved'),
                     route: '/saved',
                   ),
-                  _NavRow(
-                    glyph: _Glyphs.settings,
+
+                  _GroupRule(),
+                  _Eyebrow('Account'),
+                  _MenuRow(
+                    icon: _MenuGlyphs.settings,
                     label: 'Settings',
-                    current: here.startsWith('/settings'),
                     route: '/settings',
                   ),
-                  const _NavRow(
-                    glyph: _Glyphs.help,
+                  // The one exception to "nothing on the right", and it earns
+                  // it by replacing the chevron rather than joining it: a row
+                  // that says Soon is not a destination.
+                  _MenuRow(
+                    icon: _MenuGlyphs.help,
                     label: 'Help & Support',
-                    inert: true,
+                    soon: true,
                   ),
-
-                  const _GroupRule(),
-                  const _Eyebrow('Not built yet'),
-                  const _NavRow(
-                    glyph: _Glyphs.clubs,
-                    label: 'Clubs',
-                    inert: true,
-                    roadmap: true,
-                  ),
-                  const SizedBox(height: 8),
                 ],
               ),
             ),
-
-            const Divider(height: 1, thickness: 1, color: CkColors.hairline),
-            const _Footer(),
+            const _Hairline(),
+            const _SignOut(),
           ],
         ),
       ),
@@ -344,361 +130,47 @@ class MenuScreen extends ConsumerWidget {
   }
 }
 
-// ─── 5.6 Identity block ─────────────────────────────────────────────────────
+// ─── Chrome ─────────────────────────────────────────────────────────────────
 
-class _Identity extends StatelessWidget {
-  const _Identity({
-    required this.loading,
-    required this.name,
-    required this.subline,
-    required this.avatarUrl,
-    required this.postsCount,
-    required this.followersCount,
-  });
+/// 2b draws its own 38pt back button and a 25pt title, rather than the 56dp
+/// [CkPushNav] every other pushed route wears. Menu is the one page whose
+/// title *is* the page, so the canvas gives it the larger setting.
+class _Header extends StatelessWidget {
+  const _Header({required this.onBack});
 
-  final bool loading;
-  final String name;
-  final String subline;
-  final String? avatarUrl;
-  final int postsCount;
-  final int followersCount;
-
-  @override
-  Widget build(BuildContext context) {
-    if (loading) {
-      // Fully const since the close button left with the drawer — the whole
-      // skeleton is now static.
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(18, 14, 14, 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CkShimmer(
-              child: CkShimmerBox(
-                width: 48,
-                height: 48,
-                shape: BoxShape.circle,
-              ),
-            ),
-            SizedBox(width: 14),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(top: 3),
-                child: CkShimmer(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CkShimmerBox(width: 132, height: 15),
-                      SizedBox(height: 6),
-                      CkShimmerBox(width: 178, height: 11, radius: 5),
-                      SizedBox(height: 6),
-                      CkShimmerBox(width: 112, height: 9, radius: 5),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // The stat line is the only thing added to the block: it is a doorway to
-    // the profile, not the profile. Cover, bio and batting style stay there.
-    final stats =
-        postsCount == 0 && followersCount == 0
-            ? 'NO POSTS YET'
-            : '$postsCount POSTS · $followersCount FOLLOWERS';
-
-    return _Pressable(
-      onTap: () => context.push('/profile'),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Avatar(mono: _initialsOf(name), imageUrl: avatarUrl, size: 48),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name.isEmpty ? '·' : name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: CkType.display(fontSize: 17),
-                    ),
-                    if (subline.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subline,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: CkType.body(
-                          fontSize: 11.5,
-                          color: CkColors.muted,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 4),
-                    Text(
-                      stats,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: _tabular(
-                        CkType.mono(
-                          fontSize: 10,
-                          letterSpacing: 0.10,
-                          color:
-                              postsCount == 0 && followersCount == 0
-                                  ? CkColors.soft
-                                  : CkColors.muted,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── 5.4 Live card — the hero state ─────────────────────────────────────────
-
-class _LiveCard extends StatelessWidget {
-  const _LiveCard({required this.match});
-
-  final LivePanelMatch match;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 2),
-      child: _Pressable(
-        radius: BorderRadius.circular(14),
-        pressedColor: _redSoftHairline,
-        restColor: CkColors.redSoft,
-        onTap: () => context.push('/matches/${match.matchId}'),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const _LivePill(),
-                  Text(
-                    '${match.oversLabel} OV',
-                    style: _tabular(
-                      CkType.mono(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.09,
-                        color: CkInk.red,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _LiveScoreLine(
-                short: match.battingShort,
-                color: match.battingColor,
-                name: match.battingName,
-                score: match.battingScore,
-                batting: true,
-              ),
-              const SizedBox(height: 7),
-              _LiveScoreLine(
-                short: match.opponentShort,
-                color: match.opponentColor,
-                name: match.opponentName,
-                score: match.opponentScore,
-                batting: false,
-              ),
-              const SizedBox(height: 11),
-              Container(
-                padding: const EdgeInsets.only(top: 9),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: _redSoftHairline)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        (match.targetLine ?? '').toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: CkType.mono(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.09,
-                          color: CkInk.red,
-                        ),
-                      ),
-                    ),
-                    V2Svg(
-                      _Glyphs.chevronRight,
-                      size: _scaled(context, 16),
-                      color: CkInk.red,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LiveScoreLine extends StatelessWidget {
-  const _LiveScoreLine({
-    required this.short,
-    required this.color,
-    required this.name,
-    required this.score,
-    required this.batting,
-  });
-
-  final String short;
-  final Color color;
-  final String name;
-  final String score;
-
-  /// The side at the crease is ink; the side that has set its total is muted.
-  final bool batting;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _LiveCrest(short: short, color: color),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: CkType.display(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-              color: batting ? CkColors.ink : CkColors.muted,
-            ),
-          ),
-        ),
-        const SizedBox(width: 9),
-        Text(
-          score,
-          style: _tabular(
-            batting
-                ? CkType.display(fontSize: 16)
-                : CkType.mono(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0,
-                  color: CkColors.muted,
-                ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 22×22 r6 crest. Not `Crest` from the kit: this one is drawn at the card's
-/// own monogram size (Inter Tight 10/700, no tracking).
-class _LiveCrest extends StatelessWidget {
-  const _LiveCrest({required this.short, required this.color});
-
-  final String short;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 22,
-      height: 22,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        short,
-        style: CkType.display(
-          fontSize: 10,
-          letterSpacing: 0,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-}
-
-/// LIVE pill with the 5px dot pulsing 1400ms ease-in-out, opacity 1 → .25.
-class _LivePill extends StatefulWidget {
-  const _LivePill();
-
-  @override
-  State<_LivePill> createState() => _LivePillState();
-}
-
-class _LivePillState extends State<_LivePill>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 700),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: CkColors.red,
-        borderRadius: BorderRadius.circular(999),
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 14),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          FadeTransition(
-            opacity: Tween<double>(
-              begin: 1,
-              end: 0.25,
-            ).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+          InkWell(
+            onTap: onBack,
+            customBorder: const CircleBorder(),
             child: Container(
-              width: 5,
-              height: 5,
+              width: 38,
+              height: 38,
               decoration: const BoxDecoration(
-                color: Colors.white,
+                color: CkColors.paper2,
                 shape: BoxShape.circle,
               ),
+              alignment: Alignment.center,
+              child: _MenuGlyphs.svg(
+                _MenuGlyphs.back,
+                size: 18,
+                color: CkColors.ink,
+              ),
             ),
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: 14),
           Text(
-            'LIVE',
-            style: CkType.mono(
-              fontSize: 9,
+            'Menu',
+            style: CkType.display(
+              fontSize: 25,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.09,
-              color: Colors.white,
+              color: CkColors.ink,
             ),
           ),
         ],
@@ -707,45 +179,152 @@ class _LivePillState extends State<_LivePill>
   }
 }
 
-// ─── 5.2 First run ──────────────────────────────────────────────────────────
+class _Hairline extends StatelessWidget {
+  const _Hairline();
 
-/// A sentence, not a button. States the rule of the panel without adding a
-/// verb: the destinations still own creation.
-class _OrientationNote extends StatelessWidget {
-  const _OrientationNote();
+  @override
+  Widget build(BuildContext context) =>
+      Container(height: 1, color: CkColors.hairline);
+}
+
+/// The rule that opens a new group. Carries the canvas's 10pt of air above it
+/// so the sections breathe without a spacer widget.
+class _GroupRule extends StatelessWidget {
+  const _GroupRule();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.only(top: 10),
+        child: _Hairline(),
+      );
+}
+
+class _Eyebrow extends StatelessWidget {
+  const _Eyebrow(this.text);
+
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        decoration: BoxDecoration(
-          color: CkColors.cream,
-          border: Border.all(color: CkColors.creamBorder),
-          borderRadius: BorderRadius.circular(12),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 2),
+      child: Text(
+        text.toUpperCase(),
+        style: CkType.mono(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.1,
+          color: CkColors.muted,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+    );
+  }
+}
+
+// ─── Identity ───────────────────────────────────────────────────────────────
+
+class _Identity extends StatelessWidget {
+  const _Identity({
+    required this.name,
+    required this.email,
+    required this.avatarUrl,
+    required this.onTap,
+  });
+
+  final String name;
+  final String email;
+  final String? avatarUrl;
+  final VoidCallback onTap;
+
+  /// "Muhammad Saran" → "MS". Two letters, or one when there is only one word.
+  String get _initials {
+    final words =
+        name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    if (words.isEmpty) return '';
+    if (words.length == 1) return words.first[0].toUpperCase();
+    return '${words[0][0]}${words[1][0]}'.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = avatarUrl;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
           children: [
-            Text(
-              'YOUR SIDE OF MATCHDAY',
-              style: CkType.mono(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.10,
-                color: CkInk.amber,
+            Container(
+              width: 52,
+              height: 52,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                // A pale slate ground, so a monogram reads as a portrait slot
+                // rather than as another paper chip.
+                color: const Color(0xFFDCE6EE),
+                shape: BoxShape.circle,
+                border: Border.all(color: CkColors.hairline),
+              ),
+              alignment: Alignment.center,
+              child: url == null || url.isEmpty
+                  ? Text(
+                      _initials,
+                      style: CkType.display(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: CkColors.ink2,
+                      ),
+                    )
+                  : Image.network(
+                      url,
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Text(
+                        _initials,
+                        style: CkType.display(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: CkColors.ink2,
+                        ),
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: CkType.display(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: CkColors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: CkType.body(
+                      fontSize: 13,
+                      color: const Color(0xFF6E6658),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 5),
-            Text(
-              'Everything you join, create or are invited to collects here. '
-              'It fills up as you play.',
-              style: CkType.body(
-                fontSize: 11.5,
-                height: 1.5,
-                color: CkColors.ink2,
-              ),
+            const SizedBox(width: 8),
+            _MenuGlyphs.svg(
+              _MenuGlyphs.chevron,
+              size: 17,
+              color: CkColors.muted,
             ),
           ],
         ),
@@ -756,260 +335,62 @@ class _OrientationNote extends StatelessWidget {
 
 // ─── Rows ───────────────────────────────────────────────────────────────────
 
-class _Eyebrow extends StatelessWidget {
-  const _Eyebrow(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
-      child: Text(
-        text.toUpperCase(),
-        style: CkType.mono(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.10,
-          color: CkColors.muted,
-        ),
-      ),
-    );
-  }
-}
-
-class _GroupRule extends StatelessWidget {
-  const _GroupRule();
-
-  @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.only(top: 8),
-    child: Divider(height: 1, thickness: 1, color: CkColors.hairline),
-  );
-}
-
-enum _BadgeTone { neutral, live, pending, soon }
-
-class _NavRow extends StatelessWidget {
-  const _NavRow({
-    required this.glyph,
+class _MenuRow extends StatelessWidget {
+  const _MenuRow({
+    required this.icon,
     required this.label,
-    this.subtitle,
-    this.badge,
-    this.badgeTone = _BadgeTone.neutral,
-    this.skeletonWidth = 46,
-    this.loading = false,
-    this.empty = false,
-    this.current = false,
-    this.inert = false,
-    this.roadmap = false,
     this.route,
+    this.soon = false,
   });
 
-  final String glyph;
+  final String icon;
   final String label;
 
-  /// Shown only in the empty state, in place of a count.
-  final String? subtitle;
-
-  final String? badge;
-  final _BadgeTone badgeTone;
-
-  /// Width of the shimmer block that stands in for this row's badge, so the
-  /// slot is pre-sized and nothing jumps when the value resolves.
-  final double skeletonWidth;
-
-  final bool loading;
-
-  /// First run — the account has nothing anywhere yet, so count rows fall back
-  /// to an em-dash plus a one-line subtitle saying what will appear there.
-  final bool empty;
-
-  /// The destination the user is currently inside — paper2 fill + red rail.
-  final bool current;
-
-  /// No destination: no chevron, no press state, not focusable.
-  final bool inert;
-
-  /// A `NOT BUILT YET` row — one step quieter and shorter than [inert].
-  final bool roadmap;
-
+  /// Null means the row is drawn but goes nowhere yet.
   final String? route;
 
-  bool get _empty => empty && !loading && !inert && subtitle != null;
+  /// Renders the row muted with a Soon pill where the chevron would be.
+  final bool soon;
 
   @override
   Widget build(BuildContext context) {
-    final double height = roadmap ? 48 : (_empty ? 60 : 56);
+    final r = route;
 
-    final Color glyphColor = switch (true) {
-      _ when roadmap => CkColors.soft,
-      _ when inert || loading => loading ? CkColors.soft : CkColors.muted,
-      _ when _empty => CkColors.muted,
-      _ => CkColors.ink,
-    };
-
-    final label0 = Text(
-      label,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: CkType.display(
-        fontSize: roadmap ? 13.5 : 14.5,
-        fontWeight: current ? FontWeight.w700 : FontWeight.w600,
-        color: (inert || roadmap) ? CkColors.muted : CkColors.ink,
-      ),
-    );
-
-    final Widget? trailing = switch (true) {
-      _ when loading => CkShimmer(
-        child: CkShimmerBox(width: skeletonWidth, height: 15, radius: 5),
-      ),
-      _ when inert || roadmap => const _Badge('Soon', _BadgeTone.soon),
-      _ when badge != null => _Badge(
-        badge!,
-        badgeTone,
-        // The place marker already fills the row with paper2, so a neutral
-        // badge steps one notch up the ramp to stay legible.
-        onPaper2: !current,
-      ),
-      _ when _empty => Text(
-        '—',
-        style: CkType.mono(
-          fontSize: 11,
-          letterSpacing: 0,
-          color: CkColors.soft,
-        ),
-      ),
-      _ => null,
-    };
-
-    // Chevron sits 6dp from a badge, 8dp from the empty state's em-dash, and
-    // the full 14dp row gap when there is nothing between it and the label.
-    final double chevronGap = trailing == null ? 14 : (_empty ? 8 : 6);
-
-    final row = Row(
-      children: [
-        V2Svg(
-          glyph,
-          size: _scaled(context, roadmap ? 20 : 22),
-          color: glyphColor,
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child:
-              subtitle != null && _empty
-                  ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      label0,
-                      const SizedBox(height: 1),
-                      Text(
-                        subtitle!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: CkType.body(fontSize: 11, color: CkColors.muted),
-                      ),
-                    ],
-                  )
-                  : label0,
-        ),
-        if (trailing != null) ...[const SizedBox(width: 14), trailing],
-        if (!inert && !roadmap) ...[
-          SizedBox(width: chevronGap),
-          V2Svg(
-            _Glyphs.chevronRight,
-            size: _scaled(context, 18),
-            color: (loading || _empty) ? CkColors.soft : CkColors.muted,
-          ),
-        ],
-      ],
-    );
-
-    // min-height, not height: at 120% text scale the row grows to ~67 rather
-    // than clipping. The 6dp vertical padding is what gives it room.
-    final body = Container(
-      constraints: BoxConstraints(minHeight: _scaled(context, height)),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      alignment: Alignment.centerLeft,
-      child: row,
-    );
-
-    if (inert || roadmap || loading) {
-      return Semantics(enabled: false, child: body);
-    }
-
-    return Stack(
-      children: [
-        _Pressable(
-          restColor: current ? CkColors.paper2 : null,
-          onTap: route == null ? null : () => context.push(route!),
-          child: body,
-        ),
-        // Place marker: 3 × 20 rail at x = 0, vertically centred. One row max.
-        if (current)
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: Container(
-                width: 3,
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: CkColors.red,
-                  borderRadius: BorderRadius.horizontal(
-                    right: Radius.circular(2),
+    return InkWell(
+      onTap: soon || r == null ? null : () => context.push(r),
+      child: SizedBox(
+        height: 52,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              _MenuGlyphs.svg(
+                icon,
+                size: 22,
+                color: soon ? CkColors.soft : CkColors.ink,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CkType.display(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w600,
+                    color: soon ? CkColors.muted : CkColors.ink,
                   ),
                 ),
               ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge(this.text, this.tone, {this.onPaper2 = true});
-
-  final String text;
-  final _BadgeTone tone;
-
-  /// False when the row already carries a paper2 fill (the current place).
-  final bool onPaper2;
-
-  @override
-  Widget build(BuildContext context) {
-    final (Color bg, Color fg, Color? border) = switch (tone) {
-      _BadgeTone.neutral => (
-        onPaper2 ? CkColors.paper2 : CkColors.hairline,
-        CkColors.ink,
-        null,
-      ),
-      _BadgeTone.live => (CkColors.redSoft, CkInk.red, null),
-      _BadgeTone.pending => (CkColors.cream, CkInk.amber, CkColors.creamBorder),
-      _BadgeTone.soon => (CkColors.cream, CkInk.amber, CkColors.creamBorder),
-    };
-
-    return Container(
-      padding:
-          tone == _BadgeTone.soon
-              ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2)
-              : const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(5),
-        border: border == null ? null : Border.all(color: border),
-      ),
-      child: Text(
-        text.toUpperCase(),
-        style: _tabular(
-          CkType.mono(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.09,
-            color: fg,
+              if (soon)
+                const _SoonPill()
+              else
+                _MenuGlyphs.svg(
+                  _MenuGlyphs.chevron,
+                  size: 17,
+                  color: CkColors.muted,
+                ),
+            ],
           ),
         ),
       ),
@@ -1017,81 +398,118 @@ class _Badge extends StatelessWidget {
   }
 }
 
-// ─── Footer ─────────────────────────────────────────────────────────────────
+class _SoonPill extends StatelessWidget {
+  const _SoonPill();
 
-class _Footer extends ConsumerWidget {
-  const _Footer();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: CkColors.cream,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: CkColors.creamBorder),
+      ),
+      child: Text(
+        'SOON',
+        style: CkType.mono(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.09,
+          color: CkColors.amberDark,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Sign out ───────────────────────────────────────────────────────────────
+
+class _SignOut extends ConsumerWidget {
+  const _SignOut();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-      child: Column(
-        children: [
-          _SignOutButton(onTap: () => _confirmSignOut(context, ref)),
-          const SizedBox(height: 12),
-          Text(
-            'MATCHDAY · v2.0',
-            textAlign: TextAlign.center,
-            style: CkType.mono(
-              fontSize: 9,
-              fontWeight: FontWeight.w400,
-              letterSpacing: 0.09,
-              color: CkColors.muted,
-            ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+      child: InkWell(
+        onTap: () => _confirm(context, ref),
+        borderRadius: BorderRadius.circular(11),
+        child: Container(
+          height: 52,
+          decoration: BoxDecoration(
+            color: CkColors.paper2,
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: CkColors.hairline),
           ),
-        ],
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _MenuGlyphs.svg(
+                _MenuGlyphs.signOut,
+                size: 17,
+                color: CkColors.red,
+              ),
+              const SizedBox(width: 9),
+              Text(
+                'Sign out',
+                style: CkType.display(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: CkColors.red,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  void _confirmSignOut(BuildContext context, WidgetRef ref) {
+  void _confirm(BuildContext context, WidgetRef ref) {
     showDialog<void>(
       context: context,
-      builder:
-          (dialogCtx) => AlertDialog(
-            backgroundColor: CkColors.paper,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            shadowColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-            actionsPadding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-            buttonPadding: EdgeInsets.zero,
-            actionsAlignment: MainAxisAlignment.end,
-            title: Text('Sign out', style: CkType.display(fontSize: 18)),
-            content: Text(
-              'Are you sure you want to sign out of Matchday?',
-              style: CkType.body(
-                fontSize: 13.5,
-                height: 1.5,
-                color: CkColors.ink2,
-              ),
-            ),
-            actions: [
-              _DialogAction(
-                label: 'Cancel',
-                style: CkType.body(fontSize: 13, color: CkColors.muted),
-                onTap: () => Navigator.of(dialogCtx).pop(),
-              ),
-              const SizedBox(width: 8),
-              _DialogAction(
-                label: 'Sign out',
-                style: CkType.body(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: CkColors.red,
-                ),
-                onTap: () async {
-                  Navigator.of(dialogCtx).pop();
-                  await ref.read(authControllerProvider.notifier).signOut();
-                },
-              ),
-            ],
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: CkColors.paper,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+        buttonPadding: EdgeInsets.zero,
+        actionsAlignment: MainAxisAlignment.end,
+        title: Text('Sign out', style: CkType.display(fontSize: 18)),
+        content: Text(
+          'Are you sure you want to sign out of Matchday?',
+          style: CkType.body(
+            fontSize: 13.5,
+            height: 1.5,
+            color: CkColors.ink2,
           ),
+        ),
+        actions: [
+          _DialogAction(
+            label: 'Cancel',
+            style: CkType.body(fontSize: 13, color: CkColors.muted),
+            onTap: () => Navigator.of(dialogCtx).pop(),
+          ),
+          const SizedBox(width: 8),
+          _DialogAction(
+            label: 'Sign out',
+            style: CkType.body(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: CkColors.red,
+            ),
+            onTap: () async {
+              Navigator.of(dialogCtx).pop();
+              await ref.read(authControllerProvider.notifier).signOut();
+            },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1109,126 +527,86 @@ class _DialogAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          alignment: Alignment.center,
-          child: Text(label, style: style),
-        ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        child: Text(label, style: style),
       ),
     );
   }
 }
 
-/// Pressed = redSoft fill + `CkInk.red`, per the redline.
-class _SignOutButton extends StatefulWidget {
-  const _SignOutButton({required this.onTap});
+// ─── Glyphs ─────────────────────────────────────────────────────────────────
 
-  final VoidCallback onTap;
+/// The artboard's glyph set, verbatim.
+///
+/// Held as SVG path data and rendered through `flutter_svg` rather than
+/// redrawn as `CustomPainter`s or swapped for Material icons. The canvas's
+/// claim is that the set reads clean *because* every glyph obeys the same
+/// three rules — one optical box, one stroke weight, one corner language — so
+/// the fidelity that matters is between the glyphs, not in any one of them.
+/// Transcribing the paths keeps that property by construction.
+abstract final class _MenuGlyphs {
+  static const back = '<path d="M14 6l-6 6 6 6M8.5 12H20"/>';
+  static const chevron = '<path d="M9.5 5.5l6.5 6.5-6.5 6.5"/>';
 
-  @override
-  State<_SignOutButton> createState() => _SignOutButtonState();
-}
+  /// A versus pair, not a bat and stumps: two chevrons facing off across a
+  /// bat's line.
+  static const matches = '<path d="M9.2 7.4L5.6 12l3.6 4.6M14.8 7.4L18.4 12'
+      'l-3.6 4.6M13.2 3.8L10.8 20.2"/>';
 
-class _SignOutButtonState extends State<_SignOutButton> {
-  bool _down = false;
+  /// Two people, one behind the other. The shield the panel used to carry
+  /// moved off Teams — a squad is people, not a badge.
+  static const teams = '<circle cx="9.2" cy="8.6" r="3.4"/>'
+      '<path d="M3.4 19.4c0-3.2 2.6-5.2 5.8-5.2s5.8 2 5.8 5.2"/>'
+      '<path d="M16 6.2a3.2 3.2 0 0 1 0 6M18.2 19.4c0-2.4-.9-4.1-2.6-4.9"/>';
 
-  @override
-  Widget build(BuildContext context) {
-    final fg = _down ? CkInk.red : CkColors.red;
-    return Semantics(
-      button: true,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onTapDown: (_) => setState(() => _down = true),
-        onTapUp: (_) => setState(() => _down = false),
-        onTapCancel: () => setState(() => _down = false),
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: Duration(milliseconds: _down ? 90 : 120),
-          curve: Curves.linear,
-          constraints: const BoxConstraints(minHeight: 44),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: _down ? CkColors.redSoft : CkColors.paper2,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: CkColors.hairline),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              V2Svg(_Glyphs.signOut, size: _scaled(context, 17), color: fg),
-              const SizedBox(width: 8),
-              Text(
-                'Sign out',
-                style: CkType.body(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: fg,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+  /// A flag on a pole, replacing the old crosshair.
+  static const challenges = '<path d="M6 21V3.6M6 4.4h12l-2.8 4.4L18 13.2H6"/>';
 
-// ─── Press state ────────────────────────────────────────────────────────────
+  static const tournaments = '<path d="M7 3.8h10v5.4a5 5 0 0 1-10 0z"/>'
+      '<path d="M12 14.6v4M7.8 20.6h8.4"/>';
 
-/// Row press: fill in 90ms linear, out 120ms. No scale, and deliberately no
-/// ripple — a Material splash bleeds past the panel's edge and reads wrong on
-/// paper.
-class _Pressable extends StatefulWidget {
-  const _Pressable({
-    required this.child,
-    this.onTap,
-    this.restColor,
-    this.pressedColor,
-    this.radius,
-  });
+  static const invites =
+      '<rect x="3.2" y="5.6" width="17.6" height="12.8" rx="1.6"/>'
+      '<path d="M3.6 6.4L12 13l8.4-6.6"/>';
 
-  final Widget child;
-  final VoidCallback? onTap;
-  final Color? restColor;
-  final Color? pressedColor;
-  final BorderRadius? radius;
+  static const notifications =
+      '<path d="M6.2 10.4a5.8 5.8 0 0 1 11.6 0v4.2l1.8 2.6H4.4l1.8-2.6z"/>'
+      '<path d="M10.2 20.2h3.6"/>';
 
-  @override
-  State<_Pressable> createState() => _PressableState();
-}
+  static const saved = '<path d="M6.2 3.6h11.6v17l-5.8-4.4-5.8 4.4z"/>';
 
-class _PressableState extends State<_Pressable> {
-  bool _down = false;
+  static const settings = '<path d="M21.1 9.7L21.1 14.3L18.8 14.5L17.5 16.6'
+      'L18.5 18.8L14.6 21L13.3 19.1L10.8 19.1L9.4 21L5.5 18.8L6.5 16.6L5.2 14.5'
+      'L2.9 14.3L2.9 9.7L5.2 9.5L6.5 7.4L5.5 5.2L9.4 3L10.8 4.9L13.3 4.9L14.6 3'
+      'L18.5 5.2L17.5 7.4L18.8 9.5Z"/><circle cx="12" cy="12" r="3"/>';
 
-  @override
-  Widget build(BuildContext context) {
-    final rest = widget.restColor ?? Colors.transparent;
-    final pressed = widget.pressedColor ?? CkColors.paper2;
-    return GestureDetector(
-      onTap: widget.onTap,
-      onTapDown:
-          widget.onTap == null ? null : (_) => setState(() => _down = true),
-      onTapUp:
-          widget.onTap == null ? null : (_) => setState(() => _down = false),
-      onTapCancel:
-          widget.onTap == null ? null : () => setState(() => _down = false),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: _down ? 90 : 120),
-        curve: Curves.linear,
-        decoration: BoxDecoration(
-          color: _down ? pressed : rest,
-          borderRadius: widget.radius,
-        ),
-        child: widget.child,
-      ),
+  static const help = '<circle cx="12" cy="12" r="8.6"/>'
+      '<path d="M9.8 9.4a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1 1-1.1 1.8'
+      'M12 16.6h.01"/>';
+
+  static const signOut =
+      '<path d="M14.4 4.2H7.6A2.4 2.4 0 0 0 5.2 6.6v10.8a2.4 2.4 0 0 0 2.4 '
+      '2.4h6.8M16.4 8.4L20 12l-3.6 3.6M11.4 12H20"/>';
+
+  /// Wraps a body in the family's shared frame. Every glyph is drawn on the
+  /// same 24 box at 1.9, outline only — that sameness is the whole point, so
+  /// it lives here rather than at each call site.
+  static Widget svg(
+    String body, {
+    required double size,
+    required Color color,
+  }) {
+    final hex = '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+    return SvgPicture.string(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" '
+      'viewBox="0 0 24 24" fill="none" stroke="$hex" stroke-width="1.9" '
+      'stroke-linecap="round" stroke-linejoin="round">$body</svg>',
+      width: size,
+      height: size,
     );
   }
 }

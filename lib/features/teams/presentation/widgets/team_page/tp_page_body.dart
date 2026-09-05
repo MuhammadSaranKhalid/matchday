@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
+import '../../utils/team_share.dart';
 import 'tabs/tp_about_tab.dart';
 import 'tabs/tp_matches_tab.dart';
 import 'tabs/tp_posts_tab.dart';
@@ -8,6 +9,7 @@ import 'tabs/tp_squad_tab.dart';
 import 'tabs/tp_stats_tab.dart';
 import 'tp_banners.dart';
 import 'tp_hero.dart';
+import 'tp_options_sheet.dart';
 import 'tp_tabs_bar.dart';
 import 'tp_view.dart';
 
@@ -124,6 +126,18 @@ class _TeamPageBodyState extends State<TeamPageBody> {
             viewer: v.viewer,
             badges: v.badges,
             onBack: widget.onBack,
+            onShare: () => shareTeam(
+              context,
+              teamId: widget.teamId,
+              teamName: v.team.name,
+            ),
+            onOptions: () => showTeamOptionsSheet(
+              context,
+              teamId: widget.teamId,
+              team: v.team,
+              viewer: v.viewer,
+              viewerMembershipId: v.viewerPlayerId,
+            ),
           ),
           if (v.team.live != null) TpLiveBanner(data: v.team.live!),
           if (v.banner != null)

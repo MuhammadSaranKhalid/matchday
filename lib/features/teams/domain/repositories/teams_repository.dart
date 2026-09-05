@@ -83,6 +83,24 @@ abstract class TeamsRepository {
     String? countryCode,
   });
 
+  /// Archives or restores a team by moving `teams.status`.
+  ///
+  /// Archiving is reversible and deliberately not a delete: the page stays
+  /// visible as a record, but posting, joining and following stop. Only a
+  /// manager can call it (RLS `teams_update_managers`).
+  Future<Either<Failure, Team>> setTeamStatus({
+    required TeamId teamId,
+    required TeamStatus status,
+  });
+
+  /// The signed-in player leaves the squad.
+  ///
+  /// Goes through the `leave_team()` RPC rather than a direct delete — the
+  /// team_members RLS policy denies self-writes so a player cannot promote
+  /// themselves, and the RPC constrains the change to
+  /// `status='inactive' + left_at=now()`.
+  Future<Either<Failure, Unit>> leaveTeam(MembershipId membershipId);
+
   /// Uploads [bytes] (encoded as [extension], e.g. 'jpg'/'png'/'webp') to the
   /// `team-logos` bucket under `<teamId>/...`, patches the team row's
   /// `logo_url`, and returns the public URL. Existing logo for the team is

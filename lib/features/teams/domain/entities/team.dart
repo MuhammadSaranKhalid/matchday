@@ -20,6 +20,7 @@ class Team {
     this.logoUrl,
     this.logoMonogram,
     this.isVerified = false,
+    this.status = TeamStatus.active,
   });
 
   final TeamId id;
@@ -52,6 +53,12 @@ class Team {
   /// the Pool board and anywhere else a crest carries its name.
   final bool isVerified;
 
+  /// Mirrors `teams.status`. An archived team's page is a read-only record:
+  /// nobody can post, join or follow it, and only the owner can restore it.
+  final TeamStatus status;
+
+  bool get isArchived => status == TeamStatus.archived;
+
   bool isManagedBy(String userId) =>
       ownerId == userId || managers.contains(userId);
 
@@ -74,6 +81,7 @@ class Team {
           other.logoUrl == logoUrl &&
           other.logoMonogram == logoMonogram &&
           other.isVerified == isVerified &&
+          other.status == status &&
           other.createdAt == createdAt &&
           other.updatedAt == updatedAt &&
           _sameManagers(other.managers, managers);
@@ -90,7 +98,7 @@ class Team {
   int get hashCode => Object.hash(
         id, ownerId, name, type, privacy, description, homeGround, city,
         foundedYear, primaryColor, secondaryColor, tagline, logoUrl,
-        logoMonogram, isVerified, createdAt, updatedAt,
+        logoMonogram, isVerified, status, createdAt, updatedAt,
         Object.hashAll(managers),
       );
 }
@@ -119,6 +127,18 @@ enum TeamType {
 
   static TeamType fromWire(String? wire) =>
       values.where((t) => t.wire == wire).firstOrNull ?? TeamType.club;
+}
+
+enum TeamStatus {
+  active('active'),
+  disbanded('disbanded'),
+  archived('archived');
+
+  const TeamStatus(this.wire);
+  final String wire;
+
+  static TeamStatus fromWire(String? wire) =>
+      values.where((s) => s.wire == wire).firstOrNull ?? TeamStatus.active;
 }
 
 enum TeamPrivacy {

@@ -105,6 +105,51 @@ class FollowsRemoteDataSource {
     }
   }
 
+  /// Reads `notifications_enabled` for the caller's follow row. False when
+  /// the row does not exist — you cannot be notified about something you
+  /// don't follow.
+  Future<bool> areNotificationsEnabled(FollowTarget target) async {
+    try {
+      final uid = _requireUid();
+      final row = await _supabase
+          .from(_table)
+          .select('notifications_enabled')
+          .eq('follower_id', uid)
+          .eq('target_type', target.targetTypeWire)
+          .eq('target_id', target.targetId)
+          .maybeSingle();
+      return (row?['notifications_enabled'] as bool?) ?? false;
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Flips `notifications_enabled` on the caller's follow row.
+  ///
+  /// RLS (`follows_update_self`) scopes the update to the caller's own rows,
+  /// so the `follower_id` filter here is for row selection, not security.
+  /// Throws [NotFoundException] when there is no follow row to update.
+  Future<void> setNotificationsEnabled(
+    FollowTarget target, {
+    required bool enabled,
+  }) async {
+    try {
+      final uid = _requireUid();
+      final rows = await _supabase
+          .from(_table)
+          .update({'notifications_enabled': enabled})
+          .eq('follower_id', uid)
+          .eq('target_type', target.targetTypeWire)
+          .eq('target_id', target.targetId)
+          .select('follow_id');
+      if (rows.isEmpty) {
+        throw NotFoundException('Follow this team to change notifications');
+      }
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Follow list
   // -------------------------------------------------------------------------

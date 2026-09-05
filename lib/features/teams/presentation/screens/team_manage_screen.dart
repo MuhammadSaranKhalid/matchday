@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../providers/teams_providers.dart';
-import '../widgets/team_avatar.dart';
+import '../widgets/team_crest.dart';
 import '../widgets/team_manage/announcements_manage_tab.dart';
 import '../widgets/team_manage/requests_tab.dart';
 import '../widgets/team_manage/roster_tab.dart';
@@ -16,10 +16,15 @@ class TeamManageScreen extends ConsumerStatefulWidget {
     super.key,
     required this.teamId,
     this.justCreated = false,
+    this.initialTab,
   });
 
   final String teamId;
   final bool justCreated;
+
+  /// Opens straight to one tab: `roster`, `posts`, `requests` or `settings`.
+  /// Anything else (including null) lands on Roster.
+  final String? initialTab;
 
   @override
   ConsumerState<TeamManageScreen> createState() => _TeamManageScreenState();
@@ -27,6 +32,19 @@ class TeamManageScreen extends ConsumerStatefulWidget {
 
 class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
   int _activeTab = 0; // 0: Roster, 1: Posts, 2: Requests, 3: Settings
+
+  static const _tabIndexByName = {
+    'roster': 0,
+    'posts': 1,
+    'requests': 2,
+    'settings': 3,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _activeTab = _tabIndexByName[widget.initialTab] ?? 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,13 +74,12 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
                           color: CkColors.ink,
                         ),
                       ),
-                      TeamAvatar(
+                      TeamCrest(
                         name: value.name,
                         primaryColor: value.primaryColor,
                         logoUrl: value.logoUrl,
                         monogram: value.logoMonogram,
                         size: 36,
-                        radius: 10,
                       ),
                       const SizedBox(width: 10),
                       Expanded(

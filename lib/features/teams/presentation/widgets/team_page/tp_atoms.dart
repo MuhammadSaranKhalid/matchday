@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
+import '../../../../../core/util/surface_mode.dart';
 import '../../../../../core/widgets/v2/v2_kit.dart';
 import 'tp_view.dart';
 
@@ -119,8 +120,16 @@ class _BatteryPainter extends CustomPainter {
   bool shouldRepaint(_BatteryPainter old) => old.color != color;
 }
 
-/// Round 36×36 icon button. `onColor` = glassy white-overlay (sits on the
-/// hero); off → paper background with hairline border (sits on paper).
+/// Round chrome button — back / share / ⋯ on the hero.
+///
+/// `onColor` = glassy overlay on the hero; off → paper with a hairline.
+///
+/// 36px disc inside a 44px hit box. The visual size is unchanged from the
+/// original design; only the touch target grew, by inseting the 44 box 4px
+/// into itself so the row can be laid out at 10px padding and the disc still
+/// lands on the hero's 14px optical margin. Adjacent hit boxes touch with no
+/// gap — two 44s side by side leave exactly the 8px visual gap between discs
+/// that the design already had, with no dead pixels between targets.
 class TpIconBtn extends StatelessWidget {
   const TpIconBtn({
     super.key,
@@ -128,36 +137,86 @@ class TpIconBtn extends StatelessWidget {
     this.onColor = false,
     this.onTap,
     this.size = 36,
+    this.mode = CkSurfaceMode.paper,
+    this.tooltip,
   });
 
   final IconData icon;
+
+  /// Renders on a coloured hero rather than on paper.
   final bool onColor;
+
   final VoidCallback? onTap;
+
+  /// Diameter of the visible disc. The hit box is always at least 44.
   final double size;
+
+  /// Which ink ramp the hero is using. Ignored unless [onColor].
+  final CkSurfaceMode mode;
+
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: onColor
-              ? Colors.white.withValues(alpha: 0.16)
-              : CkColors.paper,
-          shape: BoxShape.circle,
-          border: onColor ? null : Border.all(color: CkColors.hairline),
-        ),
-        alignment: Alignment.center,
-        child: Icon(
-          icon,
-          size: 16,
-          color: onColor ? Colors.white : CkColors.ink,
+    final ink = onColor && mode.isInk;
+    final Color fill;
+    final Color foreground;
+    Border? border;
+
+    if (!onColor) {
+      fill = CkColors.paper;
+      foreground = CkColors.ink;
+      border = Border.all(color: CkColors.hairline);
+    } else if (ink) {
+      // On a pale primary an 8% ink fill alone cannot hold 3:1, so the disc
+      // gains a hairline to read as a control.
+      fill = CkColors.ink.withValues(alpha: 0.08);
+      foreground = CkColors.ink;
+      border = Border.all(color: CkColors.ink.withValues(alpha: 0.14));
+    } else {
+      fill = Colors.white.withValues(alpha: 0.16);
+      foreground = Colors.white;
+    }
+
+    final hit = size < 44.0 ? 44.0 : size;
+    final button = SizedBox(
+      width: hit,
+      height: hit,
+      child: Center(
+        child: IgnorePointer(
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: fill,
+              shape: BoxShape.circle,
+              border: border,
+            ),
+            alignment: Alignment.center,
+            // 18, not 16: Material at weight 400 goes thin against a mid-tone
+            // primary, and the extra 2px costs no layout.
+            child: Icon(icon, size: 18, color: foreground),
+          ),
         ),
       ),
     );
+
+    final tappable = Material(
+      type: MaterialType.transparency,
+      child: InkResponse(
+        onTap: onTap,
+        radius: hit / 2,
+        containedInkWell: false,
+        highlightColor: (onColor && !ink)
+            ? Colors.white.withValues(alpha: 0.12)
+            : CkColors.ink.withValues(alpha: 0.06),
+        splashColor: Colors.transparent,
+        child: button,
+      ),
+    );
+
+    if (tooltip == null) return tappable;
+    return Tooltip(message: tooltip!, child: tappable);
   }
 }
 
@@ -215,8 +274,12 @@ class _TpLivePulseState extends State<TpLivePulse>
 /// Small green check inside a 14×14 frosted circle — sits next to a verified
 /// team's eyebrow on the hero.
 class TpVerifiedTick extends StatelessWidget {
-  const TpVerifiedTick({super.key, this.size = 10});
+  const TpVerifiedTick({super.key, this.size = 10, this.color = Colors.white});
   final double size;
+
+  /// Ink for the tick. Follows the hero's ramp — on a pale team primary the
+  /// white tick on a white-alpha disc disappears entirely.
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -225,14 +288,14 @@ class TpVerifiedTick extends StatelessWidget {
       width: box,
       height: box,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.22),
+        color: color.withValues(alpha: 0.22),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
       child: Icon(
         Icons.check_rounded,
         size: size,
-        color: Colors.white,
+        color: color,
       ),
     );
   }

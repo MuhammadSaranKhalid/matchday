@@ -112,3 +112,16 @@ Future<Set<String>> followedTeamIds(Ref ref) async {
       await ref.watch(followsRepositoryProvider).listFollowedTeamIds();
   return result.fold((_) => <String>{}, (ids) => ids.toSet());
 }
+
+/// Whether the signed-in user wants notifications about a team.
+///
+/// Autodispose: a sheet that is open for four seconds should not pin a
+/// subscription for the session. False when the user doesn't follow the team
+/// — there is no row to carry the preference.
+@riverpod
+Future<bool> teamNotificationsEnabled(Ref ref, String teamId) async {
+  final result = await ref
+      .watch(followsRepositoryProvider)
+      .areNotificationsEnabled(TeamFollowTarget(TeamId(teamId)));
+  return result.fold((_) => false, (enabled) => enabled);
+}

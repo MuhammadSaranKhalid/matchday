@@ -31,13 +31,17 @@
 -- Run-outs, retirements, obstruction, timed-out and handled-the-ball are the
 -- batter's or the fielding side's, never the bowler's.
 create or replace function public._bowler_credited_wickets()
-returns public.wicket_kind[]
+returns text[]
 language sql
 immutable
+set search_path = public, pg_temp
 as $$
+  -- Returns the dismissal kinds that count against the bowler's figures.
+  -- Returning text[] avoids Postgres's eager enum-body validation; the caller
+  -- uses = any() which implicitly casts text to wicket_kind.
   select array[
     'bowled', 'caught', 'caught_and_bowled', 'lbw', 'stumped', 'hit_wicket'
-  ]::public.wicket_kind[];
+  ]::text[];
 $$;
 
 -- -----------------------------------------------------------------------------
@@ -85,8 +89,8 @@ as $$
       dv.match_id,
       max(dv.display_name)                                        as display_name,
       bool_or(dv.user_id is null)                                 as is_unclaimed,
-      max(case dv.team_side when 'team_a' then dv.team_a_id
-                            else dv.team_b_id end)                as team_id,
+      (array_agg(case dv.team_side when 'team_a' then dv.team_a_id
+                                   else dv.team_b_id end))[1]     as team_id,
       sum(dv.runs_off_bat)::integer                               as runs,
       count(*) filter (where dv.is_legal_delivery)::integer       as balls,
       count(*) filter (where dv.is_four)::integer                 as fours,
@@ -176,11 +180,11 @@ as $$
       dv.match_id,
       max(dv.display_name)                                    as display_name,
       bool_or(dv.user_id is null)                             as is_unclaimed,
-      max(case dv.team_side when 'team_a' then dv.team_a_id
-                            else dv.team_b_id end)            as team_id,
+      (array_agg(case dv.team_side when 'team_a' then dv.team_a_id
+                                   else dv.team_b_id end))[1] as team_id,
       count(*) filter (
         where dv.is_wicket
-          and dv.wicket_type = any(public._bowler_credited_wickets())
+          and dv.wicket_type::text = any(public._bowler_credited_wickets())
       )::integer                                              as wickets,
       -- Byes and leg-byes are not charged to the bowler; a penalty is nobody's.
       sum(
@@ -263,7 +267,9 @@ stable
 set search_path = public, pg_temp
 as $$
   with organiser as (
-    select t.created_by as uid, t.city
+    -- tournaments.location is jsonb, same shape as profiles.location; there
+    -- is no flat `city` column (see the tournaments_city index).
+    select t.created_by as uid, t.location->>'city' as city
       from public.tournaments t
      where t.tournament_id = p_tournament_id
   ),

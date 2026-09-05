@@ -22,6 +22,20 @@ abstract class FollowsRepository {
   /// absent — RLS will silently no-op a delete that matches nothing).
   Future<Either<Failure, Unit>> unfollow(FollowTarget target);
 
+  /// Whether the signed-in user wants notifications about [target].
+  ///
+  /// Backed by `follows.notifications_enabled`, so it is only meaningful for
+  /// a target the user actually follows; returns false when there is no row.
+  Future<Either<Failure, bool>> areNotificationsEnabled(FollowTarget target);
+
+  /// Turns notifications about [target] on or off. Requires an existing
+  /// follow row — returns [NotFoundFailure] when the user does not follow
+  /// [target].
+  Future<Either<Failure, Unit>> setNotificationsEnabled(
+    FollowTarget target, {
+    required bool enabled,
+  });
+
   /// Returns true if the signed-in user currently follows [target].
   Future<Either<Failure, bool>> isFollowing(FollowTarget target);
 

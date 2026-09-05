@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../matches/domain/entities/match.dart';
@@ -117,7 +118,13 @@ TeamPageView buildTeamPageViewFromReal({
     privacy: team.privacy.wire,
     tagline: team.tagline,
     logoUrl: team.logoUrl,
-    verified: false,
+    verified: team.isVerified,
+    // `teams` has no archived_at column, so the status change's own timestamp
+    // is the best available date. It is only ever shown as a day, never
+    // compared, so a later manager edit shifting it is cosmetic.
+    archived: team.isArchived
+        ? DateFormat('d MMM yyyy').format(team.updatedAt.toLocal())
+        : null,
     squad: squad,
     upcoming: upcoming,
     recent: recent,

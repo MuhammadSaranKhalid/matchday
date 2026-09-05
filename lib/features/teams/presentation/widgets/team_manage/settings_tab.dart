@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../domain/entities/team.dart';
 import '../edit_team_sheet.dart';
-import '../team_avatar.dart';
+import '../team_crest.dart';
 
 /// Team Settings and details tab.
 class SettingsTab extends StatelessWidget {
@@ -29,13 +29,12 @@ class SettingsTab extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  TeamAvatar(
+                  TeamCrest(
                     name: team.name,
                     primaryColor: team.primaryColor,
                     logoUrl: team.logoUrl,
                     monogram: team.logoMonogram,
                     size: 44,
-                    radius: 12,
                   ),
                   const SizedBox(width: 14),
                   Expanded(

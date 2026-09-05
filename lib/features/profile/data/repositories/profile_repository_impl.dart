@@ -107,18 +107,23 @@ class ProfileRepositoryImpl implements ProfileRepository {
     required DisplayName displayName,
     Username? username,
     String? bio,
-    required City city,
+    City? city,
     String? placeId,
     double? latitude,
     double? longitude,
     String? countryCode,
     File? avatar,
+    File? cover,
   }) async {
     try {
-      // Upload the new avatar first (if any) so its URL goes into the row UPDATE.
+      // Upload images first (if any) so their URLs go into the row UPDATE.
       String? photoUrl;
       if (avatar != null) {
         photoUrl = await _remote.uploadAvatar(avatar);
+      }
+      String? coverUrl;
+      if (cover != null) {
+        coverUrl = await _remote.uploadCover(cover);
       }
       final dto = await _remote.updateProfile({
         'display_name': displayName.value,
@@ -126,13 +131,17 @@ class ProfileRepositoryImpl implements ProfileRepository {
         // null clears the bio column.
         'bio': bio,
         if (photoUrl != null) 'profile_photo_url': photoUrl,
-        'location': {
-          'city': city.value,
-          if (placeId != null) 'place_id': placeId,
-          if (latitude != null) 'lat': latitude,
-          if (longitude != null) 'lng': longitude,
-          if (countryCode != null) 'country_code': countryCode,
-        },
+        if (coverUrl != null) 'cover_photo_url': coverUrl,
+        // Omitted entirely when the caller has no city to offer, so the
+        // existing location survives the update untouched.
+        if (city != null)
+          'location': {
+            'city': city.value,
+            if (placeId != null) 'place_id': placeId,
+            if (latitude != null) 'lat': latitude,
+            if (longitude != null) 'lng': longitude,
+            if (countryCode != null) 'country_code': countryCode,
+          },
       });
       return Right(dto.toEntity());
     } on UnauthorizedException catch (e) {

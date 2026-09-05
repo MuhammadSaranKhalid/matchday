@@ -52,6 +52,40 @@ class FollowsRepositoryImpl implements FollowsRepository {
   }
 
   @override
+  Future<Either<Failure, bool>> areNotificationsEnabled(
+    FollowTarget target,
+  ) async {
+    try {
+      return Right(await _remote.areNotificationsEnabled(target));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> setNotificationsEnabled(
+    FollowTarget target, {
+    required bool enabled,
+  }) async {
+    try {
+      await _remote.setNotificationsEnabled(target, enabled: enabled);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NotFoundException catch (e) {
+      return Left(NotFoundFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<String>>> listFollowedTeamIds() async {
     try {
       return Right(await _remote.listFollowedTeamIds());

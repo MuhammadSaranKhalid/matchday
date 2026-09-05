@@ -157,6 +157,7 @@ class TeamsRemoteDataSource {
       if (payload.containsKey('home_ground')) updates['home_ground'] = payload['home_ground'];
       if (payload.containsKey('tagline')) updates['tagline'] = payload['tagline'];
       if (payload.containsKey('logo_monogram')) updates['logo_monogram'] = payload['logo_monogram'];
+      if (payload.containsKey('status')) updates['status'] = payload['status'];
       if (payload.containsKey('founded_year')) updates['founded_year'] = payload['founded_year'];
       if (payload.containsKey('city') || payload.containsKey('district') || payload.containsKey('province')) {
         updates['location'] = {
@@ -181,6 +182,22 @@ class TeamsRemoteDataSource {
           .select()
           .single();
       return TeamDto.fromJson(row);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Self-leave. Direct deletes/updates on one's own `team_members` row are
+  /// denied by RLS (a player could otherwise promote themselves), so the
+  /// server exposes `leave_team()` as the only path — SECURITY DEFINER, and
+  /// it constrains the write to `status='inactive' + left_at=now()`.
+  Future<void> leaveTeam(String membershipId) async {
+    try {
+      _requireUid();
+      await _supabase.rpc<void>(
+        'leave_team',
+        params: {'p_membership_id': membershipId},
+      );
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

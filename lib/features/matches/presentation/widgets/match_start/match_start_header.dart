@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../teams/presentation/providers/teams_providers.dart';
-import '../../../../teams/presentation/widgets/team_avatar.dart';
+import '../../../../teams/presentation/widgets/team_crest.dart';
 import '../../../domain/entities/match.dart';
 import '../../state/match_start_state.dart';
 
@@ -142,13 +142,12 @@ class _PhonePill extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       child: Row(
         children: [
-          TeamAvatar(
+          TeamCrest(
             name: team?.name ?? '??',
             primaryColor: team?.primaryColor,
             logoUrl: team?.logoUrl,
             monogram: team?.logoMonogram,
             size: 20,
-            radius: 5,
           ),
           const SizedBox(width: 8),
           Flexible(

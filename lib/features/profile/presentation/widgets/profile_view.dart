@@ -21,7 +21,6 @@ import '../../../teams/domain/entities/user_team_affiliation.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/player_profile.dart';
 import '../../domain/entities/profile.dart';
-import '../screens/profile_edit_screen.dart';
 
 // ── Profile Main Views ────────────────────────────────────────────────────────
 
@@ -155,17 +154,9 @@ class ProfileView extends ConsumerWidget {
                                           children: [
                                             Expanded(
                                               child: GestureDetector(
-                                                onTap:
-                                                    () => Navigator.of(
-                                                      context,
-                                                      rootNavigator: true,
-                                                    ).push(
-                                                      MaterialPageRoute<void>(
-                                                        builder:
-                                                            (_) =>
-                                                                const ProfileEditScreen(),
-                                                      ),
-                                                    ),
+                                                onTap: () => context.push(
+                                                  '/profile/edit',
+                                                ),
                                                 child: Container(
                                                   height: 38,
                                                   alignment: Alignment.center,
@@ -302,28 +293,33 @@ class ProfileView extends ConsumerWidget {
                             ),
                           ),
                         ),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          child: Row(
-                            children: [
-                              _chip(
-                                label: 'All',
-                                count: postsAsync.value?.length ?? 0,
-                                active: true,
-                              ),
-                              const SizedBox(width: 6),
-                              _chip(
-                                label: 'Posts',
-                                count: postsAsync.value?.length ?? 0,
-                              ),
-                              const SizedBox(width: 6),
-                              _chip(label: 'Photos', count: 0),
-                              const SizedBox(width: 6),
-                              _chip(label: 'Moments', count: 0),
-                            ],
-                          ),
-                        ),
+                        // COMMENTED OUT — the All / Posts / Photos / Moments filter chips.
+                        // Photos and Moments have no filtering behind them (they were hard-
+                        // coded to 0), and All and Posts counted the same list, so the row
+                        // offered four choices that all showed the same thing. Restore it
+                        // with the `_chip` helper below once the filters are real.
+                        // SingleChildScrollView(
+                        //   scrollDirection: Axis.horizontal,
+                        //   padding: const EdgeInsets.symmetric(horizontal: 18),
+                        //   child: Row(
+                        //     children: [
+                        //       _chip(
+                        //         label: 'All',
+                        //         count: postsAsync.value?.length ?? 0,
+                        //         active: true,
+                        //       ),
+                        //       const SizedBox(width: 6),
+                        //       _chip(
+                        //         label: 'Posts',
+                        //         count: postsAsync.value?.length ?? 0,
+                        //       ),
+                        //       const SizedBox(width: 6),
+                        //       _chip(label: 'Photos', count: 0),
+                        //       const SizedBox(width: 6),
+                        //       _chip(label: 'Moments', count: 0),
+                        //     ],
+                        //   ),
+                        // ),
                         const SizedBox(height: 10),
                       ],
                     ),
@@ -441,6 +437,8 @@ class ProfileView extends ConsumerWidget {
     );
   }
 
+  // Parked with the commented-out filter row above.
+  // ignore: unused_element
   Widget _chip({
     required String label,
     required int count,

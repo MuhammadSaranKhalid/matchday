@@ -6,6 +6,7 @@ import 'package:matchday/features/auth/domain/entities/user.dart';
 import 'package:matchday/features/auth/domain/value_objects/email.dart';
 import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament.dart';
+import 'package:matchday/features/tournaments/domain/entities/tournament_fee_entry.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_live_match.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_registration.dart';
 import 'package:fpdart/fpdart.dart';
@@ -85,7 +86,7 @@ void main() {
       ),
     ];
 
-    testWidgets('chrome is Manage + three tabs, with a badge for what is owed',
+    testWidgets('chrome is Manage + three tabs, with the queue on the inbox',
         (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -108,21 +109,104 @@ void main() {
       expect(find.text('Manage'), findsOneWidget);
       expect(find.text('Lahore Champions Trophy'), findsOneWidget);
 
-      // Three tabs, and the second names seeds because this cup is knockout.
-      expect(find.text('Registrations'), findsOneWidget);
+      // Three tabs. The first is "Teams" at every stage now that the queue
+      // has moved out of it, and the second names seeds because this cup is
+      // knockout.
+      expect(find.text('Teams'), findsOneWidget);
+      expect(find.text('Registrations'), findsNothing);
       expect(find.text('Fixtures & Seeds'), findsOneWidget);
       expect(find.text('Live Ops'), findsOneWidget);
       expect(find.text('Groups & Pools'), findsNothing);
 
-      // One application is waiting, so the badge reads 1 — not 2, which is
-      // how many registrations exist.
+      // One application is waiting, so the inbox badge reads 1 — not 2, which
+      // is how many registrations exist.
+      expect(find.byTooltip('Requests inbox'), findsOneWidget);
       expect(find.text('1'), findsWidgets);
 
-      expect(find.text('PENDING APPLICATIONS (1)'), findsOneWidget);
-      expect(find.text('Lahore Lions'), findsOneWidget);
-      expect(find.text('Approve Team'), findsOneWidget);
-      expect(find.text('Decline'), findsOneWidget);
-      expect(find.text('APPROVED TEAMS (1 / 8)'), findsOneWidget);
+      // The tab keeps a one-line stub so the queue is never invisible, and
+      // nothing else of it: no cards, no approve/decline.
+      expect(find.text('1 REQUEST AWAITING YOU'), findsOneWidget);
+      expect(find.text('REVIEW'), findsOneWidget);
+      expect(find.text('Approve Team'), findsNothing);
+      expect(find.text('Decline'), findsNothing);
+
+      expect(find.text('CONFIRMED TEAMS · 1'), findsOneWidget);
+    });
+
+    testWidgets('the fee line counts what these teams owe, not a full draw',
+        (tester) async {
+      // One approved team at PKR 5,000, two of which are already in. The old
+      // sum multiplied by maxTeams (8) and ignored part payments, so it read
+      // "Fees 5k / 40k" for the same facts.
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tournamentsRepositoryProvider.overrideWithValue(repo),
+            currentUserStreamProvider
+                .overrideWith((ref) => Stream.value(mockUser)),
+            tournamentDetailProvider('tourn-console-1')
+                .overrideWith((ref) => Future.value(mockTournament)),
+            tournamentRegistrationsProvider('tourn-console-1')
+                .overrideWith((ref) => Future.value(mockRegistrations)),
+            tournamentFeeLedgerProvider('tourn-console-1').overrideWith(
+              (ref) => Future.value([
+                const TournamentFeeEntry(
+                  registrationId: 'reg-a1',
+                  teamId: 'team-2',
+                  teamName: 'Karachi Kings Club',
+                  entryFee: 5000,
+                  amountPaid: 2000,
+                ),
+              ]),
+            ),
+          ],
+          child: const MaterialApp(
+            home: OrganizerConsoleScreen(tournamentId: 'tourn-console-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fees 2k / 5k'), findsOneWidget);
+
+      // And the row states the part payment rather than calling it unpaid.
+      expect(find.text('2k / 5k'), findsOneWidget);
+      expect(find.text('UNPAID'), findsNothing);
+      expect(find.text('PAID'), findsNothing);
+    });
+
+    testWidgets('a settled team reads PAID, not an amount', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tournamentsRepositoryProvider.overrideWithValue(repo),
+            currentUserStreamProvider
+                .overrideWith((ref) => Stream.value(mockUser)),
+            tournamentDetailProvider('tourn-console-1')
+                .overrideWith((ref) => Future.value(mockTournament)),
+            tournamentRegistrationsProvider('tourn-console-1')
+                .overrideWith((ref) => Future.value(mockRegistrations)),
+            tournamentFeeLedgerProvider('tourn-console-1').overrideWith(
+              (ref) => Future.value([
+                const TournamentFeeEntry(
+                  registrationId: 'reg-a1',
+                  teamId: 'team-2',
+                  teamName: 'Karachi Kings Club',
+                  entryFee: 5000,
+                  amountPaid: 5000,
+                ),
+              ]),
+            ),
+          ],
+          child: const MaterialApp(
+            home: OrganizerConsoleScreen(tournamentId: 'tourn-console-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fees 5k / 5k'), findsOneWidget);
+      expect(find.text('PAID'), findsOneWidget);
     });
 
     testWidgets('the second tab is Fixtures & Order for a flat format',
@@ -188,7 +272,7 @@ void main() {
       expect(find.textContaining('PENDING APPLICATIONS'), findsNothing);
     });
 
-    testWidgets('approving is undoable for five seconds rather than confirmed',
+    testWidgets('the Teams tab hands the queue to the inbox, never deciding it',
         (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -208,21 +292,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Approve Team'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      // Approve / decline are gone from this tab entirely — the applicant is
+      // named on the requests page now, not here.
+      expect(find.text('Approve Team'), findsNothing);
+      expect(find.text('Decline'), findsNothing);
+      expect(find.text('Lahore Lions'), findsNothing);
 
-      // No dialog — a snackbar carrying the undo.
-      expect(find.text('Lahore Lions approved'), findsOneWidget);
-      expect(find.text('Undo'), findsOneWidget);
-      // The row leaves the queue immediately.
-      expect(find.text('PENDING APPLICATIONS (1)'), findsNothing);
-
-      await tester.tap(find.text('Undo'));
-      await tester.pumpAndSettle();
-
-      // Undo puts it back.
-      expect(find.text('PENDING APPLICATIONS (1)'), findsOneWidget);
+      // What is left is the stub and the inbox it points at, both reachable
+      // without leaving the tab.
+      expect(find.text('1 REQUEST AWAITING YOU'), findsOneWidget);
+      expect(find.text('REVIEW'), findsOneWidget);
+      expect(find.byTooltip('Requests inbox'), findsOneWidget);
     });
 
     testWidgets('the seeding tab explains the draw and gates the lock',
@@ -680,8 +760,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap overflow menu
-      await tester.tap(find.byIcon(Icons.more_vert));
+      // Tap the console's own overflow — the roster rows carry one too.
+      await tester.tap(find.byTooltip('Tournament actions'));
       await tester.pumpAndSettle();
 
       expect(find.text('Cancel tournament'), findsOneWidget);

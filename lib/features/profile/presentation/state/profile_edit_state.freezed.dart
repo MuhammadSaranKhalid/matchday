@@ -14,10 +14,13 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ProfileEditState {
 
- String get displayName; String get username; String get bio; String get city;// Seeded from the loaded profile; passed through on save so we don't wipe geo
-// or trip the username cooldown on an unchanged handle.
- String? get originalUsername; String? get placeId; double? get latitude; double? get longitude; String? get countryCode;/// Newly-picked avatar (square-cropped, resized) awaiting upload on save.
- File? get avatar; String? get currentAvatarUrl; bool get saving; Failure? get error;
+ String get displayName; String get username; String get bio;/// Seeded from the loaded profile. Save compares against these to decide
+/// whether anything actually changed, and passes the username through only
+/// when it differs so an unchanged handle never trips the cooldown.
+ String get originalDisplayName; String get originalUsername; String get originalBio;/// Newly-picked images awaiting upload on save.
+ File? get avatar; File? get cover; String? get currentAvatarUrl; String? get currentCoverUrl; UsernameStatus get usernameStatus;/// Set when the username is invalid or taken, or when a save came back
+/// with a field-specific reason. Rendered under the offending field.
+ String? get usernameError; String? get nameError; bool get saving; Failure? get error;
 /// Create a copy of ProfileEditState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +31,16 @@ $ProfileEditStateCopyWith<ProfileEditState> get copyWith => _$ProfileEditStateCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileEditState&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.username, username) || other.username == username)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.city, city) || other.city == city)&&(identical(other.originalUsername, originalUsername) || other.originalUsername == originalUsername)&&(identical(other.placeId, placeId) || other.placeId == placeId)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&(identical(other.countryCode, countryCode) || other.countryCode == countryCode)&&(identical(other.avatar, avatar) || other.avatar == avatar)&&(identical(other.currentAvatarUrl, currentAvatarUrl) || other.currentAvatarUrl == currentAvatarUrl)&&(identical(other.saving, saving) || other.saving == saving)&&(identical(other.error, error) || other.error == error));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileEditState&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.username, username) || other.username == username)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.originalDisplayName, originalDisplayName) || other.originalDisplayName == originalDisplayName)&&(identical(other.originalUsername, originalUsername) || other.originalUsername == originalUsername)&&(identical(other.originalBio, originalBio) || other.originalBio == originalBio)&&(identical(other.avatar, avatar) || other.avatar == avatar)&&(identical(other.cover, cover) || other.cover == cover)&&(identical(other.currentAvatarUrl, currentAvatarUrl) || other.currentAvatarUrl == currentAvatarUrl)&&(identical(other.currentCoverUrl, currentCoverUrl) || other.currentCoverUrl == currentCoverUrl)&&(identical(other.usernameStatus, usernameStatus) || other.usernameStatus == usernameStatus)&&(identical(other.usernameError, usernameError) || other.usernameError == usernameError)&&(identical(other.nameError, nameError) || other.nameError == nameError)&&(identical(other.saving, saving) || other.saving == saving)&&(identical(other.error, error) || other.error == error));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,displayName,username,bio,city,originalUsername,placeId,latitude,longitude,countryCode,avatar,currentAvatarUrl,saving,error);
+int get hashCode => Object.hash(runtimeType,displayName,username,bio,originalDisplayName,originalUsername,originalBio,avatar,cover,currentAvatarUrl,currentCoverUrl,usernameStatus,usernameError,nameError,saving,error);
 
 @override
 String toString() {
-  return 'ProfileEditState(displayName: $displayName, username: $username, bio: $bio, city: $city, originalUsername: $originalUsername, placeId: $placeId, latitude: $latitude, longitude: $longitude, countryCode: $countryCode, avatar: $avatar, currentAvatarUrl: $currentAvatarUrl, saving: $saving, error: $error)';
+  return 'ProfileEditState(displayName: $displayName, username: $username, bio: $bio, originalDisplayName: $originalDisplayName, originalUsername: $originalUsername, originalBio: $originalBio, avatar: $avatar, cover: $cover, currentAvatarUrl: $currentAvatarUrl, currentCoverUrl: $currentCoverUrl, usernameStatus: $usernameStatus, usernameError: $usernameError, nameError: $nameError, saving: $saving, error: $error)';
 }
 
 
@@ -48,7 +51,7 @@ abstract mixin class $ProfileEditStateCopyWith<$Res>  {
   factory $ProfileEditStateCopyWith(ProfileEditState value, $Res Function(ProfileEditState) _then) = _$ProfileEditStateCopyWithImpl;
 @useResult
 $Res call({
- String displayName, String username, String bio, String city, String? originalUsername, String? placeId, double? latitude, double? longitude, String? countryCode, File? avatar, String? currentAvatarUrl, bool saving, Failure? error
+ String displayName, String username, String bio, String originalDisplayName, String originalUsername, String originalBio, File? avatar, File? cover, String? currentAvatarUrl, String? currentCoverUrl, UsernameStatus usernameStatus, String? usernameError, String? nameError, bool saving, Failure? error
 });
 
 
@@ -65,19 +68,21 @@ class _$ProfileEditStateCopyWithImpl<$Res>
 
 /// Create a copy of ProfileEditState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? displayName = null,Object? username = null,Object? bio = null,Object? city = null,Object? originalUsername = freezed,Object? placeId = freezed,Object? latitude = freezed,Object? longitude = freezed,Object? countryCode = freezed,Object? avatar = freezed,Object? currentAvatarUrl = freezed,Object? saving = null,Object? error = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? displayName = null,Object? username = null,Object? bio = null,Object? originalDisplayName = null,Object? originalUsername = null,Object? originalBio = null,Object? avatar = freezed,Object? cover = freezed,Object? currentAvatarUrl = freezed,Object? currentCoverUrl = freezed,Object? usernameStatus = null,Object? usernameError = freezed,Object? nameError = freezed,Object? saving = null,Object? error = freezed,}) {
   return _then(_self.copyWith(
 displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
 as String,username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String,bio: null == bio ? _self.bio : bio // ignore: cast_nullable_to_non_nullable
-as String,city: null == city ? _self.city : city // ignore: cast_nullable_to_non_nullable
-as String,originalUsername: freezed == originalUsername ? _self.originalUsername : originalUsername // ignore: cast_nullable_to_non_nullable
-as String?,placeId: freezed == placeId ? _self.placeId : placeId // ignore: cast_nullable_to_non_nullable
-as String?,latitude: freezed == latitude ? _self.latitude : latitude // ignore: cast_nullable_to_non_nullable
-as double?,longitude: freezed == longitude ? _self.longitude : longitude // ignore: cast_nullable_to_non_nullable
-as double?,countryCode: freezed == countryCode ? _self.countryCode : countryCode // ignore: cast_nullable_to_non_nullable
-as String?,avatar: freezed == avatar ? _self.avatar : avatar // ignore: cast_nullable_to_non_nullable
+as String,originalDisplayName: null == originalDisplayName ? _self.originalDisplayName : originalDisplayName // ignore: cast_nullable_to_non_nullable
+as String,originalUsername: null == originalUsername ? _self.originalUsername : originalUsername // ignore: cast_nullable_to_non_nullable
+as String,originalBio: null == originalBio ? _self.originalBio : originalBio // ignore: cast_nullable_to_non_nullable
+as String,avatar: freezed == avatar ? _self.avatar : avatar // ignore: cast_nullable_to_non_nullable
+as File?,cover: freezed == cover ? _self.cover : cover // ignore: cast_nullable_to_non_nullable
 as File?,currentAvatarUrl: freezed == currentAvatarUrl ? _self.currentAvatarUrl : currentAvatarUrl // ignore: cast_nullable_to_non_nullable
+as String?,currentCoverUrl: freezed == currentCoverUrl ? _self.currentCoverUrl : currentCoverUrl // ignore: cast_nullable_to_non_nullable
+as String?,usernameStatus: null == usernameStatus ? _self.usernameStatus : usernameStatus // ignore: cast_nullable_to_non_nullable
+as UsernameStatus,usernameError: freezed == usernameError ? _self.usernameError : usernameError // ignore: cast_nullable_to_non_nullable
+as String?,nameError: freezed == nameError ? _self.nameError : nameError // ignore: cast_nullable_to_non_nullable
 as String?,saving: null == saving ? _self.saving : saving // ignore: cast_nullable_to_non_nullable
 as bool,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
 as Failure?,
@@ -165,10 +170,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String displayName,  String username,  String bio,  String city,  String? originalUsername,  String? placeId,  double? latitude,  double? longitude,  String? countryCode,  File? avatar,  String? currentAvatarUrl,  bool saving,  Failure? error)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String displayName,  String username,  String bio,  String originalDisplayName,  String originalUsername,  String originalBio,  File? avatar,  File? cover,  String? currentAvatarUrl,  String? currentCoverUrl,  UsernameStatus usernameStatus,  String? usernameError,  String? nameError,  bool saving,  Failure? error)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ProfileEditState() when $default != null:
-return $default(_that.displayName,_that.username,_that.bio,_that.city,_that.originalUsername,_that.placeId,_that.latitude,_that.longitude,_that.countryCode,_that.avatar,_that.currentAvatarUrl,_that.saving,_that.error);case _:
+return $default(_that.displayName,_that.username,_that.bio,_that.originalDisplayName,_that.originalUsername,_that.originalBio,_that.avatar,_that.cover,_that.currentAvatarUrl,_that.currentCoverUrl,_that.usernameStatus,_that.usernameError,_that.nameError,_that.saving,_that.error);case _:
   return orElse();
 
 }
@@ -186,10 +191,10 @@ return $default(_that.displayName,_that.username,_that.bio,_that.city,_that.orig
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String displayName,  String username,  String bio,  String city,  String? originalUsername,  String? placeId,  double? latitude,  double? longitude,  String? countryCode,  File? avatar,  String? currentAvatarUrl,  bool saving,  Failure? error)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String displayName,  String username,  String bio,  String originalDisplayName,  String originalUsername,  String originalBio,  File? avatar,  File? cover,  String? currentAvatarUrl,  String? currentCoverUrl,  UsernameStatus usernameStatus,  String? usernameError,  String? nameError,  bool saving,  Failure? error)  $default,) {final _that = this;
 switch (_that) {
 case _ProfileEditState():
-return $default(_that.displayName,_that.username,_that.bio,_that.city,_that.originalUsername,_that.placeId,_that.latitude,_that.longitude,_that.countryCode,_that.avatar,_that.currentAvatarUrl,_that.saving,_that.error);case _:
+return $default(_that.displayName,_that.username,_that.bio,_that.originalDisplayName,_that.originalUsername,_that.originalBio,_that.avatar,_that.cover,_that.currentAvatarUrl,_that.currentCoverUrl,_that.usernameStatus,_that.usernameError,_that.nameError,_that.saving,_that.error);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -206,10 +211,10 @@ return $default(_that.displayName,_that.username,_that.bio,_that.city,_that.orig
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String displayName,  String username,  String bio,  String city,  String? originalUsername,  String? placeId,  double? latitude,  double? longitude,  String? countryCode,  File? avatar,  String? currentAvatarUrl,  bool saving,  Failure? error)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String displayName,  String username,  String bio,  String originalDisplayName,  String originalUsername,  String originalBio,  File? avatar,  File? cover,  String? currentAvatarUrl,  String? currentCoverUrl,  UsernameStatus usernameStatus,  String? usernameError,  String? nameError,  bool saving,  Failure? error)?  $default,) {final _that = this;
 switch (_that) {
 case _ProfileEditState() when $default != null:
-return $default(_that.displayName,_that.username,_that.bio,_that.city,_that.originalUsername,_that.placeId,_that.latitude,_that.longitude,_that.countryCode,_that.avatar,_that.currentAvatarUrl,_that.saving,_that.error);case _:
+return $default(_that.displayName,_that.username,_that.bio,_that.originalDisplayName,_that.originalUsername,_that.originalBio,_that.avatar,_that.cover,_that.currentAvatarUrl,_that.currentCoverUrl,_that.usernameStatus,_that.usernameError,_that.nameError,_that.saving,_that.error);case _:
   return null;
 
 }
@@ -220,24 +225,29 @@ return $default(_that.displayName,_that.username,_that.bio,_that.city,_that.orig
 /// @nodoc
 
 
-class _ProfileEditState implements ProfileEditState {
-  const _ProfileEditState({this.displayName = '', this.username = '', this.bio = '', this.city = '', this.originalUsername, this.placeId, this.latitude, this.longitude, this.countryCode, this.avatar, this.currentAvatarUrl, this.saving = false, this.error});
+class _ProfileEditState extends ProfileEditState {
+  const _ProfileEditState({this.displayName = '', this.username = '', this.bio = '', this.originalDisplayName = '', this.originalUsername = '', this.originalBio = '', this.avatar, this.cover, this.currentAvatarUrl, this.currentCoverUrl, this.usernameStatus = UsernameStatus.untouched, this.usernameError, this.nameError, this.saving = false, this.error}): super._();
   
 
 @override@JsonKey() final  String displayName;
 @override@JsonKey() final  String username;
 @override@JsonKey() final  String bio;
-@override@JsonKey() final  String city;
-// Seeded from the loaded profile; passed through on save so we don't wipe geo
-// or trip the username cooldown on an unchanged handle.
-@override final  String? originalUsername;
-@override final  String? placeId;
-@override final  double? latitude;
-@override final  double? longitude;
-@override final  String? countryCode;
-/// Newly-picked avatar (square-cropped, resized) awaiting upload on save.
+/// Seeded from the loaded profile. Save compares against these to decide
+/// whether anything actually changed, and passes the username through only
+/// when it differs so an unchanged handle never trips the cooldown.
+@override@JsonKey() final  String originalDisplayName;
+@override@JsonKey() final  String originalUsername;
+@override@JsonKey() final  String originalBio;
+/// Newly-picked images awaiting upload on save.
 @override final  File? avatar;
+@override final  File? cover;
 @override final  String? currentAvatarUrl;
+@override final  String? currentCoverUrl;
+@override@JsonKey() final  UsernameStatus usernameStatus;
+/// Set when the username is invalid or taken, or when a save came back
+/// with a field-specific reason. Rendered under the offending field.
+@override final  String? usernameError;
+@override final  String? nameError;
 @override@JsonKey() final  bool saving;
 @override final  Failure? error;
 
@@ -251,16 +261,16 @@ _$ProfileEditStateCopyWith<_ProfileEditState> get copyWith => __$ProfileEditStat
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileEditState&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.username, username) || other.username == username)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.city, city) || other.city == city)&&(identical(other.originalUsername, originalUsername) || other.originalUsername == originalUsername)&&(identical(other.placeId, placeId) || other.placeId == placeId)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&(identical(other.countryCode, countryCode) || other.countryCode == countryCode)&&(identical(other.avatar, avatar) || other.avatar == avatar)&&(identical(other.currentAvatarUrl, currentAvatarUrl) || other.currentAvatarUrl == currentAvatarUrl)&&(identical(other.saving, saving) || other.saving == saving)&&(identical(other.error, error) || other.error == error));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileEditState&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.username, username) || other.username == username)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.originalDisplayName, originalDisplayName) || other.originalDisplayName == originalDisplayName)&&(identical(other.originalUsername, originalUsername) || other.originalUsername == originalUsername)&&(identical(other.originalBio, originalBio) || other.originalBio == originalBio)&&(identical(other.avatar, avatar) || other.avatar == avatar)&&(identical(other.cover, cover) || other.cover == cover)&&(identical(other.currentAvatarUrl, currentAvatarUrl) || other.currentAvatarUrl == currentAvatarUrl)&&(identical(other.currentCoverUrl, currentCoverUrl) || other.currentCoverUrl == currentCoverUrl)&&(identical(other.usernameStatus, usernameStatus) || other.usernameStatus == usernameStatus)&&(identical(other.usernameError, usernameError) || other.usernameError == usernameError)&&(identical(other.nameError, nameError) || other.nameError == nameError)&&(identical(other.saving, saving) || other.saving == saving)&&(identical(other.error, error) || other.error == error));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,displayName,username,bio,city,originalUsername,placeId,latitude,longitude,countryCode,avatar,currentAvatarUrl,saving,error);
+int get hashCode => Object.hash(runtimeType,displayName,username,bio,originalDisplayName,originalUsername,originalBio,avatar,cover,currentAvatarUrl,currentCoverUrl,usernameStatus,usernameError,nameError,saving,error);
 
 @override
 String toString() {
-  return 'ProfileEditState(displayName: $displayName, username: $username, bio: $bio, city: $city, originalUsername: $originalUsername, placeId: $placeId, latitude: $latitude, longitude: $longitude, countryCode: $countryCode, avatar: $avatar, currentAvatarUrl: $currentAvatarUrl, saving: $saving, error: $error)';
+  return 'ProfileEditState(displayName: $displayName, username: $username, bio: $bio, originalDisplayName: $originalDisplayName, originalUsername: $originalUsername, originalBio: $originalBio, avatar: $avatar, cover: $cover, currentAvatarUrl: $currentAvatarUrl, currentCoverUrl: $currentCoverUrl, usernameStatus: $usernameStatus, usernameError: $usernameError, nameError: $nameError, saving: $saving, error: $error)';
 }
 
 
@@ -271,7 +281,7 @@ abstract mixin class _$ProfileEditStateCopyWith<$Res> implements $ProfileEditSta
   factory _$ProfileEditStateCopyWith(_ProfileEditState value, $Res Function(_ProfileEditState) _then) = __$ProfileEditStateCopyWithImpl;
 @override @useResult
 $Res call({
- String displayName, String username, String bio, String city, String? originalUsername, String? placeId, double? latitude, double? longitude, String? countryCode, File? avatar, String? currentAvatarUrl, bool saving, Failure? error
+ String displayName, String username, String bio, String originalDisplayName, String originalUsername, String originalBio, File? avatar, File? cover, String? currentAvatarUrl, String? currentCoverUrl, UsernameStatus usernameStatus, String? usernameError, String? nameError, bool saving, Failure? error
 });
 
 
@@ -288,19 +298,21 @@ class __$ProfileEditStateCopyWithImpl<$Res>
 
 /// Create a copy of ProfileEditState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? displayName = null,Object? username = null,Object? bio = null,Object? city = null,Object? originalUsername = freezed,Object? placeId = freezed,Object? latitude = freezed,Object? longitude = freezed,Object? countryCode = freezed,Object? avatar = freezed,Object? currentAvatarUrl = freezed,Object? saving = null,Object? error = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? displayName = null,Object? username = null,Object? bio = null,Object? originalDisplayName = null,Object? originalUsername = null,Object? originalBio = null,Object? avatar = freezed,Object? cover = freezed,Object? currentAvatarUrl = freezed,Object? currentCoverUrl = freezed,Object? usernameStatus = null,Object? usernameError = freezed,Object? nameError = freezed,Object? saving = null,Object? error = freezed,}) {
   return _then(_ProfileEditState(
 displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
 as String,username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String,bio: null == bio ? _self.bio : bio // ignore: cast_nullable_to_non_nullable
-as String,city: null == city ? _self.city : city // ignore: cast_nullable_to_non_nullable
-as String,originalUsername: freezed == originalUsername ? _self.originalUsername : originalUsername // ignore: cast_nullable_to_non_nullable
-as String?,placeId: freezed == placeId ? _self.placeId : placeId // ignore: cast_nullable_to_non_nullable
-as String?,latitude: freezed == latitude ? _self.latitude : latitude // ignore: cast_nullable_to_non_nullable
-as double?,longitude: freezed == longitude ? _self.longitude : longitude // ignore: cast_nullable_to_non_nullable
-as double?,countryCode: freezed == countryCode ? _self.countryCode : countryCode // ignore: cast_nullable_to_non_nullable
-as String?,avatar: freezed == avatar ? _self.avatar : avatar // ignore: cast_nullable_to_non_nullable
+as String,originalDisplayName: null == originalDisplayName ? _self.originalDisplayName : originalDisplayName // ignore: cast_nullable_to_non_nullable
+as String,originalUsername: null == originalUsername ? _self.originalUsername : originalUsername // ignore: cast_nullable_to_non_nullable
+as String,originalBio: null == originalBio ? _self.originalBio : originalBio // ignore: cast_nullable_to_non_nullable
+as String,avatar: freezed == avatar ? _self.avatar : avatar // ignore: cast_nullable_to_non_nullable
+as File?,cover: freezed == cover ? _self.cover : cover // ignore: cast_nullable_to_non_nullable
 as File?,currentAvatarUrl: freezed == currentAvatarUrl ? _self.currentAvatarUrl : currentAvatarUrl // ignore: cast_nullable_to_non_nullable
+as String?,currentCoverUrl: freezed == currentCoverUrl ? _self.currentCoverUrl : currentCoverUrl // ignore: cast_nullable_to_non_nullable
+as String?,usernameStatus: null == usernameStatus ? _self.usernameStatus : usernameStatus // ignore: cast_nullable_to_non_nullable
+as UsernameStatus,usernameError: freezed == usernameError ? _self.usernameError : usernameError // ignore: cast_nullable_to_non_nullable
+as String?,nameError: freezed == nameError ? _self.nameError : nameError // ignore: cast_nullable_to_non_nullable
 as String?,saving: null == saving ? _self.saving : saving // ignore: cast_nullable_to_non_nullable
 as bool,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
 as Failure?,

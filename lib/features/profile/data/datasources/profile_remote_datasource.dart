@@ -169,4 +169,26 @@ class ProfileRemoteDataSource {
       throw ServerException(e.message);
     }
   }
+
+  /// Upload a cover to `avatars/<uid>/cover_<ts>.jpg` and return its public
+  /// URL. It shares the `avatars` bucket deliberately: the bucket's RLS keys
+  /// on the `<auth.uid()>` folder, not the filename, so a second bucket would
+  /// duplicate four policies to gain nothing.
+  Future<String> uploadCover(File file) async {
+    try {
+      final uid = _requireUid();
+      final path = '$uid/cover_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await _supabase.storage.from('avatars').upload(
+            path,
+            file,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
+      return _supabase.storage.from('avatars').getPublicUrl(path);
+    } on StorageException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
 }

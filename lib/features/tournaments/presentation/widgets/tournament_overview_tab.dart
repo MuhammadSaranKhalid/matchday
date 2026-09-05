@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_leader.dart';
 import '../../domain/entities/tournament_live_match.dart';
@@ -56,6 +57,10 @@ class _RegistrationOverview extends ConsumerWidget {
         ref.watch(tournamentRegistrationsProvider(tournament.id)).value ??
             const <TournamentRegistration>[];
     final approved = regs.where((r) => r.isApproved).toList();
+    final myTeams = ref.watch(myTeamsProvider).value ?? const [];
+    final myReg = regs
+        .where((r) => myTeams.any((t) => t.id.value == r.teamId))
+        .firstOrNull;
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 28),
@@ -74,8 +79,13 @@ class _RegistrationOverview extends ConsumerWidget {
           child: SizedBox(
             height: 52,
             child: ElevatedButton(
-              onPressed: () =>
-                  context.push('/tournaments/${tournament.id}/register'),
+              onPressed: () {
+                if (myReg != null) {
+                  context.push('/tournaments/${tournament.id}/register/status');
+                } else {
+                  context.push('/tournaments/${tournament.id}/register');
+                }
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: CkColors.ink,
                 foregroundColor: CkColors.paper,
@@ -84,16 +94,24 @@ class _RegistrationOverview extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: Text(
-                (tournament.entryFee ?? 0) > 0
-                    ? 'Register Your Team · PKR '
-                        '${_money.format(tournament.entryFee)}'
-                    : 'Register Your Team',
-                style: CkType.body(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: CkColors.paper,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    myReg != null
+                        ? 'Registration ${myReg.status.label} · View Tracker'
+                        : ((tournament.entryFee ?? 0) > 0
+                            ? 'Register a Team · PKR ${_money.format(tournament.entryFee)}'
+                            : 'Register a Team'),
+                    style: CkType.body(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: CkColors.paper,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.arrow_forward, size: 16, color: CkColors.paper),
+                ],
               ),
             ),
           ),

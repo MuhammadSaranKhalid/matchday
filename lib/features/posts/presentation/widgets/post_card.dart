@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +8,7 @@ import '../../../../core/widgets/v2/ck_feed_image.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../follows/presentation/controllers/follow_toggle_controller.dart';
+import '../../../teams/presentation/widgets/team_crest.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_media.dart';
 
@@ -41,25 +41,16 @@ class FeedPostCard extends ConsumerWidget {
   /// Hide the author avatar/name on a profile (where every post is the owner's).
   final bool showAuthor;
 
-  Widget _buildTeamMonogram() {
-    return Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        color: CkColors.ink,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        post.displayMonogram,
-        style: CkType.display(
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-          color: CkColors.paper,
-        ),
-      ),
-    );
-  }
+  /// A team author is a crest, not a square tile: artwork inset on a paper
+  /// disc, against the player author's full-bleed photo circle below. That
+  /// silhouette difference is what tells a reader whether the byline is a
+  /// club or a person.
+  Widget _teamCrest() => TeamCrest(
+        name: post.displayName,
+        logoUrl: post.displayPhotoUrl,
+        monogram: post.displayMonogram,
+        size: 38,
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -132,19 +123,7 @@ class FeedPostCard extends ConsumerWidget {
           behavior: HitTestBehavior.opaque,
           onTap: onNavigate,
           child: isTeam
-              ? (post.displayPhotoUrl != null && post.displayPhotoUrl!.trim().isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: CachedNetworkImage(
-                        imageUrl: post.displayPhotoUrl!.trim(),
-                        width: 38,
-                        height: 38,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => _buildTeamMonogram(),
-                        errorWidget: (_, __, ___) => _buildTeamMonogram(),
-                      ),
-                    )
-                  : _buildTeamMonogram())
+              ? _teamCrest()
               : Avatar(
                   mono: post.authorMonogram,
                   imageUrl: post.displayPhotoUrl,

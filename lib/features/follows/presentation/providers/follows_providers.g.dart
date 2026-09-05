@@ -502,3 +502,103 @@ final class FollowedTeamIdsProvider
 }
 
 String _$followedTeamIdsHash() => r'e4c85e3df87878ce224fa6c1ab58398fa55bf352';
+
+/// Whether the signed-in user wants notifications about a team.
+///
+/// Autodispose: a sheet that is open for four seconds should not pin a
+/// subscription for the session. False when the user doesn't follow the team
+/// — there is no row to carry the preference.
+
+@ProviderFor(teamNotificationsEnabled)
+final teamNotificationsEnabledProvider = TeamNotificationsEnabledFamily._();
+
+/// Whether the signed-in user wants notifications about a team.
+///
+/// Autodispose: a sheet that is open for four seconds should not pin a
+/// subscription for the session. False when the user doesn't follow the team
+/// — there is no row to carry the preference.
+
+final class TeamNotificationsEnabledProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, FutureOr<bool>>
+    with $FutureModifier<bool>, $FutureProvider<bool> {
+  /// Whether the signed-in user wants notifications about a team.
+  ///
+  /// Autodispose: a sheet that is open for four seconds should not pin a
+  /// subscription for the session. False when the user doesn't follow the team
+  /// — there is no row to carry the preference.
+  TeamNotificationsEnabledProvider._({
+    required TeamNotificationsEnabledFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'teamNotificationsEnabledProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$teamNotificationsEnabledHash();
+
+  @override
+  String toString() {
+    return r'teamNotificationsEnabledProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<bool> create(Ref ref) {
+    final argument = this.argument as String;
+    return teamNotificationsEnabled(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TeamNotificationsEnabledProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$teamNotificationsEnabledHash() =>
+    r'4fa0a01250a9725bc494ed5421da307e8b852c3c';
+
+/// Whether the signed-in user wants notifications about a team.
+///
+/// Autodispose: a sheet that is open for four seconds should not pin a
+/// subscription for the session. False when the user doesn't follow the team
+/// — there is no row to carry the preference.
+
+final class TeamNotificationsEnabledFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<bool>, String> {
+  TeamNotificationsEnabledFamily._()
+    : super(
+        retry: null,
+        name: r'teamNotificationsEnabledProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Whether the signed-in user wants notifications about a team.
+  ///
+  /// Autodispose: a sheet that is open for four seconds should not pin a
+  /// subscription for the session. False when the user doesn't follow the team
+  /// — there is no row to carry the preference.
+
+  TeamNotificationsEnabledProvider call(String teamId) =>
+      TeamNotificationsEnabledProvider._(argument: teamId, from: this);
+
+  @override
+  String toString() => r'teamNotificationsEnabledProvider';
+}

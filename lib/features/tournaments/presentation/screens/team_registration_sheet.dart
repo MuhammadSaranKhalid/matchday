@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/ck_button.dart';
 import '../../../../core/widgets/ck_text_field.dart';
+import '../../../teams/domain/entities/roster_member.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/tournament.dart';
@@ -12,6 +14,11 @@ import '../controllers/tournaments_controller.dart';
 import '../providers/tournaments_providers.dart';
 
 /// 4-Step Team Registration Wizard for Tournament Entrants (Artboards 29–33).
+///
+/// Step 1: Select team (Artboard 30)
+/// Step 2: Squad picker with pinned counter (Artboard 31)
+/// Step 3: Rules & fee agreement (Artboard 32)
+/// Step 4: Status tracker (Artboard 33)
 class TeamRegistrationSheet extends ConsumerStatefulWidget {
   const TeamRegistrationSheet({super.key, required this.tournamentId});
 
@@ -23,7 +30,9 @@ class TeamRegistrationSheet extends ConsumerStatefulWidget {
 }
 
 class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
-  int _currentStep = 0;
+  static final _money = NumberFormat.decimalPattern();
+
+  int _currentStep = 0; // 0: Team, 1: Squad, 2: Rules & Fee
   String? _selectedTeamId;
   final Set<String> _selectedPlayerIds = {};
   String? _captainPlayerId;
@@ -32,39 +41,24 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
   // Guest players added for this tournament entry
   final List<Map<String, String>> _guestPlayers = [];
 
-  // Step 3 Payment fields
-  final _txRefController = TextEditingController();
-  final _messageController = TextEditingController();
-  bool _paymentProofUploaded = false;
-
-  // Step 4 Declaration
+  // Step 3 rules agreement
   bool _rulesAgreed = false;
   String? _errorMessage;
 
-  @override
-  void dispose() {
-    _txRefController.dispose();
-    _messageController.dispose();
-    super.dispose();
-  }
-
-  /// The organiser sets these in the create wizard (step 5, written to
-  /// `rules.min_squad` / `rules.max_squad`). They used to be hardcoded 11–16
-  /// here, so a cup that asked for 12–18 still enforced 11–16.
   int _minSquad(Tournament t) =>
       (t.rules['min_squad'] as num?)?.toInt() ?? 11;
 
   int _maxSquad(Tournament t) =>
       (t.rules['max_squad'] as num?)?.toInt() ?? 16;
 
-  /// "20 Overs", or "100 Balls" for The Hundred — read from the keys the
-  /// create wizard actually writes.
-  String _formatLine(Tournament t) {
-    final balls = (t.format['balls_per_innings'] as num?)?.toInt();
-    if (balls != null) return '$balls Balls';
-    final overs = (t.format['max_overs'] as num?)?.toInt() ?? 20;
-    return '$overs Overs';
-  }
+  int _overs(Tournament t) =>
+      (t.format['max_overs'] as num?)?.toInt() ?? 20;
+
+  int _maxPerBowler(Tournament t) =>
+      (t.rules['max_overs_per_bowler'] as num?)?.toInt() ?? (_overs(t) ~/ 5).clamp(1, 10);
+
+  String _ballType(Tournament t) =>
+      (t.rules['ball_type'] as String?) ?? 'Leather (Red)';
 
   void _nextStep(Tournament tournament) {
     setState(() => _errorMessage = null);
@@ -74,34 +68,22 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
         setState(() => _errorMessage = 'Please select a team to register.');
         return;
       }
+      setState(() => _currentStep = 1);
     } else if (_currentStep == 1) {
-      final totalPlayers = _selectedPlayerIds.length + _guestPlayers.length;
+      final total = _selectedPlayerIds.length + _guestPlayers.length;
       final min = _minSquad(tournament);
       final max = _maxSquad(tournament);
-      if (totalPlayers < min) {
+      if (total < min) {
         setState(() => _errorMessage =
-            'Minimum $min players required in squad ($totalPlayers selected).');
+            'Please select at least $min players ($total selected).');
         return;
       }
-      if (totalPlayers > max) {
+      if (total > max) {
         setState(() => _errorMessage =
-            'Maximum $max players allowed in squad ($totalPlayers selected).');
+            'Maximum $max players allowed ($total selected).');
         return;
       }
-      if (_captainPlayerId == null) {
-        setState(() => _errorMessage = 'Please designate a Captain (C).');
-        return;
-      }
-      if (_wicketKeeperPlayerId == null) {
-        setState(() => _errorMessage = 'Please designate a Wicketkeeper (WK).');
-        return;
-      }
-    } else if (_currentStep == 2) {
-      // Step 2 is payment / message
-    }
-
-    if (_currentStep < 3) {
-      setState(() => _currentStep++);
+      setState(() => _currentStep = 2);
     }
   }
 
@@ -109,6 +91,8 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
     setState(() => _errorMessage = null);
     if (_currentStep > 0) {
       setState(() => _currentStep--);
+    } else {
+      context.pop();
     }
   }
 
@@ -125,17 +109,11 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
     ];
 
     final noteParts = <String>[];
-    if (_txRefController.text.trim().isNotEmpty) {
-      noteParts.add('Payment Ref: ${_txRefController.text.trim()}');
-    }
     if (_captainPlayerId != null) {
       noteParts.add('Captain: $_captainPlayerId');
     }
     if (_wicketKeeperPlayerId != null) {
       noteParts.add('WK: $_wicketKeeperPlayerId');
-    }
-    if (_messageController.text.trim().isNotEmpty) {
-      noteParts.add(_messageController.text.trim());
     }
 
     final reg = await ref
@@ -151,29 +129,32 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              '🎉 Registration submitted! The organizer has been notified.'),
-          backgroundColor: CkColors.greenInk,
+            'Registration submitted! The organizer has been notified.',
+          ),
+          backgroundColor: Color(0xFF1E5A2C),
         ),
       );
-      context.pop();
+      // Navigate to status tracker (Artboard 33)
+      context.pushReplacement('/tournaments/${widget.tournamentId}/register/status');
     }
   }
 
   void _showAddGuestDialog() {
     final nameCtrl = TextEditingController();
-    String guestRole = 'Batsman';
+    String guestRole = 'All-Rounder';
 
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: CkColors.paper,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(CkRadii.lg)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Padding(
+            return Container(
+              decoration: const BoxDecoration(
+                color: CkColors.paper,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
               padding: EdgeInsets.only(
                 left: 20,
                 right: 20,
@@ -203,9 +184,9 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
                   ),
                   const SizedBox(height: 12),
                   CkTextField(
+                    label: 'Player Name',
                     controller: nameCtrl,
-                    label: 'Player Full Name',
-                    hint: 'e.g. Usama Mir',
+                    hint: 'e.g. Uncle Asif',
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -220,8 +201,10 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
                   Wrap(
                     spacing: 8,
                     children: [
-                      'Batsman',
-                      'Bowler',
+                      'Top order',
+                      'Middle order',
+                      'Pace',
+                      'Spin',
                       'All-Rounder',
                       'Wicketkeeper'
                     ].map((role) {
@@ -243,21 +226,31 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 24),
-                  CkButton(
-                    label: 'Add to Tournament Squad',
-                    onPressed: () {
-                      if (nameCtrl.text.trim().isNotEmpty) {
-                        setState(() {
-                          _guestPlayers.add({
-                            'name': nameCtrl.text.trim(),
-                            'role': guestRole,
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (nameCtrl.text.trim().isNotEmpty) {
+                          setState(() {
+                            _guestPlayers.add({
+                              'name': nameCtrl.text.trim(),
+                              'role': guestRole,
+                            });
                           });
-                        });
-                        Navigator.pop(ctx);
-                      }
-                    },
-                    variant: CkButtonVariant.primary,
+                          Navigator.pop(ctx);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CkColors.ink,
+                        foregroundColor: CkColors.paper,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Add to Squad'),
+                    ),
                   ),
                 ],
               ),
@@ -277,891 +270,235 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
         ref.watch(tournamentRegistrationsProvider(widget.tournamentId));
     final isBusy = ref.watch(tournamentsControllerProvider).isLoading;
 
-    return Scaffold(
-      backgroundColor: CkColors.canvas,
-      appBar: AppBar(
+    return tournamentAsync.when(
+      loading: () => const Scaffold(
         backgroundColor: CkColors.paper,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: CkColors.ink),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          'Team Registration',
-          style: CkType.display(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
+        body: Center(child: CircularProgressIndicator()),
       ),
-      body: tournamentAsync.when(
-        data: (tournament) {
-          // Check if user already has an existing registration for this tournament (Artboard 33)
-          return myTeamsAsync.when(
-            data: (myTeams) {
-              return registrationsAsync.when(
-                data: (registrations) {
-                  final mine = registrations
-                      .where((r) =>
-                          myTeams.any((t) => t.id.value == r.teamId))
-                      .toList();
-
-                  // Scoped to the team the manager picked, not to *any* team
-                  // they run. Matching on any of them meant that once Team A
-                  // was in, Team B could never be entered — the manager got
-                  // Team A's status screen instead of the wizard. Club
-                  // officials running several sides are exactly the people
-                  // who register more than once.
-                  //
-                  // With no team picked yet the status view still wins when
-                  // there is nothing left to enter, so a single-team manager
-                  // lands straight on their tracker as before.
-                  final registeredTeamIds =
-                      mine.map((r) => r.teamId).toSet();
-                  final hasFreeTeam = myTeams
-                      .any((t) => !registeredTeamIds.contains(t.id.value));
-
-                  final selected = _selectedTeamId;
-                  final existingReg = selected != null
-                      ? mine.where((r) => r.teamId == selected).firstOrNull
-                      : (mine.isNotEmpty && !hasFreeTeam ? mine.first : null);
-
-                  if (existingReg != null) {
-                    return _buildExistingRegistrationView(
-                        existingReg, tournament);
-                  }
-
-                  return _buildWizardContent(tournament, myTeams, isBusy);
-                },
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text(e.toString())),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text(e.toString())),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(e.toString())),
+      error: (e, _) => Scaffold(
+        backgroundColor: CkColors.paper,
+        body: Center(child: Text('$e')),
       ),
-    );
-  }
-
-  Widget _buildWizardContent(
-      Tournament tournament, List<Team> myTeams, bool isBusy) {
-    return SafeArea(
-      child: Column(
-        children: [
-          // Step Progress Bar (Artboards 29–32)
-          _buildStepHeader(),
-
-          if (_errorMessage != null) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: CkColors.redSurface,
-                  borderRadius: BorderRadius.circular(CkRadii.sm),
-                  border: Border.all(color: CkColors.redBorder),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.error_outline,
-                        size: 18, color: CkColors.redInk),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _errorMessage!,
-                        style: CkType.body(
-                          fontSize: 12.5,
-                          color: CkColors.redInk,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-
-          // Step Content Pages
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: _buildCurrentStep(tournament, myTeams),
-            ),
+      data: (tournament) {
+        return myTeamsAsync.when(
+          loading: () => const Scaffold(
+            backgroundColor: CkColors.paper,
+            body: Center(child: CircularProgressIndicator()),
           ),
-
-          // Bottom Action Bar
-          _buildBottomBar(tournament, isBusy),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepHeader() {
-    final steps = ['Team', 'Squad', 'Payment', 'Review'];
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        color: CkColors.paper,
-        border: Border(bottom: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        children: List.generate(steps.length, (idx) {
-          final isDone = idx < _currentStep;
-          final isCurrent = idx == _currentStep;
-
-          return Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: isDone
-                                  ? CkColors.greenInk
-                                  : isCurrent
-                                      ? CkColors.ink
-                                      : CkColors.paper2,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: isDone
-                                  ? const Icon(Icons.check,
-                                      size: 12, color: Colors.white)
-                                  : Text(
-                                      '${idx + 1}',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: isCurrent
-                                            ? Colors.white
-                                            : CkColors.muted,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            steps[idx],
-                            style: CkType.mono(
-                              fontSize: 10.5,
-                              fontWeight: isCurrent
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: isCurrent
-                                  ? CkColors.ink
-                                  : isDone
-                                      ? CkColors.greenInk
-                                      : CkColors.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: isDone
-                              ? CkColors.greenInk
-                              : isCurrent
-                                  ? CkColors.ink
-                                  : CkColors.hairline,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (idx < steps.length - 1) const SizedBox(width: 8),
-              ],
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildCurrentStep(Tournament tournament, List<Team> myTeams) {
-    switch (_currentStep) {
-      case 0:
-        return _buildStep1SelectTeam(tournament, myTeams);
-      case 1:
-        return _buildStep2SquadPicker(tournament);
-      case 2:
-        return _buildStep3PaymentProof(tournament);
-      case 3:
-        return _buildStep4ReviewSubmit(tournament, myTeams);
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  // ─── Step 1: Select Team (Artboard 29) ────────────────────────────────────
-  Widget _buildStep1SelectTeam(Tournament tournament, List<Team> myTeams) {
-    if (myTeams.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.circular(CkRadii.md),
-          border: Border.all(color: CkColors.hairline),
-        ),
-        child: Column(
-          children: [
-            const Icon(Icons.shield_outlined, size: 48, color: CkColors.soft),
-            const SizedBox(height: 12),
-            Text('No Teams Managed', style: CkType.display(fontSize: 16)),
-            const SizedBox(height: 6),
-            Text(
-              'You need to be a manager or captain of a team to register for tournaments.',
-              style: CkType.body(fontSize: 13, color: CkColors.muted),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            CkButton(
-              label: '+ Create New Team',
-              onPressed: () => context.push('/teams/new'),
-              variant: CkButtonVariant.secondary,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Tournament Requirements Card
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: CkColors.paper,
-            borderRadius: BorderRadius.circular(CkRadii.md),
-            border: Border.all(color: CkColors.hairline),
+          error: (e, _) => Scaffold(
+            backgroundColor: CkColors.paper,
+            body: Center(child: Text('$e')),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'TOURNAMENT REQUIREMENTS',
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: CkColors.muted,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Format',
-                      style: CkType.body(fontSize: 13, color: CkColors.muted)),
-                  Text(
-                    // `max_overs` is the key the create wizard writes;
-                    // `overs` never existed, so this line used to read
-                    // "20 Overs" for every cup including a 50-over one.
-                    '${_formatLine(tournament)} · ${tournament.type.label}',
-                    style: CkType.display(
-                        fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-              const Divider(height: 16, color: CkColors.hairline),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Squad Requirement',
-                      style: CkType.body(fontSize: 13, color: CkColors.muted)),
-                  Text(
-                      'Min ${_minSquad(tournament)}, '
-                      'Max ${_maxSquad(tournament)} Players',
-                      style: CkType.display(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
-                ],
-              ),
-              const Divider(height: 16, color: CkColors.hairline),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Entry Fee',
-                      style: CkType.body(fontSize: 13, color: CkColors.muted)),
-                  Text(
-                    tournament.entryFee != null && tournament.entryFee! > 0
-                        ? 'PKR ${tournament.entryFee!.toStringAsFixed(0)}'
-                        : 'Free Entry',
-                    style: CkType.display(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: tournament.entryFee != null &&
-                              tournament.entryFee! > 0
-                          ? CkColors.ink
-                          : CkColors.greenInk,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
+          data: (myTeams) {
+            final allRegs = registrationsAsync.value ?? const <TournamentRegistration>[];
+            final registeredTeamIds = allRegs.map((r) => r.teamId).toSet();
 
-        Text(
-          'SELECT YOUR TEAM',
-          style: CkType.mono(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w700,
-            color: CkColors.ink,
-          ),
-        ),
-        const SizedBox(height: 10),
 
-        ...myTeams.map((team) {
-          final isSelected = _selectedTeamId == team.id.value;
-          final monogram = team.name.length >= 2
-              ? team.name.substring(0, 2).toUpperCase()
-              : team.name;
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(CkRadii.md),
-              onTap: () {
-                setState(() {
-                  _selectedTeamId = team.id.value;
-                  _selectedPlayerIds.clear();
-                  _captainPlayerId = null;
-                  _wicketKeeperPlayerId = null;
-                  _guestPlayers.clear();
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isSelected ? CkColors.paper : CkColors.paper,
-                  borderRadius: BorderRadius.circular(CkRadii.md),
-                  border: Border.all(
-                    color: isSelected ? CkColors.ink : CkColors.hairline,
-                    width: isSelected ? 1.5 : 1.0,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: CkColors.ink2,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Center(
-                        child: Text(
-                          monogram,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            team.name,
-                            style: CkType.display(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            team.city ?? 'Local Club',
-                            style: CkType.body(
-                                fontSize: 12, color: CkColors.muted),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Radio<String>(
-                      value: team.id.value,
-                      groupValue: _selectedTeamId,
-                      activeColor: CkColors.ink,
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedTeamId = val;
-                          _selectedPlayerIds.clear();
-                          _captainPlayerId = null;
-                          _wicketKeeperPlayerId = null;
-                          _guestPlayers.clear();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
-  // ─── Step 2: Squad Selection & Roles (Artboard 30) ─────────────────────────
-  Widget _buildStep2SquadPicker(Tournament tournament) {
-    final rosterAsync = ref.watch(rosterProvider(_selectedTeamId!));
-    final totalCount = _selectedPlayerIds.length + _guestPlayers.length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Squad count header
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: totalCount >= 11 && totalCount <= 16
-                ? CkColors.greenSurface
-                : CkColors.paper,
-            borderRadius: BorderRadius.circular(CkRadii.md),
-            border: Border.all(
-              color: totalCount >= 11 && totalCount <= 16
-                  ? CkColors.greenBorder
-                  : CkColors.hairline,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'SQUAD SELECTION',
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: totalCount >= 11 && totalCount <= 16
-                      ? CkColors.greenInk
-                      : CkColors.ink,
-                ),
-              ),
-              Text(
-                '$totalCount / 16 Selected (Min 11)',
-                style: CkType.mono(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: totalCount >= 11 && totalCount <= 16
-                      ? CkColors.greenInk
-                      : CkColors.muted,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        rosterAsync.when(
-          data: (roster) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'TEAM ROSTER PLAYERS',
-                  style: CkType.mono(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
+            return Scaffold(
+              backgroundColor: CkColors.paper,
+              appBar: AppBar(
+                backgroundColor: CkColors.paper,
+                elevation: 0,
+                surfaceTintColor: Colors.transparent,
+                leading: IconButton(
+                  icon: Icon(
+                    _currentStep == 0 ? Icons.close : Icons.arrow_back,
                     color: CkColors.ink,
                   ),
+                  onPressed: _prevStep,
                 ),
-                const SizedBox(height: 8),
+                titleSpacing: 0,
+                title: Text(
+                  _currentStep == 0
+                      ? tournament.name
+                      : '${_selectedTeam(myTeams)?.name ?? "Your team"} · ${tournament.name}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+                ),
+              ),
+              body: SafeArea(
+                child: Column(
+                  children: [
+                    // Continuous 4px linear progress bar (Artboards 30–32)
+                    _buildProgressBar(),
 
-                ...roster.map((member) {
-                  final pid = member.member.playerId;
-                  final isSelected = _selectedPlayerIds.contains(pid);
-                  final isCaptain = _captainPlayerId == pid;
-                  final isWk = _wicketKeeperPlayerId == pid;
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      color: CkColors.paper,
-                      borderRadius: BorderRadius.circular(CkRadii.md),
-                      border: Border.all(
-                        color: isSelected ? CkColors.ink : CkColors.hairline,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: isSelected,
-                            activeColor: CkColors.ink,
-                            onChanged: (val) {
-                              setState(() {
-                                if (val == true) {
-                                  _selectedPlayerIds.add(pid);
-                                  if (_captainPlayerId == null) {
-                                    _captainPlayerId = pid;
-                                  }
-                                } else {
-                                  _selectedPlayerIds.remove(pid);
-                                  if (_captainPlayerId == pid) {
-                                    _captainPlayerId = null;
-                                  }
-                                  if (_wicketKeeperPlayerId == pid) {
-                                    _wicketKeeperPlayerId = null;
-                                  }
-                                }
-                              });
-                            },
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  member.displayName,
-                                  style: CkType.display(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Text(
-                                  member.member.role.name.toUpperCase(),
-                                  style: CkType.body(
-                                      fontSize: 11.5, color: CkColors.muted),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (isSelected) ...[
-                            // Captain toggle chip
-                            InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _captainPlayerId =
-                                      _captainPlayerId == pid ? null : pid;
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isCaptain
-                                      ? CkColors.cream
-                                      : CkColors.paper2,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: isCaptain
-                                        ? CkColors.creamBorder
-                                        : CkColors.hairline,
-                                  ),
-                                ),
-                                child: Text(
-                                  'C',
-                                  style: CkType.mono(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: isCaptain
-                                        ? CkColors.amberDark
-                                        : CkColors.muted,
-                                  ),
-                                ),
+                    // Step indicator and title
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'STEP ${_currentStep + 1} OF 4',
+                              style: CkType.mono(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.12,
+                                color: CkColors.muted,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            // Wicketkeeper toggle chip
-                            InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _wicketKeeperPlayerId =
-                                      _wicketKeeperPlayerId == pid ? null : pid;
-                                });
+                            const SizedBox(height: 4),
+                            Text(
+                              switch (_currentStep) {
+                                0 => 'Which team is playing?',
+                                1 => 'Pick your squad',
+                                _ => 'Before you submit',
                               },
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isWk
-                                      ? CkColors.greenSurface
-                                      : CkColors.paper2,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: isWk
-                                        ? CkColors.greenBorder
-                                        : CkColors.hairline,
-                                  ),
-                                ),
-                                child: Text(
-                                  'WK',
-                                  style: CkType.mono(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: isWk
-                                        ? CkColors.greenInk
-                                        : CkColors.muted,
-                                  ),
-                                ),
+                              style: CkType.display(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.02,
                               ),
                             ),
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                  );
-                }),
 
-                if (_guestPlayers.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    'GUEST PLAYERS',
-                    style: CkType.mono(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: CkColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ..._guestPlayers.map((guest) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: CkColors.paper,
-                        borderRadius: BorderRadius.circular(CkRadii.md),
-                        border: Border.all(color: CkColors.hairline),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    if (_errorMessage != null) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFDECEB),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFECA39E)),
+                          ),
+                          child: Row(
                             children: [
-                              Text(
-                                guest['name'] ?? '',
-                                style: CkType.display(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                              const Icon(Icons.info_outline, size: 16, color: CkColors.redInk),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: CkType.body(
+                                    fontSize: 12,
+                                    color: CkColors.redInk,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                '${guest['role']} · Guest',
-                                style: CkType.body(
-                                    fontSize: 11.5, color: CkColors.muted),
                               ),
                             ],
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline,
-                                size: 18, color: CkColors.redInk),
-                            onPressed: () {
-                              setState(() {
-                                _guestPlayers.remove(guest);
-                              });
-                            },
-                          ),
-                        ],
+                        ),
                       ),
-                    );
-                  }),
-                ],
+                    ],
 
-                const SizedBox(height: 12),
-                CkButton(
-                  label: '+ Add Guest Player',
-                  onPressed: _showAddGuestDialog,
-                  variant: CkButtonVariant.secondary,
+                    // Step content
+                    Expanded(
+                      child: switch (_currentStep) {
+                        0 => _buildStep1SelectTeam(myTeams, registeredTeamIds, tournament),
+                        1 => _buildStep2SquadPicker(myTeams, tournament),
+                        _ => _buildStep3RulesAndFee(tournament, myTeams),
+                      },
+                    ),
+
+                    // Bottom navigation bar (Artboard 30–32)
+                    _buildBottomBar(tournament, isBusy),
+                  ],
                 ),
-              ],
+              ),
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text(e.toString()),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  // ─── Step 3: Payment & Proof (Artboard 31) ────────────────────────────────
-  Widget _buildStep3PaymentProof(Tournament tournament) {
-    final hasFee = tournament.entryFee != null && tournament.entryFee! > 0;
+  Widget _buildProgressBar() {
+    final fraction = (_currentStep + 1) / 4.0;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      height: 4,
+      width: double.infinity,
+      color: const Color(0xFFF3F0E9),
+      alignment: Alignment.centerLeft,
+      child: FractionallySizedBox(
+        widthFactor: fraction,
+        child: Container(
+          decoration: BoxDecoration(
+            color: CkColors.ink,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Team? _selectedTeam(List<Team> myTeams) {
+    if (_selectedTeamId == null) return null;
+    return myTeams.where((t) => t.id.value == _selectedTeamId).firstOrNull;
+  }
+
+  // ─── Step 1: Select Team (Artboard 30) ─────────────────────────────────────
+
+  Widget _buildStep1SelectTeam(
+    List<Team> myTeams,
+    Set<String> registeredTeamIds,
+    Tournament tournament,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       children: [
-        if (hasFee) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
+        Text(
+          'YOUR TEAMS · ${myTeams.length}',
+          style: CkType.mono(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.12,
+            color: CkColors.muted,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final team in myTeams) ...[
+          _buildTeamCard(team, registeredTeamIds, tournament),
+          const SizedBox(height: 8),
+        ],
+
+        // Dashed Create Team Card (Artboard 30)
+        InkWell(
+          onTap: () => context.push('/teams/create'),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
               color: CkColors.paper,
-              borderRadius: BorderRadius.circular(CkRadii.md),
-              border: Border.all(color: CkColors.hairline),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'ENTRY FEE PAYABLE',
-                      style: CkType.mono(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: CkColors.muted,
-                      ),
-                    ),
-                    Text(
-                      'PKR ${tournament.entryFee!.toStringAsFixed(0)}',
-                      style: CkType.display(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: CkColors.ink,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 20, color: CkColors.hairline),
-                Text(
-                  'ORGANIZER PAYMENT DETAILS',
-                  style: CkType.mono(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    color: CkColors.ink,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  tournament.rules['paymentDetails']?.toString() ??
-                      'JazzCash / EasyPaisa: 0300-1234567\nBank Alfalah: PK36 ALFH 0123 4567 8901 2345\nAccount Title: Tournament Organizer',
-                  style: CkType.body(fontSize: 12.5, color: CkColors.ink2),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          CkTextField(
-            controller: _txRefController,
-            label: 'Transaction ID / Reference #',
-            hint: 'e.g. JC-982347102',
-          ),
-          const SizedBox(height: 16),
-          // Proof Upload Simulator
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _paymentProofUploaded
-                  ? CkColors.greenSurface
-                  : CkColors.paper,
-              borderRadius: BorderRadius.circular(CkRadii.md),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: _paymentProofUploaded
-                    ? CkColors.greenBorder
-                    : CkColors.hairline,
+                color: CkColors.hairline,
+                style: BorderStyle.solid,
               ),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: _paymentProofUploaded
-                        ? CkColors.greenInk
-                        : CkColors.paper2,
-                    borderRadius: BorderRadius.circular(8),
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF3F0E9),
+                    shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    _paymentProofUploaded ? Icons.receipt_long : Icons.upload_file,
-                    color: _paymentProofUploaded ? Colors.white : CkColors.ink,
-                  ),
+                  child: const Icon(Icons.add, size: 18, color: CkColors.ink),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _paymentProofUploaded
-                            ? 'Receipt Attached'
-                            : 'Upload Payment Receipt',
-                        style: CkType.display(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        _paymentProofUploaded
-                            ? 'receipt_payment_proof.jpg'
-                            : 'Screenshot or PDF payment proof',
-                        style:
-                            CkType.body(fontSize: 12, color: CkColors.muted),
-                      ),
-                    ],
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _paymentProofUploaded = !_paymentProofUploaded;
-                    });
-                  },
-                  child: Text(
-                    _paymentProofUploaded ? 'Change' : 'Attach',
-                    style: CkType.mono(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: CkColors.ink,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ] else ...[
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: CkColors.greenSurface,
-              borderRadius: BorderRadius.circular(CkRadii.md),
-              border: Border.all(color: CkColors.greenBorder),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.check_circle,
-                    color: CkColors.greenInk, size: 24),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'FREE ENTRY TOURNAMENT',
-                        style: CkType.mono(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: CkColors.greenInk,
+                        'Create a new team',
+                        style: CkType.display(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 2),
                       Text(
-                        'No registration fees required.',
-                        style: CkType.body(
-                            fontSize: 12.5, color: CkColors.ink),
+                        'You will need at least ${_minSquad(tournament)} players before registering.',
+                        style: CkType.body(fontSize: 11, color: CkColors.muted),
                       ),
                     ],
                   ),
@@ -1169,304 +506,834 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
               ],
             ),
           ),
-        ],
-
-        const SizedBox(height: 20),
-        CkTextField(
-          controller: _messageController,
-          label: 'Message for Tournament Organizer (Optional)',
-          hint: 'e.g. Excited to participate; our kit color is Navy Blue.',
-          maxLines: 2,
         ),
       ],
     );
   }
 
-  // ─── Step 4: Review & Submit (Artboard 32) ────────────────────────────────
-  Widget _buildStep4ReviewSubmit(Tournament tournament, List<Team> myTeams) {
-    final selectedTeam = myTeams
-        .where((t) => t.id.value == _selectedTeamId)
-        .firstOrNull;
-    final teamName = selectedTeam?.name ?? 'Selected Team';
-    final totalSquad = _selectedPlayerIds.length + _guestPlayers.length;
+  Widget _buildTeamCard(
+    Team team,
+    Set<String> registeredTeamIds,
+    Tournament tournament,
+  ) {
+    final isRegistered = registeredTeamIds.contains(team.id.value);
+    // Roster is loaded separately via rosterProvider — use managers count as
+    // a conservative floor for Step 1 eligibility; Step 2 shows the real list.
+    final rosterAsync = ref.watch(rosterProvider(team.id.value));
+    final squadCount = rosterAsync.value?.length ?? 0;
+    final minSquad = _minSquad(tournament);
+    final hasEnoughPlayers = squadCount >= minSquad;
+    final isEligible = !isRegistered && hasEnoughPlayers;
+    final isSelected = _selectedTeamId == team.id.value;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: CkColors.paper,
-            borderRadius: BorderRadius.circular(CkRadii.md),
-            border: Border.all(color: CkColors.hairline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'REGISTRATION SUMMARY',
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: CkColors.muted,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Team',
-                      style: CkType.body(fontSize: 13, color: CkColors.muted)),
-                  Text(
-                    teamName,
-                    style: CkType.display(
-                        fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-              const Divider(height: 16, color: CkColors.hairline),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Squad Members',
-                      style: CkType.body(fontSize: 13, color: CkColors.muted)),
-                  Text(
-                    '$totalSquad Players (${_guestPlayers.length} guests)',
-                    style: CkType.display(
-                        fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-              const Divider(height: 16, color: CkColors.hairline),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Entry Fee',
-                      style: CkType.body(fontSize: 13, color: CkColors.muted)),
-                  Text(
-                    tournament.entryFee != null && tournament.entryFee! > 0
-                        ? 'PKR ${tournament.entryFee!.toStringAsFixed(0)}'
-                        : 'Free',
-                    style: CkType.display(
-                        fontSize: 13, fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-              if (_txRefController.text.trim().isNotEmpty) ...[
-                const Divider(height: 16, color: CkColors.hairline),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Payment Ref',
-                        style:
-                            CkType.body(fontSize: 13, color: CkColors.muted)),
-                    Text(
-                      _txRefController.text.trim(),
-                      style: CkType.mono(
-                          fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ],
-            ],
+    return InkWell(
+      onTap: isEligible
+          ? () {
+              final roster = rosterAsync.value ?? const <RosterMember>[];
+              setState(() {
+                _selectedTeamId = team.id.value;
+                // Pre-select first max-squad members
+                _selectedPlayerIds.clear();
+                _selectedPlayerIds.addAll(
+                  roster.take(_maxSquad(tournament)).map((RosterMember m) => m.member.playerId),
+                );
+                if (roster.isNotEmpty) {
+                  _captainPlayerId ??= roster.first.member.playerId;
+                  if (roster.length > 1) {
+                    _wicketKeeperPlayerId ??= roster[1].member.playerId;
+                  }
+                }
+              });
+            }
+          : null,
+      borderRadius: BorderRadius.circular(14),
+      child: Opacity(
+        opacity: isEligible ? 1.0 : 0.75,
+        child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: CkColors.paper,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected
+                ? CkColors.ink
+                : CkColors.hairline,
+            width: isSelected ? 1.5 : 1,
           ),
         ),
-        const SizedBox(height: 20),
-
-        // Declaration checkbox
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Checkbox(
-              value: _rulesAgreed,
-              activeColor: CkColors.ink,
-              onChanged: (val) {
-                setState(() {
-                  _rulesAgreed = val ?? false;
-                });
-              },
-            ),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _rulesAgreed = !_rulesAgreed),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Text(
-                    'I confirm that all squad members meet tournament eligibility rules and will adhere to the official fixture schedule and code of conduct.',
-                    style: CkType.body(
-                        fontSize: 12.5, color: CkColors.ink2),
-                  ),
+            // Radio circle indicator (Artboard 30)
+            Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected
+                      ? CkColors.ink
+                      : isEligible
+                          ? const Color(0xFFB9B1A2)
+                          : CkColors.hairline,
+                  width: isSelected ? 5 : 1.5,
                 ),
+                color: isSelected ? CkColors.paper : Colors.transparent,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Monogram
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F0E9),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isEligible ? CkColors.hairline : const Color(0xFFB9B1A2),
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                (team.name.length >= 2 ? team.name.substring(0, 2) : 'TM').toUpperCase(),
+                style: CkType.mono(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: isEligible ? CkColors.ink : CkColors.muted,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    team.name,
+                    style: CkType.display(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: isEligible ? CkColors.ink : CkColors.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  if (isRegistered)
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF4ECDD),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFDED0AC)),
+                      ),
+                      child: Text(
+                        'ALREADY REGISTERED · PENDING',
+                        style: CkType.mono(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF6B5414),
+                        ),
+                      ),
+                    )
+                  else if (!hasEnoughPlayers)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF4ECDD),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFDED0AC)),
+                          ),
+                          child: Text(
+                            'NEEDS $minSquad PLAYERS · HAS $squadCount',
+                            style: CkType.mono(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF6B5414),
+                            ),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => context.push('/teams/${team.id.value}'),
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Add players to this team →',
+                              style: CkType.body(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: CkColors.ink,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      '$squadCount players · eligible',
+                      style: CkType.body(fontSize: 11, color: CkColors.muted),
+                    ),
+                ],
               ),
             ),
           ],
         ),
+       ),
+      ),
+    );
+  }
+
+  // ─── Step 2: Squad Picker (Artboard 31) ────────────────────────────────────
+
+  Widget _buildStep2SquadPicker(List<Team> myTeams, Tournament tournament) {
+    final roster = _selectedTeamId != null
+        ? (ref.watch(rosterProvider(_selectedTeamId!)).value ?? const <RosterMember>[])
+        : const <RosterMember>[];
+    final totalSelected = _selectedPlayerIds.length + _guestPlayers.length;
+    final minSquad = _minSquad(tournament);
+    final maxSquad = _maxSquad(tournament);
+    final hasMetMin = totalSelected >= minSquad;
+    final remainingSlots = (maxSquad - totalSelected).clamp(0, maxSquad);
+
+    return Column(
+      children: [
+        // Pinned sticky squad counter card (Artboard 31)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: CkColors.paper,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: CkColors.hairline),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SELECT SQUAD ROSTER',
+                        style: CkType.mono(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.10,
+                          color: CkColors.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasMetMin
+                            ? 'Minimum $minSquad met · $remainingSlots slots left'
+                            : 'Need ${minSquad - totalSelected} more to meet minimum $minSquad',
+                        style: CkType.body(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: hasMetMin ? const Color(0xFF1E5A2C) : const Color(0xFF8C5311),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '$totalSelected',
+                        style: CkType.mono(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: CkColors.ink,
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' / $maxSquad',
+                        style: CkType.mono(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: CkColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Player roster list
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: CkColors.paper,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: CkColors.hairline),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    for (final member in roster) ...[
+                        _buildPlayerRow(member.member.playerId, member.displayName),
+                        const Divider(height: 1, color: CkColors.hairline),
+                      ],
+                    for (final guest in _guestPlayers) ...[
+                      _buildGuestRow(guest),
+                      const Divider(height: 1, color: CkColors.hairline),
+                    ],
+                    // Footnote
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        '* Unclaimed guest player on team roster.',
+                        style: CkType.body(fontSize: 11, color: CkColors.muted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Add guest button
+              OutlinedButton.icon(
+                onPressed: _showAddGuestDialog,
+                icon: const Icon(Icons.person_add_outlined, size: 16),
+                label: const Text('Add Guest Player to Squad'),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: CkColors.hairline),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  // ─── Existing Registration View (Artboard 33) ─────────────────────────────
-  Widget _buildExistingRegistrationView(
-      TournamentRegistration reg, Tournament tournament) {
-    return SafeArea(
+  Widget _buildPlayerRow(String playerId, [String? displayName]) {
+    final isSelected = _selectedPlayerIds.contains(playerId);
+    final isCaptain = _captainPlayerId == playerId;
+    final isWK = _wicketKeeperPlayerId == playerId;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedPlayerIds.remove(playerId);
+            if (isCaptain) _captainPlayerId = null;
+            if (isWK) _wicketKeeperPlayerId = null;
+          } else {
+            _selectedPlayerIds.add(playerId);
+          }
+        });
+      },
       child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
           children: [
+            // Checkbox
             Container(
-              padding: const EdgeInsets.all(18),
+              width: 20,
+              height: 20,
               decoration: BoxDecoration(
-                color: reg.isApproved
-                    ? CkColors.greenSurface
-                    : reg.isPending
-                        ? CkColors.cream
-                        : CkColors.redSurface,
-                borderRadius: BorderRadius.circular(CkRadii.md),
+                color: isSelected ? CkColors.ink : CkColors.paper,
+                borderRadius: BorderRadius.circular(5),
                 border: Border.all(
-                  color: reg.isApproved
-                      ? CkColors.greenBorder
-                      : reg.isPending
-                          ? CkColors.creamBorder
-                          : CkColors.redBorder,
+                  color: isSelected ? CkColors.ink : const Color(0xFFB9B1A2),
+                  width: 1.5,
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        reg.status.label.toUpperCase(),
-                        style: CkType.mono(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: reg.isApproved
-                              ? CkColors.greenInk
-                              : reg.isPending
-                                  ? CkColors.amberDark
-                                  : CkColors.redInk,
-                        ),
-                      ),
-                      Text(
-                        'Registered ${reg.registeredAt.day}/${reg.registeredAt.month}/${reg.registeredAt.year}',
-                        style: CkType.mono(
-                            fontSize: 10, color: CkColors.muted),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    reg.isApproved
-                        ? '🎉 Entry Approved & Confirmed'
-                        : reg.isPending
-                            ? '⏳ Application Under Organizer Review'
-                            : 'Entry Not Accepted',
-                    style: CkType.display(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: CkColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    reg.isApproved
-                        ? 'Your team is seeded and ready for fixtures.'
-                        : reg.isPending
-                            ? 'The tournament director will review your squad and fee proof shortly.'
-                            // The organiser's words, not the manager's own
-                            // application note — showing `message` here told
-                            // a declined team their own covering letter was
-                            // the reason.
-                            : reg.decisionReason ??
-                                'Registration was declined.',
-                    style: CkType.body(fontSize: 13, color: CkColors.ink2),
-                  ),
-                ],
-              ),
+              child: isSelected
+                  ? const Icon(Icons.check, size: 13, color: CkColors.paper)
+                  : null,
             ),
-            const SizedBox(height: 20),
-
+            const SizedBox(width: 10),
+            // Avatar
             Container(
-              padding: const EdgeInsets.all(16),
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
-                color: CkColors.paper,
-                borderRadius: BorderRadius.circular(CkRadii.md),
+                color: const Color(0xFFF3F0E9),
+                shape: BoxShape.circle,
                 border: Border.all(color: CkColors.hairline),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              alignment: Alignment.center,
+              child: Text(
+                (displayName ?? playerId).substring(0, (displayName ?? playerId).length >= 2 ? 2 : 1).toUpperCase(),
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: CkColors.ink,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Row(
                 children: [
-                  Text(
-                    'SUBMITTED SQUAD DETAILS',
-                    style: CkType.mono(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: CkColors.muted,
+                  Flexible(
+                    child: Text(
+                      displayName ?? playerId,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: CkType.body(fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '${reg.squad.length} Players Registered',
-                    style: CkType.display(
-                        fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                  if (reg.seedNumber != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Seed Number: #${reg.seedNumber}',
-                      style: CkType.mono(
-                          fontSize: 12, color: CkColors.greenInk),
-                    ),
+                  if (isCaptain) ...[
+                    const SizedBox(width: 4),
+                    Text('(CAPT)', style: CkType.mono(fontSize: 9.5, fontWeight: FontWeight.w700, color: CkColors.muted)),
+                  ],
+                  if (isWK) ...[
+                    const SizedBox(width: 4),
+                    Text('(WK)', style: CkType.mono(fontSize: 9.5, fontWeight: FontWeight.w700, color: CkColors.muted)),
                   ],
                 ],
               ),
             ),
-            const Spacer(),
-            CkButton(
-              label: 'View Tournament Schedule →',
-              onPressed: () => context.pop(),
-              variant: CkButtonVariant.primary,
-            ),
+            // C and WK designation pills
+            if (isSelected) ...[
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _captainPlayerId = isCaptain ? null : playerId;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isCaptain ? CkColors.ink : const Color(0xFFF3F0E9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'C',
+                    style: CkType.mono(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: isCaptain ? CkColors.paper : CkColors.muted,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _wicketKeeperPlayerId = isWK ? null : playerId;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isWK ? CkColors.ink : const Color(0xFFF3F0E9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'WK',
+                    style: CkType.mono(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: isWK ? CkColors.paper : CkColors.muted,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  Widget _buildGuestRow(Map<String, String> guest) {
+    final name = guest['name'] ?? 'Guest';
+    final role = guest['role'] ?? 'Player';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: CkColors.ink,
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: const Icon(Icons.check, size: 13, color: CkColors.paper),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F0E9),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFB9B1A2), style: BorderStyle.solid),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase(),
+              style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, color: CkColors.muted),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '*$name (Guest)',
+              style: CkType.body(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+          Text(role, style: CkType.body(fontSize: 11, color: CkColors.muted)),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16, color: CkColors.muted),
+            onPressed: () => setState(() => _guestPlayers.remove(guest)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Step 3: Rules & Fee (Artboard 32) ─────────────────────────────────────
+
+  Widget _buildStep3RulesAndFee(Tournament tournament, List<Team> myTeams) {
+    final fee = tournament.entryFee ?? 0;
+    final totalPlayers = _selectedPlayerIds.length + _guestPlayers.length;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      children: [
+        Text(
+          'MATCH RULES',
+          style: CkType.mono(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.12,
+            color: CkColors.muted,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // 2x2 rules grid (Artboard 32)
+        Container(
+          decoration: BoxDecoration(
+            color: CkColors.paper,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: CkColors.hairline),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildRuleCell('Overs per innings', '${_overs(tournament)}'),
+                  ),
+                  Container(width: 1, height: 56, color: CkColors.hairline),
+                  Expanded(
+                    child: _buildRuleCell('Max per bowler', '${_maxPerBowler(tournament)}'),
+                  ),
+                ],
+              ),
+              const Divider(height: 1, color: CkColors.hairline),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildRuleCell('Ball', _ballType(tournament)),
+                  ),
+                  Container(width: 1, height: 56, color: CkColors.hairline),
+                  Expanded(
+                    child: _buildRuleCell('Your squad', '$totalPlayers of ${_minSquad(tournament)}–${_maxSquad(tournament)}'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Rules bullet points (Artboard 32)
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: CkColors.paper,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: CkColors.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildBullet('Points: win 2 · tie or no result 1 · loss 0'),
+              _buildBullet('Teams that do not arrive within 20 minutes of start forfeit the match'),
+              _buildBullet('Squads are locked once the draw is published — no substitutions after that'),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // Entry Fee card (Artboard 32)
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4ECDD),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFDED0AC)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'ENTRY FEE',
+                      style: CkType.mono(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.10,
+                        color: const Color(0xFF6B5414),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    fee > 0 ? 'PKR ${_money.format(fee)}' : 'FREE',
+                    style: CkType.mono(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: CkColors.ink,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                fee > 0
+                    ? 'This tournament has an entry fee of PKR ${_money.format(fee)}. '
+                      'Please arrange cash or bank transfer directly with the organiser. '
+                      'Your registration will show as Pending Payment until they confirm.'
+                    : 'This tournament is free to enter. Your registration will sit in review until approved.',
+                style: CkType.body(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: const Color(0xFF4A4339),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Mandatory Agreement Checkbox Card (Artboard 32)
+        InkWell(
+          onTap: () => setState(() => _rulesAgreed = !_rulesAgreed),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: CkColors.paper,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _rulesAgreed ? CkColors.ink : CkColors.hairline,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  margin: const EdgeInsets.only(top: 2),
+                  decoration: BoxDecoration(
+                    color: _rulesAgreed ? CkColors.ink : CkColors.paper,
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: _rulesAgreed ? CkColors.ink : const Color(0xFFB9B1A2),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: _rulesAgreed
+                      ? const Icon(Icons.check, size: 13, color: CkColors.paper)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'I have read the rules and understand the entry fee is arranged directly with the organiser.',
+                    style: CkType.body(
+                      fontSize: 12.5,
+                      height: 1.45,
+                      color: const Color(0xFF4A4339),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRuleCell(String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: CkType.body(fontSize: 11, color: CkColors.muted)),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: CkType.mono(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: CkColors.ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 4,
+            height: 4,
+            margin: const EdgeInsets.only(top: 7, right: 8),
+            decoration: const BoxDecoration(
+              color: CkColors.muted,
+              shape: BoxShape.circle,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: CkType.body(fontSize: 11.5, height: 1.4, color: CkColors.ink2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Bottom Navigation Bar ─────────────────────────────────────────────────
+
   Widget _buildBottomBar(Tournament tournament, bool isBusy) {
+    final totalSelected = _selectedPlayerIds.length + _guestPlayers.length;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
         color: CkColors.paper,
         border: Border(top: BorderSide(color: CkColors.hairline)),
       ),
       child: Row(
         children: [
-          if (_currentStep > 0) ...[
-            Expanded(
-              flex: 1,
-              child: CkButton(
-                label: '← Back',
-                onPressed: isBusy ? null : _prevStep,
-                variant: CkButtonVariant.secondary,
+          Expanded(
+            flex: 1,
+            child: SizedBox(
+              height: 50,
+              child: OutlinedButton(
+                onPressed: _prevStep,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: CkColors.hairline),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  _currentStep == 0 ? 'Cancel' : 'Back',
+                  style: CkType.body(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: CkColors.ink,
+                  ),
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-          ],
+          ),
+          const SizedBox(width: 10),
           Expanded(
             flex: 2,
-            child: CkButton(
-              label: _currentStep == 3
-                  ? (isBusy ? 'Submitting...' : 'Submit Entry 🏏')
-                  : 'Continue →',
-              onPressed: isBusy
-                  ? null
-                  : _currentStep == 3
-                      ? _submitRegistration
-                      : () => _nextStep(tournament),
-              variant: CkButtonVariant.primary,
+            child: SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: isBusy
+                    ? null
+                    : () {
+                        if (_currentStep < 2) {
+                          _nextStep(tournament);
+                        } else {
+                          _submitRegistration();
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: (_currentStep == 2 && !_rulesAgreed)
+                      ? const Color(0xFFF3F0E9)
+                      : CkColors.ink,
+                  foregroundColor: (_currentStep == 2 && !_rulesAgreed)
+                      ? CkColors.muted
+                      : CkColors.paper,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: isBusy
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: CkColors.paper,
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            switch (_currentStep) {
+                              0 => 'Continue',
+                              1 => 'Continue · $totalSelected selected',
+                              _ => 'Submit Registration',
+                            },
+                            style: CkType.body(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: (_currentStep == 2 && !_rulesAgreed)
+                                  ? CkColors.muted
+                                  : CkColors.paper,
+                            ),
+                          ),
+                          if (_currentStep < 2) ...[
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.arrow_forward,
+                              size: 16,
+                              color: (_currentStep == 2 && !_rulesAgreed)
+                                  ? CkColors.muted
+                                  : CkColors.paper,
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
             ),
           ),
         ],

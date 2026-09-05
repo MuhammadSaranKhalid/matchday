@@ -3,7 +3,8 @@ import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../entities/explore_results.dart';
 
-/// Unified search + discovery across players, teams and matches.
+/// Unified search + discovery across players, teams, matches and
+/// tournaments.
 ///
 /// Online-only, like every feature outside the messages exemption: both
 /// methods hit the `search-all` edge function directly. There is no local
@@ -14,16 +15,16 @@ abstract class ExploreRepository {
   /// a round-trip.
   ///
   /// [category] narrows to one group for the "See all" drill-down; null
-  /// returns all three. Defaulting to all is deliberate — NN/g's scoped-search
-  /// finding is that a pre-selected scope makes users conclude the app has
-  /// nothing.
+  /// returns every group. Defaulting to all is deliberate — NN/g's
+  /// scoped-search finding is that a pre-selected scope makes users conclude
+  /// the app has nothing.
   Future<Either<Failure, ExploreResults>> search(
     String query, {
     ExploreCategory? category,
     int? limit,
   });
 
-  /// The empty-query discovery state: live matches, recent teams, players to
-  /// follow.
+  /// The empty-query discovery state: live matches, open tournaments, recent
+  /// teams, players to follow.
   Future<Either<Failure, ExploreBrowse>> browse();
 }

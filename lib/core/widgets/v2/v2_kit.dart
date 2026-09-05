@@ -677,14 +677,9 @@ class _Badge extends StatelessWidget {
 ///
 /// Organising rule: Bottom nav is the world; side panel is you.
 /// Profile is reached via the side panel's identity masthead.
-enum V2Tab { home, matches, pool, messages, explore, menu }
+enum V2Tab { home, matches, pool, messages, explore }
 
-/// 5-tab bottom navigation — Home · Matches · Pool · Messages · Menu.
-///
-/// The fifth slot is the signed-in user's avatar, opening the `/menu` branch
-/// ([MenuScreen]). It replaced the old top-left drawer trigger: a thumb-reach
-/// target that doesn't fight [SwipeableBranchView]'s horizontal tab pager for
-/// the screen edge.
+/// 4-tab bottom navigation — Home · Matches · Pool · Messages.
 class V2BottomNav extends ConsumerWidget {
   const V2BottomNav({
     super.key,
@@ -698,7 +693,6 @@ class V2BottomNav extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unreadMessages = ref.watch(unreadMessagesCountProvider);
-    final profile = ref.watch(myProfileProvider).value;
 
     return Container(
       decoration: const BoxDecoration(
@@ -716,11 +710,6 @@ class V2BottomNav extends ConsumerWidget {
             _navItem(V2Tab.matches, V2Icons.matches),
             _navItem(V2Tab.pool, V2Icons.pool),
             _navItem(V2Tab.messages, V2Icons.messages, badge: unreadMessages),
-            _avatarItem(
-              V2Tab.menu,
-              imageUrl: profile?.avatarUrl,
-              mono: _monogram(profile?.displayName ?? profile?.username),
-            ),
           ],
         ),
       ),
@@ -763,61 +752,6 @@ class V2BottomNav extends ConsumerWidget {
       ),
     );
   }
-
-  /// The Menu slot. An avatar rather than a hamburger: it is the most legible
-  /// "this is you" affordance there is, and it matches the rule the whole tab
-  /// row is built on — the other four are places, this one is a person.
-  ///
-  /// Sized 24 like the glyphs, so the row's optical rhythm holds. Active state
-  /// is a 2dp red ring instead of the glyphs' colour swap, since an avatar
-  /// carries its own colour and cannot be recoloured.
-  Widget _avatarItem(V2Tab id, {String? imageUrl, required String mono}) {
-    final isActive = id == active;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => onSelect(id),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: SizedBox(
-          height: 32,
-          child: Center(
-            child: AnimatedScale(
-              scale: isActive ? 1.08 : 1.0,
-              duration: const Duration(milliseconds: 150),
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isActive ? CkColors.red : Colors.transparent,
-                    width: 2,
-                  ),
-                ),
-                child: Avatar(mono: mono, imageUrl: imageUrl, size: 24),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Two-letter initials for the nav avatar's fallback.
-String _monogram(String? name) {
-  final parts = (name ?? '')
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((s) => s.isNotEmpty)
-      .toList();
-  if (parts.isEmpty) return '·';
-  if (parts.length == 1) {
-    return parts.first
-        .substring(0, parts.first.length >= 2 ? 2 : 1)
-        .toUpperCase();
-  }
-  return (parts.first[0] + parts.last[0]).toUpperCase();
 }
 
 /// Per-post action bar — Like · Comment · Share, optional RSVP text, Save.

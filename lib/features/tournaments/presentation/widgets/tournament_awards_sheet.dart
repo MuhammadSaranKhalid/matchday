@@ -74,49 +74,56 @@ class _TournamentAwardsSheetState extends ConsumerState<TournamentAwardsSheet> {
                   return ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
+                      // Every tile used to fall back to an invented winner
+                      // (Babar Azam, playerId '1') while Confirm published
+                      // the *stored* object — so the organiser saw three
+                      // names, published an empty `{}`, and the checklist
+                      // could never tick. Nothing is auto-computed yet, so
+                      // an empty award says so.
                       _awardTile(
                         'PLAYER OF THE TOURNAMENT (MVP)',
-                        awards.playerOfTheTournament ??
-                            const AwardRecipient(
-                              playerId: '1',
-                              playerName: 'Babar Azam',
-                              teamName: 'Model Town CC',
-                              metricLabel: 'Performance',
-                              metricValue: '342 Runs · 6 Wkts',
-                            ),
+                        awards.playerOfTheTournament,
                       ),
                       const SizedBox(height: 12),
                       _awardTile(
                         'BEST BATSMAN (ORANGE CAP)',
-                        awards.bestBatsman ??
-                            const AwardRecipient(
-                              playerId: '1',
-                              playerName: 'Babar Azam',
-                              teamName: 'Model Town CC',
-                              metricLabel: 'Runs',
-                              metricValue: '342 Runs (SR 154.2)',
-                            ),
+                        awards.bestBatsman,
                       ),
                       const SizedBox(height: 12),
                       _awardTile(
                         'BEST BOWLER (PURPLE CAP)',
-                        awards.bestBowler ??
-                            const AwardRecipient(
-                              playerId: '2',
-                              playerName: 'Shaheen Afridi',
-                              teamName: 'Model Town CC',
-                              metricLabel: 'Wickets',
-                              metricValue: '14 Wickets (Econ 5.8)',
-                            ),
+                        awards.bestBowler,
                       ),
                       const SizedBox(height: 24),
+                      // Confirming also flips the tournament to `completed`,
+                      // and there is no RPC to undo that. With nothing to
+                      // publish the button used to make that one-way move
+                      // while writing an empty object, and report success.
                       CkButton(
                         label: isBusy
                             ? 'Confirming...'
-                            : 'Confirm & Publish Awards →',
-                        onPressed: isBusy ? null : () => _confirm(awards),
+                            : awards.toJson().isEmpty
+                                ? 'Nothing to publish yet'
+                                : 'Confirm & Publish Awards →',
+                        onPressed: isBusy || awards.toJson().isEmpty
+                            ? null
+                            : () => _confirm(awards),
                         variant: CkButtonVariant.primary,
                       ),
+                      if (awards.toJson().isEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          'Award winners are not computed from match data '
+                          'yet, so there is nothing to confirm. Publishing '
+                          'also closes the tournament, which cannot be '
+                          'undone.',
+                          style: CkType.body(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: CkColors.muted,
+                          ),
+                        ),
+                      ],
                     ],
                   );
                 },
@@ -131,7 +138,7 @@ class _TournamentAwardsSheetState extends ConsumerState<TournamentAwardsSheet> {
     );
   }
 
-  Widget _awardTile(String label, AwardRecipient recipient) {
+  Widget _awardTile(String label, AwardRecipient? recipient) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -168,14 +175,18 @@ class _TournamentAwardsSheetState extends ConsumerState<TournamentAwardsSheet> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  recipient.playerName,
+                  recipient?.playerName ?? 'Not yet awarded',
                   style: CkType.display(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w700,
+                    color: recipient == null ? CkColors.muted : CkColors.ink,
                   ),
                 ),
                 Text(
-                  '${recipient.teamName ?? "Team"} · ${recipient.metricValue}',
+                  recipient == null
+                      ? 'Nothing is computed automatically yet'
+                      : '${recipient.teamName ?? "Team"} · '
+                          '${recipient.metricValue}',
                   style: CkType.body(fontSize: 12, color: CkColors.ink2),
                 ),
               ],

@@ -30,6 +30,7 @@ class ExploreSeeAllScreen extends ConsumerStatefulWidget {
     this.onOpenTeam,
     this.onOpenProfile,
     this.onOpenMatch,
+    this.onOpenTournament,
   });
 
   final String query;
@@ -37,6 +38,7 @@ class ExploreSeeAllScreen extends ConsumerStatefulWidget {
   final ValueChanged<String>? onOpenTeam;
   final ValueChanged<String>? onOpenProfile;
   final ValueChanged<String>? onOpenMatch;
+  final ValueChanged<String>? onOpenTournament;
 
   @override
   ConsumerState<ExploreSeeAllScreen> createState() =>
@@ -152,6 +154,13 @@ class _ExploreSeeAllScreenState extends ConsumerState<ExploreSeeAllScreen> {
                 onTap: () => widget.onOpenMatch?.call(m.matchId),
               ))
           .toList(),
+      ExploreCategory.tournaments => r.tournaments
+          .map((t) => TournamentRow(
+                tournament: t,
+                query: widget.query,
+                onTap: () => widget.onOpenTournament?.call(t.tournamentId),
+              ))
+          .toList(),
     };
 
     if (rows.isEmpty) {
@@ -166,6 +175,8 @@ class _ExploreSeeAllScreenState extends ConsumerState<ExploreSeeAllScreen> {
       ExploreCategory.teams => rows.length == 1 ? 'team' : 'teams',
       ExploreCategory.players => rows.length == 1 ? 'player' : 'players',
       ExploreCategory.matches => rows.length == 1 ? 'match' : 'matches',
+      ExploreCategory.tournaments =>
+        rows.length == 1 ? 'tournament' : 'tournaments',
     };
 
     return ListView(

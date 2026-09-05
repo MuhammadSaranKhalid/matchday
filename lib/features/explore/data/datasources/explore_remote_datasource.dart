@@ -4,11 +4,12 @@ import '../../../../core/error/exceptions.dart';
 import '../models/match_result_dto.dart';
 import '../models/player_result_dto.dart';
 import '../models/team_result_dto.dart';
+import '../models/tournament_result_dto.dart';
 
 /// Wraps the `search-all` edge function.
 ///
 /// One function, two modes: a body with `q` searches, a body without it
-/// browses. Grouping server-side is what lets the three categories share a
+/// browses. Grouping server-side is what lets the four categories share a
 /// single relevance ordering and one round-trip per keystroke.
 class ExploreRemoteDataSource {
   ExploreRemoteDataSource(this._supabase);
@@ -22,6 +23,7 @@ class ExploreRemoteDataSource {
     List<PlayerResultDto> players,
     List<TeamResultDto> teams,
     List<MatchResultDto> matches,
+    List<TournamentResultDto> tournaments,
   })> search(
     String query, {
     String? kind,
@@ -36,18 +38,22 @@ class ExploreRemoteDataSource {
       players: _list(data, 'players', PlayerResultDto.fromJson),
       teams: _list(data, 'teams', TeamResultDto.fromJson),
       matches: _list(data, 'matches', MatchResultDto.fromJson),
+      tournaments: _list(data, 'tournaments', TournamentResultDto.fromJson),
     );
   }
 
-  /// Empty-query discovery: live matches, recent teams, players to follow.
+  /// Empty-query discovery: live matches, open tournaments, recent teams,
+  /// players to follow.
   Future<({
     List<MatchResultDto> live,
+    List<TournamentResultDto> tournaments,
     List<TeamResultDto> teams,
     List<PlayerResultDto> players,
   })> browse() async {
     final data = await _invoke(const <String, dynamic>{});
     return (
       live: _list(data, 'live', MatchResultDto.fromJson),
+      tournaments: _list(data, 'tournaments', TournamentResultDto.fromJson),
       teams: _list(data, 'teams', TeamResultDto.fromJson),
       players: _list(data, 'players', PlayerResultDto.fromJson),
     );

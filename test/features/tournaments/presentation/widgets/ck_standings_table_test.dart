@@ -50,6 +50,7 @@ void main() {
             body: CkStandingsTable(
               standings: standings,
               qualificationCutRank: 1,
+              cutLabel: 'Top 4 advance to semi-finals',
             ),
           ),
         ),
@@ -59,7 +60,7 @@ void main() {
       expect(find.text('Cantt CC'), findsOneWidget);
       expect(find.text('+2.000'), findsOneWidget);
       expect(find.text('+0.667'), findsOneWidget);
-      expect(find.text('QUALIFICATION CUT LINE (TOP 4 ADVANCE)'),
+      expect(find.text('TOP 4 ADVANCE TO SEMI-FINALS'),
           findsOneWidget);
     });
   });

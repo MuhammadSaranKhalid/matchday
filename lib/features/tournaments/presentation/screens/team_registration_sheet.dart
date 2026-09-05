@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
 import '../../../../core/widgets/ck_text_field.dart';
-import '../../../teams/domain/entities/roster_member.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/tournament.dart';
@@ -49,7 +48,25 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
     super.dispose();
   }
 
-  void _nextStep() {
+  /// The organiser sets these in the create wizard (step 5, written to
+  /// `rules.min_squad` / `rules.max_squad`). They used to be hardcoded 11–16
+  /// here, so a cup that asked for 12–18 still enforced 11–16.
+  int _minSquad(Tournament t) =>
+      (t.rules['min_squad'] as num?)?.toInt() ?? 11;
+
+  int _maxSquad(Tournament t) =>
+      (t.rules['max_squad'] as num?)?.toInt() ?? 16;
+
+  /// "20 Overs", or "100 Balls" for The Hundred — read from the keys the
+  /// create wizard actually writes.
+  String _formatLine(Tournament t) {
+    final balls = (t.format['balls_per_innings'] as num?)?.toInt();
+    if (balls != null) return '$balls Balls';
+    final overs = (t.format['max_overs'] as num?)?.toInt() ?? 20;
+    return '$overs Overs';
+  }
+
+  void _nextStep(Tournament tournament) {
     setState(() => _errorMessage = null);
 
     if (_currentStep == 0) {
@@ -59,14 +76,16 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
       }
     } else if (_currentStep == 1) {
       final totalPlayers = _selectedPlayerIds.length + _guestPlayers.length;
-      if (totalPlayers < 11) {
+      final min = _minSquad(tournament);
+      final max = _maxSquad(tournament);
+      if (totalPlayers < min) {
         setState(() => _errorMessage =
-            'Minimum 11 players required in squad ($totalPlayers selected).');
+            'Minimum $min players required in squad ($totalPlayers selected).');
         return;
       }
-      if (totalPlayers > 16) {
+      if (totalPlayers > max) {
         setState(() => _errorMessage =
-            'Maximum 16 players allowed in squad ($totalPlayers selected).');
+            'Maximum $max players allowed in squad ($totalPlayers selected).');
         return;
       }
       if (_captainPlayerId == null) {
@@ -144,7 +163,7 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
     final nameCtrl = TextEditingController();
     String guestRole = 'Batsman';
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: CkColors.paper,
@@ -280,9 +299,30 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
             data: (myTeams) {
               return registrationsAsync.when(
                 data: (registrations) {
-                  final existingReg = registrations.where((r) {
-                    return myTeams.any((t) => t.id.value == r.teamId);
-                  }).firstOrNull;
+                  final mine = registrations
+                      .where((r) =>
+                          myTeams.any((t) => t.id.value == r.teamId))
+                      .toList();
+
+                  // Scoped to the team the manager picked, not to *any* team
+                  // they run. Matching on any of them meant that once Team A
+                  // was in, Team B could never be entered — the manager got
+                  // Team A's status screen instead of the wizard. Club
+                  // officials running several sides are exactly the people
+                  // who register more than once.
+                  //
+                  // With no team picked yet the status view still wins when
+                  // there is nothing left to enter, so a single-team manager
+                  // lands straight on their tracker as before.
+                  final registeredTeamIds =
+                      mine.map((r) => r.teamId).toSet();
+                  final hasFreeTeam = myTeams
+                      .any((t) => !registeredTeamIds.contains(t.id.value));
+
+                  final selected = _selectedTeamId;
+                  final existingReg = selected != null
+                      ? mine.where((r) => r.teamId == selected).firstOrNull
+                      : (mine.isNotEmpty && !hasFreeTeam ? mine.first : null);
 
                   if (existingReg != null) {
                     return _buildExistingRegistrationView(
@@ -354,7 +394,7 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
           ),
 
           // Bottom Action Bar
-          _buildBottomBar(isBusy),
+          _buildBottomBar(tournament, isBusy),
         ],
       ),
     );
@@ -527,7 +567,10 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
                   Text('Format',
                       style: CkType.body(fontSize: 13, color: CkColors.muted)),
                   Text(
-                    '${tournament.format['overs'] ?? 20} Overs · ${tournament.type.label}',
+                    // `max_overs` is the key the create wizard writes;
+                    // `overs` never existed, so this line used to read
+                    // "20 Overs" for every cup including a 50-over one.
+                    '${_formatLine(tournament)} · ${tournament.type.label}',
                     style: CkType.display(
                         fontSize: 13, fontWeight: FontWeight.w600),
                   ),
@@ -539,7 +582,9 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
                 children: [
                   Text('Squad Requirement',
                       style: CkType.body(fontSize: 13, color: CkColors.muted)),
-                  Text('Min 11, Max 16 Players',
+                  Text(
+                      'Min ${_minSquad(tournament)}, '
+                      'Max ${_maxSquad(tournament)} Players',
                       style: CkType.display(
                           fontSize: 13, fontWeight: FontWeight.w600)),
                 ],
@@ -1330,7 +1375,12 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
                         ? 'Your team is seeded and ready for fixtures.'
                         : reg.isPending
                             ? 'The tournament director will review your squad and fee proof shortly.'
-                            : reg.message ?? 'Registration was declined.',
+                            // The organiser's words, not the manager's own
+                            // application note — showing `message` here told
+                            // a declined team their own covering letter was
+                            // the reason.
+                            : reg.decisionReason ??
+                                'Registration was declined.',
                     style: CkType.body(fontSize: 13, color: CkColors.ink2),
                   ),
                 ],
@@ -1385,7 +1435,7 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
     );
   }
 
-  Widget _buildBottomBar(bool isBusy) {
+  Widget _buildBottomBar(Tournament tournament, bool isBusy) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
@@ -1415,7 +1465,7 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
                   ? null
                   : _currentStep == 3
                       ? _submitRegistration
-                      : _nextStep,
+                      : () => _nextStep(tournament),
               variant: CkButtonVariant.primary,
             ),
           ),

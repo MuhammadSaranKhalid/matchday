@@ -3,11 +3,14 @@ import 'package:equatable/equatable.dart';
 import '../../../teams/domain/entities/team_search_result.dart';
 import 'match_result.dart';
 import 'player_result.dart';
+import 'tournament_result.dart';
 
-/// The categories Explore searches. Tournaments are deliberately absent in
-/// v1: the backend is complete but no client can create a tournament, so the
-/// table is empty and a tournaments group would never render.
-enum ExploreCategory { players, teams, matches }
+/// The categories Explore searches.
+///
+/// Tournaments joined in once the create wizard shipped — `search-all` had
+/// returned the group from the start, but with no client able to create a
+/// tournament the table was empty and the group would never have rendered.
+enum ExploreCategory { players, teams, matches, tournaments }
 
 extension ExploreCategoryX on ExploreCategory {
   /// Wire value for the edge function's `kind` narrowing parameter.
@@ -15,6 +18,7 @@ extension ExploreCategoryX on ExploreCategory {
         ExploreCategory.players => 'players',
         ExploreCategory.teams => 'teams',
         ExploreCategory.matches => 'matches',
+        ExploreCategory.tournaments => 'tournaments',
       };
 
   /// Group heading, e.g. "PLAYERS".
@@ -22,6 +26,7 @@ extension ExploreCategoryX on ExploreCategory {
         ExploreCategory.players => 'Players',
         ExploreCategory.teams => 'Teams',
         ExploreCategory.matches => 'Matches',
+        ExploreCategory.tournaments => 'Tournaments',
       };
 }
 
@@ -35,6 +40,7 @@ class ExploreResults extends Equatable {
     this.players = const [],
     this.teams = const [],
     this.matches = const [],
+    this.tournaments = const [],
   });
 
   static const empty = ExploreResults();
@@ -42,8 +48,10 @@ class ExploreResults extends Equatable {
   final List<PlayerResult> players;
   final List<TeamSearchResult> teams;
   final List<MatchResult> matches;
+  final List<TournamentResult> tournaments;
 
-  int get totalCount => players.length + teams.length + matches.length;
+  int get totalCount =>
+      players.length + teams.length + matches.length + tournaments.length;
 
   bool get isEmpty => totalCount == 0;
 
@@ -51,29 +59,35 @@ class ExploreResults extends Equatable {
         ExploreCategory.players => players.length,
         ExploreCategory.teams => teams.length,
         ExploreCategory.matches => matches.length,
+        ExploreCategory.tournaments => tournaments.length,
       };
 
   /// Categories that actually have hits, in the order the screen renders
   /// them. Teams lead: a name query in this app is most often a team.
+  /// Tournaments sit second — a cup name is the next most likely query, and
+  /// it is the object a searcher is most likely to want to act on.
   List<ExploreCategory> get nonEmptyCategories => [
         ExploreCategory.teams,
+        ExploreCategory.tournaments,
         ExploreCategory.players,
         ExploreCategory.matches,
       ].where((c) => countFor(c) > 0).toList();
 
   @override
-  List<Object?> get props => [players, teams, matches];
+  List<Object?> get props => [players, teams, matches, tournaments];
 }
 
 /// The no-query discovery state.
 ///
-/// v1 leads with live matches — real data, and the most compelling object in
-/// the app — then recently-active teams and players to follow. This replaces
-/// the design's proximity sections ("Teams near you") until coordinates are
-/// captured; ordering an empty distance dimension would be a lie.
+/// Leads with live matches — real data, and the most compelling object in
+/// the app — then open tournaments, recently-active teams and players to
+/// follow. This replaces the design's proximity sections ("Teams near you")
+/// until coordinates are captured; ordering an empty distance dimension
+/// would be a lie.
 class ExploreBrowse extends Equatable {
   const ExploreBrowse({
     this.live = const [],
+    this.tournaments = const [],
     this.teams = const [],
     this.players = const [],
   });
@@ -81,11 +95,17 @@ class ExploreBrowse extends Equatable {
   static const empty = ExploreBrowse();
 
   final List<MatchResult> live;
+
+  /// Cups in `registration`, `upcoming` or `live`, live-first. The closest
+  /// thing to the design's "Featured grassroots cups" that real data allows.
+  final List<TournamentResult> tournaments;
+
   final List<TeamSearchResult> teams;
   final List<PlayerResult> players;
 
-  bool get isEmpty => live.isEmpty && teams.isEmpty && players.isEmpty;
+  bool get isEmpty =>
+      live.isEmpty && tournaments.isEmpty && teams.isEmpty && players.isEmpty;
 
   @override
-  List<Object?> get props => [live, teams, players];
+  List<Object?> get props => [live, tournaments, teams, players];
 }

@@ -35,8 +35,12 @@ void main() {
       startDate: DateTime(2026, 9, 1),
       endDate: DateTime(2026, 9, 10),
       entryFee: 5000.0,
-      format: const {'overs': 10},
-      rules: const {'paymentDetails': 'EasyPaisa 0300-1122334'},
+      format: const {'max_overs': 10},
+      rules: const {
+        'paymentDetails': 'EasyPaisa 0300-1122334',
+        'min_squad': 12,
+        'max_squad': 18,
+      },
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -167,6 +171,134 @@ void main() {
       expect(find.text('🎉 Entry Approved & Confirmed'), findsOneWidget);
       expect(find.text('11 Players Registered'), findsOneWidget);
       expect(find.text('Seed Number: #1'), findsOneWidget);
+    });
+
+    testWidgets(
+        'requirements read the organiser\'s own format and squad range',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserStreamProvider
+                .overrideWith((ref) => Stream.value(mockUser)),
+            tournamentDetailProvider('tourn-reg-1')
+                .overrideWith((ref) => Future.value(mockTournament)),
+            myTeamsProvider.overrideWith((ref) => Stream.value(mockTeams)),
+            tournamentRegistrationsProvider('tourn-reg-1')
+                .overrideWith((ref) => Future.value(<TournamentRegistration>[])),
+          ],
+          child: const MaterialApp(
+            home: TeamRegistrationSheet(tournamentId: 'tourn-reg-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Was hardcoded: every cup advertised "20 Overs" and "Min 11, Max 16"
+      // regardless of what the organiser set in the wizard.
+      expect(find.text('10 Overs · Knockout'), findsOneWidget);
+      expect(find.text('Min 12, Max 18 Players'), findsOneWidget);
+    });
+
+    testWidgets('a manager with a second team can still enter it',
+        (tester) async {
+      final twoTeams = <Team>[
+        ...mockTeams,
+        Team(
+          id: const TeamId('team-reg-2'),
+          ownerId: 'user-mgr-1',
+          name: 'Gulberg Lions',
+          type: TeamType.club,
+          privacy: TeamPrivacy.public,
+          managers: const ['user-mgr-1'],
+          city: 'Lahore',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ];
+
+      final firstTeamIn = TournamentRegistration(
+        registrationId: 'reg-1',
+        tournamentId: 'tourn-reg-1',
+        teamId: 'team-reg-1',
+        teamName: 'Lahore Warriors',
+        status: TournamentRegistrationStatus.approved,
+        squad: const [],
+        registeredBy: 'user-mgr-1',
+        registeredAt: DateTime.now(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserStreamProvider
+                .overrideWith((ref) => Stream.value(mockUser)),
+            tournamentDetailProvider('tourn-reg-1')
+                .overrideWith((ref) => Future.value(mockTournament)),
+            myTeamsProvider.overrideWith((ref) => Stream.value(twoTeams)),
+            tournamentRegistrationsProvider('tourn-reg-1')
+                .overrideWith((ref) => Future.value([firstTeamIn])),
+          ],
+          child: const MaterialApp(
+            home: TeamRegistrationSheet(tournamentId: 'tourn-reg-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The gate used to match ANY team the manager runs, so Team A being in
+      // showed Team A's tracker and Team B could never be entered.
+      expect(find.text('SELECT YOUR TEAM'), findsOneWidget);
+      expect(find.text('Gulberg Lions'), findsOneWidget);
+
+      // Picking the team that IS registered still shows its tracker.
+      await tester.tap(find.text('Lahore Warriors'));
+      await tester.pumpAndSettle();
+      expect(find.text('🎉 Entry Approved & Confirmed'), findsOneWidget);
+    });
+
+    testWidgets('a declined team is shown the organiser\'s reason, not its own '
+        'application note', (tester) async {
+      final declined = TournamentRegistration(
+        registrationId: 'reg-declined-1',
+        tournamentId: 'tourn-reg-1',
+        teamId: 'team-reg-1',
+        teamName: 'Lahore Warriors',
+        status: TournamentRegistrationStatus.rejected,
+        squad: const [],
+        message: 'Payment Ref: TX-9931 | Captain: player-0',
+        decisionReason: 'The cup filled before your entry arrived.',
+        registeredBy: 'user-mgr-1',
+        registeredAt: DateTime.now(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserStreamProvider
+                .overrideWith((ref) => Stream.value(mockUser)),
+            tournamentDetailProvider('tourn-reg-1')
+                .overrideWith((ref) => Future.value(mockTournament)),
+            myTeamsProvider.overrideWith((ref) => Stream.value(mockTeams)),
+            tournamentRegistrationsProvider('tourn-reg-1')
+                .overrideWith((ref) => Future.value([declined])),
+          ],
+          child: const MaterialApp(
+            home: TeamRegistrationSheet(tournamentId: 'tourn-reg-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('The cup filled before your entry arrived.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Payment Ref'), findsNothing);
     });
   });
 }

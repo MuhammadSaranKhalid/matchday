@@ -398,7 +398,7 @@ void main() {
 
       // Ground header + LIVE pill.
       expect(find.text('GROUND 1 · GADDAFI STADIUM'), findsOneWidget);
-      expect(find.text('LIVE'), findsOneWidget);
+      expect(find.text('LIVE · 2ND INNINGS'), findsOneWidget);
 
       // Both innings lines, in O.B over notation.
       expect(find.text('161/7 (20.0)'), findsOneWidget);
@@ -407,7 +407,8 @@ void main() {
       // The scorer footer with last-ball staleness.
       expect(find.text('Haris Rauf · scoring'), findsOneWidget);
       expect(find.text('Last ball 40s ago'), findsOneWidget);
-      expect(find.text('ACTIONS'), findsOneWidget);
+      expect(find.text('OPEN SCORER'), findsOneWidget);
+      expect(find.text('MATCH OPS'), findsOneWidget);
     });
 
     testWidgets('an unassigned fixture raises the cream scorer alert',
@@ -422,14 +423,92 @@ void main() {
       expect(find.text('Starts in 4 hours'), findsOneWidget);
     });
 
+    testWidgets('an innings break goes amber and offers the one action that '
+        'unblocks it', (tester) async {
+      // Artboard 27L: nothing is being scored at the break, so the day's one
+      // red belongs to the ground that IS live — this card keeps its ink.
+      final broken = TournamentLiveMatch(
+        matchId: 'm-break',
+        venue: 'Ground 2 · Racecourse',
+        status: 'innings_break',
+        scheduledStartTime: DateTime(2026, 4, 11, 9),
+        teamAId: 'team-a',
+        teamAName: 'Lahore Lions',
+        teamBId: 'team-b',
+        teamBName: 'Faisalabad Falcons',
+        scorerId: 'scorer-1',
+        scorerName: 'Ali',
+        inningsLines: const [
+          LiveInningsLine(
+            inningsNumber: 1,
+            battingTeamId: 'team-a',
+            runs: 185,
+            wickets: 6,
+            legalBalls: 120,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(console(board: [buildLiveBoard()[0], broken]));
+      await openLiveOps(tester);
+
+      expect(find.text('INNINGS BREAK'), findsOneWidget);
+      expect(find.text('Start 2nd Innings'), findsOneWidget);
+      // The side yet to bat has a target, which beats "Yet to bat".
+      expect(find.text('Target 186 in 20'), findsOneWidget);
+    });
+
+    testWidgets('the Actions menu offers the rain sheet once play is under way',
+        (tester) async {
+      await tester.pumpWidget(console());
+      await openLiveOps(tester);
+
+      await tester.tap(find.text('MATCH OPS'));
+      await settle(tester);
+
+      // Artboards 27m / 28b reached from the per-match menu.
+      expect(find.text('Revise match conditions'), findsOneWidget);
+      // And the officials destination artboard 27 had nowhere to send you.
+      expect(find.text('Assign umpires & scorers'), findsOneWidget);
+    });
+
     testWidgets('tournament state counts played and pending fixtures',
         (tester) async {
       await tester.pumpWidget(console());
       await openLiveOps(tester);
 
       expect(find.text('TOURNAMENT STATE'), findsOneWidget);
+
+      // The tiles sit below the fold once the ground cards carry their own
+      // Start Match / Toss action (artboard 27k), and a ListView will not
+      // build what it has not laid out — so scroll before asserting.
+      await tester.scrollUntilVisible(
+        find.text('0 / 2'),
+        200,
+        scrollable: find.descendant(
+          of: find.byType(RefreshIndicator),
+          matching: find.byType(Scrollable),
+        ),
+      );
+
       expect(find.text('0 / 2'), findsOneWidget); // played
-      expect(find.text('2'), findsOneWidget); // results pending
+      // One ground is live, so the organiser's other queue is what has not
+      // started yet rather than what has no result (artboard 27L).
+      expect(find.text('AWAITING TOSS'), findsOneWidget);
+      // Scoped to the tile: a bare find.text('1') would also match the
+      // Registrations tab's pending badge.
+      expect(
+        find.descendant(
+          of: find
+              .ancestor(
+                of: find.text('AWAITING TOSS'),
+                matching: find.byType(Column),
+              )
+              .first,
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('the per-match Actions menu offers the ground-ops verbs',
@@ -437,7 +516,7 @@ void main() {
       await tester.pumpWidget(console());
       await openLiveOps(tester);
 
-      await tester.tap(find.text('ACTIONS'));
+      await tester.tap(find.text('MATCH OPS'));
       await settle(tester);
 
       expect(find.text('Change scorer'), findsOneWidget);
@@ -454,7 +533,7 @@ void main() {
       await tester.pumpWidget(console());
       await openLiveOps(tester);
 
-      await tester.tap(find.text('ACTIONS'));
+      await tester.tap(find.text('MATCH OPS'));
       await settle(tester);
       await tester.tap(find.text('Abandon match'));
       await settle(tester);
@@ -476,7 +555,7 @@ void main() {
       await tester.pumpWidget(console());
       await openLiveOps(tester);
 
-      await tester.tap(find.text('ACTIONS'));
+      await tester.tap(find.text('MATCH OPS'));
       await settle(tester);
       await tester.tap(find.text('Declare walkover'));
       await settle(tester);

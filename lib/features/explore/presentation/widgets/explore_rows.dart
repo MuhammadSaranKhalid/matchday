@@ -5,6 +5,7 @@ import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../teams/domain/entities/team_search_result.dart';
 import '../../domain/entities/match_result.dart';
 import '../../domain/entities/player_result.dart';
+import '../../domain/entities/tournament_result.dart';
 import 'explore_atoms.dart';
 
 /// A team result row: crest, name (+ verified tick), meta line, chevron.
@@ -368,4 +369,87 @@ class _LivePillState extends State<_LivePill>
           ],
         ),
       );
+}
+
+/// A tournament result row: crest, name, "type · city · N/M teams", and a
+/// status pill.
+///
+/// Red is spent here exactly once and only when earned — a live cup gets the
+/// pulsing pill, matching the canvas ruling. "Registration open" is the row's
+/// actionable state, so it takes the cream treatment rather than the accent:
+/// a deadline is urgent, not dangerous.
+class TournamentRow extends StatelessWidget {
+  const TournamentRow({
+    super.key,
+    required this.tournament,
+    this.query = '',
+    this.onTap,
+  });
+
+  final TournamentResult tournament;
+  final String query;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = [
+      tournament.typeLabel,
+      if (tournament.city?.isNotEmpty == true) tournament.city!,
+      if (tournament.teamsLine != null) tournament.teamsLine!,
+    ].join(' · ');
+
+    return RuledRow(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Crest(
+            short: ckInitials(tournament.name),
+            color: CkColors.ink2,
+            logoUrl: tournament.logoUrl,
+            size: 40,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                HighlightedName(
+                  text: tournament.name,
+                  query: query,
+                  style: CkType.display(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.01,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                ExploreMetaLine(meta),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _TournamentStatusPill(tournament: tournament),
+        ],
+      ),
+    );
+  }
+}
+
+class _TournamentStatusPill extends StatelessWidget {
+  const _TournamentStatusPill({required this.tournament});
+
+  final TournamentResult tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tournament.isLive) return const _LivePill(label: 'LIVE');
+    return switch (tournament.status) {
+      'registration' => const Pill(label: 'REG OPEN', tone: PillTone.amber),
+      'upcoming' => const Pill(label: 'UPCOMING'),
+      'completed' => const Pill(label: 'RESULT'),
+      'cancelled' => const Pill(label: 'CANCELLED'),
+      'abandoned' => const Pill(label: 'ABANDONED'),
+      final s => Pill(label: s.replaceAll('_', ' ').toUpperCase()),
+    };
+  }
 }

@@ -122,7 +122,18 @@ void main() {
       expect(find.text('Bracket'), findsOneWidget);
       expect(find.text('Teams'), findsOneWidget);
       expect(find.text('Stats'), findsOneWidget);
-      expect(find.text('🏏 Register Your Team'), findsOneWidget);
+      // The expanded header is a 168pt banner plus the identity zone
+      // (artboards 09-15), so the Overview CTA sits below the fold on a
+      // phone-sized viewport — scroll to it rather than shrinking the header.
+      await tester.scrollUntilVisible(
+        find.textContaining('Register Your Team'),
+        250,
+        scrollable: find.byType(Scrollable).last,
+      );
+
+      // The CTA carries the fee, because "is it worth PKR 15,000" is one of
+      // the three questions artboard 09 is built around.
+      expect(find.textContaining('Register Your Team'), findsOneWidget);
     });
 
     testWidgets('switches to Teams tab and displays approved teams', (tester) async {

@@ -910,6 +910,97 @@ All are `security definer` with a pinned `search_path`, and all authorise throug
 | `tournament_set_coorganizer` | Creator-only; a co-organiser cannot add further co-organisers. |
 | `tournament_announce` | Fans out to managers, squad players and followers; returns the real recipient count. Joins `profiles` to drop unclaimed-player ids from `squad`, which would otherwise violate the notifications FK. |
 | `tournament_cancel` | Creator-only. Voids unplayed fixtures, **keeps completed scorecards**, stores the public reason on `rules`, and announces. |
+| `tournament_generate_fixtures(uuid, jsonb, uuid[])` | Locks the draw: inserts **every round**, records the seed order, moves the cup to `upcoming` and seeds standings. See below. |
+
+Added 2026-09-04 by `20260904000000_console_ledger_officials_ops.sql`, which
+completes the console surfaces that had no schema behind them:
+
+| RPC | Artboard | Purpose |
+|---|---|---|
+| `tournament_fee_ledger` | 24c | Every approved team's fee line plus the entry fee, so the client sums expected / collected / outstanding in one call. Organiser-only — it names who paid what. |
+| `tournament_record_payment` | 24c | Records the **cumulative** amount received (a set, not an increment) with channel and reference, and keeps the legacy `payment_status` label in step. Rejects an amount above the entry fee. |
+| `tournament_match_officials` | 27j | Every appointed official for one fixture, with each person's club and a neutrality flag computed against *that* fixture's two sides. |
+| `tournament_official_candidates` | 27j | Who *may* officiate this match: neutrality, matches-officiated count, and a "busy on another fixture within 4 hours" note. |
+| `tournament_assign_official` / `tournament_remove_official` | 27j | Umpire and referee roles only — the scorer keeps `tournament_assign_scorer`, which carries handover rules these do not. One person cannot hold two roles in one fixture. |
+| `tournament_auto_assign_scorers` | 27k | Walks unscored fixtures oldest-first and gives each one an organiser who is not already scoring an overlapping fixture. Returns how many it filled; leaves the rest alone so the banner still shows the honest remainder. |
+| `tournament_revise_match_conditions` | 27m, 28b | **Stores** a rain revision — revised overs, bowler quota, the target the organiser applied and which method produced it. Guards the five-over floor and refuses to *extend* a match. |
+| `tournament_trigger_super_over` | 28c | Moves a `tied` fixture to `super_over` and records who bats first. Does not decide the tie and does not score the over. |
+
+Two new columns back the ledger: `tournament_teams.amount_paid` (plus
+`payment_channel`, `payment_reference`, `payment_recorded_at/by`), because the
+original free-text `payment_status` cannot express "5,000 of 15,000 received in
+cash on 02 Mar"; and `matches.revised_conditions`, the audit trail for a
+rain-revised fixture.
+
+##### Where the cricket arithmetic lives — and why DLS is typed in
+
+`tournament_revise_match_conditions` performs **no cricket arithmetic**. Every
+number reaches it as a parameter, computed by
+`lib/features/tournaments/domain/ops/revised_target.dart` — pure Dart, no I/O,
+property-tested against the figures the design canvas itself prints (14 balls
+left, par 93, Panthers +3, a quota of 3 from 14 overs). This is the same
+discipline the scoring banner in CLAUDE.md imposes: the laws of cricket get one
+implementation, and it is not SQL.
+
+The calculator splits the three methods deliberately:
+
+* **Standard run-rate** is arithmetic — `ceil(S1 × N2 / N1) + 1` — and is
+  computed exactly.
+* **DLS** is a *lookup* against the official resource table, not a formula.
+  The organiser reads the figure off that table (or the ICC app) and enters it.
+  Reproducing the table from memory is precisely the failure this codebase has
+  already paid for once; a table that is subtly wrong is worse than no table,
+  because it is wrong *confidently*, and a revised target decides a real cup.
+  The design already has the organiser reading the number back to both captains
+  before committing, so this keeps the authority where it already sat.
+* **Custom** is the organiser's own agreed figure.
+
+Everything *around* the target — balls left, required rate, par, the bowler
+quota — is plain arithmetic and is computed for all three methods. Note that
+the canvas's own 28b artboard has "DLS revised target" selected, so its 112 is
+a DLS figure and is not reproducible by run-rate; the run-rate answer for the
+same stoppage is 105.
+
+#### Locking the draw
+
+The pairing lives in **exactly one place**: `buildDraw`
+(`lib/features/tournaments/domain/draw/draw_builder.dart`), pure Dart, covered
+by `test/features/tournaments/domain/draw/draw_builder_test.dart`. The seeding
+tab hands the plan it previewed straight to the lock action, so what an
+organiser is shown is what is published. Do **not** add a second pairing
+implementation — in SQL or anywhere else. There were two once (a preview in the
+seeding tab and a loop in the console) and they had already drifted: with an
+odd field the preview named the top seed as the bye while the lock benched the
+middle team.
+
+`tournament_generate_fixtures` is authorisation, referential integrity and
+atomicity only. Its payload carries client-side `slot_id` strings ("r2m1")
+because no match id exists when the plan is built; the function mints every id
+up front so one `INSERT` can satisfy the self-referencing
+`prev_match_a_id` / `prev_match_b_id` foreign keys.
+
+Two faults it corrected, both shipped in `20260901000000`:
+
+- **Only round one was ever created.** Any slot with a null team was filtered
+  out, so the semis and the final were never inserted.
+  `trg_advance_tournament_bracket` advances a winner by finding a row whose
+  `prev_match_*_id` is the finished match and whose matching side is still
+  null — with no such rows it fired on every result and advanced nobody. A
+  knockout could not reach a champion, which made awards, the champion moment
+  and the archive page unreachable by playing.
+- **`seed_number` was never written.** It was read in four places (the Teams
+  tab badges, the registration tracker, the seeding tab's initial order) and
+  written in none, so the drag order was lost on a tab switch. The order *is*
+  the draw, so it is now stored in the same transaction that locks it.
+
+A bye is expressed by omitting the fixture and carrying the team into the next
+round's slot as a concrete team id. A row with one side null and no feeder on
+that side is rejected: it is indistinguishable from an unresolved tie and would
+never resolve.
+
+`group_knockout` and `double_elimination` remain reserved enum values with no
+generator. `buildDraw` returns `DrawPlan.unsupported` for them rather than
+producing a bracket of the wrong shape.
 
 ---
 
@@ -998,6 +1089,87 @@ class TournamentsController extends _$TournamentsController {
   }
 }
 ```
+
+#### Section D — the read surface (rebuilt 2026-09-05)
+
+The detail screen's nine artboards (09–15) were rebuilt against the canvas.
+Three things changed shape enough to be worth naming:
+
+* **The header now collapses.** It was a `SliverToBoxAdapter` that scrolled
+  away entirely. It is now a pinned persistent header: a 168pt banner with the
+  crest floating −24 over its edge, collapsing to a 56pt bar over ~120pt of
+  travel. The banner fades and the crest *scales into* the monogram rather
+  than sliding away, so the identity is continuous. The tab strip pins under
+  whichever state is showing.
+* **The standings cut-line is a 2px ink rule with a mono caption, not a colour
+  change.** The old table tinted qualifying ranks green. The canvas forbids
+  that outright — teams above and below the line are styled identically,
+  because a green tint says "these teams are safe", which is false while
+  matches remain.
+* **A hybrid cup gets its own four tabs** — Overview / Groups / Playoffs /
+  Stats (artboard 13b) — so the `TabController` is now a `DefaultTabController`
+  sized from the format rather than pinned at five.
+
+The bracket's **feeder-line grammar** is implemented as the canvas specifies
+it, in `_FeederPainter`: 1px solid ink for a resolved route (drawn only once
+the feeding match has a winner), 1px hairline for an unresolved one
+(orthogonal only — out, across the gutter, in; no diagonals, no curves), and
+1px dashed ink for a bye, whose node keeps its seed chip and states the reason
+in mono. The 3rd place playoff is pinned below the Final rather than drawn
+into the tree: it is a fixture, not a route.
+
+Two RPCs back it (`20260905000000_tournament_leaderboards.sql`):
+
+| RPC | Artboard | Purpose |
+|---|---|---|
+| `tournament_batting_leaderboard` / `tournament_bowling_leaderboard` | 10, 11, 15 | The orange and purple caps, aggregated from scored deliveries. `tournaments.awards` is organiser-*published* and empty until the cup ends, but the canvas shows the caps while it is still being played. |
+| `tournament_organizer_profile` | 09 | The credibility row: how many cups this organiser has actually run, and since when. "Is this organiser trustworthy" is one of the three questions artboard 09 is built around, and it had no data behind it. |
+
+⚠️ The leaderboards aggregate **already-recorded delivery facts**; they do not
+decide what a delivery is worth, and must never start to. The one convention
+they encode is which dismissals are credited to the bowler, pinned in
+`_bowler_credited_wickets()` so it cannot drift — the same class of rule as
+"a walkover contributes no NRR", which has lived in SQL since 20260825000000.
+
+#### Console routes
+
+The console is a **pushed** screen off the hub, never a tab, and every screen it
+opens is pushed over the four-tab shell too — a shell header on any of them
+would read as a tab the organiser never chose. `test/router/full_screen_routes_test.dart`
+pins that invariant.
+
+| Route | Artboard | Screen |
+|---|---|---|
+| `/tournaments/:id/manage` · `/console` | 24–28 | `OrganizerConsoleScreen` — three tabs, the second renamed by format |
+| `/tournaments/:id/settings` | 27d | `TournamentSettingsScreen` |
+| `/tournaments/:id/announce` | 27e | `TournamentAnnounceScreen` |
+| `/tournaments/:id/people` | 27f | `TournamentPeopleScreen` |
+| `/tournaments/:id/fees` | 24c | `TournamentFeeLedgerScreen` — reached from the console ⋮, and only offered when the cup charges a fee |
+| `/tournaments/:id/live/:matchId/officials` | 27j | `TournamentOfficialsScreen` — umpires, scorer, and the handover code |
+
+Three existing surfaces changed shape to match the canvas, and the change is
+visible to anyone who knew the old ones:
+
+* **The first console tab renames to "Teams" once the draw locks** (25d).
+  Nobody is applying any more, so "Registrations" stopped describing it — the
+  tabs become *Teams / Fixtures*, alongside the existing rename of the second
+  tab from "Fixtures & Seeds"/"& Order" to plain "Fixtures".
+* **A live ground card now carries two actions, not one** (27L): *Open Scorer*
+  and *Match Ops*, replacing the single *Actions* chip. The board's job is to
+  answer "which ground needs me right now", and the answer is usually "open the
+  scorer", not "open a menu". Off a live match it stays a single *Actions*
+  chip.
+* **The LIVE pill names the innings** — "Live · 2nd innings" (27L) — because on
+  a two-ground morning the innings is what tells the organiser how much longer
+  that ground needs them. An innings break is its own state: **amber, not red**,
+  since nothing is being scored, and the side yet to bat shows "Target 186 in
+  20" rather than "Yet to bat".
+
+The two match-law sheets (27m / 28b revise-target, 28c super over) live in
+`presentation/widgets/tournament_ops_sheets.dart` alongside abandon / walkover /
+override, because they share that file's sheet vocabulary — white surface, 20pt
+top corners, a flat 32% ink scrim, no blur. Rain is **cream throughout**; red
+stays reserved for abandonment.
 
 ---
 

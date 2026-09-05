@@ -38,10 +38,12 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Android App Links: open https://joinmatchday.com/u/* in-app
-                 (shared profile links land on /u/:username). autoVerify makes
-                 Android fetch https://joinmatchday.com/.well-known/assetlinks.json
-                 and verify it lists this app's release signing SHA-256
+            <!-- Android App Links: open https://joinmatchday.com/u/* and
+                 /t/* in-app (shared profile links land on /u/:username;
+                 tournament invite links on /t/:tournamentId, which the router
+                 redirects to /tournaments/:id). autoVerify makes Android fetch
+                 https://joinmatchday.com/.well-known/assetlinks.json and
+                 verify it lists this app's release signing SHA-256
                  fingerprint — until that file is hosted, links open in the
                  browser instead of the app. -->
             <intent-filter android:autoVerify="true">
@@ -52,6 +54,10 @@
                     android:scheme="https"
                     android:host="joinmatchday.com"
                     android:pathPrefix="/u/" />
+                <data
+                    android:scheme="https"
+                    android:host="joinmatchday.com"
+                    android:pathPrefix="/t/" />
             </intent-filter>
         </activity>
         <!-- image_cropper (uCrop). Required manual registration; uCrop needs an

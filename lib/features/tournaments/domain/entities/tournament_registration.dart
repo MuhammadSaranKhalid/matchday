@@ -34,6 +34,7 @@ class TournamentRegistration {
     this.paymentStatus,
     this.decidedBy,
     this.decidedAt,
+    this.decisionReason,
     this.message,
     this.teamName,
     this.teamLogoUrl,
@@ -55,6 +56,12 @@ class TournamentRegistration {
   final String? paymentStatus;
   final String? decidedBy;
   final DateTime? decidedAt;
+
+  /// Why the organiser declined, in their own words. Distinct from [message],
+  /// which is the note the *manager* submitted with the application — showing
+  /// that one back as the decline reason is what this field replaced.
+  final String? decisionReason;
+
   final String? message;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -84,6 +91,7 @@ class TournamentRegistration {
           other.status == status &&
           other.seedNumber == seedNumber &&
           other.paymentStatus == paymentStatus &&
+          other.decisionReason == decisionReason &&
           other.message == message;
 
   @override
@@ -94,5 +102,6 @@ class TournamentRegistration {
         status,
         seedNumber,
         paymentStatus,
+        decisionReason,
       );
 }

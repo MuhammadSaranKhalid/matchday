@@ -7,6 +7,7 @@ import 'package:matchday/features/explore/data/datasources/explore_remote_dataso
 import 'package:matchday/features/explore/data/models/match_result_dto.dart';
 import 'package:matchday/features/explore/data/models/player_result_dto.dart';
 import 'package:matchday/features/explore/data/models/team_result_dto.dart';
+import 'package:matchday/features/explore/data/models/tournament_result_dto.dart';
 import 'package:matchday/features/explore/data/repositories/explore_repository_impl.dart';
 import 'package:matchday/features/explore/domain/entities/player_result.dart';
 import 'package:mocktail/mocktail.dart';
@@ -17,12 +18,14 @@ typedef _SearchResult = ({
   List<PlayerResultDto> players,
   List<TeamResultDto> teams,
   List<MatchResultDto> matches,
+  List<TournamentResultDto> tournaments,
 });
 
 _SearchResult _empty() => (
       players: <PlayerResultDto>[],
       teams: <TeamResultDto>[],
       matches: <MatchResultDto>[],
+      tournaments: <TournamentResultDto>[],
     );
 
 void main() {
@@ -134,6 +137,7 @@ void main() {
                 ],
                 teams: <TeamResultDto>[],
                 matches: <MatchResultDto>[],
+                tournaments: <TournamentResultDto>[],
               ));
 
       final result = await repo.search('lah');
@@ -158,6 +162,7 @@ void main() {
                 ],
                 teams: <TeamResultDto>[],
                 matches: <MatchResultDto>[],
+                tournaments: <TournamentResultDto>[],
               ));
 
       final result = await repo.search('ahm');

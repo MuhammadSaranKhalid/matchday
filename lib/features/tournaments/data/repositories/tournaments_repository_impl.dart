@@ -4,11 +4,17 @@ import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../../matches/domain/entities/match.dart';
+import '../../domain/draw/draw_plan.dart';
 import '../../domain/entities/ground.dart';
 import '../../domain/entities/my_tournament_entry.dart';
 import '../../domain/entities/scorer_candidate.dart';
 import '../../domain/entities/tournament.dart';
+import '../../domain/entities/match_official.dart';
 import '../../domain/entities/tournament_awards.dart';
+import '../../domain/entities/tournament_fee_entry.dart';
+import '../../domain/entities/tournament_leader.dart';
+import '../../domain/entities/tournament_organizer.dart';
+import '../../domain/ops/revised_target.dart';
 import '../../domain/entities/tournament_live_match.dart';
 import '../../domain/entities/tournament_registration.dart';
 import '../../domain/entities/tournament_standing.dart';
@@ -307,15 +313,25 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   @override
   Future<Either<Failure, int>> generateAndPublishFixtures({
     required String tournamentId,
-    required List<FixtureSlotParams> slots,
+    required DrawPlan plan,
+    List<String> seedOrder = const [],
   }) async {
-    if (slots.isEmpty) {
+    // A type with no generator reaches here as an empty plan carrying its
+    // reason; say the reason rather than "no fixtures to publish".
+    final unsupported = plan.unsupported;
+    if (unsupported != null) {
+      return Left(
+        ValidationFailure('$unsupported draws are not supported yet.'),
+      );
+    }
+    if (plan.isEmpty) {
       return const Left(ValidationFailure('There are no fixtures to publish.'));
     }
     try {
       final count = await _remote.generateAndPublishFixtures(
         tournamentId: tournamentId,
-        slots: slots,
+        plan: plan,
+        seedOrder: seedOrder,
       );
       return Right(count);
     } on ServerException catch (e) {
@@ -678,6 +694,266 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
       return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  // ─── Fee ledger (artboard 24c) ──────────────────────────────────────────────
+
+  @override
+  Future<Either<Failure, List<TournamentFeeEntry>>> getFeeLedger(
+    String tournamentId,
+  ) async {
+    try {
+      final dtos = await _remote.getFeeLedger(tournamentId);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> recordPayment({
+    required String registrationId,
+    required double amountPaid,
+    PaymentChannel? channel,
+    String? reference,
+  }) async {
+    // Business rules live here, not in the sheet: a negative receipt is a
+    // typo, and a reference longer than the column would be truncated
+    // silently by Postgres.
+    if (amountPaid < 0) {
+      return const Left(ValidationFailure('An amount cannot be negative'));
+    }
+    final note = reference?.trim();
+    if (note != null && note.length > 200) {
+      return const Left(
+        ValidationFailure('Keep the reference under 200 characters'),
+      );
+    }
+
+    try {
+      await _remote.recordPayment(
+        registrationId: registrationId,
+        amountPaid: amountPaid,
+        channel: channel,
+        reference: note == null || note.isEmpty ? null : note,
+      );
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  // ─── Match officials (artboard 27j) ─────────────────────────────────────────
+
+  @override
+  Future<Either<Failure, List<MatchOfficial>>> getMatchOfficials(
+    String matchId,
+  ) async {
+    try {
+      final dtos = await _remote.getMatchOfficials(matchId);
+      return Right(
+        dtos.map((d) => d.toEntity()).whereType<MatchOfficial>().toList(),
+      );
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<OfficialCandidate>>> getOfficialCandidates({
+    required String tournamentId,
+    required String matchId,
+  }) async {
+    try {
+      final dtos = await _remote.getOfficialCandidates(
+        tournamentId: tournamentId,
+        matchId: matchId,
+      );
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> assignOfficial({
+    required String matchId,
+    required String userId,
+    required OfficialRole role,
+  }) async {
+    if (role == OfficialRole.scorer) {
+      return const Left(
+        ValidationFailure('Use Assign scorer to change who is scoring'),
+      );
+    }
+    try {
+      await _remote.assignOfficial(
+        matchId: matchId,
+        userId: userId,
+        role: role,
+      );
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> removeOfficial({
+    required String matchId,
+    required OfficialRole role,
+  }) async {
+    if (role == OfficialRole.scorer) {
+      return const Left(
+        ValidationFailure('Use Assign scorer to change who is scoring'),
+      );
+    }
+    try {
+      await _remote.removeOfficial(matchId: matchId, role: role);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  // ─── Matchday-morning ops (artboards 27k, 27m, 28b, 28c) ────────────────────
+
+  @override
+  Future<Either<Failure, int>> autoAssignScorers(String tournamentId) async {
+    try {
+      return Right(await _remote.autoAssignScorers(tournamentId));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> reviseMatchConditions({
+    required String matchId,
+    required int revisedOvers,
+    required int bowlerQuota,
+    int? revisedTarget,
+    TargetMethod method = TargetMethod.runRate,
+    String? reason,
+  }) async {
+    // The five-over floor is a competition rule, so it is checked on the way
+    // out as well as in SQL — the sheet should never be able to post a
+    // revision the server will only reject after a round trip.
+    if (revisedOvers < RevisedTargetCalculator.minimumOvers) {
+      return const Left(
+        ValidationFailure(
+          'A result needs at least '
+          '${RevisedTargetCalculator.minimumOvers} overs per side',
+        ),
+      );
+    }
+    if (bowlerQuota < 1) {
+      return const Left(
+        ValidationFailure('Each bowler needs at least one over'),
+      );
+    }
+    if (method != TargetMethod.runRate &&
+        revisedTarget != null &&
+        revisedTarget < 1) {
+      return const Left(ValidationFailure('A target must be at least 1 run'));
+    }
+
+    try {
+      await _remote.reviseMatchConditions(
+        matchId: matchId,
+        revisedOvers: revisedOvers,
+        bowlerQuota: bowlerQuota,
+        revisedTarget: revisedTarget,
+        method: method,
+        reason: reason,
+      );
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> triggerSuperOver({
+    required String matchId,
+    required String batsFirstTeamId,
+  }) async {
+    try {
+      await _remote.triggerSuperOver(
+        matchId: matchId,
+        batsFirstTeamId: batsFirstTeamId,
+      );
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, TournamentLeaderboards>> getLeaderboards(
+    String tournamentId, {
+    int limit = 5,
+  }) async {
+    try {
+      return Right(await _remote.getLeaderboards(tournamentId, limit: limit));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, TournamentOrganizer?>> getOrganizer(
+    String tournamentId,
+  ) async {
+    try {
+      return Right(await _remote.getOrganizer(tournamentId));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
     }
   }
 }

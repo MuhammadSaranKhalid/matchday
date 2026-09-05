@@ -3,7 +3,10 @@
 <plist version="1.0">
 <dict>
 	<!-- Universal Links: open https://joinmatchday.com/* in-app (shared profile
-	     links land on /u/:username). This file is wired into the build by adding
+	     links land on /u/:username; tournament invite links on /t/:id, which
+	     the router redirects to /tournaments/:id). The association is
+	     domain-wide, so no path list needs maintaining here — go_router
+	     decides what resolves. This file is wired into the build by adding
 	     the "Associated Domains" capability in Xcode (Runner target → Signing &
 	     Capabilities), which also registers the capability on the provisioning
 	     profile. Apple must be able to fetch

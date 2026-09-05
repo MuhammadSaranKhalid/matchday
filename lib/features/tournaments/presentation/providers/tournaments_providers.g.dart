@@ -1042,3 +1042,456 @@ final class TournamentDraftStreamProvider
 
 String _$tournamentDraftStreamHash() =>
     r'a124c7f6de5c134d6af02d9dc8706f09799023fe';
+
+/// The fee ledger for one cup (artboard 24c). Organiser-only on the server,
+/// so a manager who reaches the route gets an error rather than an empty list.
+
+@ProviderFor(tournamentFeeLedger)
+final tournamentFeeLedgerProvider = TournamentFeeLedgerFamily._();
+
+/// The fee ledger for one cup (artboard 24c). Organiser-only on the server,
+/// so a manager who reaches the route gets an error rather than an empty list.
+
+final class TournamentFeeLedgerProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<TournamentFeeEntry>>,
+          List<TournamentFeeEntry>,
+          FutureOr<List<TournamentFeeEntry>>
+        >
+    with
+        $FutureModifier<List<TournamentFeeEntry>>,
+        $FutureProvider<List<TournamentFeeEntry>> {
+  /// The fee ledger for one cup (artboard 24c). Organiser-only on the server,
+  /// so a manager who reaches the route gets an error rather than an empty list.
+  TournamentFeeLedgerProvider._({
+    required TournamentFeeLedgerFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'tournamentFeeLedgerProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$tournamentFeeLedgerHash();
+
+  @override
+  String toString() {
+    return r'tournamentFeeLedgerProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<TournamentFeeEntry>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<TournamentFeeEntry>> create(Ref ref) {
+    final argument = this.argument as String;
+    return tournamentFeeLedger(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TournamentFeeLedgerProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$tournamentFeeLedgerHash() =>
+    r'6872653ee2c4e6b291b1a7855a1d64b485acd80c';
+
+/// The fee ledger for one cup (artboard 24c). Organiser-only on the server,
+/// so a manager who reaches the route gets an error rather than an empty list.
+
+final class TournamentFeeLedgerFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<TournamentFeeEntry>>, String> {
+  TournamentFeeLedgerFamily._()
+    : super(
+        retry: null,
+        name: r'tournamentFeeLedgerProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The fee ledger for one cup (artboard 24c). Organiser-only on the server,
+  /// so a manager who reaches the route gets an error rather than an empty list.
+
+  TournamentFeeLedgerProvider call(String tournamentId) =>
+      TournamentFeeLedgerProvider._(argument: tournamentId, from: this);
+
+  @override
+  String toString() => r'tournamentFeeLedgerProvider';
+}
+
+/// Everyone already appointed to one fixture (artboard 27j).
+
+@ProviderFor(matchOfficials)
+final matchOfficialsProvider = MatchOfficialsFamily._();
+
+/// Everyone already appointed to one fixture (artboard 27j).
+
+final class MatchOfficialsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<MatchOfficial>>,
+          List<MatchOfficial>,
+          FutureOr<List<MatchOfficial>>
+        >
+    with
+        $FutureModifier<List<MatchOfficial>>,
+        $FutureProvider<List<MatchOfficial>> {
+  /// Everyone already appointed to one fixture (artboard 27j).
+  MatchOfficialsProvider._({
+    required MatchOfficialsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'matchOfficialsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$matchOfficialsHash();
+
+  @override
+  String toString() {
+    return r'matchOfficialsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<MatchOfficial>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<MatchOfficial>> create(Ref ref) {
+    final argument = this.argument as String;
+    return matchOfficials(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MatchOfficialsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$matchOfficialsHash() => r'8c4934c9189bb27e394ffdba72e92bf0af04479b';
+
+/// Everyone already appointed to one fixture (artboard 27j).
+
+final class MatchOfficialsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<MatchOfficial>>, String> {
+  MatchOfficialsFamily._()
+    : super(
+        retry: null,
+        name: r'matchOfficialsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Everyone already appointed to one fixture (artboard 27j).
+
+  MatchOfficialsProvider call(String matchId) =>
+      MatchOfficialsProvider._(argument: matchId, from: this);
+
+  @override
+  String toString() => r'matchOfficialsProvider';
+}
+
+/// Everyone who *could* be appointed to one fixture (artboard 27j).
+
+@ProviderFor(officialCandidates)
+final officialCandidatesProvider = OfficialCandidatesFamily._();
+
+/// Everyone who *could* be appointed to one fixture (artboard 27j).
+
+final class OfficialCandidatesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<OfficialCandidate>>,
+          List<OfficialCandidate>,
+          FutureOr<List<OfficialCandidate>>
+        >
+    with
+        $FutureModifier<List<OfficialCandidate>>,
+        $FutureProvider<List<OfficialCandidate>> {
+  /// Everyone who *could* be appointed to one fixture (artboard 27j).
+  OfficialCandidatesProvider._({
+    required OfficialCandidatesFamily super.from,
+    required ({String tournamentId, String matchId}) super.argument,
+  }) : super(
+         retry: null,
+         name: r'officialCandidatesProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$officialCandidatesHash();
+
+  @override
+  String toString() {
+    return r'officialCandidatesProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<OfficialCandidate>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<OfficialCandidate>> create(Ref ref) {
+    final argument = this.argument as ({String tournamentId, String matchId});
+    return officialCandidates(
+      ref,
+      tournamentId: argument.tournamentId,
+      matchId: argument.matchId,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is OfficialCandidatesProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$officialCandidatesHash() =>
+    r'2c46490ceecaad1df7e0f757b11e394f02dde9eb';
+
+/// Everyone who *could* be appointed to one fixture (artboard 27j).
+
+final class OfficialCandidatesFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          FutureOr<List<OfficialCandidate>>,
+          ({String tournamentId, String matchId})
+        > {
+  OfficialCandidatesFamily._()
+    : super(
+        retry: null,
+        name: r'officialCandidatesProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Everyone who *could* be appointed to one fixture (artboard 27j).
+
+  OfficialCandidatesProvider call({
+    required String tournamentId,
+    required String matchId,
+  }) => OfficialCandidatesProvider._(
+    argument: (tournamentId: tournamentId, matchId: matchId),
+    from: this,
+  );
+
+  @override
+  String toString() => r'officialCandidatesProvider';
+}
+
+/// The cup's orange- and purple-cap boards (artboards 10, 11, 15).
+
+@ProviderFor(tournamentLeaderboards)
+final tournamentLeaderboardsProvider = TournamentLeaderboardsFamily._();
+
+/// The cup's orange- and purple-cap boards (artboards 10, 11, 15).
+
+final class TournamentLeaderboardsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<TournamentLeaderboards>,
+          TournamentLeaderboards,
+          FutureOr<TournamentLeaderboards>
+        >
+    with
+        $FutureModifier<TournamentLeaderboards>,
+        $FutureProvider<TournamentLeaderboards> {
+  /// The cup's orange- and purple-cap boards (artboards 10, 11, 15).
+  TournamentLeaderboardsProvider._({
+    required TournamentLeaderboardsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'tournamentLeaderboardsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$tournamentLeaderboardsHash();
+
+  @override
+  String toString() {
+    return r'tournamentLeaderboardsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<TournamentLeaderboards> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<TournamentLeaderboards> create(Ref ref) {
+    final argument = this.argument as String;
+    return tournamentLeaderboards(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TournamentLeaderboardsProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$tournamentLeaderboardsHash() =>
+    r'de2122c0363f0c4bbdce63facf12e0c9c58b99ba';
+
+/// The cup's orange- and purple-cap boards (artboards 10, 11, 15).
+
+final class TournamentLeaderboardsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<TournamentLeaderboards>, String> {
+  TournamentLeaderboardsFamily._()
+    : super(
+        retry: null,
+        name: r'tournamentLeaderboardsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The cup's orange- and purple-cap boards (artboards 10, 11, 15).
+
+  TournamentLeaderboardsProvider call(String tournamentId) =>
+      TournamentLeaderboardsProvider._(argument: tournamentId, from: this);
+
+  @override
+  String toString() => r'tournamentLeaderboardsProvider';
+}
+
+/// The organiser's track record (artboard 09).
+
+@ProviderFor(tournamentOrganizer)
+final tournamentOrganizerProvider = TournamentOrganizerFamily._();
+
+/// The organiser's track record (artboard 09).
+
+final class TournamentOrganizerProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<TournamentOrganizer?>,
+          TournamentOrganizer?,
+          FutureOr<TournamentOrganizer?>
+        >
+    with
+        $FutureModifier<TournamentOrganizer?>,
+        $FutureProvider<TournamentOrganizer?> {
+  /// The organiser's track record (artboard 09).
+  TournamentOrganizerProvider._({
+    required TournamentOrganizerFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'tournamentOrganizerProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$tournamentOrganizerHash();
+
+  @override
+  String toString() {
+    return r'tournamentOrganizerProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<TournamentOrganizer?> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<TournamentOrganizer?> create(Ref ref) {
+    final argument = this.argument as String;
+    return tournamentOrganizer(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TournamentOrganizerProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$tournamentOrganizerHash() =>
+    r'53ca953ec13bb9d5eb9b635a1e52a923155e04b5';
+
+/// The organiser's track record (artboard 09).
+
+final class TournamentOrganizerFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<TournamentOrganizer?>, String> {
+  TournamentOrganizerFamily._()
+    : super(
+        retry: null,
+        name: r'tournamentOrganizerProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The organiser's track record (artboard 09).
+
+  TournamentOrganizerProvider call(String tournamentId) =>
+      TournamentOrganizerProvider._(argument: tournamentId, from: this);
+
+  @override
+  String toString() => r'tournamentOrganizerProvider';
+}

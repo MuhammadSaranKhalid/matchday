@@ -135,13 +135,13 @@ lib/
 │       ├── ck_screen_scaffold.dart       # paper Scaffold + top bar (matchday wordmark / title / bell / avatar)
 │       └── v2/                           # v2 IA kit — feed/profile/composer widgets, CkFeedImage, shimmer
 ├── router/
-│   └── app_router.dart                   # go_router; auth redirect + StatefulShellRoute (5-tab shell)
+│   └── app_router.dart                   # go_router; auth redirect + StatefulShellRoute (4-tab shell)
 ├── app.dart                              # MaterialApp.router + DB clear on sign-out + push registrar
 ├── main.dart                             # Supabase.initialize + GoogleSignIn.initialize + ProviderScope
 └── features/
     ├── auth/                             # PERMANENT — email OTP + native Google OAuth (full layered)
     ├── onboarding/                       # PERMANENT — first-run profile wizard (full layered)
-    ├── shell/                            # PERMANENT — authenticated 5-tab shell; tab 5 is MenuScreen, the "you" surface (presentation-only)
+    ├── shell/                            # PERMANENT — authenticated 4-tab shell + /menu page, the "you" surface (presentation-only)
     ├── home/                             # PRESENTATION-ONLY — feed tab (composes posts providers)
     ├── profile/                          # PRESENTATION-ONLY — profile detail view
     ├── messages/                         # PRESENTATION-ONLY — messages tab
@@ -1490,6 +1490,7 @@ The `todos` reference feature and all general offline-first wiring were removed 
 | Provider DI shape (no use-case providers — just `<feature>Repository` + intermediate `Stream`/`Future` views) | `lib/features/teams/presentation/providers/teams_providers.dart`, `lib/features/matches/presentation/providers/matches_providers.dart` |
 | Controller calling repo directly with value-object validation inlined | `lib/features/onboarding/presentation/controllers/onboarding_controller.dart` (`submit`), `lib/features/teams/presentation/controllers/add_unclaimed_player_controller.dart` (`submit`) |
 | Wizard draft persistence | `lib/core/database/wizard_draft_store.dart` + `lib/core/database/tables.dart` |
+| Pure-domain algorithm shared by a preview and a write (no I/O, one implementation, property-tested) | `lib/features/tournaments/domain/draw/draw_builder.dart` + `test/features/tournaments/domain/draw/draw_builder_test.dart` |
 | **Local-first write path (exemption 2 — do not copy without agreement)** | `lib/features/matches/data/datasources/matches_local_datasource.dart` (WAL + outbox), `lib/features/matches/presentation/controllers/scoring_controller.dart` (apply-locally-then-drain), `docs/offline-scoring-design.md` (rationale) |
 ---
 

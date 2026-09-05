@@ -58,8 +58,8 @@ MyMatchConfirmed _row({required String id, required bool live}) =>
 /// The menu reads the current location off go_router, so it has to be
 /// pumped inside a router rather than a bare MaterialApp.
 ///
-/// Pumped bare, without [AppShell]: this is the branch body, and the header /
-/// bottom nav around it are the shell's, covered by their own tests.
+/// It is a full-screen route, so it brings its own [Scaffold] and [V2Header] —
+/// nothing wraps it here.
 Future<void> _pumpMenu(
   WidgetTester tester, {
   MyMatchesView view = const MyMatchesView.empty(),
@@ -91,7 +91,7 @@ Future<void> _pumpMenu(
     routes: [
       GoRoute(
         path: '/',
-        builder: (_, __) => const Scaffold(body: MenuScreen()),
+        builder: (_, __) => const MenuScreen(),
       ),
     ],
   );
@@ -131,6 +131,17 @@ void main() {
     expect(find.text('My Challenges'), findsOneWidget);
     expect(find.text('My Tournaments'), findsOneWidget);
 
+    // The footer is pinned outside the scrolling list, so it is on screen
+    // whatever the row list is doing.
+    expect(find.text('Sign out'), findsOneWidget);
+    expect(find.text('MATCHDAY · v2.0'), findsOneWidget);
+
+    // The account zone sits below the fold once the page carries its own
+    // header, and the list builds lazily — so scroll to it rather than
+    // widening the viewport until the assertion happens to pass.
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
     // ACCOUNT — built out per §5.1 of the brief.
     expect(find.text('Saved'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
@@ -144,9 +155,6 @@ void main() {
 
     // Help & Support + the one roadmap row are both honestly inert.
     expect(find.text('SOON'), findsNWidgets(2));
-
-    expect(find.text('Sign out'), findsOneWidget);
-    expect(find.text('MATCHDAY · v2.0'), findsOneWidget);
   });
 
   testWidgets('first run furnishes empty rows instead of leaving them bare', (

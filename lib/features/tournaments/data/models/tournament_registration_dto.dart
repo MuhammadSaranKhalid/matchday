@@ -17,6 +17,7 @@ class TournamentRegistrationDto {
     this.paymentStatus,
     this.decidedBy,
     this.decidedAt,
+    this.decisionReason,
     this.message,
     this.teamName,
     this.teamLogoUrl,
@@ -38,6 +39,7 @@ class TournamentRegistrationDto {
   final String? paymentStatus;
   final String? decidedBy;
   final String? decidedAt;
+  final String? decisionReason;
   final String? message;
   final String? teamName;
   final String? teamLogoUrl;
@@ -70,6 +72,7 @@ class TournamentRegistrationDto {
       paymentStatus: json['payment_status'] as String?,
       decidedBy: json['decided_by'] as String?,
       decidedAt: json['decided_at'] as String?,
+      decisionReason: json['decision_reason'] as String?,
       message: json['message'] as String?,
       teamName: teamJson?['team_name'] as String?,
       teamLogoUrl: teamJson?['logo_url'] as String?,
@@ -98,6 +101,7 @@ class TournamentRegistrationDto {
       paymentStatus: paymentStatus,
       decidedBy: decidedBy,
       decidedAt: decidedAt != null ? DateTime.parse(decidedAt!) : null,
+      decisionReason: decisionReason,
       message: message,
       teamName: teamName,
       teamLogoUrl: teamLogoUrl,

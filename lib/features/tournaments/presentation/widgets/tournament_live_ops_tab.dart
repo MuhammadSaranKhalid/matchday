@@ -20,11 +20,29 @@ class TournamentLiveOpsTab extends ConsumerStatefulWidget {
     required this.tournament,
     required this.onMatchActions,
     required this.onAssignScorer,
+    this.onStartMatch,
+    this.onQuickPin,
+    this.onReschedule,
+    this.onStartSecondInnings,
+    this.onAutoAssignScorers,
+    this.onOpenScorer,
   });
 
   final Tournament tournament;
   final void Function(TournamentLiveMatch match) onMatchActions;
   final void Function(TournamentLiveMatch match) onAssignScorer;
+  final void Function(TournamentLiveMatch match)? onStartMatch;
+  final void Function(TournamentLiveMatch match)? onQuickPin;
+  final void Function(TournamentLiveMatch match)? onReschedule;
+
+  /// Artboard 27L — the innings-break card's single unblocking action.
+  final void Function(TournamentLiveMatch match)? onStartSecondInnings;
+
+  /// Artboard 27k — the banner's "Auto-assign >".
+  final VoidCallback? onAutoAssignScorers;
+
+  /// Artboard 27L — the live card's "Open Scorer".
+  final void Function(TournamentLiveMatch match)? onOpenScorer;
 
   @override
   ConsumerState<TournamentLiveOpsTab> createState() =>
@@ -61,6 +79,15 @@ class _TournamentLiveOpsTabState extends ConsumerState<TournamentLiveOpsTab> {
         final live = board.where((m) => m.isLive).toList();
         final unscored = board.where((m) => m.needsScorer).toList();
         final played = board.where((m) => m.isFinished).length;
+        // Once a ground is under way the organiser's other queue is the
+        // fixtures still waiting to start, so the second tile becomes
+        // "Awaiting toss" (artboard 27L). Before the first ball there is
+        // nothing to be awaiting yet, so it stays "Results pending"
+        // (artboard 27k).
+        final awaitingToss = board
+            .where((m) => !m.isLive && !m.isFinished)
+            .length;
+        final anyLive = live.isNotEmpty;
 
         // Before the first ball the board is a readiness checklist, not a
         // dashboard (artboard 27h).
@@ -76,14 +103,23 @@ class _TournamentLiveOpsTabState extends ConsumerState<TournamentLiveOpsTab> {
                 _ScorerAlertBanner(
                   count: unscored.length,
                   onFix: () => onAssignScorer(unscored.first),
+                  onAutoAssign: widget.onAutoAssignScorers,
                 ),
               if (!anyStarted)
-                _PreMatchdayReadiness(board: board)
+                _MatchdayMorningBoard(
+                  board: board,
+                  onStartMatch: widget.onStartMatch,
+                  onQuickPin: widget.onQuickPin,
+                  onAssignScorer: onAssignScorer,
+                  onReschedule: widget.onReschedule,
+                  onMatchActions: onMatchActions,
+                )
               else ...[
                 _SectionEyebrow(
                   label: live.isEmpty
                       ? '${board.length} fixtures'
-                      : 'Today · ${live.length} ground${live.length == 1 ? '' : 's'}',
+                      : 'Live now · ${live.length} '
+                          'ground${live.length == 1 ? '' : 's'} active',
                   fetchedAt: _fetchedAt,
                 ),
                 const SizedBox(height: 8),
@@ -92,6 +128,16 @@ class _TournamentLiveOpsTabState extends ConsumerState<TournamentLiveOpsTab> {
                     match: match,
                     onActions: () => onMatchActions(match),
                     onAssign: () => onAssignScorer(match),
+                    onStartMatch: widget.onStartMatch == null
+                        ? null
+                        : () => widget.onStartMatch!(match),
+                    onStartSecondInnings: widget.onStartSecondInnings == null
+                        ? null
+                        : () => widget.onStartSecondInnings!(match),
+                    onOpenScorer: widget.onOpenScorer == null
+                        ? null
+                        : () => widget.onOpenScorer!(match),
+                    maxOvers: tournament.maxOvers,
                   ),
                   const SizedBox(height: 10),
                 ],
@@ -117,8 +163,10 @@ class _TournamentLiveOpsTabState extends ConsumerState<TournamentLiveOpsTab> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _StatTile(
-                      label: 'Results pending',
-                      value: '${board.length - played}',
+                      label: anyLive ? 'Awaiting toss' : 'Results pending',
+                      value: anyLive
+                          ? '$awaitingToss'
+                          : '${board.length - played}',
                     ),
                   ),
                 ],
@@ -134,10 +182,18 @@ class _TournamentLiveOpsTabState extends ConsumerState<TournamentLiveOpsTab> {
 // ─── Alert banner ────────────────────────────────────────────────────────────
 
 class _ScorerAlertBanner extends StatelessWidget {
-  const _ScorerAlertBanner({required this.count, required this.onFix});
+  const _ScorerAlertBanner({
+    required this.count,
+    required this.onFix,
+    this.onAutoAssign,
+  });
 
   final int count;
   final VoidCallback onFix;
+
+  /// Four unscored fixtures is a queue of four sheets; this collapses it to
+  /// one tap (artboard 27k). Cream, because it is urgent, not dangerous.
+  final VoidCallback? onAutoAssign;
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +203,10 @@ class _ScorerAlertBanner extends StatelessWidget {
         color: CkColors.cream,
         borderRadius: BorderRadius.circular(CkRadii.sm),
         child: InkWell(
-          onTap: onFix,
+          // One unscored fixture goes straight to its picker; a queue of them
+          // is what auto-assign exists for.
+          onTap: onAutoAssign == null || count < 2 ? onFix : onAutoAssign,
+          onLongPress: onFix,
           borderRadius: BorderRadius.circular(CkRadii.sm),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -171,7 +230,7 @@ class _ScorerAlertBanner extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'FIX',
+                  onAutoAssign == null || count < 2 ? 'FIX' : 'AUTO-ASSIGN',
                   style: CkType.mono(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
@@ -197,11 +256,19 @@ class _GroundCard extends StatelessWidget {
     required this.match,
     required this.onActions,
     required this.onAssign,
+    this.onStartMatch,
+    this.onStartSecondInnings,
+    this.onOpenScorer,
+    this.maxOvers,
   });
 
   final TournamentLiveMatch match;
+  final int? maxOvers;
   final VoidCallback onActions;
   final VoidCallback onAssign;
+  final VoidCallback? onStartMatch;
+  final VoidCallback? onStartSecondInnings;
+  final VoidCallback? onOpenScorer;
 
   @override
   Widget build(BuildContext context) {
@@ -240,16 +307,107 @@ class _GroundCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _TeamScoreRow(match: match, teamId: match.teamAId),
+                _TeamScoreRow(
+                  match: match,
+                  teamId: match.teamAId,
+                  maxOvers: maxOvers,
+                ),
                 const SizedBox(height: 6),
-                _TeamScoreRow(match: match, teamId: match.teamBId),
+                _TeamScoreRow(
+                  match: match,
+                  teamId: match.teamBId,
+                  maxOvers: maxOvers,
+                ),
               ],
             ),
           ),
           Container(height: 1, color: CkColors.hairline),
           match.needsScorer
               ? _AssignScorerFooter(match: match, onAssign: onAssign)
-              : _ScorerFooter(match: match, onActions: onActions),
+              : _ScorerFooter(
+                  match: match,
+                  onActions: onActions,
+                  // A ball can only be recorded while play is on; at the
+                  // break the card's action is Start 2nd Innings instead.
+                  onOpenScorer: match.status == 'live' ||
+                          match.status == 'super_over'
+                      ? onOpenScorer
+                      : null,
+                ),
+          // Artboard 27L: the innings-break card is the one that needs the
+          // organiser, so it carries the single action that unblocks it.
+          if (match.status == 'innings_break' &&
+              onStartSecondInnings != null) ...[
+            Container(height: 1, color: CkColors.hairline),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: ElevatedButton(
+                onPressed: onStartSecondInnings,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CkColors.cream,
+                  foregroundColor: CkColors.amberDark,
+                  elevation: 0,
+                  minimumSize: const Size.fromHeight(38),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
+                    side: const BorderSide(color: CkColors.creamBorder),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.play_arrow_rounded,
+                      size: 17,
+                      color: CkColors.amberDark,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Start 2nd Innings',
+                      style: CkType.body(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: CkColors.amberDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (!match.isLive && !match.isFinished && onStartMatch != null) ...[
+            Container(height: 1, color: CkColors.hairline),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: ElevatedButton(
+                onPressed: onStartMatch,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CkColors.ink,
+                  foregroundColor: CkColors.paper,
+                  elevation: 0,
+                  minimumSize: const Size.fromHeight(38),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.sports_cricket, size: 15, color: CkColors.paper),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Start Match / Toss',
+                      style: CkType.body(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: CkColors.paper,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -261,6 +419,13 @@ class _StatusPill extends StatelessWidget {
 
   final TournamentLiveMatch match;
 
+  static String _ordinal(int n) => switch (n) {
+        1 => '1ST',
+        2 => '2ND',
+        3 => '3RD',
+        _ => '${n}TH',
+      };
+
   @override
   Widget build(BuildContext context) {
     late final String label;
@@ -268,8 +433,26 @@ class _StatusPill extends StatelessWidget {
     late final Color fg;
     Color? border;
 
-    if (match.isLive) {
-      label = 'LIVE';
+    if (match.status == 'innings_break') {
+      // Amber, not red: nothing is being scored, so the day's one red belongs
+      // to the ground that IS live (artboard 27L).
+      label = 'INNINGS BREAK';
+      bg = CkColors.cream;
+      fg = CkColors.amberInk;
+      border = CkColors.creamBorder;
+    } else if (match.status == 'super_over') {
+      label = 'SUPER OVER';
+      bg = CkColors.red;
+      fg = Colors.white;
+    } else if (match.isLive) {
+      // "Live · 1st innings" — on a two-ground morning the innings is what
+      // tells the organiser how long this ground still needs them.
+      final innings = match.inningsLines.isEmpty
+          ? null
+          : match.inningsLines
+              .map((l) => l.inningsNumber)
+              .reduce((a, b) => a > b ? a : b);
+      label = innings == null ? 'LIVE' : 'LIVE · ${_ordinal(innings)} INNINGS';
       bg = CkColors.red;
       fg = Colors.white;
     } else if (match.isFinished) {
@@ -328,10 +511,29 @@ class _StatusPill extends StatelessWidget {
 /// One side's line. The team currently batting is inked and, when the match is
 /// live, its score carries the pulse; a completed innings recedes to muted.
 class _TeamScoreRow extends StatelessWidget {
-  const _TeamScoreRow({required this.match, required this.teamId});
+  const _TeamScoreRow({
+    required this.match,
+    required this.teamId,
+    this.maxOvers,
+  });
 
   final TournamentLiveMatch match;
   final String? teamId;
+  final int? maxOvers;
+
+  /// "Target 186 in 20" for the side that has not batted yet at the innings
+  /// break. One more than the innings just completed, over the same number of
+  /// overs — a display transform of numbers the engine already produced, not a
+  /// re-derivation of the result.
+  static String? _chaseLine(
+    TournamentLiveMatch match,
+    LiveInningsLine? latest, {
+    int? overs,
+  }) {
+    if (match.status != 'innings_break' || latest == null) return null;
+    final target = 'Target ${latest.runs + 1}';
+    return overs == null ? target : '$target in $overs';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -344,8 +546,13 @@ class _TeamScoreRow extends StatelessWidget {
         : match.inningsLines.reduce(
             (a, b) => b.inningsNumber > a.inningsNumber ? b : a,
           );
-    final isStriking =
-        match.isLive && line != null && line.inningsNumber == latest?.inningsNumber;
+    // The red + pulse belong to a ball actually being bowled. At an innings
+    // break nothing is being scored, so the card keeps its ink (artboard 27L)
+    // and the day's one red stays on the ground that is live.
+    final isBeingScored = match.status == 'live' || match.status == 'super_over';
+    final isStriking = isBeingScored &&
+        line != null &&
+        line.inningsNumber == latest?.inningsNumber;
 
     final nameColor = match.isFinished
         ? (match.winnerId != null && match.winnerId == teamId
@@ -383,7 +590,9 @@ class _TeamScoreRow extends StatelessWidget {
           ),
         ] else if (match.isLive)
           Text(
-            'Yet to bat',
+            // At the break the side yet to bat has a target, which is the
+            // more useful thing to show than "Yet to bat".
+            _chaseLine(match, latest, overs: maxOvers) ?? 'Yet to bat',
             style: CkType.body(fontSize: 11.5, color: CkColors.muted),
           ),
       ],
@@ -392,10 +601,17 @@ class _TeamScoreRow extends StatelessWidget {
 }
 
 class _ScorerFooter extends StatelessWidget {
-  const _ScorerFooter({required this.match, required this.onActions});
+  const _ScorerFooter({
+    required this.match,
+    required this.onActions,
+    this.onOpenScorer,
+  });
 
   final TournamentLiveMatch match;
   final VoidCallback onActions;
+
+  /// Only offered while a ball can actually be recorded (artboard 27L).
+  final VoidCallback? onOpenScorer;
 
   String _initials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
@@ -460,7 +676,17 @@ class _ScorerFooter extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          _GhostChip(label: 'ACTIONS', onTap: onActions),
+          // Artboard 27L gives the live card two actions, not one: the board
+          // answers "which ground needs me right now", and the answer is
+          // usually "open the scorer", not "open a menu".
+          if (onOpenScorer != null) ...[
+            _GhostChip(label: 'OPEN SCORER', onTap: onOpenScorer!),
+            const SizedBox(width: 6),
+          ],
+          _GhostChip(
+            label: onOpenScorer == null ? 'ACTIONS' : 'MATCH OPS',
+            onTap: onActions,
+          ),
         ],
       ),
     );
@@ -725,17 +951,61 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-/// Artboard 27h — the draw is locked but nobody has bowled yet. The tab is a
-/// readiness checklist rather than an empty dashboard.
-class _PreMatchdayReadiness extends StatelessWidget {
-  const _PreMatchdayReadiness({required this.board});
+/// Artboard 27k — matchday morning, actionable.
+///
+/// Instead of a passive read-only checklist, this presents each scheduled
+/// fixture as an interactive card with [Start Match / Toss], [Quick PIN],
+/// and inline schedule editing.
+class _MatchdayMorningBoard extends StatefulWidget {
+  const _MatchdayMorningBoard({
+    required this.board,
+    required this.onStartMatch,
+    required this.onQuickPin,
+    required this.onAssignScorer,
+    required this.onReschedule,
+    required this.onMatchActions,
+  });
 
   final List<TournamentLiveMatch> board;
+  final void Function(TournamentLiveMatch match)? onStartMatch;
+  final void Function(TournamentLiveMatch match)? onQuickPin;
+  final void Function(TournamentLiveMatch match) onAssignScorer;
+  final void Function(TournamentLiveMatch match)? onReschedule;
+  final void Function(TournamentLiveMatch match) onMatchActions;
+
+  @override
+  State<_MatchdayMorningBoard> createState() => _MatchdayMorningBoardState();
+}
+
+class _MatchdayMorningBoardState extends State<_MatchdayMorningBoard> {
+  /// Artboard 27k shows the first two fixtures in full and folds the rest
+  /// behind "Show 2 more" — a matchday morning is about the next match, not
+  /// the whole card.
+  static const _initiallyShown = 2;
+  bool _expanded = false;
+
+  /// "13:30 · G2" — the two facts that tell the organiser when and where.
+  static String _slot(TournamentLiveMatch m) {
+    final t = m.scheduledStartTime;
+    final time = '${t.hour.toString().padLeft(2, '0')}:'
+        '${t.minute.toString().padLeft(2, '0')}';
+    return '$time · ${m.venue}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final board = widget.board;
+    final onStartMatch = widget.onStartMatch;
+    final onQuickPin = widget.onQuickPin;
+    final onAssignScorer = widget.onAssignScorer;
+    final onReschedule = widget.onReschedule;
+    final onMatchActions = widget.onMatchActions;
+
     final withScorer = board.where((m) => m.scorerId != null).length;
-    final next = board.take(3).toList();
+    final totalGrounds = board.map((m) => m.venue).toSet().length;
+    final visibleCount =
+        _expanded ? board.length : board.length.clamp(0, _initiallyShown);
+    final hidden = board.length - visibleCount;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -745,8 +1015,7 @@ class _PreMatchdayReadiness extends StatelessWidget {
         _ReadinessRow(
           done: true,
           title: '${board.length} fixtures scheduled',
-          subtitle: '${board.map((m) => m.venue).toSet().length} '
-              'ground${board.map((m) => m.venue).toSet().length == 1 ? '' : 's'}',
+          subtitle: '$totalGrounds ground${totalGrounds == 1 ? '' : 's'}',
         ),
         _ReadinessRow(
           done: withScorer == board.length,
@@ -756,83 +1025,579 @@ class _PreMatchdayReadiness extends StatelessWidget {
               : 'Assign before the first ball',
         ),
         const SizedBox(height: 14),
-        Text(
-          'FIRST FIXTURES',
-          style: CkType.mono(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.12,
-          ),
+
+        // Section header for scheduled fixtures
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'FIXTURES · AWAITING TOSS',
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.12,
+                  color: CkColors.muted,
+                ),
+              ),
+            ),
+            Text(
+              '${board.length} matches',
+              style: CkType.mono(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.06,
+                color: CkColors.muted,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
-        for (final m in next)
+
+        // Fixture Cards (Artboard 27k)
+        for (var i = 0; i < visibleCount; i++) ...[
+          _ScheduledMatchCard(
+            matchIndex: i + 1,
+            match: board[i],
+            onStartMatch: () => onStartMatch?.call(board[i]),
+            onQuickPin: () => onQuickPin?.call(board[i]),
+            onAssign: () => onAssignScorer(board[i]),
+            onReschedule: () => onReschedule?.call(board[i]),
+            onActions: () => onMatchActions(board[i]),
+          ),
+          const SizedBox(height: 10),
+        ],
+
+        if (hidden > 0)
           Padding(
-            padding: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.only(bottom: 12),
+            child: GestureDetector(
+              onTap: () => setState(() => _expanded = true),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      // Name the folded fixtures rather than just counting
+                      // them, the way the artboard does.
+                      board
+                          .skip(visibleCount)
+                          .map((m) => '${m.round ?? 'Match'} ${_slot(m)}')
+                          .join('  ·  '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: CkType.mono(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.06,
+                        color: CkColors.muted,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Show $hidden more',
+                    style: CkType.body(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: CkColors.ink,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        const SizedBox(height: 4),
+
+        // Bottom stats: Played 0 / N, Awaiting toss N
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: CkColors.paper2,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: CkColors.hairline),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PLAYED',
+                      style: CkType.mono(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.10,
+                        color: CkColors.muted,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '0 / ${board.length}',
+                      style: CkType.mono(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: CkColors.ink,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: CkColors.paper2,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: CkColors.hairline),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AWAITING TOSS',
+                      style: CkType.mono(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.10,
+                        color: CkColors.muted,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${board.length}',
+                      style: CkType.mono(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: CkColors.ink,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Artboard 27h's closing line — the tab says what it will become, so
+        // the empty dashboard reads as "not yet" rather than "broken".
+        Text(
+          'Live scores appear here on matchday',
+          style: CkType.body(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: CkColors.ink2,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Once the first scorer starts a match, this tab becomes the '
+          'multi-ground dashboard.',
+          style: CkType.body(
+            fontSize: 11.5,
+            height: 1.5,
+            color: CkColors.muted,
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+class _ScheduledMatchCard extends StatelessWidget {
+  const _ScheduledMatchCard({
+    required this.matchIndex,
+    required this.match,
+    required this.onStartMatch,
+    required this.onQuickPin,
+    required this.onAssign,
+    required this.onReschedule,
+    required this.onActions,
+  });
+
+  final int matchIndex;
+  final TournamentLiveMatch match;
+  final VoidCallback onStartMatch;
+  final VoidCallback onQuickPin;
+  final VoidCallback onAssign;
+  final VoidCallback onReschedule;
+  final VoidCallback onActions;
+
+  String _monogram(String? name) {
+    if (name == null || name.trim().isEmpty) return '?';
+    return name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .take(2)
+        .map((w) => w.characters.first)
+        .join()
+        .toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final timeStr =
+        '${match.scheduledStartTime.hour.toString().padLeft(2, '0')}:'
+        '${match.scheduledStartTime.minute.toString().padLeft(2, '0')}';
+    final label = match.round != null && match.round!.isNotEmpty
+        ? match.round!
+        : 'M$matchIndex';
+
+    final teamA = match.teamAName ?? 'TBC';
+    final teamB = match.teamBName ?? 'TBC';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: CkColors.hairline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header: M1 · 09:00 · Ground 1 · Edit · Scheduled
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: const BoxDecoration(
+              color: CkColors.paper2,
+              border: Border(bottom: BorderSide(color: CkColors.hairline)),
+            ),
             child: Row(
               children: [
                 Text(
-                  '${m.scheduledStartTime.hour.toString().padLeft(2, '0')}:'
-                  '${m.scheduledStartTime.minute.toString().padLeft(2, '0')}',
+                  label,
                   style: CkType.mono(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 0,
+                    letterSpacing: 0.06,
                     color: CkColors.ink,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '${m.teamAName ?? 'TBC'} v ${m.teamBName ?? 'TBC'}',
+                    '$timeStr · ${match.venue}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: CkType.body(fontSize: 12.5, color: CkColors.ink2),
+                    style: CkType.mono(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.02,
+                      color: CkColors.muted,
+                    ),
                   ),
                 ),
-                Text(
-                  m.scorerName == null ? 'No scorer' : m.venue,
-                  style: CkType.mono(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: m.scorerName == null
-                        ? CkColors.amberDark
-                        : CkColors.muted,
+                InkWell(
+                  onTap: onReschedule,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.edit_outlined, size: 11, color: CkColors.ink),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Edit',
+                          style: CkType.mono(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.06,
+                            color: CkColors.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: CkColors.paper,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: CkColors.hairline),
+                  ),
+                  child: Text(
+                    'SCHEDULED',
+                    style: CkType.mono(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.08,
+                      color: CkColors.muted,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: CkColors.paper,
-            borderRadius: BorderRadius.circular(CkRadii.md),
-            border: Border.all(color: CkColors.hairline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Live scores appear here on matchday',
-                style: CkType.display(fontSize: 14),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Once the first scorer starts a match, this tab becomes the '
-                'multi-ground dashboard.',
-                style: CkType.body(
-                  fontSize: 12,
-                  height: 1.5,
-                  color: CkColors.muted,
+
+          // Matchup row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+            child: Row(
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: CkColors.paper2,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: CkColors.line),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _monogram(teamA),
+                    style: CkType.mono(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w700,
+                      color: CkColors.ink,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    teamA,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: CkType.display(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: CkColors.ink,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    'v',
+                    style: CkType.mono(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: CkColors.soft,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: CkColors.paper2,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: CkColors.line),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _monogram(teamB),
+                    style: CkType.mono(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w700,
+                      color: CkColors.ink,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    teamB,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: CkType.display(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: CkColors.ink,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 18),
-      ],
+
+          // Scorer Status Bar
+          if (match.needsScorer) ...[
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: CkColors.cream,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: CkColors.creamBorder),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    'NO SCORER',
+                    style: CkType.mono(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.08,
+                      color: CkColors.amberDark,
+                    ),
+                  ),
+                  const Spacer(),
+                  InkWell(
+                    onTap: onQuickPin,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: CkColors.paper,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: CkColors.creamBorder),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.dialpad, size: 12, color: CkColors.muted),
+                          const SizedBox(width: 4),
+                          Text(
+                            'QUICK PIN',
+                            style: CkType.mono(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.06,
+                              color: CkColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: onAssign,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: CkColors.ink),
+                      ),
+                      child: Text(
+                        '+ Assign',
+                        style: CkType.body(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: CkColors.ink,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: CkColors.paper,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: CkColors.hairline),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: CkColors.greenInk,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Scorer: ${match.scorerName ?? 'Assigned'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: CkType.body(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: CkColors.ink,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Action Buttons: [Start Match / Toss] + [Actions ▾]
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: onStartMatch,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CkColors.ink,
+                      foregroundColor: CkColors.paper,
+                      elevation: 0,
+                      minimumSize: const Size.fromHeight(40),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.sports_cricket, size: 16, color: CkColors.paper),
+                        const SizedBox(width: 7),
+                        Text(
+                          'Start Match / Toss',
+                          style: CkType.body(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: CkColors.paper,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: onActions,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: CkColors.hairline),
+                    backgroundColor: CkColors.paper,
+                    elevation: 0,
+                    minimumSize: const Size(90, 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Actions',
+                        style: CkType.body(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: CkColors.ink,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_drop_down, size: 16, color: CkColors.ink),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

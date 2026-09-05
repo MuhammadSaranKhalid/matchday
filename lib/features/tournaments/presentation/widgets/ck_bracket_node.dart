@@ -18,6 +18,7 @@ class CkBracketNode extends StatelessWidget {
     this.teamBCrestColor,
     this.isLive = false,
     this.isBye = false,
+    this.byeReason,
     this.roundLabel,
     this.onTap,
   });
@@ -35,6 +36,10 @@ class CkBracketNode extends StatelessWidget {
   final String? teamBCrestColor;
   final bool isLive;
   final bool isBye;
+
+  /// "Bye · advances to SF". The canvas insists the node states *why* it is
+  /// empty, in mono — an unexplained blank half reads as a loading state.
+  final String? byeReason;
   final String? roundLabel;
   final VoidCallback? onTap;
 
@@ -118,7 +123,7 @@ class CkBracketNode extends StatelessWidget {
               ),
               const Divider(height: 1, thickness: 1, color: CkColors.hairline),
               _buildTeamSlot(
-                name: isBye ? 'BYE (Advances)' : teamBName,
+                name: isBye ? (byeReason ?? 'Bye · advances') : teamBName,
                 seed: seedB,
                 score: scoreB,
                 isWinner: isTeamBWinner,

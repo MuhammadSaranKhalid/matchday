@@ -473,6 +473,21 @@ class _TournamentCreateWizardScreenState
       return;
     }
 
+    // Artwork goes up only now: the storage policy authorises on
+    // `is_tournament_organizer(<first path segment>::uuid)`, so the folder has
+    // to be a tournament that already exists. Running it after publish rather
+    // than before also keeps a failed upload from poisoning the error state
+    // that `_showFailure` reads — the cup is live either way, and matchday
+    // falls back to the seam pattern when there is no banner.
+    if (_logoFile != null || _bannerFile != null) {
+      await controller.uploadArtwork(
+        tournamentId: tournament.id,
+        banner: _bannerFile,
+        logo: _logoFile,
+      );
+      if (!mounted) return;
+    }
+
     final key = _draftKey;
     if (key != null) await ref.read(wizardDraftStoreProvider).clear(key);
     if (!mounted) return;

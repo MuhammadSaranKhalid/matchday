@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../domain/entities/tournament_live_match.dart';
+import '../../domain/ops/revised_target.dart';
 
 /// The ground-ops bottom sheets (artboard 28).
 ///
@@ -606,7 +607,14 @@ class _WalkoverSheetState extends State<_WalkoverSheet> {
               _ChoiceCard(
                 selected: _winnerId == id,
                 title: m.displayNameFor(id),
-                subtitle: '',
+                // The two sides of the same fact (artboard 28) — but only
+                // once a winner is picked; before that neither side has been
+                // accused of anything.
+                subtitle: _winnerId == null
+                    ? ''
+                    : _winnerId == id
+                        ? 'Arrived and was ready to play'
+                        : 'Did not arrive',
                 leading: _TeamCrest(name: m.displayNameFor(id)),
                 onTap: () => setState(() => _winnerId = id),
               ),
@@ -795,8 +803,11 @@ class _OverrideSheetState extends State<_OverrideSheet> {
 // ─── The per-match Actions menu (artboard 27c, right) ────────────────────────
 
 enum MatchOpsAction {
+  assignOfficials,
   changeScorer,
   changeGroundOrTime,
+  reviseConditions,
+  launchSuperOver,
   declareWalkover,
   overrideResult,
   abandonMatch,
@@ -829,6 +840,13 @@ Future<MatchOpsAction?> showMatchActionsMenu(
             ),
             if (!match.isFinished)
               _MenuRow(
+                title: 'Assign umpires & scorers',
+                subtitle: 'Officials and the handover code',
+                onTap: () =>
+                    Navigator.pop(ctx, MatchOpsAction.assignOfficials),
+              ),
+            if (!match.isFinished)
+              _MenuRow(
                 title: 'Change scorer',
                 subtitle: scorerLine,
                 onTap: () => Navigator.pop(ctx, MatchOpsAction.changeScorer),
@@ -840,6 +858,22 @@ Future<MatchOpsAction?> showMatchActionsMenu(
                     '${DateFormat('d MMM, HH:mm').format(match.scheduledStartTime)}',
                 onTap: () =>
                     Navigator.pop(ctx, MatchOpsAction.changeGroundOrTime),
+              ),
+            // Rain: only once there is a match in progress to shorten.
+            if (started && !match.isFinished)
+              _MenuRow(
+                title: 'Revise match conditions',
+                subtitle: 'Rain — reduce overs and reset the target',
+                onTap: () =>
+                    Navigator.pop(ctx, MatchOpsAction.reviseConditions),
+              ),
+            // The engine decides the tie; this only opens the super over.
+            if (match.status == 'tied')
+              _MenuRow(
+                title: 'Launch super over',
+                subtitle: 'Scores are level after regulation',
+                onTap: () =>
+                    Navigator.pop(ctx, MatchOpsAction.launchSuperOver),
               ),
             if (!match.isFinished)
               _MenuRow(
@@ -939,6 +973,7 @@ class _MenuRow extends StatelessWidget {
 
 enum ConsoleMenuAction {
   editSettings,
+  feeLedger,
   sendAnnouncement,
   coOrganisers,
   closeRegistrationEarly,
@@ -952,6 +987,7 @@ Future<ConsoleMenuAction?> showConsoleMenu(
   required bool inRegistration,
   required bool drawLocked,
   bool isOwner = true,
+  bool hasEntryFee = false,
 }) {
   return _showOpsSheet<ConsoleMenuAction>(
     context: context,
@@ -967,6 +1003,14 @@ Future<ConsoleMenuAction?> showConsoleMenu(
             subtitle: 'Dates, rules, prizes, venues',
             onTap: () => Navigator.pop(ctx, ConsoleMenuAction.editSettings),
           ),
+          // Artboard 24c. Only offered when there is money to reconcile — a
+          // free cup has no ledger, and an empty one is worse than absent.
+          if (hasEntryFee)
+            _MenuRow(
+              title: 'Fee ledger',
+              subtitle: 'Who has paid, and what is outstanding',
+              onTap: () => Navigator.pop(ctx, ConsoleMenuAction.feeLedger),
+            ),
           _MenuRow(
             title: 'Send an announcement',
             subtitle: 'Notifies all managers and followers',
@@ -1014,4 +1058,795 @@ Future<ConsoleMenuAction?> showConsoleMenu(
       ),
     ),
   );
+}
+
+// ─── Match-law ops (artboards 27m, 28b) ──────────────────────────────────────
+
+/// What the organiser applied on the rain sheet.
+class ReviseConditionsOutcome {
+  const ReviseConditionsOutcome({
+    required this.revisedOvers,
+    required this.bowlerQuota,
+    required this.method,
+    this.revisedTarget,
+    this.reason,
+  });
+
+  final int revisedOvers;
+  final int bowlerQuota;
+  final TargetMethod method;
+  final int? revisedTarget;
+  final String? reason;
+}
+
+/// Artboards 27m / 28b — "Revise match conditions" and "Revise the target".
+///
+/// These are **calculators, not confirmations**: form on top, the computed
+/// answer in a cream box, the action at the bottom. The organiser reads the
+/// number back to both captains before committing, which is also why the DLS
+/// figure is typed in rather than guessed at — see [RevisedTargetCalculator].
+///
+/// Cream throughout. Red is reserved for abandonment, which lives one row
+/// below in the match-ops menu.
+Future<ReviseConditionsOutcome?> showReviseConditionsSheet(
+  BuildContext context, {
+  required TournamentLiveMatch match,
+  required StoppageContext stoppage,
+  String? stoppageNote,
+}) {
+  return _showOpsSheet<ReviseConditionsOutcome>(
+    context: context,
+    builder: (ctx) => _ReviseConditionsSheet(
+      match: match,
+      stoppage: stoppage,
+      stoppageNote: stoppageNote,
+    ),
+  );
+}
+
+class _ReviseConditionsSheet extends StatefulWidget {
+  const _ReviseConditionsSheet({
+    required this.match,
+    required this.stoppage,
+    this.stoppageNote,
+  });
+
+  final TournamentLiveMatch match;
+  final StoppageContext stoppage;
+  final String? stoppageNote;
+
+  @override
+  State<_ReviseConditionsSheet> createState() => _ReviseConditionsSheetState();
+}
+
+class _ReviseConditionsSheetState extends State<_ReviseConditionsSheet> {
+  late int _overs;
+  late TargetMethod _method;
+  final _target = TextEditingController();
+  final _reason = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Open one over short of the original — the organiser is here because
+    // play was lost, so the starting guess should already be a reduction.
+    final min = RevisedTargetCalculator.minimumSelectableOvers(widget.stoppage);
+    final suggested = widget.stoppage.originalOvers - 1;
+    _overs = suggested < min ? min : suggested;
+    _method = TargetMethod.runRate;
+  }
+
+  @override
+  void dispose() {
+    _target.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
+
+  RevisedTargetPreview get _preview => RevisedTargetCalculator.preview(
+        context: widget.stoppage,
+        revisedOvers: _overs,
+        method: _method,
+        enteredTarget: int.tryParse(_target.text.trim()),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final stoppage = widget.stoppage;
+    final preview = _preview;
+    final min = RevisedTargetCalculator.minimumSelectableOvers(stoppage);
+    final max = stoppage.originalOvers;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SheetHeader(
+            title: stoppage.isChaseInterrupted
+                ? 'Revise the target'
+                : 'Revise match conditions',
+            subtitle: '${widget.match.teamAName ?? 'Team A'} v '
+                '${widget.match.teamBName ?? 'Team B'}'
+                '${widget.match.round == null ? '' : ' · ${widget.match.round}'}',
+          ),
+
+          // The situation, stated before anything is asked of the organiser.
+          Container(
+            margin: const EdgeInsets.only(top: 4, bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+            decoration: BoxDecoration(
+              color: CkColors.cream,
+              borderRadius: BorderRadius.circular(CkRadii.md),
+              border: Border.all(color: CkColors.creamBorder),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.water_drop_outlined,
+                  size: 16,
+                  color: CkColors.amberDark,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    widget.stoppageNote ??
+                        'Play stopped at ${stoppage.oversBowledText} overs in '
+                            'the ${stoppage.inningsNumber == 1 ? '1st' : '2nd'} '
+                            'innings. Reducing the match will recalculate the '
+                            'bowler quota'
+                            '${stoppage.isChaseInterrupted ? ' and the target' : ''}.',
+                    style: CkType.body(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: CkColors.ink2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          _FieldLabel(
+            'New match length per side',
+            trailing: 'was ${stoppage.originalOvers}',
+          ),
+          const SizedBox(height: 8),
+          _OversStepper(
+            value: _overs,
+            min: min,
+            max: max,
+            onChanged: (v) => setState(() => _overs = v),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Minimum ${RevisedTargetCalculator.minimumOvers} overs per side '
+            'for a result.',
+            style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+          ),
+
+          if (stoppage.isChaseInterrupted) ...[
+            const SizedBox(height: 16),
+            const _FieldLabel('Target calculation method'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                for (final m in TargetMethod.values)
+                  _MethodPill(
+                    label: m.label,
+                    selected: _method == m,
+                    onTap: () => setState(() => _method = m),
+                  ),
+              ],
+            ),
+            if (_method != TargetMethod.runRate) ...[
+              const SizedBox(height: 10),
+              _TargetEntry(
+                controller: _target,
+                method: _method,
+                onChanged: () => setState(() {}),
+              ),
+            ],
+          ],
+
+          const SizedBox(height: 14),
+          _ImpactPreview(preview: preview, stoppage: stoppage),
+
+          const SizedBox(height: 12),
+          const _FieldLabel('Reason · shown to both captains'),
+          const SizedBox(height: 8),
+          _ReasonBox(
+            controller: _reason,
+            hint: 'e.g. Rain at Model Town Ground, 26 minutes lost',
+          ),
+
+          const SizedBox(height: 12),
+          const _NoteBlock(
+            title: 'When you apply this',
+            body: 'Both captains and the scorer are notified the moment this '
+                'is applied. The scoring app picks up the new overs and bowler '
+                'quota immediately.',
+          ),
+
+          const SizedBox(height: 14),
+          _SheetActions(
+            // "Resume Play (Unchanged)" (artboard 28b): the organiser opened
+            // the sheet because play stopped, and the commonest outcome is
+            // that it resumes with nothing revised. Dismissing is that
+            // outcome, so the cancel slot says so rather than "Cancel".
+            cancelLabel: 'Resume Play (Unchanged)',
+            confirmLabel: stoppage.isChaseInterrupted
+                ? 'Apply Revised Target & Notify Teams'
+                : 'Apply & Notify Teams',
+            onCancel: () => Navigator.pop(context),
+            onConfirm: preview.isValid
+                ? () => Navigator.pop(
+                      context,
+                      ReviseConditionsOutcome(
+                        revisedOvers: preview.revisedOvers,
+                        bowlerQuota: preview.bowlerQuota,
+                        method: _method,
+                        revisedTarget: preview.target,
+                        reason: _reason.text.trim().isEmpty
+                            ? null
+                            : _reason.text.trim(),
+                      ),
+                    )
+                : null,
+          ),
+          if (!preview.isValid && preview.invalidReason != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              preview.invalidReason!,
+              textAlign: TextAlign.center,
+              style: CkType.body(fontSize: 11.5, color: CkColors.amberInk),
+            ),
+          ],
+          const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+}
+
+/// The cream computed box: the number the organiser reads back to the captains.
+class _ImpactPreview extends StatelessWidget {
+  const _ImpactPreview({required this.preview, required this.stoppage});
+
+  final RevisedTargetPreview preview;
+  final StoppageContext stoppage;
+
+  @override
+  Widget build(BuildContext context) {
+    final target = preview.target;
+    final rate = preview.requiredRunRate;
+    final par = preview.parScore;
+    final diff = preview.parDifference;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: CkColors.cream,
+        borderRadius: BorderRadius.circular(CkRadii.md),
+        border: Border.all(color: CkColors.creamBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            target == null ? 'IMPACT PREVIEW' : 'REVISED TARGET',
+            style: CkType.mono(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.10,
+              color: CkColors.amberDark,
+            ),
+          ),
+          if (target != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              '$target',
+              style: CkType.mono(
+                fontSize: 34,
+                fontWeight: FontWeight.w700,
+                color: CkColors.ink,
+              ),
+            ),
+            Text(
+              'RUNS FROM ${preview.revisedOvers} OVERS',
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.10,
+                color: CkColors.amberDark,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ] else
+            const SizedBox(height: 10),
+          Wrap(
+            spacing: 18,
+            runSpacing: 10,
+            children: [
+              _ImpactStat(
+                label: 'Max overs per bowler',
+                value: '${stoppage.originalQuota} → ${preview.bowlerQuota}',
+              ),
+              _ImpactStat(
+                label: 'Overs bowled',
+                value: '${stoppage.oversBowledText} of '
+                    '${preview.revisedOvers}',
+              ),
+              if (rate != null)
+                _ImpactStat(
+                  label: 'Required rate',
+                  value: '${rate.toStringAsFixed(2)} RPO · '
+                      '${preview.ballsRemaining} balls left',
+                ),
+              if (par != null && diff != null)
+                _ImpactStat(
+                  label: 'Par at ${stoppage.oversBowledText}',
+                  value: '$par · ${diff >= 0 ? '+' : ''}$diff',
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImpactStat extends StatelessWidget {
+  const _ImpactStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: CkType.mono(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.10,
+            color: CkColors.muted,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: CkType.mono(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: CkColors.ink,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Overs are *tapped*, not dragged — the same reasoning as the scheduler in
+/// artboard 25: one number is being fixed in place, not explored.
+class _OversStepper extends StatelessWidget {
+  const _OversStepper({
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _StepButton(
+          icon: Icons.remove,
+          onTap: value > min ? () => onChanged(value - 1) : null,
+        ),
+        Expanded(
+          child: Column(
+            children: [
+              Text(
+                '$value',
+                style: CkType.mono(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  color: CkColors.ink,
+                ),
+              ),
+              Text(
+                value == 1 ? 'OVER' : 'OVERS',
+                style: CkType.mono(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.10,
+                  color: CkColors.muted,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _StepButton(
+          icon: Icons.add,
+          onTap: value < max ? () => onChanged(value + 1) : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({required this.icon, this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: CkColors.paper,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: CkColors.line),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: onTap == null ? CkColors.soft : CkColors.ink,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MethodPill extends StatelessWidget {
+  const _MethodPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? CkColors.paper2 : CkColors.paper,
+      borderRadius: BorderRadius.circular(999),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 13,
+            vertical: selected ? 7.5 : 8,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? CkColors.ink : CkColors.line,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Text(
+            label,
+            style: CkType.body(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: selected ? CkColors.ink : CkColors.ink2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// DLS is a lookup against the official table, so the organiser enters the
+/// figure they read off it. See [RevisedTargetCalculator] for why this app
+/// does not reproduce that table.
+class _TargetEntry extends StatelessWidget {
+  const _TargetEntry({
+    required this.controller,
+    required this.method,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final TargetMethod method;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          decoration: BoxDecoration(
+            color: CkColors.surface,
+            borderRadius: BorderRadius.circular(CkRadii.md),
+            border: Border.all(color: CkColors.line),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  onChanged: (_) => onChanged(),
+                  keyboardType: TextInputType.number,
+                  style: CkType.mono(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: CkColors.ink,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    isDense: true,
+                    filled: false,
+                    contentPadding: EdgeInsets.zero,
+                    hintText: method == TargetMethod.dls
+                        ? 'Target from the DLS table'
+                        : 'Agreed target',
+                    hintStyle: CkType.body(fontSize: 13, color: CkColors.soft),
+                  ),
+                ),
+              ),
+              Text(
+                'RUNS',
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.08,
+                  color: CkColors.muted,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (method == TargetMethod.dls) ...[
+          const SizedBox(height: 6),
+          Text(
+            'Read the revised target off the official DLS table or the ICC '
+            'app, then enter it here. Matchday does not compute DLS — a table '
+            'reproduced from memory would be wrong confidently.',
+            style: CkType.body(
+              fontSize: 11.5,
+              height: 1.45,
+              color: CkColors.muted,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ReasonBox extends StatelessWidget {
+  const _ReasonBox({required this.controller, required this.hint});
+
+  final TextEditingController controller;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      decoration: BoxDecoration(
+        color: CkColors.surface,
+        borderRadius: BorderRadius.circular(CkRadii.md),
+        border: Border.all(color: CkColors.line),
+      ),
+      child: TextField(
+        controller: controller,
+        maxLines: 2,
+        maxLength: 240,
+        style: CkType.body(fontSize: 12.5, height: 1.5, color: CkColors.ink),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          isDense: true,
+          filled: false,
+          counterText: '',
+          contentPadding: EdgeInsets.zero,
+          hintText: hint,
+          hintStyle: CkType.body(
+            fontSize: 12.5,
+            height: 1.5,
+            color: CkColors.soft,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Super over (artboard 28c) ───────────────────────────────────────────────
+
+/// Which side bats first in the super over.
+class SuperOverOutcome {
+  const SuperOverOutcome({required this.batsFirstTeamId});
+
+  final String batsFirstTeamId;
+}
+
+/// Artboard 28c — "Launch super over".
+///
+/// The scores are level and the engine has already said so; this sheet does
+/// not decide the tie and does not score the over. It states the rules in
+/// force, takes the one decision that is the organiser's — who bats first —
+/// and hands over to the scorer console.
+Future<SuperOverOutcome?> showSuperOverSheet(
+  BuildContext context, {
+  required TournamentLiveMatch match,
+  bool boundaryCountback = true,
+}) {
+  return _showOpsSheet<SuperOverOutcome>(
+    context: context,
+    builder: (ctx) => _SuperOverSheet(
+      match: match,
+      boundaryCountback: boundaryCountback,
+    ),
+  );
+}
+
+class _SuperOverSheet extends StatefulWidget {
+  const _SuperOverSheet({
+    required this.match,
+    required this.boundaryCountback,
+  });
+
+  final TournamentLiveMatch match;
+  final bool boundaryCountback;
+
+  @override
+  State<_SuperOverSheet> createState() => _SuperOverSheetState();
+}
+
+class _SuperOverSheetState extends State<_SuperOverSheet> {
+  String? _batsFirst;
+
+  @override
+  void initState() {
+    super.initState();
+    // The side that chased in regulation bats first by convention, and the
+    // chasing side is whichever innings came last.
+    final lines = widget.match.inningsLines;
+    if (lines.isNotEmpty) {
+      final last = lines.reduce(
+        (a, b) => b.inningsNumber > a.inningsNumber ? b : a,
+      );
+      _batsFirst = last.battingTeamId;
+    }
+    _batsFirst ??= widget.match.teamBId;
+  }
+
+  String _scoreOf(String? teamId) {
+    final line = widget.match.lineFor(teamId);
+    return line?.scoreText ?? '—';
+  }
+
+  /// "Batted first" / "Chased second" — the artboard shows how each side got
+  /// here, because the convention is that the side that chased bats first in
+  /// the super over.
+  String _regulationRole(String? teamId) {
+    final line = widget.match.lineFor(teamId);
+    if (line == null) return 'Regulation';
+    return line.inningsNumber == 1 ? 'Batted first' : 'Chased second';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final match = widget.match;
+    final aId = match.teamAId;
+    final bId = match.teamBId;
+
+    // The level score, taken from whichever innings line is present.
+    final level = match.inningsLines.isEmpty
+        ? null
+        : match.inningsLines.first.runs;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SheetHeader(
+            title: 'Launch super over',
+            subtitle: '${match.teamAName ?? 'Team A'} v '
+                '${match.teamBName ?? 'Team B'}'
+                '${level == null ? '' : ' · scores level at $level'}',
+          ),
+
+          _NoteBlock(
+            title: 'Rules in force',
+            body: '1 over per team, 2 wickets max. If the super over is also '
+                'tied, ${widget.boundaryCountback ? 'boundary countback decides' : 'the match is recorded as a tie'} '
+                '— set by the organiser at creation.',
+          ),
+
+          const SizedBox(height: 14),
+          const _FieldLabel('Bats first in the super over'),
+          const SizedBox(height: 8),
+          if (aId != null)
+            _ChoiceCard(
+              selected: _batsFirst == aId,
+              title: match.teamAName ?? 'Team A',
+              subtitle: '${_regulationRole(aId)} · ${_scoreOf(aId)}',
+              leading: _TeamCrest(name: match.teamAName ?? 'Team A'),
+              onTap: () => setState(() => _batsFirst = aId),
+            ),
+          if (aId != null && bId != null) const SizedBox(height: 8),
+          if (bId != null)
+            _ChoiceCard(
+              selected: _batsFirst == bId,
+              title: match.teamBName ?? 'Team B',
+              subtitle: '${_regulationRole(bId)} · ${_scoreOf(bId)}',
+              leading: _TeamCrest(name: match.teamBName ?? 'Team B'),
+              onTap: () => setState(() => _batsFirst = bId),
+            ),
+
+          const SizedBox(height: 14),
+          const _NoteBlock(
+            title: 'Before the first ball',
+            body: 'Nominate 3 batters and 1 bowler now. The super over is '
+                'bowled from the same end as the final over of the innings. '
+                'Both scorecards stay attached to this fixture — regulation '
+                'first, the super over as a second card — and for the table '
+                'the match is a win worth 2 points, with NRR taken from the '
+                'regulation innings only.',
+            cream: false,
+          ),
+
+          const SizedBox(height: 14),
+          _SheetActions(
+            // The match is already recorded as tied, so dismissing really is
+            // "record as tie" — the label is a promise the state already keeps.
+            cancelLabel: 'Record as tie — no super over',
+            confirmLabel: 'Open Super Over Scorer Console',
+            onCancel: () => Navigator.pop(context),
+            onConfirm: _batsFirst == null
+                ? null
+                : () => Navigator.pop(
+                      context,
+                      SuperOverOutcome(batsFirstTeamId: _batsFirst!),
+                    ),
+          ),
+          const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
 }

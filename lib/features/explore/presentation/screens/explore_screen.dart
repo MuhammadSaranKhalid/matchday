@@ -32,6 +32,7 @@ class ExploreScreen extends ConsumerStatefulWidget {
     this.onOpenTeam,
     this.onOpenProfile,
     this.onOpenMatch,
+    this.onOpenTournament,
     this.onSeeAll,
     this.onCreateTeam,
   });
@@ -41,6 +42,7 @@ class ExploreScreen extends ConsumerStatefulWidget {
   final ValueChanged<String>? onOpenTeam;
   final ValueChanged<String>? onOpenProfile;
   final ValueChanged<String>? onOpenMatch;
+  final ValueChanged<String>? onOpenTournament;
   final void Function(String query, ExploreCategory category)? onSeeAll;
   final VoidCallback? onCreateTeam;
 
@@ -276,6 +278,14 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   query: q,
                   onTap: () => widget.onOpenMatch?.call(m.matchId),
                 )),
+        ExploreCategory.tournaments => r.tournaments
+            .take(_previewCount)
+            .map((t) => TournamentRow(
+                  tournament: t,
+                  query: q,
+                  onTap: () =>
+                      widget.onOpenTournament?.call(t.tournamentId),
+                )),
       },
     ];
   }
@@ -335,6 +345,18 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               ),
             ),
           ),
+        ],
+        // ── Open tournaments ──
+        // The design's "Featured grassroots cups" (artboard 08), ordered
+        // live-first by the function rather than by distance — the same
+        // honesty the teams section below applies.
+        if (b.tournaments.isNotEmpty) ...[
+          const ExploreSectionHeader(label: 'Tournaments'),
+          for (final t in b.tournaments)
+            TournamentRow(
+              tournament: t,
+              onTap: () => widget.onOpenTournament?.call(t.tournamentId),
+            ),
         ],
         // ── Recently active teams ──
         // Replaces the design's "Teams near you": ordering by recency is the

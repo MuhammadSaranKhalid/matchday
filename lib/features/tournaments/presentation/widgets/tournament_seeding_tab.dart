@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../domain/draw/draw_builder.dart';
+import '../../domain/draw/draw_plan.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_registration.dart';
 
@@ -30,6 +33,7 @@ class TournamentSeedingTab extends StatefulWidget {
     required this.approved,
     required this.groundNames,
     required this.onLock,
+    this.onGoToLiveOps,
   });
 
   final Tournament tournament;
@@ -38,9 +42,19 @@ class TournamentSeedingTab extends StatefulWidget {
   /// G1/G2 labels come from the tournament's ground list, in order.
   final List<String> groundNames;
 
-  /// Receives the ordered registrations when the organiser locks the draw.
-  /// Null while a write is already in flight.
-  final void Function(List<TournamentRegistration> ordered)? onLock;
+  /// Receives the ordered registrations *and the exact plan this tab
+  /// previewed* when the organiser locks the draw. Handing the plan over
+  /// rather than letting the console rebuild it is what makes "what you see
+  /// is what publishes" structural instead of conventional — the two used to
+  /// be separate pairing routines and had already drifted.
+  final void Function(
+    List<TournamentRegistration> ordered,
+    DrawPlan plan,
+  )? onLock;
+
+  /// Triggered when the organiser taps "Go to Live Ops Dashboard" on the
+  /// permanently locked draw screen (artboard 25d).
+  final VoidCallback? onGoToLiveOps;
 
   @override
   State<TournamentSeedingTab> createState() => _TournamentSeedingTabState();
@@ -50,12 +64,13 @@ class _TournamentSeedingTabState extends State<TournamentSeedingTab> {
   late List<TournamentRegistration> _ordered = _initialOrder();
   SeedingMethod _method = SeedingMethod.manual;
 
-  /// The daily slots the generated preview spreads fixtures across.
-  static const _slots = ['09:00', '13:30', '18:00'];
-
   bool get _isKnockout =>
       widget.tournament.type == TournamentType.knockout ||
       widget.tournament.type == TournamentType.doubleElimination;
+
+  bool get _isLocked =>
+      widget.tournament.status != TournamentStatus.draft &&
+      widget.tournament.status != TournamentStatus.registration;
 
   /// Past form needs completed tournaments to rank on. With too few, a
   /// form-based order would be mostly guesswork — so it is withheld with the
@@ -108,6 +123,25 @@ class _TournamentSeedingTabState extends State<TournamentSeedingTab> {
     });
   }
 
+  /// The draw exactly as it will be published. One call, one implementation;
+  /// the console publishes this very object.
+  DrawPlan _buildPlan() => buildDraw(
+        type: widget.tournament.type,
+        orderedTeamIds: _ordered.map((r) => r.teamId).toList(),
+        grounds: widget.groundNames,
+        startDate: widget.tournament.startDate ??
+            DateTime.now().add(const Duration(days: 2)),
+      );
+
+  String _nameOf(String? teamId) {
+    if (teamId == null) return 'TBD';
+    return _ordered
+            .where((r) => r.teamId == teamId)
+            .firstOrNull
+            ?.teamName ??
+        'Team';
+  }
+
   @override
   Widget build(BuildContext context) {
     final minTeams = widget.tournament.minTeams ?? 4;
@@ -116,11 +150,31 @@ class _TournamentSeedingTabState extends State<TournamentSeedingTab> {
       return _NotEnoughTeams(have: _ordered.length, need: minTeams);
     }
 
+    final plan = _buildPlan();
+    if (plan.unsupported != null) {
+      return _UnsupportedType(label: plan.unsupported!);
+    }
+
+    // Knockout shows the whole tree, because every one of those rows is
+    // created at lock time. The flat formats show round one and state the
+    // full total underneath — 15 rows of round robin is a scroll, not a
+    // preview.
+    final previewed =
+        _isKnockout ? plan.fixtures : plan.fixturesInRound(1);
+
+    if (_isLocked) {
+      return _buildLockedDraw(plan, previewed);
+    }
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
       children: [
         if (!_isKnockout) ...[
-          _RoundRobinExplainer(teamCount: _ordered.length),
+          _RoundRobinExplainer(
+            teamCount: _ordered.length,
+            matchCount: plan.fixtures.length,
+            roundCount: plan.roundCount,
+          ),
           const SizedBox(height: 16),
         ],
         Text(
@@ -224,8 +278,8 @@ class _TournamentSeedingTabState extends State<TournamentSeedingTab> {
         const SizedBox(height: 18),
         Text(
           _isKnockout
-              ? 'GENERATED FIXTURES · PREVIEW'
-              : 'ROUND 1 · GENERATED',
+              ? 'GENERATED FIXTURES · ALL ${plan.roundCount} ROUNDS'
+              : 'ROUND 1 OF ${plan.roundCount} · GENERATED',
           style: CkType.mono(
             fontSize: 10,
             fontWeight: FontWeight.w700,
@@ -234,23 +288,23 @@ class _TournamentSeedingTabState extends State<TournamentSeedingTab> {
         ),
         const SizedBox(height: 8),
         _FixturePreview(
-          pairings: _pairings(),
-          groundNames: widget.groundNames,
-          slots: _slots,
-          byeTeam: _byeTeam(),
+          fixtures: previewed,
+          nameOf: _nameOf,
+          byeTeams: plan.byes.map((b) => _nameOf(b.teamId)).toList(),
         ),
-        if (!_isKnockout) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Later rounds follow the same rotation. Playoff seeds come from '
-            'the final points table, not this screen.',
-            style: CkType.body(
-              fontSize: 11.5,
-              height: 1.45,
-              color: CkColors.muted,
-            ),
+        const SizedBox(height: 8),
+        Text(
+          _isKnockout
+              ? 'Later rounds are created now and fill in as results land.'
+              : 'All ${plan.fixtures.length} fixtures across '
+                  '${plan.roundCount} rounds are created at lock. Playoff '
+                  'seeds come from the final points table, not this screen.',
+          style: CkType.body(
+            fontSize: 11.5,
+            height: 1.45,
+            color: CkColors.muted,
           ),
-        ],
+        ),
         const SizedBox(height: 18),
         Text(
           'BULK ASSIGN · GROUND × SLOT',
@@ -261,18 +315,12 @@ class _TournamentSeedingTabState extends State<TournamentSeedingTab> {
           ),
         ),
         const SizedBox(height: 8),
-        _GroundSlotMatrix(
-          groundNames: widget.groundNames.isEmpty
-              ? const ['G1']
-              : widget.groundNames,
-          slots: _slots,
-          pairings: _pairings(),
-        ),
+        _GroundSlotMatrix(fixtures: plan.fixtures),
         const SizedBox(height: 22),
         ElevatedButton(
           onPressed: widget.onLock == null
               ? null
-              : () => widget.onLock!(_ordered),
+              : () => widget.onLock!(_ordered, plan),
           style: ElevatedButton.styleFrom(
             backgroundColor: CkColors.ink,
             disabledBackgroundColor: CkColors.paper2,
@@ -296,59 +344,299 @@ class _TournamentSeedingTabState extends State<TournamentSeedingTab> {
     );
   }
 
-  /// With an odd field one team cannot be paired. In knockout the top seed
-  /// takes the bye and goes straight through; the flat formats sit the last
-  /// team out of round one. Returning it lets the preview say so rather than
-  /// quietly dropping a team.
-  String? _byeTeam() {
-    if (_ordered.length.isEven) return null;
-    final names = _ordered.map((r) => r.teamName ?? 'Team').toList();
-    return _isKnockout ? names.first : names.last;
+  /// Artboard 25d — the draw permanently locked.
+  ///
+  /// After locking, seeding is no longer a thing the organiser does. Drag
+  /// handles disappear rather than grey out, each seed gets a cream shield,
+  /// and the primary action hands over to Live Ops.
+  Widget _buildLockedDraw(DrawPlan plan, List<DrawFixture> previewed) {
+    final dateFormat = DateFormat('dd MMM · HH:mm');
+    final lockedAt = widget.tournament.updatedAt;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+      children: [
+        // Artboard 25d: Draw locked banner
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: CkColors.cream,
+            borderRadius: BorderRadius.circular(CkRadii.md),
+            border: Border.all(color: CkColors.creamBorder),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.lock_outline, size: 16, color: CkColors.amberDark),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DRAW LOCKED · ${_ordered.length} TEAMS SEEDED',
+                      style: CkType.mono(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.10,
+                        color: CkColors.amberDark,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'Seeds and bracket pairings are permanent. Match times, venues, and match officials can be managed in Live Ops.',
+                      style: CkType.body(
+                        fontSize: 12,
+                        height: 1.55,
+                        color: CkColors.ink,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Section: Final seeds
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'FINAL SEEDS',
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.12,
+                  color: CkColors.muted,
+                ),
+              ),
+            ),
+            Text(
+              'Locked ${dateFormat.format(lockedAt)}',
+              style: CkType.mono(
+                fontSize: 10,
+                color: CkColors.muted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // 2-column grid of final seeds with cream shields and NO drag handles
+        _FinalSeedsGrid(ordered: _ordered),
+        const SizedBox(height: 18),
+
+        // Published fixtures preview
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _isKnockout
+                    ? 'QUARTER-FINALS · PUBLISHED'
+                    : 'MATCHES · PUBLISHED',
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.12,
+                  color: CkColors.muted,
+                ),
+              ),
+            ),
+            Text(
+              'Published',
+              style: CkType.mono(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.06,
+                color: CkColors.muted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _FixturePreview(
+          fixtures: previewed,
+          nameOf: _nameOf,
+          byeTeams: plan.byes.map((b) => _nameOf(b.teamId)).toList(),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _isKnockout
+              ? 'Semi-finals and the final populate as results come in. All managers were notified when the draw was published.'
+              : 'All fixtures are published. Playoff seeds come from the final points table.',
+          style: CkType.body(
+            fontSize: 11,
+            height: 1.45,
+            color: CkColors.muted,
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Primary Bottom Action: Go to Live Ops Dashboard
+        OutlinedButton(
+          onPressed: widget.onGoToLiveOps,
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: CkColors.ink, width: 1.5),
+            backgroundColor: CkColors.paper,
+            minimumSize: const Size.fromHeight(52),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(CkRadii.md),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.bolt, size: 18, color: CkColors.ink),
+              const SizedBox(width: 8),
+              Text(
+                'Go to Live Ops Dashboard',
+                style: CkType.body(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: CkColors.ink,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
+}
 
-  /// Round-one pairings. Knockout pairs strongest against weakest (1 v N);
-  /// round robin and league pair off the rotation's first round.
-  List<(String, String, String)> _pairings() {
-    final names = _ordered.map((r) => r.teamName ?? 'Team').toList();
-    final out = <(String, String, String)>[];
+class _FinalSeedsGrid extends StatelessWidget {
+  const _FinalSeedsGrid({required this.ordered});
 
-    if (_isKnockout) {
-      final label = switch (names.length) {
-        <= 2 => 'F',
-        <= 4 => 'SF',
-        <= 8 => 'QF',
-        _ => 'R1',
-      };
-      // The bye seed is removed before pairing, so the remaining field is even
-      // and nobody is silently left out.
-      final field = names.length.isOdd ? names.sublist(1) : names;
-      for (var i = 0; i < field.length ~/ 2; i++) {
-        out.add((
-          '$label${i + 1}',
-          field[i],
-          field[field.length - 1 - i],
-        ));
-      }
-    } else {
-      for (var i = 0; i + 1 < names.length; i += 2) {
-        out.add(('M${(i ~/ 2) + 1}', names[i], names[i + 1]));
-      }
-    }
-    return out;
+  final List<TournamentRegistration> ordered;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = (constraints.maxWidth - 6) / 2;
+        return Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (var i = 0; i < ordered.length; i++)
+              SizedBox(
+                width: itemWidth,
+                child: _FinalSeedCard(
+                  position: i + 1,
+                  reg: ordered[i],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _FinalSeedCard extends StatelessWidget {
+  const _FinalSeedCard({required this.position, required this.reg});
+
+  final int position;
+  final TournamentRegistration reg;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = reg.teamName ?? 'Team';
+    final monogram = reg.teamMonogram ??
+        name
+            .trim()
+            .split(RegExp(r'\s+'))
+            .take(2)
+            .map((w) => w.characters.first)
+            .join()
+            .toUpperCase();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: CkColors.hairline),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      child: Row(
+        children: [
+          // Cream shield badge with checkmark (Artboard 25d)
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              color: CkColors.cream,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: CkColors.creamBorder),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(Icons.check, size: 10, color: CkColors.amberDark),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '#$position',
+            style: CkType.mono(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: CkColors.ink,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              shape: BoxShape.circle,
+              border: Border.all(color: CkColors.line),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              monogram,
+              style: CkType.mono(
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                color: CkColors.ink,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.display(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: CkColors.ink,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 class _RoundRobinExplainer extends StatelessWidget {
-  const _RoundRobinExplainer({required this.teamCount});
+  const _RoundRobinExplainer({
+    required this.teamCount,
+    required this.matchCount,
+    required this.roundCount,
+  });
 
   final int teamCount;
 
+  /// Straight from the plan. This block used to compute n(n-1)/2 itself and
+  /// promise a number the lock never published — the console generated n/2.
+  final int matchCount;
+  final int roundCount;
+
   @override
   Widget build(BuildContext context) {
-    // n(n-1)/2 fixtures, played across n-1 rounds for an even field.
-    final matches = teamCount * (teamCount - 1) ~/ 2;
-    final rounds = teamCount.isEven ? teamCount - 1 : teamCount;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -375,7 +663,7 @@ class _RoundRobinExplainer extends StatelessWidget {
               children: [
                 TextSpan(text: '$teamCount teams · '),
                 TextSpan(
-                  text: '$matches matches',
+                  text: '$matchCount matches',
                   style: CkType.body(
                     fontSize: 12,
                     height: 1.5,
@@ -383,7 +671,7 @@ class _RoundRobinExplainer extends StatelessWidget {
                     color: CkColors.ink,
                   ),
                 ),
-                TextSpan(text: ' across $rounds rounds.'),
+                TextSpan(text: ' across $roundCount rounds.'),
               ],
             ),
           ),
@@ -593,22 +881,25 @@ class _SeedRow extends StatelessWidget {
 
 class _FixturePreview extends StatelessWidget {
   const _FixturePreview({
-    required this.pairings,
-    required this.groundNames,
-    required this.slots,
-    this.byeTeam,
+    required this.fixtures,
+    required this.nameOf,
+    this.byeTeams = const [],
   });
 
-  final List<(String, String, String)> pairings;
-  final List<String> groundNames;
-  final List<String> slots;
+  final List<DrawFixture> fixtures;
 
-  /// Named when the field is odd, so the unpaired team is visible.
-  final String? byeTeam;
+  /// Resolves a team id to its name; unresolved sides render as "TBD".
+  final String Function(String?) nameOf;
+
+  /// Named when the field is not a power of two, so the teams that walk
+  /// through are visible rather than silently absent from round one.
+  final List<String> byeTeams;
 
   @override
   Widget build(BuildContext context) {
-    final grounds = groundNames.isEmpty ? const ['G1'] : groundNames;
+    final time = DateFormat('HH:mm');
+    final day = DateFormat('d MMM');
+    var lastRound = -1;
 
     return Container(
       decoration: BoxDecoration(
@@ -619,7 +910,7 @@ class _FixturePreview extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          if (byeTeam != null) ...[
+          for (final bye in byeTeams) ...[
             Container(
               color: CkColors.cream,
               padding:
@@ -640,7 +931,7 @@ class _FixturePreview extends StatelessWidget {
                   ),
                   Expanded(
                     child: Text(
-                      '$byeTeam goes through — odd number of teams',
+                      '$bye goes straight through',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: CkType.body(
@@ -655,8 +946,33 @@ class _FixturePreview extends StatelessWidget {
             ),
             Container(height: 1, color: CkColors.hairline),
           ],
-          for (var i = 0; i < pairings.length; i++) ...[
-            if (i > 0) Container(height: 1, color: CkColors.hairline),
+          for (var i = 0; i < fixtures.length; i++) ...[
+            // A round header, not a divider, wherever the round changes —
+            // the preview now spans the whole tree, so "which round is this"
+            // has to be answerable without counting.
+            if (fixtures[i].roundNumber != lastRound) ...[
+              if (i > 0) Container(height: 1, color: CkColors.hairline),
+              Builder(builder: (_) {
+                lastRound = fixtures[i].roundNumber;
+                return Container(
+                  width: double.infinity,
+                  color: CkColors.paper2,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 7),
+                  child: Text(
+                    '${fixtures[i].roundLabel.toUpperCase()} · '
+                    '${day.format(fixtures[i].scheduledStartTime)}',
+                    style: CkType.mono(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.08,
+                      color: CkColors.muted,
+                    ),
+                  ),
+                );
+              }),
+            ] else
+              Container(height: 1, color: CkColors.hairline),
             Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
@@ -665,7 +981,7 @@ class _FixturePreview extends StatelessWidget {
                   SizedBox(
                     width: 34,
                     child: Text(
-                      pairings[i].$1,
+                      fixtures[i].shortCode,
                       style: CkType.mono(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -675,21 +991,26 @@ class _FixturePreview extends StatelessWidget {
                   ),
                   Expanded(
                     child: Text(
-                      '${pairings[i].$2} v ${pairings[i].$3}',
+                      '${nameOf(fixtures[i].teamAId)} v '
+                      '${nameOf(fixtures[i].teamBId)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: CkType.body(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w500,
-                        color: CkColors.ink,
+                        color: fixtures[i].isResolved
+                            ? CkColors.ink
+                            : CkColors.muted,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    // Spread across grounds first, then slots.
-                    'G${(i % grounds.length) + 1} · '
-                    '${slots[(i ~/ grounds.length) % slots.length]}',
+                    // The plan's own venue and time, not a re-derivation of
+                    // the spread. Recomputing it here is how the preview and
+                    // the published fixtures came apart before.
+                    '${fixtures[i].venue} · '
+                    '${time.format(fixtures[i].scheduledStartTime)}',
                     style: CkType.mono(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -707,24 +1028,42 @@ class _FixturePreview extends StatelessWidget {
 }
 
 /// Bulk assignment is a grounds × slots matrix, not per-match pickers.
+///
+/// Both axes and every cell come from the plan itself. It used to re-derive
+/// the spread from a fixture's index, which is a third copy of the scheduling
+/// rule and drifted from the other two the moment a round overflowed a day.
 class _GroundSlotMatrix extends StatelessWidget {
-  const _GroundSlotMatrix({
-    required this.groundNames,
-    required this.slots,
-    required this.pairings,
-  });
+  const _GroundSlotMatrix({required this.fixtures});
 
-  final List<String> groundNames;
-  final List<String> slots;
-  final List<(String, String, String)> pairings;
+  final List<DrawFixture> fixtures;
 
   @override
   Widget build(BuildContext context) {
-    // Same spread the preview uses, inverted into cells.
-    String? codeAt(int groundIndex, int slotIndex) {
-      final i = slotIndex * groundNames.length + groundIndex;
-      return i < pairings.length ? pairings[i].$1 : null;
-    }
+    if (fixtures.isEmpty) return const SizedBox.shrink();
+
+    final time = DateFormat('HH:mm');
+    // The first day only — the matrix answers "what is on where today", and
+    // a draw can span weeks.
+    final firstDay = fixtures
+        .map((f) => DateTime(f.scheduledStartTime.year,
+            f.scheduledStartTime.month, f.scheduledStartTime.day))
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+
+    final onDay = fixtures.where((f) {
+      final d = f.scheduledStartTime;
+      return DateTime(d.year, d.month, d.day) == firstDay;
+    }).toList();
+
+    final grounds = onDay.map((f) => f.venue).toSet().toList();
+    final slots = (onDay.map((f) => time.format(f.scheduledStartTime)).toSet()
+          ..toList())
+        .toList()
+      ..sort();
+
+    DrawFixture? at(String ground, String slot) => onDay
+        .where((f) =>
+            f.venue == ground && time.format(f.scheduledStartTime) == slot)
+        .firstOrNull;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -757,7 +1096,7 @@ class _GroundSlotMatrix extends StatelessWidget {
               ],
             ),
             Container(height: 1, color: CkColors.hairline),
-            for (var g = 0; g < groundNames.length; g++) ...[
+            for (var g = 0; g < grounds.length; g++) ...[
               if (g > 0) Container(height: 1, color: CkColors.hairline),
               Row(
                 children: [
@@ -775,7 +1114,7 @@ class _GroundSlotMatrix extends StatelessWidget {
                       ),
                     ),
                   ),
-                  for (var s = 0; s < slots.length; s++)
+                  for (final slot in slots)
                     Container(
                       width: 78,
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -786,12 +1125,12 @@ class _GroundSlotMatrix extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        codeAt(g, s) ?? '—',
+                        at(grounds[g], slot)?.shortCode ?? '—',
                         style: CkType.mono(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0,
-                          color: codeAt(g, s) == null
+                          color: at(grounds[g], slot) == null
                               ? CkColors.soft
                               : CkColors.ink,
                         ),
@@ -805,6 +1144,43 @@ class _GroundSlotMatrix extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A tournament type the draw builder has no generator for. Saying so beats
+/// publishing a bracket of the wrong shape.
+class _UnsupportedType extends StatelessWidget {
+  const _UnsupportedType({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$label draws are not supported yet',
+                style:
+                    CkType.display(fontSize: 15.5, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Knockout, round robin and league can be drawn and locked '
+                'today. Change the format in Edit settings to continue.',
+                style: CkType.body(
+                  fontSize: 12.5,
+                  height: 1.5,
+                  color: CkColors.muted,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 class _NotEnoughTeams extends StatelessWidget {

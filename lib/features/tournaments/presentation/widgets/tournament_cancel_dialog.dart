@@ -401,6 +401,34 @@ class CancelledConsoleView extends StatelessWidget {
                       color: CkColors.amberDark,
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  // The block names the amount so the organiser is not left
+                  // calculating it; this is where they go to see the split
+                  // per team (artboards 27i → 24c).
+                  GestureDetector(
+                    onTap: () => context.push(
+                      '/tournaments/${tournament.id}/fees',
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'See who paid',
+                          style: CkType.body(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: CkColors.amberDark,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.chevron_right,
+                          size: 15,
+                          color: CkColors.amberDark,
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

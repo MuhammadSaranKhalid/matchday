@@ -3,13 +3,22 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../matches/domain/entities/match.dart';
+import '../../domain/draw/draw_plan.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/ground.dart';
+import '../../domain/entities/match_official.dart';
 import '../../domain/entities/scorer_candidate.dart';
 import '../../domain/entities/tournament_awards.dart';
+import '../../domain/entities/tournament_fee_entry.dart';
+import '../../domain/entities/tournament_leader.dart';
+import '../../domain/entities/tournament_organizer.dart';
+import '../../domain/ops/revised_target.dart';
 import '../../domain/repositories/tournaments_repository.dart';
+import '../models/match_official_dto.dart';
 import '../models/ground_dto.dart';
 import '../models/tournament_dto.dart';
+import '../models/tournament_fee_entry_dto.dart';
+import '../models/tournament_leader_dto.dart';
 import '../models/tournament_fixture_dto.dart';
 import '../models/tournament_live_match_dto.dart';
 import '../models/tournament_registration_dto.dart';
@@ -42,17 +51,26 @@ class TournamentsRemoteDataSource {
     try {
       final response = await _supabase
           .from(_tournamentsTable)
-          .select('''
-            *,
-            approved_teams_count:tournament_teams(count)
-          ''')
+          .select()
           .eq('tournament_id', tournamentId)
           .single();
 
-      final countList = response['approved_teams_count'] as List<dynamic>?;
-      final count = countList?.firstOrNull?['count'] as int? ?? 0;
+      // Counted in its own round-trip rather than as an embedded aggregate.
+      // The embed counted every registration regardless of status, so a cup
+      // with two teams in and four declined advertised itself as 6/8 full —
+      // and disagreed with `search-all`, which has always filtered on
+      // `approved`. An embedded filter would have fixed the number but a
+      // `!inner` join drops the tournament row entirely when nobody is
+      // approved yet, which is every cup on its first day.
+      final countRes = await _supabase
+          .from(_registrationsTable)
+          .select('registration_id')
+          .eq('tournament_id', tournamentId)
+          .eq('status', 'approved')
+          .count(CountOption.exact);
+
       final copy = Map<String, dynamic>.from(response);
-      copy['approved_teams_count'] = count;
+      copy['approved_teams_count'] = countRes.count;
 
       return TournamentDto.fromJson(copy);
     } on PostgrestException catch (e) {
@@ -463,9 +481,14 @@ class TournamentsRemoteDataSource {
   /// Goes through an RPC rather than inserting: `matches` has RLS enabled with
   /// only a SELECT policy, so a client-side insert is rejected — silently, as
   /// far as the organiser could tell. Returns the number of fixtures created.
+  ///
+  /// The whole plan goes over, unresolved rounds included. Feeder links travel
+  /// as the plan's own `slot_id` strings because no match id exists yet; the
+  /// RPC mints the ids and resolves them.
   Future<int> generateAndPublishFixtures({
     required String tournamentId,
-    required List<FixtureSlotParams> slots,
+    required DrawPlan plan,
+    List<String> seedOrder = const [],
   }) async {
     try {
       final count = await _supabase.rpc<int>(
@@ -473,18 +496,22 @@ class TournamentsRemoteDataSource {
         params: {
           'p_tournament_id': tournamentId,
           'p_slots': [
-            for (final slot in slots)
+            for (final f in plan.fixtures)
               {
-                'team_a_id': slot.teamAId,
-                'team_b_id': slot.teamBId,
+                'slot_id': f.slotId,
+                'team_a_id': f.teamAId,
+                'team_b_id': f.teamBId,
+                'prev_slot_a': f.prevSlotAId,
+                'prev_slot_b': f.prevSlotBId,
                 'scheduled_start_time':
-                    slot.scheduledStartTime.toUtc().toIso8601String(),
-                'venue': slot.venue,
-                'round': slot.round,
-                'bracket_round_number': slot.bracketRoundNumber,
-                'bracket_match_number': slot.bracketMatchNumber,
+                    f.scheduledStartTime.toUtc().toIso8601String(),
+                'venue': f.venue,
+                'round': f.roundLabel,
+                'bracket_round_number': f.roundNumber,
+                'bracket_match_number': f.matchNumber,
               },
           ],
+          'p_seed_order': seedOrder,
         },
       );
       return count;
@@ -897,6 +924,230 @@ class TournamentsRemoteDataSource {
         params: {'p_tournament_id': tournamentId, 'p_message': message},
       );
       return count;
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // ─── Fee ledger (artboard 24c) ──────────────────────────────────────────────
+
+  Future<List<TournamentFeeEntryDto>> getFeeLedger(String tournamentId) async {
+    try {
+      final rows = await _supabase.rpc<List<dynamic>>(
+        'tournament_fee_ledger',
+        params: {'p_tournament_id': tournamentId},
+      );
+      return rows
+          .cast<Map<String, dynamic>>()
+          .map(TournamentFeeEntryDto.fromJson)
+          .toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> recordPayment({
+    required String registrationId,
+    required double amountPaid,
+    PaymentChannel? channel,
+    String? reference,
+  }) async {
+    try {
+      await _supabase.rpc<void>(
+        'tournament_record_payment',
+        params: {
+          'p_registration_id': registrationId,
+          'p_amount_paid': amountPaid,
+          'p_channel': channel?.wire,
+          'p_reference': reference,
+        },
+      );
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // ─── Match officials (artboard 27j) ─────────────────────────────────────────
+
+  Future<List<MatchOfficialDto>> getMatchOfficials(String matchId) async {
+    try {
+      final rows = await _supabase.rpc<List<dynamic>>(
+        'tournament_match_officials',
+        params: {'p_match_id': matchId},
+      );
+      return rows
+          .cast<Map<String, dynamic>>()
+          .map(MatchOfficialDto.fromJson)
+          .toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<List<OfficialCandidateDto>> getOfficialCandidates({
+    required String tournamentId,
+    required String matchId,
+  }) async {
+    try {
+      final rows = await _supabase.rpc<List<dynamic>>(
+        'tournament_official_candidates',
+        params: {'p_tournament_id': tournamentId, 'p_match_id': matchId},
+      );
+      return rows
+          .cast<Map<String, dynamic>>()
+          .map(OfficialCandidateDto.fromJson)
+          .toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> assignOfficial({
+    required String matchId,
+    required String userId,
+    required OfficialRole role,
+  }) async {
+    try {
+      await _supabase.rpc<void>(
+        'tournament_assign_official',
+        params: {
+          'p_match_id': matchId,
+          'p_user_id': userId,
+          'p_role': role.wire,
+        },
+      );
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> removeOfficial({
+    required String matchId,
+    required OfficialRole role,
+  }) async {
+    try {
+      await _supabase.rpc<void>(
+        'tournament_remove_official',
+        params: {'p_match_id': matchId, 'p_role': role.wire},
+      );
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // ─── Matchday-morning ops (artboards 27k, 27m, 28b, 28c) ────────────────────
+
+  Future<int> autoAssignScorers(String tournamentId) async {
+    try {
+      return await _supabase.rpc<int>(
+        'tournament_auto_assign_scorers',
+        params: {'p_tournament_id': tournamentId},
+      );
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Writes down the revision the organiser read back to the captains. Every
+  /// number here was computed by [RevisedTargetCalculator]; the RPC stores it.
+  Future<void> reviseMatchConditions({
+    required String matchId,
+    required int revisedOvers,
+    required int bowlerQuota,
+    int? revisedTarget,
+    TargetMethod method = TargetMethod.runRate,
+    String? reason,
+  }) async {
+    try {
+      await _supabase.rpc<void>(
+        'tournament_revise_match_conditions',
+        params: {
+          'p_match_id': matchId,
+          'p_revised_overs': revisedOvers,
+          'p_bowler_quota': bowlerQuota,
+          'p_revised_target': revisedTarget,
+          'p_method': method.wire,
+          'p_reason': reason,
+        },
+      );
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> triggerSuperOver({
+    required String matchId,
+    required String batsFirstTeamId,
+  }) async {
+    try {
+      await _supabase.rpc<void>(
+        'tournament_trigger_super_over',
+        params: {
+          'p_match_id': matchId,
+          'p_bats_first_id': batsFirstTeamId,
+        },
+      );
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  // ─── Leaderboards (artboards 10, 11, 15) ────────────────────────────────────
+
+  /// Both boards in one round trip — "Leading the cup" needs the pair, and
+  /// two sequential RPCs would make the Overview tab pop in twice.
+  Future<TournamentLeaderboards> getLeaderboards(
+    String tournamentId, {
+    int limit = 5,
+  }) async {
+    try {
+      final results = await Future.wait([
+        _supabase.rpc<List<dynamic>>(
+          'tournament_batting_leaderboard',
+          params: {'p_tournament_id': tournamentId, 'p_limit': limit},
+        ),
+        _supabase.rpc<List<dynamic>>(
+          'tournament_bowling_leaderboard',
+          params: {'p_tournament_id': tournamentId, 'p_limit': limit},
+        ),
+      ]);
+      return TournamentLeaderboards(
+        batting: results[0]
+            .cast<Map<String, dynamic>>()
+            .map((r) => TournamentLeaderDto(r, batting: true).toEntity())
+            .toList(),
+        bowling: results[1]
+            .cast<Map<String, dynamic>>()
+            .map((r) => TournamentLeaderDto(r, batting: false).toEntity())
+            .toList(),
+      );
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// The organiser's track record (artboard 09). Null when the cup has no
+  /// creator on record — an import, or a deleted account.
+  Future<TournamentOrganizer?> getOrganizer(String tournamentId) async {
+    try {
+      final rows = await _supabase.rpc<List<dynamic>>(
+        'tournament_organizer_profile',
+        params: {'p_tournament_id': tournamentId},
+      );
+      if (rows.isEmpty) return null;
+      final r = rows.first as Map<String, dynamic>;
+      int asInt(Object? v) => v is int ? v : int.tryParse('$v') ?? 0;
+      return TournamentOrganizer(
+        userId: r['user_id'] as String,
+        displayName: r['display_name'] as String? ?? 'Organiser',
+        username: r['username'] as String?,
+        avatarUrl: r['avatar_url'] as String?,
+        city: r['city'] as String?,
+        cupsRun: asInt(r['cups_run']),
+        firstCupYear:
+            r['first_cup_year'] == null ? null : asInt(r['first_cup_year']),
+        completedCups: asInt(r['completed_cups']),
+      );
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

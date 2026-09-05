@@ -57,7 +57,7 @@ pill and a red `← ALL RESULTS` escape.
 | **E3** | **Coordinates come from team-create instead** — a required "where do you play" field, resolved through Places autocomplete or GPS. | Capturing a team's location is a **content attribute, not a permission** — typing into an autocomplete needs no GPS grant. Teams are Explore's primary entity, so this single field unblocks near-me, facets, and the open match pool. |
 | **E4** | **Capture ships even though the geo UI does not.** | Capture and display are separable. Deferring both means near-me launches into an equally empty database later. Capturing now means it launches warm. |
 | **E5** | **Browse leads with live matches**, then recently-active teams, then players to follow — replacing the design's "Teams near you". | Ordering by recency is honest without coordinates. A section headed "near you" that is not sorted by distance is a lie. |
-| **E6** | **Tournaments designed but not built.** | The tournament backend is complete but no client can create one, so the table is empty. A permanently-empty group teaches users the app is dead. |
+| **E6** | ~~**Tournaments designed but not built.**~~ **Reversed — tournaments ship as a search group and a browse section.** | The original reason was that no client could create a tournament, so the table was empty and a permanently-empty group would teach users the app is dead. The create wizard shipped; the table fills. `search-all` had returned the `tournaments` group all along — the Flutter side simply parsed the key off and dropped it, which left the cup with no entry door at all. |
 | **E7** | **Results always default to ALL categories**; no pre-selected entity filter. The See-all screen states its scope in mono and offers one-tap escape. | NN/g: users overlook an active scope and conclude the app has nothing. |
 | **E8** | **One `search-all` edge function**, not three parallel calls. | A unified relevance ordering across entity types cannot be done client-side. Groups are fetched concurrently *inside* the function. |
 | **E9** | **Recent searches live in `WizardDrafts`**, not a new table, not the network, not a new package. | Search history is transient presentation state — the case CLAUDE.md §6.5 sanctions. `AppDatabase.clear()` wiping it on sign-out is a **privacy feature**: user B must not see user A's searches. |
@@ -124,5 +124,7 @@ rejects outright and CLAUDE.md §10 forbids.
    be shown once, so the primer has to gate it, not follow it.
 6. Retire `teams_remote_datasource.searchUsers()` (raw ILIKE, unranked, ignores
    `appear_in_search`, string-interpolated PostgREST filter).
-7. Tournaments group, once tournament authoring exists.
+7. ~~Tournaments group, once tournament authoring exists.~~ **Done** — see E6.
+   Still deferred within it: the four facet groups of artboard 06 and the
+   day-1 editorial cold start (artboard 08), both of which need coordinates.
 8. Tier 2 cards, once a stats rollup exists.

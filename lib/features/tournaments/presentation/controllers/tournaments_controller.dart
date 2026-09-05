@@ -3,9 +3,13 @@ import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
+import '../../domain/draw/draw_plan.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/ground.dart';
+import '../../domain/entities/match_official.dart';
 import '../../domain/entities/tournament_awards.dart';
+import '../../domain/entities/tournament_fee_entry.dart';
+import '../../domain/ops/revised_target.dart';
 import '../../domain/entities/tournament_live_match.dart';
 import '../../domain/entities/tournament_registration.dart';
 import '../../domain/repositories/tournaments_repository.dart';
@@ -341,13 +345,15 @@ class TournamentsController extends _$TournamentsController {
   /// Returns the number of fixtures published, or null on failure.
   Future<int?> generateAndPublishFixtures({
     required String tournamentId,
-    required List<FixtureSlotParams> slots,
+    required DrawPlan plan,
+    List<String> seedOrder = const [],
   }) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
     final result = await repo.generateAndPublishFixtures(
       tournamentId: tournamentId,
-      slots: slots,
+      plan: plan,
+      seedOrder: seedOrder,
     );
     return result.fold(
       (failure) {
@@ -627,4 +633,116 @@ class TournamentsController extends _$TournamentsController {
     if (ok) ref.invalidate(myTournamentsProvider);
     return ok;
   }
+
+  // ─── Fee ledger (artboard 24c) ──────────────────────────────────────────────
+
+  Future<bool> recordPayment({
+    required String tournamentId,
+    required String registrationId,
+    required double amountPaid,
+    PaymentChannel? channel,
+    String? reference,
+  }) async {
+    final ok = await _run(
+      tournamentId,
+      (repo) => repo.recordPayment(
+        registrationId: registrationId,
+        amountPaid: amountPaid,
+        channel: channel,
+        reference: reference,
+      ),
+    );
+    if (ok && ref.mounted) {
+      ref.invalidate(tournamentFeeLedgerProvider(tournamentId));
+      // The registrations tab shows the same "Paid" chip off payment_status.
+      ref.invalidate(tournamentRegistrationsProvider(tournamentId));
+    }
+    return ok;
+  }
+
+  // ─── Match officials (artboard 27j) ─────────────────────────────────────────
+
+  Future<bool> assignOfficial({
+    required String tournamentId,
+    required String matchId,
+    required String userId,
+    required OfficialRole role,
+  }) async {
+    final ok = await _run(
+      tournamentId,
+      (repo) =>
+          repo.assignOfficial(matchId: matchId, userId: userId, role: role),
+    );
+    if (ok && ref.mounted) ref.invalidate(matchOfficialsProvider(matchId));
+    return ok;
+  }
+
+  Future<bool> removeOfficial({
+    required String tournamentId,
+    required String matchId,
+    required OfficialRole role,
+  }) async {
+    final ok = await _run(
+      tournamentId,
+      (repo) => repo.removeOfficial(matchId: matchId, role: role),
+    );
+    if (ok && ref.mounted) ref.invalidate(matchOfficialsProvider(matchId));
+    return ok;
+  }
+
+  // ─── Matchday-morning ops (artboards 27k, 27m, 28b, 28c) ────────────────────
+
+  /// Returns how many fixtures were filled, or null if the call failed.
+  /// Zero is a real answer — nobody was free — and reads differently from
+  /// a failure, so the screen can say so.
+  Future<int?> autoAssignScorers(String tournamentId) async {
+    state = const AsyncLoading();
+    final repo = ref.read(tournamentsRepositoryProvider);
+    final result = await repo.autoAssignScorers(tournamentId);
+    return result.fold(
+      (failure) {
+        _fail(failure);
+        return null;
+      },
+      (count) {
+        _ok();
+        _refreshOps(tournamentId);
+        return count;
+      },
+    );
+  }
+
+  Future<bool> reviseMatchConditions({
+    required String tournamentId,
+    required String matchId,
+    required int revisedOvers,
+    required int bowlerQuota,
+    int? revisedTarget,
+    TargetMethod method = TargetMethod.runRate,
+    String? reason,
+  }) =>
+      _run(
+        tournamentId,
+        (repo) => repo.reviseMatchConditions(
+          matchId: matchId,
+          revisedOvers: revisedOvers,
+          bowlerQuota: bowlerQuota,
+          revisedTarget: revisedTarget,
+          method: method,
+          reason: reason,
+        ),
+      );
+
+  Future<bool> triggerSuperOver({
+    required String tournamentId,
+    required String matchId,
+    required String batsFirstTeamId,
+  }) =>
+      _run(
+        tournamentId,
+        (repo) => repo.triggerSuperOver(
+          matchId: matchId,
+          batsFirstTeamId: batsFirstTeamId,
+        ),
+      );
 }

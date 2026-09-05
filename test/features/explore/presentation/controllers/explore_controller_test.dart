@@ -4,6 +4,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:matchday/core/error/failures.dart';
 import 'package:matchday/features/explore/domain/entities/explore_results.dart';
 import 'package:matchday/features/explore/domain/entities/player_result.dart';
+import 'package:matchday/features/explore/domain/entities/tournament_result.dart';
 import 'package:matchday/features/explore/domain/repositories/explore_repository.dart';
 import 'package:matchday/features/explore/presentation/controllers/explore_controller.dart';
 import 'package:matchday/features/explore/presentation/providers/explore_providers.dart';
@@ -228,5 +229,33 @@ void main() {
       expect(withPlayers.nonEmptyCategories, [ExploreCategory.players]);
       expect(withPlayers.totalCount, 1);
     });
+
+    test('tournaments render second, behind teams and ahead of players', () {
+      const r = ExploreResults(
+        players: [_stubPlayer],
+        tournaments: [_stubTournament],
+      );
+
+      expect(r.nonEmptyCategories, [
+        ExploreCategory.tournaments,
+        ExploreCategory.players,
+      ]);
+      expect(r.countFor(ExploreCategory.tournaments), 1);
+      expect(r.totalCount, 2);
+    });
   });
 }
+
+const _stubPlayer = PlayerResult(
+  id: 'p9',
+  kind: PlayerKind.profile,
+  name: 'Someone',
+  score: 0.5,
+);
+
+const _stubTournament = TournamentResult(
+  tournamentId: 't9',
+  name: 'Model Town Super Cup',
+  type: 'knockout',
+  status: 'registration',
+);

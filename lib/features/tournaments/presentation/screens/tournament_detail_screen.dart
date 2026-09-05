@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/theme/circk_theme.dart';
+import '../../../follows/presentation/controllers/follow_toggle_controller.dart';
 import '../../domain/entities/tournament.dart';
+import '../../domain/entities/tournament_live_match.dart';
 import '../providers/tournaments_providers.dart';
 import '../widgets/ck_standings_table.dart';
 import '../widgets/tournament_bracket_view.dart';
 import '../widgets/tournament_fixtures_tab.dart';
+import '../widgets/tournament_group_hub_tab.dart';
 import '../widgets/tournament_overview_tab.dart';
 import '../widgets/tournament_stats_tab.dart';
 import '../widgets/tournament_teams_tab.dart';
@@ -28,35 +32,22 @@ class TournamentDetailScreen extends ConsumerStatefulWidget {
       _TournamentDetailScreenState();
 }
 
+/// 168pt banner + the identity zone beneath it. Fixed so the pinned
+/// header has a stable maxExtent; the zone ellipsises rather than growing.
+const double _headerMaxExtent = 300;
+
 class _TournamentDetailScreenState
     extends ConsumerState<TournamentDetailScreen>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  bool _isFollowing = false;
-  int _followCount = 42;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(
-      length: 5,
-      vsync: this,
-      initialIndex: widget.initialTab.clamp(0, 4),
-    );
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  void _toggleFollow() {
-    setState(() {
-      _isFollowing = !_isFollowing;
-      _followCount += _isFollowing ? 1 : -1;
-    });
-  }
+  /// Writes a real `follows` row with `target_type = 'tournament'`. The
+  /// follows feature already modelled [TournamentFollowTarget] end to end;
+  /// this screen was the only consumer that never called it, which is why
+  /// the hub's Following bucket — a query over exactly these rows — could
+  /// never fill.
+  void _toggleFollow() => ref
+      .read(followToggleProvider('tournament', widget.tournamentId).notifier)
+      .toggle();
 
   void _shareTournament(Tournament tournament) {
     SharePlus.instance.share(
@@ -75,23 +66,48 @@ class _TournamentDetailScreenState
     return tournamentAsync.when(
       data: (tournament) {
         final isKnockout = tournament.type == TournamentType.knockout;
+        // Artboard 13b: two groups feeding a bracket is its own shape. The
+        // group table and the bracket are different questions, so they get
+        // different tabs — and Fixtures folds into Groups, because in a
+        // hybrid every fixture belongs to a group or to the playoffs.
+        final isHybrid = tournament.type == TournamentType.groupKnockout;
 
-        final tabs = [
-          const Tab(text: 'Overview'),
-          const Tab(text: 'Fixtures'),
-          Tab(text: isKnockout ? 'Bracket' : 'Standings'),
-          const Tab(text: 'Teams'),
-          const Tab(text: 'Stats'),
-        ];
+        final tabs = isHybrid
+            ? const [
+                Tab(text: 'Overview'),
+                Tab(text: 'Groups'),
+                Tab(text: 'Playoffs'),
+                Tab(text: 'Stats'),
+              ]
+            : [
+                const Tab(text: 'Overview'),
+                const Tab(text: 'Fixtures'),
+                Tab(text: isKnockout ? 'Bracket' : 'Standings'),
+                const Tab(text: 'Teams'),
+                const Tab(text: 'Stats'),
+              ];
 
-        return Scaffold(
+        return DefaultTabController(
+          length: tabs.length,
+          initialIndex: widget.initialTab.clamp(0, tabs.length - 1),
+          child: Scaffold(
           backgroundColor: CkColors.paper,
           body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
-                // Top Hero Banner + Identity Zone
-                SliverToBoxAdapter(
-                  child: _buildHeaderContent(tournament),
+                // Artboard 09–15 header. Expanded it is the banner and the
+                // floating crest; on scroll it collapses to a 56pt bar over
+                // about 120pt of travel. The banner fades and the logo
+                // *scales into* the monogram — it does not slide away — so the
+                // identity never leaves the screen.
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _CollapsingHeader(
+                    tournament: tournament,
+                    expanded: _buildHeaderContent(tournament),
+                    logo: (size) => _buildLogo(tournament, size),
+                    maxHeight: _headerMaxExtent,
+                  ),
                 ),
 
                 // Pinned Tab Bar
@@ -99,7 +115,6 @@ class _TournamentDetailScreenState
                   pinned: true,
                   delegate: _SliverTabBarDelegate(
                     TabBar(
-                      controller: _tabController,
                       isScrollable: true,
                       tabAlignment: TabAlignment.start,
                       labelColor: CkColors.ink,
@@ -121,18 +136,25 @@ class _TournamentDetailScreenState
               ];
             },
             body: TabBarView(
-              controller: _tabController,
-              children: [
-                TournamentOverviewTab(tournament: tournament),
-                TournamentFixturesTab(tournament: tournament),
-                if (isKnockout)
-                  TournamentBracketView(tournament: tournament)
-                else
-                  _buildStandingsTab(tournament),
-                TournamentTeamsTab(tournament: tournament),
-                TournamentStatsTab(tournament: tournament),
-              ],
+              children: isHybrid
+                  ? [
+                      TournamentGroupHubTab(tournament: tournament),
+                      _buildStandingsTab(tournament),
+                      TournamentBracketView(tournament: tournament),
+                      TournamentStatsTab(tournament: tournament),
+                    ]
+                  : [
+                      TournamentOverviewTab(tournament: tournament),
+                      TournamentFixturesTab(tournament: tournament),
+                      if (isKnockout)
+                        TournamentBracketView(tournament: tournament)
+                      else
+                        _buildStandingsTab(tournament),
+                      TournamentTeamsTab(tournament: tournament),
+                      TournamentStatsTab(tournament: tournament),
+                    ],
             ),
+          ),
           ),
         );
       },
@@ -160,7 +182,7 @@ class _TournamentDetailScreenState
             if (tournament.bannerImageUrl != null)
               Image.network(
                 tournament.bannerImageUrl!,
-                height: 150,
+                height: 168,
                 width: double.infinity,
                 fit: BoxFit.cover,
               )
@@ -185,13 +207,22 @@ class _TournamentDetailScreenState
                       ),
                       Row(
                         children: [
-                          _buildNavCircle(
-                            icon: _isFollowing
-                                ? Icons.notifications_active
-                                : Icons.notifications_none,
-                            iconColor:
-                                _isFollowing ? CkColors.red : CkColors.ink,
-                            onTap: _toggleFollow,
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final following = ref
+                                      .watch(followToggleProvider(
+                                          'tournament', widget.tournamentId))
+                                      .value ??
+                                  false;
+                              return _buildNavCircle(
+                                icon: following
+                                    ? Icons.notifications_active
+                                    : Icons.notifications_none,
+                                iconColor:
+                                    following ? CkColors.red : CkColors.ink,
+                                onTap: _toggleFollow,
+                              );
+                            },
                           ),
                           const SizedBox(width: 8),
                           _buildNavCircle(
@@ -328,15 +359,6 @@ class _TournamentDetailScreenState
                     _buildDateString(tournament),
                     style: CkType.mono(fontSize: 11, color: CkColors.muted),
                   ),
-                  const SizedBox(width: 10),
-                  Text('·',
-                      style: CkType.mono(
-                          fontSize: 12, color: CkColors.soft)),
-                  const SizedBox(width: 10),
-                  Text(
-                    '$_followCount followers',
-                    style: CkType.body(fontSize: 12, color: CkColors.muted),
-                  ),
                 ],
               ),
             ],
@@ -437,14 +459,76 @@ class _TournamentDetailScreenState
   Widget _buildStandingsTab(Tournament tournament) {
     final standingsStream =
         ref.watch(tournamentStandingsStreamProvider(tournament.id));
+    // Form and the next fixture are read off the same board the rest of the
+    // detail screen uses, so the table can never disagree with the fixtures
+    // tab about who beat whom.
+    final board = ref.watch(tournamentLiveBoardProvider(tournament.id)).value ??
+        const <TournamentLiveMatch>[];
 
     return standingsStream.when(
       data: (standings) => SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: CkStandingsTable(standings: standings),
+        padding: const EdgeInsets.only(bottom: 24),
+        child: CkStandingsTable(
+          standings: standings,
+          qualificationCutRank: _cutRankFor(tournament, standings.length),
+          cutLabel: _cutLabelFor(tournament, standings.length),
+          contextFor: (s) => _contextFor(s.teamId, board),
+        ),
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text(e.toString())),
+    );
+  }
+
+  /// How many teams go through. A league sends four to the semi-finals; a
+  /// group sends the top two. Zero hides the rule rather than guessing.
+  int _cutRankFor(Tournament t, int teams) {
+    if (teams < 3) return 0;
+    return switch (t.type) {
+      TournamentType.league => teams >= 6 ? 4 : 2,
+      TournamentType.roundRobin => teams >= 6 ? 4 : 2,
+      TournamentType.groupKnockout => 2,
+      _ => 0,
+    };
+  }
+
+  String? _cutLabelFor(Tournament t, int teams) {
+    final cut = _cutRankFor(t, teams);
+    if (cut == 0) return null;
+    return cut == 2
+        ? 'Top 2 advance to semi-finals'
+        : 'Top $cut advance to semi-finals';
+  }
+
+  /// Last five results, oldest first, plus what they play next.
+  StandingContext _contextFor(String teamId, List<TournamentLiveMatch> board) {
+    final theirs = board
+        .where((m) => m.teamAId == teamId || m.teamBId == teamId)
+        .toList()
+      ..sort((a, b) => a.scheduledStartTime.compareTo(b.scheduledStartTime));
+
+    final form = <String>[];
+    for (final m in theirs.where((m) => m.isFinished)) {
+      form.add(switch (m.status) {
+        'tied' => 'T',
+        'no_result' || 'abandoned' => 'N',
+        _ when m.winnerId == null => 'N',
+        _ => m.winnerId == teamId ? 'W' : 'L',
+      });
+    }
+
+    String? next;
+    for (final m in theirs) {
+      if (m.isFinished || m.isLive) continue;
+      final opponentId = m.teamAId == teamId ? m.teamBId : m.teamAId;
+      final opponent = m.displayNameFor(opponentId);
+      next = 'v $opponent, ${DateFormat('E').format(m.scheduledStartTime)}';
+      break;
+    }
+
+    return StandingContext(
+      form: form.length <= 5 ? form : form.sublist(form.length - 5),
+      nextFixture: next,
     );
   }
 
@@ -574,5 +658,153 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverTabBarDelegate oldDelegate) {
     return false;
+  }
+}
+
+
+/// The tournament detail header (artboards 09–15).
+///
+/// Expanded it is a 168pt banner with the crest floating −24 over its edge.
+/// On scroll it collapses to a 56pt bar over about 120pt of travel: the banner
+/// fades out, and the crest **scales into** the 28pt monogram rather than
+/// sliding away, so the identity is continuous from one state to the other.
+/// The tab strip pins directly under whichever state is showing, which is why
+/// this is a pinned persistent header rather than a sliver that scrolls off.
+class _CollapsingHeader extends SliverPersistentHeaderDelegate {
+  const _CollapsingHeader({
+    required this.tournament,
+    required this.expanded,
+    required this.logo,
+    required this.maxHeight,
+  });
+
+  final Tournament tournament;
+  final Widget expanded;
+  final Widget Function(double size) logo;
+  final double maxHeight;
+
+  static const _collapsedHeight = 56.0;
+
+  /// The canvas specifies the travel, not just the endpoints.
+  static const _travel = 120.0;
+
+  @override
+  double get minExtent => _collapsedHeight;
+
+  @override
+  double get maxExtent => maxHeight;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlaps) {
+    final t = (shrinkOffset / _travel).clamp(0.0, 1.0);
+
+    return ClipRect(
+      child: Material(
+        color: CkColors.paper,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // The expanded state fades as it is scrolled over. OverflowBox
+            // lets the natural content keep its own height while the sliver
+            // shrinks around it, so nothing reflows on the way down.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: maxHeight,
+              child: Opacity(
+                opacity: 1 - t,
+                // A generous but *bounded* ceiling: the content lays out at
+                // its natural height and the ClipRect trims anything past the
+                // sliver, rather than throwing an overflow.
+                child: OverflowBox(
+                  alignment: Alignment.topCenter,
+                  minHeight: 0,
+                  maxHeight: maxHeight * 2,
+                  child: expanded,
+                ),
+              ),
+            ),
+            if (t > 0)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: _collapsedHeight,
+                child: Opacity(
+                  opacity: t,
+                  child: _CollapsedBar(
+                    tournament: tournament,
+                    // The crest scales down into the monogram across the same
+                    // travel, so the two states share one object.
+                    logo: logo(28 + (48 - 28) * (1 - t)),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _CollapsingHeader old) =>
+      old.tournament != tournament || old.maxHeight != maxHeight;
+}
+
+class _CollapsedBar extends StatelessWidget {
+  const _CollapsedBar({required this.tournament, required this.logo});
+
+  final Tournament tournament;
+  final Widget logo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: const BoxDecoration(
+        color: CkColors.paper,
+        border: Border(bottom: BorderSide(color: CkColors.hairline)),
+      ),
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Row(
+          children: [
+            Material(
+              color: CkColors.paper2,
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => Navigator.of(context).maybePop(),
+                child: const SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Icon(Icons.arrow_back, size: 17, color: CkColors.ink),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(width: 28, height: 28, child: FittedBox(child: logo)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                tournament.name,
+                maxLines: 1,
+                // Tail-ellipsised, per the canvas: the start of a cup's name
+                // is what identifies it.
+                overflow: TextOverflow.ellipsis,
+                style: CkType.display(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.02,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

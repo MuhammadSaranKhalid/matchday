@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 
@@ -15,6 +16,9 @@ Future<bool?> showLockDrawDialog(
   required int teamCount,
   required int playerCount,
   required bool hasWaitlist,
+  required int fixtureCount,
+  required int roundCount,
+  DateTime? lastDate,
 }) {
   return showDialog<bool>(
     context: context,
@@ -23,6 +27,9 @@ Future<bool?> showLockDrawDialog(
       teamCount: teamCount,
       playerCount: playerCount,
       hasWaitlist: hasWaitlist,
+      fixtureCount: fixtureCount,
+      roundCount: roundCount,
+      lastDate: lastDate,
     ),
   );
 }
@@ -32,11 +39,20 @@ class _LockDrawDialog extends StatefulWidget {
     required this.teamCount,
     required this.playerCount,
     required this.hasWaitlist,
+    required this.fixtureCount,
+    required this.roundCount,
+    this.lastDate,
   });
 
   final int teamCount;
   final int playerCount;
   final bool hasWaitlist;
+
+  /// The size of the draw about to be published. Named here because this is
+  /// the last screen before it becomes permanent.
+  final int fixtureCount;
+  final int roundCount;
+  final DateTime? lastDate;
 
   @override
   State<_LockDrawDialog> createState() => _LockDrawDialogState();
@@ -111,6 +127,14 @@ class _LockDrawDialogState extends State<_LockDrawDialog> {
                         ? 'Registration closes immediately — the waitlist is '
                             'discarded'
                         : 'Registration closes immediately',
+                  ),
+                  _Consequence(
+                    '${widget.fixtureCount} fixture'
+                    '${widget.fixtureCount == 1 ? '' : 's'} across '
+                    '${widget.roundCount} round'
+                    '${widget.roundCount == 1 ? '' : 's'} are created'
+                    '${widget.lastDate == null ? '' : ', finishing '
+                        '${DateFormat('d MMM').format(widget.lastDate!)}'}',
                   ),
                   const _Consequence(
                     'Times and grounds stay editable per match',

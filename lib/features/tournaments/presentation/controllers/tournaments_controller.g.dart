@@ -34,7 +34,7 @@ final class TournamentsControllerProvider
 }
 
 String _$tournamentsControllerHash() =>
-    r'2a351f929a2a2befe07fdc34d080c2b5449e5840';
+    r'385e1f7f47c56e1bf2590c9831ee10de3d4af5ac';
 
 abstract class _$TournamentsController extends $AsyncNotifier<void> {
   FutureOr<void> build();

@@ -3,11 +3,17 @@ import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../../../matches/domain/entities/match.dart';
+import '../draw/draw_plan.dart';
 import '../entities/ground.dart';
 import '../entities/my_tournament_entry.dart';
 import '../entities/scorer_candidate.dart';
 import '../entities/tournament.dart';
+import '../entities/match_official.dart';
 import '../entities/tournament_awards.dart';
+import '../entities/tournament_fee_entry.dart';
+import '../entities/tournament_leader.dart';
+import '../entities/tournament_organizer.dart';
+import '../ops/revised_target.dart';
 import '../entities/tournament_live_match.dart';
 import '../entities/tournament_registration.dart';
 import '../entities/tournament_standing.dart';
@@ -70,31 +76,6 @@ class CreateTournamentParams {
   final int? maxTeams;
   final String? bannerImageUrl;
   final String? logoUrl;
-}
-
-/// Parameters to schedule a fixture slot.
-class FixtureSlotParams {
-  const FixtureSlotParams({
-    required this.teamAId,
-    required this.teamBId,
-    required this.scheduledStartTime,
-    required this.venue,
-    this.round,
-    this.bracketRoundNumber,
-    this.bracketMatchNumber,
-    this.prevMatchAId,
-    this.prevMatchBId,
-  });
-
-  final String teamAId;
-  final String teamBId;
-  final DateTime scheduledStartTime;
-  final String venue;
-  final String? round;
-  final int? bracketRoundNumber;
-  final int? bracketMatchNumber;
-  final String? prevMatchAId;
-  final String? prevMatchBId;
 }
 
 /// Abstract contract for tournament data operations. Pure Dart.
@@ -178,9 +159,16 @@ abstract class TournamentsRepository {
   Stream<List<TournamentStanding>> watchStandings(String tournamentId);
 
   /// Publishes the draw and returns how many fixtures were created.
+  ///
+  /// Takes the whole [DrawPlan] — every round, including the unresolved ones
+  /// linked by feeder slot — rather than a flat slot list, because a knockout
+  /// with only its first round inserted has nothing for the advancement
+  /// trigger to move winners into. [seedOrder] is the approved teams in draw
+  /// order; position becomes `seed_number`, written in the same transaction.
   Future<Either<Failure, int>> generateAndPublishFixtures({
     required String tournamentId,
-    required List<FixtureSlotParams> slots,
+    required DrawPlan plan,
+    List<String> seedOrder = const [],
   });
 
   // Awards
@@ -297,4 +285,78 @@ abstract class TournamentsRepository {
     required String tournamentId,
     required String message,
   });
+
+  // ─── Fee ledger (artboard 24c) ──────────────────────────────────────────────
+
+  /// Every approved team's fee line. Organiser-only — it names who paid what.
+  Future<Either<Failure, List<TournamentFeeEntry>>> getFeeLedger(
+    String tournamentId,
+  );
+
+  /// Records the cumulative amount received for one registration. A set, not
+  /// an increment: the sheet shows the running total and the organiser
+  /// confirms the new figure, so a mistyped entry is fixed by re-recording.
+  Future<Either<Failure, Unit>> recordPayment({
+    required String registrationId,
+    required double amountPaid,
+    PaymentChannel? channel,
+    String? reference,
+  });
+
+  // ─── Match officials (artboard 27j) ─────────────────────────────────────────
+
+  Future<Either<Failure, List<MatchOfficial>>> getMatchOfficials(String matchId);
+
+  Future<Either<Failure, List<OfficialCandidate>>> getOfficialCandidates({
+    required String tournamentId,
+    required String matchId,
+  });
+
+  /// Appoints an umpire or referee. The scorer role goes through
+  /// [assignScorer] — it carries handover rules these do not.
+  Future<Either<Failure, Unit>> assignOfficial({
+    required String matchId,
+    required String userId,
+    required OfficialRole role,
+  });
+
+  Future<Either<Failure, Unit>> removeOfficial({
+    required String matchId,
+    required OfficialRole role,
+  });
+
+  // ─── Matchday-morning ops (artboards 27k, 27m, 28b, 28c) ────────────────────
+
+  /// Fills every unscored fixture it can and returns how many it filled.
+  Future<Either<Failure, int>> autoAssignScorers(String tournamentId);
+
+  /// Applies a rain revision. The caller computes the numbers with
+  /// [RevisedTargetCalculator]; this records the decision.
+  Future<Either<Failure, Unit>> reviseMatchConditions({
+    required String matchId,
+    required int revisedOvers,
+    required int bowlerQuota,
+    int? revisedTarget,
+    TargetMethod method,
+    String? reason,
+  });
+
+  /// Moves a tied fixture into its super over (artboard 28c).
+  Future<Either<Failure, Unit>> triggerSuperOver({
+    required String matchId,
+    required String batsFirstTeamId,
+  });
+
+  /// The orange- and purple-cap boards, aggregated from what has been scored
+  /// (artboards 10, 11, 15). Distinct from `getSuggestedAwards`, which reads
+  /// the organiser's *published* awards and is empty until the cup ends.
+  Future<Either<Failure, TournamentLeaderboards>> getLeaderboards(
+    String tournamentId, {
+    int limit,
+  });
+
+  /// The organiser's track record, for the credibility row (artboard 09).
+  Future<Either<Failure, TournamentOrganizer?>> getOrganizer(
+    String tournamentId,
+  );
 }

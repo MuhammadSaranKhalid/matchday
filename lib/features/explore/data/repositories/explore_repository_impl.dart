@@ -38,6 +38,7 @@ class ExploreRepositoryImpl implements ExploreRepository {
           players: res.players.map((d) => d.toEntity()).toList(),
           teams: res.teams.map((d) => d.toEntity()).toList(),
           matches: res.matches.map((d) => d.toEntity()).toList(),
+          tournaments: res.tournaments.map((d) => d.toEntity()).toList(),
         ),
       );
     } catch (e) {
@@ -52,6 +53,7 @@ class ExploreRepositoryImpl implements ExploreRepository {
       return Right(
         ExploreBrowse(
           live: res.live.map((d) => d.toEntity()).toList(),
+          tournaments: res.tournaments.map((d) => d.toEntity()).toList(),
           teams: res.teams.map((d) => d.toEntity()).toList(),
           players: res.players.map((d) => d.toEntity()).toList(),
         ),

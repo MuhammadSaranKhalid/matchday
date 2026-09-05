@@ -45,6 +45,8 @@ import '../features/posts/domain/entities/post.dart';
 import '../features/posts/presentation/screens/composer_screen.dart';
 import '../features/tournaments/presentation/screens/my_tournaments_screen.dart';
 import '../features/tournaments/presentation/screens/tournament_announce_screen.dart';
+import '../features/tournaments/presentation/screens/tournament_fee_ledger_screen.dart';
+import '../features/tournaments/presentation/screens/tournament_officials_screen.dart';
 import '../features/tournaments/presentation/screens/tournament_people_screen.dart';
 import '../features/tournaments/presentation/screens/tournament_published_screen.dart';
 import '../features/tournaments/presentation/screens/tournament_settings_screen.dart';
@@ -176,18 +178,6 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
-          // 4 · Menu — the "you" surface (was the AppDrawer side panel).
-          // Deliberately NOT preloaded: it is the one branch a session may
-          // never open, and its body watches profile, matches, teams and pool
-          // at once. The other four earn their preload by being swiped to.
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/menu',
-                builder: (_, __) => const MenuScreen(),
-              ),
-            ],
-          ),
         ],
       ),
       // Explore — unified search + discovery over players, teams and matches
@@ -204,6 +194,8 @@ GoRouter appRouter(Ref ref) {
               onOpenProfile: (username) => context.push('/u/$username'),
               onOpenMatch: (matchId) =>
                   context.push('/matches/$matchId/scorecard'),
+              onOpenTournament: (tournamentId) =>
+                  context.push('/tournaments/$tournamentId'),
               onCreateTeam: () => context.push('/teams/create'),
               onSeeAll: (query, category) => context.push(
                 '/explore/all/${category.wireName}?q=${Uri.encodeQueryComponent(query)}',
@@ -230,6 +222,8 @@ GoRouter appRouter(Ref ref) {
                 onOpenProfile: (u) => context.push('/u/$u'),
                 onOpenMatch: (matchId) =>
                     context.push('/matches/$matchId/scorecard'),
+                onOpenTournament: (tournamentId) =>
+                    context.push('/tournaments/$tournamentId'),
               );
             },
           ),
@@ -240,13 +234,22 @@ GoRouter appRouter(Ref ref) {
           ),
         ],
       ),
-      // Own profile (root-level push route over the shell, reached from drawer)
+      // The "you" surface — a full-screen page over the shell, pushed by the
+      // avatar at the header's left edge. Was a Scaffold.drawer until the
+      // drawer's edge-drag proved unwinnable against the tab pager's swipe;
+      // see docs/navigation-ia-design.md N12.
+      GoRoute(
+        path: '/menu',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, __) => const MenuScreen(),
+      ),
+      // Own profile (root-level push route over the shell, reached from Menu)
       GoRoute(
         path: '/profile',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (_, __) => const MyProfileScreen(),
       ),
-      // Side panel destinations under `/my/...`
+      // Menu destinations under `/my/...`
       GoRoute(
         path: '/my/matches',
         builder: (_, __) => const MyMatchesScreen(),
@@ -314,6 +317,21 @@ GoRouter appRouter(Ref ref) {
         path: '/tournaments/:tournamentId/people',
         builder: (_, state) => TournamentPeopleScreen(
           tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
+      // Artboard 24c — the payment reconciliation ledger.
+      GoRoute(
+        path: '/tournaments/:tournamentId/fees',
+        builder: (_, state) => TournamentFeeLedgerScreen(
+          tournamentId: state.pathParameters['tournamentId']!,
+        ),
+      ),
+      // Artboard 27j — assign umpires & scorers for one fixture.
+      GoRoute(
+        path: '/tournaments/:tournamentId/live/:matchId/officials',
+        builder: (_, state) => TournamentOfficialsScreen(
+          tournamentId: state.pathParameters['tournamentId']!,
+          matchId: state.pathParameters['matchId']!,
         ),
       ),
       GoRoute(
@@ -495,6 +513,16 @@ GoRouter appRouter(Ref ref) {
         path: '/u/:username',
         builder: (_, state) =>
             PublicProfileScreen(username: state.pathParameters['username']!),
+      ),
+      // The invite link the Published screen shares to WhatsApp
+      // (`joinmatchday.com/t/<tournament_id>`). It had no route, so the one
+      // way into a tournament for someone who was sent one resolved to
+      // nothing. Redirect rather than a second builder, so the detail screen
+      // stays the single owner of the surface.
+      GoRoute(
+        path: '/t/:tournamentId',
+        redirect: (_, state) =>
+            '/tournaments/${state.pathParameters['tournamentId']}',
       ),
       GoRoute(
         path: '/composer',

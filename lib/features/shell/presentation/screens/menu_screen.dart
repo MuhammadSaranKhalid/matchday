@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/widgets/ck_push_nav.dart';
 import '../../../../core/widgets/v2/ck_shimmer.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
@@ -105,19 +106,21 @@ String _playerRoleLabel(PlayerRole? r) => switch (r) {
   null => '',
 };
 
-/// The **Menu** tab — the "you" half of the app's navigation.
+/// The **Menu** page — the "you" half of the app's navigation.
 ///
 /// Organising principle: "Bottom nav is the world; Menu is you." The screen is
 /// **nouns only, no verbs** — every destination owns its own create button one
 /// tap deeper.
 ///
-/// Was `AppDrawer`, a `Scaffold.drawer` side panel, until it became the fifth
-/// shell branch (`/menu`). The move killed the edge-drag's gesture fight with
-/// [SwipeableBranchView]'s horizontal tab pager and put the entry point in the
-/// thumb-reachable bottom nav instead of the top-left corner. Everything below
-/// the container is the original Side Panel canvas (Claude Design project
-/// "Matchday mobile app design", `Side Panel.dc.html`), unchanged — it still
-/// draws five states off the same tree:
+/// Was `AppDrawer`, a `Scaffold.drawer` side panel, until it became a
+/// full-screen route (`/menu`) pushed by the avatar at the header's left edge.
+/// The trigger did not move — that avatar opened the drawer too — but the
+/// surface it opens did: a pushed page defends no gesture of its own, so
+/// [SwipeableBranchView]'s tab pager gets the whole left edge back instead of
+/// splitting it with a `DrawerController`. Everything below the container is
+/// the original Side Panel canvas (Claude Design project "Matchday mobile app
+/// design", `Side Panel.dc.html`), unchanged — it still draws five states off
+/// the same tree:
 ///
 /// * **A · Default** — populated, with the current destination carrying the
 ///   place marker (paper2 fill + a 3×20 red rail).
@@ -209,119 +212,133 @@ class MenuScreen extends ConsumerWidget {
 
     final here = GoRouter.of(context).state.uri.path;
 
-    // No Scaffold and no SafeArea: [AppShell] owns both, plus the shared
-    // V2Header above and V2BottomNav below. This is a branch body, not a route
-    // with its own chrome.
-    return Material(
-      color: CkColors.paper,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Identity(
-            loading: identityLoading,
-            name: displayName,
-            subline: subline,
-            avatarUrl: profile?.avatarUrl,
-            postsCount: postsCount,
-            followersCount: followersCount,
-          ),
-          const Divider(height: 1, thickness: 1, color: CkColors.hairline),
-
-          // B · the hero state.
-          if (live != null) _LiveCard(match: live),
-
-          // C · one sentence that states the rule of the panel.
-          if (firstRun) const _OrientationNote(),
-
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                const _Eyebrow('Yours'),
-                _NavRow(
-                  glyph: _Glyphs.matches,
-                  label: 'My Matches',
-                  empty: firstRun,
-                  subtitle: 'Fixtures you are playing in',
-                  badge: matchBadge,
-                  badgeTone: matchTone,
-                  skeletonWidth: 46,
-                  loading: countsLoading,
-                  current: here.startsWith('/my/matches'),
-                  route: '/my/matches',
-                ),
-                _NavRow(
-                  glyph: _Glyphs.teams,
-                  label: 'My Teams',
-                  empty: firstRun,
-                  subtitle: 'Squads you own or belong to',
-                  badge: (teamCount ?? 0) > 0 ? '$teamCount' : null,
-                  skeletonWidth: 22,
-                  loading: countsLoading,
-                  current:
-                      here.startsWith('/my/teams') || here.startsWith('/teams'),
-                  route: '/my/teams',
-                ),
-                _NavRow(
-                  glyph: _Glyphs.pool,
-                  label: 'My Challenges',
-                  empty: firstRun,
-                  subtitle: 'Challenges you posted',
-                  badge: (poolCount ?? 0) > 0 ? '$poolCount open' : null,
-                  skeletonWidth: 38,
-                  loading: countsLoading,
-                  current: here.startsWith('/my/pool-requests'),
-                  route: '/my/pool-requests',
-                ),
-                _NavRow(
-                  glyph: _Glyphs.trophy,
-                  label: 'My Tournaments',
-                  empty: firstRun,
-                  subtitle: 'Cups & leagues you organize or follow',
-                  skeletonWidth: 38,
-                  loading: countsLoading,
-                  current:
-                      here.startsWith('/my/tournaments') ||
-                      here.startsWith('/tournaments'),
-                  route: '/my/tournaments',
-                ),
-
-                const _GroupRule(),
-                const _Eyebrow('Account'),
-                _NavRow(
-                  glyph: _Glyphs.bookmark,
-                  label: 'Saved',
-                  current: here.startsWith('/saved'),
-                  route: '/saved',
-                ),
-                _NavRow(
-                  glyph: _Glyphs.settings,
-                  label: 'Settings',
-                  current: here.startsWith('/settings'),
-                  route: '/settings',
-                ),
-                const _NavRow(
-                  glyph: _Glyphs.help,
-                  label: 'Help & Support',
-                  inert: true,
-                ),
-
-                const _GroupRule(),
-                const _Eyebrow('Not built yet'),
-                const _NavRow(
-                  glyph: _Glyphs.clubs,
-                  label: 'Clubs',
-                  inert: true,
-                  roadmap: true,
-                ),
-                const SizedBox(height: 8),
-              ],
+    // A full-screen route over the shell, so it wears push chrome, not shell
+    // chrome: [CkPushNav], the same 56dp back bar every other pushed route uses
+    // (`my_matches_screen.dart`, `teams_list_screen.dart`). Not [V2Header] —
+    // that is the *shell's* header, and wearing it here made the page read as a
+    // fifth tab rather than somewhere you had navigated to.
+    //
+    // No trailing action: N7 — the Menu is nouns only, and every destination
+    // owns its own create button one tap deeper.
+    return Scaffold(
+      backgroundColor: CkColors.paper,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CkPushNav(
+              title: 'Menu',
+              onBack: () =>
+                  context.canPop() ? context.pop() : context.go('/home'),
             ),
-          ),
+            _Identity(
+              loading: identityLoading,
+              name: displayName,
+              subline: subline,
+              avatarUrl: profile?.avatarUrl,
+              postsCount: postsCount,
+              followersCount: followersCount,
+            ),
+            const Divider(height: 1, thickness: 1, color: CkColors.hairline),
 
-          const Divider(height: 1, thickness: 1, color: CkColors.hairline),
-          const _Footer(),
-        ],
+            // B · the hero state.
+            if (live != null) _LiveCard(match: live),
+
+            // C · one sentence that states the rule of the panel.
+            if (firstRun) const _OrientationNote(),
+
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  const _Eyebrow('Yours'),
+                  _NavRow(
+                    glyph: _Glyphs.matches,
+                    label: 'My Matches',
+                    empty: firstRun,
+                    subtitle: 'Fixtures you are playing in',
+                    badge: matchBadge,
+                    badgeTone: matchTone,
+                    skeletonWidth: 46,
+                    loading: countsLoading,
+                    current: here.startsWith('/my/matches'),
+                    route: '/my/matches',
+                  ),
+                  _NavRow(
+                    glyph: _Glyphs.teams,
+                    label: 'My Teams',
+                    empty: firstRun,
+                    subtitle: 'Squads you own or belong to',
+                    badge: (teamCount ?? 0) > 0 ? '$teamCount' : null,
+                    skeletonWidth: 22,
+                    loading: countsLoading,
+                    current:
+                        here.startsWith('/my/teams') ||
+                        here.startsWith('/teams'),
+                    route: '/my/teams',
+                  ),
+                  _NavRow(
+                    glyph: _Glyphs.pool,
+                    label: 'My Challenges',
+                    empty: firstRun,
+                    subtitle: 'Challenges you posted',
+                    badge: (poolCount ?? 0) > 0 ? '$poolCount open' : null,
+                    skeletonWidth: 38,
+                    loading: countsLoading,
+                    current: here.startsWith('/my/pool-requests'),
+                    route: '/my/pool-requests',
+                  ),
+                  _NavRow(
+                    glyph: _Glyphs.trophy,
+                    label: 'My Tournaments',
+                    empty: firstRun,
+                    subtitle: 'Cups & leagues you organize or follow',
+                    skeletonWidth: 38,
+                    loading: countsLoading,
+                    current:
+                        here.startsWith('/my/tournaments') ||
+                        here.startsWith('/tournaments'),
+                    route: '/my/tournaments',
+                  ),
+
+                  const _GroupRule(),
+                  const _Eyebrow('Account'),
+                  _NavRow(
+                    glyph: _Glyphs.bookmark,
+                    label: 'Saved',
+                    current: here.startsWith('/saved'),
+                    route: '/saved',
+                  ),
+                  _NavRow(
+                    glyph: _Glyphs.settings,
+                    label: 'Settings',
+                    current: here.startsWith('/settings'),
+                    route: '/settings',
+                  ),
+                  const _NavRow(
+                    glyph: _Glyphs.help,
+                    label: 'Help & Support',
+                    inert: true,
+                  ),
+
+                  const _GroupRule(),
+                  const _Eyebrow('Not built yet'),
+                  const _NavRow(
+                    glyph: _Glyphs.clubs,
+                    label: 'Clubs',
+                    inert: true,
+                    roadmap: true,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+
+            const Divider(height: 1, thickness: 1, color: CkColors.hairline),
+            const _Footer(),
+          ],
+        ),
       ),
     );
   }

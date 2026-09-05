@@ -6,10 +6,14 @@ import '../../data/datasources/tournaments_datasource_providers.dart';
 import '../../data/repositories/tournaments_repository_impl.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/ground.dart';
+import '../../domain/entities/match_official.dart';
 import '../../domain/entities/my_tournament_entry.dart';
 import '../../domain/entities/scorer_candidate.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_awards.dart';
+import '../../domain/entities/tournament_fee_entry.dart';
+import '../../domain/entities/tournament_leader.dart';
+import '../../domain/entities/tournament_organizer.dart';
 import '../../domain/entities/tournament_live_match.dart';
 import '../../domain/entities/tournament_registration.dart';
 import '../../domain/entities/tournament_standing.dart';
@@ -194,4 +198,76 @@ Stream<Map<String, dynamic>?> tournamentDraftStream(Ref ref) {
   final user = ref.watch(currentUserStreamProvider).value;
   if (user == null) return Stream.value(null);
   return ref.watch(wizardDraftStoreProvider).watch('tournament_create:${user.id.value}');
+}
+
+/// The fee ledger for one cup (artboard 24c). Organiser-only on the server,
+/// so a manager who reaches the route gets an error rather than an empty list.
+@riverpod
+Future<List<TournamentFeeEntry>> tournamentFeeLedger(
+  Ref ref,
+  String tournamentId,
+) async {
+  final repo = ref.watch(tournamentsRepositoryProvider);
+  final result = await repo.getFeeLedger(tournamentId);
+  return result.fold(
+    (failure) => throw Exception(failure.message),
+    (entries) => entries,
+  );
+}
+
+/// Everyone already appointed to one fixture (artboard 27j).
+@riverpod
+Future<List<MatchOfficial>> matchOfficials(Ref ref, String matchId) async {
+  final repo = ref.watch(tournamentsRepositoryProvider);
+  final result = await repo.getMatchOfficials(matchId);
+  return result.fold(
+    (failure) => throw Exception(failure.message),
+    (officials) => officials,
+  );
+}
+
+/// Everyone who *could* be appointed to one fixture (artboard 27j).
+@riverpod
+Future<List<OfficialCandidate>> officialCandidates(
+  Ref ref, {
+  required String tournamentId,
+  required String matchId,
+}) async {
+  final repo = ref.watch(tournamentsRepositoryProvider);
+  final result = await repo.getOfficialCandidates(
+    tournamentId: tournamentId,
+    matchId: matchId,
+  );
+  return result.fold(
+    (failure) => throw Exception(failure.message),
+    (candidates) => candidates,
+  );
+}
+
+/// The cup's orange- and purple-cap boards (artboards 10, 11, 15).
+@riverpod
+Future<TournamentLeaderboards> tournamentLeaderboards(
+  Ref ref,
+  String tournamentId,
+) async {
+  final repo = ref.watch(tournamentsRepositoryProvider);
+  final result = await repo.getLeaderboards(tournamentId);
+  return result.fold(
+    (failure) => throw Exception(failure.message),
+    (boards) => boards,
+  );
+}
+
+/// The organiser's track record (artboard 09).
+@riverpod
+Future<TournamentOrganizer?> tournamentOrganizer(
+  Ref ref,
+  String tournamentId,
+) async {
+  final repo = ref.watch(tournamentsRepositoryProvider);
+  final result = await repo.getOrganizer(tournamentId);
+  return result.fold(
+    (failure) => throw Exception(failure.message),
+    (organizer) => organizer,
+  );
 }

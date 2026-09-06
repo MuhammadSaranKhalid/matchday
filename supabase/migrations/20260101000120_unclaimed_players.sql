@@ -36,9 +36,16 @@ create table public.unclaimed_players (
   -- style without needing a real player_profiles row.
   player_profile       jsonb not null default '{}'::jsonb,
 
-  -- Manager who created this placeholder. ON DELETE SET NULL so
-  -- self-service account deletion (delete_user RPC in 0700) doesn't
-  -- block; the placeholder lives on under its display name.
+  -- Manager who created this placeholder, NULL once they delete their account
+  -- (or for the synthetic placeholder delete_user creates for a departing
+  -- player, which no manager created).
+  --
+  -- 20260609000000 made this NOT NULL on the grounds that "the app always sets
+  -- it on insert". True at insert time, but NOT NULL and ON DELETE SET NULL
+  -- are contradictory: the first account deletion raises a not-null violation.
+  -- The placeholder must outlive its creator — that is the entire point of the
+  -- table — so the column is nullable and the FK keeps SET NULL. Folded and
+  -- corrected 2026-09-06.
   added_by             uuid
                           references public.profiles(user_id) on delete set null,
 
@@ -49,6 +56,11 @@ create table public.unclaimed_players (
 
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now(),
+
+  -- Normalised display_name for trigram search. GENERATED — never write it.
+  search_name          text generated always as (
+                         lower(public.f_unaccent(coalesce(display_name, '')))
+                       ) stored,
 
   -- Either both claim columns are null, or both are non-null.
   constraint claim_consistency check (
@@ -156,6 +168,7 @@ alter table public.unclaimed_players enable row level security;
 
 create policy "unclaimed_players_read_public"
   on public.unclaimed_players for select
+  to anon, authenticated
   using (true);
 
 create policy "unclaimed_players_insert_authed"
@@ -165,12 +178,50 @@ create policy "unclaimed_players_insert_authed"
 
 create policy "unclaimed_players_update_owner"
   on public.unclaimed_players for update
+  to authenticated
   using ((select auth.uid()) = added_by)
   with check ((select auth.uid()) = added_by);
 
 create policy "unclaimed_players_delete_owner"
   on public.unclaimed_players for delete
+  to authenticated
   using ((select auth.uid()) = added_by);
+
+-- -----------------------------------------------------------------------------
+-- PII: phone_number and email are NOT readable through the API.
+-- -----------------------------------------------------------------------------
+-- These are contact details for people who never signed up and never consented
+-- — the most sensitive data in the database. The read policy above is
+-- `using (true)` because rosters, scorecards and match lineups all have to
+-- render an unclaimed player's NAME to anyone looking at a public match. RLS
+-- is row-level, so it cannot make the name public and the phone number private.
+--
+-- Column-level GRANTs can. Revoking the two sensitive columns from the API
+-- roles means PostgREST rejects any select that touches them, while
+-- `select unclaimed_id, display_name, ...` keeps working. Writes still work
+-- because the insert/update policies above already restrict them to the
+-- manager who owns the row, and INSERT privilege is granted at table level.
+--
+-- The one screen that legitimately needs the phone (team join-request review,
+-- teams_remote_datasource.dart) goes through
+-- unclaimed_player_contact_for_manager() below, which is SECURITY DEFINER and
+-- checks that the caller manages a team the placeholder belongs to.
+-- NOTE the shape: you cannot subtract a column from a table-level SELECT.
+-- `revoke select (phone_number, email) …` is a no-op while the role still
+-- holds SELECT on the whole table (which 0010's ALTER DEFAULT PRIVILEGES
+-- grants to every new table). The table-level grant has to go first, and the
+-- allowed columns granted back explicitly.
+revoke select on public.unclaimed_players from anon, authenticated;
+
+grant select (
+  unclaimed_id, display_name, added_by, player_profile,
+  claimed_by_user_id, claimed_at, created_at, updated_at, search_name
+) on public.unclaimed_players to anon, authenticated;
+
+-- The accessor itself, unclaimed_player_contact_for_manager(), is declared in
+-- 20260101000210_team_members.sql. It has to be: it is `language sql`, so
+-- Postgres checks its body at CREATE time, and it reads teams (0200) and
+-- team_members (0210) — neither of which exists yet at 0120.
 
 -- -----------------------------------------------------------------------------
 -- RPC: claim_unclaimed_by_phone()

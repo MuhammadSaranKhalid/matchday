@@ -16,7 +16,6 @@
 --   • 'group' — ad-hoc cricket group / tournament channel.
 -- =============================================================================
 
-create type public.chat_type as enum ('team', 'dm', 'match', 'group');
 
 create table public.chats (
   chat_id          uuid primary key default gen_random_uuid(),
@@ -24,6 +23,9 @@ create table public.chats (
 
   -- For team chats: references public.teams. Null for DMs, matches, groups.
   team_id          uuid references public.teams(team_id) on delete cascade,
+  -- The chat_type enum has always carried 'match', but there was no column to
+  -- point a match chat at its match, so the value was unusable. (2026-09-06.)
+  match_id         uuid references public.matches(match_id) on delete cascade,
 
   -- Denormalised "last activity" timestamp. Bumped by the trigger in 0802.
   last_message_at  timestamptz,
@@ -34,6 +36,9 @@ create table public.chats (
   -- Required-shape consistency
   constraint chats_team_team_id_required check (
     (type = 'team' and team_id is not null) or (type <> 'team')
+  ),
+  constraint chats_match_match_id_required check (
+    (type = 'match' and match_id is not null) or (type <> 'match')
   )
 );
 
@@ -41,6 +46,11 @@ create table public.chats (
 create unique index chats_team_unique
   on public.chats (team_id)
   where team_id is not null;
+
+-- One match chat per match, same shape as the team rule above.
+create unique index chats_match_unique
+  on public.chats (match_id)
+  where match_id is not null;
 
 -- Inbox sort index: nulls last so brand-new chats settle at bottom
 create index chats_last_message_at on public.chats (last_message_at desc nulls last);
@@ -62,6 +72,12 @@ create table public.dm_channels (
   user_a     uuid not null references public.profiles(user_id) on delete cascade,
   user_b     uuid not null references public.profiles(user_id) on delete cascade,
   created_at timestamptz not null default now(),
+
+  -- DM request acceptance. A DM from a non-follower lands as a request; these
+  -- two are stamped by accept_dm_request (20260816000000) when the recipient
+  -- accepts. Null = still pending.
+  accepted_at timestamptz,
+  accepted_by uuid references public.profiles(user_id) on delete set null,
   constraint dm_channels_users_order check (user_a < user_b),
   constraint dm_channels_unique_pair unique (user_a, user_b)
 );
@@ -162,3 +178,15 @@ $$;
 
 revoke all on function public.get_or_create_dm_chat(uuid) from public;
 grant execute on function public.get_or_create_dm_chat(uuid) to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
+-- -----------------------------------------------------------------------------
+-- Postgres does NOT index the referencing side of a foreign key for you. Every
+-- one of these columns points at a parent that gets deleted or updated
+-- (profiles on account deletion, matches/teams on cascade), and without an
+-- index each such statement seq-scans this table once per affected parent row.
+-- They are also the columns joined on when reading.
+
+create index if not exists idx_dm_channels_accepted_by
+  on public.dm_channels (accepted_by);

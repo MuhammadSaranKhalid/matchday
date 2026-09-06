@@ -92,7 +92,7 @@ begin
   -- ---------------------------------------------------------------------------
   -- 1) Clear the previous run, innermost first.
   -- ---------------------------------------------------------------------------
-  delete from public.match_requests
+  delete from public.match_challenges
    where request_id in (
      r_pool_eagles, r_pool_sultans, r_pool_knights, r_pool_quetta, r_pool_ravi,
      r_mine_busy, r_mine_waiting, r_mine_matched, r_mine_expired, r_mine_withdrawn
@@ -171,7 +171,7 @@ begin
   -- Karachi Knights carries no time, ground or expiry, which is artboard 01's
   -- short third card. Expiries are relative to now(), so 41h reads amber and
   -- 50h reads grey whenever this runs.
-  insert into public.match_requests (
+  insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
     proposed_start_time, proposed_venue, proposed_format, message,
     status, share_code, code_expires_at, proposal_expires_at, created_at
@@ -224,7 +224,7 @@ begin
   -- ---------------------------------------------------------------------------
   -- 5) My challenges — yours, live.
   -- ---------------------------------------------------------------------------
-  insert into public.match_requests (
+  insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
     proposed_start_time, proposed_venue, proposed_format, message,
     status, share_code, code_expires_at, proposal_expires_at, created_at
@@ -267,7 +267,7 @@ begin
                        'balls_per_over', 6, 'innings_per_side', 1)
   );
 
-  insert into public.match_requests (
+  insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
     proposed_start_time, proposed_venue, proposed_format,
     status, decided_by, decided_at, match_id, created_at
@@ -283,7 +283,7 @@ begin
   );
 
   -- Expired carries a decided_at but no decider — nobody closed it, the clock did.
-  insert into public.match_requests (
+  insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
     proposed_start_time, proposed_venue, proposed_format,
     status, decided_at, created_at
@@ -297,7 +297,7 @@ begin
     'expired', now() - interval '20 days', now() - interval '24 days'
   );
 
-  insert into public.match_requests (
+  insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
     proposed_start_time, proposed_venue, proposed_format,
     status, decided_by, decided_at, decision_note, created_at
@@ -368,7 +368,7 @@ $seed_pool_prod$;
 -- =============================================================================
 -- Rollback — removes every row this seed created, and nothing else.
 -- =============================================================================
--- delete from public.match_requests where request_id::text like 'cccc000%';
+-- delete from public.match_challenges where request_id::text like 'cccc000%';
 -- delete from public.matches         where match_id::text  like 'cccc0003%';
 -- delete from public.team_members    where team_id::text   like 'bbbb0000%';
 -- delete from public.teams           where team_id::text   like 'bbbb0000%';

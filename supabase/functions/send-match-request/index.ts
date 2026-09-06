@@ -234,10 +234,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  // players_per_side is the single source of truth. The match_requests
+  // players_per_side is the single source of truth. The match_challenges
   // `players_per_side` column is now a generated projection of
   // proposed_format->>'players_per_team' (migration
-  // match_requests_pps_single_source), and a CHECK requires the key to be
+  // match_challenges_pps_single_source), and a CHECK requires the key to be
   // present (5..15). Fold it in here and never write the generated column.
   const proposedFormat = {
     ...proposedFormatInput,
@@ -260,7 +260,7 @@ Deno.serve(async (req) => {
       // change ground). Mirrors the SQL function exactly.
       if (toTeamId !== null) {
         const dupRows = await tx`
-          select 1 from match_requests
+          select 1 from match_challenges
            where from_team_id = ${fromTeamId}
              and to_team_id   = ${toTeamId}
              and status in ('pending', 'countered')
@@ -281,7 +281,7 @@ Deno.serve(async (req) => {
         const code = mintCode();
         try {
           const rows = await tx`
-            insert into match_requests (
+            insert into match_challenges (
               from_team_id, to_team_id, requested_by,
               proposed_start_time, proposed_venue, proposed_format, message,
               from_team_xi, from_team_keeper_id,

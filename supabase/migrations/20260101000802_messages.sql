@@ -32,6 +32,7 @@ alter table public.messages enable row level security;
 -- =============================================================================
 create policy "messages_read_for_members"
   on public.messages for select
+  to authenticated
   using (public.is_chat_member(chat_id));
 
 create policy "messages_insert_self"
@@ -208,3 +209,15 @@ $$;
 
 revoke all on function public.list_my_chats() from public;
 grant execute on function public.list_my_chats() to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
+-- -----------------------------------------------------------------------------
+-- Postgres does NOT index the referencing side of a foreign key for you. Every
+-- one of these columns points at a parent that gets deleted or updated
+-- (profiles on account deletion, matches/teams on cascade), and without an
+-- index each such statement seq-scans this table once per affected parent row.
+-- They are also the columns joined on when reading.
+
+create index if not exists idx_messages_sender_id
+  on public.messages (sender_id);

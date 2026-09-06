@@ -41,7 +41,7 @@ as $$
 declare
   v_count integer;
 begin
-  update public.match_requests
+  update public.match_challenges
      set status        = 'expired',
          decided_at    = now(),
          decision_note = case status

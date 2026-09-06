@@ -29,69 +29,20 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- 1. match_officials — per-match scorer / umpire assignment.
+-- 1. match_officials — MOVED
 -- -----------------------------------------------------------------------------
--- Shape mirrors the table already deployed (see the drift note above): no
--- created_at/updated_at, and the umpire roles split by position.
-create table if not exists public.match_officials (
-  match_id    uuid not null references public.matches(match_id) on delete cascade,
-  user_id     uuid not null references public.profiles(user_id) on delete cascade,
-  role        text not null
-                check (role in ('scorer', 'umpire_main', 'umpire_leg',
-                                'umpire_third', 'referee')),
-  assigned_at timestamptz not null default now(),
-  assigned_by uuid references public.profiles(user_id) on delete set null,
-
-  primary key (match_id, user_id, role)
-);
-
-create index if not exists match_officials_user
-  on public.match_officials (user_id);
-
-alter table public.match_officials enable row level security;
-
--- Read: anyone who can already see the match's tournament, plus the official
--- themselves. Kept permissive on select because a scorer's name is shown on
--- the public Live Ops and fixture surfaces.
-drop policy if exists "match_officials_read" on public.match_officials;
-create policy "match_officials_read"
-  on public.match_officials for select
-  to authenticated
-  using (true);
-
--- Write: organisers of the match's tournament only. Assignment is an
--- organiser act; a scorer cannot appoint themselves.
-drop policy if exists "match_officials_write_organizers" on public.match_officials;
-create policy "match_officials_write_organizers"
-  on public.match_officials for all
-  to authenticated
-  using (
-    exists (
-      select 1 from public.matches m
-       where m.match_id = match_officials.match_id
-         and m.tournament_id is not null
-         and public.is_tournament_organizer(m.tournament_id)
-    )
-  )
-  with check (
-    exists (
-      select 1 from public.matches m
-       where m.match_id = match_officials.match_id
-         and m.tournament_id is not null
-         and public.is_tournament_organizer(m.tournament_id)
-    )
-  );
+-- The table, its index and its RLS now live in 20260101000410_match_officials.sql
+-- (split out 2026-09-06). It had to move: list_my_matches (20260816120000)
+-- joins it and is `language sql`, so it is body-checked at CREATE time and a
+-- clean db reset failed here. This migration keeps only the ops RPCs below,
+-- which write the table.
 
 -- -----------------------------------------------------------------------------
 -- 2. matches.winner_id — promoted from result->>'winner_team_id'.
 -- -----------------------------------------------------------------------------
-alter table public.matches
-  add column if not exists winner_id uuid
-    references public.teams(team_id) on delete set null;
-
-create index if not exists idx_matches_tournament_winner
-  on public.matches (tournament_id, winner_id)
-  where tournament_id is not null;
+-- matches.winner_id and its index are declared inline in
+-- 20260101000400_matches.sql (folded there 2026-09-06). This migration owns
+-- the trigger below that keeps it in step with `result`.
 
 -- `result` remains authoritative: the trigger derives winner_id from it on
 -- every write. Ops RPCs below therefore set `result` and let the trigger
@@ -99,6 +50,7 @@ create index if not exists idx_matches_tournament_winner
 create or replace function public.trg_sync_match_winner_id()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   new.winner_id := nullif(new.result->>'winner_team_id', '')::uuid;
@@ -508,7 +460,6 @@ begin
            scheduled_start_time = p_reschedule_to,
            actual_start_time = null,
            completed_at = null,
-           end_time = null,
            toss_won_by = null,
            toss_decision = null,
            toss_face = null,
@@ -525,7 +476,10 @@ begin
              'win_type', 'no_result',
              'description', coalesce(nullif(p_reason, ''), 'Match abandoned — no result')
            ),
-           end_time = now(),
+           -- Was `end_time = now()` while completed_at stayed null — the one
+           -- place the two finish-time columns actually disagreed. An abandoned
+           -- match IS finished, so it gets the finish timestamp.
+           completed_at = now(),
            updated_at = now()
      where match_id = p_match_id;
   end if;
@@ -583,7 +537,6 @@ begin
            'description', 'Won by walkover',
            'summary', 'Won by walkover'
          ),
-         end_time = now(),
          completed_at = now(),
          updated_at = now()
    where match_id = p_match_id;
@@ -1052,3 +1005,59 @@ $$;
 
 revoke all on function public.tournament_scorer_candidates(uuid) from public;
 grant execute on function public.tournament_scorer_candidates(uuid) to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- tournament_ground_clashes() — moved here 2026-09-06
+-- -----------------------------------------------------------------------------
+-- Declared in grounds until that file was renumbered to 20260101000330 to run
+-- before matches. This function joins public.matches twice, so it must live in
+-- a migration that runs after the matches schema — here, with the other
+-- tournament ops RPCs.
+-- 7. Fixture clashes on a ground (the soft check, per decision 3).
+-- Returns pairs of fixtures sharing a ground whose scheduled starts fall
+-- within p_window of each other. The console shows these; nothing blocks the
+-- write, so a rain reshuffle can pass through a colliding intermediate state.
+create or replace function public.tournament_ground_clashes(
+  p_tournament_id uuid,
+  p_window        interval default interval '3 hours'
+)
+returns table (
+  ground_id     uuid,
+  ground_name   text,
+  match_a_id    uuid,
+  match_a_start timestamptz,
+  match_b_id    uuid,
+  match_b_start timestamptz,
+  gap           interval
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    g.ground_id,
+    g.name,
+    a.match_id,
+    a.scheduled_start_time,
+    b.match_id,
+    b.scheduled_start_time,
+    b.scheduled_start_time - a.scheduled_start_time
+  from public.matches a
+  join public.matches b
+    on b.tournament_id = a.tournament_id
+   and b.ground_id = a.ground_id
+   -- Ordered pair, so each clash is reported once rather than twice.
+   and (a.scheduled_start_time, a.match_id) < (b.scheduled_start_time, b.match_id)
+  join public.grounds g on g.ground_id = a.ground_id
+  where a.tournament_id = p_tournament_id
+    and a.ground_id is not null
+    and a.status not in ('completed', 'abandoned', 'no_result', 'walkover')
+    and b.status not in ('completed', 'abandoned', 'no_result', 'walkover')
+    and b.scheduled_start_time - a.scheduled_start_time < p_window
+    and public.is_tournament_organizer(p_tournament_id)
+  order by g.name, a.scheduled_start_time;
+$$;
+
+revoke all on function public.tournament_ground_clashes(uuid, interval) from public;
+grant execute on function public.tournament_ground_clashes(uuid, interval) to authenticated;

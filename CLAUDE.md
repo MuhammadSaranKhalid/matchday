@@ -7,6 +7,16 @@
 >
 > **EXEMPTION 2 (2026-08-22) — the `matches` live-scoring write path only.** Ball-by-ball scoring is **local-first**. Deliveries are computed on-device by the Dart scoring engine (`lib/features/matches/domain/scoring/`), appended to a drift-backed write-ahead log (`ScoringOps`, `ScoringSnapshots`), applied to the UI immediately, and drained to Supabase by a background outbox keyed on a client-generated idempotency uuid. The scoring device is the **authority on the arithmetic** of the innings it is scoring; `record-ball` does **not** recompute the delivery — it authorizes the writer, rejects duplicates by idempotency key, stores the row and sums the innings.
 >
+> Schema note (2026-09-06): `match_deliveries` carries **one column per fact**.
+> It used to carry two of several (`runs_off_bat`/`runs_scored`,
+> `striker_id`/`batsman_id`, `delivery_type`/`ball_type`,
+> `recorded_by`/`created_by`), written in lockstep by record-ball — and
+> `total_runs` is GENERATED from one side of two of those pairs, so any writer
+> using the other spelling would have silently produced a wrong innings total.
+> The aliases are gone. `match_batsman_stats` / `match_bowler_stats` are gone
+> too: nothing had written them since the SQL engine was removed, and
+> scorecards are derived client-side from the ledger.
+>
 > The rules of cricket live in **exactly one place**: the Dart engine. Its specification is `supabase/functions/_shared/scoring/vectors.json`, executed by the Dart test suite. **A change to scoring rules is a change to the vectors first.** Do NOT add cricket arithmetic to an edge function or a database trigger — three disagreeing implementations appeared that way once already.
 >
 > Strictly scoped to **recording deliveries in an already-started innings**. Match creation, toss, lineup lock, challenges, the innings-break handover, and every read surface outside the scoring screen stay online-only. One scorer per innings — the batting side scores its own, control passes at the break — so there is still NO sync service, NO LWW and NO merge logic: it is a single-writer append-only queue with an idempotency key, which needs none of those. A score may be provisional; **a result may never be rendered from local computation.** Full rationale and decision log: `docs/offline-scoring-design.md`.
@@ -173,7 +183,7 @@ lib/features/<feature>/
     └── providers/                        # @riverpod repository provider + intermediate stream/future views
 
 supabase/
-└── migrations/                           # timestamp-epoch SQL (e.g. 20260101000100_profiles.sql)
+└── migrations/                           # one table per file, dependency-ordered (see §12)
 
 test/
 └── features/<feature>/
@@ -1394,6 +1404,78 @@ After ANY change to a `@riverpod`, `@freezed`, `@JsonSerializable`, or drift tab
 
 ## 12. Supabase Schema Conventions
 
+### 12.0 Migration layout (restructured 2026-09-06)
+
+**This project is pre-production. Migrations are EDITED AT THE SOURCE, not patched.**
+
+There is no deployed database whose history must be preserved, so the migration
+directory is maintained as a *description of the current schema*, not a
+chronological log of how it got here. Four rules:
+
+1. **One table per migration**, named for that table
+   (`20260101000210_team_members.sql`). A table's columns, indexes, constraints,
+   triggers, RLS policies and grants all live in its own file.
+
+2. **All enums live in `20260101000000_shared_helpers.sql`** — the enum
+   catalogue. Types depend on nothing and everything depends on them, so
+   declaring them first is the only ordering that needs no forward reference.
+   To add a value, edit the list in place. **Never** write
+   `alter type ... add value` in a later migration; that is how the schema
+   ended up with `match_status` missing `rescheduled` in SQL while the Dart
+   enum had it, and carrying `tied`/`no_result` that Dart did not.
+
+3. **Changing a column means editing the migration that declares it.** Do NOT
+   add `alter table ... add column` in a new file. Before this restructure a
+   single table's real shape was spread across up to four migrations, and the
+   only way to know what `matches` looked like was to replay the whole run.
+
+4. **File numbers encode dependency order, not dates.** A migration may only
+   reference objects created by a lower-numbered file. Renumber rather than
+   bolt on a late `ALTER` — `grounds` moved from `20260831000000` to
+   `20260101000330` so `matches.ground_id` could be an inline FK.
+
+   ⚠️ **The trap this codebase keeps falling into:** plpgsql function bodies
+   are NOT checked at CREATE time, so a function referencing a table that does
+   not exist yet compiles fine and fails at runtime, often months later.
+   `language sql` functions and generated columns ARE checked immediately.
+   A clean `supabase db reset` is the only thing that catches either — run it
+   after touching migrations.
+
+**Seed data does not belong in `migrations/`.** Demo/test fixtures live in
+`supabase/seed*.sql` and are opted into via `[db.seed] sql_paths`. Seeds that
+hardcode specific accounts must guard on their subjects existing, or they break
+`db reset` for everyone else.
+
+
+### 12.1 RLS and grants — the rules the advisors check
+
+Supabase runs a set of security/performance lints (the "Advisors"). They need a
+linked project, so they are reimplemented as plain SQL in
+`supabase/snippets/advisors.sql`. **Run it after every `supabase db reset`:**
+
+```bash
+docker exec -i supabase_db_crick psql -U postgres -f - < supabase/snippets/advisors.sql
+```
+
+Every check should come back empty except two documented exceptions
+(`spatial_ref_sys`, `get_follow_list`). The rules, and why each matters here:
+
+| Rule | The rule | Why |
+|---|---|---|
+| **0003** | `(select auth.uid())`, never bare `auth.uid()` | The subquery becomes an InitPlan evaluated **once per statement**; bare, it runs **once per row**. Supabase measures 179ms → 9ms, and up to 1,100x when a `SECURITY DEFINER` helper is wrapped too. |
+| **0011** | Every function gets `set search_path = public, pg_temp` | A `SECURITY DEFINER` function with a mutable search_path runs as its owner against schemas the *caller* may control — a privilege-escalation path. |
+| **0010** | Views get `with (security_invoker = on)` | A view otherwise runs with its **owner's** privileges and reads straight past the RLS of its base table. `create or replace view` does NOT inherit this option — restate it on every redefinition. |
+| **0028/9** | `revoke all on function … from public` at the declaration site | Postgres grants `EXECUTE` to `PUBLIC` on every new function, and `anon` holds `PUBLIC`. A `SECURITY DEFINER` function anon can call bypasses RLS completely. `20260906120000_function_grants_hardening.sql` sweeps this exhaustively as a backstop **and must stay the last migration.** |
+| **0001** | Index every FK column | Postgres does not index the referencing side. Each parent delete/update seq-scans the child once per affected row — this is what makes account deletion untenable at scale. |
+| **0006** | One permissive policy per (table, command, role) | Multiple permissive policies are all tested for every row. |
+| — | Every policy names its roles: `to authenticated` or `to anon, authenticated` | Without `TO`, the policy is evaluated for **every** role including anon. Use `anon, authenticated` only when the expression has a branch an anonymous user can actually satisfy; if it calls `auth.uid()` or a membership helper, it is `authenticated`. |
+| — | Every `UPDATE`/`ALL` policy has `WITH CHECK`, not just `USING` | `USING` decides which rows you may *target*; `WITH CHECK` decides what they may *become*. Without it, a user who can update their own row can rewrite its owner. |
+
+**Do not use `CREATE INDEX CONCURRENTLY` here.** The Supabase CLI runs each
+migration inside a transaction, and `CONCURRENTLY` cannot run in one. It is the
+right tool against a live production table with traffic; it is not available in
+this migration path.
+
 Every user-owned table follows this template:
 
 ```sql
@@ -1524,7 +1606,7 @@ Push is wired end-to-end as of 2026-06-06. Firebase project: `matchday-44ed4`. A
 
 **Tap handling:** Push payloads include a `route` field. `PushMessagingService` listens for tap events and forwards the route to the router; the router validates and navigates. Don't navigate from the service directly — go through go_router so the auth-redirect logic still applies.
 
-**Routing requests through push.** Anything that would have wanted a real-time subscription on a request-shaped table (e.g. `match_requests`) should instead piggyback on the existing notifications broadcast — the state-change signal is already there. Do not add request tables to `supabase_realtime`.
+**Routing requests through push.** Anything that would have wanted a real-time subscription on a request-shaped table (e.g. `match_challenges`) should instead piggyback on the existing notifications broadcast — the state-change signal is already there. Do not add request tables to `supabase_realtime`.
 
 ---
 
@@ -1540,12 +1622,38 @@ Wired 2026-06-08 for the profile **share** button. Host: `joinmatchday.com`.
 
 **Native config (in-repo).** Android: an `autoVerify` App Links `<intent-filter>` for `https://joinmatchday.com/u/*` + `flutter_deeplinking_enabled` meta-data (`AndroidManifest.xml`). iOS: `FlutterDeepLinkingEnabled` in `Info.plist` + `Runner.entitlements` with `applinks:joinmatchday.com` (the empty `FlutterSceneDelegate` forwards Universal Links to the engine automatically; go_router then resolves the path).
 
-**External steps (NOT in-repo — required before links auto-open the app):**
-- Host `https://joinmatchday.com/.well-known/assetlinks.json` with the **release** signing SHA-256 fingerprint (`keytool -list -v -keystore <release.keystore>`).
-- Host `https://joinmatchday.com/.well-known/apple-app-site-association` (JSON, **no** extension, `Content-Type: application/json`) with the Apple **Team ID** + bundle id.
-- In Xcode, add the **Associated Domains** capability to the Runner target (wires `CODE_SIGN_ENTITLEMENTS` to `Runner.entitlements` and registers the capability on the provisioning profile).
+**The link host is now the `link-preview` edge function** (added 2026-09-06,
+`supabase/functions/link-preview/`). Point `joinmatchday.com` at it and it
+serves:
+- `/u/<username>`, `/t/<team_id>`, `/c/<tournament_id>`, `/m/<match_id>` — HTML
+  landing pages carrying Open Graph / Twitter tags, so a link pasted into
+  WhatsApp unfurls with a title, description and image instead of showing
+  nothing. Unfurlers do not run JS, which is why this is a server-rendered
+  endpoint and not a Flutter web route.
+- `/.well-known/assetlinks.json` and `/.well-known/apple-app-site-association`,
+  generated from secrets — the two files this section previously listed as
+  external steps. They return **503 while unconfigured**, so a missing
+  fingerprint is loud rather than silently serving an empty association.
 
-Until both files are hosted, `share_plus` still works and the in-app route resolves — the link just opens the browser instead of the app. **Follow / Message** on a by-username profile are still inert (their own ticket).
+Set these secrets before it can verify app links:
+`ANDROID_CERT_SHA256` (release signing SHA-256 from
+`keytool -list -v -keystore <release.keystore>`), `APPLE_TEAM_ID`,
+`APPLE_BUNDLE_ID`, and optionally `PUBLIC_SITE_URL` / `PLAY_STORE_URL` /
+`APP_STORE_URL`.
+
+**Still external:** in Xcode, add the **Associated Domains** capability to the
+Runner target (wires `CODE_SIGN_ENTITLEMENTS` to `Runner.entitlements` and
+registers the capability on the provisioning profile).
+
+**URL scheme — `/u/` user, `/t/` team, `/c/` competition.** Tournaments used to
+share under `/t/` as well while the router sent every `/t/:id` to
+`/tournaments/:id`, so shared TEAM links opened a tournament route that could
+not resolve. Fixed 2026-09-06: tournaments moved to `/c/`, `/t/` is teams, and
+`link-preview` resolves a legacy `/t/<uuid>` by trying teams then tournaments so
+links already in circulation keep working (and their `og:url` canonicalises to
+`/c/`). `test/router/full_screen_routes_test.dart` pins both prefixes.
+
+**Follow / Message** on a by-username profile are still inert (their own ticket).
 
 ---
 

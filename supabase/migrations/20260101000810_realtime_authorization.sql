@@ -84,7 +84,7 @@ create policy "realtime_join_authorized"
   using (
     realtime.messages.extension = 'broadcast'
     and (
-      -- Own user channels: user:<auth.uid()>:notifications | :match_requests
+      -- Own user channels: user:<auth.uid()>:notifications | :match_challenges
       (
         split_part((select realtime.topic()), ':', 1) = 'user'
         and split_part((select realtime.topic()), ':', 2) = (select auth.uid())::text

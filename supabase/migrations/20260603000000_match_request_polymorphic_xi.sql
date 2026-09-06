@@ -13,7 +13,7 @@
 --        so any unclaimed id in the picked XI raises 23514 and the send
 --        edge function returns 422 invalid_xi.
 --
---     2. `match_requests.from_team_keeper_id` has a hard FK to
+--     2. `match_challenges.from_team_keeper_id` has a hard FK to
 --        `profiles(user_id)`. An unclaimed keeper id would trip the FK with
 --        23503 even before `_validate_team_xi` runs.
 --
@@ -29,11 +29,11 @@
 --      override at lines 98–99) all benefit automatically — claimed-only
 --      XIs continue to validate because the OR still matches `user_id`.
 --
---   2. Drop the FK on `match_requests.from_team_keeper_id` so an unclaimed
+--   2. Drop the FK on `match_challenges.from_team_keeper_id` so an unclaimed
 --      keeper id is accepted at the column level.
 --
 --   3. Add `_validate_match_request_keeper` + a BEFORE INSERT OR UPDATE
---      trigger on `match_requests` that enforces, when the keeper is set:
+--      trigger on `match_challenges` that enforces, when the keeper is set:
 --        a. keeper is one of the picked XI ids, AND
 --        b. keeper is an active polymorphic team_member of `from_team_id`.
 --      This preserves the FK's "is this a real team member?" guarantee
@@ -90,8 +90,8 @@ grant execute on function public._validate_team_xi(uuid, uuid[]) to authenticate
 -- =============================================================================
 -- 2. Drop the claimed-only FK on from_team_keeper_id
 -- =============================================================================
-alter table public.match_requests
-  drop constraint if exists match_requests_from_team_keeper_id_fkey;
+alter table public.match_challenges
+  drop constraint if exists match_challenges_from_team_keeper_id_fkey;
 
 -- =============================================================================
 -- 3. Keeper-validation trigger
@@ -136,8 +136,8 @@ begin
 end;
 $$;
 
-drop trigger if exists match_requests_validate_keeper on public.match_requests;
-create trigger match_requests_validate_keeper
+drop trigger if exists match_challenges_validate_keeper on public.match_challenges;
+create trigger match_challenges_validate_keeper
   before insert or update of from_team_keeper_id, from_team_xi, from_team_id
-       on public.match_requests
+       on public.match_challenges
   for each row execute function public._validate_match_request_keeper();

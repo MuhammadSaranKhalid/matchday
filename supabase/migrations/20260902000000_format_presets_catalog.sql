@@ -58,7 +58,12 @@ $$;
 -- -----------------------------------------------------------------------------
 -- 2. The view the 0400 migration introduced, rebuilt over the new shape.
 -- -----------------------------------------------------------------------------
-create or replace view public.format_presets as
+-- security_invoker so the view respects match_format_presets' RLS rather than
+-- running as its owner (Supabase advisor 0010). `create or replace view` does
+-- NOT inherit the options of the view it replaces, so this has to be restated
+-- here as well as at the original declaration in 0400.
+create or replace view public.format_presets
+  with (security_invoker = on) as
   select * from public.match_format_presets;
 
 -- -----------------------------------------------------------------------------
@@ -70,6 +75,7 @@ alter table public.match_format_presets enable row level security;
 drop policy if exists "match_format_presets_read_all" on public.match_format_presets;
 create policy "match_format_presets_read_all"
   on public.match_format_presets for select
+  to anon, authenticated
   using (true);
 
 grant select on public.match_format_presets to anon, authenticated;
@@ -103,3 +109,8 @@ on conflict (id) do update set
 create index if not exists idx_match_format_presets_active_order
   on public.match_format_presets (sort_order)
   where is_active;
+
+-- FK index (Supabase advisor 0001). created_by is declared on the rebuilt table
+-- in this migration, not in 0400, so the index belongs here too.
+create index if not exists idx_match_format_presets_created_by
+  on public.match_format_presets (created_by);

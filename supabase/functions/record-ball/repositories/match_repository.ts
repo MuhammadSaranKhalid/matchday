@@ -45,6 +45,12 @@ export class MatchRepository {
   }
 
   // deno-lint-ignore no-explicit-any
+  // One column per fact. This used to write every value twice — into
+  // delivery_type AND ball_type, runs_off_bat AND runs_scored, striker_id AND
+  // batsman_id, recorded_by AND created_by — because the table carried both
+  // spellings. total_runs is GENERATED from runs_off_bat + extra_runs, so the
+  // pairs disagreeing would have silently corrupted the innings total. The
+  // alias columns were dropped 2026-09-06.
   async insertDelivery(
     tx: any,
     input: RecordDeliveryInput,
@@ -59,26 +65,26 @@ export class MatchRepository {
     const inserted = await tx`
       insert into match_deliveries (
         innings_id, match_id, innings_number, seq,
-        over_number, ball_in_over, is_legal_delivery, delivery_type, ball_type,
-        runs_off_bat, runs_scored, extra_runs, extras, is_free_hit,
+        over_number, ball_in_over, is_legal_delivery, delivery_type,
+        runs_off_bat, extra_runs, is_free_hit,
         is_wicket, wicket_type, is_four, is_six, is_boundary,
-        striker_id, non_striker_id, bowler_id, batsman_id, fielder_id,
-        idempotency_key, commentary, recorded_by, created_by
+        striker_id, non_striker_id, bowler_id, fielder_id,
+        idempotency_key, commentary, recorded_by
       ) values (
         ${inningsId}, ${input.matchId}, ${input.inningsNumber}, ${nextSeq},
         ${input.overNumber}, ${input.ballInOver},
         ${input.isLegalDelivery},
-        ${input.ballType}, ${input.ballType},
-        ${input.runsScored}, ${input.runsScored},
-        ${input.extras}, ${input.extras},
+        ${input.ballType},
+        ${input.runsScored},
+        ${input.extras},
         ${input.isFreeHit},
         ${input.isWicket},
         ${input.wicketType},
         ${isFour}, ${isSix}, ${isBoundary},
-        ${input.batsmanId}, ${input.nonStrikerId}, ${input.bowlerId}, ${input.batsmanId},
+        ${input.batsmanId}, ${input.nonStrikerId}, ${input.bowlerId},
         ${input.fielderId},
         ${input.idempotencyKey}, ${input.commentary},
-        ${actor}, ${actor}
+        ${actor}
       )
       on conflict (innings_id, idempotency_key) do nothing
       returning *`;

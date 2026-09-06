@@ -11,8 +11,8 @@
 -- -----------------------------------------------------------------------------
 -- 1. Awards column on tournaments
 -- -----------------------------------------------------------------------------
-alter table public.tournaments
-  add column if not exists awards jsonb not null default '{}'::jsonb;
+-- tournaments.awards is declared inline in 20260101000300_tournaments.sql
+-- (folded there 2026-09-06). This migration owns the RPCs that write it.
 
 -- -----------------------------------------------------------------------------
 -- 2. Standings recalculation function

@@ -32,28 +32,9 @@
 -- <tournament_id>/<filename>. Organizer-only write.
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- Tournament-only enums.
--- -----------------------------------------------------------------------------
-create type public.tournament_type as enum (
-  'knockout',
-  'round_robin',
-  'league',
-  'group_knockout',          -- v1.1
-  'double_elimination'       -- v1.2
-);
+-- Enums moved to 20260101000000_shared_helpers.sql (the enum catalogue),
+-- 2026-09-06 — one enum, one definition, declared before anything uses it.
 
-create type public.tournament_status as enum (
-  'draft',
-  'registration',
-  'upcoming',
-  'live',
-  'completed',
-  'cancelled',
-  'abandoned'
-);
-
-create type public.tournament_privacy as enum ('public', 'private');
 
 -- -----------------------------------------------------------------------------
 -- tournaments table.
@@ -108,6 +89,10 @@ create table public.tournaments (
 
   status                 public.tournament_status  not null default 'draft',
   privacy                public.tournament_privacy not null default 'public',
+
+  -- Per-tournament award winners (best batter / bowler / player of the
+  -- tournament …), written by the leaderboard RPCs in 20260905000000.
+  awards                 jsonb not null default '{}'::jsonb,
 
   created_at             timestamptz not null default now(),
   updated_at             timestamptz not null default now(),
@@ -170,6 +155,7 @@ alter table public.tournaments enable row level security;
 
 create policy "tournaments_read_visible"
   on public.tournaments for select
+  to anon, authenticated
   using (
     privacy = 'public'
     or (select auth.uid()) = created_by

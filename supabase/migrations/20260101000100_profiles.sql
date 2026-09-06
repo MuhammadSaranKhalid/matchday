@@ -35,16 +35,8 @@
 --   the public URL into it). Folder convention: <user_id>/<filename>.
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- Profile-only enums.
--- -----------------------------------------------------------------------------
-create type public.account_status as enum ('active', 'suspended', 'deleted');
-create type public.user_gender as enum (
-  'male',
-  'female',
-  'other',
-  'prefer_not_to_say'
-);
+-- Enums moved to 20260101000000_shared_helpers.sql (the enum catalogue),
+-- 2026-09-06 — one enum, one definition, declared before anything uses it.
 
 -- -----------------------------------------------------------------------------
 -- profiles table.
@@ -58,6 +50,9 @@ create table public.profiles (
                           check (username is null or username ~ '^[a-z0-9_]{3,20}$'),
   display_name         text not null check (length(display_name) between 1 and 80),
   profile_photo_url    text,
+  -- Public URL of the profile cover image in the `avatars` bucket
+  -- (<user_id>/cover_<ts>.jpg). Null renders the generative placeholder.
+  cover_photo_url      text,
   date_of_birth        date,
   gender               public.user_gender,
   bio                  text check (bio is null or length(bio) <= 200),
@@ -102,7 +97,18 @@ create table public.profiles (
 
   last_active_at       timestamptz not null default now(),
   created_at           timestamptz not null default now(),
-  updated_at           timestamptz not null default now()
+  updated_at           timestamptz not null default now(),
+
+  -- Normalised display_name + username for trigram search. GENERATED — never
+  -- write it. f_unaccent() is declared in 0000_shared_helpers so this column
+  -- can be declared here rather than bolted on by a later ALTER.
+  search_name          text generated always as (
+                         lower(
+                           public.f_unaccent(
+                             coalesce(display_name, '') || ' ' || coalesce(username, '')
+                           )
+                         )
+                       ) stored
 );
 
 comment on column public.profiles.location is
@@ -190,15 +196,18 @@ alter table public.profiles enable row level security;
 
 create policy "profiles_read_public"
   on public.profiles for select
+  to anon, authenticated
   using (account_status = 'active');
 
 create policy "profiles_update_self"
   on public.profiles for update
+  to authenticated
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
 create policy "profiles_delete_self"
   on public.profiles for delete
+  to authenticated
   using ((select auth.uid()) = user_id);
 
 -- =============================================================================

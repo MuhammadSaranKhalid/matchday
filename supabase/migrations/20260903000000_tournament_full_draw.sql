@@ -183,7 +183,7 @@ begin
       bracket_round_number, bracket_match_number,
       prev_match_a_id, prev_match_b_id,
       team_a_id, team_b_id, venue, scheduled_start_time,
-      rules_config, format, status, created_by
+      format, status, created_by
     )
     select
       (v_ids->>(slot.elem->>'slot_id'))::uuid,
@@ -214,10 +214,9 @@ begin
       (v_ids->>(slot.elem->>'prev_slot_b'))::uuid,
       (slot.elem->>'team_a_id')::uuid,
       (slot.elem->>'team_b_id')::uuid,
-      coalesce(nullif(slot.elem->>'venue', ''), 'Ground 1'),
+      nullif(slot.elem->>'venue', ''),
       (slot.elem->>'scheduled_start_time')::timestamptz,
-      v_format,
-      v_format,
+      public._normalize_match_format(v_format),
       'scheduled',
       v_uid
     from jsonb_array_elements(p_slots) as slot(elem)

@@ -33,12 +33,6 @@
 -- -----------------------------------------------------------------------------
 -- Registration-status enum.
 -- -----------------------------------------------------------------------------
-create type public.tournament_registration_status as enum (
-  'pending',
-  'approved',
-  'rejected',
-  'withdrawn'
-);
 
 -- -----------------------------------------------------------------------------
 -- tournament_teams table.
@@ -63,6 +57,24 @@ create table public.tournament_teams (
   decided_by        uuid references public.profiles(user_id) on delete set null,
   decided_at        timestamptz,
   message           text check (message is null or length(message) <= 500),
+  -- Why the organiser declined (or approved with a note). Shown to the team's
+  -- manager — the decline dialog tells the organiser it will be.
+  decision_reason   text check (decision_reason is null or length(decision_reason) <= 500),
+
+  -- Payment ledger (artboard 24c). `payment_status` above is a free-text flag
+  -- and cannot express "5,000 of 15,000 received in cash on 02 Mar", so the
+  -- amount is its own column and payment_status stays the derived label the
+  -- older screens read. Partial payments are allowed: the ledger shows
+  -- amount_paid against tournaments.entry_fee.
+  amount_paid         numeric(12,2) not null default 0 check (amount_paid >= 0),
+  payment_channel     text
+    check (payment_channel is null or payment_channel in
+           ('cash', 'jazzcash', 'easypaisa', 'bank_transfer', 'other')),
+  payment_reference   text
+    check (payment_reference is null or length(payment_reference) <= 200),
+  payment_recorded_at timestamptz,
+  payment_recorded_by uuid references public.profiles(user_id) on delete set null,
+
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
 
@@ -76,6 +88,11 @@ create table public.tournament_teams (
 create index tournament_teams_tournament on public.tournament_teams (tournament_id);
 create index tournament_teams_team       on public.tournament_teams (team_id);
 create index tournament_teams_status     on public.tournament_teams (tournament_id, status);
+
+-- squad is a uuid[] that gets probed by id ("is this player registered?").
+-- Without a GIN index every such check is a sequential scan of the array.
+create index if not exists tournament_teams_squad_gin
+  on public.tournament_teams using gin (squad);
 
 create trigger tournament_teams_set_updated_at
   before update on public.tournament_teams
@@ -170,6 +187,7 @@ alter table public.tournament_teams enable row level security;
 
 create policy "tournament_teams_read"
   on public.tournament_teams for select
+  to anon, authenticated
   using (
     public.is_tournament_organizer(tournament_id)
     or public.is_team_manager(team_id)
@@ -204,3 +222,19 @@ create policy "tournament_teams_update_manager_or_organizer"
     public.is_team_manager(team_id)
     or public.is_tournament_organizer(tournament_id)
   );
+
+-- -----------------------------------------------------------------------------
+-- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
+-- -----------------------------------------------------------------------------
+-- Postgres does NOT index the referencing side of a foreign key for you. Every
+-- one of these columns points at a parent that gets deleted or updated
+-- (profiles on account deletion, matches/teams on cascade), and without an
+-- index each such statement seq-scans this table once per affected parent row.
+-- They are also the columns joined on when reading.
+
+create index if not exists idx_tournament_teams_decided_by
+  on public.tournament_teams (decided_by);
+create index if not exists idx_tournament_teams_payment_recorded_by
+  on public.tournament_teams (payment_recorded_by);
+create index if not exists idx_tournament_teams_registered_by
+  on public.tournament_teams (registered_by);

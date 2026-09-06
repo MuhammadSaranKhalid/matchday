@@ -120,6 +120,7 @@ alter table public.claim_requests enable row level security;
 
 create policy "claim_requests_read_self_or_owner"
   on public.claim_requests for select
+  to authenticated
   using ((select auth.uid()) = requester_id or public.is_unclaimed_owner(unclaimed_id));
 
 create policy "claim_requests_insert_self"
@@ -132,3 +133,15 @@ create policy "claim_requests_update_self_or_owner"
   to authenticated
   using ((select auth.uid()) = requester_id or public.is_unclaimed_owner(unclaimed_id))
   with check ((select auth.uid()) = requester_id or public.is_unclaimed_owner(unclaimed_id));
+
+-- -----------------------------------------------------------------------------
+-- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
+-- -----------------------------------------------------------------------------
+-- Postgres does NOT index the referencing side of a foreign key for you. Every
+-- one of these columns points at a parent that gets deleted or updated
+-- (profiles on account deletion, matches/teams on cascade), and without an
+-- index each such statement seq-scans this table once per affected parent row.
+-- They are also the columns joined on when reading.
+
+create index if not exists idx_claim_requests_decided_by
+  on public.claim_requests (decided_by);

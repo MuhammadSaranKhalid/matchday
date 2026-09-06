@@ -39,3 +39,15 @@ create policy "bookmarks_delete_self"
   on public.bookmarks for delete
   to authenticated
   using ((select auth.uid()) = user_id);
+
+-- -----------------------------------------------------------------------------
+-- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
+-- -----------------------------------------------------------------------------
+-- Postgres does NOT index the referencing side of a foreign key for you. Every
+-- one of these columns points at a parent that gets deleted or updated
+-- (profiles on account deletion, matches/teams on cascade), and without an
+-- index each such statement seq-scans this table once per affected parent row.
+-- They are also the columns joined on when reading.
+
+create index if not exists idx_bookmarks_post_id
+  on public.bookmarks (post_id);

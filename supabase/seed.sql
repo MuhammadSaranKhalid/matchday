@@ -858,7 +858,7 @@ begin
 
   -- 5) Match Requests (Challenges for Lahore Lions):
   --    a. Incoming Match Challenge from Karachi Kings to Lahore Lions
-  insert into public.match_requests (
+  insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
     proposed_start_time, proposed_venue, proposed_format,
     share_code, message, status,
@@ -882,7 +882,7 @@ begin
   on conflict (request_id) do nothing;
 
   --    b. Countered Match Challenge from Rawalpindi Rams to Lahore Lions
-  insert into public.match_requests (
+  insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
     proposed_start_time, proposed_venue, proposed_format,
     countered_start_time, countered_venue, countered_players_per_side,
@@ -915,7 +915,7 @@ begin
   on conflict (request_id) do nothing;
 
   --    c. Outgoing Open Challenge by Lahore Lions (with share code)
-  insert into public.match_requests (
+  insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
     proposed_start_time, proposed_venue, proposed_format,
     share_code, message, status,
@@ -951,6 +951,16 @@ begin
     mp_saran_live   constant uuid := '31000000-0000-0000-0000-000000000001';
     mp_babar_live   constant uuid := '31000000-0000-0000-0000-000000000002';
     mp_bilal_live   constant uuid := '31000000-0000-0000-0000-000000000003';
+    -- match_players rows for the completed match. The live-match trio above
+    -- belong to m_live_id and cannot be reused as the past match's lineup:
+    -- match_deliveries' player FKs point at match_players, and match_players
+    -- is scoped to one match_id.
+    mp_saran_past   constant uuid := '31000000-0000-0000-0000-000000000011';
+    mp_babar_past   constant uuid := '31000000-0000-0000-0000-000000000012';
+    mp_bilal_past   constant uuid := '31000000-0000-0000-0000-000000000013';
+    inn_live_1      constant uuid := '32000000-0000-0000-0000-000000000001';
+    inn_past_1      constant uuid := '32000000-0000-0000-0000-000000000011';
+    inn_past_2      constant uuid := '32000000-0000-0000-0000-000000000012';
   begin
     -- 1. LIVE MATCH
     insert into public.matches (
@@ -973,30 +983,47 @@ begin
       actual_start_time = excluded.actual_start_time;
 
     -- Match Players for Live Match
-    insert into public.match_players (match_player_id, match_id, team_side, profile_id, batting_order, jersey_number, is_captain)
+    -- Current match_players shape: user_id (not profile_id), a single `role`
+    -- enum (not is_captain/is_keeper), team_side 'team_a'/'team_b' (not 'a'/'b'),
+    -- and display_name, which is NOT NULL.
+    insert into public.match_players (
+      match_player_id, match_id, team_side, user_id,
+      display_name, batting_order, jersey_number, role
+    )
     values
-      (mp_saran_live, m_live_id, 'a', v_saran_uid, 1, 7, true),
-      (mp_babar_live, m_live_id, 'a', v_babar_uid, 2, 56, false),
-      (mp_bilal_live, m_live_id, 'b', v_bilal_uid, null, 10, true)
+      (mp_saran_live, m_live_id, 'team_a', v_saran_uid, 'Saran Khalid', 1, 7, 'captain'),
+      (mp_babar_live, m_live_id, 'team_a', v_babar_uid, 'Babar Azam',   2, 56, 'player'),
+      (mp_bilal_live, m_live_id, 'team_b', v_bilal_uid, 'Bilal Ahmed',  null, 10, 'captain')
     on conflict (match_player_id) do nothing;
 
-    -- Live Innings State
+    -- Live Innings. match_innings_state hangs off match_innings, so the parent
+    -- has to exist first: its PK innings_id is NOT NULL on the state row.
+    insert into public.match_innings (
+      innings_id, match_id, innings_number,
+      batting_team_side, bowling_team_side, overs_allocated
+    )
+    values (inn_live_1, m_live_id, 1, 'team_a', 'team_b', 20.0)
+    on conflict (innings_id) do nothing;
+
+    -- total_extras is GENERATED from the five breakdown columns and cannot be
+    -- written directly; seed the parts and let it compute (8 = 5 wides + 3 byes).
     insert into public.match_innings_state (
-      match_id, innings_number,
+      innings_id, match_id, innings_number,
       striker_id, non_striker_id, bowler_id,
-      legal_ball_count, total_runs, total_wickets, total_extras,
+      legal_ball_count, total_runs, total_wickets,
+      total_wides, total_byes,
       version
     )
     values (
-      m_live_id, 1,
+      inn_live_1, m_live_id, 1,
       mp_saran_live, mp_babar_live, mp_bilal_live,
-      94, 142, 3, 8, 1
+      94, 142, 3,
+      5, 3, 1
     )
-    on conflict (match_id, innings_number) do update set
+    on conflict (innings_id) do update set
       legal_ball_count = excluded.legal_ball_count,
       total_runs = excluded.total_runs,
-      total_wickets = excluded.total_wickets,
-      total_extras = excluded.total_extras;
+      total_wickets = excluded.total_wickets;
 
     -- 2. CONFIRMED UPCOMING MATCH: Lahore Lions vs Rawalpindi Rams (Tomorrow at 4:30 PM)
     insert into public.matches (
@@ -1020,7 +1047,7 @@ begin
     --    Lahore Lions won by 24 runs (LL: 168/5, IU: 144/9)
     insert into public.matches (
       match_id, match_type, team_a_id, team_b_id, team_a_captain, team_b_captain,
-      format, venue, scheduled_start_time, actual_start_time, end_time,
+      format, venue, scheduled_start_time, actual_start_time, completed_at,
       toss_won_by, toss_decision, toss_face, start_phase, status,
       result, created_by, created_at, updated_at
     )
@@ -1040,43 +1067,62 @@ begin
       start_phase = excluded.start_phase,
       result = excluded.result;
 
-    -- Past Match Innings 1 (Lahore Lions: 168/5)
-    insert into public.match_innings_state (
-      match_id, innings_number,
-      legal_ball_count, total_runs, total_wickets, total_extras, version
-    )
-    values (
-      m_past_id, 1,
-      120, 168, 5, 12, 1
-    )
-    on conflict (match_id, innings_number) do update set
-      legal_ball_count = excluded.legal_ball_count,
-      total_runs = excluded.total_runs,
-      total_wickets = excluded.total_wickets;
-
-    -- Past Match Innings 2 (Islamabad United: 144/9)
-    insert into public.match_innings_state (
-      match_id, innings_number,
-      legal_ball_count, total_runs, total_wickets, total_extras, version
-    )
-    values (
-      m_past_id, 2,
-      120, 144, 9, 6, 1
-    )
-    on conflict (match_id, innings_number) do update set
-      legal_ball_count = excluded.legal_ball_count,
-      total_runs = excluded.total_runs,
-      total_wickets = excluded.total_wickets;
-
-    -- Also insert sample deliveries into public.balls for listInningsForMatches aggregation
-    insert into public.balls (
-      match_id, innings_number, over_number, ball_in_over,
-      bowler_id, batsman_id, non_striker_id, runs_scored, is_legal_delivery
+    -- Lineup for the completed match. Needed because match_deliveries' striker /
+    -- non-striker / bowler FKs point at match_players, scoped per match.
+    insert into public.match_players (
+      match_player_id, match_id, team_side, user_id,
+      display_name, batting_order, jersey_number, role
     )
     values
-      (m_past_id, 1, 19, 6, mp_bilal_live, mp_saran_live, mp_babar_live, 4, true),
-      (m_past_id, 2, 19, 6, mp_saran_live, mp_bilal_live, mp_babar_live, 1, true)
-    on conflict (match_id, innings_number, seq) do nothing;
+      (mp_saran_past, m_past_id, 'team_a', v_saran_uid, 'Saran Khalid', 1, 7, 'captain'),
+      (mp_babar_past, m_past_id, 'team_a', v_babar_uid, 'Babar Azam',   2, 56, 'player'),
+      (mp_bilal_past, m_past_id, 'team_b', v_bilal_uid, 'Bilal Ahmed',  1, 10, 'captain')
+    on conflict (match_player_id) do nothing;
+
+    -- Past Match Innings 1 (Lahore Lions: 168/5) and 2 (Islamabad United: 144/9)
+    insert into public.match_innings (
+      innings_id, match_id, innings_number,
+      batting_team_side, bowling_team_side, overs_allocated, is_completed
+    )
+    values
+      (inn_past_1, m_past_id, 1, 'team_a', 'team_b', 20.0, true),
+      (inn_past_2, m_past_id, 2, 'team_b', 'team_a', 20.0, true)
+    on conflict (innings_id) do nothing;
+
+    -- total_extras is generated; seed its parts (12 = 8 wides + 4 byes,
+    -- 6 = 4 wides + 2 leg-byes).
+    insert into public.match_innings_state (
+      innings_id, match_id, innings_number,
+      legal_ball_count, total_runs, total_wickets,
+      total_wides, total_byes, total_leg_byes,
+      target, version
+    )
+    values
+      (inn_past_1, m_past_id, 1, 120, 168, 5, 8, 4, 0, null, 1),
+      (inn_past_2, m_past_id, 2, 120, 144, 9, 4, 0, 2, 169,  1)
+    on conflict (innings_id) do update set
+      legal_ball_count = excluded.legal_ball_count,
+      total_runs = excluded.total_runs,
+      total_wickets = excluded.total_wickets;
+
+    -- Sample deliveries for listInningsForMatches aggregation. Written to
+    -- match_deliveries directly rather than through the `balls` view, with the
+    -- columns the table actually has: innings_id and seq are NOT NULL, and
+    -- idempotency_key no longer carries a default (the client owns it).
+    insert into public.match_deliveries (
+      innings_id, match_id, innings_number, seq,
+      over_number, ball_in_over, is_legal_delivery, delivery_type,
+      runs_off_bat, striker_id, non_striker_id, bowler_id,
+      is_four, is_boundary, idempotency_key
+    )
+    values
+      (inn_past_1, m_past_id, 1, 1, 19, 6, true, 'legal',
+       4, mp_saran_past, mp_babar_past, mp_bilal_past,
+       true, true, 'seed-past-inn1-ball1'),
+      (inn_past_2, m_past_id, 2, 1, 19, 6, true, 'legal',
+       1, mp_bilal_past, mp_babar_past, mp_saran_past,
+       false, false, 'seed-past-inn2-ball1')
+    on conflict (innings_id, seq) do nothing;
   end;
 
   raise notice 'Team requests & matches seeded successfully for Lahore Lions.';

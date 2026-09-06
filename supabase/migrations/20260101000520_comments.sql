@@ -25,7 +25,6 @@
 --   columns).
 -- =============================================================================
 
-create type public.comment_status as enum ('active', 'deleted', 'reported');
 
 create table public.comments (
   comment_id          uuid primary key default gen_random_uuid(),
@@ -235,6 +234,7 @@ alter table public.comments enable row level security;
 
 create policy "comments_read_if_post_visible"
   on public.comments for select
+  to anon, authenticated
   using (
     exists (
       select 1 from public.posts p

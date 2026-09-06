@@ -1,7 +1,7 @@
--- match_requests_pps_single_source — proposed_format.players_per_team is the
+-- match_challenges_pps_single_source — proposed_format.players_per_team is the
 -- single source of truth for players-per-side on a match request.
 --
--- Previously `match_requests.players_per_side` was a standalone column written
+-- Previously `match_challenges.players_per_side` was a standalone column written
 -- alongside `proposed_format`. That allowed the two to drift. Now:
 --   1. send_match_request folds the validated pps into proposed_format and no
 --      longer writes the column.
@@ -58,7 +58,7 @@ begin
   perform public._validate_team_xi(p_from_team_id, p_from_team_xi);
 
   if p_to_team_id is not null and exists (
-    select 1 from public.match_requests
+    select 1 from public.match_challenges
      where from_team_id = p_from_team_id
        and to_team_id   = p_to_team_id
        and status in ('pending', 'countered')
@@ -70,7 +70,7 @@ begin
   loop
     v_code := lpad((floor(random() * 1000000))::int::text, 6, '0');
     begin
-      insert into public.match_requests (
+      insert into public.match_challenges (
         from_team_id, to_team_id, requested_by,
         proposed_start_time, proposed_venue, proposed_format, message,
         from_team_xi, from_team_keeper_id,
@@ -100,16 +100,9 @@ begin
 end;
 $function$;
 
--- 2) Guarantee the key is always present and valid so the projection is sound.
-alter table public.match_requests
-  add constraint match_requests_proposed_ppt_valid check (
-    proposed_format ? 'players_per_team'
-    and (proposed_format->>'players_per_team')::int between 5 and 15
-  );
-
--- 3) Replace the standalone column with a generated projection of the blob.
-alter table public.match_requests drop column players_per_side;
-
-alter table public.match_requests
-  add column players_per_side smallint
-    generated always as ((proposed_format->>'players_per_team')::smallint) stored;
+-- 2 & 3. MOVED 2026-09-06.
+--   match_challenges.players_per_side is declared as a GENERATED projection of
+--   proposed_format->>'players_per_team' directly in
+--   20260101000600_match_challenges.sql, together with the check constraint that
+--   makes the projection sound. There is no longer a standalone column to drop
+--   and re-add, so nothing remains here but the RPC above.

@@ -95,6 +95,7 @@ alter table public.post_likes enable row level security;
 -- exposing rows lets the UI render the avatar strip without an extra RPC.
 create policy "post_likes_read_public"
   on public.post_likes for select
+  to anon, authenticated
   using (true);
 
 create policy "post_likes_insert_self"

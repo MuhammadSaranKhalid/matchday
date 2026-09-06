@@ -26,31 +26,16 @@
 -- upload — clients must INSERT first, upload second.
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- Post-only enums.
--- -----------------------------------------------------------------------------
+-- Enums moved to 20260101000000_shared_helpers.sql (the enum catalogue),
+-- 2026-09-06 — one enum, one definition, declared before anything uses it.
 -- §6.5 author context.
-create type public.post_author_context as enum (
-  'personal',
-  'team_manager',
-  'tournament_organizer'
-);
 
 -- §6.6 MVP types only — auto types (match_result, milestone_achievement,
 -- team_roster_change) ship in v1.1 with the auto-generation Edge Function.
-create type public.post_type as enum (
-  'text',
-  'photo',
-  'match_announcement',
-  'recruitment',
-  'tournament_update'
-);
 
 -- §6.5 visibility. FollowersOnly is v1.2 (private accounts).
-create type public.post_visibility as enum ('public');
 
 -- §6.5 status — soft-delete posture mirrors balls (preserve audit trail).
-create type public.post_status as enum ('active', 'hidden', 'deleted', 'reported');
 
 -- -----------------------------------------------------------------------------
 -- posts table.
@@ -221,6 +206,7 @@ alter table public.posts enable row level security;
 
 create policy "posts_read_public"
   on public.posts for select
+  to anon, authenticated
   using (status = 'active' or (select auth.uid()) = author_id);
 
 create policy "posts_insert_self_or_manager"

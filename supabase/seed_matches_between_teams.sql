@@ -1,4 +1,17 @@
 -- =============================================================================
+-- MOVED OUT OF supabase/migrations/ ON 2026-09-06
+-- =============================================================================
+-- This is demo data, not schema. It hardcodes two real accounts and their
+-- teams, so on any database that does not already contain them every insert
+-- fails on a foreign key — which is exactly how `supabase db reset` broke.
+-- Migrations are now schema only (one table per migration); seed data lives
+-- here and is opted into via [db.seed] sql_paths in config.toml.
+--
+-- The guard below makes the file a no-op when its subjects are absent, so it
+-- is safe to add to sql_paths on any machine.
+-- =============================================================================
+
+-- =============================================================================
 -- 20260822100000 · seed_matches_between_teams
 -- =============================================================================
 -- Seeds realistic matches between the two real registered accounts and their teams:
@@ -70,6 +83,12 @@ declare
   inn_comp_2_1  constant uuid := '22222222-0000-0000-0000-000000000001';
   inn_comp_2_2  constant uuid := '22222222-0000-0000-0000-000000000002';
 begin
+  if not exists (select 1 from public.teams where team_id = t_saran_strikers)
+     or not exists (select 1 from public.teams where team_id = t_muazam_mavs) then
+    raise notice 'seed_matches_between_teams: target teams absent — skipping.';
+    return;
+  end if;
+
   -- 0. Clean up prior matches and dummy test users
   delete from public.matches;
   delete from auth.users where email like '%@local.test';
@@ -231,10 +250,10 @@ begin
   -- 2nd Innings (Muazam Mavericks: 168/8, Target: 187)
   insert into public.match_innings (
     innings_id, match_id, innings_number, batting_team_side, bowling_team_side,
-    overs_allocated, target_runs, is_completed, start_time, end_time
+    overs_allocated, is_completed, start_time, end_time
   ) values (
     inn_comp_2_2, m_completed_2, 2, 'team_b', 'team_a',
-    20.0, 187, true, now() - interval '2 days' + interval '1 hour 50 minutes', now() - interval '2 days' + interval '3 hours 20 minutes'
+    20.0, true, now() - interval '2 days' + interval '1 hour 50 minutes', now() - interval '2 days' + interval '3 hours 20 minutes'
   ) on conflict (innings_id) do nothing;
 
   -- 2nd Innings State

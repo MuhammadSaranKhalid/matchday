@@ -10,12 +10,12 @@
 --   carries its own keys (post_id, actor_id, comment_id, match_id, ...).
 --   The taxonomy lives in the `notification_type` enum below; later
 --   migrations extend it via `alter type ... add value if not exists`
---   when new event sources land (e.g. match_requests in 0600).
+--   when new event sources land (e.g. match_challenges in 0600).
 --
 -- Writes:
 --   Clients NEVER insert into this table directly. Every notification is
 --   produced by a trigger somewhere else — on post_likes, comments, follows,
---   match_requests, claim_requests, etc. Each of those trigger functions is
+--   match_challenges, claim_requests, etc. Each of those trigger functions is
 --   SECURITY DEFINER so it can write here even when the actor wouldn't
 --   otherwise satisfy the recipient-only RLS.
 --
@@ -30,20 +30,6 @@
 --   stat_milestone     → milestone-post auto-generation
 -- v0600 will append match_request / match_request_decision.
 -- -----------------------------------------------------------------------------
-create type public.notification_type as enum (
-  'follow',
-  'post_like',
-  'post_comment',
-  'comment_reply',
-  'mention',
-  'team_post',
-  'tournament_post',
-  'match_starting',
-  'match_upcoming',
-  'stat_milestone',
-  'claim_decision',
-  'team_invitation'
-);
 
 -- -----------------------------------------------------------------------------
 -- notifications table.

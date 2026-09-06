@@ -28,12 +28,12 @@
 --                                NULL in 0400; we also null it
 --                                explicitly here as a belt-and-braces.)
 --
---   * balls.created_by        — same reasoning. The scorer's name
+--   * match_deliveries.recorded_by — same reasoning. The scorer's name
 --                                disappears from the over-by-over feed,
 --                                but the deliveries themselves remain.
---                                (FK is ON DELETE SET NULL in 0410.)
+--                                (FK is ON DELETE SET NULL in 0400.)
 --
---   * match_players.profile_id — historical lineups (and therefore the
+--   * match_players.user_id    — historical lineups (and therefore the
 --                                full scorecard / stats lineage) must
 --                                survive a profile delete. We promote
 --                                the user's match_players rows to point
@@ -83,7 +83,7 @@ begin
   end if;
 
   -- ---------------------------------------------------------------------------
-  -- Match-history promotion (match_players.profile_id ON DELETE RESTRICT).
+  -- Match-history promotion (match_players.user_id).
   -- ---------------------------------------------------------------------------
   -- If the user has EVER appeared in a match lineup, create one
   -- unclaimed_players placeholder carrying their display name, then
@@ -95,20 +95,23 @@ begin
   -- partial unique on match_players_unique_unclaimed would reject the
   -- update. The NOT EXISTS subquery skips those rows so the bulk
   -- update completes; orphans are left as-is for operator review.
-  if exists (select 1 from public.match_players where profile_id = v_uid) then
+  if exists (select 1 from public.match_players where user_id = v_uid) then
     select coalesce(display_name, 'Former player')
       into v_display_name
       from public.profiles
      where user_id = v_uid;
 
+    -- added_by is left NULL: no manager created this placeholder, and pointing
+    -- it at v_uid would either cascade it away or trip a not-null violation
+    -- when auth.users is deleted below.
     insert into public.unclaimed_players (display_name, added_by)
-    values (v_display_name, v_uid)
+    values (v_display_name, null)
     returning unclaimed_id into v_unclaimed_id;
 
     update public.match_players mp1
-       set profile_id   = null,
+       set user_id      = null,
            unclaimed_id = v_unclaimed_id
-     where profile_id = v_uid
+     where user_id = v_uid
        and not exists (
          select 1 from public.match_players mp2
           where mp2.match_id     = mp1.match_id
@@ -122,8 +125,13 @@ begin
   -- on cascade, but explicit makes the RPC predictable if the FK actions
   -- ever change.
   -- ---------------------------------------------------------------------------
-  update public.matches set created_by = null where created_by = v_uid;
-  update public.balls    set created_by = null where created_by = v_uid;
+  update public.matches           set created_by  = null where created_by  = v_uid;
+  update public.match_deliveries  set recorded_by = null where recorded_by = v_uid;
+
+  -- Audit breadcrumbs that must not block the delete. Both FKs are ON DELETE
+  -- SET NULL so this is belt-and-braces, but explicit keeps the RPC readable.
+  update public.team_members      set added_by    = null where added_by    = v_uid;
+  update public.unclaimed_players set added_by    = null where added_by    = v_uid;
 
   -- ---------------------------------------------------------------------------
   -- Final cascade. Everything else hung off auth.users / profiles cleans
@@ -135,3 +143,66 @@ $$;
 
 revoke all on function public.delete_user() from public;
 grant execute on function public.delete_user() to authenticated;
+
+
+-- =============================================================================
+-- Dangling uuid[] cleanup on profile delete
+-- =============================================================================
+-- Seven columns hold uuid[] of profile ids with no referential integrity —
+-- an array cannot carry a foreign key. Deleting a profile therefore left its
+-- id behind in every one of them, and two of those arrays (teams.managers,
+-- tournaments.organizers) are read by RLS policies to decide who may write.
+-- A stale id in an authorization array is the part that actually matters.
+--
+-- A trigger rather than more statements inside delete_user(), so it also
+-- catches deletions that do not go through the RPC — an admin DELETE, or the
+-- auth.users cascade.
+--
+-- Forward references are deliberate and safe here: the body is plpgsql, which
+-- Postgres does NOT check at CREATE time, and every table named below exists
+-- by the end of the migration run — which is the earliest this can ever fire.
+-- (The same late-binding that hid the match_officials ordering bug is the
+-- thing that makes this legal.)
+create or replace function public._strip_deleted_profile_from_arrays()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.teams
+     set managers = array_remove(managers, old.user_id)
+   where old.user_id = any(managers);
+
+  update public.tournaments
+     set organizers = array_remove(organizers, old.user_id)
+   where old.user_id = any(organizers);
+
+  update public.tournament_teams
+     set squad = array_remove(squad, old.user_id)
+   where old.user_id = any(squad);
+
+  update public.match_challenges
+     set from_team_xi = array_remove(from_team_xi, old.user_id)
+   where old.user_id = any(from_team_xi);
+
+  update public.match_pool_applications
+     set applicant_xi = array_remove(applicant_xi, old.user_id)
+   where old.user_id = any(applicant_xi);
+
+  update public.posts
+     set linked_player_ids = array_remove(linked_player_ids, old.user_id)
+   where old.user_id = any(linked_player_ids);
+
+  update public.comments
+     set mentioned_user_ids = array_remove(mentioned_user_ids, old.user_id)
+   where old.user_id = any(mentioned_user_ids);
+
+  return old;
+end;
+$$;
+
+drop trigger if exists profiles_strip_from_arrays on public.profiles;
+create trigger profiles_strip_from_arrays
+  before delete on public.profiles
+  for each row execute function public._strip_deleted_profile_from_arrays();

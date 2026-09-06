@@ -28,17 +28,9 @@
 -- 15,000 received in cash on 02 Mar". The ledger needs the amount to sum a
 -- tournament's collected/outstanding totals, so the amount becomes a column
 -- and payment_status stays as the derived label the older screens still read.
-alter table public.tournament_teams
-  add column if not exists amount_paid         numeric(12,2) not null default 0
-    check (amount_paid >= 0),
-  add column if not exists payment_channel     text
-    check (payment_channel is null or payment_channel in
-           ('cash', 'jazzcash', 'easypaisa', 'bank_transfer', 'other')),
-  add column if not exists payment_reference   text
-    check (payment_reference is null or length(payment_reference) <= 200),
-  add column if not exists payment_recorded_at timestamptz,
-  add column if not exists payment_recorded_by uuid
-    references public.profiles(user_id) on delete set null;
+-- The ledger columns are declared inline in
+-- 20260101000310_tournament_teams.sql (folded there 2026-09-06).
+-- This migration owns the RPCs that write them.
 
 comment on column public.tournament_teams.amount_paid is
   'Cumulative fee received for this registration, in the tournament currency. '
@@ -481,13 +473,8 @@ grant execute on function public.tournament_auto_assign_scorers(uuid) to authent
 -- parameter, already computed by the Dart engine. This function does no
 -- cricket arithmetic — it writes down what the organiser read back to the
 -- captains, and stamps who decided it and when.
-alter table public.matches
-  add column if not exists revised_conditions jsonb;
-
-comment on column public.matches.revised_conditions is
-  'Audit trail for a rain-revised match (artboards 27m / 28b): the original '
-  'and revised overs, the target the organiser applied, and which method '
-  'produced it. Computed in the Dart engine, never in SQL.';
+-- matches.revised_conditions is declared inline in
+-- 20260101000400_matches.sql (folded there 2026-09-06).
 
 create or replace function public.tournament_revise_match_conditions(
   p_match_id       uuid,
@@ -523,7 +510,9 @@ begin
       using errcode = '22023';
   end if;
 
-  v_original := coalesce((v_match.rules_config->>'max_overs')::integer, 20);
+  -- `format`, not the former `rules_config`: one format document per match
+  -- since the 2026-09-06 consolidation, normalized by _normalize_match_format.
+  v_original := coalesce((v_match.format->>'overs_per_innings')::integer, 20);
 
   if p_revised_overs > v_original then
     raise exception 'Overs can only be reduced, not extended'
@@ -535,18 +524,19 @@ begin
   end if;
 
   update public.matches
-     set rules_config = rules_config
-                          || jsonb_build_object(
-                               'max_overs', p_revised_overs,
-                               'max_overs_per_bowler', p_bowler_quota
-                             ),
+     set format = public._normalize_match_format(
+                    format || jsonb_build_object(
+                      'overs_per_innings',    p_revised_overs,
+                      'max_overs_per_bowler', p_bowler_quota
+                    )
+                  ),
          revised_conditions = jsonb_build_object(
            'applied_at',        now(),
            'applied_by',        auth.uid(),
            'original_overs',    v_original,
            'revised_overs',     p_revised_overs,
            'original_quota',    coalesce(
-                                  (v_match.rules_config->>'max_overs_per_bowler')::integer,
+                                  (v_match.format->>'max_overs_per_bowler')::integer,
                                   4),
            'revised_quota',     p_bowler_quota,
            'revised_target',    p_revised_target,
@@ -592,7 +582,7 @@ begin
       using errcode = '22023';
   end if;
 
-  if not coalesce((v_match.rules_config->>'super_over_enabled')::boolean, true) then
+  if not coalesce((v_match.format->>'super_over_enabled')::boolean, true) then
     raise exception 'Super overs are disabled for this tournament'
       using errcode = '22023';
   end if;

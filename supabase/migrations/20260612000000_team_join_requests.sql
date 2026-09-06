@@ -38,24 +38,37 @@ create trigger team_join_requests_set_updated_at
 -- RLS
 alter table public.team_join_requests enable row level security;
 
+-- `(select auth.uid())` rather than a bare `auth.uid()`: wrapping it in a
+-- subquery makes the planner treat it as an InitPlan and evaluate it ONCE per
+-- statement instead of once per row (Supabase advisor 0003). Same for the
+-- is_team_manager() SECURITY DEFINER call. Every other policy in this schema
+-- already used the wrapped form; these three were the stragglers.
 create policy team_join_requests_read on public.team_join_requests
   for select to authenticated
   using (
-    player_id = auth.uid()
-    or public.is_team_manager(team_id)
+    player_id = (select auth.uid())
+    or (select public.is_team_manager(team_id))
   );
 
 create policy team_join_requests_insert on public.team_join_requests
   for insert to authenticated
   with check (
-    player_id = auth.uid()
+    player_id = (select auth.uid())
   );
 
+-- WITH CHECK is not optional on an UPDATE policy. USING decides which rows you
+-- may target; WITH CHECK decides what the row is allowed to look like
+-- afterwards. Without it a player could pass the USING test on their own
+-- request and then rewrite player_id or team_id to anything at all.
 create policy team_join_requests_update on public.team_join_requests
   for update to authenticated
   using (
-    player_id = auth.uid()
-    or public.is_team_manager(team_id)
+    player_id = (select auth.uid())
+    or (select public.is_team_manager(team_id))
+  )
+  with check (
+    player_id = (select auth.uid())
+    or (select public.is_team_manager(team_id))
   );
 
 -- RPC to request joining a team
@@ -179,3 +192,15 @@ $$;
 grant execute on function public.request_to_join_team(uuid, public.member_role, text) to authenticated;
 grant execute on function public.accept_team_join_request(uuid, integer) to authenticated;
 grant execute on function public.decline_team_join_request(uuid) to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
+-- -----------------------------------------------------------------------------
+-- Postgres does NOT index the referencing side of a foreign key for you. Every
+-- one of these columns points at a parent that gets deleted or updated
+-- (profiles on account deletion, matches/teams on cascade), and without an
+-- index each such statement seq-scans this table once per affected parent row.
+-- They are also the columns joined on when reading.
+
+create index if not exists idx_team_join_requests_decided_by
+  on public.team_join_requests (decided_by);

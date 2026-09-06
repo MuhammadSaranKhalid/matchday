@@ -44,15 +44,8 @@
 -- display_name is NOT NULL; username is nullable until onboarding sets it.
 -- coalesce keeps the expression total so the generated column never goes NULL
 -- (a NULL here would silently drop the row out of the trigram index).
-alter table public.profiles
-  add column search_name text
-  generated always as (
-    lower(
-      public.f_unaccent(
-        coalesce(display_name, '') || ' ' || coalesce(username, '')
-      )
-    )
-  ) stored;
+-- profiles.search_name is declared inline in 20260101000100_profiles.sql
+-- (folded there 2026-09-06). The index below is what this migration owns.
 
 comment on column public.profiles.search_name is
   'Normalised (lower + accent-folded) "display_name username" for trigram '
@@ -86,9 +79,8 @@ create index profiles_search_trgm
 --
 -- Only unclaimed rows are indexed: once claimed, the person has a real profile
 -- and should surface through `profiles` instead (otherwise they appear twice).
-alter table public.unclaimed_players
-  add column search_name text
-  generated always as (lower(public.f_unaccent(coalesce(display_name, '')))) stored;
+-- unclaimed_players.search_name is declared inline in
+-- 20260101000120_unclaimed_players.sql (folded there 2026-09-06).
 
 comment on column public.unclaimed_players.search_name is
   'Normalised display_name for trigram search. Generated — never write directly.';

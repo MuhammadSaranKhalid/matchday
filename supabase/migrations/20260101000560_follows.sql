@@ -23,8 +23,6 @@
 --   target_id=follower_id`. Following your own team/tournament is allowed.
 -- =============================================================================
 
-create type public.follow_target_type as enum ('user', 'team', 'tournament');
-create type public.follow_status      as enum ('active', 'muted');
 
 create table public.follows (
   follow_id              uuid primary key default gen_random_uuid(),
@@ -118,6 +116,7 @@ alter table public.follows enable row level security;
 
 create policy "follows_read_public"
   on public.follows for select
+  to anon, authenticated
   using (true);
 
 create policy "follows_insert_self"

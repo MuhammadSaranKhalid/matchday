@@ -13,6 +13,7 @@
 --    `overs_per_innings`). The client and the scoring engine read `format`, so
 --    a match created without an explicit format had overs_per_innings = 0,
 --    which the engine reads as UNLIMITED — the innings could never end on overs.
+--    (Fixed at the source on 2026-09-06: the two blobs are now one column.)
 --
 -- 3. Both match-creation RPCs still wrote the pre-reset `match_players` shape:
 --    `profile_id` (now `user_id`), `is_captain` / `is_keeper` (now one `role`
@@ -25,62 +26,16 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- 1. The canonical match-format shape
+-- 1 & 2. Format normalization — MOVED
 -- -----------------------------------------------------------------------------
--- One place that decides what a format document looks like. Every key the
--- client's MatchDto and the Dart scoring engine read is guaranteed present with
--- a sane value, so no downstream reader has to guess what a missing key means.
+-- `_normalize_match_format(jsonb)` and the `matches.format` DEFAULT that uses
+-- it were defined here. Both moved into 20260101000400_matches.sql during the
+-- 2026-09-06 consolidation, so the column carries a playable default from the
+-- moment the table exists rather than acquiring one much later in the run.
 --
--- `overs_per_innings` matters most: the engine treats 0 as "unlimited" (Test
--- cricket), so a format that merely omits it silently produces an innings that
--- never ends. Accepts `max_overs` as an alias because that is the key the
--- `rules_config` default has always used.
-create or replace function public._normalize_match_format(p_format jsonb)
-returns jsonb
-language sql
-immutable
-set search_path = public, pg_temp
-as $$
-  select jsonb_strip_nulls(
-    jsonb_build_object(
-      'overs_per_innings',   coalesce(
-                               (f->>'overs_per_innings')::int,
-                               (f->>'max_overs')::int,
-                               20),
-      'players_per_team',    coalesce((f->>'players_per_team')::int, 11),
-      'balls_per_over',      coalesce((f->>'balls_per_over')::int, 6),
-      'max_overs_per_bowler',coalesce((f->>'max_overs_per_bowler')::int, 4),
-      'innings_per_side',    coalesce((f->>'innings_per_side')::int, 1),
-      'ball_type',           coalesce(nullif(f->>'ball_type', ''), 'leather'),
-      -- Optional. Null is meaningful for both: the engine derives
-      -- wickets_to_all_out as (players_per_team - 1) when absent, and
-      -- end_change_balls defaults to balls_per_over. jsonb_strip_nulls drops
-      -- them rather than writing a null the reader must special-case.
-      'wickets_to_all_out',  (f->>'wickets_to_all_out')::int,
-      'end_change_balls',    (f->>'end_change_balls')::int
-    )
-  )
-  from (select coalesce(p_format, '{}'::jsonb) as f) s;
-$$;
-
-revoke all on function public._normalize_match_format(jsonb) from public;
-grant execute on function public._normalize_match_format(jsonb) to authenticated, service_role;
-
--- -----------------------------------------------------------------------------
--- 2. A match created without an explicit format gets a playable one
--- -----------------------------------------------------------------------------
-alter table public.matches
-  alter column format set default public._normalize_match_format('{}'::jsonb);
-
--- Repair rows already carrying an unusable format. Safe to re-run.
-update public.matches
-   set format = public._normalize_match_format(
-                  case when format = '{}'::jsonb then rules_config else format end)
- where format is null
-    or format = '{}'::jsonb
-    -- jsonb_exists(), not the `?` operator: `?` is a parameter placeholder to
-    -- several drivers and gets mangled before it reaches Postgres.
-    or not jsonb_exists(format, 'overs_per_innings');
+-- The backfill that once stood here read `rules_config`, the second format
+-- blob. That column no longer exists (merged into `format`), and with the
+-- default now set at CREATE TABLE time there are no unusable rows to repair.
 
 -- -----------------------------------------------------------------------------
 -- 3. Match creation writes the current match_players shape
@@ -105,7 +60,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_req         public.match_requests%rowtype;
+  v_req         public.match_challenges%rowtype;
   v_to_team     uuid;
   v_match_id    uuid;
   v_format      jsonb;
@@ -121,7 +76,7 @@ begin
     raise exception 'Not authenticated' using errcode = '42501';
   end if;
 
-  select * into v_req from public.match_requests
+  select * into v_req from public.match_challenges
    where request_id = p_request_id
    for update;
   if not found then
@@ -286,7 +241,7 @@ begin
   -- another concurrent transaction (counter / cancel / decline) already
   -- transitioned the row, our UPDATE matches zero rows and we roll back
   -- — preventing a match from being created against stale terms.
-  update public.match_requests
+  update public.match_challenges
      set status        = 'accepted',
          decided_by    = auth.uid(),
          decided_at    = now(),
@@ -323,7 +278,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_app            public.match_pool_applications%rowtype;
-  v_req            public.match_requests%rowtype;
+  v_req            public.match_challenges%rowtype;
   v_match_id       uuid;
   v_format         jsonb;
   v_a_captain      uuid;
@@ -347,7 +302,7 @@ begin
       using errcode = '22023';
   end if;
 
-  select * into v_req from public.match_requests
+  select * into v_req from public.match_challenges
    where request_id = v_app.request_id
    for update;
 
@@ -479,7 +434,7 @@ begin
      and status = 'pending';
 
   -- Close the match_request
-  update public.match_requests
+  update public.match_challenges
      set status        = 'accepted',
          decided_by    = auth.uid(),
          decided_at    = now(),
@@ -597,15 +552,16 @@ begin
   v_batting_side := case when v_batting_team = v_team_a then 'team_a' else 'team_b' end;
   v_bowling_side := case when v_batting_team = v_team_a then 'team_b' else 'team_a' end;
 
+  -- The target goes to match_innings_state only. match_innings.target_runs was
+  -- a second copy written by this same statement and was dropped 2026-09-06.
   insert into public.match_innings (
-    match_id, innings_number, batting_team_side, bowling_team_side, target_runs
+    match_id, innings_number, batting_team_side, bowling_team_side
   ) values (
-    p_match_id, p_innings_number, v_batting_side, v_bowling_side, p_target
+    p_match_id, p_innings_number, v_batting_side, v_bowling_side
   )
   on conflict (match_id, innings_number) do update set
     batting_team_side = excluded.batting_team_side,
-    bowling_team_side = excluded.bowling_team_side,
-    target_runs = coalesce(excluded.target_runs, match_innings.target_runs)
+    bowling_team_side = excluded.bowling_team_side
   returning innings_id into v_innings_id;
 
   insert into public.match_innings_state (

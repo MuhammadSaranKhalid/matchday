@@ -4,7 +4,7 @@
 
 create table if not exists public.match_pool_applications (
   application_id       uuid primary key default gen_random_uuid(),
-  request_id           uuid not null references public.match_requests(request_id) on delete cascade,
+  request_id           uuid not null references public.match_challenges(request_id) on delete cascade,
   applicant_team_id   uuid not null references public.teams(team_id) on delete cascade,
   applicant_user_id   uuid not null references public.profiles(user_id) on delete cascade,
   applicant_xi        uuid[] default '{}'::uuid[],
@@ -37,7 +37,7 @@ create policy "match_pool_apps_select"
   using (
     public.is_team_manager(applicant_team_id)
     or exists (
-      select 1 from public.match_requests mr
+      select 1 from public.match_challenges mr
        where mr.request_id = match_pool_applications.request_id
          and public.is_team_manager(mr.from_team_id)
     )
@@ -59,7 +59,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_req            public.match_requests%rowtype;
+  v_req            public.match_challenges%rowtype;
   v_app_id         uuid;
   v_applicant_name text;
 begin
@@ -72,7 +72,7 @@ begin
       using errcode = '42501';
   end if;
 
-  select * into v_req from public.match_requests
+  select * into v_req from public.match_challenges
    where request_id = p_request_id
    for share;
 
@@ -177,7 +177,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_app            public.match_pool_applications%rowtype;
-  v_req            public.match_requests%rowtype;
+  v_req            public.match_challenges%rowtype;
   v_match_id       uuid;
   v_format         jsonb;
   v_a_captain      uuid;
@@ -201,7 +201,7 @@ begin
       using errcode = '22023';
   end if;
 
-  select * into v_req from public.match_requests
+  select * into v_req from public.match_challenges
    where request_id = v_app.request_id
    for update;
 
@@ -303,7 +303,7 @@ begin
      and status = 'pending';
 
   -- Close the match_request
-  update public.match_requests
+  update public.match_challenges
      set status        = 'accepted',
          decided_by    = auth.uid(),
          decided_at    = now(),
@@ -362,7 +362,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_app public.match_pool_applications%rowtype;
-  v_req public.match_requests%rowtype;
+  v_req public.match_challenges%rowtype;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated' using errcode = '42501';
@@ -376,7 +376,7 @@ begin
     raise exception 'Application not found' using errcode = 'P0002';
   end if;
 
-  select * into v_req from public.match_requests
+  select * into v_req from public.match_challenges
    where request_id = v_app.request_id;
 
   if not public.is_team_manager(v_req.from_team_id) then
@@ -395,3 +395,15 @@ $$;
 
 revoke all on function public.reject_pool_application(uuid, text) from public;
 grant execute on function public.reject_pool_application(uuid, text) to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
+-- -----------------------------------------------------------------------------
+-- Postgres does NOT index the referencing side of a foreign key for you. Every
+-- one of these columns points at a parent that gets deleted or updated
+-- (profiles on account deletion, matches/teams on cascade), and without an
+-- index each such statement seq-scans this table once per affected parent row.
+-- They are also the columns joined on when reading.
+
+create index if not exists idx_match_pool_applications_applicant_user_id
+  on public.match_pool_applications (applicant_user_id);

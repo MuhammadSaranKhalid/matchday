@@ -32,27 +32,12 @@
 --     edge function's near-me / blend SQL reads them directly.
 -- =============================================================================
 
--- 1. unaccent + IMMUTABLE wrapper.
-create extension if not exists unaccent;
-
-create or replace function public.f_unaccent(text)
-returns text
-language sql
-immutable
-parallel safe
-strict
-set search_path = public, pg_temp
-as $$
-  -- Two-arg form is IMMUTABLE (single-arg is only STABLE). Bind the
-  -- dictionary explicitly so the planner can constant-fold inside the
-  -- generated column / index expression.
-  select public.unaccent('public.unaccent', $1)
-$$;
-
--- 2. Generated normalised search column on teams.
-alter table public.teams
-  add column search_name text
-  generated always as (lower(public.f_unaccent(team_name))) stored;
+-- 1 & 2. MOVED 2026-09-06.
+--   • `unaccent` + f_unaccent()  → 20260101000000_shared_helpers.sql, because
+--     three tables now declare a GENERATED column calling it.
+--   • teams.search_name          → declared inline in 20260101000200_teams.sql.
+-- What remains here is the index, which needs the table and the column but
+-- nothing else.
 
 -- 3. Partial trigram index on the discoverable hot set.
 -- The predicate must match the edge function's WHERE clause exactly so the

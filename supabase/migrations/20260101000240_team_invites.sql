@@ -170,6 +170,7 @@ alter table public.team_invites enable row level security;
 
 create policy "team_invites_read_self_or_manager"
   on public.team_invites for select
+  to authenticated
   using ((select auth.uid()) = invitee_id or public.is_team_manager(team_id));
 
 create policy "team_invites_insert_manager"
@@ -185,3 +186,17 @@ create policy "team_invites_update_self_or_manager"
   to authenticated
   using ((select auth.uid()) = invitee_id or public.is_team_manager(team_id))
   with check ((select auth.uid()) = invitee_id or public.is_team_manager(team_id));
+
+-- -----------------------------------------------------------------------------
+-- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
+-- -----------------------------------------------------------------------------
+-- Postgres does NOT index the referencing side of a foreign key for you. Every
+-- one of these columns points at a parent that gets deleted or updated
+-- (profiles on account deletion, matches/teams on cascade), and without an
+-- index each such statement seq-scans this table once per affected parent row.
+-- They are also the columns joined on when reading.
+
+create index if not exists idx_team_invites_decided_by
+  on public.team_invites (decided_by);
+create index if not exists idx_team_invites_invited_by
+  on public.team_invites (invited_by);

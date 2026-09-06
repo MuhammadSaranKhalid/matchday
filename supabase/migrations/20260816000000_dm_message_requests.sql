@@ -11,9 +11,8 @@
 -- =============================================================================
 
 -- 1) Add acceptance columns to dm_channels
-alter table public.dm_channels
-  add column if not exists accepted_at timestamptz,
-  add column if not exists accepted_by uuid references public.profiles(user_id);
+-- dm_channels.accepted_at / accepted_by are declared inline in
+-- 20260101000800_chats.sql (folded there 2026-09-06).
 
 -- 2) RPC: accept_dm_request
 create or replace function public.accept_dm_request(p_chat_id uuid)

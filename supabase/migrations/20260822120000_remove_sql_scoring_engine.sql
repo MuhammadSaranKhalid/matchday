@@ -21,13 +21,8 @@
 -- reads it back off `returning *`. Without it the edge function's SELECT fails
 -- outright ("column total_extras does not exist") and no delivery can be
 -- recorded at all.
-alter table public.match_innings_state
-  add column if not exists total_extras integer
-    not null
-    generated always as (
-      total_wides + total_no_balls + total_byes
-      + total_leg_byes + total_penalties
-    ) stored;
+-- match_innings_state.total_extras is declared inline in
+-- 20260101000400_matches.sql (folded there 2026-09-06).
 
 -- -----------------------------------------------------------------------------
 -- 2. Remove the SQL scoring engine

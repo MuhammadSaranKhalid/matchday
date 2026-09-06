@@ -28,19 +28,8 @@
 -- Storage: the team-logos bucket lives here; folder convention <team_id>/.
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- Team-only enums.
--- -----------------------------------------------------------------------------
-create type public.team_type as enum (
-  'club',
-  'village',
-  'casual',
-  'corporate',
-  'school',
-  'university'
-);
-create type public.team_privacy as enum ('public', 'private');
-create type public.team_status  as enum ('active', 'disbanded', 'archived');
+-- Enums moved to 20260101000000_shared_helpers.sql (the enum catalogue),
+-- 2026-09-06 — one enum, one definition, declared before anything uses it.
 
 -- -----------------------------------------------------------------------------
 -- teams table.
@@ -97,7 +86,13 @@ create table public.teams (
                        check (max_squad_size between 11 and 50),
 
   created_at          timestamptz not null default now(),
-  updated_at          timestamptz not null default now()
+  updated_at          timestamptz not null default now(),
+
+  -- Normalised team_name for trigram search. GENERATED — never write it.
+  -- f_unaccent() is declared in 0000_shared_helpers.
+  search_name         text generated always as (
+                        lower(public.f_unaccent(team_name))
+                      ) stored
 );
 
 -- -----------------------------------------------------------------------------
@@ -143,6 +138,7 @@ alter table public.teams enable row level security;
 
 create policy "teams_read_public"
   on public.teams for select
+  to anon, authenticated
   using (true);
 
 create policy "teams_insert_self_owner"

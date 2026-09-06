@@ -18,25 +18,8 @@
 -- copied over by the cascade trigger.
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- Cricket-specific enums.
--- -----------------------------------------------------------------------------
-create type public.batting_style as enum ('right_hand', 'left_hand');
-create type public.bowling_style as enum (
-  'right_arm_fast',
-  'right_arm_medium',
-  'right_arm_spin',
-  'left_arm_fast',
-  'left_arm_spin',
-  'doesnt_bowl'
-);
-create type public.player_role as enum (
-  'batter',
-  'bowler',
-  'all_rounder',
-  'wicket_keeper'
-);
-create type public.ball_type as enum ('leather', 'tape', 'tennis');
+-- Enums moved to 20260101000000_shared_helpers.sql (the enum catalogue),
+-- 2026-09-06 — one enum, one definition, declared before anything uses it.
 
 -- -----------------------------------------------------------------------------
 -- player_profiles table.
@@ -65,10 +48,12 @@ alter table public.player_profiles enable row level security;
 
 create policy "player_profiles_read_public"
   on public.player_profiles for select
+  to anon, authenticated
   using (true);
 
 create policy "player_profiles_write_self"
   on public.player_profiles for all
+  to authenticated
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 

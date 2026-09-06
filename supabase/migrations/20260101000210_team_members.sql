@@ -27,16 +27,8 @@
 --   table.
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- Membership-only enums.
--- -----------------------------------------------------------------------------
-create type public.member_role as enum (
-  'captain',
-  'vice_captain',
-  'wicket_keeper',
-  'player'
-);
-create type public.member_status as enum ('active', 'inactive', 'removed');
+-- Enums moved to 20260101000000_shared_helpers.sql (the enum catalogue),
+-- 2026-09-06 — one enum, one definition, declared before anything uses it.
 
 -- -----------------------------------------------------------------------------
 -- team_members table.
@@ -60,6 +52,10 @@ create table public.team_members (
   is_primary       boolean not null default false,
   -- Manager who added this membership. ON DELETE SET NULL so a deleted
   -- manager's account doesn't block; the membership row outlives them.
+  -- Who added this member. NULL once that person deletes their account: this
+  -- is an audit breadcrumb, not an owner, so the roster row must survive them.
+  -- (20260609000000 set NOT NULL here, which contradicts ON DELETE SET NULL
+  -- and made account deletion raise. Folded and corrected 2026-09-06.)
   added_by         uuid
                        references public.profiles(user_id) on delete set null,
   created_at       timestamptz not null default now(),
@@ -165,6 +161,7 @@ alter table public.team_members enable row level security;
 
 create policy "team_members_read_public"
   on public.team_members for select
+  to anon, authenticated
   using (true);
 
 create policy "team_members_insert_managers"
@@ -182,3 +179,69 @@ create policy "team_members_delete_managers"
   on public.team_members for delete
   to authenticated
   using (public.is_team_manager(team_id));
+
+
+-- =============================================================================
+-- unclaimed_player_contact_for_manager() — the one way to read the PII
+-- =============================================================================
+-- unclaimed_players.phone_number / email are revoked from anon and
+-- authenticated at column level in 20260101000120 (they are contact details
+-- for people who never signed up and never consented). This is the sanctioned
+-- read: SECURITY DEFINER, and it re-checks that the caller actually manages a
+-- team the placeholder plays for.
+--
+-- It lives here rather than with its table because it is `language sql` — body
+-- checked at CREATE time — and it reads teams (0200) and team_members (this
+-- file). At 0120 neither exists.
+create or replace function public.unclaimed_player_contact_for_manager(
+  p_unclaimed_id uuid
+)
+returns table (phone_number text, email text)
+language sql
+security definer
+stable
+set search_path = public, pg_temp
+as $$
+  select u.phone_number, u.email
+    from public.unclaimed_players u
+   where u.unclaimed_id = p_unclaimed_id
+     and (
+       -- The manager who created the placeholder.
+       u.added_by = auth.uid()
+       -- Or an owner / manager / captain of a team the placeholder plays for.
+       or exists (
+         select 1
+           from public.team_members tm
+           join public.teams t on t.team_id = tm.team_id
+          where tm.unclaimed_id = u.unclaimed_id
+            and tm.status = 'active'
+            and (
+              t.owner_id = auth.uid()
+              or auth.uid() = any(t.managers)
+              or exists (
+                select 1 from public.team_members me
+                 where me.team_id = t.team_id
+                   and me.user_id = auth.uid()
+                   and me.status  = 'active'
+                   and me.role in ('captain', 'vice_captain')
+              )
+            )
+       )
+     );
+$$;
+
+revoke all on function public.unclaimed_player_contact_for_manager(uuid) from public;
+grant execute on function public.unclaimed_player_contact_for_manager(uuid)
+  to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
+-- -----------------------------------------------------------------------------
+-- Postgres does NOT index the referencing side of a foreign key for you. Every
+-- one of these columns points at a parent that gets deleted or updated
+-- (profiles on account deletion, matches/teams on cascade), and without an
+-- index each such statement seq-scans this table once per affected parent row.
+-- They are also the columns joined on when reading.
+
+create index if not exists idx_team_members_added_by
+  on public.team_members (added_by);

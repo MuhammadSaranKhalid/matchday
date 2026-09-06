@@ -11,7 +11,6 @@
 -- were part of without re-joining giving them the cliff edge.
 -- =============================================================================
 
-create type public.chat_role as enum ('admin', 'member');
 
 create table public.chat_members (
   membership_id   uuid primary key default gen_random_uuid(),
@@ -60,12 +59,26 @@ grant execute on function public.is_chat_member(uuid) to authenticated;
 -- =============================================================================
 create policy "chats_read_members"
   on public.chats for select
+  to authenticated
   using (public.is_chat_member(chat_id));
 
+-- WITH CHECK mirrors USING: an admin may edit a chat they administer, and the
+-- row must still be one they administer afterwards. Without the WITH CHECK an
+-- UPDATE policy constrains only which rows you may touch, never what you may
+-- turn them into.
 create policy "chats_update_admin"
   on public.chats for update
   to authenticated
   using (
+    exists (
+      select 1 from public.chat_members
+       where chat_members.chat_id = chats.chat_id
+         and chat_members.user_id = (select auth.uid())
+         and chat_members.role    = 'admin'
+         and chat_members.left_at is null
+    )
+  )
+  with check (
     exists (
       select 1 from public.chat_members
        where chat_members.chat_id = chats.chat_id
@@ -88,15 +101,30 @@ create policy "dm_channels_read_members"
 -- =============================================================================
 create policy "chat_members_read_self_or_chat"
   on public.chat_members for select
+  to authenticated
   using (
     user_id = (select auth.uid())
     or public.is_chat_member(chat_id)
   );
 
+-- WITH CHECK mirrors USING. Without it, a member passing the USING test on
+-- their own row could rewrite user_id or chat_id and move themselves into a
+-- chat they were never added to. (The role-change guard trigger below is a
+-- separate concern — it stops privilege escalation *within* a legal row.)
 create policy "chat_members_update_self_or_admin"
   on public.chat_members for update
   to authenticated
   using (
+    user_id = (select auth.uid())
+    or exists (
+      select 1 from public.chat_members admin
+       where admin.chat_id = chat_members.chat_id
+         and admin.user_id = (select auth.uid())
+         and admin.role    = 'admin'
+         and admin.left_at is null
+    )
+  )
+  with check (
     user_id = (select auth.uid())
     or exists (
       select 1 from public.chat_members admin

@@ -247,7 +247,7 @@ begin
     total_byes       = agg.byes,
     total_leg_byes   = agg.leg_byes,
     total_penalties  = agg.penalties,
-    striker_id       = coalesce(v_row.striker_id, v_row.batsman_id, s.striker_id),
+    striker_id       = coalesce(v_row.striker_id, s.striker_id),
     non_striker_id   = coalesce(v_row.non_striker_id, s.non_striker_id),
     bowler_id        = coalesce(v_row.bowler_id, s.bowler_id),
     is_all_out       = false,
@@ -255,14 +255,10 @@ begin
     updated_at       = now()
   from (
     select
-      -- Read the real columns directly. `runs_scored`, `extras` and `ball_type`
-      -- are vestigial duplicates that nothing writes, and `coalesce`-ing over
-      -- them was not merely pointless — all four are NOT NULL — it did not
-      -- typecheck: delivery_type is the delivery_kind ENUM and ball_type is
-      -- text, so COALESCE could not resolve a common type and every undo
-      -- failed with "COALESCE types delivery_kind and text cannot be matched".
       -- Matches the aggregate record-ball uses, deliberately: the two must
-      -- agree about what an innings totals to.
+      -- agree about what an innings totals to. (The vestigial duplicate
+      -- columns this once had to coalesce over — runs_scored, extras,
+      -- ball_type, batsman_id — were dropped on 2026-09-06.)
       coalesce(sum(runs_off_bat + extra_runs), 0)::int                           as runs,
       (count(*) filter (where is_wicket))::int                                   as wickets,
       (count(*) filter (where is_legal_delivery))::int                           as legal,
@@ -294,7 +290,6 @@ begin
     update public.matches
        set status       = 'live',
            result       = null,
-           end_time     = null,
            completed_at = null,
            updated_at   = now()
      where match_id = p_match_id;

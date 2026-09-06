@@ -8,94 +8,33 @@
 --   • Polymorphic lineups (match_players)
 --   • Innings & live hot state (match_innings, match_innings_state)
 --   • Event ledger & dismissals (match_deliveries, match_wickets)
---   • Materialized scorecards (match_batsman_stats, match_bowler_stats)
 --   • Scorer leases & concurrency guards (match_scorer_leases)
 --   • Triggers for atomic state reduction, strike rotation, & lifecycle
+--
+-- 2026-09-06 schema consolidation. Every fact in this schema now has exactly
+-- ONE column. The pairs that used to carry the same value under two names
+-- (runs_off_bat/runs_scored, striker_id/batsman_id, format/rules_config,
+-- completed_at/end_time, …) were written in lockstep by a single writer, so
+-- they never disagreed — but nothing prevented it, and `total_runs` is
+-- GENERATED from one side of two of those pairs. The alias columns are gone;
+-- the canonical name is the one the Dart engine and record-ball already used.
+-- match_batsman_stats / match_bowler_stats are gone too: nothing has written
+-- them since the SQL scoring engine was removed, and scorecards are derived
+-- client-side from the delivery ledger.
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- 1. Domain Enums & Types
--- -----------------------------------------------------------------------------
-do $$ begin
-  create type public.match_format as enum (
-    't20', 'odi', 'test', 'the_hundred', 'custom_limited', 'pairs'
-  );
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.match_type as enum (
-    'friendly', 'tournament', 'practice', 'league'
-  );
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.match_status as enum (
-    'scheduled', 'toss', 'live', 'innings_break', 'super_over', 
-    'completed', 'abandoned', 'tied', 'no_result', 'walkover'
-  );
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.toss_decision as enum ('bat', 'bowl');
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.match_stage as enum (
-    'group', 'quarter_final', 'semi_final', 'final', 'playoff'
-  );
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.match_start_phase as enum (
-    'toss', 'lineup', 'ready', 'live'
-  );
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.scoring_mode as enum (
-    'live_ball_by_ball', 'post_match_scorecard'
-  );
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.delivery_kind as enum (
-    'legal', 'wide', 'no_ball', 'bye', 'leg_bye', 'penalty'
-  );
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.wicket_kind as enum (
-    'bowled', 'caught', 'caught_and_bowled', 'lbw', 'run_out', 
-    'stumped', 'hit_wicket', 'retired_hurt', 'retired_out', 
-    'obstructing_the_field', 'timed_out', 'handled_the_ball'
-  );
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.match_role as enum (
-    'captain', 'vice_captain', 'wicket_keeper', 'player', 'substitute'
-  );
-exception when duplicate_object then null;
-end $$;
+-- Enums moved to 20260101000000_shared_helpers.sql (the enum catalogue),
+-- 2026-09-06 — one enum, one definition, declared before anything uses it.
 
 -- -----------------------------------------------------------------------------
--- 2. Clean Drop of Legacy Objects (Clean Slate Initialization)
+-- 1. Clean Drop of Legacy Objects (Clean Slate Initialization)
 -- -----------------------------------------------------------------------------
 drop view if exists public.balls cascade;
 drop view if exists public.format_presets cascade;
 drop table if exists public.match_result_history cascade;
 drop table if exists public.match_scorer_leases cascade;
-drop table if exists public.match_bowler_stats cascade;
-drop table if exists public.match_batsman_stats cascade;
+drop table if exists public.match_bowler_stats cascade;   -- removed 2026-09-06
+drop table if exists public.match_batsman_stats cascade;  -- removed 2026-09-06
 drop table if exists public.match_wickets cascade;
 drop table if exists public.match_deliveries cascade;
 drop table if exists public.match_innings_state cascade;
@@ -106,7 +45,7 @@ drop table if exists public.match_format_presets cascade;
 drop table if exists public.matches cascade;
 
 -- -----------------------------------------------------------------------------
--- 3. Format Catalog
+-- 2. Format Catalog
 -- -----------------------------------------------------------------------------
 create table public.match_format_presets (
   preset_id             uuid primary key default gen_random_uuid(),
@@ -118,8 +57,63 @@ create table public.match_format_presets (
   created_at            timestamptz not null default now()
 );
 
-create or replace view public.format_presets as
+create or replace view public.format_presets
+  with (security_invoker = on) as
   select * from public.match_format_presets;
+
+-- -----------------------------------------------------------------------------
+-- 3. The canonical match-format shape
+-- -----------------------------------------------------------------------------
+-- One place that decides what a format document looks like. Every key the
+-- client's MatchDto and the Dart scoring engine read is guaranteed present with
+-- a sane value, so no downstream reader has to guess what a missing key means.
+--
+-- `overs_per_innings` matters most: the engine treats 0 as "unlimited" (Test
+-- cricket), so a format that merely omits it silently produces an innings that
+-- never ends. `max_overs` is accepted as an alias because that is the key the
+-- old `rules_config` column used before it was merged into `format`
+-- (2026-09-06); competition RPCs that revise conditions write the canonical
+-- key.
+--
+-- Moved here from 20260822110000 during the 2026-09-06 consolidation so that
+-- `matches.format` can carry a playable DEFAULT from the moment the table
+-- exists, rather than acquiring one two hundred migrations later.
+create or replace function public._normalize_match_format(p_format jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select jsonb_strip_nulls(
+    jsonb_build_object(
+      'overs_per_innings',   coalesce(
+                               (f->>'overs_per_innings')::int,
+                               (f->>'max_overs')::int,
+                               20),
+      'players_per_team',    coalesce((f->>'players_per_team')::int, 11),
+      'balls_per_over',      coalesce((f->>'balls_per_over')::int, 6),
+      'max_overs_per_bowler',coalesce((f->>'max_overs_per_bowler')::int, 4),
+      'innings_per_side',    coalesce((f->>'innings_per_side')::int, 1),
+      'ball_type',           coalesce(nullif(f->>'ball_type', ''), 'leather'),
+      -- Competition switches. Absorbed from the former `rules_config` column
+      -- (2026-09-06): tournament_trigger_super_over reads super_over_enabled,
+      -- and dls_enabled is reserved for the rain-rule work.
+      'super_over_enabled',  coalesce((f->>'super_over_enabled')::boolean, true),
+      'dls_enabled',         coalesce((f->>'dls_enabled')::boolean, true),
+      -- Optional. Null is meaningful for both: the engine derives
+      -- wickets_to_all_out as (players_per_team - 1) when absent, and
+      -- end_change_balls defaults to balls_per_over. jsonb_strip_nulls drops
+      -- them rather than writing a null the reader must special-case.
+      'wickets_to_all_out',  (f->>'wickets_to_all_out')::int,
+      'end_change_balls',    (f->>'end_change_balls')::int
+    )
+  )
+  from (select coalesce(p_format, '{}'::jsonb) as f) s;
+$$;
+
+revoke all on function public._normalize_match_format(jsonb) from public;
+grant execute on function public._normalize_match_format(jsonb)
+  to authenticated, service_role;
 
 -- -----------------------------------------------------------------------------
 -- 4. Matches & Team Slots
@@ -139,26 +133,22 @@ create table public.matches (
   prev_match_b_id        uuid references public.matches(match_id) on delete set null,
   group_id               text,
 
-  -- Scheduling, Geo & Venue
-  venue                  text not null default 'Ground 1',
-  ground_coordinates     point,
+  -- Scheduling & Venue
+  -- `venue` is free text for a fixture with no `grounds` row yet. It is
+  -- nullable: the old NOT NULL DEFAULT 'Ground 1' meant every venue-less
+  -- match claimed to be played somewhere specific.
+  venue                  text,
+  ground_id              uuid references public.grounds(ground_id)
+                           on delete set null,
   scheduled_start_time   timestamptz not null default now(),
   actual_start_time      timestamptz,
   completed_at           timestamptz,
-  end_time               timestamptz,
 
-  -- Format & Rules Contract
-  rules_config           jsonb not null default '{
-    "max_overs": 20,
-    "max_overs_per_bowler": 4,
-    "balls_per_over": 6,
-    "wide_runs": 1,
-    "noball_runs": 1,
-    "free_hit": true,
-    "super_over_enabled": true,
-    "dls_enabled": true
-  }'::jsonb,
-  format                 jsonb not null default '{}'::jsonb, -- alias for rules_config
+  -- Format & Rules Contract. ONE document, normalized on the way in.
+  -- (Was `format` + `rules_config`, two jsonb blobs holding overs and ball
+  -- rules under different key names. Merged 2026-09-06.)
+  format                 jsonb not null
+                           default public._normalize_match_format('{}'::jsonb),
 
   -- Toss Information
   toss_won_by            uuid references public.teams(team_id) on delete set null,
@@ -175,11 +165,21 @@ create table public.matches (
   -- Match Lifecycle Status
   status                 public.match_status not null default 'scheduled',
   
-  -- Result Snapshot
+  -- Result Snapshot. `result` is authoritative; winner_id is derived from it
+  -- by match_sync_winner_id on every write (20260830000000) so tournament
+  -- queries can index and join on a plain uuid.
   result                 jsonb,
   result_summary         jsonb,
+  winner_id              uuid references public.teams(team_id) on delete set null,
+
+  -- Audit trail for a rain-revised match (artboards 27m / 28b): the original
+  -- and revised overs, the target the organiser applied, and which method
+  -- produced it. Computed in the Dart engine, never in SQL.
+  revised_conditions     jsonb,
+  -- Was also duplicated as `man_of_the_match`; both were unreferenced by any
+  -- reader and neither had a foreign key. One column, and it gets one below
+  -- (as an ALTER, because match_players does not exist yet at this point).
   player_of_the_match_id uuid,
-  man_of_the_match       uuid,
 
   -- Team References
   team_a_id             uuid references public.teams(team_id) on delete set null,
@@ -192,12 +192,18 @@ create table public.matches (
   updated_at             timestamptz not null default now()
 );
 
+-- Per-side slot detail that does NOT fit on `matches`: which side bats first,
+-- and who keeps wicket. The team ids and captains themselves live on `matches`
+-- (team_a_id/team_b_id, team_a_captain/team_b_captain) — this table does not
+-- restate them, it hangs the per-side extras off the side label that
+-- match_players.team_side also uses.
 create table public.match_teams (
   match_id               uuid not null references public.matches(match_id) on delete cascade,
   team_id                uuid references public.teams(team_id) on delete set null,
   team_name              text not null,
   team_side              text not null check (team_side in ('team_a', 'team_b')),
   is_batting_first       boolean,
+  -- FKs added below as ALTERs: match_players is defined after this table.
   captain_player_id      uuid,
   keeper_player_id       uuid,
   created_at             timestamptz not null default now(),
@@ -205,7 +211,7 @@ create table public.match_teams (
 );
 
 -- -----------------------------------------------------------------------------
--- 4. Lineup Boundary (match_players)
+-- 5. Lineup Boundary (match_players)
 -- -----------------------------------------------------------------------------
 create table public.match_players (
   match_player_id        uuid primary key default gen_random_uuid(),
@@ -223,16 +229,38 @@ create table public.match_players (
 
   created_at             timestamptz not null default now(),
 
+  -- Exactly one of (user_id, unclaimed_id). Same shape as
+  -- team_members.player_ref_xor so the two read identically.
   constraint chk_match_player_identity check (
-    (user_id is not null and unclaimed_id is null) or 
-    (user_id is null and unclaimed_id is not null)
+    num_nonnulls(user_id, unclaimed_id) = 1
   ),
   unique(match_id, user_id),
   unique(match_id, unclaimed_id)
 );
 
+-- Deferred FK: the PoM is a participant in THIS match, so it points at
+-- match_players (which is polymorphic over profiles/unclaimed_players) rather
+-- than profiles. Declared here because match_players is defined after matches.
+alter table public.matches
+  add constraint matches_player_of_the_match_fkey
+  foreign key (player_of_the_match_id)
+  references public.match_players(match_player_id) on delete set null;
+
+-- Same deferral for match_teams' two player slots. Both point at this match's
+-- own lineup, so a player cannot be named captain or keeper of a match they
+-- are not in.
+alter table public.match_teams
+  add constraint match_teams_captain_player_fkey
+  foreign key (captain_player_id)
+  references public.match_players(match_player_id) on delete set null;
+
+alter table public.match_teams
+  add constraint match_teams_keeper_player_fkey
+  foreign key (keeper_player_id)
+  references public.match_players(match_player_id) on delete set null;
+
 -- -----------------------------------------------------------------------------
--- 5. Innings & Live Hot State
+-- 6. Innings & Live Hot State
 -- -----------------------------------------------------------------------------
 create table public.match_innings (
   innings_id             uuid primary key default gen_random_uuid(),
@@ -242,19 +270,34 @@ create table public.match_innings (
   bowling_team_side      text not null check (bowling_team_side in ('team_a', 'team_b')),
   
   overs_allocated        numeric(4,1) not null default 20.0,
-  target_runs            integer check (target_runs is null or target_runs > 0),
-  
-  is_declared            boolean not null default false,
-  is_all_out             boolean not null default false,
+
+  -- `match_innings` is the DEFINITION of an innings (who bats, how long, did
+  -- it finish). Everything that changes ball to ball — target, is_declared,
+  -- is_all_out, the on-field trio, the totals — lives on match_innings_state
+  -- and ONLY there. Those three columns used to be restated here and written
+  -- in the same statement as their state-row twins (start_innings wrote
+  -- p_target into both), which is two rows that can disagree about whether an
+  -- innings was declared.
   is_completed           boolean not null default false,
-  
+
   start_time             timestamptz default now(),
   end_time               timestamptz,
   updated_at             timestamptz not null default now(),
 
-  unique(match_id, innings_number)
+  unique(match_id, innings_number),
+  -- Redundant as a uniqueness claim (innings_id is already the PK), but it is
+  -- the target match_innings_state's composite FK needs in order to pin its
+  -- denormalized match_id / innings_number to this row's.
+  unique(innings_id, match_id, innings_number)
 );
 
+-- The live hot row. Authoritative for every value that moves during play.
+-- `match_id` and `innings_number` ARE duplicated from match_innings, and that
+-- is deliberate: Supabase realtime filters on a column of the changed row, so
+-- a client watching one match's score cannot join to get them. They are kept
+-- honest by a COMPOSITE foreign key rather than by a trigger or by every
+-- writer remembering to — the pair cannot drift from its parent because the
+-- database will not accept a row where it has.
 create table public.match_innings_state (
   innings_id             uuid primary key references public.match_innings(innings_id) on delete cascade,
   match_id               uuid not null references public.matches(match_id) on delete cascade,
@@ -294,11 +337,18 @@ create table public.match_innings_state (
 
   constraint chk_state_distinct_batters check (
     striker_id is null or non_striker_id is null or striker_id <> non_striker_id
-  )
+  ),
+
+  -- match_id / innings_number must be THIS innings' match and number, not
+  -- merely some valid match and some number in range.
+  constraint match_innings_state_parent_fkey
+    foreign key (innings_id, match_id, innings_number)
+    references public.match_innings(innings_id, match_id, innings_number)
+    on delete cascade
 );
 
 -- -----------------------------------------------------------------------------
--- 6. Deliveries & Dismissals Ledger
+-- 7. Deliveries & Dismissals Ledger
 -- -----------------------------------------------------------------------------
 create table public.match_deliveries (
   delivery_id            uuid primary key default gen_random_uuid(),
@@ -308,15 +358,24 @@ create table public.match_deliveries (
 
   seq                    integer not null check (seq >= 1),
   over_number            integer not null check (over_number >= 0),
-  ball_in_over           smallint not null check (ball_in_over between 0 and 6),
+  -- 0 is NOT a missing value here: the Dart engine encodes an illegal delivery
+  -- as ball_in_over = 0 because a wide or no-ball does not advance the over
+  -- (scoring_engine.dart: `isLegal ? (legalBallCount % ballsPerOver) + 1 : 0`,
+  -- pinned by vectors.json). The old `between 0 and 6` failed to say that, and
+  -- also hardcoded a six-ball over — wrong for The Hundred and for any custom
+  -- balls_per_over. chk_delivery_ball_in_over below states the real rule.
+  ball_in_over           smallint not null check (ball_in_over >= 0),
   is_legal_delivery      boolean not null,
+  -- The enum, not the free-text twin. `ball_type` also meant something else
+  -- entirely in matches.format ('leather' | 'tape' | 'tennis'), so the same
+  -- name carried two vocabularies in one schema.
   delivery_type          public.delivery_kind not null default 'legal',
-  ball_type              text not null default 'legal',
 
+  -- total_runs is GENERATED from runs_off_bat + extra_runs. When the aliases
+  -- runs_scored / extras existed, a writer populating the alias side left the
+  -- generated total silently wrong with no constraint to catch it.
   runs_off_bat           smallint not null default 0 check (runs_off_bat between 0 and 7),
-  runs_scored            smallint not null default 0 check (runs_scored between 0 and 7),
   extra_runs             smallint not null default 0 check (extra_runs between 0 and 10),
-  extras                 smallint not null default 0 check (extras between 0 and 10),
   total_runs             smallint not null generated always as (runs_off_bat + extra_runs) stored,
   
   is_boundary            boolean not null default false,
@@ -326,10 +385,10 @@ create table public.match_deliveries (
   is_wicket              boolean not null default false,
   wicket_type            public.wicket_kind,
 
+  -- `batsman_id` was a third name for the striker and is gone.
   striker_id             uuid references public.match_players(match_player_id) on delete restrict,
   non_striker_id         uuid references public.match_players(match_player_id) on delete restrict,
   bowler_id              uuid references public.match_players(match_player_id) on delete restrict,
-  batsman_id             uuid references public.match_players(match_player_id) on delete restrict,
   fielder_id             uuid references public.match_players(match_player_id) on delete set null,
 
   pitch_x                numeric(5,2),
@@ -338,19 +397,54 @@ create table public.match_deliveries (
   shot_distance          numeric(5,2),
   shot_type              text,
 
-  idempotency_key        text not null default gen_random_uuid()::text,
+  -- NO DEFAULT, deliberately. This is the whole point of the column: the
+  -- offline scoring outbox generates the key once per delivery on-device and
+  -- replays it until the server acknowledges. A server-side
+  -- `default gen_random_uuid()::text` gave every retry a fresh key, so the
+  -- unique index below could never fire and a retried ball was recorded twice.
+  idempotency_key        text not null,
   is_undone              boolean not null default false,
   commentary             text,
+  -- One actor, one timestamp. (Was also recorded as created_by / created_at,
+  -- written with the identical values by the same statement.)
   recorded_by            uuid references public.profiles(user_id) on delete set null,
-  created_by             uuid references public.profiles(user_id) on delete set null,
   recorded_at            timestamptz not null default now(),
-  created_at             timestamptz not null default now(),
 
   unique (innings_id, seq),
-  unique (innings_id, idempotency_key)
+  unique (innings_id, idempotency_key),
+
+  -- The invariant the old range check was reaching for: a legal delivery
+  -- occupies a numbered slot in the over, an illegal one occupies none.
+  constraint chk_delivery_ball_in_over check (
+    (is_legal_delivery and ball_in_over >= 1)
+    or (not is_legal_delivery and ball_in_over = 0)
+  ),
+
+  -- delivery_type and is_legal_delivery were free to contradict each other.
+  -- Note this is NOT `delivery_type = 'legal'`: a bye and a leg-bye ARE legal
+  -- deliveries that count towards the over (vectors.json, "bye 1: legal ball"),
+  -- they just send their runs to extras. Only a wide or a no-ball is re-bowled.
+  -- 'penalty' is left unconstrained — penalty runs are awarded between
+  -- deliveries and the engine does not commit to a legality for them.
+  constraint chk_delivery_type_legality check (
+    case delivery_type
+      when 'wide'    then is_legal_delivery = false
+      when 'no_ball' then is_legal_delivery = false
+      when 'legal'   then is_legal_delivery = true
+      when 'bye'     then is_legal_delivery = true
+      when 'leg_bye' then is_legal_delivery = true
+      else true
+    end
+  )
 );
 
-create or replace view public.balls as
+-- security_invoker: a view defaults to running with its OWNER's privileges,
+-- which means it reads straight past the RLS on match_deliveries. It is a
+-- compatibility alias for a table whose rows are public today, so nothing
+-- leaks right now — but the day match_deliveries gets a narrower read policy,
+-- this view would quietly serve every row anyway. (Supabase advisor 0010.)
+create or replace view public.balls
+  with (security_invoker = on) as
   select * from public.match_deliveries;
 
 create table public.match_wickets (
@@ -375,44 +469,15 @@ create table public.match_wickets (
 );
 
 -- -----------------------------------------------------------------------------
--- 7. Materialized Scorecards & Scorer Leases
+-- 8. Scorer Leases
 -- -----------------------------------------------------------------------------
-create table public.match_batsman_stats (
-  innings_id             uuid not null references public.match_innings(innings_id) on delete cascade,
-  player_id              uuid not null references public.match_players(match_player_id) on delete cascade,
-  batting_position       smallint,
-  
-  runs                   integer not null default 0 check (runs >= 0),
-  balls_faced            integer not null default 0 check (balls_faced >= 0),
-  dots                   integer not null default 0 check (dots >= 0),
-  fours                  integer not null default 0 check (fours >= 0),
-  sixes                  integer not null default 0 check (sixes >= 0),
-  singles                integer not null default 0 check (singles >= 0),
-  doubles                integer not null default 0 check (doubles >= 0),
-  triples                integer not null default 0 check (triples >= 0),
-  
-  is_out                 boolean not null default false,
-  dismissal_text         text,
-  minutes_batted         integer,
-
-  primary key (innings_id, player_id)
-);
-
-create table public.match_bowler_stats (
-  innings_id             uuid not null references public.match_innings(innings_id) on delete cascade,
-  player_id              uuid not null references public.match_players(match_player_id) on delete cascade,
-  bowling_position       smallint,
-  
-  legal_balls_bowled     integer not null default 0 check (legal_balls_bowled >= 0),
-  maidens                smallint not null default 0 check (maidens >= 0),
-  runs_conceded          integer not null default 0 check (runs_conceded >= 0),
-  wickets                smallint not null default 0 check (wickets >= 0),
-  wides_conceded         integer not null default 0 check (wides_conceded >= 0),
-  no_balls_conceded      integer not null default 0 check (no_balls_conceded >= 0),
-  dot_balls_bowled       integer not null default 0 check (dot_balls_bowled >= 0),
-
-  primary key (innings_id, player_id)
-);
+-- match_batsman_stats and match_bowler_stats used to live here. Nothing has
+-- written them since 20260822120000 removed the SQL scoring engine, and
+-- nothing read them either: the Dart repository exposed getters that no
+-- controller called. Scorecards are derived on the client from the delivery
+-- ledger (scoring_rules.dart). Dropped 2026-09-06 rather than re-backed with
+-- views, because a view would put cricket arithmetic back in SQL — which the
+-- CLAUDE.md banner forbids: the rules live in the Dart engine only.
 
 create table public.match_scorer_leases (
   match_id               uuid primary key references public.matches(match_id) on delete cascade,
@@ -435,7 +500,7 @@ create table public.match_result_history (
 );
 
 -- -----------------------------------------------------------------------------
--- 8. Core Functions & Triggers
+-- 9. Core Functions & Triggers
 -- -----------------------------------------------------------------------------
 
 -- Helper Predicates
@@ -444,6 +509,11 @@ returns boolean
 language sql
 security definer
 stable
+-- SECURITY DEFINER without a pinned search_path is a privilege-escalation
+-- vector: anything this body names unqualified could be resolved against a
+-- schema the caller controls, and the function runs as the owner.
+-- (Supabase advisor 0011.)
+set search_path = public, pg_temp
 as $$
   select exists (
     select 1 from public.matches m
@@ -600,13 +670,14 @@ $$;
 -- 🟥 DO NOT reintroduce scoring arithmetic in SQL. If a scorecard number looks
 -- wrong, the fix belongs in the Dart engine and its vectors.
 --
--- Consequence to be aware of: match_batsman_stats and match_bowler_stats are no
--- longer populated by anything. Scorecards are derived from the delivery ledger
--- on the client (see scoring_rules.dart). Those two tables are retained but
--- empty pending a decision to drop them or to back them with views.
+-- That decision left match_batsman_stats and match_bowler_stats populated by
+-- nothing. They were retained empty "pending a decision to drop them or back
+-- them with views"; on 2026-09-06 the decision was made and they were dropped.
+-- Scorecards are derived from the delivery ledger on the client
+-- (see scoring_rules.dart), which is the only place the rules live.
 
 -- -----------------------------------------------------------------------------
--- 9. Match Lifecycle RPCs
+-- 10. Match Lifecycle RPCs
 -- -----------------------------------------------------------------------------
 
 create or replace function public.record_match_toss(
@@ -645,6 +716,7 @@ create or replace function public.submit_match_openers(
 returns void
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 declare
   v_innings_id uuid;
@@ -688,6 +760,7 @@ create or replace function public.start_match_now(p_match_id uuid)
 returns void
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 begin
   if not public._is_match_captain(p_match_id) then
@@ -721,13 +794,15 @@ declare
   v_batting_side text := case when p_innings_number % 2 = 1 then 'team_a' else 'team_b' end;
   v_bowling_side text := case when p_innings_number % 2 = 1 then 'team_b' else 'team_a' end;
 begin
+  -- The target lives on match_innings_state (below) and nowhere else.
   insert into public.match_innings (
-    match_id, innings_number, batting_team_side, bowling_team_side, target_runs
+    match_id, innings_number, batting_team_side, bowling_team_side
   ) values (
-    p_match_id, p_innings_number, v_batting_side, v_bowling_side, p_target
+    p_match_id, p_innings_number, v_batting_side, v_bowling_side
   )
   on conflict (match_id, innings_number) do update set
-    target_runs = coalesce(excluded.target_runs, match_innings.target_runs)
+    batting_team_side = excluded.batting_team_side,
+    bowling_team_side = excluded.bowling_team_side
   returning innings_id into v_innings_id;
 
   insert into public.match_innings_state (
@@ -768,7 +843,7 @@ as $$
 $$;
 
 -- -----------------------------------------------------------------------------
--- 10. RLS & Realtime Publication
+-- 11. RLS & Realtime Publication
 -- -----------------------------------------------------------------------------
 alter table public.matches enable row level security;
 alter table public.match_teams enable row level security;
@@ -777,44 +852,68 @@ alter table public.match_innings enable row level security;
 alter table public.match_innings_state enable row level security;
 alter table public.match_deliveries enable row level security;
 alter table public.match_wickets enable row level security;
-alter table public.match_batsman_stats enable row level security;
-alter table public.match_bowler_stats enable row level security;
 alter table public.match_scorer_leases enable row level security;
+alter table public.match_result_history enable row level security;
 alter table public.match_format_presets enable row level security;
 
 -- Public Read Policies
 drop policy if exists "matches_read_all" on public.matches;
-create policy "matches_read_all" on public.matches for select using (true);
+create policy "matches_read_all" on public.matches for select
+  to anon, authenticated
+  using (true);
 
 drop policy if exists "match_teams_read_all" on public.match_teams;
-create policy "match_teams_read_all" on public.match_teams for select using (true);
+create policy "match_teams_read_all" on public.match_teams for select
+  to anon, authenticated
+  using (true);
 
 drop policy if exists "match_players_read_all" on public.match_players;
-create policy "match_players_read_all" on public.match_players for select using (true);
+create policy "match_players_read_all" on public.match_players for select
+  to anon, authenticated
+  using (true);
 
 drop policy if exists "match_innings_read_all" on public.match_innings;
-create policy "match_innings_read_all" on public.match_innings for select using (true);
+create policy "match_innings_read_all" on public.match_innings for select
+  to anon, authenticated
+  using (true);
 
 drop policy if exists "match_innings_state_read_all" on public.match_innings_state;
-create policy "match_innings_state_read_all" on public.match_innings_state for select using (true);
+create policy "match_innings_state_read_all" on public.match_innings_state for select
+  to anon, authenticated
+  using (true);
 
 drop policy if exists "match_deliveries_read_all" on public.match_deliveries;
-create policy "match_deliveries_read_all" on public.match_deliveries for select using (true);
+create policy "match_deliveries_read_all" on public.match_deliveries for select
+  to anon, authenticated
+  using (true);
 
 drop policy if exists "match_wickets_read_all" on public.match_wickets;
-create policy "match_wickets_read_all" on public.match_wickets for select using (true);
-
-drop policy if exists "match_batsman_stats_read_all" on public.match_batsman_stats;
-create policy "match_batsman_stats_read_all" on public.match_batsman_stats for select using (true);
-
-drop policy if exists "match_bowler_stats_read_all" on public.match_bowler_stats;
-create policy "match_bowler_stats_read_all" on public.match_bowler_stats for select using (true);
+create policy "match_wickets_read_all" on public.match_wickets for select
+  to anon, authenticated
+  using (true);
 
 drop policy if exists "match_scorer_leases_read_all" on public.match_scorer_leases;
-create policy "match_scorer_leases_read_all" on public.match_scorer_leases for select using (true);
+create policy "match_scorer_leases_read_all" on public.match_scorer_leases for select
+  to anon, authenticated
+  using (true);
+
+-- match_result_history is the audit trail for result overrides, so it is
+-- append-only from the app's point of view: readable by anyone who can read the
+-- match it belongs to (scores are public), never writable through PostgREST.
+-- The three tournament_* RPCs that append to it are SECURITY DEFINER and run
+-- as the owner, so they bypass RLS and are unaffected by the absence of an
+-- INSERT policy. RLS was simply never enabled on this table before 2026-09-06,
+-- which left the entire override trail world-writable with the anon key.
+drop policy if exists "match_result_history_read_all" on public.match_result_history;
+create policy "match_result_history_read_all"
+  on public.match_result_history for select
+  to anon, authenticated
+  using (true);
 
 drop policy if exists "match_format_presets_read_all" on public.match_format_presets;
-create policy "match_format_presets_read_all" on public.match_format_presets for select using (true);
+create policy "match_format_presets_read_all" on public.match_format_presets for select
+  to anon, authenticated
+  using (true);
 
 -- Scorer Write Policies
 drop policy if exists "match_deliveries_write_scorer" on public.match_deliveries;
@@ -828,6 +927,97 @@ create policy "match_innings_state_write_scorer" on public.match_innings_state f
 
 -- Performance Indexes
 create index if not exists idx_matches_status_time on public.matches(status, scheduled_start_time desc);
-create index if not exists idx_deliveries_innings_seq on public.match_deliveries(innings_id, seq desc);
+-- NOT indexed separately: the `unique (innings_id, seq)` constraint on
+-- match_deliveries already provides a btree on exactly (innings_id, seq), and
+-- Postgres scans an index backwards for `order by seq desc` at the same cost.
+-- A second index on the same columns is pure write amplification on the
+-- highest-volume table in the schema (Supabase advisor 0009_duplicate_index).
 create index if not exists idx_match_players_user on public.match_players(user_id) where user_id is not null;
 create index if not exists idx_match_players_unclaimed on public.match_players(unclaimed_id) where unclaimed_id is not null;
+create index if not exists idx_match_players_match on public.match_players(match_id);
+
+-- Every FK that gets followed on delete or joined on read. Postgres does not
+-- index the referencing side of a foreign key for you, so without these a
+-- `delete from matches` does a seq scan of the delivery ledger per row.
+create index if not exists idx_deliveries_match on public.match_deliveries(match_id);
+create index if not exists idx_deliveries_striker on public.match_deliveries(striker_id) where striker_id is not null;
+create index if not exists idx_deliveries_bowler on public.match_deliveries(bowler_id) where bowler_id is not null;
+create index if not exists idx_innings_match on public.match_innings(match_id);
+create index if not exists idx_innings_state_match on public.match_innings_state(match_id);
+create index if not exists idx_wickets_innings on public.match_wickets(innings_id);
+create index if not exists idx_result_history_match on public.match_result_history(match_id, recorded_at desc);
+create index if not exists idx_matches_tournament on public.matches(tournament_id) where tournament_id is not null;
+create index if not exists idx_matches_team_a on public.matches(team_a_id) where team_a_id is not null;
+create index if not exists idx_matches_team_b on public.matches(team_b_id) where team_b_id is not null;
+
+-- The scheduler's lookup: "what else is on this ground around this time".
+comment on column public.matches.venue is
+  'Free-text ground name, NULL when unknown. Retained for casual matches with '
+  'no registered ground. Tournament fixtures should set ground_id and mirror '
+  'the name here for display.';
+
+create index if not exists matches_ground_time
+  on public.matches (ground_id, scheduled_start_time)
+  where ground_id is not null;
+
+create index if not exists idx_matches_tournament_winner
+  on public.matches (tournament_id, winner_id)
+  where tournament_id is not null;
+
+-- -----------------------------------------------------------------------------
+-- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
+-- -----------------------------------------------------------------------------
+-- Postgres does NOT index the referencing side of a foreign key for you. Every
+-- one of these columns points at a parent that gets deleted or updated
+-- (profiles on account deletion, matches/teams on cascade), and without an
+-- index each such statement seq-scans this table once per affected parent row.
+-- They are also the columns joined on when reading.
+
+create index if not exists idx_match_deliveries_fielder_id
+  on public.match_deliveries (fielder_id);
+create index if not exists idx_match_deliveries_non_striker_id
+  on public.match_deliveries (non_striker_id);
+create index if not exists idx_match_deliveries_recorded_by
+  on public.match_deliveries (recorded_by);
+create index if not exists idx_match_innings_state_bowler_id
+  on public.match_innings_state (bowler_id);
+create index if not exists idx_match_innings_state_non_striker_id
+  on public.match_innings_state (non_striker_id);
+create index if not exists idx_match_innings_state_striker_id
+  on public.match_innings_state (striker_id);
+create index if not exists idx_match_result_history_recorded_by
+  on public.match_result_history (recorded_by);
+create index if not exists idx_match_scorer_leases_active_scorer_id
+  on public.match_scorer_leases (active_scorer_id);
+create index if not exists idx_match_teams_captain_player_id
+  on public.match_teams (captain_player_id);
+create index if not exists idx_match_teams_keeper_player_id
+  on public.match_teams (keeper_player_id);
+create index if not exists idx_match_teams_team_id
+  on public.match_teams (team_id);
+create index if not exists idx_match_wickets_assisted_fielder_id
+  on public.match_wickets (assisted_fielder_id);
+create index if not exists idx_match_wickets_credited_bowler_id
+  on public.match_wickets (credited_bowler_id);
+create index if not exists idx_match_wickets_player_out_id
+  on public.match_wickets (player_out_id);
+create index if not exists idx_match_wickets_primary_fielder_id
+  on public.match_wickets (primary_fielder_id);
+create index if not exists idx_matches_created_by
+  on public.matches (created_by);
+create index if not exists idx_matches_openers_submitted_by
+  on public.matches (openers_submitted_by);
+create index if not exists idx_matches_player_of_the_match_id
+  on public.matches (player_of_the_match_id);
+create index if not exists idx_matches_prev_match_a_id
+  on public.matches (prev_match_a_id);
+create index if not exists idx_matches_prev_match_b_id
+  on public.matches (prev_match_b_id);
+create index if not exists idx_matches_team_a_captain
+  on public.matches (team_a_captain);
+create index if not exists idx_matches_team_b_captain
+  on public.matches (team_b_captain);
+create index if not exists idx_matches_toss_won_by
+  on public.matches (toss_won_by);
+create index if not exists idx_matches_winner_id
+  on public.matches (winner_id);

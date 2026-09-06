@@ -20,7 +20,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_req         public.match_requests%rowtype;
+  v_req         public.match_challenges%rowtype;
   v_to_team     uuid;
   v_match_id    uuid;
   v_format      jsonb;
@@ -36,7 +36,7 @@ begin
     raise exception 'Not authenticated' using errcode = '42501';
   end if;
 
-  select * into v_req from public.match_requests
+  select * into v_req from public.match_challenges
    where request_id = p_request_id
    for update;
   if not found then
@@ -171,7 +171,7 @@ begin
   -- another concurrent transaction (counter / cancel / decline) already
   -- transitioned the row, our UPDATE matches zero rows and we roll back
   -- — preventing a match from being created against stale terms.
-  update public.match_requests
+  update public.match_challenges
      set status        = 'accepted',
          decided_by    = auth.uid(),
          decided_at    = now(),

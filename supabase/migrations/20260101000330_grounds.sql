@@ -1,5 +1,5 @@
 -- =============================================================================
--- 20260831000000 · grounds
+-- 0330 · grounds
 -- =============================================================================
 -- Promotes a ground from a string to a row.
 --
@@ -46,12 +46,6 @@
 -- -----------------------------------------------------------------------------
 -- 1. Surface enum.
 -- -----------------------------------------------------------------------------
-do $$ begin
-  create type public.ground_surface as enum (
-    'turf', 'matting', 'concrete', 'astro', 'other'
-  );
-exception when duplicate_object then null;
-end $$;
 
 -- -----------------------------------------------------------------------------
 -- 2. grounds.
@@ -114,6 +108,7 @@ alter table public.grounds enable row level security;
 drop policy if exists "grounds_read_public" on public.grounds;
 create policy "grounds_read_public"
   on public.grounds for select
+  to anon, authenticated
   using (true);
 
 drop policy if exists "grounds_insert_authenticated" on public.grounds;
@@ -161,6 +156,7 @@ alter table public.tournament_grounds enable row level security;
 drop policy if exists "tournament_grounds_read" on public.tournament_grounds;
 create policy "tournament_grounds_read"
   on public.tournament_grounds for select
+  to anon, authenticated
   using (
     public.is_tournament_organizer(tournament_id)
     or exists (
@@ -181,23 +177,15 @@ create policy "tournament_grounds_write_organizer"
 -- -----------------------------------------------------------------------------
 -- 4. matches.ground_id — additive, nullable.
 -- -----------------------------------------------------------------------------
-alter table public.matches
-  add column if not exists ground_id uuid
-    references public.grounds(ground_id) on delete set null;
+-- matches.ground_id and its index are declared in 20260101000400_matches.sql.
+-- This file was renumbered from 20260831000000 to 20260101000330 on 2026-09-06
+-- so that it runs BEFORE matches, which lets that FK be an inline column
+-- reference instead of a late ALTER. grounds depends only on profiles (0100)
+-- and tournaments (0300), so nothing else moves.
 
--- The scheduler's lookup: "what else is on this ground around this time".
-create index if not exists matches_ground_time
-  on public.matches (ground_id, scheduled_start_time)
-  where ground_id is not null;
-
-comment on column public.matches.venue is
-  'Free-text ground name. Retained for casual matches with no registered '
-  'ground. Tournament fixtures should set ground_id and mirror the name here '
-  'for display.';
-
-comment on column public.matches.ground_coordinates is
-  'DEPRECATED — never written. Coordinates live on grounds.location_point. '
-  'Kept until a later migration drops it.';
+-- (matches.ground_coordinates carried a 'DEPRECATED — never written' comment
+--  here. It was dropped at the source on 2026-09-06; coordinates live on
+--  grounds.location_point and only there.)
 
 -- -----------------------------------------------------------------------------
 -- 5. Backfill.
@@ -258,18 +246,9 @@ join public.grounds g
 where btrim(coalesce(v.elem->>'name', '')) <> ''
 on conflict (tournament_id, ground_id) do nothing;
 
--- Point existing tournament fixtures at their ground where the text matches a
--- ground now linked to that same tournament. Anything ambiguous is left alone
--- with its text intact rather than guessed at.
-update public.matches m
-   set ground_id = g.ground_id
-  from public.tournament_grounds tg
-  join public.grounds g on g.ground_id = tg.ground_id
- where m.ground_id is null
-   and m.tournament_id is not null
-   and tg.tournament_id = m.tournament_id
-   and lower(public.f_unaccent(btrim(m.venue)))
-       = lower(public.f_unaccent(g.name));
+-- The backfill that pointed existing fixtures at a matching ground lived here.
+-- Removed 2026-09-06: this file now runs BEFORE matches is created, so there is
+-- nothing to backfill — and on a fresh database there never was.
 
 -- -----------------------------------------------------------------------------
 -- 6. Ground search for the picker (the "did you mean …" step).
@@ -342,52 +321,9 @@ revoke all on function public.search_grounds(text, double precision, double prec
 grant execute on function public.search_grounds(text, double precision, double precision, integer) to authenticated;
 
 -- -----------------------------------------------------------------------------
--- 7. Fixture clashes on a ground (the soft check, per decision 3).
+-- tournament_ground_clashes() — MOVED
 -- -----------------------------------------------------------------------------
--- Returns pairs of fixtures sharing a ground whose scheduled starts fall
--- within p_window of each other. The console shows these; nothing blocks the
--- write, so a rain reshuffle can pass through a colliding intermediate state.
-create or replace function public.tournament_ground_clashes(
-  p_tournament_id uuid,
-  p_window        interval default interval '3 hours'
-)
-returns table (
-  ground_id     uuid,
-  ground_name   text,
-  match_a_id    uuid,
-  match_a_start timestamptz,
-  match_b_id    uuid,
-  match_b_start timestamptz,
-  gap           interval
-)
-language sql
-stable
-security definer
-set search_path = public, pg_temp
-as $$
-  select
-    g.ground_id,
-    g.name,
-    a.match_id,
-    a.scheduled_start_time,
-    b.match_id,
-    b.scheduled_start_time,
-    b.scheduled_start_time - a.scheduled_start_time
-  from public.matches a
-  join public.matches b
-    on b.tournament_id = a.tournament_id
-   and b.ground_id = a.ground_id
-   -- Ordered pair, so each clash is reported once rather than twice.
-   and (a.scheduled_start_time, a.match_id) < (b.scheduled_start_time, b.match_id)
-  join public.grounds g on g.ground_id = a.ground_id
-  where a.tournament_id = p_tournament_id
-    and a.ground_id is not null
-    and a.status not in ('completed', 'abandoned', 'no_result', 'walkover')
-    and b.status not in ('completed', 'abandoned', 'no_result', 'walkover')
-    and b.scheduled_start_time - a.scheduled_start_time < p_window
-    and public.is_tournament_organizer(p_tournament_id)
-  order by g.name, a.scheduled_start_time;
-$$;
+-- It joins public.matches twice, so it cannot be created here now that this
+-- file runs before 20260101000400_matches.sql. It lives at the end of
+-- 20260830000000_tournament_live_ops.sql, with the other tournament ops RPCs.
 
-revoke all on function public.tournament_ground_clashes(uuid, interval) from public;
-grant execute on function public.tournament_ground_clashes(uuid, interval) to authenticated;

@@ -60,6 +60,7 @@ alter table public.comment_likes enable row level security;
 -- "liked by 3" + a tappable avatar row; the count alone isn't enough.
 create policy "comment_likes_read_public"
   on public.comment_likes for select
+  to anon, authenticated
   using (true);
 
 create policy "comment_likes_insert_self"

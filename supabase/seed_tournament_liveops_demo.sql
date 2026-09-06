@@ -66,10 +66,12 @@ begin
   values (v_innings, v_m1, 1, 161, 7, 120);
 
   -- Second innings live at 142/3 off 16.2 (98 legal balls).
+  -- The target lives on match_innings_state only (match_innings.target_runs was
+  -- a duplicate, dropped 2026-09-06).
   insert into public.match_innings
     (match_id, innings_number, batting_team_side, bowling_team_side,
-     overs_allocated, target_runs)
-  values (v_m1, 2, 'team_b', 'team_a', 20.0, 162)
+     overs_allocated)
+  values (v_m1, 2, 'team_b', 'team_a', 20.0)
   returning innings_id into v_innings;
   insert into public.match_innings_state
     (innings_id, match_id, innings_number, total_runs, total_wickets,

@@ -54,6 +54,7 @@ alter table public.tournament_standings enable row level security;
 
 create policy "tournament_standings_read_public"
   on public.tournament_standings for select
+  to anon, authenticated
   using (true);
 
 create policy "tournament_standings_no_direct_write"

@@ -19,13 +19,8 @@
 -- -----------------------------------------------------------------------------
 -- 1. Keep the decision reason.
 -- -----------------------------------------------------------------------------
-alter table public.tournament_teams
-  add column if not exists decision_reason text
-    check (decision_reason is null or length(decision_reason) <= 500);
-
-comment on column public.tournament_teams.decision_reason is
-  'Why the organiser declined (or approved with a note). Shown to the team''s '
-  'manager — the decline dialog tells the organiser it will be.';
+-- tournament_teams.decision_reason is declared inline in
+-- 20260101000310_tournament_teams.sql (folded there 2026-09-06).
 
 -- Overload rather than a replacement: the 1-arg form stays for any caller that
 -- has no reason to give.
@@ -163,7 +158,7 @@ begin
       tournament_id, match_type, match_format, stage, round,
       bracket_round_number, bracket_match_number,
       team_a_id, team_b_id, venue, scheduled_start_time,
-      rules_config, format, status, created_by
+      format, status, created_by
     )
     select
       p_tournament_id,
@@ -191,10 +186,9 @@ begin
       (slot.elem->>'bracket_match_number')::int,
       (slot.elem->>'team_a_id')::uuid,
       (slot.elem->>'team_b_id')::uuid,
-      coalesce(nullif(slot.elem->>'venue', ''), 'Ground 1'),
+      nullif(slot.elem->>'venue', ''),
       (slot.elem->>'scheduled_start_time')::timestamptz,
-      v_format,
-      v_format,
+      public._normalize_match_format(v_format),
       'scheduled',
       v_uid
     from slot

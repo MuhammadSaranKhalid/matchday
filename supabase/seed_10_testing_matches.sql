@@ -1,4 +1,17 @@
 -- =============================================================================
+-- MOVED OUT OF supabase/migrations/ ON 2026-09-06
+-- =============================================================================
+-- This is demo data, not schema. It hardcodes two real accounts and their
+-- teams, so on any database that does not already contain them every insert
+-- fails on a foreign key — which is exactly how `supabase db reset` broke.
+-- Migrations are now schema only (one table per migration); seed data lives
+-- here and is opted into via [db.seed] sql_paths in config.toml.
+--
+-- The guard below makes the file a no-op when its subjects are absent, so it
+-- is safe to add to sql_paths on any machine.
+-- =============================================================================
+
+-- =============================================================================
 -- 20260822150000 · seed_10_testing_matches.sql
 -- =============================================================================
 -- Creates 10 new matches between existing teams for testing Toss and
@@ -66,6 +79,12 @@ declare
   v_new_unclaimed uuid;
 
 begin
+  -- Requires at least one real profile to attribute the fixtures to.
+  if not exists (select 1 from public.profiles) then
+    raise notice 'seed_10_testing_matches: no profiles — skipping.';
+    return;
+  end if;
+
   -- Resolve User IDs
   select id into v_saran_uid from auth.users where email = 'muhammadsarankhalid@gmail.com' limit 1;
   if v_saran_uid is null then

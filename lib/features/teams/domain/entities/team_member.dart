@@ -24,7 +24,8 @@ class TeamMember {
 
   /// The user who added this member. Guaranteed non-null — enforced by the
   /// `team_members.added_by NOT NULL` constraint.
-  final String addedBy;
+  /// Who added this member, or null once that person deletes their account.
+  final String? addedBy;
   final DateTime joinedAt;
   final DateTime updatedAt;
   final int? jerseyNumber;

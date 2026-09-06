@@ -293,15 +293,23 @@ enum MatchStatus {
   declined('declined'),
   cancelled('cancelled'),
 
-  // Deployed `match_status` enum values, in order.
+  // `match_status` enum values, in order. Kept in step with the definition in
+  // supabase/migrations/20260101000000_shared_helpers.sql.
+  //
+  // `tied` and `no_result` were missing here while the SQL enum had them, and
+  // `rescheduled` was here while the SQL enum did not — the two halves of the
+  // same drift, reconciled 2026-09-06. Their absence mattered: fromWire falls
+  // back to `scheduled`, so a completed tied match rendered as upcoming.
   scheduled('scheduled'),
   toss('toss'),
+  rescheduled('rescheduled'),
   live('live'),
   inningsBreak('innings_break'),
   superOver('super_over'),
   completed('completed'),
   abandoned('abandoned'),
-  rescheduled('rescheduled'),
+  tied('tied'),
+  noResult('no_result'),
   walkover('walkover');
 
   const MatchStatus(this.wire);
@@ -322,7 +330,11 @@ enum MatchStatus {
 
   /// Past — match has a final result (or terminal non-result).
   bool get isPast =>
-      this == completed || this == abandoned || this == walkover;
+      this == completed ||
+      this == abandoned ||
+      this == walkover ||
+      this == tied ||
+      this == noResult;
 
   /// True for statuses that represent a match worth participants' attention —
   /// upcoming, in-play, or recently concluded. Legacy [pending] / [accepted]

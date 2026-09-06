@@ -11,7 +11,12 @@ abstract class UnclaimedPlayerDto with _$UnclaimedPlayerDto {
   const factory UnclaimedPlayerDto({
     @JsonKey(name: 'unclaimed_id') required String unclaimedId,
     @JsonKey(name: 'display_name') required String displayName,
-    @JsonKey(name: 'added_by') required String addedBy,
+    // Nullable: the manager who created the placeholder may since have
+    // deleted their account (FK is ON DELETE SET NULL), and delete_user's
+    // synthetic placeholder has no creator at all.
+    @JsonKey(name: 'added_by') String? addedBy,
+    // Never present on a normal read — revoked at column level. Populated only
+    // by unclaimed_player_contact_for_manager().
     @JsonKey(name: 'phone_number') String? phoneNumber,
     @JsonKey(name: 'created_at') required String createdAt,
     @JsonKey(name: 'updated_at') required String updatedAt,

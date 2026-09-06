@@ -14,7 +14,7 @@ _TeamMemberDto _$TeamMemberDtoFromJson(Map<String, dynamic> json) =>
       unclaimedId: json['unclaimed_id'] as String?,
       jerseyNumber: (json['jersey_number'] as num?)?.toInt(),
       role: json['role'] as String? ?? 'player',
-      addedBy: json['added_by'] as String,
+      addedBy: json['added_by'] as String?,
       joinedAt: json['joined_at'] as String,
       updatedAt: json['updated_at'] as String,
     );

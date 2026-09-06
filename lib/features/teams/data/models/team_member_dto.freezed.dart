@@ -15,7 +15,9 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TeamMemberDto {
 
-@JsonKey(name: 'membership_id') String get membershipId;@JsonKey(name: 'team_id') String get teamId;@JsonKey(name: 'user_id') String? get userId;@JsonKey(name: 'unclaimed_id') String? get unclaimedId;@JsonKey(name: 'jersey_number') int? get jerseyNumber; String get role;@JsonKey(name: 'added_by') String get addedBy;@JsonKey(name: 'joined_at') String get joinedAt;@JsonKey(name: 'updated_at') String get updatedAt;
+@JsonKey(name: 'membership_id') String get membershipId;@JsonKey(name: 'team_id') String get teamId;@JsonKey(name: 'user_id') String? get userId;@JsonKey(name: 'unclaimed_id') String? get unclaimedId;@JsonKey(name: 'jersey_number') int? get jerseyNumber; String get role;// Nullable since 2026-09-06: ON DELETE SET NULL, so the roster row
+// survives the person who added it deleting their account.
+@JsonKey(name: 'added_by') String? get addedBy;@JsonKey(name: 'joined_at') String get joinedAt;@JsonKey(name: 'updated_at') String get updatedAt;
 /// Create a copy of TeamMemberDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -48,7 +50,7 @@ abstract mixin class $TeamMemberDtoCopyWith<$Res>  {
   factory $TeamMemberDtoCopyWith(TeamMemberDto value, $Res Function(TeamMemberDto) _then) = _$TeamMemberDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'membership_id') String membershipId,@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'user_id') String? userId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'jersey_number') int? jerseyNumber, String role,@JsonKey(name: 'added_by') String addedBy,@JsonKey(name: 'joined_at') String joinedAt,@JsonKey(name: 'updated_at') String updatedAt
+@JsonKey(name: 'membership_id') String membershipId,@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'user_id') String? userId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'jersey_number') int? jerseyNumber, String role,@JsonKey(name: 'added_by') String? addedBy,@JsonKey(name: 'joined_at') String joinedAt,@JsonKey(name: 'updated_at') String updatedAt
 });
 
 
@@ -65,7 +67,7 @@ class _$TeamMemberDtoCopyWithImpl<$Res>
 
 /// Create a copy of TeamMemberDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? membershipId = null,Object? teamId = null,Object? userId = freezed,Object? unclaimedId = freezed,Object? jerseyNumber = freezed,Object? role = null,Object? addedBy = null,Object? joinedAt = null,Object? updatedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? membershipId = null,Object? teamId = null,Object? userId = freezed,Object? unclaimedId = freezed,Object? jerseyNumber = freezed,Object? role = null,Object? addedBy = freezed,Object? joinedAt = null,Object? updatedAt = null,}) {
   return _then(_self.copyWith(
 membershipId: null == membershipId ? _self.membershipId : membershipId // ignore: cast_nullable_to_non_nullable
 as String,teamId: null == teamId ? _self.teamId : teamId // ignore: cast_nullable_to_non_nullable
@@ -73,8 +75,8 @@ as String,userId: freezed == userId ? _self.userId : userId // ignore: cast_null
 as String?,unclaimedId: freezed == unclaimedId ? _self.unclaimedId : unclaimedId // ignore: cast_nullable_to_non_nullable
 as String?,jerseyNumber: freezed == jerseyNumber ? _self.jerseyNumber : jerseyNumber // ignore: cast_nullable_to_non_nullable
 as int?,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
-as String,addedBy: null == addedBy ? _self.addedBy : addedBy // ignore: cast_nullable_to_non_nullable
-as String,joinedAt: null == joinedAt ? _self.joinedAt : joinedAt // ignore: cast_nullable_to_non_nullable
+as String,addedBy: freezed == addedBy ? _self.addedBy : addedBy // ignore: cast_nullable_to_non_nullable
+as String?,joinedAt: null == joinedAt ? _self.joinedAt : joinedAt // ignore: cast_nullable_to_non_nullable
 as String,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as String,
   ));
@@ -161,7 +163,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber,  String role, @JsonKey(name: 'added_by')  String addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber,  String role, @JsonKey(name: 'added_by')  String? addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TeamMemberDto() when $default != null:
 return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_that.jerseyNumber,_that.role,_that.addedBy,_that.joinedAt,_that.updatedAt);case _:
@@ -182,7 +184,7 @@ return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber,  String role, @JsonKey(name: 'added_by')  String addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber,  String role, @JsonKey(name: 'added_by')  String? addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _TeamMemberDto():
 return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_that.jerseyNumber,_that.role,_that.addedBy,_that.joinedAt,_that.updatedAt);case _:
@@ -202,7 +204,7 @@ return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber,  String role, @JsonKey(name: 'added_by')  String addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber,  String role, @JsonKey(name: 'added_by')  String? addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _TeamMemberDto() when $default != null:
 return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_that.jerseyNumber,_that.role,_that.addedBy,_that.joinedAt,_that.updatedAt);case _:
@@ -217,7 +219,7 @@ return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_
 @JsonSerializable()
 
 class _TeamMemberDto extends TeamMemberDto {
-  const _TeamMemberDto({@JsonKey(name: 'membership_id') required this.membershipId, @JsonKey(name: 'team_id') required this.teamId, @JsonKey(name: 'user_id') this.userId, @JsonKey(name: 'unclaimed_id') this.unclaimedId, @JsonKey(name: 'jersey_number') this.jerseyNumber, this.role = 'player', @JsonKey(name: 'added_by') required this.addedBy, @JsonKey(name: 'joined_at') required this.joinedAt, @JsonKey(name: 'updated_at') required this.updatedAt}): super._();
+  const _TeamMemberDto({@JsonKey(name: 'membership_id') required this.membershipId, @JsonKey(name: 'team_id') required this.teamId, @JsonKey(name: 'user_id') this.userId, @JsonKey(name: 'unclaimed_id') this.unclaimedId, @JsonKey(name: 'jersey_number') this.jerseyNumber, this.role = 'player', @JsonKey(name: 'added_by') this.addedBy, @JsonKey(name: 'joined_at') required this.joinedAt, @JsonKey(name: 'updated_at') required this.updatedAt}): super._();
   factory _TeamMemberDto.fromJson(Map<String, dynamic> json) => _$TeamMemberDtoFromJson(json);
 
 @override@JsonKey(name: 'membership_id') final  String membershipId;
@@ -226,7 +228,9 @@ class _TeamMemberDto extends TeamMemberDto {
 @override@JsonKey(name: 'unclaimed_id') final  String? unclaimedId;
 @override@JsonKey(name: 'jersey_number') final  int? jerseyNumber;
 @override@JsonKey() final  String role;
-@override@JsonKey(name: 'added_by') final  String addedBy;
+// Nullable since 2026-09-06: ON DELETE SET NULL, so the roster row
+// survives the person who added it deleting their account.
+@override@JsonKey(name: 'added_by') final  String? addedBy;
 @override@JsonKey(name: 'joined_at') final  String joinedAt;
 @override@JsonKey(name: 'updated_at') final  String updatedAt;
 
@@ -263,7 +267,7 @@ abstract mixin class _$TeamMemberDtoCopyWith<$Res> implements $TeamMemberDtoCopy
   factory _$TeamMemberDtoCopyWith(_TeamMemberDto value, $Res Function(_TeamMemberDto) _then) = __$TeamMemberDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'membership_id') String membershipId,@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'user_id') String? userId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'jersey_number') int? jerseyNumber, String role,@JsonKey(name: 'added_by') String addedBy,@JsonKey(name: 'joined_at') String joinedAt,@JsonKey(name: 'updated_at') String updatedAt
+@JsonKey(name: 'membership_id') String membershipId,@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'user_id') String? userId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'jersey_number') int? jerseyNumber, String role,@JsonKey(name: 'added_by') String? addedBy,@JsonKey(name: 'joined_at') String joinedAt,@JsonKey(name: 'updated_at') String updatedAt
 });
 
 
@@ -280,7 +284,7 @@ class __$TeamMemberDtoCopyWithImpl<$Res>
 
 /// Create a copy of TeamMemberDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? membershipId = null,Object? teamId = null,Object? userId = freezed,Object? unclaimedId = freezed,Object? jerseyNumber = freezed,Object? role = null,Object? addedBy = null,Object? joinedAt = null,Object? updatedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? membershipId = null,Object? teamId = null,Object? userId = freezed,Object? unclaimedId = freezed,Object? jerseyNumber = freezed,Object? role = null,Object? addedBy = freezed,Object? joinedAt = null,Object? updatedAt = null,}) {
   return _then(_TeamMemberDto(
 membershipId: null == membershipId ? _self.membershipId : membershipId // ignore: cast_nullable_to_non_nullable
 as String,teamId: null == teamId ? _self.teamId : teamId // ignore: cast_nullable_to_non_nullable
@@ -288,8 +292,8 @@ as String,userId: freezed == userId ? _self.userId : userId // ignore: cast_null
 as String?,unclaimedId: freezed == unclaimedId ? _self.unclaimedId : unclaimedId // ignore: cast_nullable_to_non_nullable
 as String?,jerseyNumber: freezed == jerseyNumber ? _self.jerseyNumber : jerseyNumber // ignore: cast_nullable_to_non_nullable
 as int?,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
-as String,addedBy: null == addedBy ? _self.addedBy : addedBy // ignore: cast_nullable_to_non_nullable
-as String,joinedAt: null == joinedAt ? _self.joinedAt : joinedAt // ignore: cast_nullable_to_non_nullable
+as String,addedBy: freezed == addedBy ? _self.addedBy : addedBy // ignore: cast_nullable_to_non_nullable
+as String?,joinedAt: null == joinedAt ? _self.joinedAt : joinedAt // ignore: cast_nullable_to_non_nullable
 as String,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as String,
   ));

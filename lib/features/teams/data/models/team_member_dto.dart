@@ -21,7 +21,9 @@ abstract class TeamMemberDto with _$TeamMemberDto {
     @JsonKey(name: 'unclaimed_id') String? unclaimedId,
     @JsonKey(name: 'jersey_number') int? jerseyNumber,
     @Default('player') String role,
-    @JsonKey(name: 'added_by') required String addedBy,
+    // Nullable since 2026-09-06: ON DELETE SET NULL, so the roster row
+    // survives the person who added it deleting their account.
+    @JsonKey(name: 'added_by') String? addedBy,
     @JsonKey(name: 'joined_at') required String joinedAt,
     @JsonKey(name: 'updated_at') required String updatedAt,
   }) = _TeamMemberDto;

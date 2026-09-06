@@ -19,6 +19,18 @@ class TeamsRemoteDataSource {
   static const _members = 'team_members';
   static const _unclaimed = 'unclaimed_players';
 
+  /// Every unclaimed_players column the API roles may read.
+  ///
+  /// `phone_number` and `email` are revoked at column level (see
+  /// 20260101000120_unclaimed_players.sql): they are contact details for
+  /// people who never signed up. A bare `.select()` expands to `select *`,
+  /// which Postgres rejects outright once any column is revoked — so every
+  /// read of this table must name its columns. A manager who needs the phone
+  /// number calls unclaimed_player_contact_for_manager().
+  static const _unclaimedCols =
+      'unclaimed_id, display_name, added_by, player_profile, '
+      'claimed_by_user_id, claimed_at, created_at, updated_at';
+
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
     if (id == null) throw UnauthorizedException('Must be signed in');
@@ -47,7 +59,7 @@ class TeamsRemoteDataSource {
 
   Future<List<UnclaimedPlayerDto>> listUnclaimed() async {
     try {
-      final rows = await _supabase.from(_unclaimed).select();
+      final rows = await _supabase.from(_unclaimed).select(_unclaimedCols);
       return rows.map(UnclaimedPlayerDto.fromJson).toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -79,7 +91,7 @@ class TeamsRemoteDataSource {
     try {
       final rows = await _supabase
           .from(_unclaimed)
-          .select()
+          .select(_unclaimedCols)
           .filter('unclaimed_id', 'in', unclaimedIds);
       return {
         for (final r in (rows as List))
@@ -278,7 +290,7 @@ class TeamsRemoteDataSource {
               'player_profile': payload['player_profile'],
             'added_by': _requireUid(),
           })
-          .select()
+          .select(_unclaimedCols)
           .single();
       return UnclaimedPlayerDto.fromJson(row);
     } on PostgrestException catch (e) {
@@ -505,9 +517,18 @@ class TeamsRemoteDataSource {
           .toList();
       if (unclaimedIds.isEmpty) return [];
 
+      // `phone_number` is deliberately absent from this embed. It is revoked
+      // from anon/authenticated at column level (unclaimed_players holds
+      // contact details for people who never signed up), so selecting it here
+      // makes PostgREST reject the whole query. A manager who needs the number
+      // fetches it per-row through unclaimed_player_contact_for_manager(),
+      // which re-checks that they manage a team the placeholder plays for.
       final rows = await _supabase
           .from('claim_requests')
-          .select('*, requester:profiles!requester_id(display_name, username, profile_photo_url), unclaimed:unclaimed_players!unclaimed_id(display_name, phone_number)')
+          .select(
+            '*, requester:profiles!requester_id(display_name, username, profile_photo_url), '
+            'unclaimed:unclaimed_players!unclaimed_id(display_name)',
+          )
           .inFilter('unclaimed_id', unclaimedIds)
           .eq('status', 'pending')
           .order('created_at', ascending: false);
@@ -598,8 +619,7 @@ class TeamsRemoteDataSource {
       .stream(primaryKey: ['membership_id'])
       .map((r) => r.map(TeamMemberDto.fromJson).toList());
 
-  Stream<List<UnclaimedPlayerDto>> watchUnclaimed() => _supabase
-      .from(_unclaimed)
-      .stream(primaryKey: ['unclaimed_id'])
-      .map((r) => r.map(UnclaimedPlayerDto.fromJson).toList());
+  // watchUnclaimed() was removed 2026-09-06. It had no callers, and a realtime
+  // stream replays the whole row — including the phone_number / email columns
+  // now revoked from the API roles.
 }

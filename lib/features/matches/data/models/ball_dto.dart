@@ -5,8 +5,14 @@ import '../../domain/entities/match.dart';
 part 'ball_dto.freezed.dart';
 part 'ball_dto.g.dart';
 
-/// Wire-format `balls` row. Mirrors the deployed schema — there is no
-/// innings table; deliveries are keyed by `(match_id, innings_number, seq)`.
+/// Wire-format `match_deliveries` row (also served by the `balls` view).
+///
+/// The Dart field names here are the engine's vocabulary; [fromJson] maps the
+/// column names onto them. Those used to be two different sets because the
+/// table carried both — `runs_off_bat`/`runs_scored`, `striker_id`/`batsman_id`,
+/// `delivery_type`/`ball_type` — written in lockstep by record-ball. The alias
+/// columns were dropped on 2026-09-06, so the mapping below is now a plain
+/// rename rather than a coalesce over two possible spellings.
 @freezed
 abstract class BallDto with _$BallDto {
   const factory BallDto({
@@ -34,11 +40,13 @@ abstract class BallDto with _$BallDto {
 
   factory BallDto.fromJson(Map<String, dynamic> json) {
     final modified = Map<String, dynamic>.from(json);
-    modified['ball_id'] = (modified['delivery_id'] ?? modified['ball_id'] ?? modified['id'] ?? '').toString();
-    modified['runs_scored'] = (modified['runs_off_bat'] ?? modified['runs_scored'] ?? 0);
-    modified['extras'] = (modified['extra_runs'] ?? modified['extras'] ?? 0);
-    modified['ball_type'] = (modified['delivery_type'] ?? modified['ball_type'] ?? 'legal').toString();
-    modified['batsman_id'] = modified['striker_id'] ?? modified['batsman_id'];
+    modified['ball_id'] =
+        (modified['delivery_id'] ?? modified['ball_id'] ?? modified['id'] ?? '')
+            .toString();
+    modified['runs_scored'] = modified['runs_off_bat'] ?? 0;
+    modified['extras'] = modified['extra_runs'] ?? 0;
+    modified['ball_type'] = (modified['delivery_type'] ?? 'legal').toString();
+    modified['batsman_id'] = modified['striker_id'];
     return _$BallDtoFromJson(modified);
   }
 

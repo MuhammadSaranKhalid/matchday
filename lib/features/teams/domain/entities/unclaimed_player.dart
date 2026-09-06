@@ -20,9 +20,10 @@ class UnclaimedPlayer {
   final String displayName;
   final String? phoneNumber;
 
-  /// Guaranteed non-null — enforced by the `unclaimed_players.added_by NOT
-  /// NULL` constraint.
-  final String addedBy;
+  /// The manager who created this placeholder, or null once they delete their
+  /// account (`unclaimed_players.added_by` is ON DELETE SET NULL — the
+  /// placeholder has to outlive its creator, which is the point of the table).
+  final String? addedBy;
   final DateTime createdAt;
   final DateTime updatedAt;
   final PlayingRole? playingRole;

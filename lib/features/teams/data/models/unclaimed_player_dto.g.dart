@@ -10,7 +10,7 @@ _UnclaimedPlayerDto _$UnclaimedPlayerDtoFromJson(Map<String, dynamic> json) =>
     _UnclaimedPlayerDto(
       unclaimedId: json['unclaimed_id'] as String,
       displayName: json['display_name'] as String,
-      addedBy: json['added_by'] as String,
+      addedBy: json['added_by'] as String?,
       phoneNumber: json['phone_number'] as String?,
       createdAt: json['created_at'] as String,
       updatedAt: json['updated_at'] as String,

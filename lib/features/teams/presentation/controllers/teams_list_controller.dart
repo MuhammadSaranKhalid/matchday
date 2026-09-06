@@ -126,7 +126,9 @@ MyTeamsView _buildView({
     }
   }
 
-  // ── 2. Pick the hero match: live > accepted > pending ────────────────
+  // ── 2. Pick the hero match: accepted > pending ───────────────────────
+  //      Live matches are deliberately NOT surfaced here — the My Teams
+  //      hero shows what is coming up, not what is in progress.
   TodayMatch? today;
   final picked = _pickHeroMatch(activeMatches);
   if (picked != null) {
@@ -245,13 +247,10 @@ CrestStyle _crestFor(Team team) => CrestStyle(
     );
 
 _ActiveMatch? _pickHeroMatch(List<_ActiveMatch> active) {
-  _ActiveMatch? live;
   _ActiveMatch? accepted;
   _ActiveMatch? pending;
   for (final entry in active) {
     switch (entry.match.status) {
-      case MatchStatus.live:
-        live ??= entry;
       case MatchStatus.accepted:
         accepted ??= entry;
       case MatchStatus.pending:
@@ -260,7 +259,7 @@ _ActiveMatch? _pickHeroMatch(List<_ActiveMatch> active) {
         break;
     }
   }
-  return live ?? accepted ?? pending;
+  return accepted ?? pending;
 }
 
 TodayMatch _buildTodayMatch(

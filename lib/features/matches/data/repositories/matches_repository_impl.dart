@@ -199,18 +199,36 @@ class MatchesRepositoryImpl implements MatchesRepository {
       );
 
   @override
-  Future<Either<Failure, Unit>> recordMatchToss({
+  Future<Either<Failure, Unit>> recordTossWinner({
     required MatchId id,
     required TeamId wonBy,
-    required TossDecision decision,
     String? face,
   }) async {
     try {
-      await _remote.recordMatchToss(
+      await _remote.recordTossWinner(
         matchId: id.value,
         wonBy: wonBy.value,
-        decision: decision.wire,
         face: face,
+      );
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> recordTossDecision({
+    required MatchId id,
+    required TossDecision decision,
+  }) async {
+    try {
+      await _remote.recordTossDecision(
+        matchId: id.value,
+        decision: decision.wire,
       );
       return const Right(unit);
     } on UnauthorizedException catch (e) {

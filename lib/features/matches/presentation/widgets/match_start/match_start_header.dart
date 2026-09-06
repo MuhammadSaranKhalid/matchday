@@ -40,7 +40,12 @@ class MatchStartHeader extends StatelessWidget {
   final MatchStartState state;
 
   String get _title => switch (state.phase) {
-        MatchStartPhase.toss => 'The toss.',
+        // The toss is two acts on two phones, and the headline says which one
+        // the match is waiting on.
+        MatchStartPhase.toss => switch (state.tossStep) {
+            TossStep.winner => 'The toss.',
+            TossStep.decision => 'Bat or bowl?',
+          },
         MatchStartPhase.lineup ||
         MatchStartPhase.ready => state.isViewerBattingCaptain
             ? 'Pick your openers.'
@@ -122,6 +127,7 @@ class _PhonePill extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final (teamId, roleLabel) = switch (state.viewerRole) {
+      MatchStartViewerRole.captain => (state.captainOf, 'CAPTAIN'),
       MatchStartViewerRole.battingCaptain => (
           state.battingTeamId,
           'BATTING CAPTAIN',

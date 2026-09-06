@@ -6,6 +6,10 @@ import '../../domain/entities/match.dart';
 /// The current user's role on the Match Start screen. Derived from the match
 /// row + the live toss outcome — not persisted.
 enum MatchStartViewerRole {
+  /// A captain on this match, before the toss has settled which side bats.
+  /// Both captains sit here between "match created" and the winner's call.
+  captain,
+
   /// User is the captain of the side that will bat innings 1. Hosts the
   /// openers picker and the Start CTA.
   battingCaptain,
@@ -16,6 +20,19 @@ enum MatchStartViewerRole {
   /// Not a captain on this match (manager / squad / spectator). Always sees
   /// a read-only view.
   spectator,
+}
+
+/// The two acts of the toss. Derived from the match row rather than stored:
+/// `start_phase` stays 'toss' until the winner has made their call, so the
+/// pause in between is visible without a fourth enum label.
+enum TossStep {
+  /// Nobody has won anything yet. The match creator flips the real coin and
+  /// records who won — that action is theirs alone.
+  winner,
+
+  /// The winner is known; their captain, and only their captain, chooses to
+  /// bat or bowl.
+  decision,
 }
 
 /// Visible steps in the Match Start progress bar: toss → lineup.
@@ -34,6 +51,8 @@ class MatchStartState extends Equatable {
     required this.viewerRole,
     required this.battingTeamId,
     required this.bowlingTeamId,
+    this.captainOf,
+    this.isCreator = false,
     this.lockedStriker,
     this.lockedNonStriker,
     this.pendingTossWinner,
@@ -49,10 +68,18 @@ class MatchStartState extends Equatable {
   /// User's role on this match (derived).
   final MatchStartViewerRole viewerRole;
 
-  /// Side batting innings 1. Null until the toss is recorded.
+  /// The side this viewer captains, or null if they captain neither. Roster
+  /// identity — independent of the toss, unlike [viewerRole].
+  final TeamId? captainOf;
+
+  /// Whether this viewer created the match. Grants exactly one action:
+  /// recording who won the toss.
+  final bool isCreator;
+
+  /// Side batting innings 1. Null until the toss decision is recorded.
   final TeamId? battingTeamId;
 
-  /// Side bowling innings 1. Null until the toss is recorded.
+  /// Side bowling innings 1. Null until the toss decision is recorded.
   final TeamId? bowlingTeamId;
 
   /// Openers already persisted on `match_innings_state` for innings 1,
@@ -71,6 +98,14 @@ class MatchStartState extends Equatable {
   /// [Match.startPhase] for convenience.
   MatchStartPhase get phase => match.startPhase;
 
+  /// Which act of the toss is outstanding. Only meaningful while
+  /// [phase] is [MatchStartPhase.toss].
+  TossStep get tossStep =>
+      match.tossWonBy == null ? TossStep.winner : TossStep.decision;
+
+  /// The side that won the toss, once recorded.
+  TeamId? get tossWinnerTeamId => match.tossWonBy;
+
   /// Zero-based index into the [matchStartStepCount] progress bar.
   int get stepIndex => switch (phase) {
         MatchStartPhase.toss => 0,
@@ -82,18 +117,30 @@ class MatchStartState extends Equatable {
   bool get isViewerBattingCaptain =>
       viewerRole == MatchStartViewerRole.battingCaptain;
 
+  /// Whether this viewer captains the side that won the toss — the one person
+  /// who may choose to bat or bowl.
+  bool get isViewerTossWinnerCaptain {
+    final won = match.tossWonBy;
+    return won != null && captainOf == won;
+  }
+
   /// True when the viewer should see active picker UI for the current phase.
   bool get viewerCanAct => switch (phase) {
-        MatchStartPhase.toss =>
-          viewerRole == MatchStartViewerRole.battingCaptain ||
-              viewerRole == MatchStartViewerRole.bowlingCaptain,
+        MatchStartPhase.toss => switch (tossStep) {
+            TossStep.winner => isCreator,
+            TossStep.decision => isViewerTossWinnerCaptain,
+          },
         MatchStartPhase.lineup ||
         MatchStartPhase.ready =>
-          viewerRole == MatchStartViewerRole.battingCaptain,
+          isViewerBattingCaptain,
         MatchStartPhase.live => false,
       };
 
-  bool get isTossReady => pendingTossWinner != null && pendingDecision != null;
+  /// Whether the current toss act has everything it needs to be submitted.
+  bool get isTossReady => switch (tossStep) {
+        TossStep.winner => pendingTossWinner != null,
+        TossStep.decision => pendingDecision != null,
+      };
 
   /// The opener shown in each slot: this phone's pick if it has one, else
   /// whatever is already locked server-side.
@@ -106,6 +153,8 @@ class MatchStartState extends Equatable {
   MatchStartState copyWith({
     Match? match,
     MatchStartViewerRole? viewerRole,
+    TeamId? captainOf,
+    bool? isCreator,
     TeamId? battingTeamId,
     TeamId? bowlingTeamId,
     String? lockedStriker,
@@ -119,6 +168,8 @@ class MatchStartState extends Equatable {
     return MatchStartState(
       match: match ?? this.match,
       viewerRole: viewerRole ?? this.viewerRole,
+      captainOf: captainOf ?? this.captainOf,
+      isCreator: isCreator ?? this.isCreator,
       battingTeamId: battingTeamId ?? this.battingTeamId,
       bowlingTeamId: bowlingTeamId ?? this.bowlingTeamId,
       lockedStriker: lockedStriker ?? this.lockedStriker,
@@ -141,6 +192,8 @@ class MatchStartState extends Equatable {
   List<Object?> get props => [
         match,
         viewerRole,
+        captainOf,
+        isCreator,
         battingTeamId,
         bowlingTeamId,
         lockedStriker,
@@ -153,24 +206,33 @@ class MatchStartState extends Equatable {
       ];
 }
 
+/// The side [userId] captains on this match, or null for anyone else.
+///
+/// Reads the captain snapshot on the match row. Since 20260906100000 a
+/// trigger keeps those columns filled for every path that puts a team on a
+/// match, including tournament fixtures and bracket advancement.
+TeamId? captainSideOf(Match m, String? userId) {
+  if (userId == null || userId.isEmpty) return null;
+  if (m.teamACaptain == userId) return m.teamAId;
+  if (m.teamBCaptain == userId) return m.teamBId;
+  return null;
+}
+
 /// Resolve the viewer's role given the match row + their user id.
+///
+/// Before the toss decision there is no batting side, so both captains are
+/// simply [MatchStartViewerRole.captain] — claiming otherwise would put a
+/// "BATTING CAPTAIN" badge on a phone that may end up fielding.
 MatchStartViewerRole viewerRoleOnMatch(Match m, String? userId) {
-  if (userId == null || userId.isEmpty) return MatchStartViewerRole.spectator;
+  final side = captainSideOf(m, userId);
+  if (side == null) return MatchStartViewerRole.spectator;
+
   final batting = battingFirstTeam(m);
-  if (batting == null) {
-    if (m.teamACaptain == userId || m.teamBCaptain == userId) {
-      return MatchStartViewerRole.battingCaptain;
-    }
-    return MatchStartViewerRole.spectator;
-  }
-  if (batting == m.teamAId) {
-    if (m.teamACaptain == userId) return MatchStartViewerRole.battingCaptain;
-    if (m.teamBCaptain == userId) return MatchStartViewerRole.bowlingCaptain;
-  } else if (batting == m.teamBId) {
-    if (m.teamBCaptain == userId) return MatchStartViewerRole.battingCaptain;
-    if (m.teamACaptain == userId) return MatchStartViewerRole.bowlingCaptain;
-  }
-  return MatchStartViewerRole.spectator;
+  if (batting == null) return MatchStartViewerRole.captain;
+
+  return side == batting
+      ? MatchStartViewerRole.battingCaptain
+      : MatchStartViewerRole.bowlingCaptain;
 }
 
 /// Side batting innings 1 given the toss outcome. Mirrors the deployed

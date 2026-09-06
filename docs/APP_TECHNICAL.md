@@ -392,7 +392,7 @@ Conventions used below:
 - **Domain entities:** `Match`, `Ball`, `MatchPlayer`, `MatchInningsState`, `InningsSummary`, `MatchRequest`, `MatchRole`, `FormatPreset`. `BallDraft` is the controller's computed draft (CLAUDE.md §6.6 "computed-draft object").
 - **Repository contract:** 20+ methods grouped as:
   - Setup: `listFormatPresets`, `getMatch`, `listMyMatches`, `listInningsForMatches`, `watchMatch`.
-  - Start: `recordMatchToss`, `submitMatchOpeners`, `startMatchNow`, `startInnings`.
+  - Start: `recordTossWinner`, `recordTossDecision`, `submitMatchOpeners`, `startMatchNow`, `startInnings`. The toss is two calls on two phones (20260906100000): the match **creator** records who won, then the **winning side's captain** chooses bat or bowl.
   - Live scoring: `recordBall(BallDraft)`, `undoLastBall`, `watchBalls`, `getMatchInningsState`, `watchMatchInningsState`.
   - Players: `listMatchPlayers`.
   - Completion: `completeMatch`.
@@ -440,7 +440,7 @@ Most server-side logic lives in **edge functions** during dev phase (see §10). 
 
 | RPC | Purpose |
 |---|---|
-| `start_match_now`, `submit_match_openers`, `record_match_toss`, `start_innings`, `undo_last_ball`, `submit_match_result`, `complete_match` (← name varies; see migration) | Match lifecycle write paths |
+| `start_match_now`, `submit_match_openers`, `record_toss_winner`, `record_toss_decision`, `start_innings`, `undo_last_ball`, `submit_match_result`, `complete_match` (← name varies; see migration) | Match lifecycle write paths. `record_toss_winner` is gated on the match creator, `record_toss_decision` on the captain of the side that won the toss; the rest on `_is_match_captain`, which since 20260906100000 means the two captains only — no longer the creator |
 | `record_ball` | Used as a fallback / direct-DB scoring writer (the typical write path is the `record-ball` edge function) |
 | `accept_match_request`, `counter_match_request`, `decline_match_request`, `cancel_match_request`, `find_match_request_by_code` | Match request handshake |
 | `mark_chat_read` (SECURITY DEFINER) | Sets `chat_members.last_read_at = now()` for the caller (#39 fix) |

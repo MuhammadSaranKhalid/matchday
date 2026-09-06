@@ -100,15 +100,14 @@ void main() {
     expect(view.today, isNull);
   });
 
-  test('hero match resolves opponent crest + which side is mine (live)',
-      () async {
+  test('hero match resolves opponent crest + which side is mine', () async {
     final container = makeContainer(
       teams: [_team('a', name: 'My Side')],
       cached: [_team('b', name: 'Karachi Eagles', color: '#123456')],
       matches: [
-        _match('m1', a: 'a', b: 'b', status: MatchStatus.pending),
-        _match('m2', a: 'b', b: 'a', status: MatchStatus.live), // live wins
-        _match('m3', a: 'a', b: 'c', status: MatchStatus.declined), // inactive
+        // teamA = 'b' (opponent), so my side is B.
+        _match('m1', a: 'b', b: 'a', status: MatchStatus.pending),
+        _match('m2', a: 'a', b: 'c', status: MatchStatus.declined), // inactive
       ],
     );
 
@@ -116,10 +115,26 @@ void main() {
 
     final today = view.today;
     expect(today, isNotNull);
-    expect(today!.live, isTrue);
-    // m2 has teamA = 'b' (opponent), so my side is B.
-    expect(today.a.name, 'Karachi Eagles');
+    expect(today!.a.name, 'Karachi Eagles');
     expect(today.b.name, 'My Side');
+  });
+
+  test('a live match never takes the hero slot', () async {
+    final container = makeContainer(
+      teams: [_team('a', name: 'My Side')],
+      cached: [_team('b', name: 'Karachi Eagles')],
+      matches: [
+        _match('m1', a: 'a', b: 'b', status: MatchStatus.pending),
+        _match('m2', a: 'b', b: 'a', status: MatchStatus.live),
+      ],
+    );
+
+    final view = await container.read(teamsListControllerProvider.future);
+
+    // The live match is skipped entirely; the pending one is surfaced.
+    expect(view.today, isNotNull);
+    expect(view.today!.live, isFalse);
+    expect(view.today!.a.name, 'My Side');
   });
 
   test('incoming pending match surfaces an "Incoming request" phrase', () async {
@@ -195,12 +210,13 @@ void main() {
 
     when(() => matchesRepo.listMyMatches()).thenAnswer((_) async => Right([
           _match('m1', a: 'a', b: 'b', status: MatchStatus.pending),
-          _match('m2', a: 'a', b: 'b', status: MatchStatus.live),
+          _match('m2', a: 'a', b: 'b', status: MatchStatus.accepted),
         ]));
 
     await container.read(teamsListControllerProvider.notifier).refresh();
 
     final second = await container.read(teamsListControllerProvider.future);
-    expect(second.today!.live, isTrue); // live match now wins the hero slot
+    // accepted outranks pending, so refresh picked up the new match.
+    expect(second.today!.when, 'Ready to start');
   });
 }

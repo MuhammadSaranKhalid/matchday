@@ -41,6 +41,8 @@ class MatchStartController extends _$MatchStartController {
     return MatchStartState(
       match: match,
       viewerRole: role,
+      captainOf: captainSideOf(match, userId),
+      isCreator: userId != null && userId == match.createdBy,
       battingTeamId: batting,
       bowlingTeamId: batting == null
           ? null
@@ -63,47 +65,75 @@ class MatchStartController extends _$MatchStartController {
   void pickTossDecision(TossDecision decision) =>
       _update((s) => s.copyWith(pendingDecision: () => decision));
 
-  Future<Either<Failure, Unit>> submitToss() {
+  /// Act one — the creator records who won. Only the winner is written; the
+  /// call belongs to the winning captain's phone.
+  Future<Either<Failure, Unit>> submitTossWinner() {
     final current = state.value;
-    if (current == null || !current.isTossReady) {
+    final winner = current?.pendingTossWinner;
+    if (current == null || winner == null) {
       return Future.value(
-        const Left(ValidationFailure('Please select toss winner and decision')),
+        const Left(ValidationFailure('Please select who won the toss')),
       );
     }
-    final winner = current.pendingTossWinner!;
-    final decision = current.pendingDecision!;
 
     return _busy(
-      () => _repo.recordMatchToss(
-            id: MatchId(matchId),
-            wonBy: winner,
-            decision: decision,
-          ),
-      label: 'submitToss',
+      () => _repo.recordTossWinner(id: MatchId(matchId), wonBy: winner),
+      label: 'submitTossWinner',
+      // Optimistically advance to the decision step so this phone flips to
+      // "waiting on their call" without a Realtime roundtrip.
+      reset: (s) => s.copyWith(
+        match: s.match.copyWith(
+          tossWonBy: winner,
+          startPhase: MatchStartPhase.toss,
+          status: MatchStatus.toss,
+        ),
+        pendingTossWinner: () => null,
+        pendingDecision: () => null,
+      ),
+    );
+  }
+
+  /// Act two — the winning captain calls it. This is what settles which side
+  /// bats, so it is also what fixes every downstream role.
+  Future<Either<Failure, Unit>> submitTossDecision() {
+    final current = state.value;
+    final decision = current?.pendingDecision;
+    if (current == null || decision == null) {
+      return Future.value(
+        const Left(ValidationFailure('Please choose to bat or bowl')),
+      );
+    }
+
+    return _busy(
+      () => _repo.recordTossDecision(id: MatchId(matchId), decision: decision),
+      label: 'submitTossDecision',
       // Optimistically update the state so the screen transitions to Lineup
       // immediately without waiting for the Realtime stream roundtrip.
       reset: (s) {
+        final winner = s.match.tossWonBy;
+        if (winner == null) return s;
         final batting = decision == TossDecision.bat
             ? winner
             : (winner == s.match.teamAId ? s.match.teamBId : s.match.teamAId);
         final bowling =
             batting == s.match.teamAId ? s.match.teamBId : s.match.teamAId;
         final updatedMatch = s.match.copyWith(
-          tossWonBy: winner,
           tossDecision: decision,
           startPhase: MatchStartPhase.lineup,
           status: MatchStatus.toss,
         );
         return s.copyWith(
           match: updatedMatch,
+          viewerRole: viewerRoleOnMatch(updatedMatch, _viewerId),
           battingTeamId: batting,
           bowlingTeamId: bowling,
-          pendingTossWinner: () => null,
           pendingDecision: () => null,
         );
       },
     );
   }
+
+  String? get _viewerId => ref.read(currentUserStreamProvider).value?.id.value;
 
   // ── Openers ──────────────────────────────────────────────────────────────
 

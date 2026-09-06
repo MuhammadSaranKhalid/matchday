@@ -46,19 +46,25 @@ class TeamsListScreen extends ConsumerWidget {
                         CkPushNav(
                           title: 'My Teams',
                           onBack: () => context.pop(),
-                          action: CkNavPill(
-                            label: 'Create',
-                            onTap: () => context.push('/teams/create'),
-                          ),
+                          // One primary action at a time: while the list is
+                          // empty the card below owns "Create", so the nav
+                          // pill would be a second identical CTA.
+                          action: view.isEmpty
+                              ? null
+                              : CkNavPill(
+                                  label: 'Create',
+                                  onTap: () => context.push('/teams/create'),
+                                ),
                         ),
                         Expanded(
                           child: ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.only(bottom: 12),
                             children: [
-                              // ── Empty-state card — dashed border, faded crest
-                              //    trio (LL · MK · GG), headline + body + Create
-                              //    button. ───────────────────────────────────
+                              // ── Empty-state card — dashed border, a faded
+                              //    crest row that ends in an open slot, then
+                              //    the two things you can actually do here:
+                              //    start a side, or find the one you play for.
                               if (view.isEmpty)
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(
@@ -78,22 +84,29 @@ class TeamsListScreen extends ConsumerWidget {
                                     child: Padding(
                                       padding: const EdgeInsets.fromLTRB(
                                         20,
-                                        24,
+                                        22,
                                         20,
-                                        24,
+                                        20,
                                       ),
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
+                                          // Three crests then an empty slot —
+                                          // the row says "teams, and a space
+                                          // for yours" without a caption.
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               _dimCrest(MyTeamsCrests.ll),
+                                              const SizedBox(width: 7),
                                               _dimCrest(MyTeamsCrests.mk),
+                                              const SizedBox(width: 7),
                                               _dimCrest(MyTeamsCrests.gg),
+                                              const SizedBox(width: 7),
+                                              _emptyCrestSlot(),
                                             ],
                                           ),
-                                          const SizedBox(height: 12),
+                                          const SizedBox(height: 14),
                                           Text(
                                             'No teams yet',
                                             textAlign: TextAlign.center,
@@ -106,10 +119,10 @@ class TeamsListScreen extends ConsumerWidget {
                                           const SizedBox(height: 6),
                                           Padding(
                                             padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
+                                              horizontal: 8,
                                             ),
                                             child: Text(
-                                              'Start your mohalla side, claim your spot on a team, or follow the clubs you watch every Sunday.',
+                                              'Start your mohalla side, or find the team you already play for.',
                                               textAlign: TextAlign.center,
                                               style: CkType.body(
                                                 fontSize: 13,
@@ -122,40 +135,24 @@ class TeamsListScreen extends ConsumerWidget {
                                           Row(
                                             children: [
                                               Expanded(
-                                                child: InkWell(
-                                                  onTap:
-                                                      () => context.push(
-                                                        '/teams/create',
-                                                      ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                  child: Container(
-                                                    height: 42,
-                                                    alignment: Alignment.center,
-                                                    decoration: BoxDecoration(
-                                                      color: CkColors.ink,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            10,
-                                                          ),
-                                                    ),
-                                                    child: Text(
-                                                      'Create a team',
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      style: CkType.body(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        color: CkColors.paper,
-                                                      ),
-                                                    ),
+                                                child: _emptyCta(
+                                                  label: 'Create a team',
+                                                  primary: true,
+                                                  onTap: () => context.push(
+                                                    '/teams/create',
                                                   ),
                                                 ),
                                               ),
-                                              // "Find teams near you" intentionally
-                                              // hidden — discovery backend isn't
-                                              // wired yet. Restore when ready.
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: _emptyCta(
+                                                  label: 'Find a team',
+                                                  primary: false,
+                                                  onTap: () => context.push(
+                                                    '/explore/teams',
+                                                  ),
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ],
@@ -1120,6 +1117,57 @@ class TeamsListScreen extends ConsumerWidget {
           fontWeight: FontWeight.w800,
           letterSpacing: -0.03,
           color: CkColors.muted,
+        ),
+      ),
+    );
+  }
+
+  /// The open slot at the end of the empty-state crest row — same tile
+  /// geometry as [_dimCrest] but dashed and carrying a "+", so the row reads
+  /// as teams with a space left for yours.
+  Widget _emptyCrestSlot() {
+    return CustomPaint(
+      painter: _EmptyDashedBorderPainter(
+        color: CkColors.line,
+        radius: 9,
+        strokeWidth: 1.2,
+        dashLength: 3,
+        dashGap: 3,
+      ),
+      child: const SizedBox(
+        width: 36,
+        height: 36,
+        child: Center(child: Icon(Icons.add, size: 15, color: CkColors.muted)),
+      ),
+    );
+  }
+
+  /// Empty-state CTA pill. Same primary/secondary grammar as [_actionBtn]
+  /// (filled ink vs paper + hairline) at the taller 42pt empty-card scale.
+  Widget _emptyCta({
+    required String label,
+    required bool primary,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: primary ? CkColors.ink : CkColors.paper,
+          borderRadius: BorderRadius.circular(10),
+          border: primary ? null : Border.all(color: CkColors.hairline),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: CkType.body(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: primary ? CkColors.paper : CkColors.ink,
+          ),
         ),
       ),
     );

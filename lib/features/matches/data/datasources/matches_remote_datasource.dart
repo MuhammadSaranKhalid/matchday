@@ -150,6 +150,17 @@ class MatchesRemoteDataSource {
     }
   }
 
+  /// The caller's own matches — created, captaining, on a roster, in an XI, or
+  /// officiating. Scoped server-side by `list_my_matches`, because
+  /// `matches_read_all` is `using (true)` and a plain select returns the
+  /// world's fixtures.
+  ///
+  /// There used to be a `list-my-matches` EDGE FUNCTION fallback here. It was
+  /// removed on 2026-09-06: the two implementations had drifted (the function
+  /// ignored `team_members.status`, so removed members kept seeing a team's
+  /// matches, and the two matched on different participant tables), which made
+  /// the result set depend on whether the RPC or the fallback answered. The
+  /// union of both definitions now lives in the RPC alone.
   Future<List<MatchDto>> list() async {
     try {
       final rows = await _supabase.rpc<List<dynamic>>('list_my_matches');
@@ -158,21 +169,7 @@ class MatchesRemoteDataSource {
               MatchDto.fromJson(Map<String, dynamic>.from(row as Map)))
           .toList();
     } on PostgrestException catch (e) {
-      // Fallback to edge function if RPC not present in older migrations
-      try {
-        final res = await _supabase.functions.invoke('list-my-matches');
-        final data = res.data;
-        final rows = data is Map ? data['matches'] : data;
-        if (rows is! List) {
-          throw ServerException(e.message);
-        }
-        return rows
-            .map((row) =>
-                MatchDto.fromJson(Map<String, dynamic>.from(row as Map)))
-            .toList();
-      } catch (_) {
-        throw _rpcException(e);
-      }
+      throw _rpcException(e);
     } catch (e) {
       if (e is ServerException || e is UnauthorizedException) rethrow;
       throw ServerException(e.toString());
@@ -194,17 +191,24 @@ class MatchesRemoteDataSource {
     }
   }
 
-  Future<void> recordMatchToss({
+  Future<void> recordTossWinner({
     required String matchId,
     required String wonBy,
-    required String decision,
     String? face,
   }) =>
-      _startRpc('record_match_toss', {
+      _startRpc('record_toss_winner', {
         'p_match_id': matchId,
         'p_won_by': wonBy,
-        'p_decision': decision,
         if (face != null) 'p_face': face,
+      });
+
+  Future<void> recordTossDecision({
+    required String matchId,
+    required String decision,
+  }) =>
+      _startRpc('record_toss_decision', {
+        'p_match_id': matchId,
+        'p_decision': decision,
       });
 
   Future<void> submitMatchOpeners({

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../../core/widgets/ck_button.dart';
+import '../../../../teams/domain/entities/team.dart';
 import '../../../../teams/presentation/providers/teams_providers.dart';
 import '../../../domain/entities/match.dart';
 import '../../controllers/match_start_controller.dart';
@@ -12,8 +13,11 @@ import '../../state/match_start_state.dart';
 import '../challenge/ch_section_label.dart';
 import 'match_start_atoms.dart';
 
-/// Stage 1 — the toss. Both captains watch one phone; only a captain can
-/// record the outcome.
+/// Stage 1 — the toss, in two acts.
+///
+/// The match creator records who won it; the winning side's captain then
+/// makes the call. Everyone else waits — including the creator, once they
+/// have done their one part.
 class MatchStartTossStage extends ConsumerWidget {
   const MatchStartTossStage({
     super.key,
@@ -29,21 +33,33 @@ class MatchStartTossStage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!state.viewerCanAct) {
-      return const Center(
-        child: MatchStartWaitingCard(
-          eyebrow: 'WAITING ON THE OTHER PHONE',
-          title: 'The coin is on the captain’s phone.',
-          body:
-              'Both captains watch the toss together on one device. '
-              'You’ll see the result here the moment it lands.',
-        ),
-      );
-    }
-
     final match = state.match;
     final teamA = ref.watch(teamProvider(match.teamAId.value)).value;
     final teamB = ref.watch(teamProvider(match.teamBId.value)).value;
+
+    String nameOf(TeamId? id) {
+      if (id == match.teamAId) return teamA?.name ?? 'Team A';
+      if (id == match.teamBId) return teamB?.name ?? 'Team B';
+      return 'The toss winner';
+    }
+
+    if (!state.viewerCanAct) {
+      return Center(
+        child: switch (state.tossStep) {
+          TossStep.winner => const MatchStartWaitingCard(
+              eyebrow: 'WAITING ON THE MATCH CREATOR',
+              title: 'The coin is with whoever set this match up.',
+              body: 'They record who won it. You’ll see the result here the '
+                  'moment it lands.',
+            ),
+          TossStep.decision => MatchStartWaitingCard(
+              eyebrow: 'WAITING ON THE TOSS WINNER',
+              title: '${nameOf(state.tossWinnerTeamId)} won the toss.',
+              body: 'Their captain is choosing whether to bat or bowl.',
+            ),
+        },
+      );
+    }
 
     return Column(
       children: [
@@ -53,57 +69,60 @@ class MatchStartTossStage extends ConsumerWidget {
             children: [
               Center(child: MatchStartCoinTile(face: match.tossFace)),
               const SizedBox(height: 22),
-              const ChSectionLabel('Who won the toss?'),
-              Row(
-                children: [
-                  Expanded(
-                    child: MatchStartChoiceTile(
-                      label: teamA?.name ?? 'Team A',
-                      selected: state.pendingTossWinner == match.teamAId,
-                      onTap:
-                          () => _controller(ref).pickTossWinner(match.teamAId),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: MatchStartChoiceTile(
-                      label: teamB?.name ?? 'Team B',
-                      selected: state.pendingTossWinner == match.teamBId,
-                      onTap:
-                          () => _controller(ref).pickTossWinner(match.teamBId),
-                    ),
-                  ),
-                ],
-              ),
-              if (state.pendingTossWinner != null) ...[
-                const SizedBox(height: 18),
-                const ChSectionLabel('Their call'),
-                Row(
-                  children: [
-                    Expanded(
-                      child: MatchStartChoiceTile(
-                        label: 'Bat first',
-                        selected: state.pendingDecision == TossDecision.bat,
-                        onTap:
-                            () => _controller(
-                              ref,
-                            ).pickTossDecision(TossDecision.bat),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: MatchStartChoiceTile(
-                        label: 'Bowl first',
-                        selected: state.pendingDecision == TossDecision.bowl,
-                        onTap:
-                            () => _controller(
-                              ref,
-                            ).pickTossDecision(TossDecision.bowl),
-                      ),
+              ...switch (state.tossStep) {
+                TossStep.winner => [
+                    const ChSectionLabel('Who won the toss?'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: MatchStartChoiceTile(
+                            label: nameOf(match.teamAId),
+                            selected: state.pendingTossWinner == match.teamAId,
+                            onTap: () =>
+                                _controller(ref).pickTossWinner(match.teamAId),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: MatchStartChoiceTile(
+                            label: nameOf(match.teamBId),
+                            selected: state.pendingTossWinner == match.teamBId,
+                            onTap: () =>
+                                _controller(ref).pickTossWinner(match.teamBId),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
+                TossStep.decision => [
+                    ChSectionLabel(
+                      '${nameOf(state.tossWinnerTeamId)} won — your call',
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: MatchStartChoiceTile(
+                            label: 'Bat first',
+                            selected:
+                                state.pendingDecision == TossDecision.bat,
+                            onTap: () => _controller(ref)
+                                .pickTossDecision(TossDecision.bat),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: MatchStartChoiceTile(
+                            label: 'Bowl first',
+                            selected:
+                                state.pendingDecision == TossDecision.bowl,
+                            onTap: () => _controller(ref)
+                                .pickTossDecision(TossDecision.bowl),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+              },
             ],
           ),
         ),
@@ -114,21 +133,28 @@ class MatchStartTossStage extends ConsumerWidget {
           ),
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
           child: CkButton(
-            label: 'Continue → lineup',
+            label: switch (state.tossStep) {
+              TossStep.winner => 'Record the toss',
+              TossStep.decision => 'Continue → lineup',
+            },
             busy: state.isBusy,
-            onPressed:
-                state.isTossReady
-                    ? () async {
-                      final res = await _controller(ref).submitToss();
-                      if (!context.mounted) return;
-                      res.fold(
-                        (failure) => ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(failure.message)),
-                        ),
-                        (_) {},
-                      );
-                    }
-                    : null,
+            onPressed: state.isTossReady
+                ? () async {
+                    final controller = _controller(ref);
+                    final res = switch (state.tossStep) {
+                      TossStep.winner => await controller.submitTossWinner(),
+                      TossStep.decision =>
+                        await controller.submitTossDecision(),
+                    };
+                    if (!context.mounted) return;
+                    res.fold(
+                      (failure) => ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(failure.message)),
+                      ),
+                      (_) {},
+                    );
+                  }
+                : null,
           ),
         ),
       ],

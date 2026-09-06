@@ -113,11 +113,32 @@ void main() {
       c.read(matchStartControllerProvider(_matchId).notifier);
 
   group('viewer role', () {
-    test('pre-toss, either captain may record the toss', () async {
-      final state = await load(makeContainer(userId: 'capB'));
+    test('before the toss, only the match creator may act', () async {
+      // _match() is created by capA.
+      final creator = await load(makeContainer(userId: 'capA'));
+      expect(creator.viewerRole, MatchStartViewerRole.captain);
+      expect(creator.isCreator, isTrue);
+      expect(creator.viewerCanAct, isTrue);
 
-      expect(state.viewerRole, MatchStartViewerRole.battingCaptain);
-      expect(state.viewerCanAct, isTrue);
+      final other = await load(makeContainer(userId: 'capB'));
+      expect(other.viewerRole, MatchStartViewerRole.captain);
+      expect(other.captainOf, _teamB);
+      expect(other.viewerCanAct, isFalse);
+    });
+
+    test('once the winner is known, the call is their captain\'s alone',
+        () async {
+      final match = _match(tossWonBy: _teamB);
+
+      final winner = await load(makeContainer(match: match, userId: 'capB'));
+      expect(winner.tossStep, TossStep.decision);
+      expect(winner.isViewerTossWinnerCaptain, isTrue);
+      expect(winner.viewerCanAct, isTrue);
+
+      // The creator has had their turn; bat-or-bowl is not theirs.
+      final creator = await load(makeContainer(match: match, userId: 'capA'));
+      expect(creator.isCreator, isTrue);
+      expect(creator.viewerCanAct, isFalse);
     });
 
     test('after the toss, roles follow who is batting first', () async {
@@ -240,47 +261,94 @@ void main() {
   });
 
   group('writes', () {
-    test('submitToss rejects an incomplete selection without calling the repo',
+    test('submitTossWinner rejects an empty selection without calling the repo',
         () async {
       final container = makeContainer();
       await load(container);
 
-      notifier(container).pickTossWinner(_teamA); // no decision yet
-      final result = await notifier(container).submitToss();
+      final result = await notifier(container).submitTossWinner();
 
       expect(result.getLeft().toNullable(), isA<ValidationFailure>());
-      verifyNever(() => repo.recordMatchToss(
+      verifyNever(() => repo.recordTossWinner(
             id: any(named: 'id'),
             wonBy: any(named: 'wonBy'),
-            decision: any(named: 'decision'),
           ));
     });
 
-    test('submitToss sends the pair, then clears the local copy', () async {
-      when(() => repo.recordMatchToss(
+    test('submitTossWinner sends the winner alone and stops there', () async {
+      when(() => repo.recordTossWinner(
             id: any(named: 'id'),
             wonBy: any(named: 'wonBy'),
-            decision: any(named: 'decision'),
           )).thenAnswer((_) async => const Right(unit));
 
       final container = makeContainer();
       await load(container);
 
-      notifier(container)
-        ..pickTossWinner(_teamB)
-        ..pickTossDecision(TossDecision.bat);
-      final result = await notifier(container).submitToss();
+      notifier(container).pickTossWinner(_teamB);
+      final result = await notifier(container).submitTossWinner();
 
       expect(result.isRight(), isTrue);
-      verify(() => repo.recordMatchToss(
+      verify(() => repo.recordTossWinner(
             id: const MatchId(_matchId),
             wonBy: _teamB,
-            decision: TossDecision.bat,
           )).called(1);
 
+      // No decision is implied by recording a winner: the flow parks on the
+      // second act until the winning captain calls it.
       final state =
           container.read(matchStartControllerProvider(_matchId)).value!;
+      expect(state.tossStep, TossStep.decision);
+      expect(state.match.tossDecision, isNull);
+      expect(state.phase, MatchStartPhase.toss);
       expect(state.pendingTossWinner, isNull);
+      expect(state.isBusy, isFalse);
+    });
+
+    test('submitTossDecision rejects an empty call without calling the repo',
+        () async {
+      final container = makeContainer(
+        match: _match(tossWonBy: _teamB),
+        userId: 'capB',
+      );
+      await load(container);
+
+      final result = await notifier(container).submitTossDecision();
+
+      expect(result.getLeft().toNullable(), isA<ValidationFailure>());
+      verifyNever(() => repo.recordTossDecision(
+            id: any(named: 'id'),
+            decision: any(named: 'decision'),
+          ));
+    });
+
+    test('submitTossDecision settles which side bats', () async {
+      when(() => repo.recordTossDecision(
+            id: any(named: 'id'),
+            decision: any(named: 'decision'),
+          )).thenAnswer((_) async => const Right(unit));
+
+      final container = makeContainer(
+        match: _match(tossWonBy: _teamB),
+        userId: 'capB',
+      );
+      await load(container);
+
+      notifier(container).pickTossDecision(TossDecision.bowl);
+      final result = await notifier(container).submitTossDecision();
+
+      expect(result.isRight(), isTrue);
+      verify(() => repo.recordTossDecision(
+            id: const MatchId(_matchId),
+            decision: TossDecision.bowl,
+          )).called(1);
+
+      // B won and elected to bowl, so A bats first and capB — who made the
+      // call — is the bowling captain from here on.
+      final state =
+          container.read(matchStartControllerProvider(_matchId)).value!;
+      expect(state.phase, MatchStartPhase.lineup);
+      expect(state.battingTeamId, _teamA);
+      expect(state.viewerRole, MatchStartViewerRole.bowlingCaptain);
       expect(state.pendingDecision, isNull);
       expect(state.isBusy, isFalse);
     });

@@ -51,13 +51,23 @@ abstract class MatchesRepository {
   /// hydration on subscribe.
   Stream<Match?> watchMatch(MatchId id);
 
-  /// Host phone records the toss. Advances `start_phase: toss → lineup`.
-  /// Idempotent — re-calling with the same values is a no-op.
-  Future<Either<Failure, Unit>> recordMatchToss({
+  /// The match creator records who won the toss — their one action in the
+  /// flow. Leaves `start_phase` on 'toss': the call itself belongs to the
+  /// winner, not to whoever held the coin.
+  ///
+  /// Correcting a misrecord is allowed until the openers are locked, and
+  /// clears any decision already made against the previous winner.
+  Future<Either<Failure, Unit>> recordTossWinner({
     required MatchId id,
     required TeamId wonBy,
-    required TossDecision decision,
     String? face,
+  });
+
+  /// The winning side's captain chooses to bat or bowl. Advances
+  /// `start_phase: toss → lineup`, handing the flow to the batting side.
+  Future<Either<Failure, Unit>> recordTossDecision({
+    required MatchId id,
+    required TossDecision decision,
   });
 
   /// Batting captain locks the opening pair. Advances

@@ -19,7 +19,10 @@ class TournamentPublishedScreen extends ConsumerWidget {
 
   final String tournamentId;
 
-  static const _linkBase = 'https://joinmatchday.com/t';
+  /// `/c/` — competition. Teams own `/t/` (team_share.dart documents the
+  /// scheme); tournaments shared under `/t/` too, which made every shared team
+  /// link resolve to a tournament route. Corrected 2026-09-06.
+  static const _linkBase = 'https://joinmatchday.com/c';
 
   String get _inviteLink => '$_linkBase/$tournamentId';
 

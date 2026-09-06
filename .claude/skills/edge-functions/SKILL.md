@@ -5,7 +5,9 @@ description: Write Supabase Edge Functions (Deno) following this repo's establis
 
 # Edge functions in MatchDay
 
-Nine functions exist (record-ball, search-teams, team-place-facets, send-push, send-match-request, list-my-chats, list-my-matches, list-follow-list, + _shared). READ at least one similar existing function fully before writing a new one - the conventions below are extracted from them, but the code is the source of truth.
+Nine functions exist (record-ball, search-teams, search-all, team-place-facets, send-push, send-match-request, list-my-chats, list-follow-list, link-preview, + _shared).
+
+`list-my-matches` was DELETED on 2026-09-06: it duplicated the `list_my_matches` RPC, the two had drifted (different participant tables, one ignored `team_members.status`), and the client called the RPC with the function as a fallback — so the result depended on which answered. Scope logic over our own tables belongs in SQL; that function's own header had already said so. READ at least one similar existing function fully before writing a new one - the conventions below are extracted from them, but the code is the source of truth.
 
 ## Layout & naming
 - One kebab-case folder per function: `supabase/functions/<verb-noun>/index.ts`.
@@ -30,6 +32,29 @@ Nine functions exist (record-ball, search-teams, team-place-facets, send-push, s
 - Validate inputs early; return `json(400, { error: ... })` with a stable error shape matching existing functions.
 - List endpoints: keyset pagination (cursor on a stable sort key), never offset.
 - Geo endpoints (search-teams, team-place-facets, future list-open-challenges): follow the geo-discovery skill - ST_DWithin prefilter, decay-blend ranking, facets from our own tables.
+
+## Is it actually an edge function?
+Per the Supabase docs, reach for one only when the work needs something Postgres
+cannot give you: an external service or webhook, a secret the client must never
+hold, a PUBLIC unauthenticated HTTP surface, or generated media. Multi-statement
+SQL over our own tables is a **database function (RPC)** — that is what they are
+for, and it is where most of this app's logic correctly lives. `list-my-matches`
+is the cautionary tale above.
+
+## HTML-serving functions (link-preview)
+`link-preview` is the one function that does not return the `{ok,error}` JSON
+envelope: its callers are link unfurlers and browsers, so it returns HTML with
+Open Graph tags (and JSON for the two `/.well-known/` association files).
+- No `corsPreflight()` — there is no preflight on a top-level navigation.
+- Never redirect server-side (302) on a preview route: the crawler would follow
+  it and never read the tags. Render the page, then move a real browser along
+  with a client-side hop.
+- Escape EVERY interpolated value; the titles come from user-controlled columns.
+- Use the ANON key, never the service role, so RLS stays the access control and
+  a private tournament cannot leak through a preview.
+- The edge runtime hands the handler `/<function-name>/...` — it has already
+  stripped `/functions/v1`. Strip both prefixes or every request falls through
+  to the default branch.
 
 ## Flutter side
 The Dart remote data source calls functions via `supabase.functions.invoke('<name>', body: ...)`, throws raw exceptions on non-2xx, returns DTOs. Repository translates to Failures.

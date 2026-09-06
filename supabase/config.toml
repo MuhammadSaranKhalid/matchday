@@ -394,6 +394,15 @@ deno_version = 2
 enabled = true
 verify_jwt = false
 
+# Public landing pages for shared links. Link unfurlers (WhatsApp, iMessage,
+# Slack, X) issue an unauthenticated GET and never send an Authorization
+# header, so JWT verification must be off or every preview 401s. Everything it
+# reads is public at the RLS layer and it uses the ANON key, never the service
+# role — RLS stays the access control.
+[functions.link-preview]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 55327

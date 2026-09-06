@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../core/theme/circk_theme.dart';
+import '../core/widgets/ck_push_nav.dart';
 import '../features/auth/presentation/providers/auth_providers.dart';
 import '../features/auth/presentation/screens/sign_in_screen.dart';
 import '../features/onboarding/presentation/providers/onboarding_providers.dart';
@@ -230,10 +231,30 @@ GoRouter appRouter(Ref ref) {
               );
             },
           ),
+          // Team search / discovery. TeamSearchScreen was written as a tab
+          // body — it returns a bare ColoredBox with no Scaffold — so the
+          // route supplies the Scaffold + nav, the same arrangement /explore
+          // uses above. Without it the screen's TextField throws "No Material
+          // widget found". Reached from the My Teams empty state's
+          // "Find a team".
           GoRoute(
             path: 'teams',
             parentNavigatorKey: _rootNavigatorKey,
-            builder: (_, __) => const TeamSearchScreen(),
+            builder: (context, _) => Scaffold(
+              backgroundColor: CkColors.paper,
+              body: SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    CkPushNav(
+                      title: 'Find a Team',
+                      onBack: () => context.pop(),
+                    ),
+                    const Expanded(child: TeamSearchScreen()),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -542,13 +563,20 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) =>
             PublicProfileScreen(username: state.pathParameters['username']!),
       ),
-      // The invite link the Published screen shares to WhatsApp
-      // (`joinmatchday.com/t/<tournament_id>`). It had no route, so the one
-      // way into a tournament for someone who was sent one resolved to
-      // nothing. Redirect rather than a second builder, so the detail screen
-      // stays the single owner of the surface.
+      // Shared-link prefixes. team_share.dart documents the scheme as
+      // "/u/ user, /t/ team, /c/ competition"; tournaments had taken /t/ as
+      // well, so every shared TEAM link redirected to /tournaments/<teamId>
+      // and resolved to nothing. Corrected 2026-09-06: /t/ is teams, as
+      // documented, and tournaments move to /c/.
+      //
+      // Redirects rather than second builders, so /teams/:id and
+      // /tournaments/:id each stay the single owner of their surface.
       GoRoute(
-        path: '/t/:tournamentId',
+        path: '/t/:teamId',
+        redirect: (_, state) => '/teams/${state.pathParameters['teamId']}',
+      ),
+      GoRoute(
+        path: '/c/:tournamentId',
         redirect: (_, state) =>
             '/tournaments/${state.pathParameters['tournamentId']}',
       ),

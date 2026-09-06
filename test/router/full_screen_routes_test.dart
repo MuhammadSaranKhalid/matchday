@@ -70,25 +70,38 @@ void main() {
     }
   });
 
-  /// The Published screen shares `joinmatchday.com/t/<id>` to WhatsApp, and
-  /// the Android/iOS app-link config forwards that path to the engine. There
-  /// was no `/t/:id` route at all, so the one way into a tournament for
-  /// someone who was sent an invite matched nothing and raised a GoException.
+  /// Shared links must be claimed by a route, or the one way into a team or
+  /// tournament for someone who was sent an invite matches nothing and raises
+  /// a GoException.
+  ///
+  /// The prefixes are the scheme team_share.dart documents: `/u/` user,
+  /// `/t/` team, `/c/` competition. Until 2026-09-06 tournaments ALSO shared
+  /// under `/t/`, and the router sent every `/t/:id` to `/tournaments/:id` —
+  /// so a shared TEAM link opened a tournament route that could not resolve.
+  /// This test pins both prefixes to the entity that owns them.
   ///
   /// `findMatch` resolves the route tree but does not run redirects, so this
   /// asserts the link is claimed by a redirect-only route — the redirect
   /// target itself is a one-liner in the route definition.
-  test('a tournament invite link is claimed by a route', () {
+  test('shared team and tournament links are claimed by the right route', () {
     final router = container.read(appRouterProvider);
-    final match = router.configuration.findMatch(Uri.parse('/t/abc-123'));
 
-    expect(match.error, isNull,
+    final team = router.configuration.findMatch(Uri.parse('/t/abc-123'));
+    expect(team.error, isNull,
         reason: '/t/:id must match a route, not fall through');
-    expect(match.matches, hasLength(1));
-    expect(match.pathParameters['tournamentId'], 'abc-123');
+    expect(team.matches, hasLength(1));
+    expect(team.pathParameters['teamId'], 'abc-123',
+        reason: '/t/ is TEAMS — see team_share.dart');
+
+    final cup = router.configuration.findMatch(Uri.parse('/c/xyz-789'));
+    expect(cup.error, isNull,
+        reason: '/c/:id must match a route, not fall through');
+    expect(cup.matches, hasLength(1));
+    expect(cup.pathParameters['tournamentId'], 'xyz-789',
+        reason: '/c/ is COMPETITIONS');
 
     // Control: an unclaimed path really does produce the error this guards
-    // against, so the assertion above is not vacuous.
+    // against, so the assertions above are not vacuous.
     expect(
       router.configuration.findMatch(Uri.parse('/zzz-not-a-route')).error,
       isNotNull,

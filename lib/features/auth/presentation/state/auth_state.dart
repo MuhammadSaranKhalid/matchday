@@ -33,6 +33,12 @@ class AuthVerifyingOtp extends AuthState {
   final Email email;
 }
 
+/// A replacement code is being sent while the user remains on the OTP screen.
+class AuthResendingOtp extends AuthState {
+  const AuthResendingOtp(this.email);
+  final Email email;
+}
+
 /// Google OAuth in progress (picker, ID token exchange).
 class AuthSigningInWithGoogle extends AuthState {
   const AuthSigningInWithGoogle();
@@ -46,9 +52,14 @@ class AuthAuthenticated extends AuthState {
 
 /// Any failure. UI shows the message + a way to retry the same flow.
 class AuthFailed extends AuthState {
-  const AuthFailed(this.failure, {this.email});
+  const AuthFailed(this.failure, {this.email, this.showOtpForm = false});
   final Failure failure;
 
-  /// Preserved so the UI can re-render the OTP entry screen after a bad code.
+  /// Preserved so the UI can prefill the email input or re-render the OTP
+  /// entry screen after a bad code.
   final Email? email;
+
+  /// Sending a code can fail before an OTP screen is meaningful. Verification
+  /// and resend failures, on the other hand, should leave the user in place.
+  final bool showOtpForm;
 }

@@ -82,7 +82,7 @@ final class CompletedMatchProvider
   }
 }
 
-String _$completedMatchHash() => r'3cee2e64c30dbe56d8b146040e2423956c2733ca';
+String _$completedMatchHash() => r'8d9f7b8af66e78714257d2b58fe9b4ee8d78aeb3';
 
 /// Everything the completed-match screen draws, assembled from the ledger.
 ///

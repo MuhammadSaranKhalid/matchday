@@ -65,9 +65,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       if (_username.text != state.username) {
         _username.value = TextEditingValue(
           text: state.username,
-          selection: TextSelection.collapsed(
-            offset: state.username.length,
-          ),
+          selection: TextSelection.collapsed(offset: state.username.length),
         );
       }
     }
@@ -102,7 +100,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       TextSpan(
                         children: [
                           TextSpan(
-                            text: 'circk',
+                            text: 'matchday',
                             style: CkType.display(
                               fontSize: 22,
                               letterSpacing: -0.045,
@@ -180,55 +178,90 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
                             // Avatar Upload
                             Center(
-                              child: GestureDetector(
-                                onTap: controller.pickAvatar,
-                                child: Stack(
-                                  children: [
-                                    Container(
-                                      width: 96,
-                                      height: 96,
-                                      decoration: BoxDecoration(
-                                        color: CkColors.surface,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: CkColors.line),
-                                        image: value.avatarPath != null
-                                            ? DecorationImage(
-                                                image: FileImage(
-                                                    File(value.avatarPath!)),
-                                                fit: BoxFit.cover,
-                                              )
-                                            : null,
-                                      ),
-                                      child: value.avatarPath == null
-                                          ? const Icon(
-                                              Icons.person_outline,
-                                              size: 42,
-                                              color: CkColors.soft,
-                                            )
-                                          : null,
-                                    ),
-                                    Positioned(
-                                      bottom: 0,
-                                      right: 0,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: CkColors.ink,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: CkColors.paper,
-                                            width: 2,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Semantics(
+                                    button: true,
+                                    label: 'Add a profile photo, optional',
+                                    child: GestureDetector(
+                                      onTap: controller.pickAvatar,
+                                      child: Stack(
+                                        children: [
+                                          Container(
+                                            width: 96,
+                                            height: 96,
+                                            decoration: BoxDecoration(
+                                              color: CkColors.surface,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: CkColors.line,
+                                              ),
+                                              image:
+                                                  value.avatarPath != null
+                                                      ? DecorationImage(
+                                                        image: FileImage(
+                                                          File(
+                                                            value.avatarPath!,
+                                                          ),
+                                                        ),
+                                                        fit: BoxFit.cover,
+                                                      )
+                                                      : value.remoteAvatarUrl !=
+                                                          null
+                                                      ? DecorationImage(
+                                                        image: NetworkImage(
+                                                          value
+                                                              .remoteAvatarUrl!,
+                                                        ),
+                                                        fit: BoxFit.cover,
+                                                      )
+                                                      : null,
+                                            ),
+                                            child:
+                                                value.avatarPath == null &&
+                                                        value.remoteAvatarUrl ==
+                                                            null
+                                                    ? const Icon(
+                                                      Icons.person_outline,
+                                                      size: 42,
+                                                      color: CkColors.soft,
+                                                    )
+                                                    : null,
                                           ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.camera_alt,
-                                          size: 16,
-                                          color: CkColors.paper,
-                                        ),
+                                          Positioned(
+                                            bottom: 0,
+                                            right: 0,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(6),
+                                              decoration: BoxDecoration(
+                                                color: CkColors.ink,
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: CkColors.paper,
+                                                  width: 2,
+                                                ),
+                                              ),
+                                              child: const Icon(
+                                                Icons.camera_alt,
+                                                size: 16,
+                                                color: CkColors.paper,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Profile photo (optional)',
+                                    style: CkType.body(
+                                      fontSize: 12,
+                                      color: CkColors.muted,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
 
@@ -253,9 +286,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
                         child: CkButton(
                           label: 'Continue',
-                          onPressed: value.canContinueIdentity
-                              ? controller.continueToUsername
-                              : null,
+                          onPressed:
+                              value.canContinueIdentity
+                                  ? controller.continueToUsername
+                                  : null,
                         ),
                       ),
                     ],
@@ -303,8 +337,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                   color: CkColors.soft,
                                 ),
                                 hintText: 'ahmed_khan',
-                                suffixIcon: switch (value
-                                    .usernameStatus) {
+                                suffixIcon: switch (value.usernameStatus) {
                                   UsernameStatus.checking => const Padding(
                                     padding: EdgeInsets.all(14),
                                     child: SizedBox(
@@ -377,7 +410,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         child: CkButton(
                           label: 'Save profile',
                           busy: value.submitting,
-                          onPressed: value.canSubmitUsername
+                          onPressed:
+                              value.canSubmitUsername
                                   ? controller.submit
                                   : null,
                         ),

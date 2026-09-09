@@ -28,6 +28,7 @@ abstract class ProfileRepository {
     required DisplayName displayName,
     required Username username,
     String? avatarFilePath,
+    String? existingAvatarUrl,
   });
 
   /// Update an existing profile (the edit screen). Only [displayName] is

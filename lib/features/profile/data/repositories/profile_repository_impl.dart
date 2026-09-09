@@ -66,9 +66,12 @@ class ProfileRepositoryImpl implements ProfileRepository {
     required DisplayName displayName,
     required Username username,
     String? avatarFilePath,
+    String? existingAvatarUrl,
   }) async {
     try {
-      String? photoUrl;
+      // A photo picked in the app replaces the Google-provided URL. Otherwise
+      // retain the Google avatar selected during the identity step.
+      String? photoUrl = _validRemoteAvatarUrl(existingAvatarUrl);
       if (avatarFilePath != null) {
         final tempDir = await getTemporaryDirectory();
         final targetPath =
@@ -100,6 +103,13 @@ class ProfileRepositoryImpl implements ProfileRepository {
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }
+  }
+
+  static String? _validRemoteAvatarUrl(String? value) {
+    final uri = value == null ? null : Uri.tryParse(value);
+    return uri != null && uri.hasAuthority && uri.scheme == 'https'
+        ? uri.toString()
+        : null;
   }
 
   @override

@@ -16,7 +16,9 @@ mixin _$OnboardingState {
 
  OnboardingStep get step;// Identity fields
  String get displayName; String? get avatarPath;// Local file path selected via image_picker
-// Username fields
+// Google can provide a photo before the user has selected a local file.
+// The local file, when present, always takes precedence.
+ String? get remoteAvatarUrl;// Username fields
  String get username; UsernameStatus get usernameStatus; String? get usernameMessage;// Form fields
  bool get submitting; String? get submitError; bool get completed;
 /// Create a copy of OnboardingState
@@ -29,16 +31,16 @@ $OnboardingStateCopyWith<OnboardingState> get copyWith => _$OnboardingStateCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is OnboardingState&&(identical(other.step, step) || other.step == step)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.avatarPath, avatarPath) || other.avatarPath == avatarPath)&&(identical(other.username, username) || other.username == username)&&(identical(other.usernameStatus, usernameStatus) || other.usernameStatus == usernameStatus)&&(identical(other.usernameMessage, usernameMessage) || other.usernameMessage == usernameMessage)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.submitError, submitError) || other.submitError == submitError)&&(identical(other.completed, completed) || other.completed == completed));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is OnboardingState&&(identical(other.step, step) || other.step == step)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.avatarPath, avatarPath) || other.avatarPath == avatarPath)&&(identical(other.remoteAvatarUrl, remoteAvatarUrl) || other.remoteAvatarUrl == remoteAvatarUrl)&&(identical(other.username, username) || other.username == username)&&(identical(other.usernameStatus, usernameStatus) || other.usernameStatus == usernameStatus)&&(identical(other.usernameMessage, usernameMessage) || other.usernameMessage == usernameMessage)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.submitError, submitError) || other.submitError == submitError)&&(identical(other.completed, completed) || other.completed == completed));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,step,displayName,avatarPath,username,usernameStatus,usernameMessage,submitting,submitError,completed);
+int get hashCode => Object.hash(runtimeType,step,displayName,avatarPath,remoteAvatarUrl,username,usernameStatus,usernameMessage,submitting,submitError,completed);
 
 @override
 String toString() {
-  return 'OnboardingState(step: $step, displayName: $displayName, avatarPath: $avatarPath, username: $username, usernameStatus: $usernameStatus, usernameMessage: $usernameMessage, submitting: $submitting, submitError: $submitError, completed: $completed)';
+  return 'OnboardingState(step: $step, displayName: $displayName, avatarPath: $avatarPath, remoteAvatarUrl: $remoteAvatarUrl, username: $username, usernameStatus: $usernameStatus, usernameMessage: $usernameMessage, submitting: $submitting, submitError: $submitError, completed: $completed)';
 }
 
 
@@ -49,7 +51,7 @@ abstract mixin class $OnboardingStateCopyWith<$Res>  {
   factory $OnboardingStateCopyWith(OnboardingState value, $Res Function(OnboardingState) _then) = _$OnboardingStateCopyWithImpl;
 @useResult
 $Res call({
- OnboardingStep step, String displayName, String? avatarPath, String username, UsernameStatus usernameStatus, String? usernameMessage, bool submitting, String? submitError, bool completed
+ OnboardingStep step, String displayName, String? avatarPath, String? remoteAvatarUrl, String username, UsernameStatus usernameStatus, String? usernameMessage, bool submitting, String? submitError, bool completed
 });
 
 
@@ -66,11 +68,12 @@ class _$OnboardingStateCopyWithImpl<$Res>
 
 /// Create a copy of OnboardingState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? step = null,Object? displayName = null,Object? avatarPath = freezed,Object? username = null,Object? usernameStatus = null,Object? usernameMessage = freezed,Object? submitting = null,Object? submitError = freezed,Object? completed = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? step = null,Object? displayName = null,Object? avatarPath = freezed,Object? remoteAvatarUrl = freezed,Object? username = null,Object? usernameStatus = null,Object? usernameMessage = freezed,Object? submitting = null,Object? submitError = freezed,Object? completed = null,}) {
   return _then(_self.copyWith(
 step: null == step ? _self.step : step // ignore: cast_nullable_to_non_nullable
 as OnboardingStep,displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
 as String,avatarPath: freezed == avatarPath ? _self.avatarPath : avatarPath // ignore: cast_nullable_to_non_nullable
+as String?,remoteAvatarUrl: freezed == remoteAvatarUrl ? _self.remoteAvatarUrl : remoteAvatarUrl // ignore: cast_nullable_to_non_nullable
 as String?,username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String,usernameStatus: null == usernameStatus ? _self.usernameStatus : usernameStatus // ignore: cast_nullable_to_non_nullable
 as UsernameStatus,usernameMessage: freezed == usernameMessage ? _self.usernameMessage : usernameMessage // ignore: cast_nullable_to_non_nullable
@@ -162,10 +165,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( OnboardingStep step,  String displayName,  String? avatarPath,  String username,  UsernameStatus usernameStatus,  String? usernameMessage,  bool submitting,  String? submitError,  bool completed)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( OnboardingStep step,  String displayName,  String? avatarPath,  String? remoteAvatarUrl,  String username,  UsernameStatus usernameStatus,  String? usernameMessage,  bool submitting,  String? submitError,  bool completed)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _OnboardingState() when $default != null:
-return $default(_that.step,_that.displayName,_that.avatarPath,_that.username,_that.usernameStatus,_that.usernameMessage,_that.submitting,_that.submitError,_that.completed);case _:
+return $default(_that.step,_that.displayName,_that.avatarPath,_that.remoteAvatarUrl,_that.username,_that.usernameStatus,_that.usernameMessage,_that.submitting,_that.submitError,_that.completed);case _:
   return orElse();
 
 }
@@ -183,10 +186,10 @@ return $default(_that.step,_that.displayName,_that.avatarPath,_that.username,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( OnboardingStep step,  String displayName,  String? avatarPath,  String username,  UsernameStatus usernameStatus,  String? usernameMessage,  bool submitting,  String? submitError,  bool completed)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( OnboardingStep step,  String displayName,  String? avatarPath,  String? remoteAvatarUrl,  String username,  UsernameStatus usernameStatus,  String? usernameMessage,  bool submitting,  String? submitError,  bool completed)  $default,) {final _that = this;
 switch (_that) {
 case _OnboardingState():
-return $default(_that.step,_that.displayName,_that.avatarPath,_that.username,_that.usernameStatus,_that.usernameMessage,_that.submitting,_that.submitError,_that.completed);case _:
+return $default(_that.step,_that.displayName,_that.avatarPath,_that.remoteAvatarUrl,_that.username,_that.usernameStatus,_that.usernameMessage,_that.submitting,_that.submitError,_that.completed);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -203,10 +206,10 @@ return $default(_that.step,_that.displayName,_that.avatarPath,_that.username,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( OnboardingStep step,  String displayName,  String? avatarPath,  String username,  UsernameStatus usernameStatus,  String? usernameMessage,  bool submitting,  String? submitError,  bool completed)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( OnboardingStep step,  String displayName,  String? avatarPath,  String? remoteAvatarUrl,  String username,  UsernameStatus usernameStatus,  String? usernameMessage,  bool submitting,  String? submitError,  bool completed)?  $default,) {final _that = this;
 switch (_that) {
 case _OnboardingState() when $default != null:
-return $default(_that.step,_that.displayName,_that.avatarPath,_that.username,_that.usernameStatus,_that.usernameMessage,_that.submitting,_that.submitError,_that.completed);case _:
+return $default(_that.step,_that.displayName,_that.avatarPath,_that.remoteAvatarUrl,_that.username,_that.usernameStatus,_that.usernameMessage,_that.submitting,_that.submitError,_that.completed);case _:
   return null;
 
 }
@@ -218,7 +221,7 @@ return $default(_that.step,_that.displayName,_that.avatarPath,_that.username,_th
 
 
 class _OnboardingState extends OnboardingState {
-  const _OnboardingState({this.step = OnboardingStep.identity, this.displayName = '', this.avatarPath, this.username = '', this.usernameStatus = UsernameStatus.idle, this.usernameMessage, this.submitting = false, this.submitError, this.completed = false}): super._();
+  const _OnboardingState({this.step = OnboardingStep.identity, this.displayName = '', this.avatarPath, this.remoteAvatarUrl, this.username = '', this.usernameStatus = UsernameStatus.idle, this.usernameMessage, this.submitting = false, this.submitError, this.completed = false}): super._();
   
 
 @override@JsonKey() final  OnboardingStep step;
@@ -226,6 +229,9 @@ class _OnboardingState extends OnboardingState {
 @override@JsonKey() final  String displayName;
 @override final  String? avatarPath;
 // Local file path selected via image_picker
+// Google can provide a photo before the user has selected a local file.
+// The local file, when present, always takes precedence.
+@override final  String? remoteAvatarUrl;
 // Username fields
 @override@JsonKey() final  String username;
 @override@JsonKey() final  UsernameStatus usernameStatus;
@@ -245,16 +251,16 @@ _$OnboardingStateCopyWith<_OnboardingState> get copyWith => __$OnboardingStateCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _OnboardingState&&(identical(other.step, step) || other.step == step)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.avatarPath, avatarPath) || other.avatarPath == avatarPath)&&(identical(other.username, username) || other.username == username)&&(identical(other.usernameStatus, usernameStatus) || other.usernameStatus == usernameStatus)&&(identical(other.usernameMessage, usernameMessage) || other.usernameMessage == usernameMessage)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.submitError, submitError) || other.submitError == submitError)&&(identical(other.completed, completed) || other.completed == completed));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _OnboardingState&&(identical(other.step, step) || other.step == step)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.avatarPath, avatarPath) || other.avatarPath == avatarPath)&&(identical(other.remoteAvatarUrl, remoteAvatarUrl) || other.remoteAvatarUrl == remoteAvatarUrl)&&(identical(other.username, username) || other.username == username)&&(identical(other.usernameStatus, usernameStatus) || other.usernameStatus == usernameStatus)&&(identical(other.usernameMessage, usernameMessage) || other.usernameMessage == usernameMessage)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.submitError, submitError) || other.submitError == submitError)&&(identical(other.completed, completed) || other.completed == completed));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,step,displayName,avatarPath,username,usernameStatus,usernameMessage,submitting,submitError,completed);
+int get hashCode => Object.hash(runtimeType,step,displayName,avatarPath,remoteAvatarUrl,username,usernameStatus,usernameMessage,submitting,submitError,completed);
 
 @override
 String toString() {
-  return 'OnboardingState(step: $step, displayName: $displayName, avatarPath: $avatarPath, username: $username, usernameStatus: $usernameStatus, usernameMessage: $usernameMessage, submitting: $submitting, submitError: $submitError, completed: $completed)';
+  return 'OnboardingState(step: $step, displayName: $displayName, avatarPath: $avatarPath, remoteAvatarUrl: $remoteAvatarUrl, username: $username, usernameStatus: $usernameStatus, usernameMessage: $usernameMessage, submitting: $submitting, submitError: $submitError, completed: $completed)';
 }
 
 
@@ -265,7 +271,7 @@ abstract mixin class _$OnboardingStateCopyWith<$Res> implements $OnboardingState
   factory _$OnboardingStateCopyWith(_OnboardingState value, $Res Function(_OnboardingState) _then) = __$OnboardingStateCopyWithImpl;
 @override @useResult
 $Res call({
- OnboardingStep step, String displayName, String? avatarPath, String username, UsernameStatus usernameStatus, String? usernameMessage, bool submitting, String? submitError, bool completed
+ OnboardingStep step, String displayName, String? avatarPath, String? remoteAvatarUrl, String username, UsernameStatus usernameStatus, String? usernameMessage, bool submitting, String? submitError, bool completed
 });
 
 
@@ -282,11 +288,12 @@ class __$OnboardingStateCopyWithImpl<$Res>
 
 /// Create a copy of OnboardingState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? step = null,Object? displayName = null,Object? avatarPath = freezed,Object? username = null,Object? usernameStatus = null,Object? usernameMessage = freezed,Object? submitting = null,Object? submitError = freezed,Object? completed = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? step = null,Object? displayName = null,Object? avatarPath = freezed,Object? remoteAvatarUrl = freezed,Object? username = null,Object? usernameStatus = null,Object? usernameMessage = freezed,Object? submitting = null,Object? submitError = freezed,Object? completed = null,}) {
   return _then(_OnboardingState(
 step: null == step ? _self.step : step // ignore: cast_nullable_to_non_nullable
 as OnboardingStep,displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
 as String,avatarPath: freezed == avatarPath ? _self.avatarPath : avatarPath // ignore: cast_nullable_to_non_nullable
+as String?,remoteAvatarUrl: freezed == remoteAvatarUrl ? _self.remoteAvatarUrl : remoteAvatarUrl // ignore: cast_nullable_to_non_nullable
 as String?,username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String,usernameStatus: null == usernameStatus ? _self.usernameStatus : usernameStatus // ignore: cast_nullable_to_non_nullable
 as UsernameStatus,usernameMessage: freezed == usernameMessage ? _self.usernameMessage : usernameMessage // ignore: cast_nullable_to_non_nullable

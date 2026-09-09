@@ -17,10 +17,7 @@ class AuthRemoteDataSource {
     try {
       // shouldCreateUser:true auto-registers first-time emails.
       // Email template configured in Supabase Dashboard → Auth → Templates.
-      await _supabase.auth.signInWithOtp(
-        email: email,
-        shouldCreateUser: true,
-      );
+      await _supabase.auth.signInWithOtp(email: email, shouldCreateUser: true);
     } on AuthException catch (e) {
       // Includes 'Email rate limit exceeded' etc.
       throw UnauthorizedException(e.message);
@@ -69,8 +66,8 @@ class AuthRemoteDataSource {
       // Request the scopes we need. authorizationForScopes returns the
       // existing grant if any; if null, we prompt with authorizeScopes.
       const scopes = ['email', 'profile'];
-      final authorization = await account.authorizationClient
-              .authorizationForScopes(scopes) ??
+      final authorization =
+          await account.authorizationClient.authorizationForScopes(scopes) ??
           await account.authorizationClient.authorizeScopes(scopes);
 
       final idToken = account.authentication.idToken;
@@ -99,7 +96,9 @@ class AuthRemoteDataSource {
       if (e.code == GoogleSignInExceptionCode.canceled) {
         throw UnauthorizedException('Google sign-in was cancelled');
       }
-      throw ServerException('Google sign-in failed: ${e.code}');
+      throw ServerException(
+        'Google sign-in is unavailable right now. Try email instead or try again later.',
+      );
     } catch (e) {
       throw ServerException('Google sign-in failed: $e');
     }
@@ -109,11 +108,9 @@ class AuthRemoteDataSource {
 
   Future<void> signOut() async {
     try {
-      // Explicit product decision: global scope revokes ALL sessions for this
-      // user across every device (more secure, but also signs them out
-      // elsewhere). Switch to SignOutScope.local if multi-device sessions are
-      // a product requirement.
-      await _supabase.auth.signOut(scope: SignOutScope.global);
+      // A normal sign-out should affect this phone only. A separate explicit
+      // "sign out everywhere" control can use the global scope later.
+      await _supabase.auth.signOut(scope: SignOutScope.local);
     } on AuthException catch (e) {
       throw ServerException(e.message);
     }

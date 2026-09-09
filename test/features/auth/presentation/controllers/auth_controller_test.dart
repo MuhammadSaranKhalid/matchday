@@ -16,12 +16,8 @@ void main() {
   late _MockAuthRepo repo;
 
   setUpAll(() {
-    registerFallbackValue(
-      Email.create('a@b.co').getOrElse((_) => throw ''),
-    );
-    registerFallbackValue(
-      OtpCode.create('123456').getOrElse((_) => throw ''),
-    );
+    registerFallbackValue(Email.create('a@b.co').getOrElse((_) => throw ''));
+    registerFallbackValue(OtpCode.create('123456').getOrElse((_) => throw ''));
   });
 
   setUp(() {
@@ -29,14 +25,13 @@ void main() {
   });
 
   ProviderContainer makeContainer() => ProviderContainer.test(
-        overrides: [
-          authRepositoryProvider.overrideWithValue(repo),
-        ],
-      );
+    overrides: [authRepositoryProvider.overrideWithValue(repo)],
+  );
 
   test('sendOtp(valid email) → AuthOtpSent', () async {
-    when(() => repo.sendEmailOtp(any()))
-        .thenAnswer((_) async => const Right(unit));
+    when(
+      () => repo.sendEmailOtp(any()),
+    ).thenAnswer((_) async => const Right(unit));
 
     final c = makeContainer();
     addTearDown(c.dispose);
@@ -68,7 +63,52 @@ void main() {
     final state = c.read(authControllerProvider);
     expect(state, isA<AuthFailed>());
     expect((state as AuthFailed).failure, isA<ValidationFailure>());
-    verifyNever(() =>
-        repo.verifyEmailOtp(email: any(named: 'email'), code: any(named: 'code')));
+    verifyNever(
+      () => repo.verifyEmailOtp(
+        email: any(named: 'email'),
+        code: any(named: 'code'),
+      ),
+    );
+  });
+
+  test('resendOtp keeps the user in the OTP flow', () async {
+    when(
+      () => repo.sendEmailOtp(any()),
+    ).thenAnswer((_) async => const Right(unit));
+
+    final c = makeContainer();
+    addTearDown(c.dispose);
+
+    await c.read(authControllerProvider.notifier).sendOtp('h@novex.studio');
+    await c.read(authControllerProvider.notifier).resendOtp();
+
+    final state = c.read(authControllerProvider);
+    expect(state, isA<AuthOtpSent>());
+    expect((state as AuthOtpSent).email.value, 'h@novex.studio');
+    verify(() => repo.sendEmailOtp(any())).called(2);
+  });
+
+  test('verifyOtp failure keeps the user on the OTP form', () async {
+    when(
+      () => repo.sendEmailOtp(any()),
+    ).thenAnswer((_) async => const Right(unit));
+    when(
+      () => repo.verifyEmailOtp(
+        email: any(named: 'email'),
+        code: any(named: 'code'),
+      ),
+    ).thenAnswer(
+      (_) async => const Left(AuthFailure('That code is not correct')),
+    );
+
+    final c = makeContainer();
+    addTearDown(c.dispose);
+
+    await c.read(authControllerProvider.notifier).sendOtp('h@novex.studio');
+    await c.read(authControllerProvider.notifier).verifyOtp('123456');
+
+    final state = c.read(authControllerProvider);
+    expect(state, isA<AuthFailed>());
+    expect((state as AuthFailed).showOtpForm, isTrue);
   });
 }

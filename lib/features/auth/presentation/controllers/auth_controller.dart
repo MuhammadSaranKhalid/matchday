@@ -28,8 +28,9 @@ class AuthController extends _$AuthController {
         state = AuthFailed(failure);
       case Right(value: final email):
         state = const AuthSendingOtp();
-        final result =
-            await ref.read(authRepositoryProvider).sendEmailOtp(email);
+        final result = await ref
+            .read(authRepositoryProvider)
+            .sendEmailOtp(email);
         state = result.fold(
           (f) => AuthFailed(f, email: email),
           (_) => AuthOtpSent(email),
@@ -63,13 +64,13 @@ class AuthController extends _$AuthController {
             .read(authRepositoryProvider)
             .verifyEmailOtp(email: email, code: code);
         state = result.fold(
-          (f) => AuthFailed(f, email: email),
+          (f) => AuthFailed(f, email: email, showOtpForm: true),
           AuthAuthenticated.new,
         );
     }
   }
 
-  /// Resend the OTP from the OtpSent / Failed states.
+  /// Resend the OTP without throwing the user back to the email screen.
   Future<void> resendOtp() async {
     final email = switch (state) {
       AuthOtpSent(:final email) => email,
@@ -77,7 +78,12 @@ class AuthController extends _$AuthController {
       _ => null,
     };
     if (email == null) return;
-    await sendOtp(email.value);
+    state = AuthResendingOtp(email);
+    final result = await ref.read(authRepositoryProvider).sendEmailOtp(email);
+    state = result.fold(
+      (f) => AuthFailed(f, email: email, showOtpForm: true),
+      (_) => AuthOtpSent(email),
+    );
   }
 
   /// Drop back to the email screen.
@@ -89,18 +95,14 @@ class AuthController extends _$AuthController {
 
   Future<void> signInWithGoogle() async {
     state = const AuthSigningInWithGoogle();
-    final result =
-        await ref.read(authRepositoryProvider).signInWithGoogle();
-    state = result.fold(
-      (failure) {
-        // Silently abort if the user simply closed the Google popup
-        if (failure.message.toLowerCase().contains('cancelled')) {
-          return const AuthInitial();
-        }
-        return AuthFailed(failure);
-      },
-      AuthAuthenticated.new,
-    );
+    final result = await ref.read(authRepositoryProvider).signInWithGoogle();
+    state = result.fold((failure) {
+      // Silently abort if the user simply closed the Google popup
+      if (failure.message.toLowerCase().contains('cancelled')) {
+        return const AuthInitial();
+      }
+      return AuthFailed(failure);
+    }, AuthAuthenticated.new);
   }
 
   // ─── Sign out ───────────────────────────────────────────────────────────
@@ -119,16 +121,15 @@ class AuthController extends _$AuthController {
     // sign-out on it.
     try {
       await ref.read(pushRegistrarProvider.notifier).unregister();
-    } catch (_) {/* ignore — stale tokens self-heal on next sign-in */}
+    } catch (_) {
+      /* ignore — stale tokens self-heal on next sign-in */
+    }
 
     final result = await repository.signOut();
     // Same reason: this notifier may already be gone. The redirect is driven by
     // the auth stream, not by this state, so dropping the write is harmless —
     // a rebuilt controller starts at AuthInitial anyway.
     if (!ref.mounted) return;
-    state = result.fold(
-      AuthFailed.new,
-      (_) => const AuthInitial(),
-    );
+    state = result.fold(AuthFailed.new, (_) => const AuthInitial());
   }
 }

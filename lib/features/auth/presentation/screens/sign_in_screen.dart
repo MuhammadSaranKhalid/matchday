@@ -22,32 +22,18 @@ class SignInScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Side effects: error snackbar only. Post-auth navigation is handled by
-    // the router's `redirect` callback (BEST_PRACTICES §8.1), which moves an
-    // authenticated user off /sign-in to /home (or /onboarding if profile is
-    // incomplete) the moment the auth stream emits.
-    ref.listen<AuthState>(authControllerProvider, (prev, next) {
-      if (next is AuthFailed) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(next.failure.message)));
-      }
-    });
-
     final state = ref.watch(authControllerProvider);
 
     return Scaffold(
       backgroundColor: CkColors.paper,
-      // Don't reflow the layout when the keyboard opens: the email field stays
-      // put and the bottom-anchored "OR / Continue with Google" section stays
-      // at the bottom (the keyboard just covers it) instead of sliding up
-      // under the email field.
-      resizeToAvoidBottomInset: false,
+      // Both sign-in methods remain reachable when the keyboard opens.
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: switch (state) {
           AuthOtpSent() ||
           AuthVerifyingOtp() ||
-          AuthFailed(email: != null) => const _CodeForm(),
+          AuthResendingOtp() ||
+          AuthFailed(showOtpForm: true) => const _CodeForm(),
           _ => const _EmailForm(),
         },
       ),
@@ -82,6 +68,13 @@ class _EmailFormState extends ConsumerState<_EmailForm> {
     final isSendingOtp = state is AuthSendingOtp;
     final isGoogleLoading = state is AuthSigningInWithGoogle;
     final isBusy = isSendingOtp || isGoogleLoading;
+    final failure = state is AuthFailed ? state.failure : null;
+
+    // Preserve a valid address after a dispatch failure, so a retry costs one
+    // tap instead of making the user type their address again.
+    if (_email.text.isEmpty && state is AuthFailed && state.email != null) {
+      _email.text = state.email!.value;
+    }
 
     return Stack(
       children: [
@@ -150,6 +143,10 @@ class _EmailFormState extends ConsumerState<_EmailForm> {
                               hintText: 'you@example.com',
                             ),
                           ),
+                          if (failure != null) ...[
+                            const SizedBox(height: 8),
+                            _InlineError(message: failure.message),
+                          ],
                           const SizedBox(height: 14),
                           FilledButton(
                             onPressed:
@@ -228,7 +225,8 @@ class _CodeFormState extends ConsumerState<_CodeForm> {
   final _keyNodes = List.generate(_len, (_) => FocusNode(skipTraversal: true));
 
   Timer? _timer;
-  int _resendIn = 28;
+  static const _resendCooldownSeconds = 60;
+  int _resendIn = _resendCooldownSeconds;
 
   String get _code => _controllers.map((c) => c.text).join();
   bool get _filled => _code.length == _len;
@@ -241,10 +239,12 @@ class _CodeFormState extends ConsumerState<_CodeForm> {
 
   void _startTimer() {
     _timer?.cancel();
-    _resendIn = 28;
+    _resendIn = _resendCooldownSeconds;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      setState(() => _resendIn = (_resendIn - 1).clamp(0, 28));
+      setState(
+        () => _resendIn = (_resendIn - 1).clamp(0, _resendCooldownSeconds),
+      );
       if (_resendIn == 0) _timer?.cancel();
     });
   }
@@ -304,10 +304,14 @@ class _CodeFormState extends ConsumerState<_CodeForm> {
   Widget build(BuildContext context) {
     final state = ref.watch(authControllerProvider);
     final isVerifying = state is AuthVerifyingOtp;
+    final isResending = state is AuthResendingOtp;
+    final isBusy = isVerifying || isResending;
+    final failure = state is AuthFailed ? state.failure : null;
 
     final email = switch (state) {
       AuthOtpSent(:final email) => email,
       AuthVerifyingOtp(:final email) => email,
+      AuthResendingOtp(:final email) => email,
       AuthFailed(email: final e?) => e,
       _ => null,
     };
@@ -361,14 +365,23 @@ class _CodeFormState extends ConsumerState<_CodeForm> {
             children: [
               for (var i = 0; i < _len; i++) ...[
                 if (i > 0) const SizedBox(width: 8),
-                Expanded(child: _otpBox(index: i, enabled: !isVerifying)),
+                Expanded(child: _otpBox(index: i, enabled: !isBusy)),
               ],
             ],
           ),
+          if (failure != null) ...[
+            const SizedBox(height: 10),
+            _InlineError(message: failure.message),
+          ],
           const SizedBox(height: 18),
 
           // Resend.
-          _resendIn > 0
+          isResending
+              ? Text(
+                'Sending a new code…',
+                style: CkType.body(fontSize: 13, color: CkColors.muted),
+              )
+              : _resendIn > 0
               ? Text.rich(
                 TextSpan(
                   style: CkType.body(fontSize: 13, color: CkColors.muted),
@@ -387,11 +400,16 @@ class _CodeFormState extends ConsumerState<_CodeForm> {
               )
               : GestureDetector(
                 onTap:
-                    isVerifying
+                    isBusy
                         ? null
-                        : () {
-                          ref.read(authControllerProvider.notifier).resendOtp();
-                          _startTimer();
+                        : () async {
+                          await ref
+                              .read(authControllerProvider.notifier)
+                              .resendOtp();
+                          if (mounted &&
+                              ref.read(authControllerProvider) is AuthOtpSent) {
+                            _startTimer();
+                          }
                         },
                 child: Text(
                   'Resend code',
@@ -407,7 +425,7 @@ class _CodeFormState extends ConsumerState<_CodeForm> {
 
           FilledButton(
             onPressed:
-                (!_filled || isVerifying)
+                (!_filled || isBusy)
                     ? null
                     : () => ref
                         .read(authControllerProvider.notifier)
@@ -469,6 +487,24 @@ class _BtnSpinner extends StatelessWidget {
     height: 20,
     width: 20,
     child: CircularProgressIndicator(strokeWidth: 2, color: color),
+  );
+}
+
+class _InlineError extends StatelessWidget {
+  const _InlineError({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    liveRegion: true,
+    child: Text(
+      message,
+      style: CkType.body(
+        fontSize: 13,
+        color: CkColors.red,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
   );
 }
 

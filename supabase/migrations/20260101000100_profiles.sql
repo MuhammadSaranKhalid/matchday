@@ -12,8 +12,25 @@
 --   2. auth.users row is inserted by Supabase.
 --   3. AFTER-INSERT trigger handle_new_auth_user() fires (SECURITY DEFINER)
 --      and creates public.profiles with username from raw_user_meta_data
---      (NULL until onboarding) and a placeholder display_name.
+--      (NULL until onboarding) plus whatever identity the provider gave us.
 --   4. Onboarding screen UPDATEs the row with the real values.
+--
+-- Identity keys in raw_user_meta_data (verified against a live Google sign-in
+-- 2026-09-09, and mirrored in auth.identities.identity_data):
+--   Google via signInWithIdToken → full_name, name, avatar_url, picture,
+--     email, email_verified, phone_verified, iss, sub, provider_id.
+--     It does NOT send `display_name` — reading only that key is why every
+--     Google account used to land as "New User" with a null photo.
+--   Email OTP → nothing; the seeds set `display_name` explicitly.
+-- So display_name resolves full_name → name → display_name → 'New User', and
+-- the photo resolves avatar_url → picture. full_name/avatar_url are the pair
+-- Supabase normalises across providers; name/picture are the raw OIDC claims
+-- kept as fallbacks for providers that only emit those. The Dart onboarding
+-- prefill (onboarding_controller.dart) reads the same full_name/avatar_url.
+--
+-- This is presentation data the user can overwrite during onboarding. It is
+-- never used for authorization — raw_user_meta_data is user-writable via
+-- auth.updateUser(), so nothing may trust it as a claim.
 --
 -- Username rules (§1.7):
 --   - Lowercase letters, digits, underscore. 3–20 chars.
@@ -172,11 +189,28 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  insert into public.profiles (user_id, username, display_name, location)
+  insert into public.profiles (
+    user_id, username, display_name, profile_photo_url, location
+  )
   values (
     new.id,
     new.raw_user_meta_data->>'username',
-    coalesce(new.raw_user_meta_data->>'display_name', 'New User'),
+    -- Truncated to the column's 80-char check. A raise here would abort the
+    -- auth.users INSERT and surface as "Database error saving new user", so
+    -- the trigger must not be able to reject a name a provider hands us.
+    left(
+      coalesce(
+        nullif(trim(new.raw_user_meta_data->>'full_name'), ''),
+        nullif(trim(new.raw_user_meta_data->>'name'), ''),
+        nullif(trim(new.raw_user_meta_data->>'display_name'), ''),
+        'New User'
+      ),
+      80
+    ),
+    coalesce(
+      nullif(trim(new.raw_user_meta_data->>'avatar_url'), ''),
+      nullif(trim(new.raw_user_meta_data->>'picture'), '')
+    ),
     coalesce(new.raw_user_meta_data->'location', '{}'::jsonb)
   )
   on conflict (user_id) do nothing;

@@ -49,7 +49,7 @@ final class OnboardingControllerProvider
 }
 
 String _$onboardingControllerHash() =>
-    r'4c39cafc7cc399421a07ae8660b5b0e74beeb4ab';
+    r'68586c16b3b7c1efb42f81026870c446128b293f';
 
 /// Drives the onboarding wizard: identity → username → welcome.
 ///

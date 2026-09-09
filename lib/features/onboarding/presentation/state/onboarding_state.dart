@@ -16,16 +16,19 @@ enum UsernameStatus { idle, checking, available, taken, invalid }
 abstract class OnboardingState with _$OnboardingState {
   const factory OnboardingState({
     @Default(OnboardingStep.identity) OnboardingStep step,
-    
+
     // Identity fields
     @Default('') String displayName,
     String? avatarPath, // Local file path selected via image_picker
-    
+    // Google can provide a photo before the user has selected a local file.
+    // The local file, when present, always takes precedence.
+    String? remoteAvatarUrl,
+
     // Username fields
     @Default('') String username,
     @Default(UsernameStatus.idle) UsernameStatus usernameStatus,
     String? usernameMessage,
-    
+
     // Form fields
     @Default(false) bool submitting,
     String? submitError,

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../profile/domain/value_objects/display_name.dart';
 import '../../../profile/domain/value_objects/username.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
@@ -28,7 +29,46 @@ class OnboardingController extends _$OnboardingController {
       _usernameDebounce?.cancel();
     });
 
-    return const OnboardingState();
+    // The profile shell is created by the auth trigger. For a freshly-created
+    // account, prefer the current identity metadata because it is available
+    // immediately even when a project still has the older profile trigger.
+    // This metadata is presentation data only; it is never used for access
+    // control or authorization.
+    final profileResult =
+        await ref.read(profileRepositoryProvider).getMyProfile();
+    final profile = profileResult.getRight().toNullable();
+    final metadata =
+        ref.read(supabaseClientProvider).auth.currentUser?.userMetadata ??
+        const <String, dynamic>{};
+    // Supabase's documented Google identity fields. The current account's
+    // payload also contains these exact keys; do not fall back to provider
+    // aliases because that would make the profile contract ambiguous.
+    final authName = _metadataText(metadata['full_name']);
+    final authAvatar = _httpsUrl(_metadataText(metadata['avatar_url']));
+    final storedName = _usableName(profile?.displayName);
+    final isNewProfile = profile?.onboardedAt == null;
+
+    return OnboardingState(
+      displayName:
+          isNewProfile ? (authName ?? storedName ?? '') : (storedName ?? ''),
+      remoteAvatarUrl: _httpsUrl(profile?.avatarUrl) ?? authAvatar,
+    );
+  }
+
+  static String? _metadataText(Object? value) {
+    return value is String && value.trim().isNotEmpty ? value.trim() : null;
+  }
+
+  static String? _usableName(String? value) {
+    final name = value?.trim();
+    return name == null || name.isEmpty || name == 'New User' ? null : name;
+  }
+
+  static String? _httpsUrl(String? value) {
+    final uri = value == null ? null : Uri.tryParse(value.trim());
+    return uri != null && uri.hasAuthority && uri.scheme == 'https'
+        ? uri.toString()
+        : null;
   }
 
   OnboardingState? get _s => state.value;
@@ -69,34 +109,39 @@ class OnboardingController extends _$OnboardingController {
     final s = _s;
     if (s == null) return;
 
-    final cleaned =
-        raw.toLowerCase().replaceAll(RegExp('[^a-z0-9_]'), '');
+    final cleaned = raw.toLowerCase().replaceAll(RegExp('[^a-z0-9_]'), '');
 
     if (cleaned.isEmpty) {
       _usernameDebounce?.cancel();
-      _set(s.copyWith(
-        username: '',
-        usernameStatus: UsernameStatus.idle,
-        usernameMessage: null,
-      ));
+      _set(
+        s.copyWith(
+          username: '',
+          usernameStatus: UsernameStatus.idle,
+          usernameMessage: null,
+        ),
+      );
       return;
     }
 
     Username.create(cleaned).fold(
       (failure) {
         _usernameDebounce?.cancel();
-        _set(s.copyWith(
-          username: cleaned,
-          usernameStatus: UsernameStatus.invalid,
-          usernameMessage: failure.message,
-        ));
+        _set(
+          s.copyWith(
+            username: cleaned,
+            usernameStatus: UsernameStatus.invalid,
+            usernameMessage: failure.message,
+          ),
+        );
       },
       (_) {
-        _set(s.copyWith(
-          username: cleaned,
-          usernameStatus: UsernameStatus.checking,
-          usernameMessage: null,
-        ));
+        _set(
+          s.copyWith(
+            username: cleaned,
+            usernameStatus: UsernameStatus.checking,
+            usernameMessage: null,
+          ),
+        );
         _scheduleAvailabilityCheck(cleaned);
       },
     );
@@ -120,23 +165,29 @@ class OnboardingController extends _$OnboardingController {
       result.fold(
         (failure) {
           if (failure is ValidationFailure) {
-            _set(s.copyWith(
-              usernameStatus: UsernameStatus.invalid,
-              usernameMessage: failure.message,
-            ));
+            _set(
+              s.copyWith(
+                usernameStatus: UsernameStatus.invalid,
+                usernameMessage: failure.message,
+              ),
+            );
           } else {
             // Couldn't reach the backend — let the user retry by editing.
-            _set(s.copyWith(
-              usernameStatus: UsernameStatus.idle,
-              usernameMessage: "Couldn't check — check your connection",
-            ));
+            _set(
+              s.copyWith(
+                usernameStatus: UsernameStatus.idle,
+                usernameMessage: "Couldn't check — check your connection",
+              ),
+            );
           }
         },
-        (available) => _set(s.copyWith(
-          usernameStatus:
-              available ? UsernameStatus.available : UsernameStatus.taken,
-          usernameMessage: available ? null : 'That username is taken',
-        )),
+        (available) => _set(
+          s.copyWith(
+            usernameStatus:
+                available ? UsernameStatus.available : UsernameStatus.taken,
+            usernameMessage: available ? null : 'That username is taken',
+          ),
+        ),
       );
     });
   }
@@ -155,10 +206,7 @@ class OnboardingController extends _$OnboardingController {
   Future<void> submit() async {
     final s = _s;
     if (s == null || s.submitting || !s.canSubmitUsername) return;
-    _set(s.copyWith(
-      submitting: true,
-      submitError: null,
-    ));
+    _set(s.copyWith(submitting: true, submitError: null));
 
     // Validate inputs via value objects; the first failure short-circuits and
     // is surfaced as the submitError so the form can render it.
@@ -166,10 +214,7 @@ class OnboardingController extends _$OnboardingController {
     final usernameRes = Username.create(s.username);
 
     Failure? failure;
-    for (final e in <Either<Failure, Object>>[
-      displayNameRes,
-      usernameRes,
-    ]) {
+    for (final e in <Either<Failure, Object>>[displayNameRes, usernameRes]) {
       final f = e.getLeft().toNullable();
       if (f != null) {
         failure = f;
@@ -183,10 +228,13 @@ class OnboardingController extends _$OnboardingController {
       return;
     }
 
-    final result = await ref.read(profileRepositoryProvider).completeOnboarding(
+    final result = await ref
+        .read(profileRepositoryProvider)
+        .completeOnboarding(
           displayName: displayNameRes.getRight().toNullable()!,
           username: usernameRes.getRight().toNullable()!,
           avatarFilePath: s.avatarPath,
+          existingAvatarUrl: s.remoteAvatarUrl,
         );
 
     final current = _s;
@@ -195,17 +243,18 @@ class OnboardingController extends _$OnboardingController {
       (failure) => _set(
         current.copyWith(submitting: false, submitError: failure.message),
       ),
-      (_) => _set(
-        current.copyWith(submitting: false, step: OnboardingStep.welcome),
-      ),
+      (_) {
+        // The profile is now complete on the server. Do not add a redundant
+        // success screen and another tap before the user can reach Home.
+        ref.invalidate(onboardingStatusProvider);
+        _set(current.copyWith(submitting: false, completed: true));
+      },
     );
   }
 
   // ─── Welcome step ───────────────────────────────────────────────────────────
 
-  /// Tapped "Open feed". Invalidates the onboarding-status
-  /// provider so the router gate now lets the user into /home, then flips
-  /// [OnboardingState.completed] for the screen to navigate on.
+  /// Retained for the success-state UI while the route is transitioning.
   Future<void> finish() async {
     final s = _s;
     if (s == null) return;

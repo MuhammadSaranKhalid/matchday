@@ -36,10 +36,12 @@ import '../features/matches/presentation/screens/challenge_detail_screen.dart';
 import '../features/matches/presentation/screens/challenge_send_screen.dart';
 import '../features/matches/presentation/screens/challenge_sent_screen.dart';
 import '../features/matches/presentation/screens/match_start_screen.dart';
+import '../features/matches/presentation/screens/challenges_screen.dart';
 import '../features/matches/presentation/screens/my_pool_requests_screen.dart';
 import '../features/matches/presentation/screens/open_match_pool_screen.dart';
 import '../features/matches/presentation/screens/scoring_screen.dart';
 import '../features/matches/presentation/screens/innings_break_screen.dart';
+import '../features/matches/presentation/screens/completed_match_screen.dart';
 import '../features/matches/presentation/screens/scorecard_screen.dart';
 import '../features/matches/presentation/screens/result_screen.dart';
 import '../features/notifications/presentation/screens/notifications_screen.dart';
@@ -290,6 +292,12 @@ GoRouter appRouter(Ref ref) {
         path: '/my/teams',
         builder: (_, __) => const TeamsListScreen(),
       ),
+      // Match Challenges queue (Challenges.dc.html). A pushed page: it is a
+      // list you work down, not a sheet you return from.
+      GoRoute(
+        path: '/my/challenges',
+        builder: (_, __) => const ChallengesScreen(),
+      ),
       GoRoute(
         path: '/my/pool-requests',
         builder: (_, __) => const MyPoolRequestsScreen(),
@@ -495,6 +503,14 @@ GoRouter appRouter(Ref ref) {
         path: '/matches/:matchId/innings-break',
         builder: (_, state) =>
             InningsBreakScreen(matchId: state.pathParameters['matchId']!),
+      ),
+      // The completed-match record. Distinct from /scorecard, which serves
+      // matches still in progress: this one derives everything from the final
+      // ledger and renders a printed record when no ball was ever bowled.
+      GoRoute(
+        path: '/matches/:matchId/summary',
+        builder: (_, state) =>
+            CompletedMatchScreen(matchId: state.pathParameters['matchId']!),
       ),
       GoRoute(
         path: '/matches/:matchId/scorecard',

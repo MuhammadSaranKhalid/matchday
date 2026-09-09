@@ -4,14 +4,25 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/ck_push_nav.dart';
-import '../../../../core/widgets/v2/v2_kit.dart';
-import '../../domain/entities/match_request.dart';
-import '../providers/matches_providers.dart';
+import '../../../../core/widgets/v2/ck_shimmer.dart';
+import '../providers/challenges_providers.dart';
 import '../providers/my_matches_providers.dart';
+import '../state/challenges_view.dart';
 import '../state/my_matches_view.dart';
-import '../widgets/withdraw_sheet.dart';
+import '../widgets/challenges/challenges_nav_button.dart';
+import '../widgets/my_matches/fixture_card.dart';
+import '../widgets/my_matches/past_card.dart';
 
+/// My Matches — implements `My Matches.dc.html`.
+///
+/// A pushed page reached from the drawer. It lists **only matches that exist**:
+/// challenges are a negotiation, not a fixture, and they live on their own
+/// screen. The only trace of them here is the badged header icon and — when
+/// something is genuinely about to expire — a cream banner.
+///
+/// That is the design's option (c): "the badged icon lives in the header
+/// permanently, so the queue has a fixed, learnable address and the count is
+/// always visible; the cream banner appears only when something is inside 6h."
 class MyMatchesScreen extends ConsumerStatefulWidget {
   const MyMatchesScreen({super.key});
 
@@ -20,7 +31,7 @@ class MyMatchesScreen extends ConsumerStatefulWidget {
 }
 
 class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
-  String _tab = 'confirmed';
+  bool _confirmedTab = true;
 
   @override
   Widget build(BuildContext context) {
@@ -29,113 +40,76 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
       backgroundColor: CkColors.paper,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            CkPushNav(
-              title: 'My Matches',
-              onBack: () =>
-                  context.canPop() ? context.pop() : context.go('/home'),
-              action: CkNavPill(
-                label: 'Challenge',
-                onTap: () => context.push('/challenge'),
-              ),
+        child: async.when(
+          loading: () => const _Frame(
+            confirmed: null,
+            past: null,
+            child: _Skeleton(),
+          ),
+          error: (e, _) => _Frame(
+            confirmed: null,
+            past: null,
+            child: _ErrorState(
+              message:
+                  e is FailureWrapper ? e.failure.message : 'err_net_timeout',
+              onRetry: () => ref.invalidate(myMatchesViewProvider),
             ),
-            Expanded(
-              child: async.when(
-                loading: () => const _MyMatchesLoading(),
-                error: (e, _) => _MyMatchesError(
-                  message: e is FailureWrapper ? e.failure.message : e.toString(),
-                  onRetry: () => ref.invalidate(myMatchesViewProvider),
-                ),
-                data: (view) => RefreshIndicator.adaptive(
-                  onRefresh: () async => ref.invalidate(myMatchesViewProvider),
-                  child: ListView(
-                    padding: EdgeInsets.zero,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      if (view.sent.isNotEmpty || view.inbound.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-                          child: _RequestsSection(
-                            inbound: view.inbound,
-                            outbound: view.sent,
-                            onOpen: (id) => context.push('/challenges/$id'),
-                            onWithdraw: _onWithdraw,
-                          ),
-                        ),
-                      if (view.pendingRequestsCount > 0)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-                          child: _PendingRequestsBanner(
-                            count: view.pendingRequestsCount,
-                          ),
-                        ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
-                        child: _Segmented(
-                          value: _tab,
-                          tabs: [
-                            (
-                              id: 'confirmed',
-                              label: 'Confirmed',
-                              badge: view.confirmed.length,
-                            ),
-                            (
-                              id: 'past',
-                              label: 'Past',
-                              badge: view.past.length,
-                            ),
-                          ],
-                          onSelect: (v) => setState(() => _tab = v),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-                        child: _tab == 'confirmed'
-                            ? _confirmedBody(view)
-                            : _pastBody(view),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
+          data: _body,
         ),
       ),
     );
   }
 
-  Widget _subhead(String label, String side) => Padding(
-        padding: const EdgeInsets.fromLTRB(0, 14, 0, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label.toUpperCase(), style: _monoLabel(color: CkColors.ink)),
-            Text(side.toUpperCase(),
-                style: CkType.mono(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.06,
-                  color: CkColors.muted,
-                )),
-          ],
-        ),
+  Widget _body(MyMatchesView view) {
+    // First run: tabs are suppressed, exactly as on the Challenges board —
+    // two empty tabs is a filing cabinet with no files.
+    if (view.confirmed.isEmpty && view.past.isEmpty) {
+      return const _Frame(
+        confirmed: null,
+        past: null,
+        child: _FirstRunEmpty(),
       );
+    }
+
+    return _Frame(
+      confirmed: view.confirmed.length,
+      past: view.totalPastCount,
+      confirmedActive: _confirmedTab,
+      onSelect: (v) => setState(() => _confirmedTab = v),
+      banner: const _ChallengesBanner(),
+      child: RefreshIndicator.adaptive(
+        onRefresh: () async {
+          ref.invalidate(myMatchesViewProvider);
+          await ref.read(myMatchesViewProvider.future);
+        },
+        child: _confirmedTab ? _confirmedBody(view) : _pastBody(view),
+      ),
+    );
+  }
 
   Widget _confirmedBody(MyMatchesView view) {
     if (view.confirmed.isEmpty) {
-      return const _ConfirmedEmpty();
+      return _ConfirmedEmpty(onSwitch: () => setState(() => _confirmedTab = false));
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final groups = _groupByDay(
+      view.confirmed,
+      (c) => c.startTime,
+    );
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
       children: [
-        _subhead('Confirmed · ${view.confirmed.length}', 'upcoming'),
-        for (var i = 0; i < view.confirmed.length; i++) ...[
-          if (i > 0) const SizedBox(height: 10),
-          _ConfirmedCard(v: view.confirmed[i]),
+        for (final g in groups) ...[
+          _DateRule(label: g.label, first: g == groups.first),
+          const SizedBox(height: 10),
+          for (final c in g.items) ...[
+            FixtureCard(
+              v: c,
+              onTap: () => _openFixture(c),
+            ),
+            const SizedBox(height: 10),
+          ],
         ],
       ],
     );
@@ -143,1137 +117,810 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
 
   Widget _pastBody(MyMatchesView view) {
     if (view.past.isEmpty) {
-      return const _PastEmpty();
+      return _PastEmpty(
+        confirmedCount: view.confirmed.length,
+        onSwitch: () => setState(() => _confirmedTab = true),
+      );
     }
-    final total = view.totalPastCount;
-    final shown = view.past.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final groups = _groupByDay(view.past, (p) => p.startTime);
+    final hidden = view.totalPastCount - view.past.length;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
       children: [
-        _subhead('Past · $shown shown', 'most recent'),
-        for (var i = 0; i < view.past.length; i++) ...[
-          if (i > 0) const SizedBox(height: 6),
-          _PastRow(m: _pastToRecord(view.past[i])),
+        for (final g in groups) ...[
+          _DateRule(label: g.label, first: g == groups.first),
+          const SizedBox(height: 10),
+          for (final p in g.items) ...[
+            PastCard(
+              v: p,
+              onTap: () => context.push('/matches/${p.id}/summary'),
+            ),
+            const SizedBox(height: 10),
+          ],
         ],
-        if (total > shown) ...[
-          const SizedBox(height: 12),
-          _SeeAllButton(label: 'SEE ALL $total MATCHES →'),
-        ],
+        if (hidden > 0) _SeeAll(total: view.totalPastCount),
       ],
     );
   }
 
-  Future<void> _onWithdraw(MyMatchRequest row) async {
-    final result = await showModalBottomSheet<WithdrawResult>(
-      context: context,
-      backgroundColor: CkColors.paper,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => WithdrawSheet(
-        opponentName: row.isOpen ? null : row.opponentName,
-      ),
-    );
-    if (result == null || !mounted) return;
-    final res = await ref.read(matchesRepositoryProvider).withdrawMatchChallenge(
-          requestId: MatchRequestId(row.requestId),
-          decisionNote: result.note,
-        );
-    if (!mounted) return;
-    res.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
-      (_) {
-        ref.invalidate(myMatchChallengesProvider);
-        ref.invalidate(myMatchesViewProvider);
-      },
-    );
+  /// A live card goes to scoring; a toss-ready one to match start; anything
+  /// else to the match itself.
+  void _openFixture(MyMatchConfirmed c) {
+    if (c.live) {
+      context.push('/matches/${c.id}/score');
+    } else if (c.tossReady) {
+      context.push('/matches/${c.id}/start');
+    } else {
+      context.push('/matches/${c.id}');
+    }
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Header
-// ═══════════════════════════════════════════════════════════════════════════
+// ─── Date grouping ──────────────────────────────────────────────────────────
 
-// ═══════════════════════════════════════════════════════════════════════════
-// State views (loading / error / empty)
-// ═══════════════════════════════════════════════════════════════════════════
+class _DayGroup<T> {
+  const _DayGroup(this.label, this.items);
+  final String label;
+  final List<T> items;
+}
 
-class _MyMatchesLoading extends StatelessWidget {
-  const _MyMatchesLoading();
+/// "TODAY · SAT 12 SEP", "TOMORROW · SUN 13 SEP", then plain "SAT 19 SEP".
+///
+/// Relative and absolute, in that order, and only for the two days a person
+/// plans in words: "relative alone answers 'where do I need to be?' but strands
+/// you when you're arranging a lift for the 19th; absolute alone makes you
+/// count." Pushing it to "in 3 days" would be arithmetic dressed as language.
+List<_DayGroup<T>> _groupByDay<T>(List<T> items, DateTime? Function(T) at) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final tomorrow = today.add(const Duration(days: 1));
+
+  final buckets = <DateTime, List<T>>{};
+  final undated = <T>[];
+  for (final item in items) {
+    final t = at(item);
+    if (t == null) {
+      undated.add(item);
+      continue;
+    }
+    final key = DateTime(t.year, t.month, t.day);
+    buckets.putIfAbsent(key, () => []).add(item);
+  }
+
+  final keys = buckets.keys.toList()..sort();
+  final groups = [
+    for (final k in keys)
+      _DayGroup<T>(
+        k == today
+            ? 'TODAY · ${_dayLabel(k)}'
+            : k == tomorrow
+                ? 'TOMORROW · ${_dayLabel(k)}'
+                : _dayLabel(k),
+        buckets[k]!,
+      ),
+  ];
+  if (undated.isNotEmpty) {
+    groups.add(_DayGroup<T>('DATE TO BE AGREED', undated));
+  }
+  return groups;
+}
+
+String _dayLabel(DateTime t) {
+  const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  const months = [
+    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+  ];
+  return '${days[t.weekday - 1]} ${t.day} ${months[t.month - 1]}';
+}
+
+class _DateRule extends StatelessWidget {
+  const _DateRule({required this.label, required this.first});
+
+  final String label;
+  final bool first;
 
   @override
-  Widget build(BuildContext context) => const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 64),
-          child: CircularProgressIndicator(),
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.only(top: first ? 0 : 4),
+        child: Row(
+          children: [
+            Text(
+              label,
+              style: CkType.mono(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.10,
+                color: CkColors.ink,
+              ),
+            ),
+            const SizedBox(width: 9),
+            const Expanded(child: Divider(height: 1, color: CkColors.line)),
+          ],
         ),
       );
 }
 
-class _MyMatchesError extends StatelessWidget {
-  const _MyMatchesError({required this.message, required this.onRetry});
+// ─── Chrome ─────────────────────────────────────────────────────────────────
+
+class _Frame extends StatelessWidget {
+  const _Frame({
+    required this.confirmed,
+    required this.past,
+    required this.child,
+    this.confirmedActive = true,
+    this.onSelect,
+    this.banner,
+  });
+
+  /// Null on loading / error / first-run — the tabs are suppressed entirely.
+  final int? confirmed;
+  final int? past;
+  final bool confirmedActive;
+  final ValueChanged<bool>? onSelect;
+  final Widget? banner;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Header(),
+          if (confirmed != null && past != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: _Tabs(
+                confirmedActive: confirmedActive,
+                confirmed: confirmed!,
+                past: past!,
+                onSelect: onSelect ?? (_) {},
+              ),
+            ),
+          if (banner != null) banner!,
+          Expanded(child: child),
+        ],
+      );
+}
+
+class _Header extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: CkColors.hairline)),
+        ),
+        child: Row(
+          children: [
+            InkWell(
+              onTap: () =>
+                  context.canPop() ? context.pop() : context.go('/home'),
+              customBorder: const CircleBorder(),
+              child: Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: CkColors.paper2,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_back,
+                    size: 17, color: CkColors.ink),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'My Matches',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: CkType.display(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.022,
+                  color: CkColors.ink,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const ChallengesNavButton(),
+            const SizedBox(width: 8),
+            _CreatePill(onTap: () => context.push('/challenge')),
+          ],
+        ),
+      );
+}
+
+class _CreatePill extends StatelessWidget {
+  const _CreatePill({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          decoration: BoxDecoration(
+            color: CkColors.ink,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '+',
+                style: CkType.body(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: CkColors.paper,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'CHALLENGE',
+                style: CkType.mono(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.08,
+                  color: CkColors.paper,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class _Tabs extends StatelessWidget {
+  const _Tabs({
+    required this.confirmedActive,
+    required this.confirmed,
+    required this.past,
+    required this.onSelect,
+  });
+
+  final bool confirmedActive;
+  final int confirmed;
+  final int past;
+  final ValueChanged<bool> onSelect;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: CkColors.paper2,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: CkColors.line),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _tab('Confirmed', confirmed, confirmedActive,
+                  () => onSelect(true)),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _tab('Past', past, !confirmedActive, () => onSelect(false)),
+            ),
+          ],
+        ),
+      );
+
+  Widget _tab(String label, int count, bool active, VoidCallback onTap) =>
+      GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          height: 44,
+          alignment: Alignment.center,
+          decoration: active
+              ? BoxDecoration(
+                  color: CkColors.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: CkColors.line),
+                )
+              : null,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CkType.mono(
+                    fontSize: 11,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                    letterSpacing: 0.08,
+                    color: active ? CkColors.ink : CkColors.muted,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 7),
+              if (active)
+                Container(
+                  constraints: const BoxConstraints(minWidth: 18),
+                  height: 18,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  decoration: const BoxDecoration(
+                    color: CkColors.ink,
+                    borderRadius: BorderRadius.all(Radius.circular(999)),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: CkType.mono(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0,
+                      color: CkColors.paper,
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  '$count',
+                  style: CkType.mono(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                    color: CkColors.muted,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+}
+
+/// Option (c): the banner is NOT a permanent fixture above the schedule — that
+/// is the exact mixing this screen was split to end, and it desensitises the
+/// one case that matters. It appears only when a challenge is inside 6h.
+class _ChallengesBanner extends ConsumerWidget {
+  const _ChallengesBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final needs =
+        ref.watch(challengesViewProvider).value?.needsYou ?? const <ChallengeRow>[];
+    final urgent = needs.where((r) => r.tier == ExpiryTier.urgent).toList();
+    if (urgent.isEmpty) return const SizedBox.shrink();
+
+    final soonest = urgent
+        .map((r) => r.remaining)
+        .whereType<Duration>()
+        .reduce((a, b) => a < b ? a : b);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 11, 16, 0),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => context.push('/my/challenges'),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+          decoration: BoxDecoration(
+            color: CkColors.cream,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: CkColors.creamBorder),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      needs.length == 1
+                          ? '1 CHALLENGE NEEDS YOU'
+                          : '${needs.length} CHALLENGES NEED YOU',
+                      style: CkType.mono(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.09,
+                        color: CkColors.ink,
+                      ).copyWith(height: 1.5),
+                    ),
+                    Text(
+                      soonest.inHours >= 1
+                          ? '${urgent.length} EXPIRES IN ${soonest.inHours}H'
+                          : '${urgent.length} EXPIRES IN ${soonest.inMinutes}M',
+                      style: CkType.mono(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.09,
+                        color: CkColors.redInk,
+                      ).copyWith(height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '→',
+                style: CkType.mono(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: CkColors.ink,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── States ─────────────────────────────────────────────────────────────────
+
+/// Chrome real from the first frame, only rows skeletal — no spinner, so the
+/// page never blanks.
+class _Skeleton extends StatelessWidget {
+  const _Skeleton();
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+        children: const [
+          CkShimmer(child: CkShimmerBox(width: 132, height: 10, radius: 4)),
+          SizedBox(height: 12),
+          _SkeletonFixture(opacity: 1, live: true),
+          SizedBox(height: 10),
+          _SkeletonFixture(opacity: 0.7, live: false),
+          SizedBox(height: 10),
+          _SkeletonFixture(opacity: 0.4, live: false),
+        ],
+      );
+}
+
+class _SkeletonFixture extends StatelessWidget {
+  const _SkeletonFixture({required this.opacity, required this.live});
+
+  final double opacity;
+  final bool live;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget shim(Widget c) => live ? CkShimmer(child: c) : c;
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        height: 104,
+        decoration: BoxDecoration(
+          color: CkColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: CkColors.hairline),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 84,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: CkColors.paper,
+                border: Border(right: BorderSide(color: CkColors.hairline)),
+              ),
+              child: shim(
+                const CkShimmerBox(width: 44, height: 16, radius: 4),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(13, 13, 13, 13),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    shim(const CkShimmerBox(width: 150, height: 13, radius: 4)),
+                    const SizedBox(height: 8),
+                    const CkShimmerBox(width: 120, height: 13, radius: 4),
+                    const SizedBox(height: 9),
+                    const CkShimmerBox(width: 170, height: 9, radius: 4),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Identical in language to the Challenges error board on purpose — one failure
+/// vocabulary across both screens, and no red: a failed fetch is not an
+/// emergency.
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+
   final String message;
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 32, 18, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Couldn't load your matches.",
-            style: CkType.display(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.01,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            style: CkType.body(fontSize: 12, color: CkColors.muted),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: onRetry,
-            child: const Text('Try again'),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _Centered(
+        title: "Couldn't load your matches.",
+        body: 'Nothing has been lost — fixtures, lineups and scorecards all '
+            'live on the server. Check your connection and try again.',
+        action: _InkButton(label: 'Try again', onTap: onRetry),
+        footnote: message,
+      );
 }
 
-class _ConfirmedEmpty extends StatelessWidget {
-  const _ConfirmedEmpty();
+/// The offer is a challenge, and if a queue exists it is named: an empty
+/// schedule with unanswered challenges has an obvious next move.
+class _ConfirmedEmpty extends ConsumerWidget {
+  const _ConfirmedEmpty({required this.onSwitch});
+
+  final VoidCallback onSwitch;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 28, 18, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final needs =
+        ref.watch(challengesViewProvider).value?.needsYou ?? const <ChallengeRow>[];
+    return _Centered(
+      title: 'Nothing on the schedule.',
+      body: needs.isEmpty
+          ? 'Fixtures appear here once a challenge is accepted.'
+          : 'Fixtures appear here once a challenge is accepted. Send one, or '
+              'answer the ${needs.length} already waiting on you.',
+      action: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'Nothing on the schedule.',
-            style: CkType.display(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.02,
-            ),
+          _InkButton(
+            label: '+  Challenge a team',
+            onTap: () => context.push('/challenge'),
           ),
-          const SizedBox(height: 6),
-          Text(
-            "Confirmed fixtures will appear here once you accept a "
-            "challenge or your captain picks the XI.",
-            style: CkType.body(
-              fontSize: 12,
-              color: CkColors.muted,
-              height: 1.45,
+          if (needs.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _GhostRow(
+              label: needs.length == 1
+                  ? '1 challenge needs you'
+                  : '${needs.length} challenges need you',
+              onTap: () => context.push('/my/challenges'),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 }
 
+/// No call to action: you cannot manufacture a past. It points at the schedule
+/// instead, which is where the first result will come from.
 class _PastEmpty extends StatelessWidget {
-  const _PastEmpty();
+  const _PastEmpty({required this.confirmedCount, required this.onSwitch});
+
+  final int confirmedCount;
+  final VoidCallback onSwitch;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 28, 18, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'No past matches.',
-            style: CkType.display(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.02,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            "Once you play or captain a match, the result will live here. "
-            "It builds your career record.",
-            style: CkType.body(
-              fontSize: 12,
-              color: CkColors.muted,
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _Centered(
+        title: 'No past matches.',
+        body: 'Scorecards land here the moment a match finishes — yours and '
+            'every match you were in the squad for.',
+        action: confirmedCount == 0
+            ? null
+            : _GhostRow(
+                label: 'Confirmed',
+                trailing: '$confirmedCount',
+                onTap: onSwitch,
+              ),
+      );
 }
 
-class _PendingRequestsBanner extends StatelessWidget {
-  const _PendingRequestsBanner({required this.count});
-  final int count;
+class _FirstRunEmpty extends StatelessWidget {
+  const _FirstRunEmpty();
 
   @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+  Widget build(BuildContext context) => _Centered(
+        title: 'No matches yet.',
+        body: 'Every fixture starts as a challenge: propose a day, a ground '
+            'and a format, and it appears here the moment the other manager '
+            'accepts.',
+        action: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _InkButton(
+              label: '+  Challenge a team',
+              onTap: () => context.push('/challenge'),
+            ),
+            const SizedBox(height: 10),
+            _GhostRow(
+              label: 'Post to the open pool',
+              onTap: () => context.push('/matches/send-challenge?mode=open'),
+            ),
+          ],
+        ),
+        footnote: 'Accepted challenges become fixtures · nothing else does',
+      );
+}
+
+class _SeeAll extends StatelessWidget {
+  const _SeeAll({required this.total});
+
+  final int total;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(top: 2),
+        padding: const EdgeInsets.only(top: 14),
         decoration: const BoxDecoration(
-          color: CkColors.paper,
-          border: Border(
-            top: BorderSide(color: CkColors.hairline),
-            right: BorderSide(color: CkColors.hairline),
-            bottom: BorderSide(color: CkColors.hairline),
-            left: BorderSide(color: CkColors.amber, width: 3),
-          ),
+          border: Border(top: BorderSide(color: CkColors.hairline)),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                // oklch(0.94 0.05 90) — pale amber
-                color: const Color(0xFFFBEFCF),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const V2Svg(
-                // chat-bubble (lines) from JSX
-                '<path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 9h8M8 12h5"/>',
-                size: 14,
-                color: CkColors.amber,
-                strokeWidth: 2.2,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$count match request${count == 1 ? '' : 's'} need your reply',
-                    style: CkType.body(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      height: 1.25,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      'Accept · counter · decline — tap challenge to review',
-                      style: CkType.body(fontSize: 11, color: CkColors.muted),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text('OPEN →',
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.08,
-                  color: CkColors.amber,
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RequestsSection extends StatelessWidget {
-  const _RequestsSection({
-    required this.inbound,
-    required this.outbound,
-    required this.onOpen,
-    required this.onWithdraw,
-  });
-
-  final List<MyMatchRequest> inbound;
-  final List<MyMatchRequest> outbound;
-  final ValueChanged<String> onOpen;
-  final ValueChanged<MyMatchRequest> onWithdraw;
-
-  @override
-  Widget build(BuildContext context) {
-    final total = inbound.length + outbound.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-            'CHALLENGES · $total',
-            style: _monoLabel(color: CkColors.ink),
-          ),
-        ),
-        // Inbound Challenges First (Action required!)
-        for (final req in inbound) ...[
-          _InboundRequestRow(
-            row: req,
-            onOpen: () => onOpen(req.requestId),
-          ),
-          const SizedBox(height: 8),
-        ],
-        // Outbound Challenges
-        for (var i = 0; i < outbound.length; i++) ...[
-          if (i > 0 || inbound.isNotEmpty) const SizedBox(height: 8),
-          _SentRequestRow(
-            row: outbound[i],
-            onOpen: () => onOpen(outbound[i].requestId),
-            onWithdraw: () => onWithdraw(outbound[i]),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _InboundRequestRow extends StatelessWidget {
-  const _InboundRequestRow({
-    required this.row,
-    required this.onOpen,
-  });
-
-  final MyMatchRequest row;
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final sub = [
-      row.statusLabel,
-      if (row.expiresLabel.isNotEmpty) row.expiresLabel,
-    ].join(' · ');
-
-    return InkWell(
-      onTap: onOpen,
-      borderRadius: BorderRadius.circular(12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          decoration: const BoxDecoration(
-            color: CkColors.paper,
-            border: Border(
-              top: BorderSide(color: CkColors.hairline),
-              right: BorderSide(color: CkColors.hairline),
-              bottom: BorderSide(color: CkColors.hairline),
-              left: BorderSide(color: Color(0xFFD97706), width: 3.5),
-            ),
-          ),
-          child: Row(
-            children: [
-              _MiniCrest(short: row.opponentShort, color: row.opponentColor),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Text('← ',
-                            style: CkType.mono(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFFD97706),
-                            )),
-                        Flexible(
-                          child: Text(
-                            row.opponentName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: CkType.body(
-                                fontSize: 13, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        sub,
-                        style: CkType.body(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF92400E),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: CkColors.ink,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Review →',
-                  style: CkType.mono(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: CkColors.paper,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SentRequestRow extends StatelessWidget {
-  const _SentRequestRow({
-    required this.row,
-    required this.onOpen,
-    required this.onWithdraw,
-  });
-
-  final MyMatchRequest row;
-  final VoidCallback onOpen;
-  final VoidCallback onWithdraw;
-
-  @override
-  Widget build(BuildContext context) {
-    final title = row.isOpen
-        ? 'Open · code ${row.shareCode ?? '——'}'
-        : row.opponentName;
-    final sub = [
-      row.statusLabel,
-      if (row.expiresLabel.isNotEmpty) row.expiresLabel,
-    ].join(' · ');
-    return InkWell(
-      onTap: onOpen,
-      borderRadius: BorderRadius.circular(12),
-      // Non-uniform border (amber left stripe) → round via ClipRRect, NOT a
-      // borderRadius on the BoxDecoration. A borderRadius on a non-uniform
-      // border throws at paint time and blanks the whole row.
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          decoration: const BoxDecoration(
-            color: CkColors.paper,
-            border: Border(
-              top: BorderSide(color: CkColors.hairline),
-              right: BorderSide(color: CkColors.hairline),
-              bottom: BorderSide(color: CkColors.hairline),
-              left: BorderSide(color: CkColors.amber, width: 3),
-            ),
-          ),
-          child: Row(
-            children: [
-              _MiniCrest(short: row.opponentShort, color: row.opponentColor),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Text('→ ',
-                            style: CkType.mono(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0,
-                              color: CkColors.muted,
-                            )),
-                        Flexible(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: CkType.body(
-                                fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        sub,
-                        style: CkType.body(fontSize: 11, color: CkColors.muted),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              _WithdrawChip(onTap: onWithdraw),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WithdrawChip extends StatelessWidget {
-  const _WithdrawChip({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: CkColors.line),
-        ),
-        child: Text(
-          'Withdraw',
-          style: CkType.body(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: CkColors.red,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Segmented control (Confirmed · Past)
-// ═══════════════════════════════════════════════════════════════════════════
-
-class _Segmented extends StatelessWidget {
-  const _Segmented({
-    required this.value,
-    required this.tabs,
-    required this.onSelect,
-  });
-
-  final String value;
-  final List<({String id, String label, int badge})> tabs;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: CkColors.paper2,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Row(
-        children: [
-          for (final t in tabs)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onSelect(t.id),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 7),
-                  decoration: BoxDecoration(
-                    color: value == t.id ? CkColors.paper : Colors.transparent,
-                    borderRadius: BorderRadius.circular(7),
-                    boxShadow: value == t.id
-                        ? const [
-                            BoxShadow(
-                              color: Color(0x14281E0F), // rgba(40,30,15,0.08)
-                              blurRadius: 3,
-                              offset: Offset(0, 1),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        t.label,
-                        style: CkType.body(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: value == t.id ? CkColors.ink : CkColors.muted,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color:
-                              value == t.id ? CkColors.ink : Colors.transparent,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${t.badge}',
-                          style: CkType.mono(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0,
-                            color:
-                                value == t.id ? CkColors.paper : CkColors.muted,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Confirmed card (+ pulsing dot, toss buttons)
-// ═══════════════════════════════════════════════════════════════════════════
-
-class _ConfirmedCard extends StatelessWidget {
-  const _ConfirmedCard({required this.v});
-  final MyMatchConfirmed v;
-
-  @override
-  Widget build(BuildContext context) {
-    final captain = v.role.startsWith('Captain');
-    final tossReady = v.tossReady;
-    // Soft red wash for the header strip when toss-ready — oklch(0.97 0.018
-    // 28) per the design source.
-    const tossHeaderBg = Color(0xFFFFEEEC);
-
-    return InkWell(
-      // Live → scoring screen. Toss-ready → Match Start. Scheduled/upcoming → Match Detail.
-      onTap: v.live
-          ? () => _openScoring(context)
-          : tossReady
-              ? () => _openMatchStart(context)
-              : () => _openMatchDetail(context),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: (v.urgent || tossReady) ? CkColors.red : CkColors.hairline,
-          ),
-          boxShadow: tossReady
-              ? const [
-                  BoxShadow(
-                    color: Color(0x2EBE3C28), // rgba(190,60,40,0.18)
-                    blurRadius: 20,
-                    offset: Offset(0, 6),
-                  ),
-                ]
-              : v.urgent
-                  ? const [
-                      BoxShadow(
-                        color: Color(0x14BE3C28), // rgba(190,60,40,0.08)
-                        blurRadius: 16,
-                        offset: Offset(0, 4),
-                      ),
-                    ]
-                  : null,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header strip — soft red bg + pulsing dot in toss-ready mode.
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: tossReady ? tossHeaderBg : CkColors.paper2,
-                border: const Border(
-                    bottom: BorderSide(color: CkColors.hairline)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (tossReady) ...[
-                          const _PulsingDot(),
-                          const SizedBox(width: 6),
-                        ],
-                        Flexible(
-                          child: Text(
-                            v.when.toUpperCase(),
-                            overflow: TextOverflow.ellipsis,
-                            style: CkType.mono(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.1,
-                              color: (v.urgent || tossReady)
-                                  ? CkColors.red
-                                  : CkColors.ink,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    v.tag,
-                    style: CkType.mono(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.06,
-                      color: CkColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Body.
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      _MiniCrest(short: v.homeShort, color: v.homeColor),
-                      const SizedBox(width: 10),
-                      Text('vs',
-                          style: CkType.mono(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0,
-                            color: CkColors.muted,
-                          )),
-                      const SizedBox(width: 10),
-                      _MiniCrest(short: v.awayShort, color: v.awayColor),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${v.homeName} vs ${v.awayName}',
-                              style: CkType.body(
-                                  fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(v.venue,
-                                  style: CkType.body(
-                                      fontSize: 11, color: CkColors.muted)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    margin: const EdgeInsets.only(top: 10),
-                    padding: const EdgeInsets.only(top: 8),
-                    decoration: const BoxDecoration(
-                      border:
-                          Border(top: BorderSide(color: CkColors.hairline)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            (captain ? '✦ ' : '') + v.role,
-                            style: CkType.mono(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.06,
-                              color: captain ? CkColors.red : CkColors.ink,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          v.countdown,
-                          style: CkType.mono(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.06,
-                            color: (v.urgent || tossReady)
-                                ? CkColors.red
-                                : CkColors.muted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (tossReady) ...[
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 14,
-                          child: _TossActionButton(
-                            label: 'Start match → Toss',
-                            primary: true,
-                            onTap: () => _openMatchStart(context),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 10,
-                          child: _TossActionButton(
-                            label: 'View squad',
-                            onTap: () {/* squad view — follow-up */},
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (v.helper != null) ...[
-                      const SizedBox(height: 6),
-                      Center(
-                        child: Text(
-                          v.helper!,
-                          textAlign: TextAlign.center,
-                          style: CkType.body(
-                            fontSize: 11,
-                            color: CkColors.muted,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openMatchStart(BuildContext context) {
-    context.push('/matches/${v.id}/start');
-  }
-
-  void _openMatchDetail(BuildContext context) {
-    context.push('/matches/${v.id}');
-  }
-
-  void _openScoring(BuildContext context) {
-    context.push('/matches/${v.id}/score');
-  }
-}
-
-/// Red 7×7 dot that pulses with a 1.4s ease-in-out cycle (matches the
-/// design's `pvm-pulse` keyframes: opacity 1 → 0.35 → 1).
-class _PulsingDot extends StatefulWidget {
-  const _PulsingDot();
-
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c;
-
-  @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (_, __) => Opacity(
-        opacity: 0.35 + 0.65 * _c.value,
-        child: Container(
-          width: 7,
-          height: 7,
-          decoration: const BoxDecoration(
-            color: CkColors.red,
-            shape: BoxShape.circle,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TossActionButton extends StatelessWidget {
-  const _TossActionButton({
-    required this.label,
-    required this.onTap,
-    this.primary = false,
-  });
-  final String label;
-  final VoidCallback onTap;
-  final bool primary;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: primary ? CkColors.red : CkColors.paper,
-          border: primary ? null : Border.all(color: CkColors.hairline),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          style: CkType.body(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: primary ? CkColors.paper : CkColors.ink,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Past row
-// ═══════════════════════════════════════════════════════════════════════════
-
-typedef _Past = ({
-  String id,
-  String tag,
-  String when,
-  String homeShort,
-  Color homeColor,
-  int homeRuns,
-  int homeWkts,
-  String awayShort,
-  Color awayColor,
-  int awayRuns,
-  int awayWkts,
-  bool homeWon,
-  String result,
-  String mine,
-});
-
-_Past _pastToRecord(MyMatchPast v) => (
-      id: v.id,
-      tag: v.tag,
-      when: v.when,
-      homeShort: v.homeShort,
-      homeColor: v.homeColor,
-      homeRuns: v.homeRuns,
-      homeWkts: v.homeWkts,
-      awayShort: v.awayShort,
-      awayColor: v.awayColor,
-      awayRuns: v.awayRuns,
-      awayWkts: v.awayWkts,
-      homeWon: v.homeWon,
-      result: v.result,
-      mine: v.mine,
-    );
-
-class _PastRow extends StatelessWidget {
-  const _PastRow({required this.m});
-  final _Past m;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => context.push('/matches/${m.id}'),
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: CkColors.hairline),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 56,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(m.when.toUpperCase(),
-                      style: CkType.mono(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.06,
-                        color: CkColors.ink,
-                      )),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(m.tag,
-                        style: CkType.mono(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0,
-                          color: CkColors.muted,
-                        )),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            _MiniCrest(short: m.homeShort, color: m.homeColor, size: 22),
-            const SizedBox(width: 4),
-            _MiniCrest(short: m.awayShort, color: m.awayColor, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text.rich(
-                    TextSpan(
-                      style: CkType.body(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      children: [
-                        TextSpan(text: '${m.homeRuns}/${m.homeWkts} '),
-                        TextSpan(
-                          text: 'v',
-                          style: CkType.body(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: CkColors.muted,
-                          ),
-                        ),
-                        TextSpan(text: ' ${m.awayRuns}/${m.awayWkts}'),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(m.mine,
-                        style: CkType.mono(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.04,
-                          color: CkColors.muted,
-                        )),
-                  ),
-                ],
+            Text(
+              'SEE ALL $total MATCHES',
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.09,
+                color: CkColors.ink2,
               ),
             ),
             const SizedBox(width: 8),
             Text(
-              m.result.split(' ').first.toUpperCase(),
+              '→',
               style: CkType.mono(
-                fontSize: 9,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.08,
-                color: m.homeWon ? CkColors.green : CkColors.red,
+                color: CkColors.muted,
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
+      );
 }
 
-class _SeeAllButton extends StatelessWidget {
-  const _SeeAllButton({required this.label});
+// ─── Shared bits ────────────────────────────────────────────────────────────
+
+class _Centered extends StatelessWidget {
+  const _Centered({
+    required this.title,
+    required this.body,
+    this.action,
+    this.footnote,
+  });
+
+  final String title;
+  final String body;
+  final Widget? action;
+  final String? footnote;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(28, 72, 28, 28),
+        children: [
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: CkType.display(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.015,
+              color: CkColors.ink,
+            ),
+          ),
+          const SizedBox(height: 9),
+          Text(
+            body,
+            textAlign: TextAlign.center,
+            style: CkType.body(fontSize: 13, height: 1.6, color: CkColors.muted),
+          ),
+          if (action != null) ...[const SizedBox(height: 22), action!],
+          if (footnote != null) ...[
+            const SizedBox(height: 18),
+            Text(
+              footnote!.toUpperCase(),
+              textAlign: TextAlign.center,
+              style: CkType.mono(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.08,
+                color: CkColors.soft,
+              ),
+            ),
+          ],
+        ],
+      );
+}
+
+class _InkButton extends StatelessWidget {
+  const _InkButton({required this.label, required this.onTap});
+
   final String label;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Text(
-        label,
-        style: CkType.mono(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.08,
-          color: CkColors.ink2,
+  Widget build(BuildContext context) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          height: 48,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: CkColors.ink,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            label.toUpperCase(),
+            style: CkType.mono(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.08,
+              color: CkColors.paper,
+            ),
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Atoms
-// ═══════════════════════════════════════════════════════════════════════════
+class _GhostRow extends StatelessWidget {
+  const _GhostRow({required this.label, this.trailing, required this.onTap});
 
-/// 28×22 r6 rounded-square crest (Inter Tight initials), size-parametric.
-class _MiniCrest extends StatelessWidget {
-  const _MiniCrest({required this.short, required this.color, this.size = 28});
-
-  final String short;
-  final Color color;
-  final double size;
+  final String label;
+  final String? trailing;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular((size * 0.22).roundToDouble()),
-      ),
-      child: Text(
-        short,
-        style: CkType.display(
-          fontSize: (size * 0.36).roundToDouble(),
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
+  Widget build(BuildContext context) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: CkColors.paper2,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: CkColors.line),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CkType.mono(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.08,
+                    color: CkColors.ink2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (trailing != null)
+                Text(
+                  trailing!,
+                  style: CkType.mono(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.08,
+                    color: CkColors.muted,
+                  ),
+                ),
+              const SizedBox(width: 8),
+              Text(
+                '→',
+                style: CkType.mono(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: CkColors.muted,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
-
-/// monoLabel: JetBrains Mono 10 / 700 / 0.10em uppercase, default muted.
-TextStyle _monoLabel({Color color = CkColors.muted}) => CkType.mono(
-      fontSize: 10,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.10,
-      color: color,
-    );
-

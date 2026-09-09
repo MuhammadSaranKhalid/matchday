@@ -5,12 +5,11 @@ import '../entities/ball.dart';
 import '../entities/format_preset.dart';
 import '../entities/innings_summary.dart';
 import '../entities/match.dart';
-import '../entities/match_batsman_stats.dart';
-import '../entities/match_bowler_stats.dart';
 import '../entities/match_innings_state.dart';
 import '../entities/match_player.dart';
 import '../entities/match_pool_application.dart';
 import '../entities/match_request.dart';
+import '../entities/match_innings.dart';
 import '../entities/match_wicket.dart';
 
 /// Online-only matches contract. Reads/writes hit Supabase directly; no
@@ -258,15 +257,13 @@ abstract class MatchesRepository {
     required int inningsNumber,
   });
 
-  // ─── Materialized Scorecards & Wickets ──────────────────────────────────
+  // ─── Innings & Wickets ──────────────────────────────────────────────────
 
-  Future<Either<Failure, List<MatchBatsmanStats>>> getBatsmanStats(
-    String inningsId,
-  );
-
-  Future<Either<Failure, List<MatchBowlerStats>>> getBowlerStats(
-    String inningsId,
-  );
+  /// The innings rows for a match, oldest-first.
+  ///
+  /// Needed to reach [getWickets], which is keyed by the innings uuid while
+  /// deliveries carry only an innings number.
+  Future<Either<Failure, List<MatchInnings>>> listInnings(MatchId matchId);
 
   Future<Either<Failure, List<MatchWicket>>> getWickets(
     String inningsId,

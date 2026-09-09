@@ -9,12 +9,11 @@ import '../../domain/entities/ball.dart';
 import '../../domain/entities/format_preset.dart';
 import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
-import '../../domain/entities/match_batsman_stats.dart';
-import '../../domain/entities/match_bowler_stats.dart';
 import '../../domain/entities/match_innings_state.dart';
 import '../../domain/entities/match_player.dart';
 import '../../domain/entities/match_pool_application.dart';
 import '../../domain/entities/match_request.dart';
+import '../../domain/entities/match_innings.dart';
 import '../../domain/entities/match_wicket.dart';
 import '../../domain/repositories/matches_repository.dart';
 import '../datasources/format_presets_remote_datasource.dart';
@@ -849,25 +848,11 @@ class MatchesRepositoryImpl implements MatchesRepository {
   // ─── Materialized Scorecards & Wickets ──────────────────────────────────
 
   @override
-  Future<Either<Failure, List<MatchBatsmanStats>>> getBatsmanStats(
-    String inningsId,
+  Future<Either<Failure, List<MatchInnings>>> listInnings(
+    MatchId matchId,
   ) async {
     try {
-      final dtos = await _remote.listBatsmanStats(inningsId);
-      return Right(dtos.map((d) => d.toEntity()).toList());
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(UnknownFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<MatchBowlerStats>>> getBowlerStats(
-    String inningsId,
-  ) async {
-    try {
-      final dtos = await _remote.listBowlerStats(inningsId);
+      final dtos = await _remote.listInnings(matchId.value);
       return Right(dtos.map((d) => d.toEntity()).toList());
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));

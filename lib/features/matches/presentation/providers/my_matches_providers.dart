@@ -5,6 +5,7 @@ import '../../../../core/error/failures.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../tournaments/presentation/providers/tournaments_providers.dart';
 import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_request.dart';
@@ -12,6 +13,7 @@ import '../../domain/entities/match_role.dart';
 import '../state/live_panel_match.dart';
 import '../state/my_matches_view.dart';
 import 'matches_providers.dart';
+import 'team_display.dart';
 
 part 'my_matches_providers.g.dart';
 
@@ -38,9 +40,12 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   final allRequests =
       reqResult.fold<List<MatchRequest>>((_) => const [], (list) => list);
 
-  // Resolve teams owned/managed by the user without hanging on stream .future.
-  final teamsAsync = ref.watch(myTeamsProvider);
-  final teams = teamsAsync.value ?? const <Team>[];
+  // `myTeamsProvider` is a Stream. Reading `.value` before its first event
+  // yields an empty list, and myTeamIds feeds BOTH the request filters and the
+  // captain/manager role detection below — so on the first frame every row lost
+  // its role line and the request lists came back empty. Await the first event
+  // instead; the provider is still watched, so later emissions recompute this.
+  final teams = await ref.watch(myTeamsProvider.future);
   final myTeamIds = {for (final t in teams) t.id.value};
 
   final outbound = allRequests
@@ -91,6 +96,20 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
     );
   }
 
+  // Competition names for the meta line. The design prints "Ravi Cup T20 ·
+  // Ravi Ground 2 · 16 ov"; without this the card could only say the literal
+  // word "Tournament", which tells the reader nothing they did not know.
+  final tournamentNames = <String, String>{};
+  for (final id in matches.map((m) => m.tournamentId).whereType<String>().toSet()) {
+    try {
+      final t = await ref.watch(tournamentDetailProvider(id).future);
+      tournamentNames[id] = t.name;
+    } catch (_) {
+      // A cup we cannot read (deleted, or private to someone else) simply
+      // falls back to the generic label rather than failing the whole screen.
+    }
+  }
+
   final past = matches.where((m) => m.status.isPast).toList();
   final upcoming = matches
       .where((m) => m.status.isUpcoming || m.status.isLive)
@@ -111,16 +130,18 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
 
   final confirmedRows = [
     for (final m in upcoming)
-      _confirmedFor(m, teamsById, currentUserId: user.id.value),
+      _confirmedFor(m, teamsById,
+          currentUserId: user.id.value, tournamentNames: tournamentNames),
   ];
   final pastRows = [
     for (final m in past)
       _pastFor(m, teamsById,
           innings: inningsByMatch[m.id] ?? const [],
-          currentUserId: user.id.value),
+          currentUserId: user.id.value,
+          tournamentNames: tournamentNames),
   ];
-  final sentRows = [for (final r in outbound) _sentFor(r, teamsById)];
-  final inboundRows = [for (final r in inbound) _inboundFor(r, teamsById)];
+  final sentRows = [for (final r in outbound) sentRequestRow(r, teamsById)];
+  final inboundRows = [for (final r in inbound) inboundRequestRow(r, teamsById)];
 
   return MyMatchesView(
     confirmed: confirmedRows,
@@ -144,6 +165,7 @@ MyMatchConfirmed _confirmedFor(
   Match m,
   Map<String, Team> teamsById, {
   required String currentUserId,
+  Map<String, String> tournamentNames = const {},
 }) {
   final home = teamsById[m.teamAId.value];
   final away = teamsById[m.teamBId.value];
@@ -210,12 +232,31 @@ MyMatchConfirmed _confirmedFor(
     live: m.status.isLive,
     tossReady: tossReady,
     helper: helper,
+    startTime: start,
+    metaLine: _metaLine(m, tournamentNames),
+    // Duties route somewhere and take a trailing arrow; states do not. A
+    // captain always owes something; a scorer only owes once play is on.
+    roleIsDuty: role == MatchRoleKind.captain ||
+        (role == MatchRoleKind.scoring && m.status.isLive),
+    liveState: switch (m.status) {
+      MatchStatus.live => 'LIVE',
+      MatchStatus.inningsBreak => 'BREAK',
+      MatchStatus.superOver => 'SUPER OVER',
+      _ => null,
+    },
+    liveSince: m.status.isLive && m.actualStartTime != null
+        ? 'Started ${_hhmm(m.actualStartTime!)}'
+        : null,
+    youIsHome: userTeamIds.contains(m.teamAId.value) ||
+        m.teamACaptain == currentUserId,
+    opponentTbc: away == null && m.tournamentId != null,
   );
 }
 
 MyMatchPast _pastFor(
   Match m,
   Map<String, Team> teamsById, {
+  Map<String, String> tournamentNames = const {},
   required List<InningsSummary> innings,
   required String currentUserId,
 }) {
@@ -257,16 +298,36 @@ MyMatchPast _pastFor(
     awayRuns: awayInn?.totalRuns ?? 0,
     awayWkts: awayInn?.totalWickets ?? 0,
     homeWon: homeWon,
-    result: m.status == MatchStatus.completed
-        ? (myWon ? 'WON' : 'LOST')
-        : m.status == MatchStatus.walkover
-            ? 'WALKOVER'
-            : 'ABANDONED',
+    // The one-word chip. `tied` and `no_result` are real statuses since the
+    // 2026-09-06 enum reconciliation and used to both mislabel as ABANDONED.
+    result: switch (m.status) {
+      MatchStatus.completed => myWon ? 'Won' : 'Lost',
+      MatchStatus.tied => 'Tied',
+      MatchStatus.noResult => 'No result',
+      MatchStatus.walkover => 'Walkover',
+      _ => 'Abandoned',
+    },
     mine: '',
+    startTime: m.scheduledStartTime ?? m.createdAt,
+    metaLine: _metaLine(m, tournamentNames),
+    // The result as a sentence is the card's hero; the chip only summarises it.
+    sentence: _resultSentence(m, home: home, away: away, homeWon: homeWon),
+    homeOvers: _oversLabel(homeInn, m),
+    awayOvers: _oversLabel(awayInn, m),
+    // A walkover was never bowled, so printing 0/0 would be a lie.
+    showScores: m.status != MatchStatus.walkover,
+    mineIsHome: onHome,
+    note: switch (m.status) {
+      MatchStatus.walkover => 'Opposition did not arrive · no overs bowled',
+      MatchStatus.noResult => 'Rain stopped play · result not awarded',
+      _ => null,
+    },
   );
 }
 
-MyMatchRequest _sentFor(MatchRequest r, Map<String, Team> teamsById) {
+/// Pre-render an OUTBOUND challenge row. Public because My Challenges renders
+/// the same rows now that requests have moved off My Matches.
+MyMatchRequest sentRequestRow(MatchRequest r, Map<String, Team> teamsById) {
   final isOpen = r.toTeamId == null;
   final opp = isOpen ? null : teamsById[r.toTeamId!.value];
   return MyMatchRequest(
@@ -287,7 +348,8 @@ MyMatchRequest _sentFor(MatchRequest r, Map<String, Team> teamsById) {
   );
 }
 
-MyMatchRequest _inboundFor(MatchRequest r, Map<String, Team> teamsById) {
+/// Pre-render an INBOUND challenge row. See [sentRequestRow].
+MyMatchRequest inboundRequestRow(MatchRequest r, Map<String, Team> teamsById) {
   final challenger = teamsById[r.fromTeamId.value];
   return MyMatchRequest(
     requestId: r.id.value,
@@ -319,32 +381,11 @@ String _expiresLabel(MatchRequest r) {
   return 'expires ${remaining.inDays}d';
 }
 
-String _short(Team? t, {required String fallback}) {
-  if (t == null) return fallback;
-  final mono = t.logoMonogram;
-  if (mono != null && mono.isNotEmpty) return mono.toUpperCase();
-  // Derive from the team's name: first letters of up to three words.
-  final words = t.name.split(RegExp(r'\s+'));
-  final letters = words
-      .where((w) => w.isNotEmpty)
-      .take(3)
-      .map((w) => w[0])
-      .join();
-  return letters.isEmpty ? fallback : letters.toUpperCase();
-}
+String _short(Team? t, {required String fallback}) =>
+    teamShort(t, fallback: fallback);
 
-Color _color(String? hex, {required Color fallback}) {
-  if (hex == null || hex.isEmpty) return fallback;
-  final cleaned = hex.replaceAll('#', '').trim();
-  if (cleaned.length == 6) {
-    final n = int.tryParse(cleaned, radix: 16);
-    if (n != null) return Color(0xFF000000 | n);
-  } else if (cleaned.length == 8) {
-    final n = int.tryParse(cleaned, radix: 16);
-    if (n != null) return Color(n);
-  }
-  return fallback;
-}
+Color _color(String? hex, {required Color fallback}) =>
+    teamColor(hex, fallback: fallback);
 
 bool _isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
@@ -474,4 +515,67 @@ Future<LivePanelMatch?> livePanelMatch(Ref ref) async {
     opponentScore: chased == null ? '—' : '${chased.totalRuns}',
     targetLine: targetLine,
   );
+}
+
+// ─── New-card helpers (My Matches.dc.html) ──────────────────────────────────
+
+/// "Ravi Cup T20 · Ravi Ground 2 · 16 ov" — competition, ground, overs.
+/// A friendly says so where a tournament would name itself.
+String _metaLine(Match m, [Map<String, String> tournamentNames = const {}]) {
+  final tid = m.tournamentId;
+  final comp = tid == null
+      ? 'Friendly'
+      : (tournamentNames[tid] ?? 'Tournament');
+  final ground = m.venue?.ground;
+  final overs = m.format.oversPerInnings == 0
+      ? null
+      : '${m.format.oversPerInnings} ov';
+  return [comp, ground, overs]
+      .where((p) => p != null && p.isNotEmpty)
+      .join(' · ');
+}
+
+/// Overs faced, from the legal-ball count: 98 balls at 6 per over is "16.2".
+String _oversLabel(InningsSummary? inn, Match m) {
+  if (inn == null) return '';
+  final bpo = m.format.ballsPerOver == 0 ? 6 : m.format.ballsPerOver;
+  final balls = inn.legalBallsFaced;
+  return '${balls ~/ bpo}.${balls % bpo}';
+}
+
+/// The result as a sentence — the past card's hero. The chip beside it is only
+/// the one-word summary, so this carries the margin and the reason.
+String _resultSentence(
+  Match m, {
+  required Team? home,
+  required Team? away,
+  required bool homeWon,
+}) {
+  String shortName(Team? t) {
+    final n = (t?.name ?? '').trim();
+    if (n.isEmpty) return 'They';
+    final parts = n.split(RegExp(r'\s+'));
+    return parts.length > 1 ? parts.last : n;
+  }
+
+  switch (m.status) {
+    case MatchStatus.tied:
+      return 'Match tied · scores level';
+    case MatchStatus.noResult:
+      return 'No result · rain stopped play';
+    case MatchStatus.walkover:
+      return 'Awarded to ${(homeWon ? home : away)?.name ?? 'the other side'}';
+    case MatchStatus.abandoned:
+      return 'Abandoned before the toss';
+    case MatchStatus.completed:
+      final winner = shortName(homeWon ? home : away);
+      // Prefer the server's own sentence when it wrote one — it knows the
+      // margin ("won by 24 runs" vs "won by 3 wickets"), which cannot be
+      // recomputed here without the full scorecard.
+      final summary = (m.resultDescription ?? '').trim();
+      if (summary.isNotEmpty) return summary;
+      return '$winner won';
+    default:
+      return 'Match ended';
+  }
 }

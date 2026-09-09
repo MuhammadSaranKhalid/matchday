@@ -9,8 +9,6 @@ import '../../data/scoring/scoring_session.dart';
 import '../../domain/entities/ball.dart';
 import '../../domain/entities/format_preset.dart';
 import '../../domain/entities/match.dart';
-import '../../domain/entities/match_batsman_stats.dart';
-import '../../domain/entities/match_bowler_stats.dart';
 import '../../domain/entities/match_innings_state.dart';
 import '../../domain/entities/match_player.dart';
 import '../../domain/entities/match_pool_application.dart';
@@ -194,28 +192,6 @@ Future<List<MatchPoolApplication>> poolApplications(
 }
 
 // ─── Materialized Scorecards & Wickets ──────────────────────────────────────
-
-/// Materialized batting scorecard for an innings (O(1) fast paint).
-@riverpod
-Future<List<MatchBatsmanStats>> batsmanScorecard(
-  Ref ref,
-  String inningsId,
-) async {
-  final result =
-      await ref.watch(matchesRepositoryProvider).getBatsmanStats(inningsId);
-  return result.fold((f) => throw FailureWrapper(f), (list) => list);
-}
-
-/// Materialized bowling scorecard for an innings (O(1) fast paint).
-@riverpod
-Future<List<MatchBowlerStats>> bowlerScorecard(
-  Ref ref,
-  String inningsId,
-) async {
-  final result =
-      await ref.watch(matchesRepositoryProvider).getBowlerStats(inningsId);
-  return result.fold((f) => throw FailureWrapper(f), (list) => list);
-}
 
 /// Wickets fallen for an innings (fall of wickets timeline).
 @riverpod

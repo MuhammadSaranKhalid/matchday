@@ -5,11 +5,10 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/ball_dto.dart';
-import '../models/match_batsman_stats_dto.dart';
-import '../models/match_bowler_stats_dto.dart';
 import '../models/match_dto.dart';
 import '../models/match_innings_state_dto.dart';
 import '../models/match_player_dto.dart';
+import '../models/match_innings_dto.dart';
 import '../models/match_wicket_dto.dart';
 
 /// Talks to Supabase for the match-lifecycle tables — `matches`,
@@ -45,8 +44,7 @@ class MatchesRemoteDataSource {
       'unclaimed:unclaimed_players!unclaimed_id(display_name)';
   static const _matchInningsState = 'match_innings_state';
   static const _balls = 'match_deliveries';
-  static const _batsmanStats = 'match_batsman_stats';
-  static const _bowlerStats = 'match_bowler_stats';
+  static const _matchInnings = 'match_innings';
   static const _wickets = 'match_wickets';
   static const _scorerLeases = 'match_scorer_leases';
 
@@ -796,29 +794,20 @@ class MatchesRemoteDataSource {
     return null;
   }
 
-  // ─── Materialized Scorecards & Wickets ──────────────────────────────────
+  // ─── Innings & Wickets ──────────────────────────────────────────────────
 
-  Future<List<MatchBatsmanStatsDto>> listBatsmanStats(String inningsId) async {
+  /// The innings rows for a match, oldest-first.
+  ///
+  /// Deliveries carry an innings *number*; `match_wickets` is keyed by the
+  /// innings *uuid*. This is the only way to get from one to the other.
+  Future<List<MatchInningsDto>> listInnings(String matchId) async {
     try {
       final rows = await _supabase
-          .from(_batsmanStats)
+          .from(_matchInnings)
           .select()
-          .eq('innings_id', inningsId)
-          .order('batting_position', ascending: true, nullsFirst: false);
-      return rows.map(MatchBatsmanStatsDto.fromJson).toList();
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  Future<List<MatchBowlerStatsDto>> listBowlerStats(String inningsId) async {
-    try {
-      final rows = await _supabase
-          .from(_bowlerStats)
-          .select()
-          .eq('innings_id', inningsId)
-          .order('bowling_position', ascending: true, nullsFirst: false);
-      return rows.map(MatchBowlerStatsDto.fromJson).toList();
+          .eq('match_id', matchId)
+          .order('innings_number', ascending: true);
+      return rows.map(MatchInningsDto.fromJson).toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

@@ -116,6 +116,14 @@ class MyMatchConfirmed {
     this.tossReady = false,
     this.live = false,
     this.helper,
+    this.startTime,
+    this.metaLine = '',
+    this.roleIsDuty = false,
+    this.liveState,
+    this.liveSince,
+    this.youIsHome = true,
+    this.opponentTbc = false,
+    this.tbcNote,
   });
 
   final String id;
@@ -161,6 +169,35 @@ class MyMatchConfirmed {
   /// `tossReady` card. e.g. "Both captains here. Tap to flip the coin
   /// together."
   final String? helper;
+
+  /// Scheduled start, kept so the list can group by day and the gutter can
+  /// print a time. Null on a fixture with no agreed date.
+  final DateTime? startTime;
+
+  /// "Ravi Cup T20 · Ravi Ground 2 · 16 ov" — competition (or Friendly),
+  /// ground, overs, in one mono line.
+  final String metaLine;
+
+  /// Whether the role strip is a DUTY (gets a trailing arrow and routes
+  /// somewhere) or a STATE (no arrow, nothing to do). The design is explicit:
+  /// "Duties get a trailing arrow, states don't, spectators get no strip."
+  final bool roleIsDuty;
+
+  /// `LIVE` / `BREAK` / `SUPER OVER` — replaces the gutter clock in play.
+  final String? liveState;
+
+  /// "Started 4:30" under the live badge.
+  final String? liveSince;
+
+  /// Which of the two rows carries the `YOU` marker.
+  final bool youIsHome;
+
+  /// Bracket fixture whose second side is not yet decided. The away row prints
+  /// [awayName] as the feeder text ("Winner of Semi-final 2") with no crest.
+  final bool opponentTbc;
+
+  /// "Opponent decided Fri 18 Sep".
+  final String? tbcNote;
 }
 
 /// Pre-rendered Past row data.
@@ -183,6 +220,14 @@ class MyMatchPast {
     required this.homeWon,
     required this.result,
     required this.mine,
+    this.startTime,
+    this.sentence = '',
+    this.metaLine = '',
+    this.homeOvers = '',
+    this.awayOvers = '',
+    this.showScores = true,
+    this.note,
+    this.mineIsHome = true,
   });
 
   final String id;
@@ -206,8 +251,31 @@ class MyMatchPast {
   final String result;
 
   /// "You: 78 (52)" line. Empty string when stats aren't available — v1
-  /// doesn't aggregate batting stats, so this is empty for now.
+  /// doesn't aggregate batting stats, so this is empty for now. The design
+  /// reserves a dashed band at the card's foot so it lands without re-layout.
   final String mine;
+
+  final DateTime? startTime;
+
+  /// The result as a SENTENCE, which is the card's hero — "Lions won by 24
+  /// runs", "Match tied · scores level", "Awarded to Lahore Lions". Not a chip;
+  /// the chip is the one-word summary beside it.
+  final String sentence;
+
+  /// "Ravi Cup T20 · Group A · 16 ov".
+  final String metaLine;
+
+  final String homeOvers;
+  final String awayOvers;
+
+  /// False for a walkover: no overs were bowled, so printing 0/0 would lie.
+  final bool showScores;
+
+  /// "Opposition did not arrive · no overs bowled" — why a number is missing.
+  final String? note;
+
+  /// Which row carries the `YOU` marker.
+  final bool mineIsHome;
 }
 
 /// Map a [MatchRoleKind] to (role line text, urgency hint). The `tag`

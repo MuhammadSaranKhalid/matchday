@@ -100,6 +100,19 @@ void main() {
     expect(cup.pathParameters['tournamentId'], 'xyz-789',
         reason: '/c/ is COMPETITIONS');
 
+    // The two challenge surfaces are distinct destinations and must both
+    // resolve. /my/challenges is the direct-challenge queue reached from the
+    // My Matches header; /my/pool-requests is the open-pool page the menu's
+    // "My Challenges" row points at. These were briefly collapsed onto one
+    // route, which took the pool page's menu entry away from it.
+    for (final path in ['/my/challenges', '/my/pool-requests']) {
+      expect(
+        router.configuration.findMatch(Uri.parse(path)).error,
+        isNull,
+        reason: '$path must resolve',
+      );
+    }
+
     // Control: an unclaimed path really does produce the error this guards
     // against, so the assertions above are not vacuous.
     expect(

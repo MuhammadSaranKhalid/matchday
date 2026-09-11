@@ -19,11 +19,10 @@ import 'package:matchday/features/teams/presentation/providers/teams_providers.d
 void main() {
   Team team(String id, String name, {bool verified = false}) => Team(
         id: TeamId(id),
-        ownerId: 'user-1',
+        createdBy: 'user-1',
         name: name,
         type: TeamType.club,
         privacy: TeamPrivacy.public,
-        managers: const ['user-1'],
         primaryColor: '#7A2E2E',
         isVerified: verified,
         createdAt: DateTime(2026, 1, 1),
@@ -281,7 +280,7 @@ void main() {
             teamId: const TeamId('team-app'),
             playerId: id,
             playerType: PlayerType.claimed,
-            role: role,
+            roles: {role.wire},
             addedBy: 'user-1',
             joinedAt: DateTime(2026, 1, 1),
             updatedAt: DateTime(2026, 1, 1),
@@ -309,12 +308,23 @@ void main() {
       expect(entries[0].initials, 'FM');
     });
 
-    test('falls back to the roster role when the XI names no keeper', () {
+    test('marks nobody as keeper when the XI names none', () {
+      // Until 2026-09-10 this fell back to a team-level `wicket_keeper` role.
+      // That role is gone: keeping is a per-match job, so the only answer is
+      // the keeper the applicant actually nominated for THIS match.
       final entries = resolveXi(
         xi: const ['p1'],
-        roster: [member('p1', 'Zeeshan Khalid', MemberRole.wicketKeeper)],
+        roster: [member('p1', 'Zeeshan Khalid', MemberRole.player)],
       );
-      expect(entries.single.keeper, isTrue);
+      expect(entries.single.keeper, isFalse);
+    });
+
+    test('marks the captain from their roster rung', () {
+      final entries = resolveXi(
+        xi: const ['p1'],
+        roster: [member('p1', 'Zeeshan Khalid', MemberRole.captain)],
+      );
+      expect(entries.single.captain, isTrue);
     });
 
     test('keeps a row for an id the roster cannot resolve', () {

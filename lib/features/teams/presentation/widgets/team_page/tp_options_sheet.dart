@@ -418,6 +418,7 @@ class _SheetHeader extends StatelessWidget {
           name: team.name,
           primaryColor: hexOf(team.primary),
           logoUrl: team.logoUrl,
+          crestKind: team.crestKind,
           monogram: team.mono,
           size: 44,
         ),

@@ -37,11 +37,10 @@ Match _match() => Match(
 
 Team _team(TeamId id, String name) => Team(
       id: id,
-      ownerId: 'capA',
+      createdBy: 'capA',
       name: name,
       type: TeamType.club,
       privacy: TeamPrivacy.public,
-      managers: const [],
       createdAt: DateTime(2026),
       updatedAt: DateTime(2026),
     );
@@ -69,7 +68,7 @@ RosterMember _roster(String refId, String name, {int? jersey}) => RosterMember(
         teamId: _teamA,
         playerId: refId,
         playerType: PlayerType.claimed,
-        role: MemberRole.player,
+        roles: {MemberRole.player.wire},
         addedBy: 'capA',
         joinedAt: DateTime(2026),
         updatedAt: DateTime(2026),

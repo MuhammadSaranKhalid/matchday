@@ -265,7 +265,16 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
   Widget build(BuildContext context) {
     final tournamentAsync =
         ref.watch(tournamentDetailProvider(widget.tournamentId));
-    final myTeamsAsync = ref.watch(myTeamsProvider);
+    // Only teams the viewer actually runs. `myTeamsProvider` includes teams
+    // they merely play for, while `tournament_teams_insert_manager` demands
+    // is_team_manager — so before this filter (2026-09-10) a squad player
+    // could pick their team in the wizard and get a raw RLS denial at submit.
+    final myRoles = ref.watch(myTeamRolesProvider).value ?? const {};
+    final myTeamsAsync = ref.watch(myTeamsProvider).whenData(
+          (teams) => teams
+              .where((t) => myRoles[t.id.value]?.isStaff ?? false)
+              .toList(),
+        );
     final registrationsAsync =
         ref.watch(tournamentRegistrationsProvider(widget.tournamentId));
     final isBusy = ref.watch(tournamentsControllerProvider).isLoading;

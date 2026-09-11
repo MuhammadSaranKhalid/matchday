@@ -197,17 +197,18 @@ as $$
     mo.role,
     mo.assigned_at,
     -- The first team this person owns or manages reads as "their club".
-    (select tm.team_name
-       from public.teams tm
-      where tm.owner_id = mo.user_id or mo.user_id = any(tm.managers)
-      order by tm.created_at
+    -- 2026-09-10: these ask "which teams does THIS person run?", so they read
+    -- the ladder directly rather than via is_team_manager(), which answers
+    -- only for auth.uid().
+    (select t.team_name
+       from public.teams t
+      where public._user_team_can(mo.user_id, t.team_id, 'team.roster.write')
+      order by t.created_at
       limit 1),
     -- Neutral = not attached to either side of THIS fixture.
-    not exists (
-      select 1
-        from public.teams tm
-       where tm.team_id in (m.team_a_id, m.team_b_id)
-         and (tm.owner_id = mo.user_id or mo.user_id = any(tm.managers))
+    not (
+      public._user_team_can(mo.user_id, m.team_a_id, 'team.roster.write')
+      or public._user_team_can(mo.user_id, m.team_b_id, 'team.roster.write')
     )
   from public.match_officials mo
   join public.matches m  on m.match_id  = mo.match_id
@@ -338,16 +339,9 @@ as $$
       from public.tournaments t
      where t.tournament_id = p_tournament_id
     union
-    select tm.owner_id
+    -- 2026-09-10: was owner_id UNION unnest(managers); one set now.
+    select public.team_staff_ids(tt.team_id)
       from public.tournament_teams tt
-      join public.teams tm on tm.team_id = tt.team_id
-     where tt.tournament_id = p_tournament_id
-       and tt.status = 'approved'
-       and tm.owner_id is not null
-    union
-    select unnest(tm.managers)
-      from public.tournament_teams tt
-      join public.teams tm on tm.team_id = tt.team_id
      where tt.tournament_id = p_tournament_id
        and tt.status = 'approved'
   )
@@ -356,16 +350,15 @@ as $$
     pr.display_name,
     pr.username,
     pr.profile_photo_url,
-    (select tm.team_name
-       from public.teams tm
-      where tm.owner_id = pr.user_id or pr.user_id = any(tm.managers)
-      order by tm.created_at
+    (select t.team_name
+       from public.teams t
+      where public._user_team_can(pr.user_id, t.team_id, 'team.roster.write')
+      order by t.created_at
       limit 1),
     not exists (
-      select 1
-        from public.teams tm, target tg
-       where tm.team_id in (tg.team_a_id, tg.team_b_id)
-         and (tm.owner_id = pr.user_id or pr.user_id = any(tm.managers))
+      select 1 from target tg
+       where public._user_team_can(pr.user_id, tg.team_a_id, 'team.roster.write')
+          or public._user_team_can(pr.user_id, tg.team_b_id, 'team.roster.write')
     ),
     (select count(*)::integer
        from public.match_officials mo2

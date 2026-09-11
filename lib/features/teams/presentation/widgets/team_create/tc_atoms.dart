@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../state/team_create_state.dart';
 import '../../utils/team_display.dart';
+import '../team_crest.dart';
 
 /// 12-swatch curated palette — port of `palette` in design/screens/TeamCreate.jsx.
 /// Mix of dark saturated + accent + neutrals chosen to look right next to
@@ -36,10 +35,10 @@ class TcLabel extends StatelessWidget {
       child: Text(
         text.toUpperCase(),
         style: CkType.mono(
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.10,
-          color: CkColors.muted,
+          color: CkColors.ink2,
         ),
       ),
     );
@@ -219,7 +218,7 @@ class TcSelectTile extends StatelessWidget {
                 Text(
                   subtitle!,
                   textAlign: TextAlign.center,
-                  style: CkType.body(fontSize: 10, color: CkColors.muted),
+                  style: CkType.body(fontSize: 12, color: CkColors.muted),
                 ),
               ],
             ],
@@ -285,7 +284,7 @@ class TcColorGrid extends StatelessWidget {
 /// backgrounds, paper for dark.
 Color _onColor(Color bg) {
   final luminance = bg.computeLuminance();
-  return luminance > 0.55 ? CkColors.ink : CkColors.paper;
+  return luminance > 0.179 ? CkColors.ink : CkColors.paper;
 }
 
 Color onColor(Color bg) => _onColor(bg);
@@ -310,93 +309,10 @@ class TcCrestPreview extends StatelessWidget {
   final double size;
   final double radius;
 
-  bool get _hasLogo =>
-      crestKind == CrestKind.upload &&
-      logoPath != null &&
-      logoPath!.isNotEmpty;
-
   @override
-  Widget build(BuildContext context) {
-    final primary = parseHexColor(primaryHex, fallback: CkColors.ink);
-    final fg = onColor(primary);
-    if (_hasLogo) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: CkColors.paper2,
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(color: CkColors.hairline),
-        ),
-        clipBehavior: Clip.antiAlias,
-        padding: EdgeInsets.all(size * 0.06),
-        child: Image.file(File(logoPath!), fit: BoxFit.contain),
-      );
-    }
-    Widget? overlay;
-    String text;
-    switch (crestKind) {
-      case CrestKind.shield:
-        overlay = CustomPaint(
-          size: Size(size, size),
-          painter: _ShieldPainter(stroke: fg),
-        );
-        text = monogram;
-      case CrestKind.initials:
-        text = monogram.isNotEmpty ? monogram[0] : '–';
-      case CrestKind.monogram:
-      case CrestKind.upload:
-        text = monogram;
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: primary,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          if (overlay != null) overlay,
-          Text(
-            text,
-            style: CkType.display(
-              fontSize: size * 0.42,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.04,
-              color: fg,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ShieldPainter extends CustomPainter {
-  _ShieldPainter({required this.stroke});
-  final Color stroke;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = size.width;
-    final paint = Paint()
-      ..color = stroke
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = s * 0.018
-      ..strokeJoin = StrokeJoin.round;
-    final path = Path()
-      ..moveTo(s * 0.5, s * 0.08)
-      ..lineTo(s * 0.92, s * 0.20)
-      ..lineTo(s * 0.88, s * 0.60)
-      ..quadraticBezierTo(s * 0.88, s * 0.84, s * 0.5, s * 0.96)
-      ..quadraticBezierTo(s * 0.12, s * 0.84, s * 0.12, s * 0.60)
-      ..lineTo(s * 0.08, s * 0.20)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
+  Widget build(BuildContext context) => TeamCrest(
+    name: monogram, monogram: monogram, primaryColor: primaryHex,
+    crestKind: crestKind, size: size,
+    localLogoPath: crestKind == CrestKind.upload ? logoPath : null,
+  );
 }

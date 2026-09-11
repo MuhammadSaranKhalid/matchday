@@ -15,9 +15,9 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TeamMemberDto {
 
-@JsonKey(name: 'membership_id') String get membershipId;@JsonKey(name: 'team_id') String get teamId;@JsonKey(name: 'user_id') String? get userId;@JsonKey(name: 'unclaimed_id') String? get unclaimedId;@JsonKey(name: 'jersey_number') int? get jerseyNumber; String get role;// Nullable since 2026-09-06: ON DELETE SET NULL, so the roster row
+@JsonKey(name: 'membership_id') String get membershipId;@JsonKey(name: 'team_id') String get teamId;@JsonKey(name: 'user_id') String? get userId;@JsonKey(name: 'unclaimed_id') String? get unclaimedId;@JsonKey(name: 'jersey_number') int? get jerseyNumber;// Nullable since 2026-09-06: ON DELETE SET NULL, so the roster row
 // survives the person who added it deleting their account.
-@JsonKey(name: 'added_by') String? get addedBy;@JsonKey(name: 'joined_at') String get joinedAt;@JsonKey(name: 'updated_at') String get updatedAt;
+@JsonKey(name: 'team_member_roles') List<Map<String, dynamic>>? get roleRows;@JsonKey(name: 'added_by') String? get addedBy;@JsonKey(name: 'joined_at') String get joinedAt;@JsonKey(name: 'updated_at') String get updatedAt;
 /// Create a copy of TeamMemberDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -30,16 +30,16 @@ $TeamMemberDtoCopyWith<TeamMemberDto> get copyWith => _$TeamMemberDtoCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TeamMemberDto&&(identical(other.membershipId, membershipId) || other.membershipId == membershipId)&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.jerseyNumber, jerseyNumber) || other.jerseyNumber == jerseyNumber)&&(identical(other.role, role) || other.role == role)&&(identical(other.addedBy, addedBy) || other.addedBy == addedBy)&&(identical(other.joinedAt, joinedAt) || other.joinedAt == joinedAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TeamMemberDto&&(identical(other.membershipId, membershipId) || other.membershipId == membershipId)&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.jerseyNumber, jerseyNumber) || other.jerseyNumber == jerseyNumber)&&const DeepCollectionEquality().equals(other.roleRows, roleRows)&&(identical(other.addedBy, addedBy) || other.addedBy == addedBy)&&(identical(other.joinedAt, joinedAt) || other.joinedAt == joinedAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,membershipId,teamId,userId,unclaimedId,jerseyNumber,role,addedBy,joinedAt,updatedAt);
+int get hashCode => Object.hash(runtimeType,membershipId,teamId,userId,unclaimedId,jerseyNumber,const DeepCollectionEquality().hash(roleRows),addedBy,joinedAt,updatedAt);
 
 @override
 String toString() {
-  return 'TeamMemberDto(membershipId: $membershipId, teamId: $teamId, userId: $userId, unclaimedId: $unclaimedId, jerseyNumber: $jerseyNumber, role: $role, addedBy: $addedBy, joinedAt: $joinedAt, updatedAt: $updatedAt)';
+  return 'TeamMemberDto(membershipId: $membershipId, teamId: $teamId, userId: $userId, unclaimedId: $unclaimedId, jerseyNumber: $jerseyNumber, roleRows: $roleRows, addedBy: $addedBy, joinedAt: $joinedAt, updatedAt: $updatedAt)';
 }
 
 
@@ -50,7 +50,7 @@ abstract mixin class $TeamMemberDtoCopyWith<$Res>  {
   factory $TeamMemberDtoCopyWith(TeamMemberDto value, $Res Function(TeamMemberDto) _then) = _$TeamMemberDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'membership_id') String membershipId,@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'user_id') String? userId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'jersey_number') int? jerseyNumber, String role,@JsonKey(name: 'added_by') String? addedBy,@JsonKey(name: 'joined_at') String joinedAt,@JsonKey(name: 'updated_at') String updatedAt
+@JsonKey(name: 'membership_id') String membershipId,@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'user_id') String? userId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'jersey_number') int? jerseyNumber,@JsonKey(name: 'team_member_roles') List<Map<String, dynamic>>? roleRows,@JsonKey(name: 'added_by') String? addedBy,@JsonKey(name: 'joined_at') String joinedAt,@JsonKey(name: 'updated_at') String updatedAt
 });
 
 
@@ -67,15 +67,15 @@ class _$TeamMemberDtoCopyWithImpl<$Res>
 
 /// Create a copy of TeamMemberDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? membershipId = null,Object? teamId = null,Object? userId = freezed,Object? unclaimedId = freezed,Object? jerseyNumber = freezed,Object? role = null,Object? addedBy = freezed,Object? joinedAt = null,Object? updatedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? membershipId = null,Object? teamId = null,Object? userId = freezed,Object? unclaimedId = freezed,Object? jerseyNumber = freezed,Object? roleRows = freezed,Object? addedBy = freezed,Object? joinedAt = null,Object? updatedAt = null,}) {
   return _then(_self.copyWith(
 membershipId: null == membershipId ? _self.membershipId : membershipId // ignore: cast_nullable_to_non_nullable
 as String,teamId: null == teamId ? _self.teamId : teamId // ignore: cast_nullable_to_non_nullable
 as String,userId: freezed == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
 as String?,unclaimedId: freezed == unclaimedId ? _self.unclaimedId : unclaimedId // ignore: cast_nullable_to_non_nullable
 as String?,jerseyNumber: freezed == jerseyNumber ? _self.jerseyNumber : jerseyNumber // ignore: cast_nullable_to_non_nullable
-as int?,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
-as String,addedBy: freezed == addedBy ? _self.addedBy : addedBy // ignore: cast_nullable_to_non_nullable
+as int?,roleRows: freezed == roleRows ? _self.roleRows : roleRows // ignore: cast_nullable_to_non_nullable
+as List<Map<String, dynamic>>?,addedBy: freezed == addedBy ? _self.addedBy : addedBy // ignore: cast_nullable_to_non_nullable
 as String?,joinedAt: null == joinedAt ? _self.joinedAt : joinedAt // ignore: cast_nullable_to_non_nullable
 as String,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as String,
@@ -163,10 +163,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber,  String role, @JsonKey(name: 'added_by')  String? addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber, @JsonKey(name: 'team_member_roles')  List<Map<String, dynamic>>? roleRows, @JsonKey(name: 'added_by')  String? addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TeamMemberDto() when $default != null:
-return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_that.jerseyNumber,_that.role,_that.addedBy,_that.joinedAt,_that.updatedAt);case _:
+return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_that.jerseyNumber,_that.roleRows,_that.addedBy,_that.joinedAt,_that.updatedAt);case _:
   return orElse();
 
 }
@@ -184,10 +184,10 @@ return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber,  String role, @JsonKey(name: 'added_by')  String? addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber, @JsonKey(name: 'team_member_roles')  List<Map<String, dynamic>>? roleRows, @JsonKey(name: 'added_by')  String? addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _TeamMemberDto():
-return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_that.jerseyNumber,_that.role,_that.addedBy,_that.joinedAt,_that.updatedAt);case _:
+return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_that.jerseyNumber,_that.roleRows,_that.addedBy,_that.joinedAt,_that.updatedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -204,10 +204,10 @@ return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber,  String role, @JsonKey(name: 'added_by')  String? addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'membership_id')  String membershipId, @JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'user_id')  String? userId, @JsonKey(name: 'unclaimed_id')  String? unclaimedId, @JsonKey(name: 'jersey_number')  int? jerseyNumber, @JsonKey(name: 'team_member_roles')  List<Map<String, dynamic>>? roleRows, @JsonKey(name: 'added_by')  String? addedBy, @JsonKey(name: 'joined_at')  String joinedAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _TeamMemberDto() when $default != null:
-return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_that.jerseyNumber,_that.role,_that.addedBy,_that.joinedAt,_that.updatedAt);case _:
+return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_that.jerseyNumber,_that.roleRows,_that.addedBy,_that.joinedAt,_that.updatedAt);case _:
   return null;
 
 }
@@ -219,7 +219,7 @@ return $default(_that.membershipId,_that.teamId,_that.userId,_that.unclaimedId,_
 @JsonSerializable()
 
 class _TeamMemberDto extends TeamMemberDto {
-  const _TeamMemberDto({@JsonKey(name: 'membership_id') required this.membershipId, @JsonKey(name: 'team_id') required this.teamId, @JsonKey(name: 'user_id') this.userId, @JsonKey(name: 'unclaimed_id') this.unclaimedId, @JsonKey(name: 'jersey_number') this.jerseyNumber, this.role = 'player', @JsonKey(name: 'added_by') this.addedBy, @JsonKey(name: 'joined_at') required this.joinedAt, @JsonKey(name: 'updated_at') required this.updatedAt}): super._();
+  const _TeamMemberDto({@JsonKey(name: 'membership_id') required this.membershipId, @JsonKey(name: 'team_id') required this.teamId, @JsonKey(name: 'user_id') this.userId, @JsonKey(name: 'unclaimed_id') this.unclaimedId, @JsonKey(name: 'jersey_number') this.jerseyNumber, @JsonKey(name: 'team_member_roles') final  List<Map<String, dynamic>>? roleRows, @JsonKey(name: 'added_by') this.addedBy, @JsonKey(name: 'joined_at') required this.joinedAt, @JsonKey(name: 'updated_at') required this.updatedAt}): _roleRows = roleRows,super._();
   factory _TeamMemberDto.fromJson(Map<String, dynamic> json) => _$TeamMemberDtoFromJson(json);
 
 @override@JsonKey(name: 'membership_id') final  String membershipId;
@@ -227,9 +227,19 @@ class _TeamMemberDto extends TeamMemberDto {
 @override@JsonKey(name: 'user_id') final  String? userId;
 @override@JsonKey(name: 'unclaimed_id') final  String? unclaimedId;
 @override@JsonKey(name: 'jersey_number') final  int? jerseyNumber;
-@override@JsonKey() final  String role;
 // Nullable since 2026-09-06: ON DELETE SET NULL, so the roster row
 // survives the person who added it deleting their account.
+ final  List<Map<String, dynamic>>? _roleRows;
+// Nullable since 2026-09-06: ON DELETE SET NULL, so the roster row
+// survives the person who added it deleting their account.
+@override@JsonKey(name: 'team_member_roles') List<Map<String, dynamic>>? get roleRows {
+  final value = _roleRows;
+  if (value == null) return null;
+  if (_roleRows is EqualUnmodifiableListView) return _roleRows;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(value);
+}
+
 @override@JsonKey(name: 'added_by') final  String? addedBy;
 @override@JsonKey(name: 'joined_at') final  String joinedAt;
 @override@JsonKey(name: 'updated_at') final  String updatedAt;
@@ -247,16 +257,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TeamMemberDto&&(identical(other.membershipId, membershipId) || other.membershipId == membershipId)&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.jerseyNumber, jerseyNumber) || other.jerseyNumber == jerseyNumber)&&(identical(other.role, role) || other.role == role)&&(identical(other.addedBy, addedBy) || other.addedBy == addedBy)&&(identical(other.joinedAt, joinedAt) || other.joinedAt == joinedAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TeamMemberDto&&(identical(other.membershipId, membershipId) || other.membershipId == membershipId)&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.unclaimedId, unclaimedId) || other.unclaimedId == unclaimedId)&&(identical(other.jerseyNumber, jerseyNumber) || other.jerseyNumber == jerseyNumber)&&const DeepCollectionEquality().equals(other._roleRows, _roleRows)&&(identical(other.addedBy, addedBy) || other.addedBy == addedBy)&&(identical(other.joinedAt, joinedAt) || other.joinedAt == joinedAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,membershipId,teamId,userId,unclaimedId,jerseyNumber,role,addedBy,joinedAt,updatedAt);
+int get hashCode => Object.hash(runtimeType,membershipId,teamId,userId,unclaimedId,jerseyNumber,const DeepCollectionEquality().hash(_roleRows),addedBy,joinedAt,updatedAt);
 
 @override
 String toString() {
-  return 'TeamMemberDto(membershipId: $membershipId, teamId: $teamId, userId: $userId, unclaimedId: $unclaimedId, jerseyNumber: $jerseyNumber, role: $role, addedBy: $addedBy, joinedAt: $joinedAt, updatedAt: $updatedAt)';
+  return 'TeamMemberDto(membershipId: $membershipId, teamId: $teamId, userId: $userId, unclaimedId: $unclaimedId, jerseyNumber: $jerseyNumber, roleRows: $roleRows, addedBy: $addedBy, joinedAt: $joinedAt, updatedAt: $updatedAt)';
 }
 
 
@@ -267,7 +277,7 @@ abstract mixin class _$TeamMemberDtoCopyWith<$Res> implements $TeamMemberDtoCopy
   factory _$TeamMemberDtoCopyWith(_TeamMemberDto value, $Res Function(_TeamMemberDto) _then) = __$TeamMemberDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'membership_id') String membershipId,@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'user_id') String? userId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'jersey_number') int? jerseyNumber, String role,@JsonKey(name: 'added_by') String? addedBy,@JsonKey(name: 'joined_at') String joinedAt,@JsonKey(name: 'updated_at') String updatedAt
+@JsonKey(name: 'membership_id') String membershipId,@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'user_id') String? userId,@JsonKey(name: 'unclaimed_id') String? unclaimedId,@JsonKey(name: 'jersey_number') int? jerseyNumber,@JsonKey(name: 'team_member_roles') List<Map<String, dynamic>>? roleRows,@JsonKey(name: 'added_by') String? addedBy,@JsonKey(name: 'joined_at') String joinedAt,@JsonKey(name: 'updated_at') String updatedAt
 });
 
 
@@ -284,15 +294,15 @@ class __$TeamMemberDtoCopyWithImpl<$Res>
 
 /// Create a copy of TeamMemberDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? membershipId = null,Object? teamId = null,Object? userId = freezed,Object? unclaimedId = freezed,Object? jerseyNumber = freezed,Object? role = null,Object? addedBy = freezed,Object? joinedAt = null,Object? updatedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? membershipId = null,Object? teamId = null,Object? userId = freezed,Object? unclaimedId = freezed,Object? jerseyNumber = freezed,Object? roleRows = freezed,Object? addedBy = freezed,Object? joinedAt = null,Object? updatedAt = null,}) {
   return _then(_TeamMemberDto(
 membershipId: null == membershipId ? _self.membershipId : membershipId // ignore: cast_nullable_to_non_nullable
 as String,teamId: null == teamId ? _self.teamId : teamId // ignore: cast_nullable_to_non_nullable
 as String,userId: freezed == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
 as String?,unclaimedId: freezed == unclaimedId ? _self.unclaimedId : unclaimedId // ignore: cast_nullable_to_non_nullable
 as String?,jerseyNumber: freezed == jerseyNumber ? _self.jerseyNumber : jerseyNumber // ignore: cast_nullable_to_non_nullable
-as int?,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
-as String,addedBy: freezed == addedBy ? _self.addedBy : addedBy // ignore: cast_nullable_to_non_nullable
+as int?,roleRows: freezed == roleRows ? _self._roleRows : roleRows // ignore: cast_nullable_to_non_nullable
+as List<Map<String, dynamic>>?,addedBy: freezed == addedBy ? _self.addedBy : addedBy // ignore: cast_nullable_to_non_nullable
 as String?,joinedAt: null == joinedAt ? _self.joinedAt : joinedAt // ignore: cast_nullable_to_non_nullable
 as String,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as String,

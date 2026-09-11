@@ -18,6 +18,7 @@ import '../../domain/value_objects/jersey_number.dart';
 import '../../domain/value_objects/player_display_name.dart';
 import '../../domain/value_objects/team_name.dart';
 import '../datasources/teams_remote_datasource.dart';
+import '../models/team_member_dto.dart';
 
 /// Online-only teams repository. Reads stream directly from Supabase realtime;
 /// writes go straight to the server. The only place remote exceptions become
@@ -44,15 +45,36 @@ class TeamsRepositoryImpl implements TeamsRepository {
               .map((m) => m.teamId)
               .toSet();
 
+          // Staff hold a roster row now (the owner's is created by a trigger),
+          // so membership alone is the whole test — the owner/manager clauses
+          // that used to sit here were dropped 2026-09-10.
           final mine = teams
               .map((d) => d.toEntity())
-              .where((t) =>
-                  t.ownerId == userId ||
-                  t.managers.contains(userId) ||
-                  myMemberTeamIds.contains(t.id.value))
+              .where((t) => myMemberTeamIds.contains(t.id.value))
               .toList()
             ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
           return mine;
+        },
+      );
+
+  @override
+  Stream<Map<String, MemberRole>> watchMyTeamRoles(String userId) =>
+      Rx.combineLatest2(
+        _remote.watchMembers(),
+        _remote.watchMemberRoles(),
+        (members, rolesByMembership) {
+          // A realtime stream cannot join, so roles arrive separately and are
+          // stitched here. Their absence means "no roles loaded yet", never
+          // "holds nothing" — so an empty set yields no entry at all rather
+          // than a member who looks demoted.
+          final out = <String, MemberRole>{};
+          for (final m in members) {
+            if (m.userId != userId) continue;
+            final keys = rolesByMembership[m.membershipId];
+            if (keys == null || keys.isEmpty) continue;
+            out[m.teamId] = m.toEntity(roles: keys).topRole;
+          }
+          return out;
         },
       );
 
@@ -90,7 +112,12 @@ class TeamsRepositoryImpl implements TeamsRepository {
 
   @override
   Stream<List<RosterMember>> watchRoster(TeamId teamId) {
-    return _remote.watchMembers().asyncMap((memberDtos) async {
+    return Rx.combineLatest2(
+      _remote.watchMembers(),
+      _remote.watchMemberRoles(),
+      (List<TeamMemberDto> m, Map<String, Set<String>> r) => (m, r),
+    ).asyncMap((pair) async {
+      final (memberDtos, rolesByMembership) = pair;
       final teamMembers =
           memberDtos.where((m) => m.teamId == teamId.value).toList();
 
@@ -127,7 +154,9 @@ class TeamsRepositoryImpl implements TeamsRepository {
               phoneNumber = u?.phoneNumber;
             }
             return RosterMember(
-              member: m.toEntity(),
+              member: m.toEntity(
+                roles: rolesByMembership[m.membershipId] ?? const <String>{},
+              ),
               displayName: displayName,
               username: username,
               profilePhotoUrl: profilePhotoUrl,
@@ -142,31 +171,27 @@ class TeamsRepositoryImpl implements TeamsRepository {
 
   @override
   Stream<List<UserTeamAffiliation>> watchUserAffiliatedTeams(String userId) {
-    return Rx.combineLatest2(
+    return Rx.combineLatest3(
       _remote.watchTeams(),
       _remote.watchMembers(),
-      (teams, members) {
+      _remote.watchMemberRoles(),
+      (teams, members, rolesByMembership) {
         final List<UserTeamAffiliation> result = [];
         final myMemberships = members.where((m) => m.userId == userId).toList();
         final memberByTeamId = {for (final m in myMemberships) m.teamId: m};
 
         for (final t in teams) {
           final member = memberByTeamId[t.teamId];
-          final isOwner = t.ownerId == userId;
-          final isManager = t.managers.contains(userId);
-          final isCaptainRole = member?.role == 'captain';
 
-          if (isOwner || isManager || isCaptainRole || member != null) {
-            final isCaptain = isOwner || isManager || isCaptainRole;
-            final roleStr = isOwner || isCaptainRole
-                ? 'CAPTAIN'
-                : isManager
-                    ? 'MANAGER'
-                    : switch (member?.role) {
-                        'vice_captain' => 'VICE CAPTAIN',
-                        'wicket_keeper' => 'WICKET-KEEPER',
-                        _ => 'PLAYER',
-                      };
+          if (member != null) {
+            // 2026-09-10: this used to compare raw strings and derive the role
+            // from two sources, which is why an OWNER and a roster captain both
+            // rendered "CAPTAIN". One enum, one label.
+            final role = member
+                .toEntity(roles: rolesByMembership[member.membershipId] ?? const {})
+                .topRole;
+            final isCaptain = role.hasMatchAuthority;
+            final roleStr = role.label;
 
             result.add(
               UserTeamAffiliation(
@@ -299,6 +324,7 @@ class TeamsRepositoryImpl implements TeamsRepository {
     String? secondaryColor,
     String? tagline,
     String? logoMonogram,
+    CrestKind crestKind = CrestKind.monogram,
     String? label,
     String? district,
     String? province,
@@ -322,6 +348,7 @@ class TeamsRepositoryImpl implements TeamsRepository {
         'secondary_color': secondaryColor,
         'tagline': tagline,
         'logo_monogram': logoMonogram,
+        'crest_kind': crestKind.name,
         'label': label,
         'district': district,
         'province': province,
@@ -455,27 +482,18 @@ class TeamsRepositoryImpl implements TeamsRepository {
     BowlingStyle? bowlingStyle,
   }) async {
     try {
-      final unclaimedId = _uuid.v4();
       final profile = <String, dynamic>{
         if (playingRole != null) 'playing_role': playingRole.wire,
         if (battingStyle != null) 'batting_style': battingStyle.wire,
         if (bowlingStyle != null) 'bowling_style': bowlingStyle.wire,
       };
-      await _remote.createUnclaimed({
-        'id': unclaimedId,
-        'display_name': displayName.value,
-        if (phoneNumber != null && phoneNumber.trim().isNotEmpty)
-          'phone_number': phoneNumber.trim(),
-        if (profile.isNotEmpty) 'player_profile': profile,
-      });
-      await _remote.createMember({
-        'id': _uuid.v4(),
-        'team_id': teamId.value,
-        'player_id': unclaimedId,
-        'player_type': PlayerType.unclaimed.wire,
-        'role': MemberRole.player.wire,
-        'jersey_number': jerseyNumber?.value,
-      });
+      await _remote.addUnclaimedTeamMember(
+        teamId: teamId.value,
+        displayName: displayName.value,
+        phoneNumber: phoneNumber?.trim(),
+        jerseyNumber: jerseyNumber?.value,
+        playerProfile: profile,
+      );
       return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -562,29 +580,18 @@ class TeamsRepositoryImpl implements TeamsRepository {
     MemberRole role,
   ) async {
     try {
-      // One captain per team: when promoting, demote the current captain
-      // first. Two sequential remote calls — not atomic, but acceptable for
-      // online-only (a Postgres function would be the next step if this needs
-      // to be transactional).
-      if (role == MemberRole.captain) {
-        final target = await _findMember(id);
-        if (target == null) {
-          return const Left(NotFoundFailure('Member not found'));
-        }
-        final roster = (await _remote.listMembers())
-            .where((m) => m.teamId == target.teamId.value)
-            .map((m) => m.toEntity())
-            .toList();
-        for (final m in roster) {
-          if (m.id != id && m.role == MemberRole.captain) {
-            await _remote.updateMember(m.id.value, {
-              'role': MemberRole.player.wire,
-            });
-          }
-        }
-      }
-      await _remote.updateMember(id.value, {'role': role.wire});
+      // 2026-09-10: this used to read the whole roster, demote the incumbent
+      // captain, then promote — three round trips, no transaction, and a race
+      // where two concurrent promotions both "won". `set_team_member_role`
+      // does the swap in one statement, and enforces the rule the client
+      // cannot ("never grant a rung at or above your own"), so a 42501 here is
+      // a real authorization answer rather than a guess.
+      await _remote.setMemberRole(id.value, role.wire);
       return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NotFoundException catch (e) {
+      return Left(NotFoundFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -592,12 +599,21 @@ class TeamsRepositoryImpl implements TeamsRepository {
     }
   }
 
-  Future<TeamMember?> _findMember(MembershipId id) async {
-    final members = await _remote.listMembers();
-    for (final m in members) {
-      if (m.membershipId == id.value) return m.toEntity();
+  @override
+  Future<Either<Failure, Unit>> transferOwnership(
+    TeamId teamId,
+    String newOwnerId,
+  ) async {
+    try {
+      await _remote.transferOwnership(teamId.value, newOwnerId);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
     }
-    return null;
   }
 
   @override

@@ -8,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
-import '../../../location/presentation/widgets/place_autocomplete_field.dart';
 import '../../domain/entities/team.dart';
 import '../controllers/team_create_controller.dart';
 import '../state/team_create_state.dart';
@@ -365,11 +364,18 @@ class _DoneView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    void onAddPlayers() =>
-        context.go('/teams/${state.createdTeamId}/manage?justCreated=true');
-    void onOpenTeam() => context.go('/teams/${state.createdTeamId}');
+    // pushReplacement, not go: `go` resets the whole stack, which threw away
+    // My Teams (and the tab shell) behind the wizard — back from the
+    // destination then had nothing to pop. Replacing just the wizard's own
+    // route keeps everything below it and drops the celebration screen, so
+    // back walks destination → My Teams → Menu.
+    void onAddPlayers() => context.pushReplacement(
+      '/teams/${state.createdTeamId}/manage?justCreated=true',
+    );
+    void onOpenTeam() =>
+        context.pushReplacement('/teams/${state.createdTeamId}');
     void onScheduleFriendly() =>
-        context.go('/matches/setup/${state.createdTeamId}');
+        context.pushReplacement('/matches/setup/${state.createdTeamId}');
     void onRegisterTournament() {
       // No tournament route yet — a brief snack so the tap isn't silent.
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1185,7 +1191,7 @@ class _StepHome extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 22),
             child: Text(
-              'Helps players nearby find you and disambiguates teams with '
+              'Shown on your team page and disambiguates teams with '
               'similar names.',
               style: CkType.body(
                 fontSize: 13,
@@ -1194,24 +1200,15 @@ class _StepHome extends StatelessWidget {
               ),
             ),
           ),
-          // Resolving picker, not a free-text box: this is the ONLY place a
-          // team acquires coordinates, and without them it can never surface
-          // in a proximity search or a city facet chip.
-          PlaceAutocompleteField(
-            field: 'team_create_city',
-            label: 'City or village',
-            hintText: 'Lahore, Hair, Chak 47…',
-            initialText: state.city,
-            onResolved: controller.setResolvedPlace,
+          // Free text, like the two fields below it. The team carries no
+          // coordinates out of this wizard, so it is findable by name and
+          // city string, not by distance.
+          const TcLabel('City or village'),
+          TcInput(
+            value: state.city,
+            onChanged: controller.setCity,
+            placeholder: 'Lahore, Hair, Chak 47…',
           ),
-          if (state.hasCoordinates)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                'Nearby players will be able to find this team.',
-                style: CkType.body(fontSize: 11, color: CkColors.muted),
-              ),
-            ),
           const SizedBox(height: 14),
           const TcLabel('Area / mohalla / locality'),
           TcInput(

@@ -301,6 +301,58 @@ final class RosterFamily extends $Family
   String toString() => r'rosterProvider';
 }
 
+/// The signed-in user's rung on each of their teams, keyed by team id.
+/// Ask this rather than comparing against `Team.ownerId` — see
+/// docs/team-roles-design.md.
+
+@ProviderFor(myTeamRoles)
+final myTeamRolesProvider = MyTeamRolesProvider._();
+
+/// The signed-in user's rung on each of their teams, keyed by team id.
+/// Ask this rather than comparing against `Team.ownerId` — see
+/// docs/team-roles-design.md.
+
+final class MyTeamRolesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Map<String, MemberRole>>,
+          Map<String, MemberRole>,
+          Stream<Map<String, MemberRole>>
+        >
+    with
+        $FutureModifier<Map<String, MemberRole>>,
+        $StreamProvider<Map<String, MemberRole>> {
+  /// The signed-in user's rung on each of their teams, keyed by team id.
+  /// Ask this rather than comparing against `Team.ownerId` — see
+  /// docs/team-roles-design.md.
+  MyTeamRolesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'myTeamRolesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$myTeamRolesHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<Map<String, MemberRole>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<Map<String, MemberRole>> create(Ref ref) {
+    return myTeamRoles(ref);
+  }
+}
+
+String _$myTeamRolesHash() => r'a80443f14cf85ae695020f3056f06559425daced';
+
 /// Real-time stream of all teams affiliated with a user (captained and played for).
 
 @ProviderFor(userAffiliatedTeams)

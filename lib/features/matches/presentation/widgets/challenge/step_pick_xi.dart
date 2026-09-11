@@ -242,10 +242,12 @@ class _PlayerRow extends StatelessWidget {
     return '${words[0][0]}${words[1][0]}'.toUpperCase();
   }
 
-  static String _role(RosterMember m) => switch (m.member.role) {
+  // The team-level role. Keeping is NOT one of these any more — it is a
+  // per-match choice, made by the C/WK marks on this very screen.
+  static String _role(RosterMember m) => switch (m.member.topRole) {
+        MemberRole.owner => 'Owner',
+        MemberRole.manager => 'Manager',
         MemberRole.captain => 'Captain',
-        MemberRole.viceCaptain => 'Vice-captain',
-        MemberRole.wicketKeeper => 'Wicket-keeper',
         MemberRole.player => 'Player',
       };
 }

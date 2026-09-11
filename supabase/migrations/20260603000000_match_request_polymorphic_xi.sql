@@ -65,6 +65,9 @@ begin
   -- Polymorphic match: a row in p_xi is valid if it equals either the
   -- claimed `user_id` or the placeholder `unclaimed_id` on an active
   -- membership for `p_team_id`.
+  --
+  -- `in_squad` added 2026-09-10: staff who don't play (the club secretary who
+  -- runs the WhatsApp group) hold a membership row but are not selectable.
   select uid into v_invalid
     from unnest(p_xi) as t(uid)
    where not exists (
@@ -72,11 +75,13 @@ begin
       where tm.team_id = p_team_id
         and (tm.user_id = t.uid or tm.unclaimed_id = t.uid)
         and tm.status  = 'active'
+        and tm.in_squad
    )
    limit 1;
 
   if v_invalid is not null then
-    raise exception 'Player % is not an active member of team %', v_invalid, p_team_id
+    raise exception 'Player % is not an active, selectable member of team %',
+      v_invalid, p_team_id
       using errcode = '23514';
   end if;
 end;

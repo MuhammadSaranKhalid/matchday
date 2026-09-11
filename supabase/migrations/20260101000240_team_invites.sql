@@ -41,7 +41,11 @@ create table public.team_invites (
   message       text check (message is null or length(message) <= 500),
   -- Pre-set role + jersey: when the manager already knows where the invitee
   -- fits. If null, accept_team_invite uses sensible defaults.
-  role          public.member_role default 'player',
+  -- A role KEY (public.roles), not an enum — roles are data since 2026-09-11.
+  -- Capped at 'captain' so an invite cannot hand out staff on accept, bypassing
+  -- grant_team_role()'s "never grant at or above your own rank" rule.
+  role          text default 'player'
+                    check (role is null or role in ('player', 'captain')),
   jersey_number integer,
   -- request_status enum lives in 0000_shared_helpers.
   status        public.request_status not null default 'pending',
@@ -87,7 +91,7 @@ declare
   v_uid           uuid := auth.uid();
   v_team_id       uuid;
   v_invitee_id    uuid;
-  v_role          public.member_role;
+  v_role          text;
   v_jersey        integer;
   v_invited_by    uuid;
   v_membership_id uuid;

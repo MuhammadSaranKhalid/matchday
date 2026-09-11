@@ -65,7 +65,9 @@ class _ChallengeCounterScreenState
       children: [
         _Header(
           changeCount: (changedStart ? 1 : 0) + (changedVenue ? 1 : 0),
-          onBack: () => context.pop(),
+          onBack: () => context.canPop()
+              ? context.pop()
+              : context.go('/my/challenges'),
         ),
         Expanded(
           child: ListView(

@@ -20,14 +20,6 @@ TeamPageView buildTeamPageViewFromReal({
 }) {
   final viewer = deriveViewer(team, roster, viewerUserId);
 
-  // Resolve userId → display name from the roster
-  final nameByUserId = <String, String>{
-    for (final r in roster)
-      if (r.member.playerType == PlayerType.claimed)
-        r.member.playerId: r.displayName,
-  };
-  String resolveName(String uid) => nameByUserId[uid] ?? _short(uid);
-
   // Map roster → TpPlayerRow list.
   final squad = <TpPlayerRow>[];
   String? viewerPlayerId;
@@ -42,7 +34,7 @@ TeamPageView buildTeamPageViewFromReal({
       TpPlayerRow(
         id: m.id.value,
         name: r.displayName,
-        role: mapRole(m.role),
+        role: mapRole(m.topRole),
         jersey: m.jerseyNumber ?? 0,
         bat: '—',
         bowl: '—',
@@ -118,6 +110,7 @@ TeamPageView buildTeamPageViewFromReal({
     privacy: team.privacy.wire,
     tagline: team.tagline,
     logoUrl: team.logoUrl,
+    crestKind: team.crestKind,
     verified: team.isVerified,
     // `teams` has no archived_at column, so the status change's own timestamp
     // is the best available date. It is only ever shown as a day, never
@@ -131,11 +124,16 @@ TeamPageView buildTeamPageViewFromReal({
     live: live,
     about: team.description ?? '',
     details: buildDetails(team),
+    // 2026-09-10: was team.ownerId + the `teams.managers` array. Staff come
+    // off the roster now, which also means this list finally reflects a
+    // manager who was appointed after the team was created.
     managers: [
-      TpManagerRow(name: resolveName(team.ownerId), role: 'Owner'),
-      for (final m in team.managers)
-        if (m != team.ownerId)
-          TpManagerRow(name: resolveName(m), role: 'Manager'),
+      for (final r in roster)
+        if (r.member.isStaff)
+          TpManagerRow(
+            name: r.displayName,
+            role: r.member.hasRole(MemberRole.owner) ? 'Owner' : 'Manager',
+          ),
     ],
   );
 
@@ -178,7 +176,7 @@ TeamPageViewer deriveViewer(
   for (final r in roster) {
     if (r.member.playerType == PlayerType.claimed &&
         r.member.playerId == userId) {
-      mineRole = r.member.role;
+      mineRole = r.member.topRole;
       break;
     }
   }
@@ -188,8 +186,6 @@ TeamPageViewer deriveViewer(
       return TeamPageViewer.owner;
     case TeamRelationship.captain:
       return TeamPageViewer.captain;
-    case TeamRelationship.viceCaptain:
-    case TeamRelationship.wicketKeeper:
     case TeamRelationship.player:
       return TeamPageViewer.player;
     case TeamRelationship.none:
@@ -219,12 +215,13 @@ List<TeamPageTab> tabsFor(TeamPageViewer viewer, TpTeam team) {
 
 TpPlayerRole mapRole(MemberRole r) {
   switch (r) {
+    // Owner and manager both read as "manager" on the public squad list — the
+    // page shows who runs the team, not the internal rung between them.
+    case MemberRole.owner:
+    case MemberRole.manager:
+      return TpPlayerRole.manager;
     case MemberRole.captain:
       return TpPlayerRole.captain;
-    case MemberRole.viceCaptain:
-      return TpPlayerRole.viceCaptain;
-    case MemberRole.wicketKeeper:
-      return TpPlayerRole.wicketKeeper;
     case MemberRole.player:
       return TpPlayerRole.player;
   }
@@ -243,9 +240,4 @@ List<TpDetailRow> buildDetails(Team team) => [
 String _matchCtx(Match m) {
   if (m.format.oversPerInnings > 0) return '${m.format.oversPerInnings} ov';
   return 'Live';
-}
-
-String _short(String uid) {
-  if (uid.length <= 8) return uid;
-  return uid.substring(0, 8);
 }

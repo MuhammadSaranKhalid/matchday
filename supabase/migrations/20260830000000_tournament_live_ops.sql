@@ -711,17 +711,11 @@ begin
   end if;
 
   with recipients as (
-    -- Managers and owners of approved teams.
-    select t.owner_id as user_id
+    -- Managers and owners of approved teams. 2026-09-10: was two UNIONed
+    -- branches (teams.owner_id, then unnest(teams.managers)); team_staff_ids()
+    -- returns both from the role ladder.
+    select public.team_staff_ids(tt.team_id) as user_id
       from public.tournament_teams tt
-      join public.teams t on t.team_id = tt.team_id
-     where tt.tournament_id = p_tournament_id
-       and tt.status = 'approved'
-       and t.owner_id is not null
-    union
-    select unnest(t.managers)
-      from public.tournament_teams tt
-      join public.teams t on t.team_id = tt.team_id
      where tt.tournament_id = p_tournament_id
        and tt.status = 'approved'
     union
@@ -921,10 +915,8 @@ as $$
            or exists (
              select 1
                from public.tournament_teams tt
-               join public.teams tm on tm.team_id = tt.team_id
               where tt.tournament_id = p_tournament_id
-                and (tm.owner_id = auth.uid()
-                     or auth.uid() = any(tm.managers)
+                and (public.is_team_manager(tt.team_id)
                      or auth.uid() = any(tt.squad))
            )
          )
@@ -964,16 +956,14 @@ as $$
       from public.tournaments t
      where t.tournament_id = p_tournament_id
     union
-    select tm.owner_id, 'Team manager'::text
+    -- 2026-09-10: was owner_id UNION unnest(managers) against teams; both come
+    -- from the role ladder now. team_staff_ids is role >= 'manager', so this
+    -- returns exactly the same people as before — captains are deliberately
+    -- NOT offered here. They can already score their own side without an
+    -- appointment (_can_score_innings), so listing them in an organiser's
+    -- assign-a-scorer picker would only invite a redundant row.
+    select public.team_staff_ids(tt.team_id), 'Team manager'::text
       from public.tournament_teams tt
-      join public.teams tm on tm.team_id = tt.team_id
-     where tt.tournament_id = p_tournament_id
-       and tt.status = 'approved'
-       and tm.owner_id is not null
-    union
-    select unnest(tm.managers), 'Team manager'::text
-      from public.tournament_teams tt
-      join public.teams tm on tm.team_id = tt.team_id
      where tt.tournament_id = p_tournament_id
        and tt.status = 'approved'
   ),

@@ -38,10 +38,11 @@ List<XiEntry> resolveXi({
         XiEntry(
           name: member.displayName,
           initials: _initials(member.displayName),
-          captain: member.member.role == MemberRole.captain,
-          keeper: keeperId == null
-              ? member.member.role == MemberRole.wicketKeeper
-              : id == keeperId,
+          captain: member.member.topRole.hasMatchAuthority,
+          // The keeper is whoever the applicant nominated for THIS match.
+          // There is no team-level keeper to fall back on any more — that was
+          // a duplicate of match_players.role and always the weaker answer.
+          keeper: id == keeperId,
         )
       else
         XiEntry(

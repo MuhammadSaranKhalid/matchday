@@ -286,6 +286,9 @@ Future<List<OpenMatchPoolItem>> filteredOpenMatchPool(Ref ref) async {
 Future<bool> viewerManagesTeam(Ref ref) async {
   final userId = ref.watch(currentUserStreamProvider).value?.id.value;
   if (userId == null) return false;
-  final teams = await ref.watch(myTeamsProvider.future);
-  return teams.any((t) => t.isManagedBy(userId));
+  // 2026-09-10: was `teams.any((t) => t.isManagedBy(userId))`, which read the
+  // dead `teams.managers` array. Same rule ("only team managers can post
+  // challenges or apply to play"), asked of the role ladder.
+  final roles = await ref.watch(myTeamRolesProvider.future);
+  return roles.values.any((r) => r.isStaff);
 }

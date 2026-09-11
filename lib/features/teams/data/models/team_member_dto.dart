@@ -20,9 +20,9 @@ abstract class TeamMemberDto with _$TeamMemberDto {
     @JsonKey(name: 'user_id') String? userId,
     @JsonKey(name: 'unclaimed_id') String? unclaimedId,
     @JsonKey(name: 'jersey_number') int? jerseyNumber,
-    @Default('player') String role,
     // Nullable since 2026-09-06: ON DELETE SET NULL, so the roster row
     // survives the person who added it deleting their account.
+    @JsonKey(name: 'team_member_roles') List<Map<String, dynamic>>? roleRows,
     @JsonKey(name: 'added_by') String? addedBy,
     @JsonKey(name: 'joined_at') required String joinedAt,
     @JsonKey(name: 'updated_at') required String updatedAt,
@@ -30,10 +30,18 @@ abstract class TeamMemberDto with _$TeamMemberDto {
 
   const TeamMemberDto._();
 
+  /// Roles live in `team_member_roles` now, not on this row. The datasource
+  /// joins them in under a `team_member_roles` key when it selects a roster;
+  /// a bare row (e.g. a realtime delta) simply has none yet.
+  Set<String> get roleKeys => {
+        for (final r in (roleRows ?? const <Map<String, dynamic>>[]))
+          if (r['role_key'] is String) r['role_key'] as String,
+      };
+
   factory TeamMemberDto.fromJson(Map<String, dynamic> json) =>
       _$TeamMemberDtoFromJson(json);
 
-  TeamMember toEntity() {
+  TeamMember toEntity({Set<String>? roles}) {
     // XOR check on the DB side guarantees exactly one is set, but be
     // defensive at the boundary (renaming a column or a partial select
     // shouldn't crash the app).
@@ -44,7 +52,7 @@ abstract class TeamMemberDto with _$TeamMemberDto {
       teamId: TeamId(teamId),
       playerId: pid,
       playerType: isClaimed ? PlayerType.claimed : PlayerType.unclaimed,
-      role: MemberRole.fromWire(role),
+      roles: roles ?? roleKeys,
       addedBy: addedBy,
       jerseyNumber: jerseyNumber,
       joinedAt: DateTime.parse(joinedAt),

@@ -9,7 +9,10 @@ create table public.team_join_requests (
   request_id   uuid primary key default gen_random_uuid(),
   team_id      uuid not null references public.teams(team_id) on delete cascade,
   player_id    uuid not null references public.profiles(user_id) on delete cascade,
-  role         public.member_role not null default 'player',
+  -- A role KEY (public.roles), not an enum — roles are data since 2026-09-11.
+  -- Capped at 'captain': staff are appointed after joining, never by asking.
+  role         text not null default 'player'
+                   check (role in ('player', 'captain')),
   message      text check (message is null or length(message) <= 500),
   status       public.request_status not null default 'pending',
   decided_by   uuid references public.profiles(user_id) on delete set null,
@@ -74,7 +77,7 @@ create policy team_join_requests_update on public.team_join_requests
 -- RPC to request joining a team
 create or replace function public.request_to_join_team(
   p_team_id uuid,
-  p_role public.member_role default 'player',
+  p_role text default 'player',
   p_message text default null
 )
 returns uuid
@@ -119,7 +122,7 @@ declare
   v_uid           uuid := auth.uid();
   v_team_id       uuid;
   v_player_id     uuid;
-  v_role          public.member_role;
+  v_role          text;
   v_membership_id uuid;
 begin
   if v_uid is null then
@@ -189,7 +192,7 @@ begin
 end;
 $$;
 
-grant execute on function public.request_to_join_team(uuid, public.member_role, text) to authenticated;
+grant execute on function public.request_to_join_team(uuid, text, text) to authenticated;
 grant execute on function public.accept_team_join_request(uuid, integer) to authenticated;
 grant execute on function public.decline_team_join_request(uuid) to authenticated;
 

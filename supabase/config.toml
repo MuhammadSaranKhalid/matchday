@@ -238,8 +238,25 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# Email OTP templates. BOTH must carry {{ .Token }} — they split the userbase:
+#   confirmation -> signInWithOtp() for an email with NO account yet, on any
+#                   project where "Confirm email" is on (mailer_autoconfirm =
+#                   false). This is prod. Supabase's stock template here has
+#                   only {{ .ConfirmationURL }}, so first-time users used to
+#                   get a link and no code at all.
+#   magic_link   -> signInWithOtp() for an email that already has an account.
+# Local dev sets enable_confirmations = false above, so it only ever exercises
+# magic_link — which is why the missing confirmation template stayed invisible
+# here and only bit on the hosted project.
+#
+# NOTE: these are LOCAL only. The hosted project reads its own copies from
+# Dashboard -> Authentication -> Emails; changing them here does not touch it.
+[auth.email.template.confirmation]
+subject = "Confirm your email"
+content_path = "./supabase/templates/confirmation.html"
+
 [auth.email.template.magic_link]
-subject = "Your Login Details"
+subject = "Your MatchDay sign-in code"
 content_path = "./supabase/templates/magic_link.html"
 
 # Uncomment to customize notification email template

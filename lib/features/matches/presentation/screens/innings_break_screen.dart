@@ -89,9 +89,14 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
     final battingTeam = ref.watch(teamProvider(battingTeamId.value)).value;
     final currentUserId =
         ref.watch(currentUserStreamProvider).value?.id.value;
+    // Match-day authority, not just staff: the captain of the side coming out
+    // to bat is exactly who sets up the next innings. `isManagedBy` (removed
+    // 2026-09-10) could not see them, so a captain-only user hit a dead
+    // button at the innings break.
+    final myRoles = ref.watch(myTeamRolesProvider).value ?? const {};
     final canSetup = battingTeam != null &&
         currentUserId != null &&
-        battingTeam.isManagedBy(currentUserId);
+        (myRoles[battingTeamId.value]?.hasMatchAuthority ?? false);
 
     final ready = _strikerId != null &&
         _nonStrikerId != null &&

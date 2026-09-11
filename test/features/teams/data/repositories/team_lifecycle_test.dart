@@ -12,7 +12,7 @@ class _MockRemote extends Mock implements TeamsRemoteDataSource {}
 
 TeamDto _dto({String status = 'active'}) => TeamDto(
       teamId: 't1',
-      ownerId: 'u1',
+      createdBy: 'u1',
       teamName: 'Lahore Lions',
       teamType: 'club',
       status: status,

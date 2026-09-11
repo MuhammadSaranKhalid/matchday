@@ -504,39 +504,14 @@ create table public.match_result_history (
 -- -----------------------------------------------------------------------------
 
 -- Helper Predicates
-create or replace function public._can_score_match(p_match_id uuid)
-returns boolean
-language sql
-security definer
-stable
--- SECURITY DEFINER without a pinned search_path is a privilege-escalation
--- vector: anything this body names unqualified could be resolved against a
--- schema the caller controls, and the function runs as the owner.
--- (Supabase advisor 0011.)
-set search_path = public, pg_temp
-as $$
-  select exists (
-    select 1 from public.matches m
-    where m.match_id = p_match_id
-      and (
-        m.created_by = auth.uid()
-        or m.team_a_captain = auth.uid()
-        or m.team_b_captain = auth.uid()
-        or exists (
-          select 1 from public.teams t
-          where (t.team_id = m.team_a_id or t.team_id = m.team_b_id)
-            and t.owner_id = auth.uid()
-        )
-        or exists (
-          select 1 from public.team_members tm
-          where tm.user_id = auth.uid()
-            and tm.role in ('captain', 'vice_captain')
-            and tm.status = 'active'
-            and (tm.team_id = m.team_a_id or tm.team_id = m.team_b_id)
-        )
-      )
-  );
-$$;
+--
+-- `_can_score_match(match_id)` was DELETED 2026-09-10. It answered the weaker
+-- "may you score this match" (either side, plus the creator), had no callers
+-- left, and was still granted — so the schema carried two live definitions of
+-- "can score", the dead one being the more permissive. `_can_score_innings`
+-- below is the only answer. Do not reintroduce a match-level variant: the
+-- innings-level distinction IS the single-writer property the local-first
+-- scoring design rests on (CLAUDE.md exemption 2).
 
 create or replace function public._is_match_captain(p_match_id uuid)
 returns boolean
@@ -611,20 +586,11 @@ as $$
       -- The captain of the batting side.
       or (b.batting_team_id = b.team_a_id and b.team_a_captain = auth.uid())
       or (b.batting_team_id = b.team_b_id and b.team_b_captain = auth.uid())
-      -- Whoever owns the batting team.
-      or exists (
-        select 1 from public.teams t
-        where t.team_id = b.batting_team_id
-          and t.owner_id = auth.uid()
-      )
-      -- A captain / vice-captain on the batting team's roster.
-      or exists (
-        select 1 from public.team_members tm
-        where tm.team_id = b.batting_team_id
-          and tm.user_id = auth.uid()
-          and tm.role in ('captain', 'vice_captain')
-          and tm.status = 'active'
-      )
+      -- The batting side, via the authorization engine (2026-09-11).
+      -- Superseded by the definition in 20260822120000, which adds the
+      -- match-scope delegation branch — grants/match_officials are not wired
+      -- up yet at this point in the run.
+      or public.can('team', b.batting_team_id, 'match.score')
   );
 $$;
 

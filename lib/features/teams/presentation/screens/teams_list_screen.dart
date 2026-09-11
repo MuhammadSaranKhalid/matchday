@@ -7,8 +7,12 @@ import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_push_nav.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../controllers/teams_list_controller.dart';
+import '../widgets/team_crest.dart';
+import '../widgets/team_create/team_draft_card.dart';
+import '../utils/team_display.dart';
 import '../state/my_teams_view.dart';
 import '../widgets/my_teams/crest_palette.dart';
+import '../widgets/my_teams/my_teams_shimmer_skeleton.dart';
 import '../widgets/my_teams/role_pill.dart';
 
 /// "My teams" — the faithful Flutter realisation of the matchday v2 design
@@ -22,6 +26,8 @@ class TeamsListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncView = ref.watch(teamsListControllerProvider);
+    final draft = ref.watch(teamCreationDraftProvider).value;
+    final hasDraft = hasTeamCreationDraft(draft);
     final controller = ref.read(teamsListControllerProvider.notifier);
 
     switch (asyncView) {
@@ -43,124 +49,19 @@ class TeamsListScreen extends ConsumerWidget {
                   children: [
                     Column(
                       children: [
-                        CkPushNav(
-                          title: 'My Teams',
-                          onBack: () => context.pop(),
-                          // One primary action at a time: while the list is
-                          // empty the card below owns "Create", so the nav
-                          // pill would be a second identical CTA.
-                          action: view.isEmpty
-                              ? null
-                              : CkNavPill(
-                                  label: 'Create',
-                                  onTap: () => context.push('/teams/create'),
-                                ),
-                        ),
+                        _nav(context),
+                        if (view.isEmpty && !hasDraft)
+                          Expanded(child: _emptyBody())
+                        else
                         Expanded(
                           child: ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.only(bottom: 12),
                             children: [
-                              // ── Empty-state card — dashed border, a faded
-                              //    crest row that ends in an open slot, then
-                              //    the two things you can actually do here:
-                              //    start a side, or find the one you play for.
-                              if (view.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    18,
-                                    20,
-                                    18,
-                                    0,
-                                  ),
-                                  child: CustomPaint(
-                                    painter: _EmptyDashedBorderPainter(
-                                      color: CkColors.line,
-                                      radius: 16,
-                                      strokeWidth: 1.2,
-                                      dashLength: 5,
-                                      dashGap: 4,
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        20,
-                                        22,
-                                        20,
-                                        20,
-                                      ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          // Three crests then an empty slot —
-                                          // the row says "teams, and a space
-                                          // for yours" without a caption.
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              _dimCrest(MyTeamsCrests.ll),
-                                              const SizedBox(width: 7),
-                                              _dimCrest(MyTeamsCrests.mk),
-                                              const SizedBox(width: 7),
-                                              _dimCrest(MyTeamsCrests.gg),
-                                              const SizedBox(width: 7),
-                                              _emptyCrestSlot(),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 14),
-                                          Text(
-                                            'No teams yet',
-                                            textAlign: TextAlign.center,
-                                            style: CkType.display(
-                                              fontSize: 19,
-                                              fontWeight: FontWeight.w700,
-                                              letterSpacing: -0.025,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                            ),
-                                            child: Text(
-                                              'Start your mohalla side, or find the team you already play for.',
-                                              textAlign: TextAlign.center,
-                                              style: CkType.body(
-                                                fontSize: 13,
-                                                color: CkColors.ink2,
-                                                height: 1.5,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: _emptyCta(
-                                                  label: 'Create a team',
-                                                  primary: true,
-                                                  onTap: () => context.push(
-                                                    '/teams/create',
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: _emptyCta(
-                                                  label: 'Find a team',
-                                                  primary: false,
-                                                  onTap: () => context.push(
-                                                    '/explore/teams',
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
+                              if (hasDraft) TeamDraftCard(draft: draft!),
+                              if (hasDraft && view.isEmpty)
+                                TextButton(onPressed: () => context.push('/teams/search'),
+                                  child: const Text('Find a team you already play for')),
                               // ── "STATUS · WHAT NEEDS YOU" banner ────────
                               if (view.needsYou.isNotEmpty)
                                 Padding(
@@ -1087,17 +988,34 @@ class TeamsListScreen extends ConsumerWidget {
           ),
         );
       case AsyncLoading():
-        return const Scaffold(
+        // Chrome real from the first frame, only the list skeletal — the page
+        // never blanks, and "Create" is reachable before the teams resolve.
+        return Scaffold(
           backgroundColor: CkColors.paper,
           body: SafeArea(
             bottom: false,
-            child: Center(
-              child: CircularProgressIndicator(color: CkColors.ink),
+            child: Column(
+              children: [
+                _nav(context),
+                const Expanded(child: MyTeamsShimmerSkeleton()),
+              ],
             ),
           ),
         );
     }
   }
+
+  /// The screen's chrome. Identical in the loaded and loading states so the
+  /// nav does not move when data lands, and the "Create" pill — the only
+  /// create affordance on this screen — is live in both.
+  Widget _nav(BuildContext context) => CkPushNav(
+    title: 'My Teams',
+    onBack: () => context.canPop() ? context.pop() : context.go('/home'),
+    action: CkNavPill(
+      label: 'Create',
+      onTap: () => context.push('/teams/create'),
+    ),
+  );
 
   // ── Empty-state crest (used 3×) ────────────────────────────────────
   Widget _dimCrest(CrestStyle crest) {
@@ -1142,31 +1060,77 @@ class TeamsListScreen extends ConsumerWidget {
     );
   }
 
-  /// Empty-state CTA pill. Same primary/secondary grammar as [_actionBtn]
-  /// (filled ink vs paper + hairline) at the taller 42pt empty-card scale.
-  Widget _emptyCta({
-    required String label,
-    required bool primary,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        height: 42,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: primary ? CkColors.ink : CkColors.paper,
-          borderRadius: BorderRadius.circular(10),
-          border: primary ? null : Border.all(color: CkColors.hairline),
-        ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: CkType.body(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: primary ? CkColors.paper : CkColors.ink,
+  /// The empty state. With no sections to sit under it is centred in the
+  /// viewport rather than hanging off the nav, and it carries no buttons of
+  /// its own — "Create" is the nav pill. Kept inside a scrollable so
+  /// pull-to-refresh still fires on an empty list.
+  Widget _emptyBody() {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: SizedBox(
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: _EmptyDashedBorderPainter(
+                    color: CkColors.line,
+                    radius: 16,
+                    strokeWidth: 1.2,
+                    dashLength: 5,
+                    dashGap: 4,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Three crests then an open slot — the row says
+                        // "teams, and a space for yours" without a caption.
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _dimCrest(MyTeamsCrests.ll),
+                            const SizedBox(width: 7),
+                            _dimCrest(MyTeamsCrests.mk),
+                            const SizedBox(width: 7),
+                            _dimCrest(MyTeamsCrests.gg),
+                            const SizedBox(width: 7),
+                            _emptyCrestSlot(),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'No teams yet',
+                          textAlign: TextAlign.center,
+                          style: CkType.display(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.025,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            'Tap Create to start your mohalla side.',
+                            textAlign: TextAlign.center,
+                            style: CkType.body(
+                              fontSize: 13,
+                              color: CkColors.ink2,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -1545,58 +1509,18 @@ class TeamRow extends StatelessWidget {
     );
   }
 
-  Widget _monoTile(CrestStyle crest, bool dim) => Container(
-    width: 44,
-    height: 44,
-    decoration: BoxDecoration(
-      color: dim ? CkColors.paper2 : crest.color,
-      borderRadius: BorderRadius.circular(11),
-      border:
-          dim
-              ? Border.all(color: CkColors.line, style: BorderStyle.solid)
-              : null,
-    ),
-    alignment: Alignment.center,
-    child: Text(
-      crest.mono,
-      style: CkType.display(
-        fontSize: 14,
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.03,
-        color: dim ? CkColors.muted : CkColors.paper,
-      ),
-    ),
-  );
-
   Widget _crestWithBadge(
     BuildContext context, {
     required CrestStyle crest,
     required bool dim,
     int? badge,
   }) {
-    final showImage =
-        !dim && (crest.logoUrl != null && crest.logoUrl!.isNotEmpty);
-    final memW = (44 * MediaQuery.devicePixelRatioOf(context)).round();
-    final tile =
-        showImage
-            ? ClipRRect(
-              borderRadius: BorderRadius.circular(11),
-              child: Container(
-                width: 44,
-                height: 44,
-                color: CkColors.paper2,
-                child: CachedNetworkImage(
-                  imageUrl: crest.logoUrl!,
-                  fit: BoxFit.cover,
-                  width: 44,
-                  height: 44,
-                  memCacheWidth: memW,
-                  errorWidget: (_, __, ___) => _monoTile(crest, dim),
-                  placeholder: (_, __) => _monoTile(crest, dim),
-                ),
-              ),
-            )
-            : _monoTile(crest, dim);
+    final tile = Opacity(
+      opacity: dim ? .5 : 1,
+      child: TeamCrest(name: crest.name, monogram: crest.mono,
+        primaryColor: hexOf(crest.color), logoUrl: crest.logoUrl,
+        crestKind: crest.crestKind, size: 44),
+    );
     return SizedBox(
       width: 44,
       height: 44,

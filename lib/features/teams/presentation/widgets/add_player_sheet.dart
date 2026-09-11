@@ -820,10 +820,12 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  // Only these two: `team_invites.role` is capped at 'captain'
+                  // by a CHECK constraint, because member_role is an authority
+                  // ladder now — staff are appointed after joining, never by
+                  // invitation.
                   _roleChip('Squad Player', MemberRole.player),
                   _roleChip('Captain', MemberRole.captain),
-                  _roleChip('Vice Captain', MemberRole.viceCaptain),
-                  _roleChip('Wicket-keeper', MemberRole.wicketKeeper),
                 ],
               ),
               const SizedBox(height: 16),

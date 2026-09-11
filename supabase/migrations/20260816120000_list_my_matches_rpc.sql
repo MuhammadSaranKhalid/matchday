@@ -8,10 +8,10 @@
 --
 -- A match is mine when:
 --   • I created it, or I am a named captain on it
---   • a team I'm an ACTIVE roster member of is playing
---   • a team I own or manage is playing  (owner_id / managers — creating a team
---     does not enrol you in its roster, so this clause is load-bearing: the
---     REQUESTING manager of a friendly is neither created_by nor a team_member)
+--   • a team I'm an ACTIVE roster member of is playing — which now INCLUDES
+--     staff. Creating a team enrols you as its role='owner' member
+--     (create_owner_membership, 0210), so the separate owner_id/managers[]
+--     clause this list used to carry is subsumed and was deleted 2026-09-10.
 --   • I am named in the XI (match_players)
 --   • I am an assigned official — scorer / umpire (match_officials)
 --
@@ -47,11 +47,9 @@ as $$
            and tm.user_id = (select auth.uid())
            and tm.status = 'active'
       )
-      or exists (
-        select 1 from public.teams t
-         where t.team_id in (m.team_a_id, m.team_b_id)
-           and (t.owner_id = (select auth.uid()) or (select auth.uid()) = any(t.managers))
-      )
+      -- The owner/managers branch that used to sit here is gone (2026-09-10).
+      -- Staff now hold a team_members row, so the membership check above
+      -- already covers them.
       or exists (
         select 1 from public.match_players mp
          where mp.match_id = m.match_id

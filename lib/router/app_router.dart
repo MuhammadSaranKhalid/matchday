@@ -250,7 +250,9 @@ GoRouter appRouter(Ref ref) {
                   children: [
                     CkPushNav(
                       title: 'Find a Team',
-                      onBack: () => context.pop(),
+                      onBack: () => context.canPop()
+                          ? context.pop()
+                          : context.go('/explore'),
                     ),
                     const Expanded(child: TeamSearchScreen()),
                   ],

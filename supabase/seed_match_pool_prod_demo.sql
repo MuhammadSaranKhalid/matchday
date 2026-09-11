@@ -76,11 +76,11 @@ begin
     return;
   end if;
 
-  select team_id into h_busy    from public.teams where owner_id = v_saran
+  select team_id into h_busy    from public.teams where created_by = v_saran
     order by created_at, team_id offset 0 limit 1;
-  select team_id into h_waiting from public.teams where owner_id = v_saran
+  select team_id into h_waiting from public.teams where created_by = v_saran
     order by created_at, team_id offset 1 limit 1;
-  select team_id into h_past    from public.teams where owner_id = v_saran
+  select team_id into h_past    from public.teams where created_by = v_saran
     order by created_at, team_id offset 2 limit 1;
 
   if h_busy is null or h_waiting is null then
@@ -109,7 +109,7 @@ begin
   -- Owned by demo profiles rather than by you, which is the whole point: the
   -- board only shows challenges from teams you are not attached to.
   insert into public.teams (
-    team_id, owner_id, team_name, team_type, privacy, tagline,
+    team_id, created_by, team_name, team_type, privacy, tagline,
     team_colors, logo_monogram, location, home_ground, founded_year
   )
   select v.team_id, p.user_id, v.team_name, 'club', 'public', v.tagline,
@@ -139,7 +139,7 @@ begin
   -- team and shirt number, so a re-run replaces rather than duplicates.
   foreach v_team in array array[o_eagles, o_sultans, o_knights, o_quetta, o_ravi]
   loop
-    select owner_id into v_owner from public.teams where team_id = v_team;
+    select created_by into v_owner from public.teams where team_id = v_team;
     continue when v_owner is null;
 
     for v_i in 1 .. array_length(v_names, 1) loop
@@ -151,13 +151,14 @@ begin
       )
       on conflict (unclaimed_id) do update set display_name = excluded.display_name;
 
-      insert into public.team_members (team_id, unclaimed_id, role, jersey_number, added_by)
+      -- No role column: these are UNCLAIMED placeholders, and 'player' (what
+      -- assign_initial_role attaches by default) is the only role flagged
+      -- allows_unclaimed. The keeper is a per-match fact (match_players.role),
+      -- never a team-level one.
+      insert into public.team_members (team_id, unclaimed_id, jersey_number, added_by)
       values (
         v_team,
         md5('pool-prod:' || v_team::text || ':' || v_i)::uuid,
-        (case when v_i = 1 then 'captain'
-              when v_i = 2 then 'wicket_keeper'
-              else 'player' end)::public.member_role,
         20 + v_i,
         v_owner
       );
@@ -176,7 +177,7 @@ begin
     proposed_start_time, proposed_venue, proposed_format, message,
     status, share_code, code_expires_at, proposal_expires_at, created_at
   )
-  select v.request_id, v.from_team_id, null, t.owner_id,
+  select v.request_id, v.from_team_id, null, t.created_by,
          v.start_time, v.venue, v.format, v.message,
          'pending', v.code,
          case when v.code is null then null else now() + interval '24 hours' end,
@@ -326,7 +327,7 @@ begin
   )
   select
     md5('pool-prod-app:' || a.team_id::text)::uuid,
-    r_mine_busy, a.team_id, t.owner_id,
+    r_mine_busy, a.team_id, t.created_by,
     xi.ids, xi.keeper, a.message, a.status, a.note,
     case when a.status = 'pending' then null else now() - interval '4 hours' end,
     now() - a.age, now() - a.age
@@ -346,16 +347,18 @@ begin
   cross join lateral (
     select
       array_agg(m.player_id order by m.rn) as ids,
-      -- No max() for uuid, so take the first keeper off a filtered aggregate.
-      (array_agg(m.player_id) filter (where m.role = 'wicket_keeper'))[1] as keeper
+      -- 2026-09-10: team_members no longer carries 'wicket_keeper' — keeping is
+      -- a per-match job (match_players.role), not a standing team role. The
+      -- demo just nominates the second name in the XI.
+      (array_agg(m.player_id order by m.rn))[2] as keeper
     from (
       select coalesce(tm.user_id, tm.unclaimed_id) as player_id,
              tm.role,
              row_number() over (
-               order by (tm.role <> 'captain'), (tm.role <> 'wicket_keeper'), tm.created_at
+               order by (tm.role <> 'captain'), tm.created_at
              ) as rn
       from public.team_members tm
-      where tm.team_id = a.team_id and tm.status = 'active'
+      where tm.team_id = a.team_id and tm.status = 'active' and tm.in_squad
       limit 11
     ) m
   ) xi

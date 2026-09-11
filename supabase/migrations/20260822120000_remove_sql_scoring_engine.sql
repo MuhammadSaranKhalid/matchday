@@ -97,18 +97,16 @@ as $$
       (b.match_type = 'practice' and b.created_by = auth.uid())
       or (b.batting_team_id = b.team_a_id and b.team_a_captain = auth.uid())
       or (b.batting_team_id = b.team_b_id and b.team_b_captain = auth.uid())
-      or exists (
-        select 1 from public.teams t
-        where t.team_id = b.batting_team_id
-          and t.owner_id = auth.uid()
-      )
-      or exists (
-        select 1 from public.team_members tm
-        where tm.team_id = b.batting_team_id
-          and tm.user_id = auth.uid()
-          and tm.role in ('captain', 'vice_captain')
-          and tm.status = 'active'
-      )
+      -- Rewritten 2026-09-11 (docs/team-roles-design.md). Scoring is no longer
+      -- a special case: BOTH branches are the same engine, asked about two
+      -- different entities. That is exactly why `match.score` is registered in
+      -- permission_scopes at 'team' AND 'match'.
+      --
+      --   team scope  → you hold match.score through a role on the batting side
+      --   match scope → you were handed it for THIS match (a nominated scorer,
+      --                 mirrored in from match_officials)
+      or public.can('team',  b.batting_team_id, 'match.score')
+      or public.can('match', b.match_id,        'match.score')
   );
 $$;
 

@@ -13,7 +13,10 @@ _TeamMemberDto _$TeamMemberDtoFromJson(Map<String, dynamic> json) =>
       userId: json['user_id'] as String?,
       unclaimedId: json['unclaimed_id'] as String?,
       jerseyNumber: (json['jersey_number'] as num?)?.toInt(),
-      role: json['role'] as String? ?? 'player',
+      roleRows:
+          (json['team_member_roles'] as List<dynamic>?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList(),
       addedBy: json['added_by'] as String?,
       joinedAt: json['joined_at'] as String,
       updatedAt: json['updated_at'] as String,
@@ -26,7 +29,7 @@ Map<String, dynamic> _$TeamMemberDtoToJson(_TeamMemberDto instance) =>
       'user_id': instance.userId,
       'unclaimed_id': instance.unclaimedId,
       'jersey_number': instance.jerseyNumber,
-      'role': instance.role,
+      'team_member_roles': instance.roleRows,
       'added_by': instance.addedBy,
       'joined_at': instance.joinedAt,
       'updated_at': instance.updatedAt,

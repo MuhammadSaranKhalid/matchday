@@ -6,7 +6,7 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../matches/domain/entities/match.dart';
 import '../../../matches/presentation/providers/matches_providers.dart';
 import '../../domain/entities/team.dart';
-import '../../domain/entities/team_relationship.dart';
+import '../../domain/entities/team_member.dart';
 import '../providers/teams_providers.dart';
 import '../state/my_teams_view.dart';
 import '../utils/team_display.dart';
@@ -39,6 +39,10 @@ class TeamsListController extends _$TeamsListController {
     // id, instead of an extra pass with an empty id while the stream loads.
     final user = await ref.watch(currentUserStreamProvider.future);
     final userId = user?.id.value ?? '';
+    // Roles come from team_member_roles now, not a column on the team. There
+    // is no `created_by` fallback: that is history, and a creator who left
+    // must not still read as the owner.
+    final myRoles = await ref.watch(myTeamRolesProvider.future);
 
     // Matches are online-only. Call the repo directly and pattern-match the
     // Either so a failure/offline fetch yields no active matches instead of
@@ -56,6 +60,7 @@ class TeamsListController extends _$TeamsListController {
       cached: cached,
       matches: matches,
       userId: userId,
+      myRoles: myRoles,
     );
     _base = base;
     return _applyFilter(base, _filter);
@@ -89,6 +94,7 @@ MyTeamsView _buildView({
   required List<Team> cached,
   required List<Match> matches,
   required String userId,
+  required Map<String, MemberRole> myRoles,
 }) {
   // ── 0. Compose active matches (resolve opponent + incoming) ──────────
   final teamIds = teams.map((t) => t.id).toSet();
@@ -108,9 +114,9 @@ MyTeamsView _buildView({
     // The relationship decision lives in the domain; this screen only maps it
     // to its presentation role + bucket. No roster on this screen, so every
     // non-owner/manager maps to `player`.
-    final role = switch (team.relationshipFor(userId: userId)) {
-      TeamRelationship.owner => MyTeamsRole.captain,
-      TeamRelationship.manager => MyTeamsRole.manager,
+    final role = switch (myRoles[team.id.value]) {
+      MemberRole.owner => MyTeamsRole.captain,
+      MemberRole.manager => MyTeamsRole.manager,
       _ => MyTeamsRole.player,
     };
     final row = TeamRowVm(
@@ -139,7 +145,7 @@ MyTeamsView _buildView({
   //      user has exactly one team, they own it, and there are no active
   //      matches yet.
   final isFirstTeam = teams.length == 1 &&
-      teams.first.ownerId == userId &&
+      (myRoles[teams.first.id.value]?.isStaff ?? false) &&
       activeMatches.isEmpty;
 
   String? subtitle;
@@ -244,6 +250,7 @@ CrestStyle _crestFor(Team team) => CrestStyle(
       name: team.name,
       city: team.city,
       logoUrl: team.logoUrl,
+      crestKind: team.crestKind,
     );
 
 _ActiveMatch? _pickHeroMatch(List<_ActiveMatch> active) {

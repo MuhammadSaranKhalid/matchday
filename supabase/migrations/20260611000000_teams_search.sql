@@ -62,6 +62,6 @@ set location = coalesce(t.location, '{}'::jsonb)
        )
      )
 from public.profiles p
-where t.owner_id = p.user_id
+where t.created_by = p.user_id
   and not (coalesce(t.location, '{}'::jsonb) ? 'lat')
   and (p.location ? 'lat');

@@ -1,4 +1,5 @@
 import 'package:flutter/painting.dart';
+import '../../../domain/entities/team.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 
@@ -13,6 +14,7 @@ class CrestStyle {
     required this.name,
     this.city,
     this.logoUrl,
+    this.crestKind = CrestKind.monogram,
   });
 
   final Color color;
@@ -30,6 +32,7 @@ class CrestStyle {
   /// Public URL of the team's uploaded crest. When set, renderers should
   /// prefer the image and fall back to the monogram-on-color tile on error.
   final String? logoUrl;
+  final CrestKind crestKind;
 }
 
 /// The 14-team static palette used by the case fixtures (mirror of the JSX

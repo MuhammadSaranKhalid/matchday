@@ -20,6 +20,13 @@ abstract class TeamsRepository {
   // ─── Reads ─────────────────────────────────────────────────────────────
   Stream<List<Team>> watchMyTeams(String userId);
 
+  /// The signed-in user's rung on every team they belong to, keyed by team id.
+  ///
+  /// The one place authority is answered on the client. Added 2026-09-10 to
+  /// replace `Team.isManagedBy`, which read a `teams.managers` array that no
+  /// longer exists — and which could not see a captain at all.
+  Stream<Map<String, MemberRole>> watchMyTeamRoles(String userId);
+
   /// All teams the signed-in user can see (for picking an opponent).
   Stream<List<Team>> watchAllTeams();
   Stream<Team?> watchTeam(TeamId id);
@@ -49,6 +56,7 @@ abstract class TeamsRepository {
     String? secondaryColor,
     String? tagline,
     String? logoMonogram,
+    CrestKind crestKind = CrestKind.monogram,
     // Structured geo, all optional. Mirrors the location jsonb contract in
     // docs/search-feature-design.md §7. The "where you play" wizard step that
     // populates these is a follow-up ticket; today's wizard leaves them null
@@ -145,9 +153,23 @@ abstract class TeamsRepository {
     JerseyNumber? jersey,
   );
 
-  /// Sets a member's role. Promoting to captain demotes the current captain
-  /// (one captain per team).
+  /// Sets a member's role. Promoting to captain demotes the incumbent in the
+  /// same transaction (one captain per team, enforced by a unique index).
+  ///
+  /// Returns an [AuthFailure] when the caller's own rung is too low — the
+  /// server rule is "you may never act on, or grant, a rung at or above your
+  /// own", so a manager cannot mint another manager or touch the owner.
   Future<Either<Failure, Unit>> setMemberRole(MembershipId id, MemberRole role);
+
+  /// Hands the team to another active member. Owner only.
+  ///
+  /// The outgoing owner becomes a manager. This is the only way ownership
+  /// moves: [setMemberRole] rejects `MemberRole.owner`, and both `leave_team`
+  /// and self-demotion refuse while the caller still owns the team.
+  Future<Either<Failure, Unit>> transferOwnership(
+    TeamId teamId,
+    String newOwnerId,
+  );
 
   /// Sends an invitation to a registered Matchday player.
   Future<Either<Failure, Unit>> sendTeamInvite({

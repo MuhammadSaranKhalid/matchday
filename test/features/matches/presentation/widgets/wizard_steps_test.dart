@@ -183,7 +183,7 @@ void main() {
             teamId: const TeamId('team-a'),
             playerId: id,
             playerType: PlayerType.claimed,
-            role: role,
+            roles: {role.wire},
             addedBy: 'user-1',
             joinedAt: DateTime(2026, 1, 1),
             updatedAt: DateTime(2026, 1, 1),
@@ -193,7 +193,7 @@ void main() {
 
     final roster = [
       member('p1', 'Ahmed Khan', MemberRole.captain),
-      member('p2', 'Bilal Aslam', MemberRole.wicketKeeper),
+      member('p2', 'Bilal Aslam', MemberRole.player),
       member('p3', 'Hamza Raza', MemberRole.player),
     ];
 

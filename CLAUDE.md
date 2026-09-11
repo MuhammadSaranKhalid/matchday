@@ -1573,7 +1573,74 @@ The `todos` reference feature and all general offline-first wiring were removed 
 | Controller calling repo directly with value-object validation inlined | `lib/features/onboarding/presentation/controllers/onboarding_controller.dart` (`submit`), `lib/features/teams/presentation/controllers/add_unclaimed_player_controller.dart` (`submit`) |
 | Wizard draft persistence | `lib/core/database/wizard_draft_store.dart` + `lib/core/database/tables.dart` |
 | Pure-domain algorithm shared by a preview and a write (no I/O, one implementation, property-tested) | `lib/features/tournaments/domain/draw/draw_builder.dart` + `test/features/tournaments/domain/draw/draw_builder_test.dart` |
+| **Authorization — the team role ladder** | `docs/team-roles-design.md` (the contract), `supabase/migrations/20260101000210_team_members.sql` (predicates + RPCs), `lib/features/teams/domain/entities/team_relationship.dart` (the client mirror) |
 | **Local-first write path (exemption 2 — do not copy without agreement)** | `lib/features/matches/data/datasources/matches_local_datasource.dart` (WAL + outbox), `lib/features/matches/presentation/controllers/scoring_controller.dart` (apply-locally-then-drain), `docs/offline-scoring-design.md` (rationale) |
+---
+
+## 14b. Team authorization — the engine (2026-09-11)
+
+> Full rationale and decision log: **`docs/team-roles-design.md`**. Read it before
+> touching anything that asks "may this user do X?".
+
+Authorization is **data**, not code. One function answers every question:
+
+```sql
+can(scope, entity_id, permission_key) -> boolean
+```
+
+`scope` is `'team'` or `'match'` today (`'tournament'` / `'club'` are reserved).
+`team_can(team_id, key)` is the convenience wrapper.
+
+### The tables (0205 catalogue, 0210 assignment)
+
+| table | holds |
+|---|---|
+| `roles` | what a person can BE. Rows, **not an enum** |
+| `role_exclusion_sets` / `_members` | "at most N of these roles per member" (NIST SSD) |
+| `permissions` | what can be DONE (`resource` + `action` are load-bearing — they are a future grid) |
+| `permission_scopes` | which entity types a permission may be evaluated against |
+| `role_permissions` | **THE MATRIX** — global default + per-team deltas |
+| `grants` | a permission handed to ONE person on ONE resource |
+| `team_member_roles` | who holds what — pure many-to-many |
+
+### Things that will bite you
+
+- **A member holds ANY number of roles.** `team_members.role` is gone, and so is
+  the `member_role` enum. Owner **+** captain is the normal case, not an edge —
+  it is the bug the whole redesign exists to fix. `TeamMember.roles` is a
+  `Set<String>` of role keys; `topRole` picks one for display.
+- **`teams.owner_id` is gone.** `teams.created_by` is immutable history and is
+  **never** an authorization answer. "Who runs this team?" is the `owner` role.
+- **Two rules that look alike are not.** "At most one of these roles per MEMBER"
+  is separation of duty — a trigger, because a role can sit in several sets.
+  "At most one holder of this role per TEAM" (owner, captain) is cardinality —
+  a partial unique index, which is race-free. Know which you are relying on.
+- **`can()` validates BEFORE the owner short-circuit.** A typo'd or wrong-scope
+  key must return FALSE. Reverse the order and every owner gets TRUE for
+  `'team.disbnad'`.
+- **`permissions` has no `scope` column.** `match.score` is evaluated at BOTH
+  team scope (the batting side's captain) and match scope (a nominated scorer).
+  `permission_scopes` lists the pairs, and both `role_permissions` and `grants`
+  FK to it — scope coherence is structural, not a convention.
+- **Direct grants are gated by `permissions.direct_grantable`.** `min_rank`
+  floors the role path only; without the flag, `grants` is a route around the
+  matrix.
+- **`is_team_manager` / `is_team_captain` are SHIMS over `can()`.** They exist so
+  the ~45 call sites could stay put while the schema moved. Replacing them with
+  specific keys is Step 2; do not add new callers.
+- **Supabase realtime cannot join.** `listMembers()` embeds
+  `team_member_roles(role_key)`; `watchMembers()` cannot, so roles have their own
+  stream and are stitched in the repository.
+- **Creation declares its intent.** There is no universal "everyone starts as
+  player" trigger — that collides with the exclusion set on the first team ever
+  created. `set_config('matchday.initial_role', …, true)` before the insert.
+- **Role is for display; permissions are for authorization.** The C badge and the
+  managers list read the role. Anything that gates an action asks `can()`.
+
+Changing what a role may do is an `INSERT` into `role_permissions` — no
+migration, no redeploy. A team's owner can override it for their team alone
+(`team_id` set), which is what the future permissions screen writes.
+
 ---
 
 ## 15. Posts feature + image/media spec

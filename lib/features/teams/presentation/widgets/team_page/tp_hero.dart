@@ -207,6 +207,7 @@ class _Identity extends StatelessWidget {
           name: team.name,
           primaryColor: hexOf(team.primary),
           logoUrl: team.logoUrl,
+          crestKind: team.crestKind,
           monogram: team.mono,
           size: 72,
           onLightSurface: mode.isInk,

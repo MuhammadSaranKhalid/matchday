@@ -57,9 +57,8 @@ class TeamSquadTab extends StatelessWidget {
         team.squad
             .where(
               (p) =>
-                  p.role == TpPlayerRole.captain ||
-                  p.role == TpPlayerRole.viceCaptain ||
-                  p.role == TpPlayerRole.wicketKeeper,
+                  p.role == TpPlayerRole.manager ||
+                  p.role == TpPlayerRole.captain,
             )
             .toList();
     final players =

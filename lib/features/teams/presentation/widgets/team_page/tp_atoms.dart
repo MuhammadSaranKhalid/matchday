@@ -360,12 +360,10 @@ class TpPlayerRowWidget extends StatelessWidget {
 
   String get _roleAbbr {
     switch (player.role) {
+      case TpPlayerRole.manager:
+        return 'MGR';
       case TpPlayerRole.captain:
         return 'C';
-      case TpPlayerRole.viceCaptain:
-        return 'VC';
-      case TpPlayerRole.wicketKeeper:
-        return 'WK';
       case TpPlayerRole.player:
         return '';
     }

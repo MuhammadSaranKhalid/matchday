@@ -30,11 +30,10 @@ void main() {
       request: request,
       fromTeam: Team(
         id: TeamId('team-$id'),
-        ownerId: 'user-2',
+        createdBy: 'user-2',
         name: name,
         type: TeamType.club,
         privacy: TeamPrivacy.public,
-        managers: const ['user-2'],
         createdAt: DateTime(2026, 1, 1),
         updatedAt: DateTime(2026, 1, 1),
       ),

@@ -222,11 +222,12 @@ class PlayerJoinRequestCard extends ConsumerWidget {
     final message = request.message;
     final ctrl = ref.read(teamManageControllerProvider.notifier);
 
+    // Invites and join requests are capped at 'captain' by a CHECK constraint
+    // on both tables — staff are appointed after joining, never by invitation.
     final roleLabel = switch (request.role) {
       MemberRole.captain => 'Captain',
-      MemberRole.viceCaptain => 'Vice Captain',
-      MemberRole.wicketKeeper => 'Wicket-keeper',
       MemberRole.player => 'Squad Player',
+      MemberRole.manager || MemberRole.owner => 'Staff',
     };
 
     return Container(
@@ -507,9 +508,8 @@ class SentInviteCard extends ConsumerWidget {
 
     final roleLabel = switch (invite.role) {
       MemberRole.captain => 'Captain',
-      MemberRole.viceCaptain => 'Vice Captain',
-      MemberRole.wicketKeeper => 'Wicket-keeper',
       MemberRole.player => 'Squad Player',
+      MemberRole.manager || MemberRole.owner => 'Staff',
     };
 
     return Container(

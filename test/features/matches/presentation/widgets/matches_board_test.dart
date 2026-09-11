@@ -12,11 +12,10 @@ import 'package:matchday/features/teams/domain/entities/team.dart';
 void main() {
   Team team(String id, String name) => Team(
         id: TeamId(id),
-        ownerId: 'user-1',
+        createdBy: 'user-1',
         name: name,
         type: TeamType.club,
         privacy: TeamPrivacy.public,
-        managers: const ['user-1'],
         primaryColor: '#7A2E2E',
         createdAt: DateTime(2026, 1, 1),
         updatedAt: DateTime(2026, 1, 1),

@@ -21,11 +21,10 @@ void main() {
 
   final team = Team(
     id: const TeamId('t1'),
-    ownerId: 'u1',
+    createdBy: 'u1',
     name: 'Lahore Lions',
     type: TeamType.club,
     privacy: TeamPrivacy.public,
-    managers: const ['u1'],
     createdAt: DateTime(2026),
     updatedAt: DateTime(2026),
   );

@@ -51,7 +51,7 @@ begin
 
   -- 2) Upsert Teams
   insert into public.teams (
-    team_id, owner_id, team_name, team_type, privacy, tagline, team_colors,
+    team_id, created_by, team_name, team_type, privacy, tagline, team_colors,
     logo_monogram, logo_url, location, home_ground, founded_year, created_at
   )
   values
@@ -155,35 +155,51 @@ begin
     home_ground   = excluded.home_ground,
     updated_at    = now();
 
-  -- 3) Clean up existing memberships for these teams and re-insert
+  -- 3) Clean up existing memberships for these teams and re-insert.
+  -- 2026-09-10: role='owner' rows are EXCLUDED. They are created by the
+  -- create_owner_membership trigger when the team is inserted above, and they
+  -- are what is_team_manager() reads — deleting them would leave every team
+  -- here unmanageable: the `owner` role IS the authority now, and deleting it
+  -- would leave the team with nobody able to act.
   delete from public.team_members
-  where team_id in (t_lahore_lions, t_isb_united, t_karachi_eagles, t_hyd_hawks, t_multan_sultans, t_quetta_gladiators, t_sialkot_stallions, t_peshawar_tigers, t_rawalpindi_rams);
+  where team_id in (t_lahore_lions, t_isb_united, t_karachi_eagles, t_hyd_hawks, t_multan_sultans, t_quetta_gladiators, t_sialkot_stallions, t_peshawar_tigers, t_rawalpindi_rams)
+    and membership_id not in (
+      select membership_id from public.team_member_roles where role_key = 'owner'
+    );
 
   -- Lahore Lions Squad
-  insert into public.team_members (team_id, user_id, role, jersey_number, added_by)
-  values
-    (t_lahore_lions, v_saran_uid, 'captain', 7, v_saran_uid),
-    (t_lahore_lions, v_babar,      'vice_captain', 56, v_saran_uid),
-    (t_lahore_lions, v_shaheen,    'player', 10, v_saran_uid),
-    (t_lahore_lions, v_haris,      'player', 99, v_saran_uid),
-    (t_lahore_lions, v_faraz,      'player', 21, v_saran_uid);
-
+  perform set_config('matchday.initial_role', 'captain', true);
+  insert into public.team_members (team_id, user_id, jersey_number, added_by)
+  values (t_lahore_lions, v_babar, 56, v_saran_uid);
+  perform set_config('matchday.initial_role', 'player', true);
+  insert into public.team_members (team_id, user_id, jersey_number, added_by)
+  values (t_lahore_lions, v_shaheen, 10, v_saran_uid);
+  perform set_config('matchday.initial_role', 'player', true);
+  insert into public.team_members (team_id, user_id, jersey_number, added_by)
+  values (t_lahore_lions, v_haris, 99, v_saran_uid);
+  perform set_config('matchday.initial_role', 'player', true);
+  insert into public.team_members (team_id, user_id, jersey_number, added_by)
+  values (t_lahore_lions, v_faraz, 21, v_saran_uid);
   -- Islamabad United Squad
-  insert into public.team_members (team_id, user_id, role, jersey_number, added_by)
-  values
-    (t_isb_united, v_saran_uid, 'captain', 7, v_saran_uid),
-    (t_isb_united, v_shadab,    'vice_captain', 77, v_saran_uid),
-    (t_isb_united, v_naseem,    'player', 71, v_saran_uid),
-    (t_isb_united, v_hassan,    'wicket_keeper', 9, v_saran_uid);
-
+  perform set_config('matchday.initial_role', 'captain', true);
+  insert into public.team_members (team_id, user_id, jersey_number, added_by)
+  values (t_isb_united, v_shadab, 77, v_saran_uid);
+  perform set_config('matchday.initial_role', 'player', true);
+  insert into public.team_members (team_id, user_id, jersey_number, added_by)
+  values (t_isb_united, v_naseem, 71, v_saran_uid);
+  perform set_config('matchday.initial_role', 'player', true);
+  insert into public.team_members (team_id, user_id, jersey_number, added_by)
+  values (t_isb_united, v_hassan, 9, v_saran_uid);
   -- Karachi Eagles Squad
-  insert into public.team_members (team_id, user_id, role, jersey_number, added_by)
-  values
-    (t_karachi_eagles, v_bilal,   'captain', 1, v_bilal),
-    (t_karachi_eagles, v_rizwan,  'vice_captain', 16, v_bilal),
-    (t_karachi_eagles, v_fakhar,  'player', 39, v_bilal),
-    (t_karachi_eagles, v_adeel,   'player', 18, v_bilal);
-
+  perform set_config('matchday.initial_role', 'captain', true);
+  insert into public.team_members (team_id, user_id, jersey_number, added_by)
+  values (t_karachi_eagles, v_rizwan, 16, v_bilal);
+  perform set_config('matchday.initial_role', 'player', true);
+  insert into public.team_members (team_id, user_id, jersey_number, added_by)
+  values (t_karachi_eagles, v_fakhar, 39, v_bilal);
+  perform set_config('matchday.initial_role', 'player', true);
+  insert into public.team_members (team_id, user_id, jersey_number, added_by)
+  values (t_karachi_eagles, v_adeel, 18, v_bilal);
   -- 4) Clear & Re-seed Rich Team-Authored Posts & Announcements
   delete from public.posts where author_context = 'team_manager' or linked_team_id is not null;
 

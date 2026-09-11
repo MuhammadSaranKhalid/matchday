@@ -85,7 +85,7 @@ final class PlacePickerProvider
   }
 }
 
-String _$placePickerHash() => r'93cfb1bf5b35b7cf72300de7c5b610405b967420';
+String _$placePickerHash() => r'c768113b31923bfccedd2a5d5bf2da4d8d4ae137';
 
 /// Drives one place-autocomplete field.
 ///

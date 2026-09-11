@@ -48,9 +48,14 @@ class TeamsRemoteDataSource {
     }
   }
 
+  /// One-shot roster read. Roles live in `team_member_roles` since
+  /// 2026-09-11, so they are embedded here — a plain `select()` would return
+  /// members who appear to hold nothing.
   Future<List<TeamMemberDto>> listMembers() async {
     try {
-      final rows = await _supabase.from(_members).select();
+      final rows = await _supabase
+          .from(_members)
+          .select('*, team_member_roles(role_key)');
       return rows.map(TeamMemberDto.fromJson).toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -107,51 +112,30 @@ class TeamsRemoteDataSource {
 
   Future<TeamDto> createTeam(Map<String, dynamic> payload) async {
     try {
-      final uid = _requireUid();
-      final row = await _supabase
-          .from(_teams)
-          .insert({
-            'team_id': payload['id'],
-            'owner_id': uid,
-            'managers': [uid],
-            'team_name': payload['team_name'],
-            'team_type': payload['team_type'],
-            'privacy': payload['privacy'],
-            if (payload['description'] != null)
-              'description': payload['description'],
-            if (payload['home_ground'] != null)
-              'home_ground': payload['home_ground'],
-            // Location jsonb: forward every structured geo field the caller
-            // provides. Each is optional; null fields are omitted so the row
-            // matches the §7 contract shape (docs/search-feature-design.md).
-            // When lat/lng land, the generated `location_point` column auto-
-            // populates and the GiST index picks the team up for proximity.
-            'location': {
-              if (payload['label'] != null) 'label': payload['label'],
-              if (payload['city'] != null) 'city': payload['city'],
-              if (payload['district'] != null) 'district': payload['district'],
-              if (payload['province'] != null) 'province': payload['province'],
-              if (payload['postcode'] != null) 'postcode': payload['postcode'],
-              if (payload['place_id'] != null) 'place_id': payload['place_id'],
-              if (payload['lat'] != null) 'lat': payload['lat'],
-              if (payload['lng'] != null) 'lng': payload['lng'],
-              if (payload['country_code'] != null)
-                'country_code': payload['country_code'],
-            },
-            if (payload['founded_year'] != null)
-              'founded_year': payload['founded_year'],
-            'team_colors': {
-              if (payload['primary_color'] != null)
-                'primary': payload['primary_color'],
-              if (payload['secondary_color'] != null)
-                'secondary': payload['secondary_color'],
-            },
-            if (payload['tagline'] != null) 'tagline': payload['tagline'],
-            if (payload['logo_monogram'] != null)
-              'logo_monogram': payload['logo_monogram'],
-          })
-          .select()
-          .single();
+      _requireUid();
+      // Team writes are RPC-only. The server derives ownership from auth.uid()
+      // and creates the owner staff assignment atomically with the team.
+      final row = await _supabase.rpc<Map<String, dynamic>>('create_team', params: {
+        'p_team_id': payload['id'],
+        'p_team_name': payload['team_name'],
+        'p_team_type': payload['team_type'],
+        'p_privacy': payload['privacy'],
+        'p_details': {
+          for (final key in ['description', 'home_ground', 'tagline',
+            'logo_monogram', 'founded_year'])
+            if (payload[key] != null) key: payload[key],
+          'location': {
+            for (final key in ['label', 'city', 'district', 'province',
+              'postcode', 'place_id', 'lat', 'lng', 'country_code'])
+              if (payload[key] != null) key: payload[key],
+          },
+          'team_colors': {
+            if (payload['primary_color'] != null) 'primary': payload['primary_color'],
+            if (payload['secondary_color'] != null) 'secondary': payload['secondary_color'],
+            if (payload['crest_kind'] != null) 'crest_kind': payload['crest_kind'],
+          },
+        },
+      });
       return TeamDto.fromJson(row);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -187,12 +171,24 @@ class TeamsRemoteDataSource {
         };
       }
 
-      final row = await _supabase
-          .from(_teams)
-          .update(updates)
-          .eq('team_id', teamId)
-          .select()
-          .single();
+      // Preserve logo style and resolved location metadata when editing only
+      // one color or location field. The profile RPC replaces each JSON object.
+      if (updates.containsKey('team_colors') || updates.containsKey('location')) {
+        final current = await _supabase.from(_teams)
+            .select('team_colors, location').eq('team_id', teamId).single();
+        for (final key in ['team_colors', 'location']) {
+          if (updates.containsKey(key)) {
+            updates[key] = {
+              ...?current[key] as Map<String, dynamic>?,
+              ...updates[key] as Map<String, dynamic>,
+            };
+          }
+        }
+      }
+      final row = await _supabase.rpc<Map<String, dynamic>>(
+        'update_team_profile',
+        params: {'p_team_id': teamId, 'p_patch': updates},
+      );
       return TeamDto.fromJson(row);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -211,6 +207,45 @@ class TeamsRemoteDataSource {
         params: {'p_membership_id': membershipId},
       );
     } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Promotes or demotes a teammate. Direct UPDATE of `team_members.role` is
+  /// blocked by the `team_members_guard_role` trigger — `role` is a privilege
+  /// now, and the manager-edit policy that exists for jersey numbers would
+  /// otherwise let any manager promote themselves to owner.
+  ///
+  /// The RPC enforces "you may never act on, or grant, a rung at or above your
+  /// own" and swaps the captaincy atomically when promoting to captain.
+  /// A `42501` means the caller's rung is too low; surface it as an
+  /// [UnauthorizedException] so the repository can map it to an AuthFailure.
+  Future<void> setMemberRole(String membershipId, String role) async {
+    try {
+      _requireUid();
+      await _supabase.rpc<void>(
+        'set_team_member_role',
+        params: {'p_membership_id': membershipId, 'p_new_role': role},
+      );
+    } on PostgrestException catch (e) {
+      if (e.code == '42501') throw UnauthorizedException(e.message);
+      if (e.code == 'P0002') throw NotFoundException(e.message);
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Hands the team to another active member. Owner-only; swaps
+  /// the `owner` role between two membership rows in one transaction.
+/// (`teams.owner_id` is gone; `created_by` is history, not authority.)
+  Future<void> transferOwnership(String teamId, String newOwnerId) async {
+    try {
+      _requireUid();
+      await _supabase.rpc<void>(
+        'transfer_team_ownership',
+        params: {'p_team_id': teamId, 'p_new_owner_id': newOwnerId},
+      );
+    } on PostgrestException catch (e) {
+      if (e.code == '42501') throw UnauthorizedException(e.message);
       throw ServerException(e.message);
     }
   }
@@ -237,10 +272,10 @@ class TeamsRemoteDataSource {
       final url = _supabase.storage.from('team-logos').getPublicUrl(path);
       // Cache-bust so a replacement upload shows immediately at the same URL.
       final cacheBusted = '$url?v=${DateTime.now().millisecondsSinceEpoch}';
-      await _supabase
-          .from(_teams)
-          .update({'logo_url': cacheBusted})
-          .eq('team_id', teamId);
+      await _supabase.rpc<void>('update_team_profile', params: {
+        'p_team_id': teamId,
+        'p_patch': {'logo_url': cacheBusted},
+      });
       return cacheBusted;
     } on StorageException catch (e) {
       throw ServerException(e.message);
@@ -276,24 +311,33 @@ class TeamsRemoteDataSource {
     }
   }
 
-  Future<UnclaimedPlayerDto> createUnclaimed(
-      Map<String, dynamic> payload) async {
+  /// Creates the player and membership atomically through the manager-only API.
+  /// Production intentionally disallows direct inserts into both tables.
+  Future<void> addUnclaimedTeamMember({
+    required String teamId,
+    required String displayName,
+    String? phoneNumber,
+    int? jerseyNumber,
+    Map<String, dynamic> playerProfile = const {},
+  }) async {
     try {
-      final row = await _supabase
-          .from(_unclaimed)
-          .insert({
-            'unclaimed_id': payload['id'],
-            'display_name': payload['display_name'],
-            if (payload['phone_number'] != null)
-              'phone_number': payload['phone_number'],
-            if (payload['player_profile'] != null)
-              'player_profile': payload['player_profile'],
-            'added_by': _requireUid(),
-          })
-          .select(_unclaimedCols)
-          .single();
-      return UnclaimedPlayerDto.fromJson(row);
+      _requireUid();
+      await _supabase.rpc<String>('add_unclaimed_team_member', params: {
+        'p_team_id': teamId,
+        'p_display_name': displayName,
+        'p_phone_number': phoneNumber,
+        'p_jersey_number': jerseyNumber,
+        'p_player_profile': playerProfile,
+      });
     } on PostgrestException catch (e) {
+      if (e.code == '42501' &&
+          e.message == 'Only team staff can add players') {
+        throw UnauthorizedException(e.message);
+      }
+      if (e.code == '23505' &&
+          e.message.contains('team_members_unique_jersey')) {
+        throw ServerException('That jersey number is already taken');
+      }
       throw ServerException(e.message);
     }
   }
@@ -618,6 +662,27 @@ class TeamsRemoteDataSource {
       .from(_members)
       .stream(primaryKey: ['membership_id'])
       .map((r) => r.map(TeamMemberDto.fromJson).toList());
+
+  /// Roles, as their own realtime stream keyed by membership.
+  ///
+  /// A Supabase realtime stream CANNOT join — it replays single-table row
+  /// sets — so the embedded `team_member_roles(role_key)` trick that works for
+  /// [listMembers] is unavailable here. Roles therefore arrive separately and
+  /// are combined in the repository, the same shape `watchMyTeams` already
+  /// uses for teams + members.
+  Stream<Map<String, Set<String>>> watchMemberRoles() => _supabase
+      .from('team_member_roles')
+      .stream(primaryKey: ['membership_id', 'scope', 'role_key'])
+      .map((rows) {
+        final byMembership = <String, Set<String>>{};
+        for (final r in rows) {
+          final mid = r['membership_id'] as String?;
+          final key = r['role_key'] as String?;
+          if (mid == null || key == null) continue;
+          (byMembership[mid] ??= <String>{}).add(key);
+        }
+        return byMembership;
+      });
 
   // watchUnclaimed() was removed 2026-09-06. It had no callers, and a realtime
   // stream replays the whole row — including the phone_number / email columns

@@ -10,6 +10,7 @@ import 'package:matchday/features/matches/domain/entities/match.dart';
 import 'package:matchday/features/matches/domain/repositories/matches_repository.dart';
 import 'package:matchday/features/matches/presentation/providers/matches_providers.dart';
 import 'package:matchday/features/teams/domain/entities/team.dart';
+import 'package:matchday/features/teams/domain/entities/team_member.dart';
 import 'package:matchday/features/teams/presentation/controllers/teams_list_controller.dart';
 import 'package:matchday/features/teams/presentation/providers/teams_providers.dart';
 import 'package:matchday/features/teams/presentation/state/my_teams_view.dart';
@@ -25,11 +26,10 @@ User _user(String id) => User(
 Team _team(String id, {String name = 'Team', String? color, String owner = 'u1'}) =>
     Team(
       id: TeamId(id),
-      ownerId: owner,
+      createdBy: owner,
       name: name,
       type: TeamType.club,
       privacy: TeamPrivacy.public,
-      managers: const [],
       createdAt: DateTime(2026),
       updatedAt: DateTime(2026),
       city: 'Lahore',
@@ -68,6 +68,10 @@ void main() {
     List<Match> matches = const [],
     Failure? matchesFailure,
     String userId = 'u1',
+    // Roles come from team_member_roles now, not teams.created_by. Default to
+    // owning every team passed in, which is what these fixtures used to mean
+    // by "owned by u1".
+    Map<String, MemberRole>? roles,
   }) {
     when(() => matchesRepo.listMyMatches()).thenAnswer(
       (_) async => matchesFailure != null ? Left(matchesFailure) : Right(matches),
@@ -75,6 +79,9 @@ void main() {
     final container = ProviderContainer.test(
       overrides: [
         myTeamsProvider.overrideWith((ref) => Stream.value(teams)),
+        myTeamRolesProvider.overrideWith((ref) => Stream.value(
+              roles ?? {for (final t in teams) t.id.value: MemberRole.owner},
+            )),
         allTeamsProvider.overrideWith((ref) => Stream.value(cached)),
         matchesRepositoryProvider.overrideWithValue(matchesRepo),
         currentUserStreamProvider

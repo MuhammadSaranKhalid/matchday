@@ -86,8 +86,7 @@ class RosterTab extends ConsumerWidget {
         }
 
       case MemberActionType.captain:
-      case MemberActionType.viceCaptain:
-      case MemberActionType.keeper:
+      case MemberActionType.manager:
       case MemberActionType.player:
         final error = await ctrl.setMemberRole(
           memberId: m.id,
@@ -194,9 +193,9 @@ class ManagedRow extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              if (m.role != MemberRole.player) ...[
+                              if (m.topRole != MemberRole.player) ...[
                                 const SizedBox(width: 6),
-                                _roleChip(m.role),
+                                _roleChip(m.topRole),
                               ],
                               if (m.jerseyNumber != null) ...[
                                 const SizedBox(width: 6),
@@ -266,9 +265,9 @@ class ManagedRow extends StatelessWidget {
 
   Widget _roleChip(MemberRole role) {
     final label = switch (role) {
+      MemberRole.owner => 'OWN',
+      MemberRole.manager => 'MGR',
       MemberRole.captain => 'C',
-      MemberRole.viceCaptain => 'VC',
-      MemberRole.wicketKeeper => 'WK',
       MemberRole.player => '',
     };
     return Container(

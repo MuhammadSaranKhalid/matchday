@@ -2,20 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../domain/entities/roster_member.dart';
+import '../../../domain/entities/team_relationship.dart';
 import '../../../domain/entities/team_member.dart';
 
 enum MemberActionType {
   jersey,
   captain,
-  viceCaptain,
-  keeper,
+  manager,
   player,
   remove;
 
   MemberRole? get role => switch (this) {
+        MemberActionType.manager => MemberRole.manager,
         MemberActionType.captain => MemberRole.captain,
-        MemberActionType.viceCaptain => MemberRole.viceCaptain,
-        MemberActionType.keeper => MemberRole.wicketKeeper,
         MemberActionType.player => MemberRole.player,
         _ => null,
       };
@@ -23,18 +22,29 @@ enum MemberActionType {
 
 /// Action sheet for promoting, demoting, setting jersey, or removing a player.
 class MemberActionsSheet extends StatelessWidget {
-  const MemberActionsSheet({super.key, required this.entry});
+  const MemberActionsSheet({
+    super.key,
+    required this.entry,
+    this.viewer = TeamRelationship.owner,
+  });
   final RosterMember entry;
 
+  /// The signed-in user's rung. Gates the staff actions so the sheet never
+  /// offers something the server will refuse with a 42501.
+  final TeamRelationship viewer;
+
   static Future<MemberActionType?> show(
-      BuildContext context, RosterMember entry) {
+    BuildContext context,
+    RosterMember entry, {
+    TeamRelationship viewer = TeamRelationship.owner,
+  }) {
     return showModalBottomSheet<MemberActionType>(
       context: context,
       backgroundColor: CkColors.paper,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => MemberActionsSheet(entry: entry),
+      builder: (_) => MemberActionsSheet(entry: entry, viewer: viewer),
     );
   }
 
@@ -104,13 +114,12 @@ class MemberActionsSheet extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        m.role == MemberRole.captain
-                            ? 'Captain'
-                            : m.role == MemberRole.viceCaptain
-                                ? 'Vice Captain'
-                                : m.role == MemberRole.wicketKeeper
-                                    ? 'Wicket-keeper'
-                                    : 'Squad Player',
+                        switch (m.topRole) {
+                          MemberRole.owner => 'Owner',
+                          MemberRole.manager => 'Manager',
+                          MemberRole.captain => 'Captain',
+                          MemberRole.player => 'Squad Player',
+                        },
                         style: CkType.body(
                           fontSize: 12,
                           color: CkColors.muted,
@@ -124,26 +133,23 @@ class MemberActionsSheet extends StatelessWidget {
           ),
           const Divider(height: 1, color: CkColors.hairline),
           item(Icons.tag_rounded, 'Set jersey number', MemberActionType.jersey),
-          if (m.role != MemberRole.captain)
+          if (m.topRole != MemberRole.captain)
             item(
               Icons.star_rounded,
               'Promote to Captain',
               MemberActionType.captain,
               color: const Color(0xFFB45309),
             ),
-          if (m.role != MemberRole.viceCaptain)
+          // Appointing staff is the owner's call alone; the server rejects a
+          // manager who tries (set_team_member_role, "never grant a rung at or
+          // above your own"), so only offer it when it can succeed.
+          if (viewer.canAppointStaff && m.topRole != MemberRole.manager)
             item(
-              Icons.star_half_rounded,
-              'Make Vice-Captain',
-              MemberActionType.viceCaptain,
+              Icons.shield_outlined,
+              'Make Manager',
+              MemberActionType.manager,
             ),
-          if (m.role != MemberRole.wicketKeeper)
-            item(
-              Icons.sports_baseball_outlined,
-              'Make Wicket-keeper',
-              MemberActionType.keeper,
-            ),
-          if (m.role != MemberRole.player)
+          if (m.topRole != MemberRole.player)
             item(
               Icons.person_outline_rounded,
               'Set as regular player',

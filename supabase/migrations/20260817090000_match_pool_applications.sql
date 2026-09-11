@@ -146,12 +146,10 @@ begin
       'actor_id',          auth.uid(),
       'message',           coalesce(v_applicant_name, 'A team') || ' applied to play your open challenge.'
     )
+  -- 2026-09-10: owner UNION managers[] collapsed into team_staff_ids(), which
+  -- reads the role ladder on team_members. Same recipients, one source.
   from public.teams t,
-  lateral (
-    select t.owner_id as uid
-    union
-    select unnest(coalesce(t.managers, '{}'::uuid[])) as uid
-  ) recip
+  lateral (select public.team_staff_ids(t.team_id) as uid) recip
   where t.team_id = v_req.from_team_id
     and recip.uid is not null
     and recip.uid <> auth.uid();
@@ -332,12 +330,10 @@ begin
       'actor_id',     auth.uid(),
       'message',      coalesce(v_host_name, 'Host team') || ' accepted your match application!'
     )
+  -- 2026-09-10: owner UNION managers[] collapsed into team_staff_ids(), which
+  -- reads the role ladder on team_members. Same recipients, one source.
   from public.teams t,
-  lateral (
-    select t.owner_id as uid
-    union
-    select unnest(coalesce(t.managers, '{}'::uuid[])) as uid
-  ) recip
+  lateral (select public.team_staff_ids(t.team_id) as uid) recip
   where t.team_id = v_app.applicant_team_id
     and recip.uid is not null;
 

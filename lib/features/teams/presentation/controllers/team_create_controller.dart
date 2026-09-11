@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/database/database_provider.dart';
+import '../../../../core/error/failures.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/value_objects/team_name.dart';
 import '../../../location/domain/entities/geo_place.dart';
@@ -16,15 +17,16 @@ String? _blankToNull(String? v) {
   return (t == null || t.isEmpty) ? null : t;
 }
 
-/// Drives the 5-step team-create wizard. AsyncNotifier so [build] can restore a
+/// Drives the three-step team-create wizard. AsyncNotifier so [build] can restore a
 /// persisted draft before the form seeds (mirrors OnboardingController).
 @riverpod
 class TeamCreateController extends _$TeamCreateController {
-  static const _draftKey = 'team_create';
+  static const draftKey = 'team_create';
+  Future<void> _pendingSave = Future.value();
 
   @override
   Future<TeamCreateState> build() async {
-    final draft = await ref.read(wizardDraftStoreProvider).load(_draftKey);
+    final draft = await ref.read(wizardDraftStoreProvider).load(draftKey);
     if (draft == null) return const TeamCreateState();
     return _fromDraft(draft);
   }
@@ -43,7 +45,7 @@ class TeamCreateController extends _$TeamCreateController {
   void setPrivacy(TeamPrivacy p) => _mutate((s) => s.copyWith(privacy: p));
   void setTagline(String v) => _mutate((s) => s.copyWith(tagline: v));
   void setFoundedYear(String v) => _mutate((s) => s.copyWith(foundedYear: v));
-  void setCity(String v) => _mutate((s) => s.copyWith(city: v));
+  void setCity(String v) => setResolvedPlace(GeoPlace.manual(v));
 
   /// Called by the place picker when the creator resolves (or clears) a
   /// place. A [GeoPlace] with no coordinates (kept-as-typed) still lands, so
@@ -52,7 +54,7 @@ class TeamCreateController extends _$TeamCreateController {
         (s) => s.copyWith(
           // `city` holds the LOCALITY, not the full formatted address — the
           // §8.0 capture contract. `label` keeps the human display string.
-          city: place?.city ?? place?.label ?? s.city,
+          city: place?.city ?? place?.label ?? '',
           locationLabel: place?.label,
           district: place?.district,
           province: place?.province,
@@ -97,7 +99,8 @@ class TeamCreateController extends _$TeamCreateController {
   void _mutate(TeamCreateState Function(TeamCreateState) f) {
     final s = _s;
     if (s == null) return;
-    _set(f(s));
+    if (s.submitting || s.createdTeamId != null) return;
+    _set(f(s).copyWith(submitError: null));
   }
 
   // ─── Navigation ───────────────────────────────────────────────────────────
@@ -105,6 +108,9 @@ class TeamCreateController extends _$TeamCreateController {
   void next() {
     final s = _s;
     if (s == null) return;
+    if (s.submitting) return;
+    if (s.step == TeamCreateStep.basics && !s.canContinueBasics) return;
+    if (s.step == TeamCreateStep.home && !s.canContinueHome) return;
     final order = TeamCreateStep.values;
     final i = s.step.index;
     if (i < order.length - 1) _set(s.copyWith(step: order[i + 1]));
@@ -112,19 +118,25 @@ class TeamCreateController extends _$TeamCreateController {
 
   void back() {
     final s = _s;
-    if (s == null) return;
+    if (s == null || s.submitting) return;
     final i = s.step.index;
     if (i > 0) _set(s.copyWith(step: TeamCreateStep.values[i - 1]));
   }
 
   void goToStep(TeamCreateStep step) => _mutate((s) => s.copyWith(step: step));
 
+  Future<void> saveDraft() => _pendingSave;
+
   // ─── Submit ───────────────────────────────────────────────────────────────
 
   Future<void> submit() async {
     final s = _s;
-    if (s == null || s.submitting) return;
-    _set(s.copyWith(submitting: true, submitError: null), persist: false);
+    if (s == null || s.submitting || s.createdTeamId != null) return;
+    if (!s.canSubmit) {
+      _set(s.copyWith(submitError: 'Add a team name and location, and check your founding year.'));
+      return;
+    }
+    _set(s.copyWith(submitting: true, submitError: null, logoUploadError: null), persist: false);
 
     final nameRes = TeamName.create(s.name);
     if (nameRes.isLeft()) {
@@ -160,38 +172,43 @@ class TeamCreateController extends _$TeamCreateController {
           secondaryColor: s.secondaryColor,
           tagline: _blankToNull(s.tagline),
           logoMonogram: _blankToNull(s.monogramOverride),
+          crestKind: s.crestKind,
         );
 
     final current = _s;
     if (current == null) return;
     await result.fold(
       (failure) async => _set(
-        current.copyWith(submitting: false, submitError: failure.message),
+        current.copyWith(submitting: false, submitError: _friendlyError(failure)),
         persist: false,
       ),
       (team) async {
-        // If the user uploaded a logo, push it to Storage and patch
-        // logo_url. Soft-failure: a failed upload still proceeds to the
-        // Done screen — the user can replace it from the team page.
+        // Creation has succeeded. A logo failure must never send the user
+        // back to Create team (which would risk a duplicate team).
+        String? uploadError;
         if (current.crestKind == CrestKind.upload &&
             (current.logoUrl?.isNotEmpty ?? false)) {
-          final file = File(current.logoUrl!);
-          final bytes = await file.readAsBytes();
-          final dot = file.path.lastIndexOf('.');
-          final extension = dot >= 0 && dot < file.path.length - 1
-              ? file.path.substring(dot + 1)
-              : 'jpg';
-          await ref.read(teamsRepositoryProvider).uploadTeamLogo(
-                teamId: team.id,
-                bytes: bytes,
-                extension: extension,
-              );
+          try {
+            final file = File(current.logoUrl!);
+            final bytes = await file.readAsBytes();
+            final extension = file.path.split('.').last;
+            final upload = await ref.read(teamsRepositoryProvider).uploadTeamLogo(
+              teamId: team.id, bytes: bytes, extension: extension,
+            );
+            if (upload.isLeft()) uploadError = 'Your team is ready, but the logo could not be uploaded. Add it from team settings.';
+          } catch (_) {
+            uploadError = 'Your team is ready, but the logo file is unavailable. Add it from team settings.';
+          }
         }
-        await ref.read(wizardDraftStoreProvider).clear(_draftKey);
-        _set(
-          current.copyWith(submitting: false, createdTeamId: team.id.value),
-          persist: false,
-        );
+        await _pendingSave;
+        await ref.read(wizardDraftStoreProvider).clear(draftKey);
+        if (!ref.mounted) return;
+        ref.invalidate(myTeamsProvider);
+        ref.invalidate(allTeamsProvider);
+        _set(current.copyWith(
+          submitting: false, createdTeamId: team.id.value,
+          logoUploadError: uploadError,
+        ), persist: false);
       },
     );
   }
@@ -199,7 +216,8 @@ class TeamCreateController extends _$TeamCreateController {
   // ─── Draft (de)serialization ────────────────────────────────────────────
 
   void _persist(TeamCreateState s) {
-    ref.read(wizardDraftStoreProvider).save(_draftKey, {
+    final store = ref.read(wizardDraftStoreProvider);
+    final payload = <String, dynamic>{
       'step': s.step.name,
       'name': s.name,
       'type': s.type.wire,
@@ -216,14 +234,37 @@ class TeamCreateController extends _$TeamCreateController {
       'logoUrl': s.logoUrl,
       'logoName': s.logoName,
       'logoSize': s.logoSize,
-    });
+      'locationLabel': s.locationLabel,
+      'district': s.district,
+      'province': s.province,
+      'postcode': s.postcode,
+      'placeId': s.placeId,
+      'latitude': s.latitude,
+      'longitude': s.longitude,
+      'countryCode': s.countryCode,
+    };
+    _pendingSave = _pendingSave.then((_) => store.save(draftKey, payload));
   }
 
   /// Resets the wizard so a freshly successful submit can be followed by
   /// "Create another team" from the Done screen.
-  void reset() {
+  Future<void> reset() async {
     state = const AsyncData(TeamCreateState());
-    ref.read(wizardDraftStoreProvider).clear(_draftKey);
+    final store = ref.read(wizardDraftStoreProvider);
+    await _pendingSave;
+    await store.clear(draftKey);
+  }
+
+  static String _friendlyError(Failure failure) {
+    if (failure is AuthFailure) return 'Sign in again to create your team. Your draft is saved on this device.';
+    final message = failure.message.toLowerCase();
+    if (message.contains('permission') || message.contains('row-level')) {
+      return 'Team creation is unavailable for your account right now. Your draft is saved; please try again later.';
+    }
+    if (failure is NetworkFailure || message.contains('socket') || message.contains('connection')) {
+      return 'Check your connection and try again. Your draft is saved on this device.';
+    }
+    return 'We couldn’t create your team. Your draft is saved. Please try again.';
   }
 
   TeamCreateState _fromDraft(Map<String, dynamic> m) => TeamCreateState(
@@ -238,6 +279,14 @@ class TeamCreateController extends _$TeamCreateController {
         foundedYear: m['foundedYear'] as String?,
         city: m['city'] as String? ?? '',
         area: m['area'] as String? ?? '',
+        locationLabel: m['locationLabel'] as String?,
+        district: m['district'] as String?,
+        province: m['province'] as String?,
+        postcode: m['postcode'] as String?,
+        placeId: m['placeId'] as String?,
+        latitude: (m['latitude'] as num?)?.toDouble(),
+        longitude: (m['longitude'] as num?)?.toDouble(),
+        countryCode: m['countryCode'] as String?,
         homeGround: m['homeGround'] as String? ?? '',
         primaryColor: m['primaryColor'] as String? ?? '#338946',
         secondaryColor: m['secondaryColor'] as String? ?? '#FDFAF4',

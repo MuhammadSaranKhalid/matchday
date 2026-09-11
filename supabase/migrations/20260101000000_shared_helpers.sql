@@ -182,15 +182,18 @@ do $$ begin
 exception when duplicate_object then null;
 end $$;
 
-do $$ begin
-  create type public.member_role as enum (
-    'captain',
-    'vice_captain',
-    'wicket_keeper',
-    'player'
-  );
-exception when duplicate_object then null;
-end $$;
+-- member_role was DELETED 2026-09-11. Roles are rows now, in public.roles
+-- (20260101000205_authz.sql), so that adding one is an INSERT rather than a
+-- schema migration — and so that a member can hold SEVERAL, which a single
+-- enum-typed column could never express. See docs/team-roles-design.md.
+--
+-- Its old values are worth recording, because two of them did not survive:
+--   captain, player       → rows in public.roles (plus owner, manager)
+--   vice_captain          → dropped for v1
+--   wicket_keeper         → never belonged. A keeper can also be the captain,
+--                           so it cannot be a rung. It lives where it means
+--                           something: player_profiles.player_role (a career
+--                           fact) and match_players.role (this match's XI).
 
 do $$ begin
   create type public.member_status as enum ('active', 'inactive', 'removed');

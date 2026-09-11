@@ -106,7 +106,9 @@ begin
   returning chat_id into v_chat_id;
 
   insert into public.chat_members (chat_id, user_id, role)
-  values (v_chat_id, new.owner_id, 'admin');
+  -- created_by, not an authority lookup: this fires on team INSERT, before
+  -- any role exists, and "who opened the chat" is a creator fact anyway.
+  values (v_chat_id, new.created_by, 'admin');
 
   return new;
 end;

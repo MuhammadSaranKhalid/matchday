@@ -17,11 +17,10 @@ void main() {
 
   Team team({bool verified = false}) => Team(
         id: const TeamId('team-a'),
-        ownerId: 'user-1',
+        createdBy: 'user-1',
         name: 'Lahore Lions',
         type: TeamType.club,
         privacy: TeamPrivacy.public,
-        managers: const ['user-1'],
         primaryColor: '#7A2E2E',
         isVerified: verified,
         createdAt: DateTime(2026, 1, 1),

@@ -210,7 +210,9 @@ end $seed_teammates$;
 -- which creates the chat row and adds the owner to chat_members as admin.
 -- =============================================================================
 
--- Your teams (3). Resolved at runtime so the owner_id is YOUR uid.
+-- Your teams (3). Resolved at runtime so created_by is YOUR uid.
+-- Inserting a team fires create_owner_membership, which makes that user the
+-- team's member holding the `owner` role — so no membership rows here.
 do $seed_my_teams$
 declare
   v_me uuid;
@@ -218,7 +220,7 @@ begin
   select id into v_me from auth.users
     where email = 'muhammadsarankhalid@gmail.com';
 
-  insert into public.teams (team_id, owner_id, team_name, team_type, team_colors, logo_monogram, home_ground, founded_year)
+  insert into public.teams (team_id, created_by, team_name, team_type, team_colors, logo_monogram, home_ground, founded_year)
   values
     ('11111111-1111-1111-1111-111111111101', v_me, 'Lahore Lions',     'club',    '{"primary":"#DC4D32","secondary":"#26221B"}'::jsonb, 'LL', 'Model Town Sports Complex',  2018),
     ('11111111-1111-1111-1111-111111111102', v_me, 'Islamabad United', 'club',    '{"primary":"#1E40AF","secondary":"#FFFFFF"}'::jsonb, 'IU', 'Islamabad Sports Complex',   2020),
@@ -226,7 +228,7 @@ begin
 end $seed_my_teams$;
 
 -- Teammates' teams (12). Owners are pinned-uuid teammates from §1.
-insert into public.teams (team_id, owner_id, team_name, team_type, team_colors, logo_monogram, home_ground, founded_year)
+insert into public.teams (team_id, created_by, team_name, team_type, team_colors, logo_monogram, home_ground, founded_year)
 values
   ('11111111-1111-1111-1111-111111111103', '00000000-0000-0000-0000-000000000002', 'Karachi Eagles',    'club',     '{"primary":"#15803D","secondary":"#FAF8E8"}'::jsonb, 'KE', 'KGA Ground',                 2017),
   ('11111111-1111-1111-1111-111111111104', '00000000-0000-0000-0000-000000000002', 'Karachi Knights',   'casual',   '{"primary":"#7C2D12","secondary":"#FED7AA"}'::jsonb, 'KK', 'Defence Cricket Club',       2021),
@@ -261,8 +263,8 @@ begin
   select id into v_me from auth.users
     where email = 'muhammadsarankhalid@gmail.com';
 
-  insert into public.team_members (team_id, user_id, added_by, role, status, joined_at)
-  select t.team_id, v_me, t.owner_id, 'player', 'active', j.joined_at
+  insert into public.team_members (team_id, user_id, added_by, status, joined_at)
+  select t.team_id, v_me, t.created_by, 'active', j.joined_at
   from (values
     ('11111111-1111-1111-1111-111111111103'::uuid, now() - interval '60 days'),  -- Karachi Eagles
     ('11111111-1111-1111-1111-111111111105'::uuid, now() - interval '70 days'),  -- Multan Sultans
@@ -275,14 +277,16 @@ end $seed_my_memberships$;
 
 -- Teammates joining each other's teams + your teams (so messages have
 -- varied senders in every active chat).
-insert into public.team_members (team_id, user_id, added_by, role, status, joined_at)
-select r.team_id, r.user_id, t.owner_id, r.role::public.member_role, r.status::public.member_status, r.joined_at
+-- The `role` column is gone (2026-09-11). Every seeded member is a plain
+-- player, which is what assign_initial_role() attaches by default.
+insert into public.team_members (team_id, user_id, added_by, status, joined_at)
+select r.team_id, r.user_id, t.created_by, r.status::public.member_status, r.joined_at
 from (values
 
   -- Lahore Lions (yours) — rich roster for the curated thread
   ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000002'::uuid, 'player', 'active', now() - interval '120 days'),
   ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000003'::uuid, 'player', 'active', now() - interval '110 days'),
-  ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000004'::uuid, 'wicket_keeper', 'active', now() - interval '100 days'),
+  ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000004'::uuid, 'player', 'active', now() - interval '100 days'),
   ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000005'::uuid, 'player', 'active', now() - interval '95 days'),
   ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000006'::uuid, 'player', 'active', now() - interval '90 days'),
   ('11111111-1111-1111-1111-111111111101'::uuid, '00000000-0000-0000-0000-000000000007'::uuid, 'player', 'active', now() - interval '85 days'),
@@ -783,10 +787,10 @@ begin
     (v_unclaimed_imad,  'Imad Wasim', '+923004445566', v_saran_uid, now(), now())
   on conflict (unclaimed_id) do nothing;
 
-  insert into public.team_members (membership_id, team_id, unclaimed_id, added_by, role, jersey_number, status)
+  insert into public.team_members (membership_id, team_id, unclaimed_id, added_by, jersey_number, status)
   values
-    ('60000000-0000-0000-0000-000000000001', v_lahore_lions, v_unclaimed_wahab, v_saran_uid, 'player', 14, 'active'),
-    ('60000000-0000-0000-0000-000000000002', v_lahore_lions, v_unclaimed_imad,  v_saran_uid, 'player', 9,  'active')
+    ('60000000-0000-0000-0000-000000000001', v_lahore_lions, v_unclaimed_wahab, v_saran_uid, 14, 'active'),
+    ('60000000-0000-0000-0000-000000000002', v_lahore_lions, v_unclaimed_imad,  v_saran_uid, 9,  'active')
   on conflict (membership_id) do nothing;
 
   -- 3) Player Claim Request: Babar claiming the Wahab Riaz spot on Lahore Lions
@@ -809,7 +813,7 @@ begin
       '75000000-0000-0000-0000-000000000001',
       v_lahore_lions,
       v_rizwan_uid,
-      'wicket_keeper',
+      'player',
       'Assalam o Alaikum! I am a wicketkeeper-batter based in Lahore. Looking to join Lahore Lions for weekend league matches.',
       'pending',
       now() - interval '2 hours'

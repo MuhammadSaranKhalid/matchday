@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../teams/domain/entities/team.dart';
+import '../../../teams/domain/entities/team_member.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../../tournaments/presentation/providers/tournaments_providers.dart';
 import '../../domain/entities/innings_summary.dart';
@@ -70,6 +71,7 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   }
 
   final teamsById = <String, Team>{for (final t in teams) t.id.value: t};
+  final myRoles = await ref.watch(myTeamRolesProvider.future);
 
   // Fan-out: any team referenced by a match OR requests that isn't already loaded.
   final missingTeamIds = <String>{};
@@ -131,13 +133,16 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   final confirmedRows = [
     for (final m in upcoming)
       _confirmedFor(m, teamsById,
-          currentUserId: user.id.value, tournamentNames: tournamentNames),
+          currentUserId: user.id.value,
+          myRoles: myRoles,
+          tournamentNames: tournamentNames),
   ];
   final pastRows = [
     for (final m in past)
       _pastFor(m, teamsById,
           innings: inningsByMatch[m.id] ?? const [],
           currentUserId: user.id.value,
+          myRoles: myRoles,
           tournamentNames: tournamentNames),
   ];
   final sentRows = [for (final r in outbound) sentRequestRow(r, teamsById)];
@@ -165,6 +170,7 @@ MyMatchConfirmed _confirmedFor(
   Match m,
   Map<String, Team> teamsById, {
   required String currentUserId,
+  required Map<String, MemberRole> myRoles,
   Map<String, String> tournamentNames = const {},
 }) {
   final home = teamsById[m.teamAId.value];
@@ -172,9 +178,13 @@ MyMatchConfirmed _confirmedFor(
   final start = m.scheduledStartTime;
   final isToday = start != null && _isSameDay(start, DateTime.now());
 
+  // Teams on this fixture where the viewer holds match-day authority.
+  // 2026-09-10: was `isManagedBy`, which read the dead `teams.managers` array
+  // and — the actual bug — could not see a captain at all, so a captain's own
+  // match never counted as theirs.
   final userTeamIds = {
-    if (home?.isManagedBy(currentUserId) ?? false) m.teamAId.value,
-    if (away?.isManagedBy(currentUserId) ?? false) m.teamBId.value,
+    if (myRoles[m.teamAId.value]?.hasMatchAuthority ?? false) m.teamAId.value,
+    if (myRoles[m.teamBId.value]?.hasMatchAuthority ?? false) m.teamBId.value,
   };
   final role = roleOnMatch(m, currentUserId, userTeamIds: userTeamIds);
   final roleLine = roleLineFor(role, m, isToday: isToday);
@@ -259,6 +269,7 @@ MyMatchPast _pastFor(
   Map<String, String> tournamentNames = const {},
   required List<InningsSummary> innings,
   required String currentUserId,
+  required Map<String, MemberRole> myRoles,
 }) {
   final home = teamsById[m.teamAId.value];
   final away = teamsById[m.teamBId.value];
@@ -279,7 +290,7 @@ MyMatchPast _pastFor(
   // uuid[] columns directly; per-match XI now lives on match_players.
   // For the past-tile attribution v1, manager-or-captain is enough —
   // matches without a clear winner-side fallback still render correctly.
-  final onHome = (home?.isManagedBy(currentUserId) ?? false) ||
+  final onHome = (myRoles[m.teamAId.value]?.hasMatchAuthority ?? false) ||
       m.teamACaptain == currentUserId;
   final myWon = onHome ? homeWon : !homeWon;
 

@@ -178,12 +178,19 @@ create trigger match_challenges_set_updated_at
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- _team_current_captain — pick the canonical captain user_id for a team.
+-- _team_current_captain — the canonical captain user_id for a team.
 -- Order of preference:
---   1. team_members where role='captain' AND status='active' — newest first
---      (so a re-assigned captain wins over a stale row).
---   2. teams.owner_id — the team creator, guaranteed present.
+--   1. the active captain — now unique, see below.
+--   2. the holder of the `owner` role — NOT teams.created_by, which is
+--      history: a team's creator may have left.
 -- Returns NULL only if the team itself is missing (caller's responsibility).
+--
+-- 2026-09-10: the `order by joined_at desc limit 1` tie-break is GONE. Single
+-- captaincy used to be enforced only in Dart, so this function had to guess
+-- which of several 'captain' rows was real; `team_members_one_captain` (0210)
+-- now makes at most one possible. `role_requires_account` also guarantees a
+-- captain has a user_id, so the null-filter is redundant — kept as a cheap
+-- assertion in case the constraint is ever relaxed.
 -- -----------------------------------------------------------------------------
 create or replace function public._team_current_captain(p_team_id uuid)
 returns uuid
@@ -192,19 +199,21 @@ stable
 security definer
 set search_path = public, pg_temp
 as $$
-  with cap as (
-    select user_id
-      from public.team_members
-     where team_id = p_team_id
-       and role = 'captain'
-       and status = 'active'
-       and user_id is not null
-     order by joined_at desc nulls last
-     limit 1
-  )
   select coalesce(
-    (select user_id from cap),
-    (select owner_id from public.teams where team_id = p_team_id)
+    (select tm.user_id
+       from public.team_members tm
+       join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
+      where tm.team_id  = p_team_id
+        and tmr.role_key = 'captain'
+        and tm.status   = 'active'
+        and tm.user_id is not null),
+    (select tm.user_id
+       from public.team_members tm
+       join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
+      where tm.team_id  = p_team_id
+        and tmr.role_key = 'owner'
+        and tm.status   = 'active'
+        and tm.user_id is not null)
   );
 $$;
 
@@ -877,8 +886,6 @@ set search_path = public, pg_temp
 as $$
 declare
   v_recipient uuid;
-  v_owner     uuid;
-  v_managers  uuid[];
 begin
   if new.status <> 'pending' then
     return new;
@@ -886,41 +893,25 @@ begin
   if new.to_team_id is null then
     return new;
   end if;
-  select owner_id, managers into v_owner, v_managers
-    from public.teams where team_id = new.to_team_id;
 
-  if v_owner is not null and v_owner <> new.requested_by then
-    insert into public.notifications (recipient_id, type, payload)
-    values (
-      v_owner,
-      'match_request',
-      jsonb_build_object(
-        'request_id',    new.request_id,
-        'from_team_id',  new.from_team_id,
-        'to_team_id',    new.to_team_id,
-        'actor_id',      new.requested_by
-      )
-    );
-  end if;
-
-  if v_managers is not null then
-    foreach v_recipient in array v_managers loop
-      if v_recipient <> new.requested_by
-         and (v_owner is null or v_recipient <> v_owner) then
-        insert into public.notifications (recipient_id, type, payload)
-        values (
-          v_recipient,
-          'match_request',
-          jsonb_build_object(
-            'request_id',    new.request_id,
-            'from_team_id',  new.from_team_id,
-            'to_team_id',    new.to_team_id,
-            'actor_id',      new.requested_by
-          )
-        );
-      end if;
-    end loop;
-  end if;
+  -- 2026-09-10: owner and managers used to be read from two different places
+  -- (teams.owner_id and teams.managers[]) and looped separately, with a manual
+  -- dedup between them. team_staff_ids() returns the one set.
+  for v_recipient in select public.team_staff_ids(new.to_team_id) loop
+    if v_recipient <> new.requested_by then
+      insert into public.notifications (recipient_id, type, payload)
+      values (
+        v_recipient,
+        'match_request',
+        jsonb_build_object(
+          'request_id',    new.request_id,
+          'from_team_id',  new.from_team_id,
+          'to_team_id',    new.to_team_id,
+          'actor_id',      new.requested_by
+        )
+      );
+    end if;
+  end loop;
   return new;
 end;
 $$;
@@ -937,8 +928,6 @@ set search_path = public, pg_temp
 as $$
 declare
   v_recipient   uuid;
-  v_owner       uuid;
-  v_managers    uuid[];
   v_actor       uuid;
   v_notify_team uuid;
 begin
@@ -977,31 +966,11 @@ begin
     return new;
   end if;
 
-  select owner_id, managers into v_owner, v_managers
-    from public.teams where team_id = v_notify_team;
-
-  if v_owner is not null
-     and v_owner <> v_actor
-     and (old.status <> 'pending' or v_owner <> new.requested_by) then
-    insert into public.notifications (recipient_id, type, payload)
-    values (
-      v_owner,
-      'match_request_decision',
-      jsonb_build_object(
-        'request_id',    new.request_id,
-        'from_team_id',  new.from_team_id,
-        'to_team_id',    new.to_team_id,
-        'status',        new.status::text,
-        'match_id',      new.match_id,
-        'actor_id',      v_actor
-      )
-    );
-  end if;
-
-  if v_managers is not null then
-    foreach v_recipient in array v_managers loop
+  -- 2026-09-10: one set instead of owner-then-array with a manual dedup.
+  -- The `old.status <> 'pending'` guard stays: on a pending→X flip the original
+  -- requester was already notified above, so they must not be told twice.
+  for v_recipient in select public.team_staff_ids(v_notify_team) loop
       if v_recipient <> v_actor
-         and (v_owner is null or v_recipient <> v_owner)
          and (old.status <> 'pending' or v_recipient <> new.requested_by) then
         insert into public.notifications (recipient_id, type, payload)
         values (
@@ -1017,8 +986,7 @@ begin
           )
         );
       end if;
-    end loop;
-  end if;
+  end loop;
   return new;
 end;
 $$;

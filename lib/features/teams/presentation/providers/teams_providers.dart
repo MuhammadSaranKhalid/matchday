@@ -7,6 +7,7 @@ import '../../domain/entities/team.dart';
 import '../../domain/entities/team_claim_request.dart';
 import '../../domain/entities/team_invite.dart';
 import '../../domain/entities/team_join_request.dart';
+import '../../domain/entities/team_member.dart';
 import '../../domain/entities/user_team_affiliation.dart';
 import '../../domain/repositories/teams_repository.dart';
 
@@ -41,6 +42,16 @@ Stream<Team?> team(Ref ref, String teamId) =>
 @riverpod
 Stream<List<RosterMember>> roster(Ref ref, String teamId) =>
     ref.watch(teamsRepositoryProvider).watchRoster(TeamId(teamId));
+
+/// The signed-in user's rung on each of their teams, keyed by team id.
+/// Ask this rather than comparing against `Team.ownerId` — see
+/// docs/team-roles-design.md.
+@riverpod
+Stream<Map<String, MemberRole>> myTeamRoles(Ref ref) {
+  final userId = ref.watch(currentUserStreamProvider).value?.id.value;
+  if (userId == null) return Stream.value(const {});
+  return ref.watch(teamsRepositoryProvider).watchMyTeamRoles(userId);
+}
 
 /// Real-time stream of all teams affiliated with a user (captained and played for).
 @riverpod

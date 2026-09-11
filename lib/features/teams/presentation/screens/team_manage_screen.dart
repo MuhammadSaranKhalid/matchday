@@ -10,7 +10,7 @@ import '../widgets/team_manage/requests_tab.dart';
 import '../widgets/team_manage/roster_tab.dart';
 import '../widgets/team_manage/settings_tab.dart';
 
-/// Complete Manager console: Roster, Posts, Requests, and Settings.
+/// Complete Manager console: Posts, Roster, Requests, and Settings.
 class TeamManageScreen extends ConsumerStatefulWidget {
   const TeamManageScreen({
     super.key,
@@ -23,7 +23,7 @@ class TeamManageScreen extends ConsumerStatefulWidget {
   final bool justCreated;
 
   /// Opens straight to one tab: `roster`, `posts`, `requests` or `settings`.
-  /// Anything else (including null) lands on Roster.
+  /// Anything else (including null) lands on Posts, or Roster just after creation.
   final String? initialTab;
 
   @override
@@ -31,11 +31,11 @@ class TeamManageScreen extends ConsumerStatefulWidget {
 }
 
 class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
-  int _activeTab = 0; // 0: Roster, 1: Posts, 2: Requests, 3: Settings
+  int _activeTab = 0; // 0: Posts, 1: Roster, 2: Requests, 3: Settings
 
   static const _tabIndexByName = {
-    'roster': 0,
-    'posts': 1,
+    'posts': 0,
+    'roster': 1,
     'requests': 2,
     'settings': 3,
   };
@@ -43,12 +43,24 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
   @override
   void initState() {
     super.initState();
-    _activeTab = _tabIndexByName[widget.initialTab] ?? 0;
+    _activeTab =
+        _tabIndexByName[widget.initialTab] ?? (widget.justCreated ? 1 : 0);
   }
 
   @override
   Widget build(BuildContext context) {
     final teamAsync = ref.watch(teamProvider(widget.teamId));
+
+    // Authorization. Until 2026-09-10 this screen had NO check at all and the
+    // route was unguarded, so any signed-in user could open the full manager
+    // console; they found out it wasn't theirs when each write came back as a
+    // raw Postgres RLS error. RLS is still the real boundary — this just tells
+    // the truth before they start typing.
+    final myRoles = ref.watch(myTeamRolesProvider);
+    final myRole = myRoles.value?[widget.teamId];
+    if (myRoles.hasValue && !(myRole?.isStaff ?? false)) {
+      return _NotYourTeam(teamId: widget.teamId);
+    }
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -117,14 +129,14 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
                   onTabSelected: (i) => setState(() => _activeTab = i),
                 ),
 
-                if (widget.justCreated && _activeTab == 0)
+                if (widget.justCreated && _activeTab == 1)
                   const _JustCreatedBanner(),
 
                 // Tab Content
                 Expanded(
                   child: switch (_activeTab) {
-                    0 => RosterTab(team: value),
-                    1 => TeamAnnouncementsManageTab(team: value),
+                    0 => TeamAnnouncementsManageTab(team: value),
+                    1 => RosterTab(team: value),
                     2 => RequestsTab(team: value),
                     _ => SettingsTab(team: value),
                   },
@@ -156,12 +168,12 @@ class _TabHeader extends StatelessWidget {
       child: Row(
         children: [
           _TabItem(
-            label: 'Roster',
+            label: 'Posts',
             active: activeIndex == 0,
             onTap: () => onTabSelected(0),
           ),
           _TabItem(
-            label: 'Posts',
+            label: 'Roster',
             active: activeIndex == 1,
             onTap: () => onTabSelected(1),
           ),
@@ -240,4 +252,53 @@ class _JustCreatedBanner extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// Shown when someone opens `/teams/:id/manage` for a team they don't run.
+///
+/// Deliberately plain and non-accusatory: the common way to land here is a
+/// stale deep link or a shared URL, not an attack. The design review
+/// (docs/design-reviews/teams-2026-09-09) asked for permission failures in
+/// plain language rather than a raw error snackbar — this is that.
+class _NotYourTeam extends StatelessWidget {
+  const _NotYourTeam({required this.teamId});
+  final String teamId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: CkColors.paper,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Only the team’s owner and managers can open Manage.',
+                  textAlign: TextAlign.center,
+                  style: CkType.body(fontSize: 14, color: CkColors.ink2),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => context.canPop()
+                      ? context.pop()
+                      : context.go('/teams/$teamId'),
+                  child: Text(
+                    'Back to the team',
+                    style: CkType.body(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: CkColors.ink,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

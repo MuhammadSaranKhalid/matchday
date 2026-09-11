@@ -30,7 +30,7 @@ declare
   v_me            uuid;
   t_mine          constant uuid := 'cc000000-0000-4000-8000-000000000001';
   -- Opponent teams. Owners are synthetic accounts created below; they never
-  -- sign in, they exist so teams.owner_id has somewhere to point.
+  -- sign in, they exist so teams.created_by has somewhere to point.
   t_shalimar      constant uuid := 'cc000000-0000-4000-8000-000000000002';
   t_gulberg       constant uuid := 'cc000000-0000-4000-8000-000000000003';
   t_modeltown     constant uuid := 'cc000000-0000-4000-8000-000000000004';
@@ -76,7 +76,7 @@ begin
                      t_johar, t_ravi, t_cavalry);
 
   -- ── 2. Synthetic owners for the opponent teams ────────────────────────────
-  -- One throwaway account per opponent so teams.owner_id is valid and
+  -- One throwaway account per opponent so teams.created_by is valid and
   -- is_team_manager() answers correctly for the other side.
   for r in
     select * from (values
@@ -133,10 +133,10 @@ begin
     v_owner := coalesce(r.owner, v_me);
     insert into public.teams (
       team_id, team_name, team_type, privacy, status,
-      owner_id, managers, team_colors, location, created_at, updated_at
+      created_by, team_colors, location, created_at, updated_at
     ) values (
       r.tid, r.tname, 'club', 'public', 'active',
-      v_owner, array[v_owner]::uuid[],
+      v_owner,
       jsonb_build_object('primary', r.colour),
       jsonb_build_object('city', 'Lahore', 'country', 'Pakistan'),
       now() - interval '30 days', now()
@@ -144,15 +144,16 @@ begin
     on conflict (team_id) do update
       set team_name   = excluded.team_name,
           team_colors = excluded.team_colors,
-          owner_id    = excluded.owner_id,
-          managers    = excluded.managers,
+          created_by  = excluded.created_by,
           status      = 'active';
 
-    -- Owner on the roster, so the team has a squad and captain lookups work.
-    insert into public.team_members (
-      team_id, user_id, role, status, added_by, joined_at
-    ) values (r.tid, v_owner, 'captain', 'active', v_owner, now() - interval '30 days')
-    on conflict do nothing;
+    -- The owner's roster row is created by the create_owner_membership trigger
+    -- (2026-09-10) with role='owner', which outranks 'captain' — inserting it
+    -- here would now collide with team_members_unique_active_user. Just
+    -- backdate the joined_at the trigger stamped with now().
+    update public.team_members
+       set joined_at = now() - interval '30 days'
+     where team_id = r.tid and user_id = v_owner and role = 'owner';
   end loop;
 
   -- ── 4. The challenges ─────────────────────────────────────────────────────

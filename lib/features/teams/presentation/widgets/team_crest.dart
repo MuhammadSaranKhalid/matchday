@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/util/surface_mode.dart';
 import '../utils/team_display.dart';
+import '../../domain/entities/team.dart';
 
 /// How a logo sits inside the crest disc.
 enum TeamCrestFit {
@@ -45,8 +48,10 @@ class TeamCrest extends StatelessWidget {
     this.primaryColor,
     this.logoUrl,
     this.monogram,
+    this.crestKind = CrestKind.monogram,
+    this.localLogoPath,
     this.size = 44,
-    this.fit = TeamCrestFit.cover,
+    this.fit = TeamCrestFit.contain,
     this.onLightSurface = false,
   });
 
@@ -60,6 +65,8 @@ class TeamCrest extends StatelessWidget {
   /// 1–3 letter override (`teams.logo_monogram`). Derived from [name] when
   /// null or blank.
   final String? monogram;
+  final CrestKind crestKind;
+  final String? localLogoPath;
 
   /// Diameter. The ramp is 72 (hero) · 44 (sheet) · 36 (post) · 28 (list) ·
   /// 22 (dense); values in between interpolate their inset and shadow.
@@ -126,7 +133,26 @@ class TeamCrest extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = logoUrl?.trim();
-    final hasLogo = url != null && url.isNotEmpty;
+    final hasLocalLogo = localLogoPath?.isNotEmpty == true;
+    final hasLogo = hasLocalLogo || (url != null && url.isNotEmpty);
+    if (!hasLogo && crestKind == CrestKind.shield) {
+      final primary = parseHexColor(primaryColor, fallback: CkColors.ink);
+      final foreground = primary.computeLuminance() > 0.179 ? CkColors.ink : CkColors.paper;
+      return Container(
+        width: size, height: size,
+        decoration: BoxDecoration(color: primary,
+          borderRadius: BorderRadius.circular(size * .22)),
+        child: CustomPaint(
+          painter: _ShieldPainter(foreground),
+          child: Center(child: FittedBox(child: Padding(
+            padding: EdgeInsets.all(size * .15),
+            child: Text(teamCrestMonogram(name, override: monogram, maxLetters: 3),
+              style: CkType.display(fontSize: size * .38,
+                fontWeight: FontWeight.w800, color: foreground)),
+          ))),
+        ),
+      );
+    }
     final cover = fit == TeamCrestFit.cover && hasLogo;
 
     return Container(
@@ -142,7 +168,10 @@ class TeamCrest extends StatelessWidget {
       // itself; `contain` keeps the paper ring visible around the artwork.
       padding: cover ? EdgeInsets.zero : EdgeInsets.all(_inset),
       child: ClipOval(
-        child: hasLogo ? _logo(context, url, cover: cover) : _monogram(),
+        child: hasLocalLogo
+            ? Image.file(File(localLogoPath!), fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => _monogram())
+            : hasLogo ? _logo(context, url!, cover: cover) : _monogram(),
       ),
     );
   }
@@ -170,7 +199,7 @@ class TeamCrest extends StatelessWidget {
     final letters = teamCrestMonogram(
       name,
       override: monogram,
-      maxLetters: size <= 24 ? 1 : 3,
+      maxLetters: crestKind == CrestKind.initials ? 1 : 3,
     );
     return Container(
       alignment: Alignment.center,
@@ -187,4 +216,23 @@ class TeamCrest extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ShieldPainter extends CustomPainter {
+  const _ShieldPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final path = Path()
+      ..moveTo(s * .5, s * .08)..lineTo(s * .92, s * .20)
+      ..lineTo(s * .88, s * .60)
+      ..quadraticBezierTo(s * .88, s * .84, s * .5, s * .96)
+      ..quadraticBezierTo(s * .12, s * .84, s * .12, s * .60)
+      ..lineTo(s * .08, s * .20)..close();
+    canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.stroke
+      ..strokeWidth = s * .018..strokeJoin = StrokeJoin.round);
+  }
+  @override
+  bool shouldRepaint(_ShieldPainter oldDelegate) => color != oldDelegate.color;
 }

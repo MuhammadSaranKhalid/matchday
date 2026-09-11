@@ -48,11 +48,10 @@ void main() {
     final mockTeams = <Team>[
       Team(
         id: const TeamId('team-reg-1'),
-        ownerId: 'user-mgr-1',
+        createdBy: 'user-mgr-1',
         name: 'Lahore Warriors',
         type: TeamType.club,
         privacy: TeamPrivacy.public,
-        managers: const ['user-mgr-1'],
         city: 'Lahore',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -65,7 +64,7 @@ void main() {
           id: MembershipId('member-$i'),
           teamId: const TeamId('team-reg-1'),
           playerId: 'player-$i',
-          role: i == 0 ? MemberRole.captain : MemberRole.player,
+          roles: {(i == 0 ? MemberRole.captain : MemberRole.player).wire},
           playerType: PlayerType.claimed,
           addedBy: 'user-mgr-1',
           joinedAt: DateTime.now(),
@@ -83,6 +82,11 @@ void main() {
             tournamentDetailProvider('tourn-reg-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             myTeamsProvider.overrideWith((ref) => Stream.value(mockTeams)),
+            // The picker now shows only teams the viewer manages, because the
+            // insert policy demands is_team_manager (2026-09-10).
+            myTeamRolesProvider.overrideWith(
+              (ref) => Stream.value(const {'team-reg-1': MemberRole.owner}),
+            ),
             tournamentRegistrationsProvider('tourn-reg-1')
                 .overrideWith((ref) => Future.value(<TournamentRegistration>[])),
           ],
@@ -109,6 +113,11 @@ void main() {
             tournamentDetailProvider('tourn-reg-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             myTeamsProvider.overrideWith((ref) => Stream.value(mockTeams)),
+            // The picker now shows only teams the viewer manages, because the
+            // insert policy demands is_team_manager (2026-09-10).
+            myTeamRolesProvider.overrideWith(
+              (ref) => Stream.value(const {'team-reg-1': MemberRole.owner}),
+            ),
             rosterProvider('team-reg-1').overrideWith((ref) => Stream.value(mockRoster)),
             tournamentRegistrationsProvider('tourn-reg-1')
                 .overrideWith((ref) => Future.value(<TournamentRegistration>[])),
@@ -156,6 +165,11 @@ void main() {
             tournamentDetailProvider('tourn-reg-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             myTeamsProvider.overrideWith((ref) => Stream.value(mockTeams)),
+            // The picker now shows only teams the viewer manages, because the
+            // insert policy demands is_team_manager (2026-09-10).
+            myTeamRolesProvider.overrideWith(
+              (ref) => Stream.value(const {'team-reg-1': MemberRole.owner}),
+            ),
             tournamentRegistrationsProvider('tourn-reg-1')
                 .overrideWith((ref) => Future.value([existingRegistration])),
           ],
@@ -184,6 +198,11 @@ void main() {
             tournamentDetailProvider('tourn-reg-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             myTeamsProvider.overrideWith((ref) => Stream.value(mockTeams)),
+            // The picker now shows only teams the viewer manages, because the
+            // insert policy demands is_team_manager (2026-09-10).
+            myTeamRolesProvider.overrideWith(
+              (ref) => Stream.value(const {'team-reg-1': MemberRole.owner}),
+            ),
             tournamentRegistrationsProvider('tourn-reg-1')
                 .overrideWith((ref) => Future.value(<TournamentRegistration>[])),
           ],
@@ -206,11 +225,10 @@ void main() {
         ...mockTeams,
         Team(
           id: const TeamId('team-reg-2'),
-          ownerId: 'user-mgr-1',
+          createdBy: 'user-mgr-1',
           name: 'Gulberg Lions',
           type: TeamType.club,
           privacy: TeamPrivacy.public,
-          managers: const ['user-mgr-1'],
           city: 'Lahore',
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
@@ -284,6 +302,11 @@ void main() {
             tournamentDetailProvider('tourn-reg-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             myTeamsProvider.overrideWith((ref) => Stream.value(mockTeams)),
+            // The picker now shows only teams the viewer manages, because the
+            // insert policy demands is_team_manager (2026-09-10).
+            myTeamRolesProvider.overrideWith(
+              (ref) => Stream.value(const {'team-reg-1': MemberRole.owner}),
+            ),
             tournamentRegistrationsProvider('tourn-reg-1')
                 .overrideWith((ref) => Future.value([declined])),
           ],

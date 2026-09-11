@@ -148,11 +148,16 @@ grant execute on function public.delete_user() to authenticated;
 -- =============================================================================
 -- Dangling uuid[] cleanup on profile delete
 -- =============================================================================
--- Seven columns hold uuid[] of profile ids with no referential integrity —
+-- Six columns hold uuid[] of profile ids with no referential integrity —
 -- an array cannot carry a foreign key. Deleting a profile therefore left its
--- id behind in every one of them, and two of those arrays (teams.managers,
--- tournaments.organizers) are read by RLS policies to decide who may write.
+-- id behind in every one of them, and one of those arrays
+-- (tournaments.organizers) is read by RLS policies to decide who may write.
 -- A stale id in an authorization array is the part that actually matters.
+--
+-- teams.managers was the seventh and is gone (2026-09-10) — team authority
+-- moved to team_members, which has a real FK and cascades on its own. What
+-- replaced it here is the ownership-succession block below: a real FK cleans
+-- up the row, but it cannot decide who should run the team next.
 --
 -- A trigger rather than more statements inside delete_user(), so it also
 -- catches deletions that do not go through the RPC — an admin DELETE, or the
@@ -170,9 +175,62 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  update public.teams
-     set managers = array_remove(managers, old.user_id)
-   where old.user_id = any(managers);
+  -- Ownership succession (rewritten 2026-09-11 for the role model).
+  --
+  -- A departing member's team_members row cascades on the profiles FK, taking
+  -- its team_member_roles with it — so staff cleanup is automatic. What is NOT
+  -- automatic is succession: `is_singleton` stops a SECOND owner but nothing
+  -- stops ZERO, and a team whose only owner deleted their account would be
+  -- left with nobody able to act (the owner short-circuit in can() has no one
+  -- to fire for).
+  --
+  -- The longest-tenured remaining manager is promoted into the `owner` role.
+  -- If there is no manager, the team is archived rather than left headless.
+  -- teams.created_by is deliberately NOT touched — it is history, and history
+  -- does not change when someone leaves.
+  with orphaned as (
+    select tm.team_id
+      from public.team_members tm
+      join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
+     where tm.user_id  = old.user_id
+       and tmr.role_key = 'owner'
+       and tm.status   = 'active'
+  ),
+  successor as (
+    select distinct on (o.team_id)
+           o.team_id, tm.membership_id
+      from orphaned o
+      join public.team_members tm
+        on tm.team_id = o.team_id
+       and tm.status  = 'active'
+       and tm.user_id is not null
+       and tm.user_id <> old.user_id
+      join public.team_member_roles tmr
+        on tmr.membership_id = tm.membership_id
+       and tmr.role_key = 'manager'
+     order by o.team_id, tm.joined_at asc
+  ),
+  -- Drop the successor's manager row before adding owner: they are two rows in
+  -- the same exclusion set {owner, manager, player}, max 1.
+  demoted as (
+    delete from public.team_member_roles tmr
+     using successor s
+     where tmr.membership_id = s.membership_id
+       and tmr.role_key in ('manager', 'player')
+    returning tmr.membership_id
+  ),
+  promoted as (
+    insert into public.team_member_roles
+      (membership_id, scope, role_key, team_id, is_singleton)
+    select s.membership_id, 'team', 'owner', s.team_id, true
+      from successor s
+    returning team_id
+  )
+  update public.teams t
+     set status = 'archived'
+   where t.team_id in (select team_id from orphaned)
+     and t.team_id not in (select team_id from promoted)
+     and t.status = 'active';
 
   update public.tournaments
      set organizers = array_remove(organizers, old.user_id)

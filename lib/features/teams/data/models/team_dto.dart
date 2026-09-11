@@ -9,7 +9,7 @@ part 'team_dto.g.dart';
 abstract class TeamDto with _$TeamDto {
   const factory TeamDto({
     @JsonKey(name: 'team_id') required String teamId,
-    @JsonKey(name: 'owner_id') required String ownerId,
+    @JsonKey(name: 'created_by') required String createdBy,
     @JsonKey(name: 'team_name') required String teamName,
     @JsonKey(name: 'team_type') required String teamType,
     String? description,
@@ -17,7 +17,6 @@ abstract class TeamDto with _$TeamDto {
     Map<String, dynamic>? location,
     @JsonKey(name: 'founded_year') int? foundedYear,
     @JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors,
-    @Default(<String>[]) List<String> managers,
     @Default('public') String privacy,
     String? tagline,
     @JsonKey(name: 'logo_url') String? logoUrl,
@@ -35,11 +34,10 @@ abstract class TeamDto with _$TeamDto {
 
   Team toEntity() => Team(
         id: TeamId(teamId),
-        ownerId: ownerId,
+        createdBy: createdBy,
         name: teamName,
         type: TeamType.fromWire(teamType),
         privacy: TeamPrivacy.fromWire(privacy),
-        managers: managers,
         description: description,
         homeGround: homeGround,
         city: location?['city'] as String?,
@@ -49,6 +47,7 @@ abstract class TeamDto with _$TeamDto {
         tagline: tagline,
         logoUrl: logoUrl,
         logoMonogram: logoMonogram,
+        crestKind: CrestKind.fromWire(teamColors?['crest_kind'] as String?),
         isVerified: isVerified,
         status: TeamStatus.fromWire(status),
         createdAt: DateTime.parse(createdAt),

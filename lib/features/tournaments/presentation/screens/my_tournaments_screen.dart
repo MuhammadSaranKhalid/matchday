@@ -139,7 +139,8 @@ class _Nav extends StatelessWidget {
   Widget build(BuildContext context) {
     return CkPushNav(
       title: 'My Tournaments',
-      onBack: () => context.pop(),
+      onBack: () =>
+          context.canPop() ? context.pop() : context.go('/home'),
       action: showCreate
           ? CkNavPill(
               label: 'Create',

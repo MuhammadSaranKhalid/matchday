@@ -2,15 +2,12 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/value_objects/team_name.dart';
 
+export '../../domain/entities/team.dart' show CrestKind;
+
 part 'team_create_state.freezed.dart';
 
 /// The 5 steps of the team-create wizard.
 enum TeamCreateStep { basics, identity, home, crest, review }
-
-/// How the team's crest renders. `upload` means the user provided their own
-/// logo (path stored in [TeamCreateState.logoUrl]); the other three are
-/// auto-generated from the team's primary color + monogram.
-enum CrestKind { monogram, initials, shield, upload }
 
 /// In-progress team-create form state. Freezed data class (same rationale as
 /// OnboardingState — concurrent fields + copyWith).
@@ -26,8 +23,8 @@ abstract class TeamCreateState with _$TeamCreateState {
     @Default('') String city,
     @Default('') String area,
     // Structured geo resolved by the place picker. Populated when the creator
-    // picks a prediction or uses GPS; all null when they keep typed text, in
-    // which case the team is name-findable but not proximity-findable.
+    // picks a prediction; all null when they keep typed text, in which case
+    // the team is name-findable but not proximity-findable.
     String? locationLabel,
     String? district,
     String? province,
@@ -46,12 +43,23 @@ abstract class TeamCreateState with _$TeamCreateState {
     int? logoSize,
     @Default(false) bool submitting,
     String? submitError,
+    String? logoUploadError,
     String? createdTeamId,
   }) = _TeamCreateState;
 
   const TeamCreateState._();
 
   bool get canContinueBasics => TeamName.create(name).isRight();
+  String? get foundedYearError {
+    final text = foundedYear?.trim() ?? '';
+    if (text.isEmpty) return null;
+    final year = int.tryParse(text);
+    return year == null || year < 1800 || year > DateTime.now().year
+        ? 'Enter a year between 1800 and ${DateTime.now().year}.' : null;
+  }
+  bool get canSubmit => canContinueBasics && canContinueHome;
+  bool get hasDraft => name.trim().isNotEmpty || city.trim().isNotEmpty;
+
   bool get canContinueHome => city.trim().isNotEmpty;
 
   /// True once the team carries a real coordinate — the thing that makes it

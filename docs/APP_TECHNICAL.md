@@ -444,10 +444,15 @@ Most server-side logic lives in **edge functions** during dev phase (see §10). 
 | `record_ball` | Used as a fallback / direct-DB scoring writer (the typical write path is the `record-ball` edge function) |
 | `accept_match_request`, `counter_match_request`, `decline_match_request`, `cancel_match_request`, `find_match_request_by_code` | Match request handshake |
 | `mark_chat_read` (SECURITY DEFINER) | Sets `chat_members.last_read_at = now()` for the caller (#39 fix) |
-| `delete_user`, `leave_team`, `accept_team_invite`, `approve_claim_request` | Identity / team lifecycle |
+| `delete_user`, `leave_team`, `accept_team_invite`, `approve_claim_request` | Identity / team lifecycle. `leave_team` refuses for the owner — they must transfer first |
+| `set_team_member_role`, `transfer_team_ownership` | The only paths that change `team_members.role`; a trigger blocks direct UPDATE. Enforce "never grant a rung at or above your own" |
 | `generate_round_robin_fixtures`, `generate_knockout_fixtures`, `generate_tournament_fixtures`, `recalculate_standings` | Tournament fixturing (UI not yet built) |
 
-Internal predicates (used by RLS and triggers, not exposed): `_can_score_match`, `_can_score_innings`, `_is_match_captain`, `_team_current_captain`, `_match_batting_team`, `_batting_first_team`, `_innings_runs`, `_innings_overs`, `_validate_team_xi`, `_format_presets_validate`, `_validate_request_format`, `_validate_match_request_keeper`.
+Internal predicates (used by RLS and triggers, not exposed): `_can_score_innings`, `_is_match_captain`, `_team_current_captain`, `_match_batting_team`, `_batting_first_team`, `_innings_runs`, `_innings_overs`, `_validate_team_xi`, `_format_presets_validate`, `_validate_request_format`, `_validate_match_request_keeper`.
+
+`_can_score_match` was **deleted** 2026-09-10: it had no callers, was still granted, and was more permissive than the gate actually enforced. Two live definitions of "can score" is the exact trap the single-writer scoring design cannot afford.
+
+Team authority predicates (exposed, `SECURITY DEFINER`, declared in `20260101000210_team_members.sql`): `is_team_manager` (role >= manager), `is_team_captain` (role >= captain), `is_team_member` (any active row), `team_staff_ids` (fan-out helper). All read the ordered `member_role` ladder on `team_members`; `teams.managers uuid[]` no longer exists. See `docs/team-roles-design.md`.
 
 Broadcast triggers (do not call directly): `broadcast_new_ball`, `broadcast_innings_state`, `broadcast_match_state`, `broadcast_new_message`, `broadcast_new_notification`, `broadcast_new_comment`, `broadcast_comment_updated`, `broadcast_comment_deleted`, `broadcast_ball_deleted`, `broadcast_notification_updated`, `broadcast_standings_change`. The `_after_match_complete` trigger handles knockout bracket advance + standings recalc.
 
@@ -513,7 +518,9 @@ This is the single most complex subsystem. The decision (recorded in memory) is 
 - The **client** uses optimistic UI via the broadcast streams; it never tries to compute the score itself.
 - All formats are supported by the engine; format gating lives in `format_presets` + `_format_presets_validate`.
 
-Who has the lock to score? **The team currently batting** — its managers. The predicate is `_can_score_innings` server-side and a UI gate in `scoring_screen.dart` client-side. The lock switches at innings break.
+Who has the lock to score? **The team currently batting** — anyone on it from `captain` upward (`is_team_captain`), plus anyone appointed as that match's `scorer` in `match_officials`. The predicate is `_can_score_innings` server-side and a UI gate in `scoring_screen.dart` client-side. The lock switches at innings break.
+
+Rewritten 2026-09-10 with the team role ladder (`docs/team-roles-design.md`). It previously read `teams.owner_id` OR a `captain`/`vice_captain` roster row, and ignored `match_officials` entirely — so a tournament-assigned scorer had no rights at all despite the organiser console offering to hand them over.
 
 Status today: innings 1 + transition to innings 2 are wired. Innings 2 → completion is **server-side complete** (the engine + transition code handle it; `_after_match_complete` advances brackets / recalculates standings) but the client handoff (`InningsBreakScreen` → second innings → `ResultScreen`) needs another integration pass. See memory entry "Match engine architecture" for the latest status.
 

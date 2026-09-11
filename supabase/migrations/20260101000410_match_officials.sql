@@ -46,8 +46,22 @@ create policy "match_officials_read"
   to authenticated
   using (true);
 
--- Write: organisers of the match's tournament only. Assignment is an
--- organiser act; a scorer cannot appoint themselves.
+-- Write: whoever runs the fixture. Assignment is always someone else's act —
+-- a scorer cannot appoint themselves.
+--
+--   * tournament match → an organiser of that tournament (as before);
+--   * casual match     → a captain/manager/owner of either side.
+--
+-- The casual branch was added 2026-09-10 with the scoring-delegation rule
+-- (docs/team-roles-design.md §5). Until then match_officials could only be
+-- written by tournament organisers AND the row granted nothing anyway —
+-- `_can_score_innings` never consulted this table, so the organiser console's
+-- offer to "revoke scoring rights or take over the match" was inert. Both
+-- halves are now real: this policy writes the row, and `_can_score_innings`
+-- honours it.
+--
+-- ONE permissive policy per (table, command, role) — Supabase advisor 0006 —
+-- so the two cases are branches of a single expression, not two policies.
 drop policy if exists "match_officials_write_organizers" on public.match_officials;
 create policy "match_officials_write_organizers"
   on public.match_officials for all
@@ -56,18 +70,86 @@ create policy "match_officials_write_organizers"
     exists (
       select 1 from public.matches m
        where m.match_id = match_officials.match_id
-         and m.tournament_id is not null
-         and public.is_tournament_organizer(m.tournament_id)
+         and (
+           case
+             when m.tournament_id is not null
+               then public.is_tournament_organizer(m.tournament_id)
+             else public.is_team_captain(m.team_a_id)
+               or public.is_team_captain(m.team_b_id)
+           end
+         )
     )
   )
   with check (
     exists (
       select 1 from public.matches m
        where m.match_id = match_officials.match_id
-         and m.tournament_id is not null
-         and public.is_tournament_organizer(m.tournament_id)
+         and (
+           case
+             when m.tournament_id is not null
+               then public.is_tournament_organizer(m.tournament_id)
+             else public.is_team_captain(m.team_a_id)
+               or public.is_team_captain(m.team_b_id)
+           end
+         )
+    )
+    -- A captain may hand out scoring, not umpiring: neutral officials on a
+    -- casual match would be self-appointed by one of the two sides.
+    and (
+      match_officials.role = 'scorer'
+      or exists (
+        select 1 from public.matches m
+         where m.match_id = match_officials.match_id
+           and m.tournament_id is not null
+      )
     )
   );
+
+-- =============================================================================
+-- The scorer appointment IS an authorization grant (2026-09-11)
+-- =============================================================================
+-- match_officials keeps its rows: they are the record of who officiated, shown
+-- on the scorecard, and they cover umpires and referees who need no permission
+-- at all. But a `scorer` row has to actually GRANT something.
+--
+-- Until now it granted nothing — `_can_score_innings` never consulted this
+-- table — while the organiser console offered to "revoke scoring rights or take
+-- over the match at any time". This trigger makes the offer true by mirroring
+-- the appointment into `grants`, which is the one place the engine looks.
+--
+-- The mirror is one-directional on purpose: match_officials is the editable
+-- record, grants is derived. Deleting the official removes the grant.
+create or replace function public.mirror_scorer_grant()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if old.role = 'scorer' then
+      delete from public.grants
+       where subject_id = old.user_id
+         and scope = 'match' and entity_id = old.match_id
+         and permission_key = 'match.score';
+    end if;
+    return old;
+  end if;
+
+  if new.role = 'scorer' then
+    insert into public.grants
+      (subject_id, scope, entity_id, permission_key, granted_by)
+    values
+      (new.user_id, 'match', new.match_id, 'match.score', new.assigned_by)
+    on conflict (subject_id, scope, entity_id, permission_key) do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger match_officials_mirror_scorer
+  after insert or update or delete on public.match_officials
+  for each row execute function public.mirror_scorer_grant();
 
 -- -----------------------------------------------------------------------------
 -- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)

@@ -33,6 +33,7 @@ class SettingsTab extends StatelessWidget {
                     name: team.name,
                     primaryColor: team.primaryColor,
                     logoUrl: team.logoUrl,
+          crestKind: team.crestKind,
                     monogram: team.logoMonogram,
                     size: 44,
                   ),

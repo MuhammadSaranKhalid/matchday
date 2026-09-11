@@ -13,6 +13,7 @@
 // production. They mirror the design's full state set; populate them when the
 // corresponding backend ships, adjusting the shape to match it.
 import 'package:flutter/foundation.dart';
+import '../../../domain/entities/team.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter/widgets.dart' show IconData;
 
@@ -39,7 +40,7 @@ enum TpPlayerStatus { app, sms, unclaimed }
 
 /// JSX role string mapped to a Flutter enum. Mirrors `Captain / Vice-Captain
 /// / Wicket-Keeper / Player`.
-enum TpPlayerRole { captain, viceCaptain, wicketKeeper, player }
+enum TpPlayerRole { manager, captain, player }
 
 /// Action-queue tone — controls left-border accent on Manage rows.
 enum TpQueueTone { red, amber, ink }
@@ -304,6 +305,7 @@ class TpTeam {
     required this.privacy,
     this.tagline,
     this.logoUrl,
+    this.crestKind = CrestKind.monogram,
     this.verified = false,
     this.archived,
     this.record,
@@ -331,6 +333,7 @@ class TpTeam {
 
   final String? tagline;
   final String? logoUrl;
+  final CrestKind crestKind;
   final bool verified;
 
   /// When set, the page renders in archive mode (desaturated, "Read-only

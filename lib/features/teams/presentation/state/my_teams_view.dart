@@ -33,44 +33,8 @@ enum MyTeamsRole {
   scorer,
 }
 
-/// Tone of a NeedsYou banner — drives the left-border accent color.
-enum NeedsYouTone { red, amber, ink }
-
 /// Filter chip selection.
 enum MyTeamsFilter { all, playing, managing, following, archived }
-
-@immutable
-class NeedsYouAction {
-  const NeedsYouAction(this.label, {this.manageTeamId});
-  final String label;
-
-  /// When set, tapping this action navigates to `/teams/$manageTeamId/manage`.
-  /// Null = inert button (rendered but not tappable). The view model stays
-  /// pure data — the screen turns this id into navigation via `onManageTeam`.
-  final String? manageTeamId;
-}
-
-@immutable
-class NeedsYouItem {
-  const NeedsYouItem({
-    required this.role,
-    required this.tone,
-    required this.title,
-    required this.body,
-    this.subTag,
-    this.actions = const <NeedsYouAction>[],
-  });
-
-  final MyTeamsRole role;
-  final NeedsYouTone tone;
-  final String title;
-  final String body;
-  final String? subTag;
-
-  /// Action buttons (first = primary, rest = ghost). Inert by default
-  /// unless [NeedsYouAction.onTap] is provided.
-  final List<NeedsYouAction> actions;
-}
 
 @immutable
 class TodayMatch {
@@ -228,7 +192,6 @@ class MyTeamsView {
   const MyTeamsView({
     this.subtitle,
     this.isEmpty = false,
-    this.needsYou = const [],
     this.today,
     this.invites = const [],
     this.teams = const TeamGroups(),
@@ -245,7 +208,6 @@ class MyTeamsView {
   /// Short-circuits everything else and shows the EmptyState card.
   final bool isEmpty;
 
-  final List<NeedsYouItem> needsYou;
   final TodayMatch? today;
   final List<InviteEntry> invites;
   final TeamGroups teams;
@@ -264,7 +226,6 @@ class MyTeamsView {
   MyTeamsView copyWith({
     String? subtitle,
     bool? isEmpty,
-    List<NeedsYouItem>? needsYou,
     TodayMatch? today,
     List<InviteEntry>? invites,
     TeamGroups? teams,
@@ -277,7 +238,6 @@ class MyTeamsView {
       MyTeamsView(
         subtitle: subtitle ?? this.subtitle,
         isEmpty: isEmpty ?? this.isEmpty,
-        needsYou: needsYou ?? this.needsYou,
         today: today ?? this.today,
         invites: invites ?? this.invites,
         teams: teams ?? this.teams,

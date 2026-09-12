@@ -6,8 +6,10 @@ description: Write Supabase/PostgreSQL migrations following this repo's conventi
 # Writing migrations for MatchDay
 
 ## Before writing SQL
-1. List `supabase/migrations/` and read the 2-3 most recent migrations plus any touching the same tables — match their naming, RLS phrasing, and trigger style exactly.
-2. One concern per migration file. Filename: repo's timestamp+slug pattern (copy the latest file's format).
+1. Read `CLAUDE.md` §12.0, list `supabase/migrations/`, and read the canonical table file plus its dependencies before editing.
+2. This project is pre-production: edit the source declaration rather than append schema patches. Each table has exactly one `CREATE TABLE` across the directory, in its own `number_table_name.sql` file. Never declare multiple tables in a file or repeat a declaration in a later `DO` block.
+3. Keep columns, indexes, constraints, triggers, RLS policies and grants with their table. Zero-table files are allowed for shared helpers and integration that must follow both related tables. Document genuine cycles that require a deferred FK, policy or lifecycle trigger; keep the table declaration and independent objects in the table file, and enable RLS there immediately.
+4. All enums live in `20260101000000_shared_helpers.sql`; edit their value lists there rather than append `ALTER TYPE ... ADD VALUE` migrations.
 
 ## Table template (adapt, don't paste blindly)
 - `id uuid primary key default gen_random_uuid()`
@@ -52,17 +54,19 @@ description: Write Supabase/PostgreSQL migrations following this repo's conventi
 - Anything with expiry semantics follows the match-requests cron pattern.
 
 ## Ordering
-- Migration numbers encode DEPENDENCY order, not dates. A file may only reference
-  objects created by a lower-numbered file. Renumber rather than bolt on a late ALTER.
-- ⚠️ plpgsql bodies are NOT checked at CREATE time; `language sql` bodies and
-  generated columns ARE. A plpgsql function referencing a not-yet-created table
-  compiles fine and fails at runtime. `supabase db reset` is the only thing that
-  catches either — always run it.
+- Migration numbers encode DEPENDENCY order, not dates. Referenced objects must
+  exist earlier in the same file or in a lower-numbered file. Renumber rather
+  than add a late schema patch. Use a documented zero-table integration file
+  only when the relationship must follow both declarations.
+- PL/pgSQL can defer relation checks until execution. A clean `supabase db reset`
+  verifies replay order and definitions checked at CREATE time; it does not
+  exercise uncalled RPCs or triggers. Run affected paths as separate checks.
 - `CREATE INDEX CONCURRENTLY` is unavailable: the CLI wraps each migration in a
   transaction.
 
 ## After writing
-- Run `supabase db reset`, then `supabase/snippets/advisors.sql`. Both must be clean.
+- Run `flutter test test/supabase/migration_layout_test.dart` to guard table ownership and filenames.
+- Run `supabase db reset`, then `supabase/snippets/advisors.sql`, using a disposable local database if existing data must be preserved. Check affected RPC and trigger paths too.
 - Hand the migration to the user to apply (Supabase MCP/CLI); don't apply unasked.
 - Recommend a `db-reviewer` agent pass for anything non-trivial.
 - If the schema realizes a design-doc decision, note the Dn reference in a SQL comment.

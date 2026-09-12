@@ -452,7 +452,7 @@ Internal predicates (used by RLS and triggers, not exposed): `_can_score_innings
 
 `_can_score_match` was **deleted** 2026-09-10: it had no callers, was still granted, and was more permissive than the gate actually enforced. Two live definitions of "can score" is the exact trap the single-writer scoring design cannot afford.
 
-Team authority predicates (exposed, `SECURITY DEFINER`, declared in `20260101000210_team_members.sql`): `is_team_manager` (role >= manager), `is_team_captain` (role >= captain), `is_team_member` (any active row), `team_staff_ids` (fan-out helper). All read the ordered `member_role` ladder on `team_members`; `teams.managers uuid[]` no longer exists. See `docs/team-roles-design.md`.
+Team authority predicates (exposed, `SECURITY DEFINER`, declared in `20260101000212_team_authorization.sql`): `can`, `is_team_manager`, `is_team_captain`, `is_team_member`, and `team_staff_ids` (fan-out helper). Memberships and role assignments live in `20260101000210_team_members.sql` and `20260101000211_team_member_roles.sql`; the shared authorization functions follow both tables. Permissions come from catalogue rows and role assignments. See `docs/team-roles-design.md`.
 
 Broadcast triggers (do not call directly): `broadcast_new_ball`, `broadcast_innings_state`, `broadcast_match_state`, `broadcast_new_message`, `broadcast_new_notification`, `broadcast_new_comment`, `broadcast_comment_updated`, `broadcast_comment_deleted`, `broadcast_ball_deleted`, `broadcast_notification_updated`, `broadcast_standings_change`. The `_after_match_complete` trigger handles knockout bracket advance + standings recalc.
 

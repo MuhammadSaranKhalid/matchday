@@ -1404,7 +1404,7 @@ After ANY change to a `@riverpod`, `@freezed`, `@JsonSerializable`, or drift tab
 
 ## 12. Supabase Schema Conventions
 
-### 12.0 Migration layout (restructured 2026-09-06)
+### 12.0 Migration layout (restructured 2026-09-11)
 
 **This project is pre-production. Migrations are EDITED AT THE SOURCE, not patched.**
 
@@ -1412,9 +1412,21 @@ There is no deployed database whose history must be preserved, so the migration
 directory is maintained as a *description of the current schema*, not a
 chronological log of how it got here. Four rules:
 
-1. **One table per migration**, named for that table
-   (`20260101000210_team_members.sql`). A table's columns, indexes, constraints,
-   triggers, RLS policies and grants all live in its own file.
+1. **One table declaration per migration, named for that table**
+   (`20260101000210_team_members.sql`). Each table has exactly one canonical
+   `CREATE TABLE` across the directory, including declarations inside `DO`
+   blocks. Its columns, indexes, constraints, triggers, RLS policies and grants
+   belong in that file.
+
+   Files declaring **zero tables** are allowed for shared helpers and integration
+   that must follow both sides of a relationship. A genuine dependency cycle
+   can require a later FK, policy or lifecycle trigger; document that dependency
+   in the integration file. For example, `team_authorization` follows
+   `team_members` and `team_member_roles`, and `chat_lifecycle` installs chat
+   policies after `chat_members` exists. Keep each table declaration and its
+   dependency-independent objects in its own named file; integration files must
+   not become another place to declare or reshape tables. Enable RLS in the
+   table's own file even when a dependent policy must follow later.
 
 2. **All enums live in `20260101000000_shared_helpers.sql`** — the enum
    catalogue. Types depend on nothing and everything depends on them, so
@@ -1429,17 +1441,24 @@ chronological log of how it got here. Four rules:
    single table's real shape was spread across up to four migrations, and the
    only way to know what `matches` looked like was to replay the whole run.
 
-4. **File numbers encode dependency order, not dates.** A migration may only
-   reference objects created by a lower-numbered file. Renumber rather than
-   bolt on a late `ALTER` — `grounds` moved from `20260831000000` to
-   `20260101000330` so `matches.ground_id` could be an inline FK.
+4. **File numbers encode dependency order, not dates.** Referenced objects must
+   already exist, either earlier in the same file or in a lower-numbered file.
+   Renumber rather than bolt on a late schema patch — `grounds` moved from
+   `20260831000000` to `20260101000330` so `matches.ground_id` could be an
+   inline FK.
 
    ⚠️ **The trap this codebase keeps falling into:** plpgsql function bodies
-   are NOT checked at CREATE time, so a function referencing a table that does
-   not exist yet compiles fine and fails at runtime, often months later.
-   `language sql` functions and generated columns ARE checked immediately.
-   A clean `supabase db reset` is the only thing that catches either — run it
-   after touching migrations.
+   can defer relation checks until execution, so a function referencing a table
+   that does not exist yet may compile and fail at runtime. A clean
+   `supabase db reset` checks replay order and definitions validated at CREATE
+   time, including generated columns and SQL function bodies under the default
+   validator settings. It does **not** test unexecuted PL/pgSQL paths: exercise
+   affected RPCs and triggers as well. Run the reset and advisors after touching
+   migrations, using a disposable local database when existing local data must
+   be preserved.
+
+Run `flutter test test/supabase/migration_layout_test.dart` to check one table
+declaration per file, canonical table filenames and duplicate declarations.
 
 **Seed data does not belong in `migrations/`.** Demo/test fixtures live in
 `supabase/seed*.sql` and are opted into via `[db.seed] sql_paths`. Seeds that
@@ -1573,7 +1592,7 @@ The `todos` reference feature and all general offline-first wiring were removed 
 | Controller calling repo directly with value-object validation inlined | `lib/features/onboarding/presentation/controllers/onboarding_controller.dart` (`submit`), `lib/features/teams/presentation/controllers/add_unclaimed_player_controller.dart` (`submit`) |
 | Wizard draft persistence | `lib/core/database/wizard_draft_store.dart` + `lib/core/database/tables.dart` |
 | Pure-domain algorithm shared by a preview and a write (no I/O, one implementation, property-tested) | `lib/features/tournaments/domain/draw/draw_builder.dart` + `test/features/tournaments/domain/draw/draw_builder_test.dart` |
-| **Authorization — the team role ladder** | `docs/team-roles-design.md` (the contract), `supabase/migrations/20260101000210_team_members.sql` (predicates + RPCs), `lib/features/teams/domain/entities/team_relationship.dart` (the client mirror) |
+| **Authorization — team roles and permissions** | `docs/team-roles-design.md` (the contract), `supabase/migrations/20260101000211_team_member_roles.sql` (assignments), `supabase/migrations/20260101000212_team_authorization.sql` (predicates + RPCs), `lib/features/teams/domain/entities/team_relationship.dart` (the client mirror) |
 | **Local-first write path (exemption 2 — do not copy without agreement)** | `lib/features/matches/data/datasources/matches_local_datasource.dart` (WAL + outbox), `lib/features/matches/presentation/controllers/scoring_controller.dart` (apply-locally-then-drain), `docs/offline-scoring-design.md` (rationale) |
 ---
 

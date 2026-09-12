@@ -173,16 +173,14 @@ void main() {
     expect(view.isEmpty, isFalse);
   });
 
-  test('first-team onboarding: subtitle + NeedsYou CTA targets the team',
-      () async {
+  test('first-team onboarding: subtitle + "You" row meta', () async {
     final container = makeContainer(teams: [_team('a', name: 'Lions')]);
 
     final view = await container.read(teamsListControllerProvider.future);
 
     expect(view.subtitle, '1 team · onboarding');
-    expect(view.needsYou, hasLength(1));
-    expect(view.needsYou.single.actions.first.label, 'Add players');
-    expect(view.needsYou.single.actions.first.manageTeamId, 'a');
+    expect(view.teams.captain, hasLength(1));
+    expect(view.teams.captain.single.meta, startsWith('You · '));
   });
 
   test('setFilter re-derives synchronously without re-fetching matches',

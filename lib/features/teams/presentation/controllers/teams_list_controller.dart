@@ -149,7 +149,6 @@ MyTeamsView _buildView({
       activeMatches.isEmpty;
 
   String? subtitle;
-  var needsYou = const <NeedsYouItem>[];
   var captain = captainBucket;
 
   if (isFirstTeam) {
@@ -163,20 +162,6 @@ MyTeamsView _buildView({
         role: captainBucket.first.role,
         teamId: team.id.value,
         meta: 'You · ${_relativeTime(team.createdAt)}',
-      ),
-    ];
-    needsYou = [
-      NeedsYouItem(
-        role: MyTeamsRole.captain,
-        tone: NeedsYouTone.amber,
-        subTag: team.name.toUpperCase(),
-        title: 'Add players to your roster',
-        body:
-            'You created this team ${_relativeTime(team.createdAt)}. Invite at least 6 players to start scoring matches.',
-        actions: [
-          NeedsYouAction('Add players', manageTeamId: team.id.value),
-          const NeedsYouAction('Later'),
-        ],
       ),
     ];
   } else {
@@ -196,7 +181,6 @@ MyTeamsView _buildView({
     subtitle: subtitle,
     isEmpty: total == 0 && activeMatches.isEmpty,
     today: today,
-    needsYou: needsYou,
     teams: TeamGroups(captain: captain, playing: playingBucket),
   );
 }

@@ -984,7 +984,10 @@ scorer reaches sign-out with a non-empty outbox, and that UI is not built yet.**
 
 D10/D11/D13 implemented. The rules of cricket now exist in exactly one place.
 
-**Database** (`20260101000400_matches.sql`)
+**Database** (table definitions now split into
+`20260101000404_match_innings_state.sql` and
+`20260101000405_match_deliveries.sql`; shared scoring predicates live in
+`20260101000409_match_helpers.sql`)
 - `fn_process_delivery` and `trg_delivery_insert` **deleted**. That trigger was the
   third implementation of the rules; it rotated strike on `runs_off_bat % 2` (so runs
   run off a no-ball never changed ends), hardcoded a six-ball over, never incremented

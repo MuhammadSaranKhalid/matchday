@@ -32,7 +32,8 @@
 --      pass through intermediate states where two fixtures briefly collide;
 --      a hard constraint would fail those writes in an order-dependent way.
 --      The check belongs in the fixture generator, which can warn and show
---      the clash. `tournament_ground_clashes` below is the read side of that.
+--      the clash. `tournament_ground_clashes` in tournament_live_ops is the
+--      read side of that.
 --
 -- Insert rights are deliberately broad — any authenticated user may create a
 -- ground, not only tournament organisers. If only the create wizard could,
@@ -44,7 +45,7 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- 1. Surface enum.
+-- Surface types are declared in shared_helpers.
 -- -----------------------------------------------------------------------------
 
 -- -----------------------------------------------------------------------------
@@ -78,7 +79,7 @@ create table if not exists public.grounds (
   notes            text check (notes is null or length(notes) <= 300),
 
   -- Normalised for trigram search. f_unaccent is the IMMUTABLE two-arg
-  -- wrapper defined in 20260611000000_teams_search.
+  -- wrapper defined in 20260101000000_shared_helpers.
   search_name      text generated always as (
                       lower(public.f_unaccent(name))
                     ) stored,
@@ -131,48 +132,6 @@ create policy "grounds_delete_creator"
   on public.grounds for delete
   to authenticated
   using ((select auth.uid()) = created_by);
-
--- -----------------------------------------------------------------------------
--- 3. tournament_grounds — which grounds a cup uses, and in what order.
--- -----------------------------------------------------------------------------
-create table if not exists public.tournament_grounds (
-  tournament_id uuid not null
-                   references public.tournaments(tournament_id) on delete cascade,
-  ground_id     uuid not null
-                   references public.grounds(ground_id) on delete restrict,
-  -- Drives the G1 / G2 labels on the wizard and the Live Ops board.
-  sort_order    integer not null default 0,
-  created_at    timestamptz not null default now(),
-
-  primary key (tournament_id, ground_id)
-);
-
-create index if not exists tournament_grounds_ground
-  on public.tournament_grounds (ground_id);
-
-alter table public.tournament_grounds enable row level security;
-
--- Visible to anyone who can see the tournament itself.
-drop policy if exists "tournament_grounds_read" on public.tournament_grounds;
-create policy "tournament_grounds_read"
-  on public.tournament_grounds for select
-  to anon, authenticated
-  using (
-    public.is_tournament_organizer(tournament_id)
-    or exists (
-      select 1 from public.tournaments t
-       where t.tournament_id = tournament_grounds.tournament_id
-         and t.privacy = 'public'
-    )
-  );
-
-drop policy if exists "tournament_grounds_write_organizer"
-  on public.tournament_grounds;
-create policy "tournament_grounds_write_organizer"
-  on public.tournament_grounds for all
-  to authenticated
-  using (public.is_tournament_organizer(tournament_id))
-  with check (public.is_tournament_organizer(tournament_id));
 
 -- -----------------------------------------------------------------------------
 -- 4. matches.ground_id — additive, nullable.
@@ -229,26 +188,6 @@ where not exists (
    where lower(public.f_unaccent(g.name)) = lower(public.f_unaccent(d.name))
      and coalesce(g.location->>'city', '') = coalesce(d.tournament_city, '')
 );
-
--- Link each tournament to the grounds it listed, preserving array order.
-insert into public.tournament_grounds (tournament_id, ground_id, sort_order)
-select
-  t.tournament_id,
-  g.ground_id,
-  (v.ord - 1)::int
-from public.tournaments t
-cross join lateral jsonb_array_elements(
-  case when jsonb_typeof(t.venues) = 'array' then t.venues else '[]'::jsonb end
-) with ordinality as v(elem, ord)
-join public.grounds g
-  on lower(public.f_unaccent(g.name)) = lower(public.f_unaccent(btrim(v.elem->>'name')))
- and coalesce(g.location->>'city', '') = coalesce(t.location->>'city', '')
-where btrim(coalesce(v.elem->>'name', '')) <> ''
-on conflict (tournament_id, ground_id) do nothing;
-
--- The backfill that pointed existing fixtures at a matching ground lived here.
--- Removed 2026-09-06: this file now runs BEFORE matches is created, so there is
--- nothing to backfill — and on a fresh database there never was.
 
 -- -----------------------------------------------------------------------------
 -- 6. Ground search for the picker (the "did you mean …" step).
@@ -319,11 +258,3 @@ $$;
 
 revoke all on function public.search_grounds(text, double precision, double precision, integer) from public;
 grant execute on function public.search_grounds(text, double precision, double precision, integer) to authenticated;
-
--- -----------------------------------------------------------------------------
--- tournament_ground_clashes() — MOVED
--- -----------------------------------------------------------------------------
--- It joins public.matches twice, so it cannot be created here now that this
--- file runs before 20260101000400_matches.sql. It lives at the end of
--- 20260830000000_tournament_live_ops.sql, with the other tournament ops RPCs.
-

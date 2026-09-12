@@ -51,9 +51,13 @@ team_member_roles         who holds what                 (pure many-to-many)
 can(scope, entity, permission)     the only question anyone asks
 ```
 
-Catalogue in `20260101000205_authz.sql`; assignment, `can()` and the RPCs in
-`20260101000210_team_members.sql` (they read `team_members`, and being
-`language sql` their bodies are checked at CREATE time).
+Each catalogue table has its own migration, from `20260101000201_roles.sql`
+through `20260101000207_grants.sql`. Memberships live in
+`20260101000210_team_members.sql`, assignments in
+`20260101000211_team_member_roles.sql`, and `can()`, shared predicates, RPCs
+and dependent policies in `20260101000212_team_authorization.sql`. That
+zero-table integration file follows both memberships and assignments so its
+SQL functions and policies have all their dependencies at CREATE time.
 
 ---
 

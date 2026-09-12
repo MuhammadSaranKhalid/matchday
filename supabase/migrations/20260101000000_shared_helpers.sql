@@ -62,6 +62,16 @@ as $$
   select public.unaccent('public.unaccent', $1)
 $$;
 
+-- A generated column's expression is evaluated as the role performing the
+-- WRITE, so every authenticated insert/update on a table carrying a
+-- `search_name` column (profiles, teams, unclaimed_players, grounds) calls
+-- this function directly. It used to work by way of the EXECUTE that Postgres
+-- grants to PUBLIC on every new function; 20260906120000 revokes exactly that,
+-- which left `permission denied for function f_unaccent` on team creation,
+-- onboarding and profile edits. The grant is explicit here so the sweep — which
+-- only revokes from `public, anon` — cannot take it away again.
+grant execute on function public.f_unaccent(text) to authenticated, service_role;
+
 -- -----------------------------------------------------------------------------
 -- set_updated_at() — generic BEFORE-UPDATE trigger function.
 -- Each table that needs it wires it via:

@@ -3,11 +3,31 @@
 -- =============================================================================
 -- Foundation that every later migration assumes is already there:
 --
---  1. Extensions
+--  1. Extensions — THE EXTENSION CATALOGUE. Every one, declared here.
 --       pgcrypto  → gen_random_uuid() for primary keys
 --       postgis   → "near me" geo queries (Feature 7, future)
 --       pg_trgm   → trigram fuzzy search (usernames, team names, profiles)
 --       unaccent  → fold diacritics before trigram matching
+--       pg_cron   → scheduled jobs (request expiry 0610, push worker 0910)
+--       pg_net    → async HTTP from SQL (the push-worker wake in 0910)
+--       pgmq      → durable notification delivery queues (0910)
+--
+--       Consolidated 2026-09-12, for the same reason the enum catalogue was:
+--       pg_cron had drifted into being declared TWICE, in 0610 and 0910, with
+--       two DIFFERENT schema clauses — and neither took effect, because
+--       Supabase pre-provisions it and `if not exists` short-circuits before
+--       the clause is validated. 0610 therefore claimed it lived in
+--       `extensions` when it actually lives in `pg_catalog`.
+--
+--       Extensions are free-standing exactly like types: they depend on
+--       nothing and everything depends on them, so declaring them all first is
+--       the only ordering that needs no forward reference.
+--
+--       ONE RULE, as with enums: a new extension is added to the list below.
+--       Do NOT declare one next to its first use. Creating the OBJECTS an
+--       extension provides (`pgmq.create('…')`, `cron.schedule('…')`) still
+--       belongs with the feature that owns them — it is the `create extension`
+--       line, and only that, which lives here.
 --
 --  1b. f_unaccent(text)
 --       IMMUTABLE wrapper around unaccent(). Moved here 2026-09-06 from
@@ -44,6 +64,26 @@ create extension if not exists pgcrypto;
 create extension if not exists postgis;
 create extension if not exists pg_trgm;
 create extension if not exists unaccent;
+
+-- Schema clauses below are NOT decoration; all three are non-relocatable, so
+-- where each lands is fixed at install time and cannot be moved afterwards.
+--
+--   pg_cron — control file names no schema, so `with schema` IS honoured on a
+--     bare Postgres. On Supabase it is a no-op: the platform pre-provisions
+--     pg_cron into pg_catalog, and `if not exists` returns before the clause is
+--     checked. The clause is kept for the non-Supabase case; do not "fix" the
+--     mismatch by asserting `extensions`, and do not trust it to tell you where
+--     the extension actually is — ask pg_extension.
+create extension if not exists pg_cron with schema extensions;
+
+--   pg_net — same situation, and here the clause DOES take effect: it lands in
+--     `extensions`, which is why 0910 can call net.http_post().
+create extension if not exists pg_net with schema extensions;
+
+--   pgmq — its control file pins `schema = 'pgmq'`. Adding a `with schema`
+--     clause naming anything else is an ERROR, not an override, so there is
+--     deliberately none here. The queues themselves are created in 0910.
+create extension if not exists pgmq;
 
 -- -----------------------------------------------------------------------------
 -- f_unaccent(text) — IMMUTABLE unaccent, safe inside generated columns.
@@ -437,33 +477,22 @@ end $$;
 -- -----------------------------------------------------------------------------
 -- 3.9 Notifications
 -- -----------------------------------------------------------------------------
--- The full taxonomy. 'match_request' / 'match_request_decision' were appended
--- by 20260101000600 via `alter type`; folded in 2026-09-06. The five values
--- after them close gaps found in the 2026-09-06 schema audit: flows that exist
--- in the schema (team join requests, tournament registration decisions, DM
--- requests, chat messages) had no notification type to fire.
-do $$ begin
-  create type public.notification_type as enum (
-    'follow',
-    'post_like',
-    'post_comment',
-    'comment_reply',
-    'mention',
-    'team_post',
-    'tournament_post',
-    'match_starting',
-    'match_upcoming',
-    'stat_milestone',
-    'claim_decision',
-    'team_invitation',
-    'match_request',
-    'match_request_decision',
-    'team_join_request',
-    'team_join_decision',
-    'tournament_registration',
-    'tournament_registration_decision',
-    'dm_request',
-    'chat_message'
-  );
-exception when duplicate_object then null;
-end $$;
+-- The `notification_type` ENUM WAS DELETED 2026-09-12. Notification types are
+-- now ROWS in public.notification_types (0491) — the same move roles made when
+-- `member_role` was deleted above, and for the same reason: an enum makes
+-- adding a value a schema migration, and it forces every client to carry an
+-- exhaustive switch, so the server cannot send a type until every app has
+-- shipped. Adding a type is now an INSERT.
+--
+-- Its 20 values are worth recording, because the shape of the failure is the
+-- argument for the redesign: TEN of them had no writer anywhere in the codebase
+-- (team_post, match_upcoming, stat_milestone, claim_decision,
+-- team_join_request, team_join_decision, tournament_registration,
+-- tournament_registration_decision, dm_request, chat_message), while the Dart
+-- enum mirroring it carried only FOURTEEN — so the six it lacked would each
+-- have rendered as "someone followed you" via a `?? NotificationType.follow`
+-- fallback. Two of the remaining values were also overloaded: 'match_starting'
+-- doubled as "you were assigned as scorer", and 'tournament_post' doubled as
+-- both "you are now an organizer" and "your registration was declined".
+--
+-- See docs/notifications-design.md.

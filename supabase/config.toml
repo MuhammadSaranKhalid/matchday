@@ -402,11 +402,9 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
-# Fans `public.notifications` inserts out to FCM via the
-# notifications_invoke_send_push trigger. `verify_jwt = false` because the
-# trigger calls the function with the service-role key in the Authorization
-# header (the function checks it manually). See
-# supabase/functions/send-push/index.ts.
+# Scheduled pgmq consumer. JWT verification is off because the worker checks
+# a dedicated x-worker-secret header against NOTIFICATION_WORKER_SECRET.
+# Configure the same value in Vault as notification_worker_secret.
 [functions.send-push]
 enabled = true
 verify_jwt = false

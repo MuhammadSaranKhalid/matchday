@@ -16,8 +16,10 @@
 --    gotten around to scoring yet.
 -- =============================================================================
 
--- pg_cron is allow-listed on Supabase but disabled by default. Enable it.
-create extension if not exists pg_cron with schema extensions;
+-- pg_cron is allow-listed on Supabase but disabled by default. It is enabled in
+-- 20260101000000_shared_helpers.sql (the extension catalogue) rather than here:
+-- this file and 0910 both used to declare it, with different schema clauses.
+-- Scheduling jobs stays here, with the jobs.
 
 -- -----------------------------------------------------------------------------
 -- expire_stale_match_requests — flips pending/countered → expired by

@@ -160,71 +160,13 @@ create trigger comments_stamp_edited_at
   for each row execute function public.stamp_comment_edited_at();
 
 -- -----------------------------------------------------------------------------
--- notify_on_comment — fan-out to post author / parent comment author / mentions.
+-- NOTIFICATION TRIGGER MOVED → 20260101000620_notification_triggers.sql
+--
+-- notify_on_comment now calls public.notify() (0570), which is declared
+-- AFTER this file. A plpgsql body referencing a not-yet-created function
+-- compiles but fails at runtime (§12.0), so the trigger follows its dependency
+-- — the same remedy the teams UPDATE policies got when they moved to 0210.
 -- -----------------------------------------------------------------------------
-create or replace function public.notify_on_comment()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_recipient_id uuid;
-  v_event_type   public.notification_type;
-  v_post_author  uuid;
-  v_mention      uuid;
-begin
-  select author_id into v_post_author from public.posts where post_id = new.post_id;
-
-  if new.parent_comment_id is null then
-    v_recipient_id := v_post_author;
-    v_event_type   := 'post_comment';
-  else
-    select author_id into v_recipient_id
-      from public.comments where comment_id = new.parent_comment_id;
-    v_event_type := 'comment_reply';
-  end if;
-
-  if v_recipient_id is not null and v_recipient_id <> new.author_id then
-    insert into public.notifications (recipient_id, type, payload)
-    values (
-      v_recipient_id,
-      v_event_type,
-      jsonb_build_object(
-        'post_id',           new.post_id,
-        'comment_id',        new.comment_id,
-        'parent_comment_id', new.parent_comment_id,
-        'actor_id',          new.author_id
-      )
-    );
-  end if;
-
-  -- Mentions: skip self + skip the recipient we just notified.
-  if cardinality(new.mentioned_user_ids) > 0 then
-    foreach v_mention in array new.mentioned_user_ids loop
-      if v_mention <> new.author_id
-         and (v_recipient_id is null or v_mention <> v_recipient_id) then
-        insert into public.notifications (recipient_id, type, payload)
-        values (
-          v_mention,
-          'mention',
-          jsonb_build_object(
-            'post_id',    new.post_id,
-            'comment_id', new.comment_id,
-            'actor_id',   new.author_id
-          )
-        );
-      end if;
-    end loop;
-  end if;
-
-  return new;
-end;
-$$;
-
-create trigger comments_notify
-  after insert on public.comments
-  for each row execute function public.notify_on_comment();
 
 -- -----------------------------------------------------------------------------
 -- RLS — visible if parent post visible; insert by self; delete by author or

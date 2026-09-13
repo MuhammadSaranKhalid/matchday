@@ -55,34 +55,13 @@ create trigger post_likes_bump_count
   for each row execute function public.bump_post_likes_count();
 
 -- -----------------------------------------------------------------------------
--- notify_on_post_like — fan-out to post author (skip self-likes).
+-- NOTIFICATION TRIGGER MOVED → 20260101000620_notification_triggers.sql
+--
+-- notify_on_post_like now calls public.notify() (0570), which is declared
+-- AFTER this file. A plpgsql body referencing a not-yet-created function
+-- compiles but fails at runtime (§12.0), so the trigger follows its dependency
+-- — the same remedy the teams UPDATE policies got when they moved to 0210.
 -- -----------------------------------------------------------------------------
-create or replace function public.notify_on_post_like()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_author_id uuid;
-begin
-  select author_id into v_author_id from public.posts where post_id = new.post_id;
-  if v_author_id is null or v_author_id = new.user_id then
-    return new;
-  end if;
-  insert into public.notifications (recipient_id, type, payload)
-  values (
-    v_author_id,
-    'post_like',
-    jsonb_build_object('post_id', new.post_id, 'actor_id', new.user_id)
-  );
-  return new;
-end;
-$$;
-
-create trigger post_likes_notify
-  after insert on public.post_likes
-  for each row execute function public.notify_on_post_like();
 
 -- -----------------------------------------------------------------------------
 -- RLS — public read; insert/delete only by self.

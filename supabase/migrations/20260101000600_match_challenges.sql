@@ -868,132 +868,18 @@ revoke all on function public.find_match_request_by_code(text) from public;
 grant execute on function public.find_match_request_by_code(text) to authenticated;
 
 -- =============================================================================
--- Notification fan-out triggers.
--- INSERT (status='pending')            → notify every manager of to_team
---                                         (open requests skip — no recipient
---                                          pool yet; notified on accept).
--- UPDATE pending  → not-pending        → notify the requester + every other
---                                         manager of from_team.
--- UPDATE countered → not-countered     → notify the from_team's counter-poser
---                                         side (i.e. members of to_team) so
---                                         they learn the sender's verdict.
+-- NOTIFICATION TRIGGERS MOVED → 20260101000620_notification_triggers.sql
 -- =============================================================================
-create or replace function public.notify_on_match_request_insert()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_recipient uuid;
-begin
-  if new.status <> 'pending' then
-    return new;
-  end if;
-  if new.to_team_id is null then
-    return new;
-  end if;
-
-  -- 2026-09-10: owner and managers used to be read from two different places
-  -- (teams.owner_id and teams.managers[]) and looped separately, with a manual
-  -- dedup between them. team_staff_ids() returns the one set.
-  for v_recipient in select public.team_staff_ids(new.to_team_id) loop
-    if v_recipient <> new.requested_by then
-      insert into public.notifications (recipient_id, type, payload)
-      values (
-        v_recipient,
-        'match_request',
-        jsonb_build_object(
-          'request_id',    new.request_id,
-          'from_team_id',  new.from_team_id,
-          'to_team_id',    new.to_team_id,
-          'actor_id',      new.requested_by
-        )
-      );
-    end if;
-  end loop;
-  return new;
-end;
-$$;
-
-create trigger match_challenges_notify_insert
-  after insert on public.match_challenges
-  for each row execute function public.notify_on_match_request_insert();
-
-create or replace function public.notify_on_match_request_decision()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_recipient   uuid;
-  v_actor       uuid;
-  v_notify_team uuid;
-begin
-  -- Fire on pending→X or countered→X status flips only.
-  if old.status = new.status
-     or old.status not in ('pending', 'countered') then
-    return new;
-  end if;
-  v_actor := coalesce(new.decided_by, auth.uid());
-
-  if old.status = 'pending' then
-    v_notify_team := new.from_team_id;
-
-    -- Always notify the original requester.
-    if new.requested_by <> v_actor then
-      insert into public.notifications (recipient_id, type, payload)
-      values (
-        new.requested_by,
-        'match_request_decision',
-        jsonb_build_object(
-          'request_id',    new.request_id,
-          'from_team_id',  new.from_team_id,
-          'to_team_id',    new.to_team_id,
-          'status',        new.status::text,
-          'match_id',      new.match_id,
-          'actor_id',      v_actor
-        )
-      );
-    end if;
-  else
-    -- countered → X: the team that countered is to_team_id.
-    v_notify_team := new.to_team_id;
-  end if;
-
-  if v_notify_team is null then
-    return new;
-  end if;
-
-  -- 2026-09-10: one set instead of owner-then-array with a manual dedup.
-  -- The `old.status <> 'pending'` guard stays: on a pending→X flip the original
-  -- requester was already notified above, so they must not be told twice.
-  for v_recipient in select public.team_staff_ids(v_notify_team) loop
-      if v_recipient <> v_actor
-         and (old.status <> 'pending' or v_recipient <> new.requested_by) then
-        insert into public.notifications (recipient_id, type, payload)
-        values (
-          v_recipient,
-          'match_request_decision',
-          jsonb_build_object(
-            'request_id',    new.request_id,
-            'from_team_id',  new.from_team_id,
-            'to_team_id',    new.to_team_id,
-            'status',        new.status::text,
-            'match_id',      new.match_id,
-            'actor_id',      v_actor
-          )
-        );
-      end if;
-  end loop;
-  return new;
-end;
-$$;
-
-create trigger match_challenges_notify_decision
-  after update of status on public.match_challenges
-  for each row execute function public.notify_on_match_request_decision();
+-- notify_on_match_request_insert / _decision now call public.notify() (0570),
+-- declared after this file, so they move with their dependency (§12.0).
+--
+-- They also changed shape in the move. `match_request_decision` used to be ONE
+-- notification type carrying `status` in its payload for the client to switch
+-- on; it is now five catalogue keys (match.challenge.accepted / .declined /
+-- .countered / .cancelled / .expired), so the copy is data. And the manual
+-- "skip the actor, skip the requester we already notified" dedup is gone —
+-- notify() does SELECT DISTINCT and drops the actor itself.
+-- =============================================================================
 
 -- =============================================================================
 -- Row-level security.

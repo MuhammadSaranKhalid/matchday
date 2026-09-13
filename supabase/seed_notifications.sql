@@ -1,7 +1,8 @@
 -- =============================================================================
 -- Seed the full notification feed for user 9686500d-5c94-49ff-b4da-c3727d609d46.
 --
--- Covers all 12 notification_type enum values:
+-- Covers a representative slice of the notification_types CATALOGUE (0491).
+-- The `notification_type` enum it used to enumerate was deleted 2026-09-12.
 --   Trigger-driven (real fan-out path):
 --     follow, post_like, post_comment, comment_reply, mention
 --   Direct-inserted (the producing trigger lives in another domain migration
@@ -46,6 +47,7 @@ declare
   v_player_id   uuid := 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
   v_top_comment uuid;
+  v_n           uuid;
 begin
   -- ===========================================================================
   -- 1. Actor auth.users → handle_new_auth_user creates profile rows.
@@ -160,64 +162,95 @@ begin
           array[v_recipient]);
 
   -- ===========================================================================
-  -- 7. Direct inserts for the 7 non-trigger types in this migration.
-  --    Each gets at least one row; some get a couple for filter variety.
+  -- 7. The types with no trigger yet.
+  --
+  --    These used to be hand-written INSERTs carrying a `type` enum value. They
+  --    now go through notify() like everything else, so the copy comes from the
+  --    catalogue rather than being invented here — which is the point: a seed
+  --    cannot drift from production copy any more.
+  --
+  --    notify() owns created_at/is_read, so the age and read-state this fixture
+  --    wants for filter variety are stamped afterwards.
   -- ===========================================================================
-  insert into public.notifications (recipient_id, type, payload, is_read, created_at)
-  values
-    -- team_post (×2)
-    (v_recipient, 'team_post',
-       jsonb_build_object('post_id', v_post_1, 'team_id', v_team_a, 'actor_id', v_actor_1),
-       false, now() - interval '2 hours'),
-    (v_recipient, 'team_post',
-       jsonb_build_object('post_id', v_post_2, 'team_id', v_team_b, 'actor_id', v_actor_2),
-       true,  now() - interval '1 day 4 hours'),
+  v_n := public.notify_one(v_recipient, 'team.post.published',
+           jsonb_build_object('post_id', v_post_1, 'team_id', v_team_a),
+           v_actor_1, 'team', v_team_a);
+  update public.notifications set created_at = now() - interval '2 hours'
+   where notification_id = v_n;
 
-    -- tournament_post (×1)
-    (v_recipient, 'tournament_post',
-       jsonb_build_object('post_id', v_post_3, 'tournament_id', v_tournament, 'actor_id', v_actor_3),
-       false, now() - interval '6 hours'),
+  v_n := public.notify_one(v_recipient, 'team.post.published',
+           jsonb_build_object('post_id', v_post_2, 'team_id', v_team_b),
+           v_actor_2, 'team', v_team_b);
+  update public.notifications
+     set created_at = now() - interval '1 day 4 hours', is_read = true
+   where notification_id = v_n;
 
-    -- match_starting (×1) — recent, drives the red "live" tone in the UI
-    (v_recipient, 'match_starting',
-       jsonb_build_object('match_id', v_match_live),
-       false, now() - interval '15 minutes'),
+  v_n := public.notify_one(v_recipient, 'tournament.post.published',
+           jsonb_build_object('post_id', v_post_3, 'tournament_id', v_tournament),
+           v_actor_3, 'tournament', v_tournament);
+  update public.notifications set created_at = now() - interval '6 hours'
+   where notification_id = v_n;
 
-    -- match_upcoming (×2) — one read, one unread
-    (v_recipient, 'match_upcoming',
-       jsonb_build_object('match_id', v_match_soon),
-       false, now() - interval '20 hours'),
-    (v_recipient, 'match_upcoming',
-       jsonb_build_object('match_id', v_match_done),
-       true,  now() - interval '2 days'),
+  -- recent, drives the red "live" tone in the UI
+  v_n := public.notify_one(v_recipient, 'match.starting',
+           jsonb_build_object('match_id', v_match_live,
+                              'team_id', v_team_a,
+                              'opponent_team_id', v_team_b),
+           v_actor_1, 'match', v_match_live);
+  update public.notifications set created_at = now() - interval '15 minutes'
+   where notification_id = v_n;
 
-    -- stat_milestone (×2) — different milestones for variety
-    (v_recipient, 'stat_milestone',
-       jsonb_build_object('milestone', '50_runs', 'match_id', v_match_done),
-       false, now() - interval '3 days'),
-    (v_recipient, 'stat_milestone',
-       jsonb_build_object('milestone', '5_wickets', 'match_id', v_match_done),
-       false, now() - interval '3 days 1 hour'),
+  v_n := public.notify_one(v_recipient, 'match.upcoming',
+           jsonb_build_object('match_id', v_match_soon,
+                              'team_id', v_team_a,
+                              'opponent_team_id', v_team_b),
+           v_actor_1, 'match', v_match_soon);
+  update public.notifications set created_at = now() - interval '20 hours'
+   where notification_id = v_n;
 
-    -- claim_decision (×1)
-    (v_recipient, 'claim_decision',
-       jsonb_build_object('decision', 'approved', 'player_id', v_player_id),
-       true,  now() - interval '4 days'),
+  v_n := public.notify_one(v_recipient, 'match.upcoming',
+           jsonb_build_object('match_id', v_match_done,
+                              'team_id', v_team_a,
+                              'opponent_team_id', v_team_b),
+           v_actor_1, 'match', v_match_done);
+  update public.notifications
+     set created_at = now() - interval '2 days', is_read = true
+   where notification_id = v_n;
 
-    -- team_invitation (×1)
-    (v_recipient, 'team_invitation',
-       jsonb_build_object('team_id', v_team_a, 'actor_id', v_actor_2),
-       false, now() - interval '5 days');
+  v_n := public.notify_one(v_recipient, 'system.stat.milestone',
+           jsonb_build_object('milestone_text', 'You passed 50 runs in a match',
+                              'match_id', v_match_done));
+  update public.notifications set created_at = now() - interval '3 days'
+   where notification_id = v_n;
+
+  v_n := public.notify_one(v_recipient, 'system.stat.milestone',
+           jsonb_build_object('milestone_text', 'Your first 5-wicket haul',
+                              'match_id', v_match_done));
+  update public.notifications set created_at = now() - interval '3 days 1 hour'
+   where notification_id = v_n;
+
+  v_n := public.notify_one(v_recipient, 'team.claim.approved',
+           jsonb_build_object('team_id', v_team_a, 'player_id', v_player_id),
+           v_actor_2, 'team', v_team_a);
+  update public.notifications
+     set created_at = now() - interval '4 days', is_read = true
+   where notification_id = v_n;
+
+  v_n := public.notify_one(v_recipient, 'team.invitation.received',
+           jsonb_build_object('team_id', v_team_a),
+           v_actor_2, 'team', v_team_a);
+  update public.notifications set created_at = now() - interval '5 days'
+   where notification_id = v_n;
 end$$;
 
 commit;
 
 -- Verify -----------------------------------------------------------------------
-select type::text,
+select type_key,
        count(*) filter (where not is_read) as unread,
        count(*) filter (where     is_read) as read,
        count(*)                            as total
   from public.notifications
  where recipient_id = '9686500d-5c94-49ff-b4da-c3727d609d46'
- group by type
+ group by type_key
  order by 1;

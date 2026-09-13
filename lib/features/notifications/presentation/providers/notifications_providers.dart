@@ -1,4 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../../../core/error/failures.dart';
+
+import '../../../auth/presentation/providers/auth_providers.dart';
 
 import '../../data/datasources/notifications_datasource_providers.dart';
 import '../../data/repositories/notifications_repository_impl.dart';
@@ -18,17 +21,28 @@ NotificationsRepository notificationsRepository(Ref ref) =>
 /// badge and the inbox. keepAlive so the broadcast channel stays subscribed
 /// across route changes.
 @Riverpod(keepAlive: true)
-Stream<List<AppNotification>> liveNotifications(Ref ref) =>
-    ref.watch(notificationsRepositoryProvider).watchMine();
+Stream<NotificationFeed> liveNotifications(Ref ref) {
+  final user = ref.watch(currentUserStreamProvider).value;
+  if (user == null) return Stream.value(const NotificationFeed());
+  return ref.watch(notificationsRepositoryProvider).watchMine();
+}
 
 /// Tier-grouped view-model derived from [liveNotifications].
 @Riverpod(keepAlive: true)
 NotificationsView notificationsView(Ref ref) {
-  final list = ref.watch(liveNotificationsProvider).value ?? const [];
-  return NotificationsView.from(list);
+  final feed =
+      ref.watch(liveNotificationsProvider).value ?? const NotificationFeed();
+  return NotificationsView.from(feed.items, unreadCount: feed.unreadCount);
 }
 
 /// Unread count — the value the bell badge renders. Cheap derived view.
 @Riverpod(keepAlive: true)
 int unreadNotificationsCount(Ref ref) =>
     ref.watch(notificationsViewProvider).unreadCount;
+
+@riverpod
+Future<List<NotificationSetting>> notificationSettings(Ref ref) async {
+  ref.watch(currentUserStreamProvider);
+  final result = await ref.watch(notificationsRepositoryProvider).settings();
+  return result.fold((f) => throw FailureWrapper(f), (settings) => settings);
+}

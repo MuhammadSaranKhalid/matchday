@@ -11,6 +11,48 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   final NotificationsRemoteDataSource _remote;
 
   @override
+  Future<Either<Failure, List<NotificationSetting>>> settings() async {
+    try {
+      final rows = await _remote.settings();
+      return Right(
+        rows
+            .map(
+              (r) => NotificationSetting(
+                category: r['category'] as String,
+                name: r['name'] as String,
+                description: r['description'] as String? ?? '',
+                inapp: r['inapp'] as bool,
+                push: r['push'] as bool,
+              ),
+            )
+            .toList(),
+      );
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> setPreference(
+    String category,
+    String channel,
+    bool enabled,
+  ) async {
+    if (!['inapp', 'push'].contains(channel)) {
+      return const Left(ValidationFailure('Unknown notification channel'));
+    }
+    try {
+      await _remote.setPreference(category, channel, enabled);
+      return const Right(unit);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  String? iconUrl(String? path) => _remote.iconUrl(path);
+
+  @override
   Future<Either<Failure, List<AppNotification>>> listMine() async {
     try {
       final dtos = await _remote.listMine();
@@ -25,12 +67,22 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   }
 
   @override
-  Stream<List<AppNotification>> watchMine() => _remote
+  Stream<NotificationFeed> watchMine() => _remote
       .watchMine()
-      .map((dtos) => dtos.map((d) => d.toEntity()).toList())
+      .map((feed) => feed.toEntity())
       .handleError(
         (Object e) => throw FailureWrapper(ServerFailure(e.toString())),
       );
+
+  @override
+  Future<Either<Failure, Unit>> loadMore() async {
+    try {
+      await _remote.loadMore();
+      return const Right(unit);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 
   @override
   Future<Either<Failure, Unit>> markRead(NotificationId id) async {

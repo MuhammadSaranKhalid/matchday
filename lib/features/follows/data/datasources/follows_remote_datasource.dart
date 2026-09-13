@@ -53,16 +53,19 @@ class FollowsRemoteDataSource {
   Future<FollowDto> follow(FollowTarget target) async {
     try {
       final uid = _requireUid();
-      final row = await _supabase
-          .from(_table)
-          .insert({
-            'follower_id': uid,
-            'target_type': target.targetTypeWire,
-            'target_id': target.targetId,
-          })
-          .select()
-          .single();
-      return FollowDto.fromJson(row);
+      final row =
+          await _supabase
+              .from(_table)
+              .insert({
+                'follower_id': uid,
+                'target_type': target.targetTypeWire,
+                'target_id': target.targetId,
+              })
+              .select()
+              .single();
+      return FollowDto.fromJson(
+        row,
+      ).copyWith(notificationsEnabled: await areNotificationsEnabled(target));
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -92,59 +95,49 @@ class FollowsRemoteDataSource {
   Future<bool> isFollowing(FollowTarget target) async {
     try {
       final uid = _requireUid();
-      final row = await _supabase
-          .from(_table)
-          .select('follow_id')
-          .eq('follower_id', uid)
-          .eq('target_type', target.targetTypeWire)
-          .eq('target_id', target.targetId)
-          .maybeSingle();
+      final row =
+          await _supabase
+              .from(_table)
+              .select('follow_id')
+              .eq('follower_id', uid)
+              .eq('target_type', target.targetTypeWire)
+              .eq('target_id', target.targetId)
+              .maybeSingle();
       return row != null;
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
   }
 
-  /// Reads `notifications_enabled` for the caller's follow row. False when
-  /// the row does not exist — you cannot be notified about something you
-  /// don't follow.
+  /// The follow bell reads/writes the shared notification mute registry.
   Future<bool> areNotificationsEnabled(FollowTarget target) async {
-    try {
-      final uid = _requireUid();
-      final row = await _supabase
-          .from(_table)
-          .select('notifications_enabled')
-          .eq('follower_id', uid)
-          .eq('target_type', target.targetTypeWire)
-          .eq('target_id', target.targetId)
-          .maybeSingle();
-      return (row?['notifications_enabled'] as bool?) ?? false;
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    if (!await isFollowing(target)) return false;
+    final row =
+        await _supabase
+            .from('notification_mutes')
+            .select('muted_until')
+            .eq('user_id', _requireUid())
+            .eq('scope', target.targetTypeWire)
+            .eq('entity_id', target.targetId)
+            .maybeSingle();
+    if (row == null) return true;
+    final until = row['muted_until'] as String?;
+    return until != null && !DateTime.parse(until).isAfter(DateTime.now());
   }
 
-  /// Flips `notifications_enabled` on the caller's follow row.
-  ///
-  /// RLS (`follows_update_self`) scopes the update to the caller's own rows,
-  /// so the `follower_id` filter here is for row selection, not security.
-  /// Throws [NotFoundException] when there is no follow row to update.
   Future<void> setNotificationsEnabled(
     FollowTarget target, {
     required bool enabled,
   }) async {
     try {
-      final uid = _requireUid();
-      final rows = await _supabase
-          .from(_table)
-          .update({'notifications_enabled': enabled})
-          .eq('follower_id', uid)
-          .eq('target_type', target.targetTypeWire)
-          .eq('target_id', target.targetId)
-          .select('follow_id');
-      if (rows.isEmpty) {
-        throw NotFoundException('Follow this team to change notifications');
-      }
+      await _supabase.rpc<void>(
+        'set_follow_notifications',
+        params: {
+          'p_scope': target.targetTypeWire,
+          'p_entity_id': target.targetId,
+          'p_enabled': enabled,
+        },
+      );
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -184,9 +177,7 @@ class FollowsRemoteDataSource {
       );
       final rows = res is List ? res : (res is Map ? res['entries'] : null);
       if (rows is! List) {
-        throw ServerException(
-          'get_follow_list returned an unexpected payload',
-        );
+        throw ServerException('get_follow_list returned an unexpected payload');
       }
       return rows
           .map(
@@ -229,10 +220,7 @@ class FollowsRemoteDataSource {
           .eq('target_type', 'user')
           .eq('follower_id', userId);
 
-      return FollowCounts(
-        followers: followersCount,
-        following: followingCount,
-      );
+      return FollowCounts(followers: followersCount, following: followingCount);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

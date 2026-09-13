@@ -67,17 +67,14 @@ begin
 
   -- Tell the manager who applied, so the reason actually reaches someone.
   if v_registered_by is not null then
-    insert into public.notifications (recipient_id, type, payload)
-    values (
-      v_registered_by,
-      'tournament_post',
+    perform public.notify_one(
+      v_registered_by, 'tournament.registration.declined',
       jsonb_build_object(
         'tournament_id', v_tournament_id,
-        'team_id', v_team_id,
-        'route', '/tournaments/' || v_tournament_id::text,
-        'reason', 'registration_declined',
-        'message', nullif(btrim(coalesce(p_reason, '')), '')
-      )
+        'team_id',       v_team_id,
+        'message',       nullif(btrim(coalesce(p_reason, '')), '')
+      ),
+      v_uid, 'tournament', v_tournament_id
     );
   end if;
 end;

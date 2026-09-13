@@ -6,6 +6,14 @@ import '../entities/app_notification.dart';
 /// `user:<user_id>:notifications` broadcast channel; writes hit RLS-scoped
 /// tables directly (no RPCs needed).
 abstract class NotificationsRepository {
+  String? iconUrl(String? path);
+  Future<Either<Failure, List<NotificationSetting>>> settings();
+  Future<Either<Failure, Unit>> setPreference(
+    String category,
+    String channel,
+    bool enabled,
+  );
+
   /// One-shot list of the signed-in user's notifications, newest first.
   Future<Either<Failure, List<AppNotification>>> listMine();
 
@@ -13,7 +21,9 @@ abstract class NotificationsRepository {
   /// `user:<id>:notifications` broadcast channel and emits the full list
   /// after each insert/update, newest first. Initial hydration via a
   /// one-shot SELECT.
-  Stream<List<AppNotification>> watchMine();
+  Stream<NotificationFeed> watchMine();
+
+  Future<Either<Failure, Unit>> loadMore();
 
   /// Direct UPDATE on the notifications row (RLS scopes to recipient_id).
   Future<Either<Failure, Unit>> markRead(NotificationId id);

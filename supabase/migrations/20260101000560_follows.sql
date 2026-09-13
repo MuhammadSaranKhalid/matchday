@@ -31,7 +31,6 @@ create table public.follows (
   target_type            public.follow_target_type not null,
   target_id              uuid not null,
   status                 public.follow_status not null default 'active',
-  notifications_enabled  boolean not null default true,
   created_at             timestamptz not null default now(),
 
   unique (follower_id, target_type, target_id),
@@ -82,31 +81,13 @@ create trigger tournaments_cleanup_follows
   for each row execute function public.cleanup_follows_on_entity_delete();
 
 -- -----------------------------------------------------------------------------
--- notify_on_follow — only user→user follows produce a notification.
+-- NOTIFICATION TRIGGER MOVED → 20260101000620_notification_triggers.sql
+--
+-- notify_on_follow now calls public.notify() (0570), which is declared
+-- AFTER this file. A plpgsql body referencing a not-yet-created function
+-- compiles but fails at runtime (§12.0), so the trigger follows its dependency
+-- — the same remedy the teams UPDATE policies got when they moved to 0210.
 -- -----------------------------------------------------------------------------
-create or replace function public.notify_on_follow()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-begin
-  if new.target_type <> 'user' then
-    return new;
-  end if;
-  insert into public.notifications (recipient_id, type, payload)
-  values (
-    new.target_id,
-    'follow',
-    jsonb_build_object('actor_id', new.follower_id)
-  );
-  return new;
-end;
-$$;
-
-create trigger follows_notify
-  after insert on public.follows
-  for each row execute function public.notify_on_follow();
 
 -- -----------------------------------------------------------------------------
 -- RLS — public read (follower lists are visible); writes only by the

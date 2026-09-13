@@ -1,0 +1,73 @@
+flowchart LR
+  grounds["grounds"]
+  match_challenges["match_challenges"]
+  match_deliveries["match_deliveries"]
+  match_innings["match_innings"]
+  match_innings_state["match_innings_state"]
+  match_officials["match_officials"]
+  match_players["match_players"]
+  match_pool_applications["match_pool_applications"]
+  match_result_history["match_result_history"]
+  match_scorer_leases["match_scorer_leases"]
+  match_teams["match_teams"]
+  match_wickets["match_wickets"]
+  matches["matches"]
+  profiles["profiles"]
+  teams["teams"]
+  tournaments["tournaments"]
+  unclaimed_players["unclaimed_players"]
+  matches -->|"created_by"| profiles
+  matches -->|"ground_id"| grounds
+  matches -->|"openers_submitted_by"| profiles
+  matches -->|"player_of_the_match_id"| match_players
+  matches -->|"prev_match_a_id"| matches
+  matches -->|"prev_match_b_id"| matches
+  matches -->|"team_a_captain"| profiles
+  matches -->|"team_a_id"| teams
+  matches -->|"team_b_captain"| profiles
+  matches -->|"team_b_id"| teams
+  matches -->|"toss_won_by"| teams
+  matches -->|"tournament_id"| tournaments
+  matches -->|"winner_id"| teams
+  match_teams -->|"captain_player_id"| match_players
+  match_teams -->|"keeper_player_id"| match_players
+  match_teams -->|"match_id"| matches
+  match_teams -->|"team_id"| teams
+  match_players -->|"match_id"| matches
+  match_players -->|"unclaimed_id"| unclaimed_players
+  match_players -->|"user_id"| profiles
+  match_innings -->|"match_id"| matches
+  match_innings_state -->|"bowler_id"| match_players
+  match_innings_state -->|"innings_id"| match_innings
+  match_innings_state -->|"match_id"| matches
+  match_innings_state -->|"non_striker_id"| match_players
+  match_innings_state -->|"innings_id, match_id, innings_number"| match_innings
+  match_innings_state -->|"striker_id"| match_players
+  match_deliveries -->|"bowler_id"| match_players
+  match_deliveries -->|"fielder_id"| match_players
+  match_deliveries -->|"innings_id"| match_innings
+  match_deliveries -->|"match_id"| matches
+  match_deliveries -->|"non_striker_id"| match_players
+  match_deliveries -->|"recorded_by"| profiles
+  match_deliveries -->|"striker_id"| match_players
+  match_wickets -->|"assisted_fielder_id"| match_players
+  match_wickets -->|"credited_bowler_id"| match_players
+  match_wickets -->|"delivery_id"| match_deliveries
+  match_wickets -->|"innings_id"| match_innings
+  match_wickets -->|"player_out_id"| match_players
+  match_wickets -->|"primary_fielder_id"| match_players
+  match_officials -->|"assigned_by"| profiles
+  match_officials -->|"match_id"| matches
+  match_officials -->|"user_id"| profiles
+  match_scorer_leases -->|"active_scorer_id"| profiles
+  match_scorer_leases -->|"match_id"| matches
+  match_result_history -->|"match_id"| matches
+  match_result_history -->|"recorded_by"| profiles
+  match_challenges -->|"decided_by"| profiles
+  match_challenges -->|"from_team_id"| teams
+  match_challenges -->|"match_id"| matches
+  match_challenges -->|"requested_by"| profiles
+  match_challenges -->|"to_team_id"| teams
+  match_pool_applications -->|"applicant_team_id"| teams
+  match_pool_applications -->|"applicant_user_id"| profiles
+  match_pool_applications -->|"request_id"| match_challenges

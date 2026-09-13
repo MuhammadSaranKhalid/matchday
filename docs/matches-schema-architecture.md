@@ -1,3 +1,5 @@
+> **Historical design document.** Parts of this specification describe removed SQL scoring reducers and statistics tables. For the current implemented schema, migration rules and diagrams, start with the [database handbook](database/README.md). Do not use SQL examples here as the current migration contract.
+
 # matchday — Scalable & Robust Matches Schema Architecture
 
 > **Document Status:** Complete Architecture Specification  

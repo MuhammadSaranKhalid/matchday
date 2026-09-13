@@ -11,7 +11,7 @@ part 'follow_dto.g.dart';
 ///
 /// Column names from migration 0560:
 ///   follow_id, follower_id, target_type, target_id, status,
-///   notifications_enabled, created_at
+///   created_at. notificationsEnabled is enriched from notification_mutes.
 ///
 /// There is no `updated_at` on this table — follows are immutable once created
 /// (only deleted or muted). [status] and [notificationsEnabled] can change via

@@ -356,16 +356,18 @@ begin
   insert into public.match_officials (match_id, user_id, role, assigned_by)
   values (p_match_id, p_user_id, 'scorer', auth.uid());
 
-  insert into public.notifications (recipient_id, type, payload)
-  values (
-    p_user_id,
-    'match_starting',
+  -- Was sending 'match_starting' with reason='scorer_assigned' — a type whose
+  -- copy reads "Your match is starting now" being used to mean "you have been
+  -- made scorer". It has its own catalogue key now.
+  perform public.notify_one(
+    p_user_id, 'match.scorer.assigned',
     jsonb_build_object(
-      'match_id', p_match_id,
-      'tournament_id', v_match.tournament_id,
-      'route', '/matches/' || p_match_id::text,
-      'reason', 'scorer_assigned'
-    )
+      'match_id',         p_match_id,
+      'tournament_id',    v_match.tournament_id,
+      'team_id',          v_match.team_a_id,
+      'opponent_team_id', v_match.team_b_id
+    ),
+    auth.uid(), 'match', p_match_id
   );
 end;
 $$;
@@ -653,14 +655,12 @@ begin
            updated_at = now()
      where tournament_id = p_tournament_id;
 
-    insert into public.notifications (recipient_id, type, payload)
-    values (
-      p_user_id, 'tournament_post',
-      jsonb_build_object(
-        'tournament_id', p_tournament_id,
-        'route', '/tournaments/' || p_tournament_id::text || '/console',
-        'reason', 'coorganizer_added'
-      )
+    -- Was 'tournament_post' with reason='coorganizer_added': "an announcement
+    -- was posted" used to mean "you were given admin rights".
+    perform public.notify_one(
+      p_user_id, 'tournament.organizer.added',
+      jsonb_build_object('tournament_id', p_tournament_id),
+      auth.uid(), 'tournament', p_tournament_id
     );
   else
     update public.tournaments
@@ -736,22 +736,15 @@ begin
       from recipients r
       join public.profiles p on p.user_id = r.user_id
      where r.user_id is not null
-  ),
-  inserted as (
-    insert into public.notifications (recipient_id, type, payload)
-    select
-      d.user_id,
-      'tournament_post',
-      jsonb_build_object(
-        'tournament_id', p_tournament_id,
-        'route', '/tournaments/' || p_tournament_id::text,
-        'reason', 'announcement',
-        'message', p_message
-      )
-    from deduped d
-    returning 1
   )
-  select count(*) into v_count from inserted;
+  select count(*) into v_count
+    from public.notify(
+      array(select d.user_id from deduped d),
+      'tournament.post.published',
+      jsonb_build_object('tournament_id', p_tournament_id,
+                         'message',       p_message),
+      auth.uid(), 'tournament', p_tournament_id
+    );
 
   return coalesce(v_count, 0);
 end;

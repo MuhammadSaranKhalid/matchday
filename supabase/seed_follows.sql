@@ -58,13 +58,13 @@ begin
   --    The other 4 stay unfollowed so the Follow button has work to do.
   -- ─────────────────────────────────────────────────────────────────────
   insert into public.follows (follower_id, target_type, target_id, status,
-                              notifications_enabled, created_at)
+                              created_at)
   values
-    (v_me, 'team', v_karachi_knights,   'active', true,
+    (v_me, 'team', v_karachi_knights,   'active',
      now() - interval '14 days'),
-    (v_me, 'team', v_quetta_gladiators, 'active', true,
+    (v_me, 'team', v_quetta_gladiators, 'active',
      now() - interval '9 days'),
-    (v_me, 'team', v_rawalpindi_rams,   'active', false,  -- muted notifs
+    (v_me, 'team', v_rawalpindi_rams,   'active',  -- muted notifs
      now() - interval '3 days')
   on conflict (follower_id, target_type, target_id) do nothing;
 
@@ -78,10 +78,10 @@ begin
   --    actor); they trigger one notification on each teammate's side.
   -- ─────────────────────────────────────────────────────────────────────
   insert into public.follows (follower_id, target_type, target_id, status,
-                              notifications_enabled, created_at)
+                              created_at)
   values
-    (v_me, 'user', v_bilal,  'active', true,  now() - interval '21 days'),
-    (v_me, 'user', v_hassan, 'active', true,  now() - interval '12 days')
+    (v_me, 'user', v_bilal,  'active',  now() - interval '21 days'),
+    (v_me, 'user', v_hassan, 'active',  now() - interval '12 days')
   on conflict (follower_id, target_type, target_id) do nothing;
 
   -- ─────────────────────────────────────────────────────────────────────
@@ -91,18 +91,22 @@ begin
   --    NotificationType.follow case with real data.
   -- ─────────────────────────────────────────────────────────────────────
   insert into public.follows (follower_id, target_type, target_id, status,
-                              notifications_enabled, created_at)
+                              created_at)
   values
-    (v_bilal,  'user', v_me, 'active', true, now() - interval '18 days'),
-    (v_hassan, 'user', v_me, 'active', true, now() - interval '11 days'),
-    (v_adeel,  'user', v_me, 'active', true, now() - interval '4 days'),
+    (v_bilal,  'user', v_me, 'active', now() - interval '18 days'),
+    (v_hassan, 'user', v_me, 'active', now() - interval '11 days'),
+    (v_adeel,  'user', v_me, 'active', now() - interval '4 days'),
     -- Faraz follows you too but their muting choice is on: tests that
     -- notifications_enabled=false doesn't suppress the followed-on
     -- notification (the column is a follower-side push toggle for FUTURE
     -- pushes about the target's activity, not about the follow event
     -- itself).
-    (v_faraz,  'user', v_me, 'active', false, now() - interval '2 days')
+    (v_faraz,  'user', v_me, 'active', now() - interval '2 days')
   on conflict (follower_id, target_type, target_id) do nothing;
+
+  insert into public.notification_mutes(user_id, scope, entity_id)
+  values (v_me, 'team', v_rawalpindi_rams), (v_faraz, 'user', v_me)
+  on conflict do nothing;
 
   raise notice 'seed_follows.sql: % follow rows present for user',
     (select count(*) from public.follows where follower_id = v_me);

@@ -27,15 +27,27 @@
 -- layer (0800 chats → 0801 chat_members → 0802 messages) is in place.
 -- =============================================================================
 
--- Allow Realtime to run RLS on the messages table. Idempotent.
-do $$
-begin
-  alter table realtime.messages enable row level security;
-exception
-  when others then null;
-end $$;
-
-
+-- Supabase owns the Realtime schema; only authorization policies are managed here.
+--
+-- VERIFIED 2026-09-12, because the policies below are worthless if it is not
+-- true. This file used to `alter table realtime.messages enable row level
+-- security` itself. That was removed on the grounds that Supabase provisions
+-- it — and after a clean `supabase db reset`:
+--
+--   select relrowsecurity from pg_class
+--    where oid = 'realtime.messages'::regclass;   -- => t
+--
+-- RLS is on, so the policies below are enforced. Re-check this after any
+-- Supabase CLI/platform upgrade: `advisors.sql` CANNOT catch a regression here,
+-- because check 0013 only scans the `public` schema. If it ever comes back
+-- `f`, every broadcast authorization policy in this file is silently inert and
+-- the enable must be restored.
+--
+-- The `grant insert on realtime.messages to postgres, service_role` was removed
+-- in the same change. Nothing in the repo inserts into that table directly —
+-- tournament_standings (0320), notifications (0500), comments (0520) and
+-- match_realtime_and_security (0820) all publish via `realtime.send()`, which
+-- is SECURITY DEFINER and owned by the Realtime role.
 
 -- -----------------------------------------------------------------------------
 -- _try_topic_uuid — extract a UUID at the given split position without
@@ -143,7 +155,7 @@ create policy "realtime_send_typing_self"
 -- Grants. Trigger functions run as SECURITY DEFINER (postgres role) so they
 -- bypass RLS; service_role is granted as well for Edge Function publishes.
 -- -----------------------------------------------------------------------------
-grant insert on realtime.messages to postgres, service_role;
+-- Server broadcasts use realtime.send(); no grants on managed Realtime tables.
 
 -- -----------------------------------------------------------------------------
 -- Supabase Realtime Table Publications

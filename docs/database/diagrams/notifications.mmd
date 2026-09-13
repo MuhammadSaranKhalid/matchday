@@ -1,0 +1,20 @@
+flowchart LR
+  device_tokens["device_tokens"]
+  notification_categories["notification_categories"]
+  notification_deliveries["notification_deliveries"]
+  notification_icons["notification_icons"]
+  notification_mutes["notification_mutes"]
+  notification_preferences["notification_preferences"]
+  notification_types["notification_types"]
+  notifications["notifications"]
+  profiles["profiles"]
+  notification_types -->|"category"| notification_categories
+  notification_types -->|"icon"| notification_icons
+  notifications -->|"actor_id"| profiles
+  notifications -->|"recipient_id"| profiles
+  notifications -->|"type_key"| notification_types
+  notification_preferences -->|"category"| notification_categories
+  notification_preferences -->|"user_id"| profiles
+  notification_mutes -->|"user_id"| profiles
+  notification_deliveries -->|"notification_id"| notifications
+  device_tokens -->|"user_id"| profiles

@@ -1404,6 +1404,8 @@ After ANY change to a `@riverpod`, `@freezed`, `@JsonSerializable`, or drift tab
 
 ## 12. Supabase Schema Conventions
 
+Current schema reference, architecture diagrams and maintenance workflow: [Database handbook](docs/database/README.md). Refresh its generated snapshot after migration changes.
+
 ### 12.0 Migration layout (restructured 2026-09-11)
 
 **This project is pre-production. Migrations are EDITED AT THE SOURCE, not patched.**
@@ -1592,9 +1594,38 @@ The `todos` reference feature and all general offline-first wiring were removed 
 | Controller calling repo directly with value-object validation inlined | `lib/features/onboarding/presentation/controllers/onboarding_controller.dart` (`submit`), `lib/features/teams/presentation/controllers/add_unclaimed_player_controller.dart` (`submit`) |
 | Wizard draft persistence | `lib/core/database/wizard_draft_store.dart` + `lib/core/database/tables.dart` |
 | Pure-domain algorithm shared by a preview and a write (no I/O, one implementation, property-tested) | `lib/features/tournaments/domain/draw/draw_builder.dart` + `test/features/tournaments/domain/draw/draw_builder_test.dart` |
+| **Notifications — the catalogue + engine** | `docs/notifications-design.md` (the contract), `supabase/migrations/20260101000491_notification_types.sql` (the catalogue), `supabase/migrations/20260101000570_notification_engine.sql` (`notify()` + audience resolvers), `supabase/migrations/20260101000620_notification_triggers.sql` (every producer) |
 | **Authorization — team roles and permissions** | `docs/team-roles-design.md` (the contract), `supabase/migrations/20260101000211_team_member_roles.sql` (assignments), `supabase/migrations/20260101000212_team_authorization.sql` (predicates + RPCs), `lib/features/teams/domain/entities/team_relationship.dart` (the client mirror) |
 | **Local-first write path (exemption 2 — do not copy without agreement)** | `lib/features/matches/data/datasources/matches_local_datasource.dart` (WAL + outbox), `lib/features/matches/presentation/controllers/scoring_controller.dart` (apply-locally-then-drain), `docs/offline-scoring-design.md` (rationale) |
 ---
+
+## 14c. Notifications — catalogue and queued delivery (2026-09-12)
+
+Read `docs/notifications-design.md` before modifying notifications. Types are
+rows, copy is rendered by `notify()`, and Flutter/FCM must never introduce an
+exhaustive type-to-copy switch. Type-specific controls may enhance the base row.
+
+The source schema snapshots icon Storage path, tone and tier. This preserves
+historical presentation; custom Realtime payloads can join data, so copying is
+not a Realtime limitation. Tabler SVGs are pinned/versioned in notification_icons
+and uploaded using `scripts/upload_notification_icons.py`; only a bundled
+fallback and flutter_svg's memory cache are used, not a persistent inbox cache.
+This extends the existing post-media Storage pattern to admin-owned artwork.
+
+The inbox subscribes before fetching, reconciles on signals/reconnect, pages by
+(created_at, notification_id), and counts unread rows independently of pages.
+Settings and the follow bell share notification_preferences/notification_mutes.
+
+pgmq owns delivery leases and retries. notification_deliveries records actual
+per-device/per-revision outcomes. Never mark sent before FCM accepts; never
+promise exactly-once delivery across FCM and Postgres. The worker's dedicated
+secret, Vault cron wake, tests and rollout prerequisites are documented in the
+design file. There is no legacy per-row HTTP delivery trigger in the source.
+
+**The hosted database was still on the legacy schema during this review.**
+Canonical migration edits do not constitute an in-place hosted upgrade. Do not
+reset populated databases or remove old-client fields without a coordinated,
+data-preserving rollout.
 
 ## 14b. Team authorization — the engine (2026-09-11)
 
@@ -1688,7 +1719,7 @@ Push is wired end-to-end as of 2026-06-06. Firebase project: `matchday-44ed4`. A
 - `features/notifications/.../push_registrar.dart` — the **registrar**. On every sign-in, requests the FCM token from the service and upserts it into the `device_tokens` Supabase table. On sign-out the token row is deleted.
 - `flutter_local_notifications` displays foreground pushes as heads-up notifications (the OS auto-shows background/killed pushes).
 
-**Backend:** the `device_tokens` table + a `send-push` edge function are already deployed. Notifications (match events, etc.) call `send-push` server-side with the target `user_id`; the edge function looks up that user's tokens and dispatches via FCM.
+**Backend source:** `notify()` enqueues per-device pgmq jobs; the scheduled `send-push` worker consumes them. See §14c for the distinction between source implementation and hosted deployment.
 
 **Tap handling:** Push payloads include a `route` field. `PushMessagingService` listens for tap events and forwards the route to the router; the router validates and navigates. Don't navigate from the service directly — go through go_router so the auth-redirect logic still applies.
 

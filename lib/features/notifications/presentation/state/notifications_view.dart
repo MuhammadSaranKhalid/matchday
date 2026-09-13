@@ -15,10 +15,10 @@ class NotificationsView {
   });
 
   const NotificationsView.empty()
-      : now = const [],
-        week = const [],
-        fyi = const [],
-        unreadCount = 0;
+    : now = const [],
+      week = const [],
+      fyi = const [],
+      unreadCount = 0;
 
   final List<AppNotification> now;
   final List<AppNotification> week;
@@ -28,7 +28,10 @@ class NotificationsView {
   bool get isEmpty => now.isEmpty && week.isEmpty && fyi.isEmpty;
   int get total => now.length + week.length + fyi.length;
 
-  factory NotificationsView.from(List<AppNotification> all) {
+  factory NotificationsView.from(
+    List<AppNotification> all, {
+    int? unreadCount,
+  }) {
     final now = <AppNotification>[];
     final week = <AppNotification>[];
     final fyi = <AppNotification>[];
@@ -48,7 +51,7 @@ class NotificationsView {
       now: now,
       week: week,
       fyi: fyi,
-      unreadCount: unread,
+      unreadCount: unreadCount ?? unread,
     );
   }
 }

@@ -24,7 +24,7 @@ abstract class FollowsRepository {
 
   /// Whether the signed-in user wants notifications about [target].
   ///
-  /// Backed by `follows.notifications_enabled`, so it is only meaningful for
+  /// Backed by `notification_mutes`, so it is only meaningful for
   /// a target the user actually follows; returns false when there is no row.
   Future<Either<Failure, bool>> areNotificationsEnabled(FollowTarget target);
 

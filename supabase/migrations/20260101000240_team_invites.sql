@@ -132,34 +132,13 @@ revoke all on function public.accept_team_invite(uuid) from public;
 grant execute on function public.accept_team_invite(uuid) to authenticated;
 
 -- -----------------------------------------------------------------------------
--- notify_on_team_invite — fan out a 'team_invitation' notification to the
--- invitee whenever a new invite is inserted. Mirrors notify_on_follow in
--- 0560_follows.sql.
+-- NOTIFICATION TRIGGER MOVED → 20260101000620_notification_triggers.sql
+--
+-- notify_on_team_invite now calls public.notify() (0570), which is declared
+-- AFTER this file. A plpgsql body referencing a not-yet-created function
+-- compiles but fails at runtime (§12.0), so the trigger follows its dependency
+-- — the same remedy the teams UPDATE policies got when they moved to 0210.
 -- -----------------------------------------------------------------------------
-create or replace function public.notify_on_team_invite()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-begin
-  insert into public.notifications (recipient_id, type, payload)
-  values (
-    new.invitee_id,
-    'team_invitation',
-    jsonb_build_object(
-      'invite_id',  new.invite_id,
-      'team_id',    new.team_id,
-      'actor_id',   new.invited_by
-    )
-  );
-  return new;
-end;
-$$;
-
-create trigger team_invites_notify
-  after insert on public.team_invites
-  for each row execute function public.notify_on_team_invite();
 
 -- -----------------------------------------------------------------------------
 -- RLS:

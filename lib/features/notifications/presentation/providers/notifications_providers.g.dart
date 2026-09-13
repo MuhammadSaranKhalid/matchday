@@ -71,13 +71,11 @@ final liveNotificationsProvider = LiveNotificationsProvider._();
 final class LiveNotificationsProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<AppNotification>>,
-          List<AppNotification>,
-          Stream<List<AppNotification>>
+          AsyncValue<NotificationFeed>,
+          NotificationFeed,
+          Stream<NotificationFeed>
         >
-    with
-        $FutureModifier<List<AppNotification>>,
-        $StreamProvider<List<AppNotification>> {
+    with $FutureModifier<NotificationFeed>, $StreamProvider<NotificationFeed> {
   /// Live notifications stream — the single source of truth driving the bell
   /// badge and the inbox. keepAlive so the broadcast channel stays subscribed
   /// across route changes.
@@ -97,17 +95,17 @@ final class LiveNotificationsProvider
 
   @$internal
   @override
-  $StreamProviderElement<List<AppNotification>> $createElement(
+  $StreamProviderElement<NotificationFeed> $createElement(
     $ProviderPointer pointer,
   ) => $StreamProviderElement(pointer);
 
   @override
-  Stream<List<AppNotification>> create(Ref ref) {
+  Stream<NotificationFeed> create(Ref ref) {
     return liveNotifications(ref);
   }
 }
 
-String _$liveNotificationsHash() => r'31a61e266e14088440ce52df73dbc059dc4da769';
+String _$liveNotificationsHash() => r'561f81b3709e0951dac682bb9356119dac3c0dc8';
 
 /// Tier-grouped view-model derived from [liveNotifications].
 
@@ -159,7 +157,7 @@ final class NotificationsViewProvider
   }
 }
 
-String _$notificationsViewHash() => r'f41b09a504ee6fc7bbcb44381ecad9cd1825cece';
+String _$notificationsViewHash() => r'5233e0b6542160013de23e613901c131d58f416b';
 
 /// Unread count — the value the bell badge renders. Cheap derived view.
 
@@ -207,3 +205,45 @@ final class UnreadNotificationsCountProvider
 
 String _$unreadNotificationsCountHash() =>
     r'3cf391522f8fda6cf2c7d85ca966951f22c2aa6d';
+
+@ProviderFor(notificationSettings)
+final notificationSettingsProvider = NotificationSettingsProvider._();
+
+final class NotificationSettingsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<NotificationSetting>>,
+          List<NotificationSetting>,
+          FutureOr<List<NotificationSetting>>
+        >
+    with
+        $FutureModifier<List<NotificationSetting>>,
+        $FutureProvider<List<NotificationSetting>> {
+  NotificationSettingsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'notificationSettingsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$notificationSettingsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<NotificationSetting>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<NotificationSetting>> create(Ref ref) {
+    return notificationSettings(ref);
+  }
+}
+
+String _$notificationSettingsHash() =>
+    r'9735c566e756b4bfa0511b27aae70ace3f53ba78';

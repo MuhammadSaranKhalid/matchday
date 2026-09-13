@@ -128,31 +128,22 @@ begin
   )
   returning application_id into v_app_id;
 
-  -- Notify the host team managers
-  select team_name into v_applicant_name from public.teams where team_id = p_applicant_team_id;
-
-  insert into public.notifications (
-    recipient_id,
-    type,
-    payload
-  )
-  select distinct
-    recip.uid,
-    'match_request'::public.notification_type,
+  -- Notify the host team's staff. The applicant's name is no longer looked up
+  -- here: notify() resolves {{opponent_name}} from opponent_team_id, so the
+  -- sentence lives in the catalogue instead of being concatenated into the
+  -- payload as a 'message' key the client had to know to read.
+  perform public.notify(
+    array(select public.team_staff_ids(v_req.from_team_id)),
+    'match.application.received',
     jsonb_build_object(
       'request_id',        p_request_id,
       'from_team_id',      v_req.from_team_id,
       'applicant_team_id', p_applicant_team_id,
-      'actor_id',          auth.uid(),
-      'message',           coalesce(v_applicant_name, 'A team') || ' applied to play your open challenge.'
-    )
-  -- 2026-09-10: owner UNION managers[] collapsed into team_staff_ids(), which
-  -- reads the role ladder on team_members. Same recipients, one source.
-  from public.teams t,
-  lateral (select public.team_staff_ids(t.team_id) as uid) recip
-  where t.team_id = v_req.from_team_id
-    and recip.uid is not null
-    and recip.uid <> auth.uid();
+      'opponent_team_id',  p_applicant_team_id,
+      'actor_id',          auth.uid()
+    ),
+    auth.uid(), 'team', v_req.from_team_id
+  );
 
   return v_app_id;
 end;
@@ -310,32 +301,20 @@ begin
          to_team_id    = v_app.applicant_team_id
    where request_id = v_app.request_id;
 
-  -- Notifications
-  select team_name into v_host_name from public.teams where team_id = v_req.from_team_id;
-
-  -- Notify accepted team
-  insert into public.notifications (
-    recipient_id,
-    type,
-    payload
-  )
-  select distinct
-    recip.uid,
-    'match_request_decision'::public.notification_type,
+  -- Notify the accepted team's staff. Host name comes from the catalogue via
+  -- {{opponent_name}}, not from a concatenated 'message' payload key.
+  perform public.notify(
+    array(select public.team_staff_ids(v_app.applicant_team_id)),
+    'match.application.accepted',
     jsonb_build_object(
-      'request_id',   v_app.request_id,
-      'match_id',     v_match_id,
-      'decision',     'accepted',
-      'host_team_id', v_req.from_team_id,
-      'actor_id',     auth.uid(),
-      'message',      coalesce(v_host_name, 'Host team') || ' accepted your match application!'
-    )
-  -- 2026-09-10: owner UNION managers[] collapsed into team_staff_ids(), which
-  -- reads the role ladder on team_members. Same recipients, one source.
-  from public.teams t,
-  lateral (select public.team_staff_ids(t.team_id) as uid) recip
-  where t.team_id = v_app.applicant_team_id
-    and recip.uid is not null;
+      'request_id',       v_app.request_id,
+      'match_id',         v_match_id,
+      'host_team_id',     v_req.from_team_id,
+      'opponent_team_id', v_req.from_team_id,
+      'actor_id',         auth.uid()
+    ),
+    auth.uid(), 'team', v_app.applicant_team_id
+  );
 
   return v_match_id;
 end;

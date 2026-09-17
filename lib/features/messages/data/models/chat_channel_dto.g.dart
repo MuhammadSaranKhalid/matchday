@@ -8,7 +8,7 @@ part of 'chat_channel_dto.dart';
 
 _ChatChannelDto _$ChatChannelDtoFromJson(Map<String, dynamic> json) =>
     _ChatChannelDto(
-      channelId: json['chat_id'] as String,
+      channelId: json['channel_id'] as String,
       channelKey: json['channel_key'] as String,
       kind: json['kind'] as String,
       contextType: json['context_type'] as String,
@@ -49,7 +49,7 @@ _ChatChannelDto _$ChatChannelDtoFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$ChatChannelDtoToJson(_ChatChannelDto instance) =>
     <String, dynamic>{
-      'chat_id': instance.channelId,
+      'channel_id': instance.channelId,
       'channel_key': instance.channelKey,
       'kind': instance.kind,
       'context_type': instance.contextType,

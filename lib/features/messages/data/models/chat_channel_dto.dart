@@ -9,7 +9,7 @@ part 'chat_channel_dto.g.dart';
 @freezed
 abstract class ChatChannelDto with _$ChatChannelDto {
   const factory ChatChannelDto({
-    @JsonKey(name: 'chat_id') required String channelId,
+    @JsonKey(name: 'channel_id') required String channelId,
     @JsonKey(name: 'channel_key') required String channelKey,
     @JsonKey(name: 'kind') required String kind,
     @JsonKey(name: 'context_type') required String contextType,

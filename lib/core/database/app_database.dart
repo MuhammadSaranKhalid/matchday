@@ -29,19 +29,12 @@ class AppDatabase extends _$AppDatabase {
   /// An instance over a caller-supplied executor, for tests.
   AppDatabase.forTesting(super.executor);
 
-  /// Schema history:
-  /// - v1–v4: legacy offline-first tables.
-  /// - v5: online-only reset; keeps only `wizard_drafts`.
-  /// - v6: legacy messages read-through cache (`chats`, `messages`, `message_drafts`).
-  /// - v7: scoring write-ahead log (`scoring_ops`, `scoring_snapshots`).
-  /// - v8: match hydration cache.
-  /// - v9: `scoring_ops.refused_at`.
-  /// - v10: Target local-first chat architecture (Spec §7).
-  /// - v11: messageId primary key on LocalMessages.
-  /// - v12: LocalChannels authoritative inbox projection.
-  /// - v13: ChannelSyncStates.newestAppliedChangeSeq durable mutation cursor.
+  /// Canonical production baseline schema (v1).
+  ///
+  /// In pre-release development, all legacy incremental upgrade ladders
+  /// have been consolidated into the canonical v1 baseline schema.
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 1;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -51,122 +44,10 @@ class AppDatabase extends _$AppDatabase {
           await _createScoringIndexes(m);
         },
         onUpgrade: (m, from, to) async {
-          if (from < 5) {
-            await m.database.customStatement('DROP TABLE IF EXISTS todos');
-            await m.database.customStatement('DROP TABLE IF EXISTS pending_operations');
-            await m.database.customStatement('DROP TABLE IF EXISTS teams');
-            await m.database.customStatement('DROP TABLE IF EXISTS team_members');
-            await m.database.customStatement('DROP TABLE IF EXISTS unclaimed_players');
-            if (from < 3) {
-              await m.createTable(wizardDrafts);
-            }
-          }
-          if (from < 6) {
-            await m.database.customStatement('DROP TABLE IF EXISTS messages_chats');
-            await m.database.customStatement('DROP TABLE IF EXISTS messages_messages');
-            await m.database.customStatement('DROP TABLE IF EXISTS messages_drafts');
-            await m.database.customStatement('DROP TABLE IF EXISTS chats');
-            await m.database.customStatement('DROP TABLE IF EXISTS messages');
-            await m.database.customStatement('DROP TABLE IF EXISTS message_drafts');
-          }
-          if (from < 7) {
-            await m.database.customStatement('DROP TABLE IF EXISTS scoring_ops');
-            await m.database.customStatement('DROP TABLE IF EXISTS scoring_snapshots');
-            await m.createTable(scoringOps);
-            await m.createTable(scoringSnapshots);
-            await _createScoringIndexes(m);
-          }
-          if (from < 8) {
-            await m.database.customStatement('DROP TABLE IF EXISTS cached_matches');
-            await m.database.customStatement('DROP TABLE IF EXISTS cached_match_players');
-            await m.database.customStatement('DROP TABLE IF EXISTS cached_innings_states');
-            await m.createTable(cachedMatches);
-            await m.createTable(cachedMatchPlayers);
-            await m.createTable(cachedInningsStates);
-          }
-          if (from < 9) {
-            await m.addColumn(scoringOps, scoringOps.refusedAt);
-            await m.database.customStatement('DROP INDEX IF EXISTS scoring_ops_pending');
-            await _createScoringIndexes(m);
-          }
-          if (from < 10) {
-            await m.database.customStatement('DROP TABLE IF EXISTS chats');
-            await m.database.customStatement('DROP TABLE IF EXISTS messages');
-            await m.database.customStatement('DROP TABLE IF EXISTS message_drafts');
-
-            await m.createTable(localChannels);
-            await m.createTable(localChannelMembers);
-            await m.createTable(localMessages);
-            await m.createTable(localMessageAttachments);
-            await m.createTable(localMessageReactions);
-            await m.createTable(localMemberRestrictions);
-            await m.createTable(outboxOperations);
-            await m.createTable(channelSyncStates);
-            await m.createTable(channelDrafts);
-            await _createChatIndexes(m);
-          }
-          if (from < 11) {
-            await m.database.transaction(() async {
-              final tables = await m.database
-                  .customSelect("SELECT name FROM sqlite_master WHERE type='table'")
-                  .get();
-              final tableNames = tables.map((r) => r.read<String>('name')).toSet();
-
-              if (tableNames.contains('local_messages')) {
-                await m.database.customStatement('ALTER TABLE local_messages RENAME TO _legacy_local_messages;');
-              }
-              if (tableNames.contains('outbox_operations')) {
-                await m.database.customStatement('ALTER TABLE outbox_operations RENAME TO _legacy_outbox_operations;');
-              }
-
-              // Drop auxiliary non-outbox tables
-              await m.database.customStatement('DROP TABLE IF EXISTS local_channels;');
-              await m.database.customStatement('DROP TABLE IF EXISTS local_channel_members;');
-              await m.database.customStatement('DROP TABLE IF EXISTS local_message_attachments;');
-              await m.database.customStatement('DROP TABLE IF EXISTS local_message_reactions;');
-              await m.database.customStatement('DROP TABLE IF EXISTS local_member_restrictions;');
-              await m.database.customStatement('DROP TABLE IF EXISTS channel_sync_states;');
-              await m.database.customStatement('DROP TABLE IF EXISTS channel_drafts;');
-
-              // Recreate all tables with definitive schema
-              await m.createTable(localChannels);
-              await m.createTable(localChannelMembers);
-              await m.createTable(localMessages);
-              await m.createTable(localMessageAttachments);
-              await m.createTable(localMessageReactions);
-              await m.createTable(localMemberRestrictions);
-              await m.createTable(outboxOperations);
-              await m.createTable(channelSyncStates);
-              await m.createTable(channelDrafts);
-
-              // Restore preserved rows
-              if (tableNames.contains('local_messages')) {
-                await m.database.customStatement('''
-                  INSERT OR REPLACE INTO local_messages 
-                  SELECT * FROM _legacy_local_messages;
-                ''');
-                await m.database.customStatement('DROP TABLE IF EXISTS _legacy_local_messages;');
-              }
-              if (tableNames.contains('outbox_operations')) {
-                await m.database.customStatement('''
-                  INSERT OR REPLACE INTO outbox_operations 
-                  SELECT * FROM _legacy_outbox_operations;
-                ''');
-                await m.database.customStatement('DROP TABLE IF EXISTS _legacy_outbox_operations;');
-              }
-
-              await _createChatIndexes(m);
-            });
-          }
-          if (from < 12) {
-            await m.addColumn(localChannels, localChannels.lastMessagePreview);
-            await m.addColumn(localChannels, localChannels.lastMessageSenderId);
-            await m.addColumn(localChannels, localChannels.lastMessageFromMe);
-            await m.addColumn(localChannels, localChannels.unreadCount);
-          }
-          if (from < 13) {
-            await m.addColumn(channelSyncStates, channelSyncStates.newestAppliedChangeSeq);
-          }
+          // Pre-release development: ensure all tables and indexes exist cleanly
+          await m.createAll();
+          await _createChatIndexes(m);
+          await _createScoringIndexes(m);
         },
       );
 
@@ -238,7 +119,7 @@ class AppDatabase extends _$AppDatabase {
 }
 
 QueryExecutor _openConnection() => driftDatabase(
-      name: 'novex_clean_arch',
+      name: 'matchday_local',
       web: DriftWebOptions(
         sqlite3Wasm: Uri.parse('sqlite3.wasm'),
         driftWorker: Uri.parse('drift_worker.js'),

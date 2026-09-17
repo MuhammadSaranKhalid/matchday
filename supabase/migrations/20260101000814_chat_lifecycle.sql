@@ -970,6 +970,7 @@ begin
 end;
 $$;
 
+drop function if exists public.list_my_chats();
 create or replace function public.list_my_chats()
 returns table (
   channel_id                 uuid,

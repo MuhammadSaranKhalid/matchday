@@ -262,3 +262,253 @@ drop trigger if exists trg_sync_tournament_team_chat on public.tournament_teams;
 create trigger trg_sync_tournament_team_chat
   after insert or update on public.tournament_teams
   for each row execute function public.sync_tournament_team_chat();
+
+-- 6. Team Chat Channel Creation on Team Insertion
+create or replace function public.create_team_chat()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_channel_id uuid;
+  v_key text;
+begin
+  v_key := 'team:' || new.team_id::text || ':main';
+
+  insert into public.chat_channels (
+    channel_key,
+    kind,
+    context_type,
+    visibility,
+    purpose,
+    team_id,
+    created_by
+  )
+  values (
+    v_key,
+    'group',
+    'team',
+    'private',
+    'main',
+    new.team_id,
+    new.created_by
+  )
+  on conflict (team_id, purpose) where team_id is not null and archived_at is null
+  do nothing
+  returning channel_id into v_channel_id;
+
+  if v_channel_id is null then
+    select channel_id into v_channel_id
+      from public.chat_channels
+     where team_id = new.team_id and purpose = 'main';
+  end if;
+
+  if v_channel_id is not null then
+    insert into public.channel_policies (channel_id)
+    values (v_channel_id)
+    on conflict (channel_id) do nothing;
+
+    if new.created_by is not null then
+      insert into public.channel_members (
+        channel_id,
+        user_id,
+        role,
+        status,
+        joined_at
+      )
+      values (
+        v_channel_id,
+        new.created_by,
+        'owner',
+        'active',
+        clock_timestamp()
+      )
+      on conflict (channel_id, user_id) do nothing;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists teams_after_insert_create_chat on public.teams;
+create trigger teams_after_insert_create_chat
+  after insert on public.teams
+  for each row execute function public.create_team_chat();
+
+-- 7. Match Chat Channel Creation on Match Insertion
+create or replace function public.create_match_chat()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_channel_id uuid;
+  v_key text;
+begin
+  v_key := 'match:' || new.match_id::text || ':main';
+
+  insert into public.chat_channels (
+    channel_key,
+    kind,
+    context_type,
+    visibility,
+    purpose,
+    match_id,
+    created_by
+  )
+  values (
+    v_key,
+    'group',
+    'match',
+    'private',
+    'main',
+    new.match_id,
+    new.created_by
+  )
+  on conflict (match_id, purpose) where match_id is not null and archived_at is null
+  do nothing
+  returning channel_id into v_channel_id;
+
+  if v_channel_id is null then
+    select channel_id into v_channel_id
+      from public.chat_channels
+     where match_id = new.match_id and purpose = 'main';
+  end if;
+
+  if v_channel_id is not null then
+    insert into public.channel_policies (channel_id)
+    values (v_channel_id)
+    on conflict (channel_id) do nothing;
+
+    if new.created_by is not null then
+      insert into public.channel_members (
+        channel_id,
+        user_id,
+        role,
+        status,
+        joined_at
+      )
+      values (
+        v_channel_id,
+        new.created_by,
+        'owner',
+        'active',
+        clock_timestamp()
+      )
+      on conflict (channel_id, user_id) do nothing;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists matches_after_insert_create_chat on public.matches;
+create trigger matches_after_insert_create_chat
+  after insert on public.matches
+  for each row execute function public.create_match_chat();
+
+-- 8. Tournament Chat Channel Creation on Tournament Insertion
+create or replace function public.create_tournament_chat()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_channel_id uuid;
+  v_key text;
+begin
+  v_key := 'tournament:' || new.tournament_id::text || ':main';
+
+  insert into public.chat_channels (
+    channel_key,
+    kind,
+    context_type,
+    visibility,
+    purpose,
+    tournament_id,
+    created_by
+  )
+  values (
+    v_key,
+    'group',
+    'tournament',
+    'private',
+    'main',
+    new.tournament_id,
+    new.created_by
+  )
+  on conflict (tournament_id, purpose) where tournament_id is not null and archived_at is null
+  do nothing
+  returning channel_id into v_channel_id;
+
+  if v_channel_id is null then
+    select channel_id into v_channel_id
+      from public.chat_channels
+     where tournament_id = new.tournament_id and purpose = 'main';
+  end if;
+
+  if v_channel_id is not null then
+    insert into public.channel_policies (channel_id)
+    values (v_channel_id)
+    on conflict (channel_id) do nothing;
+
+    if new.created_by is not null then
+      insert into public.channel_members (
+        channel_id,
+        user_id,
+        role,
+        status,
+        joined_at
+      )
+      values (
+        v_channel_id,
+        new.created_by,
+        'owner',
+        'active',
+        clock_timestamp()
+      )
+      on conflict (channel_id, user_id) do nothing;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists tournaments_after_insert_create_chat on public.tournaments;
+create trigger tournaments_after_insert_create_chat
+  after insert on public.tournaments
+  for each row execute function public.create_tournament_chat();
+
+-- 9. Idempotent Backfill for Existing Domain Entities
+insert into public.chat_channels (
+  channel_key, kind, context_type, visibility, purpose, team_id, created_by
+)
+select
+  'team:' || t.team_id::text || ':main',
+  'group',
+  'team',
+  'private',
+  'main',
+  t.team_id,
+  t.created_by
+from public.teams t
+where not exists (
+  select 1 from public.chat_channels c
+  where c.team_id = t.team_id and c.purpose = 'main' and c.archived_at is null
+)
+on conflict do nothing;
+
+insert into public.channel_policies (channel_id)
+select c.channel_id
+from public.chat_channels c
+where c.purpose = 'main'
+  and not exists (
+    select 1 from public.channel_policies p where p.channel_id = c.channel_id
+  )
+on conflict do nothing;

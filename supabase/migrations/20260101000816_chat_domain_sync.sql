@@ -147,8 +147,14 @@ set search_path = public, auth, pg_temp
 as $$
 declare
   v_channel_id uuid;
+  v_user_id uuid;
   v_is_active boolean;
 begin
+  v_user_id := coalesce(new.user_id, old.user_id);
+  if v_user_id is null then
+    return coalesce(new, old);
+  end if;
+
   if tg_op = 'DELETE' then
     v_is_active := false;
   else
@@ -175,7 +181,7 @@ begin
       joined_at
     ) values (
       v_channel_id,
-      new.user_id,
+      v_user_id,
       'member',
       'active',
       clock_timestamp()
@@ -190,7 +196,7 @@ begin
            left_at = clock_timestamp(),
            updated_at = clock_timestamp()
      where channel_id = v_channel_id
-       and user_id = coalesce(new.user_id, old.user_id)
+       and user_id = v_user_id
        and status = 'active';
   end if;
 
@@ -234,6 +240,7 @@ begin
       from public.team_members
      where team_id = new.team_id
        and status = 'active'
+       and user_id is not null
   loop
     insert into public.channel_members (
       channel_id,

@@ -14,25 +14,31 @@
 -- 1. Exhaustive Function Execute Sweep
 DO $$
 DECLARE
-  r RECORD;
+  v_sigs text[];
+  v_sig text;
   n INT := 0;
 BEGIN
-  FOR r IN
-    SELECT p.oid::regprocedure AS sig
-      FROM pg_proc p
-      JOIN pg_namespace ns ON ns.oid = p.pronamespace
-     WHERE ns.nspname IN ('public', 'private')
-       AND p.prokind IN ('f', 'p')
-       AND NOT EXISTS (
-         SELECT 1
-           FROM pg_depend d
-          WHERE d.objid = p.oid
-            AND d.classid = 'pg_proc'::regclass
-            AND d.deptype = 'e'
-       )
-  LOOP
-    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM public, anon', r.sig);
-    n := n + 1;
+  SELECT coalesce(array_agg(p.oid::regprocedure::text), '{}')
+    INTO v_sigs
+    FROM pg_proc p
+    JOIN pg_namespace ns ON ns.oid = p.pronamespace
+   WHERE ns.nspname IN ('public', 'private')
+     AND p.prokind IN ('f', 'p')
+     AND NOT EXISTS (
+       SELECT 1
+         FROM pg_depend d
+        WHERE d.objid = p.oid
+          AND d.classid = 'pg_proc'::regclass
+          AND d.deptype = 'e'
+     );
+
+  FOREACH v_sig IN ARRAY v_sigs LOOP
+    BEGIN
+      EXECUTE format('REVOKE ALL ON FUNCTION %s FROM public, anon', v_sig);
+      n := n + 1;
+    EXCEPTION WHEN undefined_function THEN
+      NULL;
+    END;
   END LOOP;
   RAISE NOTICE 'Function grants hardened: % functions', n;
 END $$;

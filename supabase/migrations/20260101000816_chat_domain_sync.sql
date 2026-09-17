@@ -82,7 +82,7 @@ begin
   else
     v_match_id := new.match_id;
     v_user_id := new.user_id;
-    v_is_active := (new.status = 'confirmed' or new.status = 'active');
+    v_is_active := true;
   end if;
 
   if v_user_id is null or v_match_id is null then

@@ -439,6 +439,55 @@ class $LocalChannelsTable extends LocalChannels
         type: DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _lastMessagePreviewMeta =
+      const VerificationMeta('lastMessagePreview');
+  @override
+  late final GeneratedColumn<String> lastMessagePreview =
+      GeneratedColumn<String>(
+        'last_message_preview',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastMessageSenderIdMeta =
+      const VerificationMeta('lastMessageSenderId');
+  @override
+  late final GeneratedColumn<String> lastMessageSenderId =
+      GeneratedColumn<String>(
+        'last_message_sender_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastMessageFromMeMeta = const VerificationMeta(
+    'lastMessageFromMe',
+  );
+  @override
+  late final GeneratedColumn<bool> lastMessageFromMe = GeneratedColumn<bool>(
+    'last_message_from_me',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("last_message_from_me" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _unreadCountMeta = const VerificationMeta(
+    'unreadCount',
+  );
+  @override
+  late final GeneratedColumn<int> unreadCount = GeneratedColumn<int>(
+    'unread_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _serverUpdatedAtMeta = const VerificationMeta(
     'serverUpdatedAt',
   );
@@ -480,6 +529,10 @@ class $LocalChannelsTable extends LocalChannels
     clubId,
     lastMessageSeq,
     lastMessageAt,
+    lastMessagePreview,
+    lastMessageSenderId,
+    lastMessageFromMe,
+    unreadCount,
     serverUpdatedAt,
     localUpdatedAt,
   ];
@@ -608,6 +661,42 @@ class $LocalChannelsTable extends LocalChannels
         ),
       );
     }
+    if (data.containsKey('last_message_preview')) {
+      context.handle(
+        _lastMessagePreviewMeta,
+        lastMessagePreview.isAcceptableOrUnknown(
+          data['last_message_preview']!,
+          _lastMessagePreviewMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_message_sender_id')) {
+      context.handle(
+        _lastMessageSenderIdMeta,
+        lastMessageSenderId.isAcceptableOrUnknown(
+          data['last_message_sender_id']!,
+          _lastMessageSenderIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_message_from_me')) {
+      context.handle(
+        _lastMessageFromMeMeta,
+        lastMessageFromMe.isAcceptableOrUnknown(
+          data['last_message_from_me']!,
+          _lastMessageFromMeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('unread_count')) {
+      context.handle(
+        _unreadCountMeta,
+        unreadCount.isAcceptableOrUnknown(
+          data['unread_count']!,
+          _unreadCountMeta,
+        ),
+      );
+    }
     if (data.containsKey('server_updated_at')) {
       context.handle(
         _serverUpdatedAtMeta,
@@ -705,6 +794,24 @@ class $LocalChannelsTable extends LocalChannels
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_message_at'],
       ),
+      lastMessagePreview: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_message_preview'],
+      ),
+      lastMessageSenderId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_message_sender_id'],
+      ),
+      lastMessageFromMe:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}last_message_from_me'],
+          )!,
+      unreadCount:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}unread_count'],
+          )!,
       serverUpdatedAt:
           attachedDatabase.typeMapping.read(
             DriftSqlType.dateTime,
@@ -740,6 +847,10 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
   final String? clubId;
   final int? lastMessageSeq;
   final DateTime? lastMessageAt;
+  final String? lastMessagePreview;
+  final String? lastMessageSenderId;
+  final bool lastMessageFromMe;
+  final int unreadCount;
   final DateTime serverUpdatedAt;
   final DateTime localUpdatedAt;
   const LocalChannelRow({
@@ -758,6 +869,10 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
     this.clubId,
     this.lastMessageSeq,
     this.lastMessageAt,
+    this.lastMessagePreview,
+    this.lastMessageSenderId,
+    required this.lastMessageFromMe,
+    required this.unreadCount,
     required this.serverUpdatedAt,
     required this.localUpdatedAt,
   });
@@ -797,6 +912,14 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
     if (!nullToAbsent || lastMessageAt != null) {
       map['last_message_at'] = Variable<DateTime>(lastMessageAt);
     }
+    if (!nullToAbsent || lastMessagePreview != null) {
+      map['last_message_preview'] = Variable<String>(lastMessagePreview);
+    }
+    if (!nullToAbsent || lastMessageSenderId != null) {
+      map['last_message_sender_id'] = Variable<String>(lastMessageSenderId);
+    }
+    map['last_message_from_me'] = Variable<bool>(lastMessageFromMe);
+    map['unread_count'] = Variable<int>(unreadCount);
     map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt);
     map['local_updated_at'] = Variable<DateTime>(localUpdatedAt);
     return map;
@@ -840,6 +963,16 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
           lastMessageAt == null && nullToAbsent
               ? const Value.absent()
               : Value(lastMessageAt),
+      lastMessagePreview:
+          lastMessagePreview == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastMessagePreview),
+      lastMessageSenderId:
+          lastMessageSenderId == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastMessageSenderId),
+      lastMessageFromMe: Value(lastMessageFromMe),
+      unreadCount: Value(unreadCount),
       serverUpdatedAt: Value(serverUpdatedAt),
       localUpdatedAt: Value(localUpdatedAt),
     );
@@ -866,6 +999,14 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
       clubId: serializer.fromJson<String?>(json['clubId']),
       lastMessageSeq: serializer.fromJson<int?>(json['lastMessageSeq']),
       lastMessageAt: serializer.fromJson<DateTime?>(json['lastMessageAt']),
+      lastMessagePreview: serializer.fromJson<String?>(
+        json['lastMessagePreview'],
+      ),
+      lastMessageSenderId: serializer.fromJson<String?>(
+        json['lastMessageSenderId'],
+      ),
+      lastMessageFromMe: serializer.fromJson<bool>(json['lastMessageFromMe']),
+      unreadCount: serializer.fromJson<int>(json['unreadCount']),
       serverUpdatedAt: serializer.fromJson<DateTime>(json['serverUpdatedAt']),
       localUpdatedAt: serializer.fromJson<DateTime>(json['localUpdatedAt']),
     );
@@ -889,6 +1030,10 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
       'clubId': serializer.toJson<String?>(clubId),
       'lastMessageSeq': serializer.toJson<int?>(lastMessageSeq),
       'lastMessageAt': serializer.toJson<DateTime?>(lastMessageAt),
+      'lastMessagePreview': serializer.toJson<String?>(lastMessagePreview),
+      'lastMessageSenderId': serializer.toJson<String?>(lastMessageSenderId),
+      'lastMessageFromMe': serializer.toJson<bool>(lastMessageFromMe),
+      'unreadCount': serializer.toJson<int>(unreadCount),
       'serverUpdatedAt': serializer.toJson<DateTime>(serverUpdatedAt),
       'localUpdatedAt': serializer.toJson<DateTime>(localUpdatedAt),
     };
@@ -910,6 +1055,10 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
     Value<String?> clubId = const Value.absent(),
     Value<int?> lastMessageSeq = const Value.absent(),
     Value<DateTime?> lastMessageAt = const Value.absent(),
+    Value<String?> lastMessagePreview = const Value.absent(),
+    Value<String?> lastMessageSenderId = const Value.absent(),
+    bool? lastMessageFromMe,
+    int? unreadCount,
     DateTime? serverUpdatedAt,
     DateTime? localUpdatedAt,
   }) => LocalChannelRow(
@@ -930,6 +1079,16 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
         lastMessageSeq.present ? lastMessageSeq.value : this.lastMessageSeq,
     lastMessageAt:
         lastMessageAt.present ? lastMessageAt.value : this.lastMessageAt,
+    lastMessagePreview:
+        lastMessagePreview.present
+            ? lastMessagePreview.value
+            : this.lastMessagePreview,
+    lastMessageSenderId:
+        lastMessageSenderId.present
+            ? lastMessageSenderId.value
+            : this.lastMessageSenderId,
+    lastMessageFromMe: lastMessageFromMe ?? this.lastMessageFromMe,
+    unreadCount: unreadCount ?? this.unreadCount,
     serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
     localUpdatedAt: localUpdatedAt ?? this.localUpdatedAt,
   );
@@ -963,6 +1122,20 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
           data.lastMessageAt.present
               ? data.lastMessageAt.value
               : this.lastMessageAt,
+      lastMessagePreview:
+          data.lastMessagePreview.present
+              ? data.lastMessagePreview.value
+              : this.lastMessagePreview,
+      lastMessageSenderId:
+          data.lastMessageSenderId.present
+              ? data.lastMessageSenderId.value
+              : this.lastMessageSenderId,
+      lastMessageFromMe:
+          data.lastMessageFromMe.present
+              ? data.lastMessageFromMe.value
+              : this.lastMessageFromMe,
+      unreadCount:
+          data.unreadCount.present ? data.unreadCount.value : this.unreadCount,
       serverUpdatedAt:
           data.serverUpdatedAt.present
               ? data.serverUpdatedAt.value
@@ -992,6 +1165,10 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
           ..write('clubId: $clubId, ')
           ..write('lastMessageSeq: $lastMessageSeq, ')
           ..write('lastMessageAt: $lastMessageAt, ')
+          ..write('lastMessagePreview: $lastMessagePreview, ')
+          ..write('lastMessageSenderId: $lastMessageSenderId, ')
+          ..write('lastMessageFromMe: $lastMessageFromMe, ')
+          ..write('unreadCount: $unreadCount, ')
           ..write('serverUpdatedAt: $serverUpdatedAt, ')
           ..write('localUpdatedAt: $localUpdatedAt')
           ..write(')'))
@@ -999,7 +1176,7 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     channelId,
     channelKey,
     kind,
@@ -1015,9 +1192,13 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
     clubId,
     lastMessageSeq,
     lastMessageAt,
+    lastMessagePreview,
+    lastMessageSenderId,
+    lastMessageFromMe,
+    unreadCount,
     serverUpdatedAt,
     localUpdatedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1037,6 +1218,10 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
           other.clubId == this.clubId &&
           other.lastMessageSeq == this.lastMessageSeq &&
           other.lastMessageAt == this.lastMessageAt &&
+          other.lastMessagePreview == this.lastMessagePreview &&
+          other.lastMessageSenderId == this.lastMessageSenderId &&
+          other.lastMessageFromMe == this.lastMessageFromMe &&
+          other.unreadCount == this.unreadCount &&
           other.serverUpdatedAt == this.serverUpdatedAt &&
           other.localUpdatedAt == this.localUpdatedAt);
 }
@@ -1057,6 +1242,10 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
   final Value<String?> clubId;
   final Value<int?> lastMessageSeq;
   final Value<DateTime?> lastMessageAt;
+  final Value<String?> lastMessagePreview;
+  final Value<String?> lastMessageSenderId;
+  final Value<bool> lastMessageFromMe;
+  final Value<int> unreadCount;
   final Value<DateTime> serverUpdatedAt;
   final Value<DateTime> localUpdatedAt;
   final Value<int> rowid;
@@ -1076,6 +1265,10 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
     this.clubId = const Value.absent(),
     this.lastMessageSeq = const Value.absent(),
     this.lastMessageAt = const Value.absent(),
+    this.lastMessagePreview = const Value.absent(),
+    this.lastMessageSenderId = const Value.absent(),
+    this.lastMessageFromMe = const Value.absent(),
+    this.unreadCount = const Value.absent(),
     this.serverUpdatedAt = const Value.absent(),
     this.localUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1096,6 +1289,10 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
     this.clubId = const Value.absent(),
     this.lastMessageSeq = const Value.absent(),
     this.lastMessageAt = const Value.absent(),
+    this.lastMessagePreview = const Value.absent(),
+    this.lastMessageSenderId = const Value.absent(),
+    this.lastMessageFromMe = const Value.absent(),
+    this.unreadCount = const Value.absent(),
     required DateTime serverUpdatedAt,
     required DateTime localUpdatedAt,
     this.rowid = const Value.absent(),
@@ -1121,6 +1318,10 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
     Expression<String>? clubId,
     Expression<int>? lastMessageSeq,
     Expression<DateTime>? lastMessageAt,
+    Expression<String>? lastMessagePreview,
+    Expression<String>? lastMessageSenderId,
+    Expression<bool>? lastMessageFromMe,
+    Expression<int>? unreadCount,
     Expression<DateTime>? serverUpdatedAt,
     Expression<DateTime>? localUpdatedAt,
     Expression<int>? rowid,
@@ -1141,6 +1342,12 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
       if (clubId != null) 'club_id': clubId,
       if (lastMessageSeq != null) 'last_message_seq': lastMessageSeq,
       if (lastMessageAt != null) 'last_message_at': lastMessageAt,
+      if (lastMessagePreview != null)
+        'last_message_preview': lastMessagePreview,
+      if (lastMessageSenderId != null)
+        'last_message_sender_id': lastMessageSenderId,
+      if (lastMessageFromMe != null) 'last_message_from_me': lastMessageFromMe,
+      if (unreadCount != null) 'unread_count': unreadCount,
       if (serverUpdatedAt != null) 'server_updated_at': serverUpdatedAt,
       if (localUpdatedAt != null) 'local_updated_at': localUpdatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1163,6 +1370,10 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
     Value<String?>? clubId,
     Value<int?>? lastMessageSeq,
     Value<DateTime?>? lastMessageAt,
+    Value<String?>? lastMessagePreview,
+    Value<String?>? lastMessageSenderId,
+    Value<bool>? lastMessageFromMe,
+    Value<int>? unreadCount,
     Value<DateTime>? serverUpdatedAt,
     Value<DateTime>? localUpdatedAt,
     Value<int>? rowid,
@@ -1183,6 +1394,10 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
       clubId: clubId ?? this.clubId,
       lastMessageSeq: lastMessageSeq ?? this.lastMessageSeq,
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+      lastMessagePreview: lastMessagePreview ?? this.lastMessagePreview,
+      lastMessageSenderId: lastMessageSenderId ?? this.lastMessageSenderId,
+      lastMessageFromMe: lastMessageFromMe ?? this.lastMessageFromMe,
+      unreadCount: unreadCount ?? this.unreadCount,
       serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
       localUpdatedAt: localUpdatedAt ?? this.localUpdatedAt,
       rowid: rowid ?? this.rowid,
@@ -1237,6 +1452,20 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
     if (lastMessageAt.present) {
       map['last_message_at'] = Variable<DateTime>(lastMessageAt.value);
     }
+    if (lastMessagePreview.present) {
+      map['last_message_preview'] = Variable<String>(lastMessagePreview.value);
+    }
+    if (lastMessageSenderId.present) {
+      map['last_message_sender_id'] = Variable<String>(
+        lastMessageSenderId.value,
+      );
+    }
+    if (lastMessageFromMe.present) {
+      map['last_message_from_me'] = Variable<bool>(lastMessageFromMe.value);
+    }
+    if (unreadCount.present) {
+      map['unread_count'] = Variable<int>(unreadCount.value);
+    }
     if (serverUpdatedAt.present) {
       map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt.value);
     }
@@ -1267,6 +1496,10 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
           ..write('clubId: $clubId, ')
           ..write('lastMessageSeq: $lastMessageSeq, ')
           ..write('lastMessageAt: $lastMessageAt, ')
+          ..write('lastMessagePreview: $lastMessagePreview, ')
+          ..write('lastMessageSenderId: $lastMessageSenderId, ')
+          ..write('lastMessageFromMe: $lastMessageFromMe, ')
+          ..write('unreadCount: $unreadCount, ')
           ..write('serverUpdatedAt: $serverUpdatedAt, ')
           ..write('localUpdatedAt: $localUpdatedAt, ')
           ..write('rowid: $rowid')
@@ -8989,6 +9222,10 @@ typedef $$LocalChannelsTableCreateCompanionBuilder =
       Value<String?> clubId,
       Value<int?> lastMessageSeq,
       Value<DateTime?> lastMessageAt,
+      Value<String?> lastMessagePreview,
+      Value<String?> lastMessageSenderId,
+      Value<bool> lastMessageFromMe,
+      Value<int> unreadCount,
       required DateTime serverUpdatedAt,
       required DateTime localUpdatedAt,
       Value<int> rowid,
@@ -9010,6 +9247,10 @@ typedef $$LocalChannelsTableUpdateCompanionBuilder =
       Value<String?> clubId,
       Value<int?> lastMessageSeq,
       Value<DateTime?> lastMessageAt,
+      Value<String?> lastMessagePreview,
+      Value<String?> lastMessageSenderId,
+      Value<bool> lastMessageFromMe,
+      Value<int> unreadCount,
       Value<DateTime> serverUpdatedAt,
       Value<DateTime> localUpdatedAt,
       Value<int> rowid,
@@ -9096,6 +9337,26 @@ class $$LocalChannelsTableFilterComposer
 
   ColumnFilters<DateTime> get lastMessageAt => $composableBuilder(
     column: $table.lastMessageAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastMessagePreview => $composableBuilder(
+    column: $table.lastMessagePreview,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastMessageSenderId => $composableBuilder(
+    column: $table.lastMessageSenderId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get lastMessageFromMe => $composableBuilder(
+    column: $table.lastMessageFromMe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get unreadCount => $composableBuilder(
+    column: $table.unreadCount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9194,6 +9455,26 @@ class $$LocalChannelsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get lastMessagePreview => $composableBuilder(
+    column: $table.lastMessagePreview,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastMessageSenderId => $composableBuilder(
+    column: $table.lastMessageSenderId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get lastMessageFromMe => $composableBuilder(
+    column: $table.lastMessageFromMe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get unreadCount => $composableBuilder(
+    column: $table.unreadCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get serverUpdatedAt => $composableBuilder(
     column: $table.serverUpdatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -9273,6 +9554,26 @@ class $$LocalChannelsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get lastMessagePreview => $composableBuilder(
+    column: $table.lastMessagePreview,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastMessageSenderId => $composableBuilder(
+    column: $table.lastMessageSenderId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get lastMessageFromMe => $composableBuilder(
+    column: $table.lastMessageFromMe,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get unreadCount => $composableBuilder(
+    column: $table.unreadCount,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get serverUpdatedAt => $composableBuilder(
     column: $table.serverUpdatedAt,
     builder: (column) => column,
@@ -9334,6 +9635,10 @@ class $$LocalChannelsTableTableManager
                 Value<String?> clubId = const Value.absent(),
                 Value<int?> lastMessageSeq = const Value.absent(),
                 Value<DateTime?> lastMessageAt = const Value.absent(),
+                Value<String?> lastMessagePreview = const Value.absent(),
+                Value<String?> lastMessageSenderId = const Value.absent(),
+                Value<bool> lastMessageFromMe = const Value.absent(),
+                Value<int> unreadCount = const Value.absent(),
                 Value<DateTime> serverUpdatedAt = const Value.absent(),
                 Value<DateTime> localUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9353,6 +9658,10 @@ class $$LocalChannelsTableTableManager
                 clubId: clubId,
                 lastMessageSeq: lastMessageSeq,
                 lastMessageAt: lastMessageAt,
+                lastMessagePreview: lastMessagePreview,
+                lastMessageSenderId: lastMessageSenderId,
+                lastMessageFromMe: lastMessageFromMe,
+                unreadCount: unreadCount,
                 serverUpdatedAt: serverUpdatedAt,
                 localUpdatedAt: localUpdatedAt,
                 rowid: rowid,
@@ -9374,6 +9683,10 @@ class $$LocalChannelsTableTableManager
                 Value<String?> clubId = const Value.absent(),
                 Value<int?> lastMessageSeq = const Value.absent(),
                 Value<DateTime?> lastMessageAt = const Value.absent(),
+                Value<String?> lastMessagePreview = const Value.absent(),
+                Value<String?> lastMessageSenderId = const Value.absent(),
+                Value<bool> lastMessageFromMe = const Value.absent(),
+                Value<int> unreadCount = const Value.absent(),
                 required DateTime serverUpdatedAt,
                 required DateTime localUpdatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -9393,6 +9706,10 @@ class $$LocalChannelsTableTableManager
                 clubId: clubId,
                 lastMessageSeq: lastMessageSeq,
                 lastMessageAt: lastMessageAt,
+                lastMessagePreview: lastMessagePreview,
+                lastMessageSenderId: lastMessageSenderId,
+                lastMessageFromMe: lastMessageFromMe,
+                unreadCount: unreadCount,
                 serverUpdatedAt: serverUpdatedAt,
                 localUpdatedAt: localUpdatedAt,
                 rowid: rowid,

@@ -9,6 +9,54 @@ part of 'messages_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
+@ProviderFor(chatLocalFirstEngine)
+final chatLocalFirstEngineProvider = ChatLocalFirstEngineProvider._();
+
+final class ChatLocalFirstEngineProvider
+    extends
+        $FunctionalProvider<
+          ChatLocalFirstEngine,
+          ChatLocalFirstEngine,
+          ChatLocalFirstEngine
+        >
+    with $Provider<ChatLocalFirstEngine> {
+  ChatLocalFirstEngineProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatLocalFirstEngineProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatLocalFirstEngineHash();
+
+  @$internal
+  @override
+  $ProviderElement<ChatLocalFirstEngine> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ChatLocalFirstEngine create(Ref ref) {
+    return chatLocalFirstEngine(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChatLocalFirstEngine value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChatLocalFirstEngine>(value),
+    );
+  }
+}
+
+String _$chatLocalFirstEngineHash() =>
+    r'2bf1e1c4cf475a010b99d99d63deaf668da760b5';
+
 @ProviderFor(chatRepository)
 final chatRepositoryProvider = ChatRepositoryProvider._();
 
@@ -48,7 +96,7 @@ final class ChatRepositoryProvider
   }
 }
 
-String _$chatRepositoryHash() => r'9d8c12ae843f3988f19dd16a6993f311662b43b9';
+String _$chatRepositoryHash() => r'67535e8f0ac9b7967dccecb24772d24cfbfc0061';
 
 @ProviderFor(messagesRepository)
 final messagesRepositoryProvider = MessagesRepositoryProvider._();

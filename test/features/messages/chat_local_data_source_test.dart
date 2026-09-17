@@ -22,7 +22,65 @@ void main() {
   });
 
   group('ChatLocalDataSource - Inbox Stream', () {
-    test('watchInbox emits channels with computed unread count and sorting', () async {
+    test('inbox projection works with ZERO LocalMessages (31A)', () async {
+      final now = DateTime.now().toUtc();
+
+      await dataSource.upsertChannelsFromDto([
+        ChatChannelDto(
+          channelId: 'ch-zero-msg',
+          channelKey: 'team:t1:main',
+          kind: 'group',
+          contextType: 'team',
+          title: 'Team Chat',
+          lastMessageBody: 'hello',
+          unreadCount: 4,
+          lastMessageSeq: 100,
+          createdAt: now.toIso8601String(),
+          updatedAt: now.toIso8601String(),
+        ),
+      ], currentUserId);
+
+      // Verify ZERO local messages exist in the database
+      final allMessages = await db.select(db.localMessages).get();
+      expect(allMessages, isEmpty);
+
+      // watchInbox must still project preview 'hello' and unread = 4
+      final inbox = await dataSource.watchInbox(currentUserId).first;
+      expect(inbox.length, 1);
+      expect(inbox.first.id, 'ch-zero-msg');
+      expect(inbox.first.lastMessagePreview, 'hello');
+      expect(inbox.first.unreadCount, 4);
+    });
+
+    test('global sparse sequence does NOT estimate lastReadSeq = lastMessageSeq - unreadCount (31B)', () async {
+      final now = DateTime.now().toUtc();
+
+      await dataSource.upsertChannelsFromDto([
+        ChatChannelDto(
+          channelId: 'ch-sparse',
+          channelKey: 'direct:1:2',
+          kind: 'direct',
+          contextType: 'none',
+          title: 'Sparse Channel',
+          lastMessageSeq: 970,
+          unreadCount: 2,
+          lastReadMessageSeq: 900, // Explicit member horizon from server
+          createdAt: now.toIso8601String(),
+          updatedAt: now.toIso8601String(),
+        ),
+      ], currentUserId);
+
+      // Check member horizon in DB
+      final member = await (db.select(db.localChannelMembers)
+            ..where((m) => m.channelId.equals('ch-sparse') & m.userId.equals(currentUserId)))
+          .getSingle();
+
+      // Must be exact server value (900), NOT calculated (970 - 2 = 968)
+      expect(member.lastReadMessageSeq, 900);
+      expect(member.lastReadMessageSeq, isNot(968));
+    });
+
+    test('watchInbox emits channels with authoritative unread count and sorting', () async {
       final now = DateTime.now().toUtc();
 
       // Upsert two channels via DTO
@@ -35,6 +93,9 @@ void main() {
           title: 'Direct Chat 1',
           dmOtherUserId: otherUserId,
           dmOtherUserName: 'Adeel',
+          lastMessageBody: 'Hello 3',
+          lastMessageSeq: 3,
+          unreadCount: 3,
           isAccepted: true,
           isPinned: false,
           createdAt: now.toIso8601String(),
@@ -53,37 +114,6 @@ void main() {
         ),
       ], currentUserId);
 
-      // Add messages to ch-1: 3 unread messages from otherUser
-      await dataSource.upsertMessagesFromDto([
-        ChatMessageDto(
-          messageId: 'm-1',
-          messageSeq: 1,
-          channelId: 'ch-1',
-          senderId: otherUserId,
-          body: 'Hello 1',
-          countsAsUnread: true,
-          createdAt: now.subtract(const Duration(minutes: 5)).toIso8601String(),
-        ),
-        ChatMessageDto(
-          messageId: 'm-2',
-          messageSeq: 2,
-          channelId: 'ch-1',
-          senderId: otherUserId,
-          body: 'Hello 2',
-          countsAsUnread: true,
-          createdAt: now.subtract(const Duration(minutes: 4)).toIso8601String(),
-        ),
-        ChatMessageDto(
-          messageId: 'm-3',
-          messageSeq: 3,
-          channelId: 'ch-1',
-          senderId: otherUserId,
-          body: 'Hello 3',
-          countsAsUnread: true,
-          createdAt: now.subtract(const Duration(minutes: 3)).toIso8601String(),
-        ),
-      ], currentUserId);
-
       final inbox = await dataSource.watchInbox(currentUserId).first;
 
       expect(inbox.length, 2);
@@ -96,13 +126,12 @@ void main() {
       expect(ch1.unreadCount, 3);
       expect(ch1.lastMessagePreview, 'Hello 3');
 
-      // Now update read horizon to seq 2
-      await dataSource.updateMemberHorizons('ch-1', currentUserId, readSeq: 2);
+      // Now update read horizon to seq 3 (fully read)
+      await dataSource.updateMemberHorizons('ch-1', currentUserId, readSeq: 3);
 
       final updatedInbox = await dataSource.watchInbox(currentUserId).first;
       final ch1Updated = updatedInbox.firstWhere((c) => c.id == 'ch-1');
-      // Only message seq 3 should be unread now
-      expect(ch1Updated.unreadCount, 1);
+      expect(ch1Updated.unreadCount, 0);
     });
   });
 

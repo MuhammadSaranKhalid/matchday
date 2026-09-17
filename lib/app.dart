@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/database/database_provider.dart';
 import 'core/theme/circk_theme.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
+import 'features/messages/presentation/providers/messages_providers.dart';
 import 'features/notifications/presentation/controllers/push_registrar.dart';
 import 'router/app_router.dart';
 
@@ -27,6 +28,9 @@ class MatchdayApp extends ConsumerWidget {
     // Activate the FCM token registrar for the session (registers on sign-in,
     // re-registers on token refresh, deep-links notification taps).
     ref.watch(pushRegistrarProvider);
+
+    // Activate the universal application-scoped chat local-first engine (Spec §8)
+    ref.watch(chatLocalFirstEngineProvider);
 
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(

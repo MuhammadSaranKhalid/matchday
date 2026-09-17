@@ -20,13 +20,19 @@ class RealtimeIngestor {
   final Map<String, StreamController<bool>> _typingControllers = {};
   final Map<String, Timer> _typingTimers = {};
   StreamSubscription<ably.Message>? _userInboxSubscription;
+  String? _subscribedUserId;
   VoidCallback? onInboxUpdated;
   void Function(String channelId, int throughSeq)? onMessageDelivered;
+  void Function(String channelId)? onTargetedCatchUpRequested;
 
   /// Subscribes to the user's private inbox channel `user:<userId>:chat`.
   void subscribeToUserInbox(String userId, {VoidCallback? onUpdated}) {
-    if (_userInboxSubscription != null) return;
-    onInboxUpdated = onUpdated;
+    if (_subscribedUserId == userId && _userInboxSubscription != null) return;
+    if (_subscribedUserId != null && _subscribedUserId != userId) {
+      unsubscribeFromUserInbox();
+    }
+    _subscribedUserId = userId;
+    if (onUpdated != null) onInboxUpdated = onUpdated;
 
     try {
       final channelName = 'user:$userId:chat';
@@ -42,10 +48,11 @@ class RealtimeIngestor {
               final channelId = (data['channel_id'] ?? innerData['channel_id']) as String?;
               final seq = (innerData['last_message_seq'] ?? data['last_message_seq']) as int?;
               final dateStr = (innerData['created_at'] ?? data['created_at']) as String?;
-              final messageId = (data['entity_id'] ?? innerData['message_id']) as String?;
               final senderId = (innerData['sender_id']) as String?;
               final senderName = (innerData['sender_display_name']) as String?;
               final preview = (innerData['body_preview'] ?? innerData['body']) as String?;
+              final unreadCount = (innerData['unread_count']) as int?;
+              final countsAsUnread = (innerData['counts_as_unread']) as bool?;
 
               if (channelId != null && seq != null) {
                 final createdAt = dateStr != null
@@ -56,10 +63,15 @@ class RealtimeIngestor {
                   lastMessageSeq: seq,
                   lastMessageAt: createdAt,
                   bodyPreview: preview,
-                  messageId: messageId,
                   senderId: senderId,
                   senderDisplayName: senderName,
+                  currentUserId: userId,
+                  unreadCount: unreadCount,
+                  countsAsUnread: countsAsUnread,
                 );
+
+                // Targeted catch-up for missing deltas (Spec §10, §11)
+                onTargetedCatchUpRequested?.call(channelId);
               }
             }
           } catch (e) {
@@ -73,6 +85,16 @@ class RealtimeIngestor {
       );
     } catch (e) {
       debugPrint('[RealtimeIngestor] Failed to subscribe to user inbox: $e');
+    }
+  }
+
+  /// Unsubscribes from the user inbox channel and releases Ably channel resource.
+  void unsubscribeFromUserInbox() {
+    _userInboxSubscription?.cancel();
+    _userInboxSubscription = null;
+    if (_subscribedUserId != null) {
+      _ablyService.releaseChannel('user:$_subscribedUserId:chat');
+      _subscribedUserId = null;
     }
   }
 
@@ -185,6 +207,11 @@ class RealtimeIngestor {
         case 'message.edited':
           final msgData = _extractMessagePayload(data);
           final dto = ChatMessageDto.fromJson(msgData);
+          final existing = await _local.getMessage(dto.messageId);
+          if (existing != null && existing.version >= dto.version) {
+            // Drop stale or out-of-order edit event (Spec §30)
+            break;
+          }
           await _local.upsertMessagesFromDto([dto], currentUserId);
           break;
 

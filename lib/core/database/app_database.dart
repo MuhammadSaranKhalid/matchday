@@ -38,8 +38,9 @@ class AppDatabase extends _$AppDatabase {
   /// - v9: `scoring_ops.refused_at`.
   /// - v10: Target local-first chat architecture (Spec §7).
   /// - v11: messageId primary key on LocalMessages.
+  /// - v12: LocalChannels authoritative inbox projection.
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -155,6 +156,12 @@ class AppDatabase extends _$AppDatabase {
 
               await _createChatIndexes(m);
             });
+          }
+          if (from < 12) {
+            await m.addColumn(localChannels, localChannels.lastMessagePreview);
+            await m.addColumn(localChannels, localChannels.lastMessageSenderId);
+            await m.addColumn(localChannels, localChannels.lastMessageFromMe);
+            await m.addColumn(localChannels, localChannels.unreadCount);
           }
         },
       );

@@ -35,6 +35,11 @@ _ChatChannelDto _$ChatChannelDtoFromJson(Map<String, dynamic> json) =>
       lastMessageSenderId: json['last_message_sender_id'] as String?,
       lastMessageFromMe: json['last_message_from_me'] as bool? ?? false,
       unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
+      lastReadMessageSeq: (json['last_read_message_seq'] as num?)?.toInt(),
+      lastReadAt: json['last_read_at'] as String?,
+      lastDeliveredMessageSeq:
+          (json['last_delivered_message_seq'] as num?)?.toInt(),
+      lastDeliveredAt: json['last_delivered_at'] as String?,
       createdAt: json['created_at'] as String,
       updatedAt: json['updated_at'] as String,
     );
@@ -68,6 +73,10 @@ Map<String, dynamic> _$ChatChannelDtoToJson(_ChatChannelDto instance) =>
       'last_message_sender_id': instance.lastMessageSenderId,
       'last_message_from_me': instance.lastMessageFromMe,
       'unread_count': instance.unreadCount,
+      'last_read_message_seq': instance.lastReadMessageSeq,
+      'last_read_at': instance.lastReadAt,
+      'last_delivered_message_seq': instance.lastDeliveredMessageSeq,
+      'last_delivered_at': instance.lastDeliveredAt,
       'created_at': instance.createdAt,
       'updated_at': instance.updatedAt,
     };

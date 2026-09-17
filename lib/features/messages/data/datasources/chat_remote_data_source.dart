@@ -168,11 +168,31 @@ class ChatRemoteDataSource {
     );
   }
 
-  /// Fetches delta messages where `message_seq > afterSeq` (for reconnection & gap filling).
+  /// Fetches a bounded recent window of messages for initial channel bootstrap (Spec §5).
+  Future<List<ChatMessageDto>> fetchRecentMessages(
+    String channelId, {
+    int limit = 50,
+  }) async {
+    final res = await _supabase
+        .from('messages')
+        .select(
+          '*, sender:profiles!messages_sender_id_fkey(display_name), attachments:message_attachments(*), reactions:message_reactions(*)',
+        )
+        .eq('channel_id', channelId)
+        .order('message_seq', ascending: false)
+        .limit(limit);
+
+    final list = _parseMessageDtos(res as List);
+    // Reverse to chronological order (asc)
+    return list.reversed.toList();
+  }
+
+  /// Fetches delta messages where `message_seq > afterSeq` with an explicit page limit (Spec §6).
   Future<List<ChatMessageDto>> fetchDeltaMessages(
     String channelId,
-    int afterSeq,
-  ) async {
+    int afterSeq, {
+    int limit = 100,
+  }) async {
     final res = await _supabase
         .from('messages')
         .select(
@@ -180,7 +200,8 @@ class ChatRemoteDataSource {
         )
         .eq('channel_id', channelId)
         .gt('message_seq', afterSeq)
-        .order('message_seq', ascending: true);
+        .order('message_seq', ascending: true)
+        .limit(limit);
 
     return _parseMessageDtos(res as List);
   }
@@ -206,23 +227,33 @@ class ChatRemoteDataSource {
     return list.reversed.toList();
   }
 
-  /// Uploads media attachment bytes to Supabase Storage and returns the public URL.
+  /// Uploads media attachment bytes to Supabase Storage private bucket and returns the storage path (Spec §26).
   Future<String> uploadMediaAttachment({
     required List<int> bytes,
     required String channelId,
+    String? messageId,
+    String? attachmentId,
     required String extension,
     required String mimeType,
   }) async {
-    final filename = '${_uuid.v4()}.$extension';
-    final path = 'channels/$channelId/$filename';
+    final msgId = messageId ?? _uuid.v4();
+    final attId = attachmentId ?? _uuid.v4();
+    final path = 'channels/$channelId/$msgId/$attId.$extension';
 
-    await _supabase.storage.from('avatars').uploadBinary(
+    await _supabase.storage.from('chat-media').uploadBinary(
           path,
           Uint8List.fromList(bytes),
           fileOptions: FileOptions(contentType: mimeType),
         );
 
-    return _supabase.storage.from('avatars').getPublicUrl(path);
+    return path;
+  }
+
+  /// Generates a temporary signed URL for authorized access to private chat media (Spec §26).
+  Future<String> getMediaSignedUrl(String storagePath, {int expiresInSeconds = 3600}) {
+    return _supabase.storage
+        .from('chat-media')
+        .createSignedUrl(storagePath, expiresInSeconds);
   }
 
   List<ChatMessageDto> _parseMessageDtos(List<dynamic> rows) {

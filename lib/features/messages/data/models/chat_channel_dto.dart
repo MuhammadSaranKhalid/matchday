@@ -36,6 +36,10 @@ abstract class ChatChannelDto with _$ChatChannelDto {
     @JsonKey(name: 'last_message_sender_id') String? lastMessageSenderId,
     @JsonKey(name: 'last_message_from_me') @Default(false) bool lastMessageFromMe,
     @JsonKey(name: 'unread_count') @Default(0) int unreadCount,
+    @JsonKey(name: 'last_read_message_seq') int? lastReadMessageSeq,
+    @JsonKey(name: 'last_read_at') String? lastReadAt,
+    @JsonKey(name: 'last_delivered_message_seq') int? lastDeliveredMessageSeq,
+    @JsonKey(name: 'last_delivered_at') String? lastDeliveredAt,
     @JsonKey(name: 'created_at') required String createdAt,
     @JsonKey(name: 'updated_at') required String updatedAt,
   }) = _ChatChannelDto;

@@ -19,6 +19,7 @@ import '../datasources/chat_local_data_source.dart';
 import '../datasources/chat_remote_data_source.dart';
 import '../sync/chat_sync_coordinator.dart';
 import '../sync/outbox_processor.dart';
+import '../sync/receipt_coordinator.dart';
 import '../sync/realtime_ingestor.dart';
 
 /// Production implementation of ChatRepository.
@@ -30,31 +31,22 @@ class ChatRepositoryImpl implements ChatRepository {
     required OutboxProcessor outboxProcessor,
     required RealtimeIngestor realtimeIngestor,
     required ChatSyncCoordinator syncCoordinator,
+    required ReceiptCoordinator receiptCoordinator,
     required SupabaseClient supabase,
   })  : _local = localDataSource,
         _remote = remoteDataSource,
         _outbox = outboxProcessor,
         _ingestor = realtimeIngestor,
         _syncCoordinator = syncCoordinator,
-        _supabase = supabase {
-    // Background outbox drain on startup
-    _outbox.notify();
-
-    // Subscribe to user inbox real-time events
-    final userId = _currentUserId;
-    if (userId != null) {
-      _ingestor.subscribeToUserInbox(
-        userId,
-        onUpdated: () => _syncCoordinator.syncInbox(userId),
-      );
-    }
-  }
+        _receiptCoordinator = receiptCoordinator,
+        _supabase = supabase;
 
   final ChatLocalDataSource _local;
   final ChatRemoteDataSource _remote;
   final OutboxProcessor _outbox;
   final RealtimeIngestor _ingestor;
   final ChatSyncCoordinator _syncCoordinator;
+  final ReceiptCoordinator _receiptCoordinator;
   final SupabaseClient _supabase;
 
   static const _uuid = Uuid();
@@ -68,10 +60,7 @@ class ChatRepositoryImpl implements ChatRepository {
       return Stream.value(const []);
     }
 
-    // Trigger asynchronous background sync
-    unawaited(_syncCoordinator.syncInbox(userId));
-
-    // Return reactive Drift stream (single read path)
+    // Return reactive Drift stream (single read path per Spec §9)
     return _local.watchInbox(userId);
   }
 
@@ -188,9 +177,13 @@ class ChatRepositoryImpl implements ChatRepository {
       final now = DateTime.now().toUtc();
       final mimeType = extension.toLowerCase() == 'png' ? 'image/png' : 'image/jpeg';
 
-      // 1. Cache image locally so it can be previewed immediately offline
-      final tempDir = await getTemporaryDirectory();
-      final localPath = '${tempDir.path}/chat_$attachmentId.$extension';
+      // 1. Cache image locally in durable app support directory (Spec §25)
+      final appSupportDir = await getApplicationSupportDirectory();
+      final outboxDir = io.Directory('${appSupportDir.path}/chat_outbox/$userId/$channelId');
+      if (!await outboxDir.exists()) {
+        await outboxDir.create(recursive: true);
+      }
+      final localPath = '${outboxDir.path}/$attachmentId.$extension';
       final localFile = io.File(localPath);
       await localFile.writeAsBytes(imageBytes);
 
@@ -288,14 +281,21 @@ class ChatRepositoryImpl implements ChatRepository {
     }
 
     try {
+      final existing = await _local.getMessage(messageId);
+      if (existing == null) {
+        return left(const NotFoundFailure('Message not found locally'));
+      }
+
+      final channelId = existing.channelId;
       final now = DateTime.now().toUtc();
       final opComp = OutboxOperationsCompanion.insert(
         operationId: _uuid.v4(),
-        channelId: '', // entity level
+        channelId: channelId,
         entityId: Value(messageId),
         operationType: 'edit_message',
         payloadJson: jsonEncode({
           'message_id': messageId,
+          'channel_id': channelId,
           'expected_version': expectedVersion,
           'body': newBody,
         }),
@@ -303,20 +303,36 @@ class ChatRepositoryImpl implements ChatRepository {
         updatedAt: now,
       );
 
-      await _local.enqueueOperation(opComp);
-      _outbox.notify();
-
-      final updated = await _remote.editChannelMessage(
+      final updatedRow = await _local.optimisticEditMessage(
         messageId: messageId,
-        expectedVersion: expectedVersion,
         newBody: newBody,
+        operation: opComp,
       );
 
-      return right(updated.toEntity());
-    } on PostgrestException catch (e) {
-      return left(ServerFailure(e.message));
+      _outbox.notify();
+
+      if (updatedRow == null) {
+        return left(const NotFoundFailure('Failed to update local message'));
+      }
+
+      final entity = ChatMessage(
+        id: updatedRow.messageId,
+        channelId: updatedRow.channelId,
+        senderId: updatedRow.senderId ?? userId,
+        senderDisplayName: updatedRow.senderDisplayName,
+        messageType: updatedRow.messageType,
+        body: updatedRow.body,
+        replyToId: updatedRow.replyToMessageId,
+        createdAt: updatedRow.createdAt ?? updatedRow.localCreatedAt,
+        editedAt: updatedRow.editedAt,
+        fromMe: updatedRow.senderId == userId,
+        syncStatus: updatedRow.syncStatus,
+        deliveryStatus: MessageDeliveryStatus.pending,
+      );
+
+      return right(entity);
     } catch (e) {
-      return left(ServerFailure('Failed to edit message: $e'));
+      return left(CacheFailure('Failed to edit message: $e'));
     }
   }
 
@@ -348,7 +364,7 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<Either<Failure, Unit>> retryMessage(String messageId) async {
     try {
-      await _local.updateMessageSyncStatus(messageId, syncStatus: 'pending');
+      await _local.retryMessage(messageId);
       _outbox.notify();
       return right(unit);
     } catch (e) {
@@ -373,26 +389,7 @@ class ChatRepositoryImpl implements ChatRepository {
         return right(unit);
       }
 
-      await _local.updateMemberHorizons(
-        channelId,
-        userId,
-        readSeq: seq,
-        deliveredSeq: seq,
-      );
-
-      final opRead = OutboxOperationsCompanion.insert(
-        operationId: _uuid.v4(),
-        channelId: channelId,
-        operationType: 'mark_read',
-        coalesceKey: Value('read:$channelId'),
-        payloadJson: jsonEncode({'through_seq': seq}),
-        createdAt: DateTime.now().toUtc(),
-        updatedAt: DateTime.now().toUtc(),
-      );
-      await _local.enqueueOperation(opRead);
-
-      _outbox.notify();
-
+      await _receiptCoordinator.markRead(channelId, userId, seq);
       return right(unit);
     } catch (e) {
       return left(CacheFailure('Failed to mark read: $e'));
@@ -406,21 +403,7 @@ class ChatRepositoryImpl implements ChatRepository {
     if (throughMessageSeq <= 0) return right(unit);
 
     try {
-      await _local.updateMemberHorizons(channelId, userId, deliveredSeq: throughMessageSeq);
-
-      final opComp = OutboxOperationsCompanion.insert(
-        operationId: _uuid.v4(),
-        channelId: channelId,
-        operationType: 'mark_delivered',
-        coalesceKey: Value('delivered:$channelId'),
-        payloadJson: jsonEncode({'through_seq': throughMessageSeq}),
-        createdAt: DateTime.now().toUtc(),
-        updatedAt: DateTime.now().toUtc(),
-      );
-
-      await _local.enqueueOperation(opComp);
-      _outbox.notify();
-
+      await _receiptCoordinator.markDelivered(channelId, userId, throughMessageSeq);
       return right(unit);
     } catch (e) {
       return left(CacheFailure('Failed to mark delivered: $e'));

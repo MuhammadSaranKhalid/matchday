@@ -144,6 +144,8 @@ class OutboxProcessor {
               final storageUrl = await _remote.uploadMediaAttachment(
                 bytes: bytes,
                 channelId: channelId,
+                messageId: messageId,
+                attachmentId: attachmentId,
                 extension: extension,
                 mimeType: mimeType,
               );
@@ -168,6 +170,21 @@ class OutboxProcessor {
           replyToMessageId: replyToId,
           payload: msgPayload,
         );
+
+        // Clean up outbox file after confirmed upload and send (Spec §25)
+        if (messageType == 'image') {
+          final localPath = payload['local_path'] as String?;
+          if (localPath != null && localPath.contains('chat_outbox')) {
+            try {
+              final file = io.File(localPath);
+              if (await file.exists()) {
+                await file.delete();
+              }
+            } catch (e) {
+              debugPrint('[OutboxProcessor] Non-critical error cleaning outbox file: $e');
+            }
+          }
+        }
 
         // Update local message with confirmed server sequence
         await _local.updateMessageSyncStatus(

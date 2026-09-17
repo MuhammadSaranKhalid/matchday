@@ -35,57 +35,31 @@ class ChatLocalDataSource {
     ]);
 
     return channelQuery.watch().asyncMap((rows) async {
+      if (rows.isEmpty) return const <ChatChannel>[];
+
+      // Batch query other members for direct message channels to avoid N+1 queries
+      final directChannelIds = rows
+          .map((r) => r.readTable(_db.localChannels))
+          .where((c) => c.kind == 'direct')
+          .map((c) => c.channelId)
+          .toList();
+
+      final otherMembers = directChannelIds.isEmpty
+          ? <LocalChannelMemberRow>[]
+          : await (_db.select(_db.localChannelMembers)
+                ..where((m) =>
+                    m.channelId.isIn(directChannelIds) &
+                    m.userId.isNotValue(currentUserId)))
+              .get();
+      final otherMemberMap = {for (final m in otherMembers) m.channelId: m};
+
       final channels = <ChatChannel>[];
+      final now = DateTime.now().toUtc();
 
       for (final row in rows) {
         final ch = row.readTable(_db.localChannels);
         final member = row.readTableOrNull(_db.localChannelMembers);
-
-        // Fetch latest message for this channel preview
-        final latestMsg = await (_db.select(_db.localMessages)
-              ..where((m) => m.channelId.equals(ch.channelId))
-              ..orderBy([
-                (m) => OrderingTerm(
-                      expression: m.messageSeq,
-                      mode: OrderingMode.desc,
-                      nulls: NullsOrder.last,
-                    ),
-                (m) => OrderingTerm(expression: m.localCreatedAt, mode: OrderingMode.desc),
-              ])
-              ..limit(1))
-            .getSingleOrNull();
-
-        // Calculate unread count
-        // If the latest message was sent by current user, current user has read at least up to that message
-        final fromMeLatestSeq = (latestMsg?.senderId == currentUserId) ? (latestMsg?.messageSeq ?? 0) : 0;
-        final memberReadSeq = member?.lastReadMessageSeq ?? 0;
-        final lastReadSeq = fromMeLatestSeq > memberReadSeq ? fromMeLatestSeq : memberReadSeq;
-
-        final unreadCountQuery = _db.localMessages.messageId.count(
-          filter: _db.localMessages.channelId.equals(ch.channelId) &
-              _db.localMessages.messageSeq.isBiggerThanValue(lastReadSeq) &
-              _db.localMessages.countsAsUnread.equals(true) &
-              (_db.localMessages.senderId.isNotValue(currentUserId) |
-                  _db.localMessages.senderId.isNull()),
-        );
-
-        final unreadResult = await (_db.selectOnly(_db.localMessages)
-              ..where(_db.localMessages.channelId.equals(ch.channelId))
-              ..addColumns([unreadCountQuery]))
-            .getSingleOrNull();
-
-        final unreadCount = unreadResult?.read(unreadCountQuery) ?? 0;
-
-        // For DM channels, fetch the other participant's metadata if available
-        LocalChannelMemberRow? otherMember;
-        if (ch.kind == 'direct') {
-          otherMember = await (_db.select(_db.localChannelMembers)
-                ..where((m) =>
-                    m.channelId.equals(ch.channelId) &
-                    m.userId.isNotValue(currentUserId))
-                ..limit(1))
-              .getSingleOrNull();
-        }
+        final otherMember = otherMemberMap[ch.channelId];
 
         channels.add(ChatChannel(
           id: ch.channelId,
@@ -99,17 +73,17 @@ class ChatLocalDataSource {
           matchId: ch.matchId,
           tournamentId: ch.tournamentId,
           clubId: ch.clubId,
-          lastMessageSeq: latestMsg?.messageSeq ?? ch.lastMessageSeq,
-          lastMessageAt: latestMsg?.createdAt ?? latestMsg?.localCreatedAt ?? ch.lastMessageAt,
-          lastMessagePreview: latestMsg?.body,
-          lastMessageSenderId: latestMsg?.senderId,
-          lastMessageFromMe: latestMsg?.senderId == currentUserId,
-          unreadCount: unreadCount,
+          lastMessageSeq: ch.lastMessageSeq,
+          lastMessageAt: ch.lastMessageAt,
+          lastMessagePreview: ch.lastMessagePreview,
+          lastMessageSenderId: ch.lastMessageSenderId,
+          lastMessageFromMe: ch.lastMessageFromMe,
+          unreadCount: ch.unreadCount,
           isAccepted: member?.status != 'pending',
           isPinned: member?.pinnedAt != null,
           isArchived: member?.archivedAt != null,
           isMuted: member?.notificationsMutedUntil != null &&
-              member!.notificationsMutedUntil!.isAfter(DateTime.now()),
+              member!.notificationsMutedUntil!.isAfter(now),
           dmOtherUserId: otherMember?.userId,
           createdAt: ch.serverUpdatedAt,
           updatedAt: ch.localUpdatedAt,
@@ -330,18 +304,20 @@ class ChatLocalDataSource {
             lastMessageAt: Value(dto.lastMessageAt == null
                 ? null
                 : DateTime.parse(dto.lastMessageAt!)),
+            lastMessagePreview: Value(dto.lastMessageBody),
+            lastMessageSenderId: Value(dto.lastMessageSenderId),
+            lastMessageFromMe: Value(dto.lastMessageFromMe),
+            unreadCount: Value(dto.unreadCount),
             serverUpdatedAt: DateTime.parse(dto.updatedAt),
             localUpdatedAt: now,
           ),
           mode: InsertMode.insertOrReplace,
         );
 
-        // Upsert current user membership
-        final initialReadSeq = dto.unreadCount == 0 && dto.lastMessageSeq != null
-            ? dto.lastMessageSeq
-            : (dto.lastMessageSeq != null && dto.unreadCount > 0
-                ? (dto.lastMessageSeq! - dto.unreadCount)
-                : null);
+        // Upsert current user membership with exact authoritative horizons
+        final readAt = dto.lastReadAt != null ? DateTime.tryParse(dto.lastReadAt!) : null;
+        final deliveredAt =
+            dto.lastDeliveredAt != null ? DateTime.tryParse(dto.lastDeliveredAt!) : null;
 
         b.insert(
           _db.localChannelMembers,
@@ -349,7 +325,10 @@ class ChatLocalDataSource {
             channelId: dto.channelId,
             userId: currentUserId,
             status: Value(dto.isAccepted ? 'active' : 'pending'),
-            lastReadMessageSeq: Value(initialReadSeq),
+            lastReadMessageSeq: Value(dto.lastReadMessageSeq),
+            lastReadAt: Value(readAt),
+            lastDeliveredMessageSeq: Value(dto.lastDeliveredMessageSeq),
+            lastDeliveredAt: Value(deliveredAt),
             pinnedAt: Value(dto.isPinned ? now : null),
             archivedAt: Value(dto.isArchived ? now : null),
             notificationsMutedUntil:
@@ -359,9 +338,15 @@ class ChatLocalDataSource {
           onConflict: DoUpdate(
             (old) => LocalChannelMembersCompanion(
               status: Value(dto.isAccepted ? 'active' : 'pending'),
-              lastReadMessageSeq: dto.unreadCount == 0 && dto.lastMessageSeq != null
-                  ? Value(dto.lastMessageSeq)
+              lastReadMessageSeq: dto.lastReadMessageSeq != null
+                  ? Value(dto.lastReadMessageSeq)
                   : const Value.absent(),
+              lastReadAt: readAt != null ? Value(readAt) : const Value.absent(),
+              lastDeliveredMessageSeq: dto.lastDeliveredMessageSeq != null
+                  ? Value(dto.lastDeliveredMessageSeq)
+                  : const Value.absent(),
+              lastDeliveredAt:
+                  deliveredAt != null ? Value(deliveredAt) : const Value.absent(),
               pinnedAt: Value(dto.isPinned ? now : null),
               archivedAt: Value(dto.isArchived ? now : null),
               notificationsMutedUntil:
@@ -392,6 +377,8 @@ class ChatLocalDataSource {
   }
 
   /// Atomically updates a channel's last message summary from real-time events.
+  /// Updates local_channels projection directly from real-time events without inserting
+  /// incomplete stubs into local_messages (Spec §10, §11).
   Future<void> updateChannelSummaryFromRealtime({
     required String channelId,
     required int lastMessageSeq,
@@ -401,42 +388,53 @@ class ChatLocalDataSource {
     String? senderId,
     String? senderDisplayName,
     String? messageType,
+    String? currentUserId,
+    int? unreadCount,
+    bool? countsAsUnread,
   }) async {
     final now = DateTime.now().toUtc();
     await _db.transaction(() async {
-      // 1. Update local_channels with latest activity
+      final currentChannel = await (_db.select(_db.localChannels)
+            ..where((c) => c.channelId.equals(channelId)))
+          .getSingleOrNull();
+
+      if (currentChannel == null) return;
+
+      final newSeq = currentChannel.lastMessageSeq != null
+          ? (currentChannel.lastMessageSeq! > lastMessageSeq
+              ? currentChannel.lastMessageSeq!
+              : lastMessageSeq)
+          : lastMessageSeq;
+
+      int newUnreadCount = currentChannel.unreadCount;
+      if (unreadCount != null) {
+        newUnreadCount = unreadCount;
+      } else if (senderId != null &&
+          currentUserId != null &&
+          senderId != currentUserId &&
+          (countsAsUnread ?? true)) {
+        if (lastMessageSeq > (currentChannel.lastMessageSeq ?? 0)) {
+          newUnreadCount = currentChannel.unreadCount + 1;
+        }
+      }
+
       await (_db.update(_db.localChannels)
             ..where((c) => c.channelId.equals(channelId)))
           .write(
         LocalChannelsCompanion(
-          lastMessageSeq: Value(lastMessageSeq),
+          lastMessageSeq: Value(newSeq),
           lastMessageAt: Value(lastMessageAt),
+          lastMessagePreview:
+              bodyPreview != null ? Value(bodyPreview) : const Value.absent(),
+          lastMessageSenderId:
+              senderId != null ? Value(senderId) : const Value.absent(),
+          lastMessageFromMe: (senderId != null && currentUserId != null)
+              ? Value(senderId == currentUserId)
+              : const Value.absent(),
+          unreadCount: Value(newUnreadCount),
           localUpdatedAt: Value(now),
         ),
       );
-
-      // 2. If messageId is present, also upsert stub/preview into local_messages
-      if (messageId != null) {
-        await _db.into(_db.localMessages).insert(
-          LocalMessagesCompanion.insert(
-            messageId: messageId,
-            messageSeq: Value(lastMessageSeq),
-            channelId: channelId,
-            senderId: Value(senderId),
-            senderDisplayName: Value(senderDisplayName),
-            messageType: Value(messageType ?? 'text'),
-            body: Value(bodyPreview),
-            syncStatus: const Value('sent'),
-            createdAt: Value(lastMessageAt),
-            localCreatedAt: now,
-          ),
-          onConflict: DoUpdate((old) => LocalMessagesCompanion(
-            messageSeq: Value(lastMessageSeq),
-            syncStatus: const Value('sent'),
-            body: Value(bodyPreview),
-          )),
-        );
-      }
     });
   }
 
@@ -553,6 +551,205 @@ class ChatLocalDataSource {
     ));
   }
 
+  /// Optimistically updates a local message's body and enqueues an outbox operation in a single transaction (Spec §18).
+  Future<LocalMessageRow?> optimisticEditMessage({
+    required String messageId,
+    required String newBody,
+    required OutboxOperationsCompanion operation,
+  }) async {
+    return _db.transaction(() async {
+      final existing = await (_db.select(_db.localMessages)
+            ..where((m) => m.messageId.equals(messageId)))
+          .getSingleOrNull();
+
+      if (existing == null) return null;
+
+      final now = DateTime.now().toUtc();
+      await (_db.update(_db.localMessages)
+            ..where((m) => m.messageId.equals(messageId)))
+          .write(
+        LocalMessagesCompanion(
+          body: Value(newBody),
+          editedAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+
+      await enqueueOperation(operation);
+
+      return (_db.select(_db.localMessages)
+            ..where((m) => m.messageId.equals(messageId)))
+          .getSingle();
+    });
+  }
+
+  /// Atomically resets a failed message and its associated outbox operation to 'pending' (Spec §19).
+  Future<void> retryMessage(String messageId) async {
+    await _db.transaction(() async {
+      final now = DateTime.now().toUtc();
+      // 1. Reset message status
+      await (_db.update(_db.localMessages)
+            ..where((m) => m.messageId.equals(messageId)))
+          .write(const LocalMessagesCompanion(
+        syncStatus: Value('pending'),
+        sendErrorCode: Value(null),
+        sendErrorMessage: Value(null),
+      ));
+
+      // 2. Reset matching Outbox operation
+      await (_db.update(_db.outboxOperations)
+            ..where((o) => o.entityId.equals(messageId)))
+          .write(OutboxOperationsCompanion(
+        status: const Value('pending'),
+        attemptCount: const Value(0),
+        nextAttemptAt: const Value(null),
+        lastErrorCode: const Value(null),
+        lastErrorMessage: const Value(null),
+        updatedAt: Value(now),
+      ));
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Channel Synchronization State (§3, §5, §22)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Gets the synchronization state and cursors for [channelId].
+  Future<ChannelSyncStateRow?> getChannelSyncState(String channelId) {
+    return (_db.select(_db.channelSyncStates)
+          ..where((s) => s.channelId.equals(channelId)))
+        .getSingleOrNull();
+  }
+
+  /// Marks synchronization as started/in-progress for [channelId].
+  Future<void> markChannelSyncStarted(String channelId) async {
+    final now = DateTime.now().toUtc();
+    await _db.into(_db.channelSyncStates).insert(
+          ChannelSyncStatesCompanion.insert(
+            channelId: channelId,
+            syncStatus: const Value('syncing'),
+            lastFullSyncAt: Value(now),
+          ),
+          onConflict: DoUpdate(
+            (old) => const ChannelSyncStatesCompanion(
+              syncStatus: Value('syncing'),
+              lastSyncError: Value(null),
+            ),
+          ),
+        );
+  }
+
+  /// Marks synchronization as succeeded, advancing cursors monotonically.
+  Future<void> markChannelSyncSucceeded(
+    String channelId, {
+    required int newestSeq,
+    int? oldestSeq,
+    bool? hasMore,
+  }) async {
+    final now = DateTime.now().toUtc();
+    final existing = await getChannelSyncState(channelId);
+
+    final currentNewest = existing?.newestSyncedMessageSeq ?? 0;
+    final updatedNewest = newestSeq > currentNewest ? newestSeq : currentNewest;
+
+    final currentOldest = existing?.oldestCachedMessageSeq;
+    final updatedOldest = (oldestSeq != null && currentOldest != null)
+        ? (oldestSeq < currentOldest ? oldestSeq : currentOldest)
+        : (oldestSeq ?? currentOldest);
+
+    await _db.into(_db.channelSyncStates).insert(
+          ChannelSyncStatesCompanion.insert(
+            channelId: channelId,
+            newestSyncedMessageSeq: Value(updatedNewest),
+            oldestCachedMessageSeq: Value(updatedOldest),
+            hasMoreHistory: Value(hasMore ?? existing?.hasMoreHistory ?? true),
+            lastFullSyncAt: Value(now),
+            syncStatus: const Value('idle'),
+            lastSyncError: const Value(null),
+          ),
+          onConflict: DoUpdate(
+            (old) => ChannelSyncStatesCompanion(
+              newestSyncedMessageSeq: Value(updatedNewest),
+              oldestCachedMessageSeq: Value(updatedOldest),
+              hasMoreHistory: Value(hasMore ?? existing?.hasMoreHistory ?? true),
+              lastFullSyncAt: Value(now),
+              syncStatus: const Value('idle'),
+              lastSyncError: const Value(null),
+            ),
+          ),
+        );
+  }
+
+  /// Marks synchronization as failed.
+  Future<void> markChannelSyncFailed(String channelId, Object error) async {
+    await (_db.update(_db.channelSyncStates)
+          ..where((s) => s.channelId.equals(channelId)))
+        .write(ChannelSyncStatesCompanion(
+      syncStatus: const Value('failed'),
+      lastSyncError: Value(error.toString()),
+    ));
+  }
+
+  /// Atomically commits server messages and advances the forward sync cursor
+  /// in the SAME Drift transaction (Spec §3 invariant).
+  Future<void> commitMessagesAndAdvanceCursor({
+    required String channelId,
+    required List<ChatMessageDto> messages,
+    required String currentUserId,
+    required int newestSeq,
+    int? oldestSeq,
+    bool? hasMore,
+  }) async {
+    await _db.transaction(() async {
+      if (messages.isNotEmpty) {
+        await upsertMessagesFromDto(messages, currentUserId);
+      }
+      await markChannelSyncSucceeded(
+        channelId,
+        newestSeq: newestSeq,
+        oldestSeq: oldestSeq,
+        hasMore: hasMore,
+      );
+    });
+  }
+
+  /// Atomically commits older message history and updates oldestCachedMessageSeq
+  /// without modifying newestSyncedMessageSeq (Spec §22).
+  Future<void> commitOlderMessagesAndUpdateCursor({
+    required String channelId,
+    required List<ChatMessageDto> messages,
+    required String currentUserId,
+    required int oldestSeq,
+    required bool hasMore,
+  }) async {
+    await _db.transaction(() async {
+      if (messages.isNotEmpty) {
+        await upsertMessagesFromDto(messages, currentUserId);
+      }
+      final existing = await getChannelSyncState(channelId);
+      final currentOldest = existing?.oldestCachedMessageSeq;
+      final updatedOldest = currentOldest != null && currentOldest < oldestSeq
+          ? currentOldest
+          : oldestSeq;
+
+      await (_db.into(_db.channelSyncStates)).insert(
+            ChannelSyncStatesCompanion.insert(
+              channelId: channelId,
+              oldestCachedMessageSeq: Value(updatedOldest),
+              hasMoreHistory: Value(hasMore),
+              syncStatus: const Value('idle'),
+            ),
+            onConflict: DoUpdate(
+              (old) => ChannelSyncStatesCompanion(
+                oldestCachedMessageSeq: Value(updatedOldest),
+                hasMoreHistory: Value(hasMore),
+                syncStatus: const Value('idle'),
+              ),
+            ),
+          );
+    });
+  }
+
   /// Upserts or removes a message reaction locally.
   Future<void> upsertReaction({
     required String messageId,
@@ -615,6 +812,11 @@ class ChatLocalDataSource {
     int? deliveredSeq,
   }) async {
     final now = DateTime.now().toUtc();
+    // Guarantee delivered horizon >= read horizon
+    final effectiveDeliveredSeq = (deliveredSeq != null && readSeq != null)
+        ? (deliveredSeq > readSeq ? deliveredSeq : readSeq)
+        : (deliveredSeq ?? readSeq);
+
     final existing = await (_db.select(_db.localChannelMembers)
           ..where((m) => m.channelId.equals(channelId) & m.userId.equals(userId)))
         .getSingleOrNull();
@@ -626,32 +828,43 @@ class ChatLocalDataSource {
               userId: userId,
               lastReadMessageSeq: Value(readSeq),
               lastReadAt: Value(readSeq != null ? now : null),
-              lastDeliveredMessageSeq: Value(deliveredSeq),
-              lastDeliveredAt: Value(deliveredSeq != null ? now : null),
+              lastDeliveredMessageSeq: Value(effectiveDeliveredSeq),
+              lastDeliveredAt: Value(effectiveDeliveredSeq != null ? now : null),
               serverUpdatedAt: now,
             ),
           );
     } else {
+      final currentRead = existing.lastReadMessageSeq ?? 0;
+      final currentDelivered = existing.lastDeliveredMessageSeq ?? 0;
+      final newRead = readSeq != null && readSeq > currentRead ? readSeq : null;
+      final newDelivered = effectiveDeliveredSeq != null &&
+              effectiveDeliveredSeq > currentDelivered
+          ? effectiveDeliveredSeq
+          : (newRead != null && newRead > currentDelivered ? newRead : null);
+
       await (_db.update(_db.localChannelMembers)
             ..where((m) => m.channelId.equals(channelId) & m.userId.equals(userId)))
           .write(LocalChannelMembersCompanion(
-        lastReadMessageSeq: readSeq != null &&
-                readSeq > (existing.lastReadMessageSeq ?? 0)
-            ? Value(readSeq)
-            : const Value.absent(),
-        lastReadAt: readSeq != null &&
-                readSeq > (existing.lastReadMessageSeq ?? 0)
-            ? Value(now)
-            : const Value.absent(),
-        lastDeliveredMessageSeq: deliveredSeq != null &&
-                deliveredSeq > (existing.lastDeliveredMessageSeq ?? 0)
-            ? Value(deliveredSeq)
-            : const Value.absent(),
-        lastDeliveredAt: deliveredSeq != null &&
-                deliveredSeq > (existing.lastDeliveredMessageSeq ?? 0)
-            ? Value(now)
-            : const Value.absent(),
+        lastReadMessageSeq:
+            newRead != null ? Value(newRead) : const Value.absent(),
+        lastReadAt: newRead != null ? Value(now) : const Value.absent(),
+        lastDeliveredMessageSeq:
+            newDelivered != null ? Value(newDelivered) : const Value.absent(),
+        lastDeliveredAt:
+            newDelivered != null ? Value(now) : const Value.absent(),
       ));
+    }
+
+    // If read reached or exceeded lastMessageSeq, local unread count safely becomes 0
+    if (readSeq != null) {
+      final ch = await (_db.select(_db.localChannels)
+            ..where((c) => c.channelId.equals(channelId)))
+          .getSingleOrNull();
+      if (ch != null && (ch.lastMessageSeq == null || readSeq >= ch.lastMessageSeq!)) {
+        await (_db.update(_db.localChannels)
+              ..where((c) => c.channelId.equals(channelId)))
+            .write(const LocalChannelsCompanion(unreadCount: Value(0)));
+      }
     }
   }
 
@@ -707,9 +920,31 @@ class ChatLocalDataSource {
   /// Enqueues generic outbox operations (edit, delete, mark_read, mark_delivered, reaction).
   Future<void> enqueueOperation(OutboxOperationsCompanion op) async {
     await _db.transaction(() async {
-      // Coalescing check
+      // Coalescing check (Spec §20)
       if (op.coalesceKey.present && op.coalesceKey.value != null) {
         final key = op.coalesceKey.value!;
+        final isReceipt = key.startsWith('read:') || key.startsWith('delivered:');
+        if (isReceipt) {
+          final existing = await (_db.select(_db.outboxOperations)
+                ..where((o) =>
+                    o.coalesceKey.equals(key) &
+                    o.status.isIn(['pending', 'retry_wait'])))
+              .getSingleOrNull();
+          if (existing != null) {
+            try {
+              final oldPayload =
+                  jsonDecode(existing.payloadJson) as Map<String, dynamic>;
+              final newPayload =
+                  jsonDecode(op.payloadJson.value) as Map<String, dynamic>;
+              final oldSeq = (oldPayload['through_seq'] as num?)?.toInt() ?? 0;
+              final newSeq = (newPayload['through_seq'] as num?)?.toInt() ?? 0;
+              if (oldSeq >= newSeq) {
+                // Keep the larger existing horizon; do not regress intent!
+                return;
+              }
+            } catch (_) {}
+          }
+        }
         await (_db.delete(_db.outboxOperations)
               ..where((o) =>
                   o.coalesceKey.equals(key) &
@@ -764,6 +999,22 @@ class ChatLocalDataSource {
     await (_db.delete(_db.outboxOperations)
           ..where((o) => o.operationId.equals(operationId)))
         .go();
+  }
+
+  /// Recovers outbox operations that were left in 'processing' state due to
+  /// an unexpected process death or crash (Spec §15).
+  Future<int> recoverStaleProcessingOperations({
+    Duration lease = const Duration(minutes: 2),
+  }) async {
+    final cutoff = DateTime.now().toUtc().subtract(lease);
+    return (_db.update(_db.outboxOperations)
+          ..where((o) =>
+              o.status.equals('processing') &
+              o.updatedAt.isSmallerThanValue(cutoff)))
+        .write(const OutboxOperationsCompanion(
+      status: Value('pending'),
+      nextAttemptAt: Value(null),
+    ));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

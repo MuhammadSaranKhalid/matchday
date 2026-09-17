@@ -27,7 +27,8 @@ class MessageThreadScreen extends ConsumerStatefulWidget {
       _MessageThreadScreenState();
 }
 
-class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
+class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
+    with WidgetsBindingObserver {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   final _composerFocus = FocusNode();
@@ -50,12 +51,53 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
   int _newMessagesWhileScrolledUp = 0;
   int? _initialUnreadCount;
 
+  AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
+  int? _lastMarkedReadSeq;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_onScrollChanged);
     _restoreDraft();
     _textController.addListener(_onComposerChanged);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycleState = state;
+    if (state == AppLifecycleState.resumed) {
+      _checkAndMarkVisibleRead();
+    }
+  }
+
+  void _checkAndMarkVisibleRead([List<Message>? currentMessages]) {
+    if (!mounted) return;
+    if (_lifecycleState != AppLifecycleState.resumed) return;
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isCurrent) return;
+    if (_isScrolledUp) return;
+
+    final msgs = currentMessages ??
+        ref.read(messageThreadProvider(widget.chatId)).value;
+    if (msgs == null || msgs.isEmpty) return;
+
+    int? highestVisibleSeq;
+    for (final m in msgs) {
+      if (m.messageSeq != null && m.messageSeq! > 0) {
+        if (highestVisibleSeq == null || m.messageSeq! > highestVisibleSeq) {
+          highestVisibleSeq = m.messageSeq;
+        }
+      }
+    }
+
+    if (highestVisibleSeq != null &&
+        (_lastMarkedReadSeq == null || highestVisibleSeq > _lastMarkedReadSeq!)) {
+      _lastMarkedReadSeq = highestVisibleSeq;
+      ref
+          .read(messageThreadProvider(widget.chatId).notifier)
+          .markRead(throughSeq: highestVisibleSeq);
+    }
   }
 
   void _onScrollChanged() {
@@ -66,7 +108,7 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
         _isScrolledUp = isScrolledUp;
         if (!_isScrolledUp && _newMessagesWhileScrolledUp > 0) {
           _newMessagesWhileScrolledUp = 0;
-          ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
+          _checkAndMarkVisibleRead();
         }
       });
     }
@@ -125,6 +167,7 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _draftSaveDebounce?.cancel();
     _typingDebounce?.cancel();
     if (_isTypingPublished) {
@@ -448,12 +491,14 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
                   _newMessagesWhileScrolledUp += newCount;
                 });
               } else {
-                ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
+                _checkAndMarkVisibleRead(messages);
               }
             }
           } else if (prevList.isEmpty && !_isScrolledUp) {
-            // Initial paint: advance read horizon if not scrolled back
-            ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
+            // Initial paint: advance read horizon after layout once message region is visible (Spec §23)
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _checkAndMarkVisibleRead(messages);
+            });
           }
         }
       }
@@ -567,7 +612,7 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
                           setState(() {
                             _newMessagesWhileScrolledUp = 0;
                           });
-                          ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
+                          _checkAndMarkVisibleRead();
                         },
                       ),
                     ),

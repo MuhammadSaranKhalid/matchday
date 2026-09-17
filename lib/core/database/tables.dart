@@ -41,6 +41,10 @@ class LocalChannels extends Table {
 
   IntColumn get lastMessageSeq => integer().nullable()();
   DateTimeColumn get lastMessageAt => dateTime().nullable()();
+  TextColumn get lastMessagePreview => text().nullable()();
+  TextColumn get lastMessageSenderId => text().nullable()();
+  BoolColumn get lastMessageFromMe => boolean().withDefault(const Constant(false))();
+  IntColumn get unreadCount => integer().withDefault(const Constant(0))();
 
   DateTimeColumn get serverUpdatedAt => dateTime()();
   DateTimeColumn get localUpdatedAt => dateTime()();

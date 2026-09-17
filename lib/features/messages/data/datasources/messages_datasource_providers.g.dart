@@ -147,6 +147,54 @@ final class OutboxProcessorProvider
 
 String _$outboxProcessorHash() => r'4595bfee96b98685f010a7c4f764fd88ffa0aa42';
 
+@ProviderFor(receiptCoordinator)
+final receiptCoordinatorProvider = ReceiptCoordinatorProvider._();
+
+final class ReceiptCoordinatorProvider
+    extends
+        $FunctionalProvider<
+          ReceiptCoordinator,
+          ReceiptCoordinator,
+          ReceiptCoordinator
+        >
+    with $Provider<ReceiptCoordinator> {
+  ReceiptCoordinatorProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'receiptCoordinatorProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$receiptCoordinatorHash();
+
+  @$internal
+  @override
+  $ProviderElement<ReceiptCoordinator> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ReceiptCoordinator create(Ref ref) {
+    return receiptCoordinator(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ReceiptCoordinator value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ReceiptCoordinator>(value),
+    );
+  }
+}
+
+String _$receiptCoordinatorHash() =>
+    r'f7bec5c5bcba1986c6cf2591a6e7adcdd7d5b1a9';
+
 @ProviderFor(realtimeIngestor)
 final realtimeIngestorProvider = RealtimeIngestorProvider._();
 
@@ -191,7 +239,53 @@ final class RealtimeIngestorProvider
   }
 }
 
-String _$realtimeIngestorHash() => r'75d7c774f92ae64209aff514ed062a70283372fa';
+String _$realtimeIngestorHash() => r'923ee95034e5283a79eb81f63b581226099a1bab';
+
+@ProviderFor(catchUpScheduler)
+final catchUpSchedulerProvider = CatchUpSchedulerProvider._();
+
+final class CatchUpSchedulerProvider
+    extends
+        $FunctionalProvider<
+          CatchUpScheduler,
+          CatchUpScheduler,
+          CatchUpScheduler
+        >
+    with $Provider<CatchUpScheduler> {
+  CatchUpSchedulerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'catchUpSchedulerProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$catchUpSchedulerHash();
+
+  @$internal
+  @override
+  $ProviderElement<CatchUpScheduler> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  CatchUpScheduler create(Ref ref) {
+    return catchUpScheduler(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CatchUpScheduler value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CatchUpScheduler>(value),
+    );
+  }
+}
+
+String _$catchUpSchedulerHash() => r'1c091971771411874ce8610d4d7bed6416154412';
 
 @ProviderFor(chatSyncCoordinator)
 final chatSyncCoordinatorProvider = ChatSyncCoordinatorProvider._();
@@ -239,4 +333,4 @@ final class ChatSyncCoordinatorProvider
 }
 
 String _$chatSyncCoordinatorHash() =>
-    r'e78370fe450e456a2d46f0b8f6a16330804281c5';
+    r'2c80355f27a731695cb759ce69d98d018385b47f';

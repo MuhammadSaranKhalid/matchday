@@ -60,9 +60,9 @@ abstract class MessagesRepository {
   /// Soft deletes a message for the user.
   Future<Either<Failure, Unit>> deleteMessage(ChatId chatId, MessageId messageId);
 
-  /// Stamps `chat_members.last_read_at = now()` for the current user in this
-  /// chat, so unread counts re-emit as 0.
-  Future<Either<Failure, Unit>> markRead(ChatId chatId);
+  /// Stamps `chat_members.last_read_at = now()` and advances read horizon
+  /// for the current user in this chat, so unread counts re-emit as 0.
+  Future<Either<Failure, Unit>> markRead(ChatId chatId, {int? throughMessageSeq});
 
   /// Resolves or creates a 1-on-1 direct message conversation with [targetUserId].
   Future<Either<Failure, ChatId>> getOrCreateDmChat(String targetUserId);
@@ -94,4 +94,10 @@ abstract class MessagesRepository {
 
   /// Drop the draft for a chat — typically after a successful send.
   Future<void> deleteDraft(ChatId chatId);
+
+  /// Streams typing indicator state for [chatId] via real-time presence.
+  Stream<bool> watchTyping(ChatId chatId);
+
+  /// Broadcasts typing activity for the current user in [chatId].
+  Future<void> setTyping(ChatId chatId, bool isTyping);
 }

@@ -37,11 +37,11 @@ class _SkeletonThreadRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar or Crest circle placeholder
+          // Avatar circle placeholder
           CkShimmerBox(
             width: 48,
             height: 48,
-            radius: 14,
+            radius: 24,
           ),
           SizedBox(width: 14),
           Expanded(

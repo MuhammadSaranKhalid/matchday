@@ -112,30 +112,49 @@ class TeamsRemoteDataSource {
 
   Future<TeamDto> createTeam(Map<String, dynamic> payload) async {
     try {
-      _requireUid();
-      // Team writes are RPC-only. The server derives ownership from auth.uid()
-      // and creates the owner staff assignment atomically with the team.
-      final row = await _supabase.rpc<Map<String, dynamic>>('create_team', params: {
-        'p_team_id': payload['id'],
-        'p_team_name': payload['team_name'],
-        'p_team_type': payload['team_type'],
-        'p_privacy': payload['privacy'],
-        'p_details': {
-          for (final key in ['description', 'home_ground', 'tagline',
-            'logo_monogram', 'founded_year'])
-            if (payload[key] != null) key: payload[key],
-          'location': {
-            for (final key in ['label', 'city', 'district', 'province',
-              'postcode', 'place_id', 'lat', 'lng', 'country_code'])
-              if (payload[key] != null) key: payload[key],
-          },
-          'team_colors': {
-            if (payload['primary_color'] != null) 'primary': payload['primary_color'],
-            if (payload['secondary_color'] != null) 'secondary': payload['secondary_color'],
-            if (payload['crest_kind'] != null) 'crest_kind': payload['crest_kind'],
-          },
-        },
-      });
+      final uid = _requireUid();
+      final row = await _supabase
+          .from(_teams)
+          .insert({
+            'team_id': payload['id'],
+            'created_by': uid,
+            'team_name': payload['team_name'],
+            'team_type': payload['team_type'],
+            'privacy': payload['privacy'] ?? 'public',
+            if (payload['description'] != null)
+              'description': payload['description'],
+            if (payload['home_ground'] != null)
+              'home_ground': payload['home_ground'],
+            if (payload['tagline'] != null) 'tagline': payload['tagline'],
+            if (payload['logo_monogram'] != null)
+              'logo_monogram': payload['logo_monogram'],
+            if (payload['founded_year'] != null)
+              'founded_year': payload['founded_year'],
+            'location': {
+              for (final key in [
+                'label',
+                'city',
+                'district',
+                'province',
+                'postcode',
+                'place_id',
+                'lat',
+                'lng',
+                'country_code'
+              ])
+                if (payload[key] != null) key: payload[key],
+            },
+            'team_colors': {
+              if (payload['primary_color'] != null)
+                'primary': payload['primary_color'],
+              if (payload['secondary_color'] != null)
+                'secondary': payload['secondary_color'],
+              if (payload['crest_kind'] != null)
+                'crest_kind': payload['crest_kind'],
+            },
+          })
+          .select()
+          .single();
       return TeamDto.fromJson(row);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -172,7 +191,7 @@ class TeamsRemoteDataSource {
       }
 
       // Preserve logo style and resolved location metadata when editing only
-      // one color or location field. The profile RPC replaces each JSON object.
+      // one color or location field.
       if (updates.containsKey('team_colors') || updates.containsKey('location')) {
         final current = await _supabase.from(_teams)
             .select('team_colors, location').eq('team_id', teamId).single();
@@ -185,10 +204,12 @@ class TeamsRemoteDataSource {
           }
         }
       }
-      final row = await _supabase.rpc<Map<String, dynamic>>(
-        'update_team_profile',
-        params: {'p_team_id': teamId, 'p_patch': updates},
-      );
+      final row = await _supabase
+          .from(_teams)
+          .update(updates)
+          .eq('team_id', teamId)
+          .select()
+          .single();
       return TeamDto.fromJson(row);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -272,10 +293,10 @@ class TeamsRemoteDataSource {
       final url = _supabase.storage.from('team-logos').getPublicUrl(path);
       // Cache-bust so a replacement upload shows immediately at the same URL.
       final cacheBusted = '$url?v=${DateTime.now().millisecondsSinceEpoch}';
-      await _supabase.rpc<void>('update_team_profile', params: {
-        'p_team_id': teamId,
-        'p_patch': {'logo_url': cacheBusted},
-      });
+      await _supabase
+          .from(_teams)
+          .update({'logo_url': cacheBusted})
+          .eq('team_id', teamId);
       return cacheBusted;
     } on StorageException catch (e) {
       throw ServerException(e.message);
@@ -501,6 +522,49 @@ class TeamsRemoteDataSource {
           .from('team_invites')
           .update({'status': 'cancelled'})
           .eq('invite_id', inviteId);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<Map<String, dynamic>?> getMyPendingInviteForTeam(String teamId) async {
+    final uid = _supabase.auth.currentUser?.id;
+    if (uid == null) return null;
+    try {
+      final row = await _supabase
+          .from('team_invites')
+          .select('*, inviter:profiles!invited_by(display_name, username)')
+          .eq('team_id', teamId)
+          .eq('invitee_id', uid)
+          .eq('status', 'pending')
+          .maybeSingle();
+      return row;
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> acceptTeamInvite(String inviteId) async {
+    try {
+      _requireUid();
+      await _supabase.rpc<dynamic>('accept_team_invite', params: {'p_invite_id': inviteId});
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> declineTeamInvite(String inviteId) async {
+    try {
+      final uid = _requireUid();
+      await _supabase
+          .from('team_invites')
+          .update({
+            'status': 'rejected',
+            'decided_by': uid,
+            'decided_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('invite_id', inviteId)
+          .eq('invitee_id', uid);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

@@ -1,21 +1,21 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import 'package:matchday/core/error/failures.dart';
-import 'package:matchday/core/theme/circk_theme.dart';
-import 'package:matchday/core/widgets/v2/v2_kit.dart';
-import 'package:matchday/features/messages/domain/entities/chat.dart';
-import 'package:matchday/features/messages/domain/entities/message.dart';
-import 'package:matchday/features/messages/presentation/controllers/message_thread_controller.dart';
-import 'package:matchday/features/messages/presentation/providers/messages_providers.dart';
-import 'package:matchday/features/messages/presentation/widgets/chat_bubble.dart';
-import 'package:matchday/features/messages/presentation/widgets/chat_composer.dart';
-import 'package:matchday/features/messages/presentation/widgets/color_utils.dart';
+import '../../../../core/error/failures.dart';
+import '../../../safety/presentation/providers/safety_providers.dart';
+import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../domain/entities/chat.dart';
+import '../../domain/entities/message.dart';
+import '../controllers/message_thread_controller.dart';
+import '../providers/messages_providers.dart';
+import '../widgets/chat_bubble.dart';
+import '../widgets/chat_composer.dart';
+import '../widgets/chat_theme.dart';
 
 class MessageThreadScreen extends ConsumerStatefulWidget {
   const MessageThreadScreen({super.key, required this.chatId});
@@ -35,26 +35,41 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
   String? _composerError;
   Message? _replyingTo;
 
-  /// Trailing debounce for draft autosave — fired 250ms after the last
-  /// keystroke.
-  Timer? _draftSaveDebounce;
+  // Selection mode (Screen 5e64f8b6161b4b75ab780b2923d64221)
+  Message? _selectedMessage;
 
-  // ─── Pagination state (ticket #35) ──────────────────────────────────────
+  Timer? _draftSaveDebounce;
+  Timer? _typingDebounce;
+  bool _isTypingPublished = false;
+
   bool _hasMoreOlder = true;
   bool _isLoadingOlder = false;
+  bool _actingOnRequest = false;
+
+  bool _isScrolledUp = false;
+  int _newMessagesWhileScrolledUp = 0;
+  int? _initialUnreadCount;
 
   @override
   void initState() {
     super.initState();
-    // Stamp last_read_at once the controller is built.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
-    });
-    // Restore composer text from a persisted draft, if any.
+    _scrollController.addListener(_onScrollChanged);
     _restoreDraft();
-    // Autosave the composer text as the user types (debounced).
     _textController.addListener(_onComposerChanged);
+  }
+
+  void _onScrollChanged() {
+    if (!_scrollController.hasClients) return;
+    final isScrolledUp = _scrollController.offset > 120;
+    if (isScrolledUp != _isScrolledUp) {
+      setState(() {
+        _isScrolledUp = isScrolledUp;
+        if (!_isScrolledUp && _newMessagesWhileScrolledUp > 0) {
+          _newMessagesWhileScrolledUp = 0;
+          ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
+        }
+      });
+    }
   }
 
   Future<void> _restoreDraft() async {
@@ -64,8 +79,7 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
     if (!mounted || draft == null || draft.isEmpty) return;
     if (_textController.text.isNotEmpty) return;
     _textController.text = draft;
-    _textController.selection =
-        TextSelection.collapsed(offset: draft.length);
+    _textController.selection = TextSelection.collapsed(offset: draft.length);
   }
 
   void _onComposerChanged() {
@@ -80,60 +94,99 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
         await repo.saveDraft(ChatId(widget.chatId), snapshot);
       }
     });
+
+    if (snapshot.trim().isNotEmpty) {
+      if (!_isTypingPublished) {
+        _isTypingPublished = true;
+        ref
+            .read(messagesRepositoryProvider)
+            .setTyping(ChatId(widget.chatId), true);
+      }
+      _typingDebounce?.cancel();
+      _typingDebounce = Timer(const Duration(seconds: 3), () {
+        if (!mounted) return;
+        if (_isTypingPublished) {
+          _isTypingPublished = false;
+          ref
+              .read(messagesRepositoryProvider)
+              .setTyping(ChatId(widget.chatId), false);
+        }
+      });
+    } else {
+      if (_isTypingPublished) {
+        _typingDebounce?.cancel();
+        _isTypingPublished = false;
+        ref
+            .read(messagesRepositoryProvider)
+            .setTyping(ChatId(widget.chatId), false);
+      }
+    }
   }
 
   @override
   void dispose() {
     _draftSaveDebounce?.cancel();
+    _typingDebounce?.cancel();
+    if (_isTypingPublished) {
+      ref
+          .read(messagesRepositoryProvider)
+          .setTyping(ChatId(widget.chatId), false);
+    }
     _textController.removeListener(_onComposerChanged);
     _textController.dispose();
+    _scrollController.removeListener(_onScrollChanged);
     _scrollController.dispose();
     _composerFocus.dispose();
     super.dispose();
   }
 
-  /// Find this chat in the inbox so the header has a name + crest.
   Chat? _findChat() {
-    return ref.watch(myChatsProvider.select((async) {
-      return switch (async) {
-        AsyncData(:final value) =>
-          value.where((c) => c.id.value == widget.chatId).firstOrNull,
-        _ => null,
-      };
-    }));
+    return ref.watch(
+      myChatsProvider.select((async) {
+        return switch (async) {
+          AsyncData(:final value) =>
+            value.where((c) => c.id.value == widget.chatId).firstOrNull,
+          _ => null,
+        };
+      }),
+    );
   }
 
   Future<void> _onLoadOlder() async {
     if (!_hasMoreOlder || _isLoadingOlder || !mounted) return;
     setState(() => _isLoadingOlder = true);
-    final result = await ref
-        .read(messageThreadProvider(widget.chatId).notifier)
-        .loadOlder();
+    final result =
+        await ref
+            .read(messageThreadProvider(widget.chatId).notifier)
+            .loadOlder();
     if (!mounted) return;
     setState(() {
       _isLoadingOlder = false;
-      result.fold(
-        (_) {},
-        (count) {
-          if (count < 50) _hasMoreOlder = false;
-        },
-      );
+      result.fold((_) {}, (count) {
+        if (count < 50) _hasMoreOlder = false;
+      });
     });
   }
 
   Future<void> _send() async {
     final text = _textController.text;
     if (text.trim().isEmpty || _sending) return;
+    _typingDebounce?.cancel();
+    if (_isTypingPublished) {
+      _isTypingPublished = false;
+      ref
+          .read(messagesRepositoryProvider)
+          .setTyping(ChatId(widget.chatId), false);
+    }
     setState(() {
       _sending = true;
       _composerError = null;
     });
 
     final replyId = _replyingTo?.id.value;
-    final result = await ref.read(messageThreadProvider(widget.chatId).notifier).send(
-          text,
-          replyToId: replyId,
-        );
+    final result = await ref
+        .read(messageThreadProvider(widget.chatId).notifier)
+        .send(text, replyToId: replyId);
     if (!mounted) return;
 
     result.fold(
@@ -156,6 +209,13 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
 
   Future<void> _sendImage(File imageFile) async {
     if (_sending) return;
+    _typingDebounce?.cancel();
+    if (_isTypingPublished) {
+      _isTypingPublished = false;
+      ref
+          .read(messagesRepositoryProvider)
+          .setTyping(ChatId(widget.chatId), false);
+    }
     setState(() {
       _sending = true;
       _composerError = null;
@@ -165,11 +225,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
     final ext = imageFile.path.split('.').last;
     final replyId = _replyingTo?.id.value;
 
-    final result = await ref.read(messageThreadProvider(widget.chatId).notifier).sendImage(
-          imageBytes: bytes,
-          extension: ext,
-          replyToId: replyId,
-        );
+    final result = await ref
+        .read(messageThreadProvider(widget.chatId).notifier)
+        .sendImage(imageBytes: bytes, extension: ext, replyToId: replyId);
     if (!mounted) return;
 
     result.fold(
@@ -195,9 +253,14 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
     if (!mounted) return;
     result.fold(
       (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete message: ${f.message}')),
+        SnackBar(
+          content: Text('Failed to delete message: ${f.message}'),
+          backgroundColor: ChatTheme.charcoalInk,
+        ),
       ),
-      (_) {},
+      (_) {
+        setState(() => _selectedMessage = null);
+      },
     );
   }
 
@@ -213,25 +276,27 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
     });
   }
 
-  bool _actingOnRequest = false;
-
   Future<void> _acceptRequest() async {
     if (_actingOnRequest) return;
     setState(() => _actingOnRequest = true);
-    final res = await ref
-        .read(messageThreadProvider(widget.chatId).notifier)
-        .acceptRequest();
+    final res =
+        await ref
+            .read(messageThreadProvider(widget.chatId).notifier)
+            .acceptRequest();
     if (!mounted) return;
     setState(() => _actingOnRequest = false);
     res.fold(
       (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message), backgroundColor: CkColors.red),
+        SnackBar(
+          content: Text(f.message),
+          backgroundColor: ChatTheme.destructiveCoralText,
+        ),
       ),
       (_) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Message request accepted'),
-            backgroundColor: CkColors.green,
+            backgroundColor: ChatTheme.successMintText,
           ),
         );
       },
@@ -242,30 +307,97 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
     if (_actingOnRequest) return;
     final confirm = await showDialog<bool>(
       context: context,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: ChatTheme.pureSurface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: ChatTheme.hairlineSand),
+            ),
+            title: Text('Delete Request?', style: ChatTheme.headlineSm()),
+            content: Text(
+              'This message request will be removed from your inbox.',
+              style: ChatTheme.bodySm(color: ChatTheme.mutedStone),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(
+                  'Cancel',
+                  style: ChatTheme.button(color: ChatTheme.charcoalInk),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(
+                  'Delete',
+                  style: ChatTheme.button(
+                    color: ChatTheme.destructiveCoralText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() => _actingOnRequest = true);
+    final res =
+        await ref
+            .read(messageThreadProvider(widget.chatId).notifier)
+            .declineRequest();
+    if (!mounted) return;
+    setState(() => _actingOnRequest = false);
+    res.fold(
+      (f) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(f.message),
+          backgroundColor: ChatTheme.destructiveCoralText,
+        ),
+      ),
+      (_) {
+        Navigator.of(context).pop();
+      },
+    );
+  }
+
+  Future<void> _blockUser() async {
+    final chat = _findChat();
+    final otherUserId = chat?.dmOtherUserId;
+    if (otherUserId == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: CkColors.paper,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: ChatTheme.pureSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: ChatTheme.hairlineSand),
+        ),
         title: Text(
-          'Delete Request?',
-          style: CkType.display(fontSize: 17, fontWeight: FontWeight.w700),
+          'Block ${chat?.displayName ?? "User"}?',
+          style: ChatTheme.headlineSm(),
         ),
         content: Text(
-          'This message request will be removed from your inbox.',
-          style: CkType.body(fontSize: 13, color: CkColors.muted),
+          'Blocked players cannot send you message requests or see your active status.',
+          style: ChatTheme.bodySm(color: ChatTheme.mutedStone),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(
               'Cancel',
-              style: CkType.body(fontSize: 13, fontWeight: FontWeight.w600, color: CkColors.ink2),
+              style: ChatTheme.button(color: ChatTheme.charcoalInk),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Delete',
-              style: CkType.body(fontSize: 13, fontWeight: FontWeight.w700, color: CkColors.red),
+              'Block',
+              style: ChatTheme.button(
+                color: ChatTheme.destructiveCoralText,
+              ),
             ),
           ),
         ],
@@ -274,17 +406,22 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
 
     if (confirm != true || !mounted) return;
 
-    setState(() => _actingOnRequest = true);
-    final res = await ref
-        .read(messageThreadProvider(widget.chatId).notifier)
-        .declineRequest();
+    final res = await ref.read(safetyRepositoryProvider).block(otherUserId);
     if (!mounted) return;
-    setState(() => _actingOnRequest = false);
     res.fold(
       (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message), backgroundColor: CkColors.red),
+        SnackBar(
+          content: Text(f.message),
+          backgroundColor: ChatTheme.destructiveCoralText,
+        ),
       ),
       (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${chat?.displayName ?? "User"} has been blocked'),
+            backgroundColor: ChatTheme.charcoalInk,
+          ),
+        );
         Navigator.of(context).pop();
       },
     );
@@ -293,66 +430,181 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
   @override
   Widget build(BuildContext context) {
     final chat = _findChat();
+    if (_initialUnreadCount == null && chat != null && chat.unreadCount > 0) {
+      _initialUnreadCount = chat.unreadCount;
+    }
+
+    ref.listen(messageThreadProvider(widget.chatId), (prev, next) {
+      if (next is AsyncData<List<Message>>) {
+        final messages = next.value;
+        if (messages.isNotEmpty) {
+          final prevList = prev?.value ?? const <Message>[];
+          if (prevList.isNotEmpty && messages.length > prevList.length) {
+            final newCount = messages.length - prevList.length;
+            final latest = messages.last;
+            if (!latest.fromMe) {
+              if (_isScrolledUp) {
+                setState(() {
+                  _newMessagesWhileScrolledUp += newCount;
+                });
+              } else {
+                ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
+              }
+            }
+          } else if (prevList.isEmpty && !_isScrolledUp) {
+            // Initial paint: advance read horizon if not scrolled back
+            ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
+          }
+        }
+      }
+    });
+
     final threadAsync = ref.watch(messageThreadProvider(widget.chatId));
 
     final isIncomingRequest = chat?.isRequest == true;
     final isPendingOutgoing = chat?.isPendingOutgoingRequest == true;
 
+    final placeholder =
+        chat?.isTeam == true
+            ? 'Message team...'
+            : 'Message ${chat?.displayName ?? 'user'}...';
+
     return Scaffold(
-      backgroundColor: CkColors.paper,
+      backgroundColor: ChatTheme.clubhouseCanvas,
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
-            _ThreadHeader(
-              chat: chat,
-              onBack: () => Navigator.of(context).pop(),
-            ),
+            // Top App Bar (Normal or Selection Mode)
+            if (_selectedMessage != null)
+              _SelectionHeader(
+                selectedMessage: _selectedMessage!,
+                onClose: () => setState(() => _selectedMessage = null),
+                onReply: (m) {
+                  setState(() {
+                    _replyingTo = m;
+                    _selectedMessage = null;
+                  });
+                  _composerFocus.requestFocus();
+                },
+                onDelete: _deleteMessage,
+              )
+            else
+              _ThreadHeader(
+                chatId: widget.chatId,
+                chat: chat,
+                onBack: () => Navigator.of(context).pop(),
+              ),
+
             if (isIncomingRequest)
               _RequestNoticeBanner(
                 userName: chat?.displayName ?? 'This player',
               ),
+
+            // Main Message Timeline
             Expanded(
-              child: switch (threadAsync) {
-                AsyncData(:final value) => value.isEmpty
-                    ? const _EmptyBody()
-                    : _Conversation(
-                        messages: value,
-                        isTeam: chat?.isTeam ?? false,
-                        scroll: _scrollController,
-                        isLoadingOlder: _isLoadingOlder,
-                        hasMoreOlder: _hasMoreOlder,
-                        onLoadOlder: _onLoadOlder,
-                        onReply: (m) => setState(() => _replyingTo = m),
-                        onDelete: _deleteMessage,
-                      ),
-                AsyncError(:final error) => _ErrorBody(
-                    message: error is FailureWrapper
-                        ? error.failure.message
-                        : error.toString(),
-                    onRetry: () =>
-                        ref.invalidate(messageThreadProvider(widget.chatId)),
-                  ),
-                _ => const Center(
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: CkColors.ink,
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  switch (threadAsync) {
+                    AsyncData(:final value) =>
+                      value.isEmpty
+                          ? const _EmptyBody()
+                          : _Conversation(
+                            messages: value,
+                            isTeam: chat?.isTeam ?? false,
+                            scroll: _scrollController,
+                            initialUnreadCount: _initialUnreadCount,
+                            selectedMessage: _selectedMessage,
+                            isLoadingOlder: _isLoadingOlder,
+                            hasMoreOlder: _hasMoreOlder,
+                            onLoadOlder: _onLoadOlder,
+                            onReply: (m) {
+                              setState(() => _replyingTo = m);
+                              _composerFocus.requestFocus();
+                            },
+                            onSelect: (m) {
+                              setState(() {
+                                if (_selectedMessage?.id == m.id) {
+                                  _selectedMessage = null;
+                                } else {
+                                  _selectedMessage = m;
+                                }
+                              });
+                            },
+                            onDelete: _deleteMessage,
+                            onReaction: (m, emoji) {
+                              ref.read(chatRepositoryProvider).setReaction(m.id.value, emoji, true);
+                            },
+                          ),
+                    AsyncError(:final error) => _ErrorBody(
+                      message:
+                          error is FailureWrapper
+                              ? error.failure.message
+                              : error.toString(),
+                      onRetry:
+                          () =>
+                              ref.invalidate(messageThreadProvider(widget.chatId)),
+                    ),
+                    _ => const Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: ChatTheme.matchDayCoral,
+                        ),
                       ),
                     ),
-                  ),
-              },
+                  },
+                  if (_isScrolledUp && _newMessagesWhileScrolledUp > 0)
+                    Positioned(
+                      bottom: 12,
+                      child: _ScrollToBottomPill(
+                        count: _newMessagesWhileScrolledUp,
+                        onTap: () {
+                          _scrollToBottom();
+                          setState(() {
+                            _newMessagesWhileScrolledUp = 0;
+                          });
+                          ref.read(messageThreadProvider(widget.chatId).notifier).markRead();
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
+
+            // Requests or Outgoing notices or Active Composer
             if (isIncomingRequest)
               _RequestActionBar(
                 onAccept: _acceptRequest,
                 onDecline: _declineRequest,
+                onBlock: _blockUser,
+                userName: chat?.displayName,
                 isLoading: _actingOnRequest,
               )
             else if (isPendingOutgoing)
               const _PendingOutgoingNotice()
-            else
+            else ...[
+              Consumer(
+                builder: (context, ref, _) {
+                  final isTyping =
+                      ref.watch(chatTypingProvider(widget.chatId)).value ??
+                      false;
+                  return AnimatedCrossFade(
+                    duration: const Duration(milliseconds: 180),
+                    crossFadeState:
+                        isTyping
+                            ? CrossFadeState.showFirst
+                            : CrossFadeState.showSecond,
+                    firstChild: _TypingIndicator(
+                      displayName: chat?.displayName ?? 'Someone',
+                    ),
+                    secondChild: const SizedBox.shrink(),
+                  );
+                },
+              ),
               ChatComposer(
                 textController: _textController,
                 focusNode: _composerFocus,
@@ -362,7 +614,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
                 replyingTo: _replyingTo,
                 onCancelReply: () => setState(() => _replyingTo = null),
                 error: _composerError,
+                placeholder: placeholder,
               ),
+            ],
           ],
         ),
       ),
@@ -370,92 +624,191 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen> {
   }
 }
 
+// ─── Header: Normal Mode ─────────────────────────────────────────────────────
 
-// ─── Header ──────────────────────────────────────────────────────────────────
+class _ThreadHeader extends ConsumerWidget {
+  const _ThreadHeader({
+    required this.chatId,
+    required this.chat,
+    required this.onBack,
+  });
 
-class _ThreadHeader extends StatelessWidget {
-  const _ThreadHeader({required this.chat, required this.onBack});
-
+  final String chatId;
   final Chat? chat;
   final VoidCallback onBack;
 
+  void _openDetails(BuildContext context) {
+    context.push('/messages/$chatId/details', extra: chat);
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final name = chat?.displayName ?? '…';
     final mono = chat?.displayMonogram ?? '?';
-    final color = parseHexColor(chat?.teamPrimaryColorHex, CkColors.ink);
     final isTeam = chat?.isTeam == true;
+    final isDm = chat?.isDm == true;
+
+    // Subtitle logic
+    final Widget subtitleWidget;
+    if (isTeam && chat?.teamId != null) {
+      final rosterAsync = ref.watch(rosterProvider(chat!.teamId!.value));
+      final count = rosterAsync.value?.length;
+      subtitleWidget = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: ChatTheme.successMintText,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            count != null ? '$count Members • Active' : 'Team Chat',
+            style: ChatTheme.metadata(color: ChatTheme.mutedStone),
+          ),
+        ],
+      );
+    } else if (isDm) {
+      subtitleWidget = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: ChatTheme.successMintText,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            'Active • Online now',
+            style: ChatTheme.metadata(color: ChatTheme.successMintText),
+          ),
+        ],
+      );
+    } else {
+      subtitleWidget = Text(
+        'Match Room',
+        style: ChatTheme.metadata(color: ChatTheme.matchDayCoral),
+      );
+    }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 14, 10),
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: const BoxDecoration(
-        color: CkColors.paper,
-        border: Border(bottom: BorderSide(color: CkColors.hairline)),
+        color: ChatTheme.clubhouseCanvas,
+        border: Border(bottom: BorderSide(color: ChatTheme.hairlineSand)),
       ),
       child: Row(
         children: [
+          // 44px Circular Back Button
           GestureDetector(
-            behavior: HitTestBehavior.opaque,
             onTap: onBack,
+            behavior: HitTestBehavior.opaque,
             child: Container(
-              width: 36,
-              height: 36,
+              width: 40,
+              height: 40,
               alignment: Alignment.center,
-              margin: const EdgeInsets.only(right: 6),
-              decoration: BoxDecoration(
-                color: CkColors.paper2,
-                shape: BoxShape.circle,
-                border: Border.all(color: CkColors.hairline),
-              ),
-              child: const V2Svg(
-                V2Icons.chevronLeft,
-                size: 18,
-                color: CkColors.ink,
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                size: 22,
+                color: ChatTheme.charcoalInk,
               ),
             ),
           ),
-          if (isTeam)
-            Crest(short: mono, color: color, size: 36, radius: 10)
-          else if (chat?.displayAvatarUrl.isNotEmpty == true)
-            ClipOval(
-              child: CachedNetworkImage(
-                imageUrl: chat!.displayAvatarUrl,
-                width: 36,
-                height: 36,
-                fit: BoxFit.cover,
-                placeholder: (_, __) =>
-                    Avatar(mono: mono, size: 36, tone: AvatarTone.ink),
-                errorWidget: (_, __, ___) =>
-                    Avatar(mono: mono, size: 36, tone: AvatarTone.ink),
-              ),
-            )
-          else
-            Avatar(mono: mono, size: 36, tone: AvatarTone.ink),
-          const SizedBox(width: 10),
+          const SizedBox(width: 4),
+
+          // Avatar & Title Tappable Group
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: CkType.display(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.01,
+            child: GestureDetector(
+              onTap: () => _openDetails(context),
+              behavior: HitTestBehavior.opaque,
+              child: Row(
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color:
+                              isTeam
+                                  ? ChatTheme.matchDayCoral
+                                  : ChatTheme.softSandFill,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color:
+                                isTeam
+                                    ? ChatTheme.matchDayCoral
+                                    : ChatTheme.hairlineSand,
+                          ),
+                        ),
+                        child: Text(
+                          mono,
+                          style: ChatTheme.badge(
+                            color:
+                                isTeam
+                                    ? ChatTheme.pureSurface
+                                    : ChatTheme.charcoalInk,
+                          ).copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      if (isDm)
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: ChatTheme.successMintText,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: ChatTheme.clubhouseCanvas,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  isTeam ? 'Team Chat' : 'Direct Message',
-                  style: CkType.body(
-                    fontSize: 11,
-                    color: CkColors.muted,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: ChatTheme.headlineSm(),
+                        ),
+                        const SizedBox(height: 1),
+                        subtitleWidget,
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+            ),
+          ),
+
+          // Trailing Info / More trigger
+          IconButton(
+            onPressed: () => _openDetails(context),
+            tooltip: 'Details',
+            icon: const Icon(
+              Icons.info_outline_rounded,
+              size: 22,
+              color: ChatTheme.charcoalInk,
             ),
           ),
         ],
@@ -464,28 +817,157 @@ class _ThreadHeader extends StatelessWidget {
   }
 }
 
-// ─── Conversation list ───────────────────────────────────────────────────────
+// ─── Header: Selection Mode ──────────────────────────────────────────────────
+
+class _SelectionHeader extends StatelessWidget {
+  const _SelectionHeader({
+    required this.selectedMessage,
+    required this.onClose,
+    required this.onReply,
+    required this.onDelete,
+  });
+
+  final Message selectedMessage;
+  final VoidCallback onClose;
+  final ValueChanged<Message> onReply;
+  final ValueChanged<Message> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: const BoxDecoration(
+        color: ChatTheme.clubhouseCanvas,
+        border: Border(bottom: BorderSide(color: ChatTheme.hairlineSand)),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: onClose,
+            tooltip: 'Deselect',
+            icon: const Icon(Icons.close_rounded, color: ChatTheme.charcoalInk),
+          ),
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: ChatTheme.matchDayCoral,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '1 SELECTED',
+                style: ChatTheme.badge(
+                  color: ChatTheme.charcoalInk,
+                ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.5),
+              ),
+            ],
+          ),
+          const Spacer(),
+          // Reply Action Pill
+          GestureDetector(
+            onTap: () => onReply(selectedMessage),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: ChatTheme.softSandFill,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: ChatTheme.hairlineSand),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.reply_rounded,
+                    size: 16,
+                    color: ChatTheme.charcoalInk,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Reply',
+                    style: ChatTheme.button(color: ChatTheme.charcoalInk),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Delete Action Pill (if own message)
+          if (selectedMessage.fromMe)
+            GestureDetector(
+              onTap: () => onDelete(selectedMessage),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: ChatTheme.destructiveCoralBg,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: ChatTheme.destructiveCoralText.withValues(
+                      alpha: 0.3,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.delete_outline_rounded,
+                      size: 16,
+                      color: ChatTheme.destructiveCoralText,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Delete',
+                      style: ChatTheme.button(
+                        color: ChatTheme.destructiveCoralText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Conversation Timeline ───────────────────────────────────────────────────
 
 class _Conversation extends StatelessWidget {
   const _Conversation({
     required this.messages,
     required this.isTeam,
     required this.scroll,
+    required this.selectedMessage,
     required this.isLoadingOlder,
     required this.hasMoreOlder,
     required this.onLoadOlder,
     required this.onReply,
+    required this.onSelect,
     required this.onDelete,
+    required this.onReaction,
+    this.initialUnreadCount,
   });
 
   final List<Message> messages;
   final bool isTeam;
   final ScrollController scroll;
+  final Message? selectedMessage;
   final bool isLoadingOlder;
   final bool hasMoreOlder;
   final VoidCallback onLoadOlder;
   final ValueChanged<Message> onReply;
+  final ValueChanged<Message> onSelect;
   final ValueChanged<Message> onDelete;
+  final void Function(Message m, String emoji) onReaction;
+  final int? initialUnreadCount;
 
   static const _loadOlderThreshold = 5;
 
@@ -497,11 +979,23 @@ class _Conversation extends StatelessWidget {
     return ListView.builder(
       controller: scroll,
       reverse: true,
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
       itemCount: itemCount,
       itemBuilder: (context, i) {
         if (isLoadingOlder && i == items.length) {
-          return const _LoadOlderSpinner();
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: ChatTheme.mutedStone,
+                ),
+              ),
+            ),
+          );
         }
         if (hasMoreOlder &&
             !isLoadingOlder &&
@@ -513,18 +1007,28 @@ class _Conversation extends StatelessWidget {
     );
   }
 
-  /// Group messages by date and check consecutive senders.
   List<Widget> _buildItems(List<Message> msgs) {
     final out = <Widget>[];
     DateTime? lastDay;
     String? lastSenderId;
 
+    final unreadBoundaryIndex = (initialUnreadCount != null && initialUnreadCount! > 0)
+        ? msgs.length - initialUnreadCount!
+        : -1;
+
     for (int i = 0; i < msgs.length; i++) {
+      if (i == unreadBoundaryIndex && unreadBoundaryIndex >= 0 && unreadBoundaryIndex < msgs.length) {
+        out.add(const _UnreadDividerChip('NEW MESSAGES'));
+      }
+
       final m = msgs[i];
-      final day = DateTime(m.createdAt.year, m.createdAt.month, m.createdAt.day);
+      final day = DateTime(
+        m.createdAt.year,
+        m.createdAt.month,
+        m.createdAt.day,
+      );
       if (lastDay == null || day != lastDay) {
-        out.add(_DayDivider(_formatDay(day)));
-        out.add(const SizedBox(height: 8));
+        out.add(_DayDividerChip(_formatDay(day)));
         lastDay = day;
         lastSenderId = null;
       }
@@ -537,8 +1041,11 @@ class _Conversation extends StatelessWidget {
           message: m,
           isTeam: isTeam,
           showSender: showSender,
+          isSelected: selectedMessage?.id == m.id,
           onReply: onReply,
+          onSelect: onSelect,
           onDelete: onDelete,
+          onReactionSelected: onReaction,
         ),
       );
     }
@@ -549,57 +1056,435 @@ class _Conversation extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
-    if (day == today) return 'Today';
-    if (day == yesterday) return 'Yesterday';
-    return DateFormat('EEE, MMM d').format(day);
+    if (day == today) return 'TODAY';
+    if (day == yesterday) return 'YESTERDAY';
+    return DateFormat('EEEE, d MMM').format(day).toUpperCase();
   }
 }
 
-class _DayDivider extends StatelessWidget {
-  const _DayDivider(this.label);
+// ─── Day Divider Chip ────────────────────────────────────────────────────────
+
+class _DayDividerChip extends StatelessWidget {
+  const _DayDividerChip(this.label);
   final String label;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        margin: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: CkColors.paper2,
+          color: ChatTheme.softSandFill,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: CkColors.hairline.withValues(alpha: 0.6)),
+          border: Border.all(color: ChatTheme.hairlineSand),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromRGBO(36, 35, 31, 0.02),
+              offset: Offset(0, 1),
+              blurRadius: 2,
+            ),
+          ],
         ),
         child: Text(
           label,
-          style: CkType.mono(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.08,
-            color: CkColors.muted,
-          ),
+          style: ChatTheme.badge(
+            color: ChatTheme.mutedStone,
+          ).copyWith(fontSize: 10, letterSpacing: 0.6),
         ),
       ),
     );
   }
 }
 
-class _LoadOlderSpinner extends StatelessWidget {
-  const _LoadOlderSpinner();
+// ─── Unread Divider Chip ─────────────────────────────────────────────────────
+
+class _UnreadDividerChip extends StatelessWidget {
+  const _UnreadDividerChip(this.label);
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 12),
-      child: Center(
-        child: SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: CkColors.muted,
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Divider(color: ChatTheme.hairlineSand, height: 1),
           ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: ChatTheme.destructiveCoralBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ChatTheme.hairlineSand),
+            ),
+            child: Text(
+              label,
+              style: ChatTheme.badge(color: ChatTheme.destructiveCoralText)
+                  .copyWith(fontSize: 10, letterSpacing: 0.8),
+            ),
+          ),
+          const Expanded(
+            child: Divider(color: ChatTheme.hairlineSand, height: 1),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Scroll To Bottom Pill ───────────────────────────────────────────────────
+
+class _ScrollToBottomPill extends StatelessWidget {
+  const _ScrollToBottomPill({
+    required this.count,
+    required this.onTap,
+  });
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: ChatTheme.matchDayCoral,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromRGBO(0, 0, 0, 0.2),
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
         ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.arrow_downward, color: Colors.white, size: 14),
+            const SizedBox(width: 6),
+            Text(
+              count > 1 ? '$count new messages' : 'New message',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Typing Indicator ────────────────────────────────────────────────────────
+
+class _TypingIndicator extends StatefulWidget {
+  const _TypingIndicator({required this.displayName});
+
+  final String displayName;
+
+  @override
+  State<_TypingIndicator> createState() => _TypingIndicatorState();
+}
+
+class _TypingIndicatorState extends State<_TypingIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      color: ChatTheme.clubhouseCanvas,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(3, (index) {
+                  final delay = index * 0.2;
+                  final value = (_controller.value - delay) % 1.0;
+                  final opacity = (value < 0.5 ? value * 2 : (1.0 - value) * 2)
+                      .clamp(0.25, 1.0);
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: ChatTheme.charcoalInk.withValues(alpha: opacity),
+                    ),
+                  );
+                }),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              '${widget.displayName} is typing...',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ChatTheme.bodySm(
+                color: ChatTheme.mutedStone,
+              ).copyWith(fontStyle: FontStyle.italic),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Notices and Empty State ─────────────────────────────────────────────────
+
+class _RequestNoticeBanner extends StatelessWidget {
+  const _RequestNoticeBanner({required this.userName});
+  final String userName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: ChatTheme.clubhouseCanvas,
+        border: Border(bottom: BorderSide(color: ChatTheme.hairlineSand)),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: ChatTheme.softSandFill,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: ChatTheme.hairlineSand),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.visibility_off_outlined,
+              size: 14,
+              color: ChatTheme.mutedStone,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                '$userName won\'t know you\'ve seen this until you accept.',
+                overflow: TextOverflow.ellipsis,
+                style: ChatTheme.metadata(color: ChatTheme.mutedStone),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RequestActionBar extends StatelessWidget {
+  const _RequestActionBar({
+    required this.onAccept,
+    required this.onDecline,
+    required this.onBlock,
+    this.userName,
+    this.isLoading = false,
+  });
+
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+  final VoidCallback onBlock;
+  final String? userName;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      decoration: const BoxDecoration(
+        color: ChatTheme.pureSurface,
+        border: Border(top: BorderSide(color: ChatTheme.hairlineSand)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Accepting allows ${userName ?? "them"} to message you directly.',
+            textAlign: TextAlign.center,
+            style: ChatTheme.metadata(color: ChatTheme.mutedStone),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Block Button
+              Expanded(
+                child: SizedBox(
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : onBlock,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ChatTheme.destructiveCoralBg,
+                      foregroundColor: ChatTheme.destructiveCoralText,
+                      elevation: 0,
+                      side: BorderSide(
+                        color: ChatTheme.destructiveCoralText.withValues(alpha: 0.2),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.block_rounded, size: 17),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Block',
+                          style: ChatTheme.button(
+                            color: ChatTheme.destructiveCoralText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Delete Button
+              Expanded(
+                child: SizedBox(
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : onDecline,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ChatTheme.softSandFill,
+                      foregroundColor: ChatTheme.charcoalInk,
+                      elevation: 0,
+                      side: const BorderSide(color: ChatTheme.hairlineSand),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.delete_outline_rounded, size: 17, color: ChatTheme.mutedStone),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Delete',
+                          style: ChatTheme.button(color: ChatTheme.charcoalInk),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Accept Button (Expanded slightly more for emphasis)
+              Expanded(
+                flex: 125,
+                child: SizedBox(
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : onAccept,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ChatTheme.matchDayCoral,
+                      foregroundColor: ChatTheme.pureSurface,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: ChatTheme.pureSurface,
+                            ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.check_rounded, size: 18, color: ChatTheme.pureSurface),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Accept',
+                                style: ChatTheme.button(color: ChatTheme.pureSurface)
+                                    .copyWith(fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingOutgoingNotice extends StatelessWidget {
+  const _PendingOutgoingNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+      decoration: const BoxDecoration(
+        color: ChatTheme.softSandFill,
+        border: Border(top: BorderSide(color: ChatTheme.hairlineSand)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.hourglass_top_rounded,
+            size: 18,
+            color: ChatTheme.mutedStone,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Message request sent. You can send more messages once they accept.',
+              style: ChatTheme.bodySm(color: ChatTheme.mutedStone),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -619,30 +1504,25 @@ class _EmptyBody extends StatelessWidget {
             Container(
               width: 52,
               height: 52,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: CkColors.paper2,
+                color: ChatTheme.softSandFill,
                 shape: BoxShape.circle,
-                border: Border.all(color: CkColors.hairline),
+                border: Border.all(color: ChatTheme.hairlineSand),
               ),
               child: const Icon(
                 Icons.chat_bubble_outline_rounded,
                 size: 24,
-                color: CkColors.muted,
+                color: ChatTheme.mutedStone,
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              'No messages yet',
-              style: CkType.display(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
+            const SizedBox(height: 14),
+            Text('No messages yet', style: ChatTheme.headlineSm()),
             const SizedBox(height: 4),
             Text(
               'Say hello to start the conversation.',
               textAlign: TextAlign.center,
-              style: CkType.body(
-                fontSize: 13,
-                color: CkColors.muted,
-              ),
+              style: ChatTheme.bodySm(color: ChatTheme.mutedStone),
             ),
           ],
         ),
@@ -667,193 +1547,13 @@ class _ErrorBody extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: CkType.body(fontSize: 13, color: CkColors.ink, height: 1.5),
+              style: ChatTheme.bodyMd(),
             ),
             const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: onRetry,
-              child: const Text('Retry'),
-            ),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),
     );
   }
 }
-
-// ─── Request Widgets ─────────────────────────────────────────────────────────
-
-class _RequestNoticeBanner extends StatelessWidget {
-  const _RequestNoticeBanner({required this.userName});
-  final String userName;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: const BoxDecoration(
-        color: CkColors.paper2,
-        border: Border(bottom: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: CkColors.ink.withValues(alpha: 0.06),
-              shape: BoxShape.circle,
-            ),
-            child: const V2Svg(
-              V2Icons.messages,
-              size: 14,
-              color: CkColors.ink,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Message Request',
-                  style: CkType.display(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: CkColors.ink,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$userName wants to send you a message. Accept to reply and add them to your Direct Messages.',
-                  style: CkType.body(
-                    fontSize: 11.5,
-                    color: CkColors.muted,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RequestActionBar extends StatelessWidget {
-  const _RequestActionBar({
-    required this.onAccept,
-    required this.onDecline,
-    this.isLoading = false,
-  });
-
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
-  final bool isLoading;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      decoration: const BoxDecoration(
-        color: CkColors.paper,
-        border: Border(top: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: isLoading ? null : onDecline,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                side: const BorderSide(color: CkColors.hairline),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Delete',
-                style: CkType.body(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: CkColors.red,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: isLoading ? null : onAccept,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: CkColors.ink,
-                foregroundColor: CkColors.paper,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: isLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: CkColors.paper,
-                      ),
-                    )
-                  : Text(
-                      'Accept',
-                      style: CkType.body(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: CkColors.paper,
-                      ),
-                    ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PendingOutgoingNotice extends StatelessWidget {
-  const _PendingOutgoingNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-      decoration: const BoxDecoration(
-        color: CkColors.paper2,
-        border: Border(top: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.hourglass_top_rounded,
-            size: 18,
-            color: CkColors.muted,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Message request sent. You can send more messages once they accept.',
-              style: CkType.body(
-                fontSize: 12,
-                color: CkColors.muted,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-

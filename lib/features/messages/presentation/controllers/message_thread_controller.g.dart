@@ -116,7 +116,7 @@ final class MessageThreadProvider
   }
 }
 
-String _$messageThreadHash() => r'8728fe5279bcdf49aed0e0694ba6fe9d8c429c7c';
+String _$messageThreadHash() => r'3c12d9b864dccd4757b16e90175d2fe00b40648c';
 
 /// Streams the messages in a chat and exposes the write actions.
 ///

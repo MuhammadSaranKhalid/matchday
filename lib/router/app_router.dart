@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../core/theme/circk_theme.dart';
+import '../features/settings/presentation/screens/settings_screen.dart';
 import '../core/widgets/ck_push_nav.dart';
 import '../features/auth/presentation/providers/auth_providers.dart';
 import '../features/auth/presentation/screens/sign_in_screen.dart';
@@ -10,6 +11,9 @@ import '../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../features/home/presentation/screens/home_feed_screen.dart';
 import '../features/matches/presentation/screens/matches_v2_screen.dart';
 import '../features/messages/presentation/screens/message_thread_screen.dart';
+import '../features/messages/presentation/screens/message_requests_screen.dart';
+import '../features/messages/presentation/screens/chat_details_screen.dart';
+import '../features/messages/domain/entities/chat.dart';
 import '../features/profile/presentation/screens/my_profile_screen.dart';
 import '../features/profile/presentation/screens/profile_edit_screen.dart';
 import '../features/profile/presentation/screens/public_profile_screen.dart';
@@ -396,18 +400,14 @@ GoRouter appRouter(Ref ref) {
           tournamentId: state.pathParameters['tournamentId']!,
         ),
       ),
-      // Side panel · Account zone. Both rows are drawn live in the Side Panel
-      // design; neither destination is built yet. `Saved` has mock UI inside
-      // posts but no screen of its own, and `Settings` still has to be built
-      // before store review (notification prefs, privacy, blocked users,
-      // account deletion, legal links).
+      // Account settings and saved content.
       GoRoute(
         path: '/saved',
         builder: (_, __) => const ComingSoonScreen(tab: 'Saved'),
       ),
       GoRoute(
         path: '/settings',
-        builder: (_, __) => const ComingSoonScreen(tab: 'Settings'),
+        builder: (_, __) => const SettingsScreen(),
       ),
       // Legacy redirects for Pavilion and old paths
       GoRoute(
@@ -564,12 +564,27 @@ GoRouter appRouter(Ref ref) {
         path: '/notifications',
         builder: (_, __) => const NotificationsScreen(),
       ),
+      // Message requests screen
+      GoRoute(
+        path: '/messages/requests',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, __) => const MessageRequestsScreen(),
+      ),
       // Message thread — rendered full-screen over the shell
       GoRoute(
         path: '/messages/:chatId',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (_, state) => MessageThreadScreen(
           chatId: state.pathParameters['chatId']!,
+        ),
+      ),
+      // Chat details screen (team info / DM profile / roster / settings)
+      GoRoute(
+        path: '/messages/:chatId/details',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, state) => ChatDetailsScreen(
+          chatId: state.pathParameters['chatId']!,
+          chat: state.extra as Chat?,
         ),
       ),
       // Public profile by @username — the landing for a shared

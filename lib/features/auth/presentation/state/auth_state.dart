@@ -44,6 +44,11 @@ class AuthSigningInWithGoogle extends AuthState {
   const AuthSigningInWithGoogle();
 }
 
+/// Facebook OAuth in progress.
+class AuthSigningInWithFacebook extends AuthState {
+  const AuthSigningInWithFacebook();
+}
+
 /// Sign-in succeeded. Router redirects on this transition.
 class AuthAuthenticated extends AuthState {
   const AuthAuthenticated(this.user);

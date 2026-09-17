@@ -246,6 +246,64 @@ class TeamsRepositoryImpl implements TeamsRepository {
   }
 
   @override
+  Future<Either<Failure, TeamInvite?>> getMyPendingInviteForTeam(
+      String teamId) async {
+    try {
+      final row = await _remote.getMyPendingInviteForTeam(teamId);
+      if (row == null) return const Right(null);
+      final inviter = row['inviter'] as Map<String, dynamic>?;
+      return Right(TeamInvite(
+        inviteId: row['invite_id'] as String,
+        teamId: row['team_id'] as String,
+        inviteeId: row['invitee_id'] as String,
+        invitedBy: row['invited_by'] as String,
+        role: MemberRole.fromWire(row['role'] as String?),
+        status: row['status'] as String? ?? 'pending',
+        createdAt: DateTime.parse(row['created_at'] as String),
+        message: row['message'] as String?,
+        jerseyNumber: row['jersey_number'] as int?,
+        inviterName: inviter?['display_name'] as String? ??
+            inviter?['username'] as String?,
+        inviterUsername: inviter?['username'] as String?,
+      ));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> acceptTeamInvite(String inviteId) async {
+    try {
+      await _remote.acceptTeamInvite(inviteId);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> declineTeamInvite(String inviteId) async {
+    try {
+      await _remote.declineTeamInvite(inviteId);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<TeamClaimRequest>>> getTeamPendingClaimRequests(
       String teamId) async {
     try {

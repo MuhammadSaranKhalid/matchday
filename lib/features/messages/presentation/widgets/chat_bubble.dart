@@ -1,243 +1,383 @@
+import 'dart:io' as io;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/theme/circk_theme.dart';
+import 'chat_theme.dart';
 import '../../../posts/domain/entities/post_media.dart';
 import '../../../posts/presentation/screens/photo_viewer_screen.dart';
+import '../../../safety/presentation/providers/safety_providers.dart';
+import '../../domain/entities/chat_message.dart' show MessageDeliveryStatus;
 import '../../domain/entities/message.dart';
 
-class ChatBubble extends StatelessWidget {
+class ChatBubble extends ConsumerStatefulWidget {
   const ChatBubble({
     super.key,
     required this.message,
     required this.isTeam,
     this.showSender = true,
+    this.isSelected = false,
     this.onReply,
     this.onDelete,
+    this.onSelect,
+    this.onReactionSelected,
   });
 
   final Message message;
   final bool isTeam;
   final bool showSender;
+  final bool isSelected;
   final ValueChanged<Message>? onReply;
   final ValueChanged<Message>? onDelete;
+  final ValueChanged<Message>? onSelect;
+  final void Function(Message message, String emoji)? onReactionSelected;
 
+  @override
+  ConsumerState<ChatBubble> createState() => _ChatBubbleState();
+}
+
+class _ChatBubbleState extends ConsumerState<ChatBubble> {
   static final _timeFmt = DateFormat('h:mm a');
+  double _dragOffset = 0.0;
+  bool _showingReactions = false;
 
   @override
   Widget build(BuildContext context) {
-    final me = message.fromMe;
-    final isDeleted = message.isDeleted;
-    final senderName = message.senderDisplayName ?? 'Deleted user';
-    final time = _timeFmt.format(message.createdAt.toLocal()).toLowerCase();
+    if (ref.watch(blockedAccountsProvider).value?.any((u) => u.id == widget.message.senderId) ?? false) {
+      return const SizedBox.shrink();
+    }
 
-    return Align(
-      alignment: me ? Alignment.centerRight : Alignment.centerLeft,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onLongPress: isDeleted ? null : () => _showActionsSheet(context),
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.76,
-          ),
-          margin: const EdgeInsets.symmetric(vertical: 2.5),
-          decoration: BoxDecoration(
-            color: me ? CkColors.ink : CkColors.paper2,
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(18),
-              topRight: const Radius.circular(18),
-              bottomLeft: Radius.circular(me ? 18 : 4),
-              bottomRight: Radius.circular(me ? 4 : 18),
-            ),
-            border: me
-                ? null
-                : Border.all(color: CkColors.hairline.withValues(alpha: 0.8)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF281E0F).withValues(alpha: 0.04),
-                offset: const Offset(0, 1),
-                blurRadius: 3,
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment:
-                me ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Team chat sender name
-              if (isTeam && !me && showSender && !isDeleted)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
-                  child: Text(
-                    senderName,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: CkColors.red,
-                    ),
-                  ),
-                ),
+    final m = widget.message;
+    final me = m.fromMe;
+    final isDeleted = m.isDeleted;
+    final senderName = m.senderDisplayName ?? 'Teammate';
+    final time = _timeFmt.format(m.createdAt.toLocal());
+    final isSelected = widget.isSelected;
 
-              // Quoted / Replied message preview
-              if (message.replyToBody != null &&
-                  message.replyToBody!.isNotEmpty &&
-                  !isDeleted)
-                _ReplyPreview(
-                  author: message.replyToAuthor ?? 'Replied message',
-                  body: message.replyToBody!,
-                  fromMe: me,
-                ),
+    // Sender initials monogram for team chat
+    final mono = senderName.isNotEmpty
+        ? senderName.trim().split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join().toUpperCase()
+        : '?';
 
-              // Photo attachment if any
-              if (message.isImage &&
-                  message.mediaUrl != null &&
-                  message.mediaUrl!.isNotEmpty &&
-                  !isDeleted)
-                _PhotoAttachment(
-                  url: message.mediaUrl!,
-                  fromMe: me,
-                  caption: message.body != 'Photo' ? message.body : null,
-                ),
-
-              // Text Body & Time
-              if (!message.isImage || (message.body != 'Photo' && !message.isImage))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.end,
-                    spacing: 8,
-                    runSpacing: 2,
-                    children: [
-                      Text(
-                        isDeleted ? 'This message was deleted' : message.body,
-                        style: isDeleted
-                            ? TextStyle(
-                                fontSize: 13,
-                                fontStyle: FontStyle.italic,
-                                color: me
-                                    ? CkColors.paper.withValues(alpha: 0.6)
-                                    : CkColors.muted,
-                              )
-                            : TextStyle(
-                                fontSize: 13.5,
-                                height: 1.35,
-                                color: me ? CkColors.paper : CkColors.ink,
-                              ),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Swipe-to-reply wrapper
+        GestureDetector(
+          onHorizontalDragUpdate: (details) {
+            if (details.primaryDelta != null && details.primaryDelta! > 0) {
+              setState(() {
+                _dragOffset = (_dragOffset + details.primaryDelta!).clamp(0.0, 72.0);
+              });
+            } else if (details.primaryDelta != null && details.primaryDelta! < 0) {
+              setState(() {
+                _dragOffset = (_dragOffset + details.primaryDelta!).clamp(0.0, 72.0);
+              });
+            }
+          },
+          onHorizontalDragEnd: (details) {
+            if (_dragOffset >= 48) {
+              HapticFeedback.lightImpact();
+              widget.onReply?.call(m);
+            }
+            setState(() => _dragOffset = 0.0);
+          },
+          onHorizontalDragCancel: () => setState(() => _dragOffset = 0.0),
+          behavior: HitTestBehavior.opaque,
+          child: Transform.translate(
+            offset: Offset(_dragOffset, 0),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: me ? MainAxisAlignment.end : MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Left avatar for team incoming messages
+                  if (!me && widget.isTeam) ...[
+                    Container(
+                      width: 32,
+                      height: 32,
+                      margin: const EdgeInsets.only(right: 8, top: 2),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: ChatTheme.surfaceContainerHigh,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: ChatTheme.hairlineSand),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (message.isEdited && !isDeleted)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 3),
-                              child: Text(
-                                'edited',
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  color: me
-                                      ? CkColors.paper.withValues(alpha: 0.6)
-                                      : CkColors.muted,
-                                ),
+                      child: Text(
+                        mono,
+                        style: ChatTheme.badge(
+                          color: ChatTheme.charcoalInk,
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Bubble body & sender name
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: me ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      children: [
+                        // Team chat sender name above incoming message
+                        if (!me && widget.isTeam && widget.showSender && !isDeleted)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4, bottom: 3),
+                            child: Text(
+                              senderName,
+                              style: ChatTheme.rowTitle(
+                                color: ChatTheme.charcoalInk,
                               ),
-                            ),
-                          Text(
-                            time,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: me
-                                  ? CkColors.paper.withValues(alpha: 0.65)
-                                  : CkColors.muted,
                             ),
                           ),
-                          if (me && !isDeleted) ...[
-                            const SizedBox(width: 3),
-                            Icon(
-                              Icons.done_all_rounded,
-                              size: 13,
-                              color: CkColors.paper.withValues(alpha: 0.75),
+
+                        // Bubble container
+                        GestureDetector(
+                          onLongPress: isDeleted ? null : () => _handleLongPress(context),
+                          onTap: () {
+                            if (_showingReactions) {
+                              setState(() => _showingReactions = false);
+                            }
+                            if (widget.onSelect != null && isSelected) {
+                              widget.onSelect!(m);
+                            }
+                          },
+                          behavior: HitTestBehavior.opaque,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                constraints: BoxConstraints(
+                                  maxWidth: MediaQuery.of(context).size.width * (me ? 0.82 : 0.85),
+                                ),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: me ? ChatTheme.charcoalInk : ChatTheme.pureSurface,
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: const Radius.circular(14),
+                                    topRight: const Radius.circular(14),
+                                    bottomLeft: Radius.circular(me ? 14 : 4),
+                                    bottomRight: Radius.circular(me ? 4 : 14),
+                                  ),
+                                  border: isSelected
+                                      ? Border.all(color: ChatTheme.matchDayCoral, width: 2)
+                                      : (me
+                                          ? null
+                                          : Border.all(color: ChatTheme.hairlineSand)),
+                                  boxShadow: isSelected
+                                      ? [
+                                          BoxShadow(
+                                            color: ChatTheme.matchDayCoral.withValues(alpha: 0.15),
+                                            offset: const Offset(0, 2),
+                                            blurRadius: 8,
+                                          ),
+                                        ]
+                                      : (me ? null : ChatTheme.whisperShadow),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      me ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Nested Quoted Reply Card
+                                    if (m.replyToBody != null &&
+                                        m.replyToBody!.isNotEmpty &&
+                                        !isDeleted)
+                                      _NestedReplyCard(
+                                        author: m.replyToAuthor ?? 'Replying',
+                                        body: m.replyToBody!,
+                                        fromMe: me,
+                                      ),
+
+                                    // Photo Attachment
+                                    if (m.isImage &&
+                                        m.mediaUrl != null &&
+                                        m.mediaUrl!.isNotEmpty &&
+                                        !isDeleted)
+                                      _PhotoAttachment(
+                                        url: m.mediaUrl!,
+                                        fromMe: me,
+                                        caption: m.body != 'Photo' ? m.body : null,
+                                      ),
+
+                                    // Text Content
+                                    if (!m.isImage || (m.body != 'Photo' && !m.isImage))
+                                      Text(
+                                        isDeleted ? 'This message was deleted' : m.body,
+                                        style: isDeleted
+                                            ? ChatTheme.bodyMd(
+                                                color: me
+                                                    ? ChatTheme.pureSurface.withValues(alpha: 0.6)
+                                                    : ChatTheme.mutedStone,
+                                              ).copyWith(fontStyle: FontStyle.italic)
+                                            : ChatTheme.bodyMd(
+                                                color: me ? ChatTheme.pureSurface : ChatTheme.charcoalInk,
+                                              ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+
+                              // Selected Checkmark Badge Indicator
+                              if (isSelected)
+                                Positioned(
+                                  top: -6,
+                                  right: -6,
+                                  child: Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: const BoxDecoration(
+                                      color: ChatTheme.matchDayCoral,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check,
+                                      size: 13,
+                                      color: ChatTheme.pureSurface,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+
+                        // Timestamp & Read Receipts Row
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 2, right: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                time,
+                                style: ChatTheme.timestamp(),
+                              ),
+                              if (m.isEdited && !isDeleted) ...[
+                                const SizedBox(width: 4),
+                                Text(
+                                  '• edited',
+                                  style: ChatTheme.timestamp(),
+                                ),
+                              ],
+                              if (me && !isDeleted) ...[
+                                const SizedBox(width: 4),
+                                switch (m.deliveryStatus) {
+                                  MessageDeliveryStatus.pending ||
+                                  MessageDeliveryStatus.sending =>
+                                    const Icon(
+                                      Icons.access_time_rounded,
+                                      size: 13,
+                                      color: ChatTheme.mutedStone,
+                                    ),
+                                  MessageDeliveryStatus.sent =>
+                                    const Icon(
+                                      Icons.check_rounded,
+                                      size: 14,
+                                      color: ChatTheme.mutedStone,
+                                    ),
+                                  MessageDeliveryStatus.delivered =>
+                                    const Icon(
+                                      Icons.done_all_rounded,
+                                      size: 14,
+                                      color: ChatTheme.mutedStone,
+                                    ),
+                                  MessageDeliveryStatus.read =>
+                                    const Icon(
+                                      Icons.done_all_rounded,
+                                      size: 14,
+                                      color: ChatTheme.matchDayCoral,
+                                    ),
+                                  MessageDeliveryStatus.failed =>
+                                    const Icon(
+                                      Icons.error_outline_rounded,
+                                      size: 14,
+                                      color: ChatTheme.destructiveCoralText,
+                                    ),
+                                },
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        // Reaction badges
+                        if (m.reactions.isNotEmpty && !isDeleted)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: () {
+                                final counts = <String, int>{};
+                                for (final r in m.reactions) {
+                                  counts[r.reaction] = (counts[r.reaction] ?? 0) + 1;
+                                }
+                                return counts.entries.map((entry) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: ChatTheme.softSandFill,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: ChatTheme.hairlineSand),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(entry.key, style: const TextStyle(fontSize: 12)),
+                                        if (entry.value > 1) ...[
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '${entry.value}',
+                                            style: ChatTheme.metadata(
+                                              color: ChatTheme.charcoalInk,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                }).toList();
+                              }(),
                             ),
-                          ],
-                        ],
-                      ),
-                    ],
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
-      ),
+
+        // Floating Reaction Pill Bar on Long-Press
+        if (_showingReactions)
+          Positioned(
+            top: -42,
+            left: me ? null : 40,
+            right: me ? 16 : null,
+            child: _FloatingReactionBar(
+              onSelectEmoji: (emoji) {
+                setState(() => _showingReactions = false);
+                widget.onReactionSelected?.call(m, emoji);
+              },
+              onClose: () => setState(() => _showingReactions = false),
+            ),
+          ),
+      ],
     );
   }
 
-  void _showActionsSheet(BuildContext context) {
+  void _handleLongPress(BuildContext context) {
     HapticFeedback.mediumImpact();
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: CkColors.paper,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: CkColors.hairline,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.copy_rounded, size: 20, color: CkColors.ink),
-                  title: const Text('Copy Text', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    Clipboard.setData(ClipboardData(text: message.body));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Copied to clipboard'), duration: Duration(seconds: 1)),
-                    );
-                  },
-                ),
-                if (onReply != null)
-                  ListTile(
-                    leading: const Icon(Icons.reply_rounded, size: 20, color: CkColors.ink),
-                    title: const Text('Reply', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      onReply!(message);
-                    },
-                  ),
-                if (message.fromMe && onDelete != null)
-                  ListTile(
-                    leading: const Icon(Icons.delete_outline_rounded, size: 20, color: CkColors.red),
-                    title: const Text('Delete for Everyone', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: CkColors.red)),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      onDelete!(message);
-                    },
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    setState(() => _showingReactions = !_showingReactions);
+    widget.onSelect?.call(widget.message);
   }
 }
 
-class _ReplyPreview extends StatelessWidget {
-  const _ReplyPreview({
+// ─── Nested Quoted Reply Card ────────────────────────────────────────────────
+class _NestedReplyCard extends StatelessWidget {
+  const _NestedReplyCard({
     required this.author,
     required this.body,
     required this.fromMe,
@@ -250,18 +390,16 @@ class _ReplyPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: fromMe
             ? Colors.white.withValues(alpha: 0.12)
-            : CkColors.paper.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(10),
-        border: Border(
-          left: BorderSide(
-            color: fromMe ? CkColors.red : CkColors.ink,
-            width: 3.5,
-          ),
+            : ChatTheme.softSandFill,
+        borderRadius: BorderRadius.circular(8),
+        border: const Border(
+          left: BorderSide(color: ChatTheme.matchDayCoral, width: 3),
         ),
       ),
       child: Column(
@@ -272,22 +410,20 @@ class _ReplyPreview extends StatelessWidget {
             author,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
+            style: ChatTheme.metadata(
+              color: ChatTheme.matchDayCoral,
               fontWeight: FontWeight.w700,
-              color: fromMe ? CkColors.redSoft : CkColors.ink,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             body,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
+            style: ChatTheme.bodySm(
               color: fromMe
-                  ? CkColors.paper.withValues(alpha: 0.75)
-                  : CkColors.muted,
+                  ? ChatTheme.pureSurface.withValues(alpha: 0.8)
+                  : ChatTheme.mutedStone,
             ),
           ),
         ],
@@ -296,6 +432,73 @@ class _ReplyPreview extends StatelessWidget {
   }
 }
 
+// ─── Floating Reaction Bar ───────────────────────────────────────────────────
+class _FloatingReactionBar extends StatelessWidget {
+  const _FloatingReactionBar({
+    required this.onSelectEmoji,
+    required this.onClose,
+  });
+
+  final ValueChanged<String> onSelectEmoji;
+  final VoidCallback onClose;
+
+  static const _emojis = ['🏏', '🔥', '👍', '❤️', '👏', '😂'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: ChatTheme.pureSurface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: ChatTheme.hairlineSand),
+          boxShadow: ChatTheme.floatingCardShadow,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ..._emojis.map((emoji) => GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    onSelectEmoji(emoji);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    child: Text(
+                      emoji,
+                      style: const TextStyle(fontSize: 19),
+                    ),
+                  ),
+                )),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: onClose,
+              child: Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: ChatTheme.softSandFill,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: ChatTheme.hairlineSand),
+                ),
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 14,
+                  color: ChatTheme.mutedStone,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Photo Attachment ────────────────────────────────────────────────────────
 class _PhotoAttachment extends StatelessWidget {
   const _PhotoAttachment({
     required this.url,
@@ -329,38 +532,62 @@ class _PhotoAttachment extends StatelessWidget {
         );
       },
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
-          margin: const EdgeInsets.all(4),
+          margin: const EdgeInsets.only(bottom: 6),
           constraints: const BoxConstraints(
-            maxHeight: 240,
+            maxHeight: 220,
             minWidth: 160,
           ),
           child: Stack(
             fit: StackFit.passthrough,
             children: [
-              CachedNetworkImage(
-                imageUrl: url,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  height: 180,
-                  color: fromMe ? Colors.white12 : CkColors.paper,
-                  child: const Center(
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+              if (url.startsWith('/') || url.startsWith('file://'))
+                Image.file(
+                  io.File(url.replaceFirst('file://', '')),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    height: 120,
+                    color: fromMe ? Colors.white12 : ChatTheme.softSandFill,
+                    child: const Center(
+                      child: Icon(
+                        Icons.broken_image_rounded,
+                        size: 28,
+                        color: ChatTheme.mutedStone,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                CachedNetworkImage(
+                  imageUrl: url,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    height: 160,
+                    color: fromMe ? Colors.white12 : ChatTheme.softSandFill,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: ChatTheme.matchDayCoral,
+                        ),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    height: 120,
+                    color: fromMe ? Colors.white12 : ChatTheme.softSandFill,
+                    child: const Center(
+                      child: Icon(
+                        Icons.broken_image_rounded,
+                        size: 28,
+                        color: ChatTheme.mutedStone,
+                      ),
                     ),
                   ),
                 ),
-                errorWidget: (_, __, ___) => Container(
-                  height: 120,
-                  color: fromMe ? Colors.white12 : CkColors.paper,
-                  child: const Center(
-                    child: Icon(Icons.broken_image_rounded, size: 28, color: CkColors.muted),
-                  ),
-                ),
-              ),
               if (caption != null && caption!.isNotEmpty)
                 Positioned(
                   bottom: 0,

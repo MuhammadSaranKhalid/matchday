@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/v2/v2_kit.dart';
+import 'chat_theme.dart';
 
-/// Clean, sleek search bar for filtering messages and conversations.
+/// Stitch-styled search bar for filtering messages and conversations.
 class InboxSearchBar extends StatelessWidget {
   const InboxSearchBar({
     super.key,
@@ -21,51 +20,44 @@ class InboxSearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 2, 18, 10),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Container(
-        height: 42,
+        height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: CkColors.paper2,
-          borderRadius: BorderRadius.circular(12),
+          color: ChatTheme.softSandFill,
+          borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: CkColors.line.withValues(alpha: 0.7),
+            color: ChatTheme.hairlineSand,
             width: 1,
           ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const V2Svg(
-              V2Icons.search,
-              size: 16,
-              color: CkColors.muted,
+            const Icon(
+              Icons.search_rounded,
+              size: 19,
+              color: ChatTheme.mutedStone,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: TextField(
                 controller: controller,
                 onChanged: onChanged,
-                style: CkType.body(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: CkColors.ink,
-                ),
-                cursorColor: CkColors.ink,
+                style: ChatTheme.bodyMd(color: ChatTheme.charcoalInk),
+                cursorColor: ChatTheme.charcoalInk,
                 cursorWidth: 1.5,
                 decoration: InputDecoration(
                   isDense: true,
                   filled: false,
                   fillColor: Colors.transparent,
                   hintText: hintText,
-                  hintStyle: CkType.body(
-                    fontSize: 13.5,
-                    color: CkColors.muted,
-                  ),
+                  hintStyle: ChatTheme.bodyMd(color: ChatTheme.mutedStone),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
                 ),
               ),
             ),
@@ -82,13 +74,13 @@ class InboxSearchBar extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: const BoxDecoration(
-                      color: CkColors.hairline,
+                      color: ChatTheme.hairlineSand,
                       shape: BoxShape.circle,
                     ),
-                    child: const V2Svg(
-                      V2Icons.close,
-                      size: 12,
-                      color: CkColors.ink,
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 14,
+                      color: ChatTheme.charcoalInk,
                     ),
                   ),
                 );

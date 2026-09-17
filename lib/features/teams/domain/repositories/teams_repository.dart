@@ -37,6 +37,15 @@ abstract class TeamsRepository {
   /// Pending team invites sent to players.
   Future<Either<Failure, List<TeamInvite>>> getTeamPendingInvites(String teamId);
 
+  /// Pending team invite for the current user for a specific team.
+  Future<Either<Failure, TeamInvite?>> getMyPendingInviteForTeam(String teamId);
+
+  /// Accepts a team invite, atomically adding the user to the roster.
+  Future<Either<Failure, Unit>> acceptTeamInvite(String inviteId);
+
+  /// Declines a team invite.
+  Future<Either<Failure, Unit>> declineTeamInvite(String inviteId);
+
   /// Pending claim requests for offline player spots.
   Future<Either<Failure, List<TeamClaimRequest>>> getTeamPendingClaimRequests(String teamId);
 

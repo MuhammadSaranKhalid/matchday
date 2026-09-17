@@ -96,7 +96,7 @@ begin
   -- update. The NOT EXISTS subquery skips those rows so the bulk
   -- update completes; orphans are left as-is for operator review.
   if exists (select 1 from public.match_players where user_id = v_uid) then
-    select coalesce(display_name, 'Former player')
+    select 'Deleted player'
       into v_display_name
       from public.profiles
      where user_id = v_uid;
@@ -109,7 +109,9 @@ begin
     returning unclaimed_id into v_unclaimed_id;
 
     update public.match_players mp1
-       set user_id      = null,
+       set display_name = 'Deleted player',
+           jersey_number = null,
+           user_id      = null,
            unclaimed_id = v_unclaimed_id
      where user_id = v_uid
        and not exists (
@@ -137,6 +139,21 @@ begin
   -- Final cascade. Everything else hung off auth.users / profiles cleans
   -- up via its own ON DELETE CASCADE.
   -- ---------------------------------------------------------------------------
+  -- A profile's claimed placeholders must not retain identity/contact data.
+  update public.unclaimed_players set display_name = 'Deleted player',
+    phone_number = null, email = null, player_profile = '{}'::jsonb,
+    claimed_by_user_id = null, claimed_at = null where claimed_by_user_id = v_uid;
+  update public.messages set body = 'This message was deleted', payload = '{}'::jsonb,
+    deleted_at = now() where sender_id = v_uid;
+
+  -- The authenticated Edge Function removes bytes through the Storage API first.
+  -- Deleting storage.objects rows directly would leak the underlying objects.
+  if exists (select 1 from storage.objects o where o.owner_id = v_uid::text
+    or (o.bucket_id = 'avatars' and split_part(o.name, '/', 1) = v_uid::text)
+    or (o.bucket_id = 'post-media' and exists (select 1 from public.posts p
+      where p.author_id = v_uid and p.post_id::text = split_part(o.name, '/', 1)))) then
+    raise exception 'Remove uploaded files before completing account deletion';
+  end if;
   delete from auth.users where id = v_uid;
 end;
 $$;
@@ -264,3 +281,18 @@ drop trigger if exists profiles_strip_from_arrays on public.profiles;
 create trigger profiles_strip_from_arrays
   before delete on public.profiles
   for each row execute function public._strip_deleted_profile_from_arrays();
+
+-- Only the caller's own object names; bounded batches for the deletion worker.
+create or replace function public.my_deletion_objects()
+returns table(bucket_id text, name text)
+language sql stable security definer set search_path = '' as $$
+  select o.bucket_id, o.name from storage.objects o
+  where auth.uid() is not null and (
+    o.owner_id = auth.uid()::text
+    or (o.bucket_id = 'avatars' and split_part(o.name, '/', 1) = auth.uid()::text)
+    or (o.bucket_id = 'post-media' and exists(select 1 from public.posts p
+      where p.author_id = auth.uid() and p.post_id::text = split_part(o.name, '/', 1))))
+  order by o.bucket_id, o.name limit 100;
+$$;
+revoke all on function public.my_deletion_objects() from public, anon;
+grant execute on function public.my_deletion_objects() to authenticated;

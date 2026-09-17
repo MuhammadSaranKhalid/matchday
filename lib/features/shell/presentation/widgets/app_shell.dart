@@ -56,7 +56,7 @@ class AppShell extends StatelessWidget {
           children: [
             V2Header(
               title: title,
-              showSearch: index == 0,
+              showSearch: true,
               onSearchTap: () => context.push('/explore'),
               onBell: () => context.push('/notifications'),
               // The header's left slot is already the signed-in user's avatar

@@ -7,9 +7,15 @@ part 'app_database.g.dart';
 @DriftDatabase(
   tables: [
     WizardDrafts,
-    Chats,
-    Messages,
-    MessageDrafts,
+    LocalChannels,
+    LocalChannelMembers,
+    LocalMessages,
+    LocalMessageAttachments,
+    LocalMessageReactions,
+    LocalMemberRestrictions,
+    OutboxOperations,
+    ChannelSyncStates,
+    ChannelDrafts,
     ScoringOps,
     ScoringSnapshots,
     CachedMatches,
@@ -21,141 +27,138 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   /// An instance over a caller-supplied executor, for tests.
-  ///
-  /// The scoring write-ahead log is a durability guarantee, and a guarantee
-  /// asserted against a mock is not asserted at all — these tests run against
-  /// real SQLite so the transaction that allocates `local_seq` is genuinely
-  /// exercised.
   AppDatabase.forTesting(super.executor);
 
   /// Schema history:
-  /// - v1–v4 carried offline-first tables (`todos`, `pending_operations`,
-  ///   `teams`, `team_members`, `unclaimed_players`) that have since been
-  ///   removed.
+  /// - v1–v4: legacy offline-first tables.
   /// - v5: online-only reset; keeps only `wizard_drafts`.
-  /// - v6: messages read-through cache + drafts (ticket #23). Adds `chats`,
-  ///   `messages`, `message_drafts`. Names mirror the Supabase schema 1:1.
-  ///   Scoped to the messages feature only — other features remain
-  ///   online-only.
-  /// - v7: scoring write-ahead log (`scoring_ops`, `scoring_snapshots`). The
-  ///   second exemption to online-only, and the first offline WRITE path —
-  ///   a scorer with no signal keeps scoring and loses nothing. See
-  ///   docs/offline-scoring-design.md.
-  /// - v8: match hydration cache (`cached_matches`, `cached_match_players`,
-  ///   `cached_innings_states`) for offline cold-start of the scoring screen.
-  /// - v9: `scoring_ops.refused_at` — a terminal state for ops the server
-  ///   ANSWERED and rejected, as opposed to ops it never received. Without it
-  ///   a refused delivery stays pending forever, blocking every op queued
-  ///   behind it and holding `pendingOpsCount` above zero (which disables
-  ///   undo). Refused rows are kept, never deleted — design doc §19.3.
+  /// - v6: legacy messages read-through cache (`chats`, `messages`, `message_drafts`).
+  /// - v7: scoring write-ahead log (`scoring_ops`, `scoring_snapshots`).
+  /// - v8: match hydration cache.
+  /// - v9: `scoring_ops.refused_at`.
+  /// - v10: Target local-first chat architecture (Spec §7).
+  /// - v11: messageId primary key on LocalMessages.
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
-          // Fresh install — drift creates all tables declared on
-          // @DriftDatabase. createAll() does NOT process raw
-          // `CREATE INDEX` statements, so the hot-path indexes must be
-          // created explicitly here too (ticket #28). Without this call,
-          // every new install runs the inbox sort + thread paging without
-          // an index — every fresh user pays the full-scan cost forever.
           await m.createAll();
-          await _createMessagesIndexes(m);
+          await _createChatIndexes(m);
           await _createScoringIndexes(m);
         },
         onUpgrade: (m, from, to) async {
           if (from < 5) {
-            // Drop every offline-first table that may still exist on devices
-            // coming from v1–v4. `IF EXISTS` so this is idempotent and safe
-            // regardless of which subset the device actually has.
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS todos');
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS pending_operations');
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS teams');
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS team_members');
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS unclaimed_players');
-            // wizard_drafts was added at v3; only create it for devices
-            // jumping from v1/v2 — devices already at v3+ have it.
+            await m.database.customStatement('DROP TABLE IF EXISTS todos');
+            await m.database.customStatement('DROP TABLE IF EXISTS pending_operations');
+            await m.database.customStatement('DROP TABLE IF EXISTS teams');
+            await m.database.customStatement('DROP TABLE IF EXISTS team_members');
+            await m.database.customStatement('DROP TABLE IF EXISTS unclaimed_players');
             if (from < 3) {
               await m.createTable(wizardDrafts);
             }
           }
           if (from < 6) {
-            // The first iteration of v6 (PR #26 pre-rename) used
-            // `messages_chats` / `messages_messages` / `messages_drafts`.
-            // Drop them if they exist so a tester device that pulled the
-            // earlier commit gets the new names cleanly. Production users
-            // coming from v5 don't have these — DROP IF EXISTS is a no-op
-            // for them.
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS messages_chats');
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS messages_messages');
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS messages_drafts');
-
-            // Partial-rerun safety (ticket #28). The createTable calls
-            // below are not wrapped in an explicit transaction; if the
-            // process is killed mid-migration `schemaVersion` stays at 5
-            // and this block re-runs on next launch. Dropping the new
-            // names here too means any orphan half-created table from a
-            // prior partial run gets cleared. No-op on a clean upgrade.
+            await m.database.customStatement('DROP TABLE IF EXISTS messages_chats');
+            await m.database.customStatement('DROP TABLE IF EXISTS messages_messages');
+            await m.database.customStatement('DROP TABLE IF EXISTS messages_drafts');
             await m.database.customStatement('DROP TABLE IF EXISTS chats');
             await m.database.customStatement('DROP TABLE IF EXISTS messages');
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS message_drafts');
-
-            // Messages cache + drafts (ticket #23).
-            await m.createTable(chats);
-            await m.createTable(messages);
-            await m.createTable(messageDrafts);
-            await _createMessagesIndexes(m);
+            await m.database.customStatement('DROP TABLE IF EXISTS message_drafts');
           }
           if (from < 7) {
-            // Same partial-rerun safety as v6: not wrapped in an explicit
-            // transaction, so a kill mid-migration leaves schemaVersion at 6
-            // and re-runs this block.
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS scoring_ops');
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS scoring_snapshots');
+            await m.database.customStatement('DROP TABLE IF EXISTS scoring_ops');
+            await m.database.customStatement('DROP TABLE IF EXISTS scoring_snapshots');
             await m.createTable(scoringOps);
             await m.createTable(scoringSnapshots);
             await _createScoringIndexes(m);
           }
           if (from < 8) {
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS cached_matches');
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS cached_match_players');
-            await m.database
-                .customStatement('DROP TABLE IF EXISTS cached_innings_states');
+            await m.database.customStatement('DROP TABLE IF EXISTS cached_matches');
+            await m.database.customStatement('DROP TABLE IF EXISTS cached_match_players');
+            await m.database.customStatement('DROP TABLE IF EXISTS cached_innings_states');
             await m.createTable(cachedMatches);
             await m.createTable(cachedMatchPlayers);
             await m.createTable(cachedInningsStates);
           }
           if (from < 9) {
-            // Additive and nullable, so no data migration: every existing row
-            // reads as "not refused", which is the correct interpretation of
-            // a row written before the distinction existed.
             await m.addColumn(scoringOps, scoringOps.refusedAt);
-            // The partial index in _createScoringIndexes now needs to exclude
-            // refused rows too, so rebuild it.
-            await m.database
-                .customStatement('DROP INDEX IF EXISTS scoring_ops_pending');
+            await m.database.customStatement('DROP INDEX IF EXISTS scoring_ops_pending');
             await _createScoringIndexes(m);
+          }
+          if (from < 10) {
+            await m.database.customStatement('DROP TABLE IF EXISTS chats');
+            await m.database.customStatement('DROP TABLE IF EXISTS messages');
+            await m.database.customStatement('DROP TABLE IF EXISTS message_drafts');
+
+            await m.createTable(localChannels);
+            await m.createTable(localChannelMembers);
+            await m.createTable(localMessages);
+            await m.createTable(localMessageAttachments);
+            await m.createTable(localMessageReactions);
+            await m.createTable(localMemberRestrictions);
+            await m.createTable(outboxOperations);
+            await m.createTable(channelSyncStates);
+            await m.createTable(channelDrafts);
+            await _createChatIndexes(m);
+          }
+          if (from < 11) {
+            await m.database.transaction(() async {
+              final tables = await m.database
+                  .customSelect("SELECT name FROM sqlite_master WHERE type='table'")
+                  .get();
+              final tableNames = tables.map((r) => r.read<String>('name')).toSet();
+
+              if (tableNames.contains('local_messages')) {
+                await m.database.customStatement('ALTER TABLE local_messages RENAME TO _legacy_local_messages;');
+              }
+              if (tableNames.contains('outbox_operations')) {
+                await m.database.customStatement('ALTER TABLE outbox_operations RENAME TO _legacy_outbox_operations;');
+              }
+
+              // Drop auxiliary non-outbox tables
+              await m.database.customStatement('DROP TABLE IF EXISTS local_channels;');
+              await m.database.customStatement('DROP TABLE IF EXISTS local_channel_members;');
+              await m.database.customStatement('DROP TABLE IF EXISTS local_message_attachments;');
+              await m.database.customStatement('DROP TABLE IF EXISTS local_message_reactions;');
+              await m.database.customStatement('DROP TABLE IF EXISTS local_member_restrictions;');
+              await m.database.customStatement('DROP TABLE IF EXISTS channel_sync_states;');
+              await m.database.customStatement('DROP TABLE IF EXISTS channel_drafts;');
+
+              // Recreate all tables with definitive schema
+              await m.createTable(localChannels);
+              await m.createTable(localChannelMembers);
+              await m.createTable(localMessages);
+              await m.createTable(localMessageAttachments);
+              await m.createTable(localMessageReactions);
+              await m.createTable(localMemberRestrictions);
+              await m.createTable(outboxOperations);
+              await m.createTable(channelSyncStates);
+              await m.createTable(channelDrafts);
+
+              // Restore preserved rows
+              if (tableNames.contains('local_messages')) {
+                await m.database.customStatement('''
+                  INSERT OR REPLACE INTO local_messages 
+                  SELECT * FROM _legacy_local_messages;
+                ''');
+                await m.database.customStatement('DROP TABLE IF EXISTS _legacy_local_messages;');
+              }
+              if (tableNames.contains('outbox_operations')) {
+                await m.database.customStatement('''
+                  INSERT OR REPLACE INTO outbox_operations 
+                  SELECT * FROM _legacy_outbox_operations;
+                ''');
+                await m.database.customStatement('DROP TABLE IF EXISTS _legacy_outbox_operations;');
+              }
+
+              await _createChatIndexes(m);
+            });
           }
         },
       );
 
-  /// The outbox's only query is "unsynced ops for this innings, in order".
-  /// createAll() does not process raw CREATE INDEX, so fresh installs need this
-  /// explicitly too — the same trap ticket #28 documents for messages.
   Future<void> _createScoringIndexes(Migrator m) async {
     await m.database.customStatement(
       'CREATE INDEX IF NOT EXISTS scoring_ops_pending '
@@ -164,39 +167,33 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  /// Hot-path indexes for the messages cache. Called from BOTH `onCreate`
-  /// (fresh install) and `onUpgrade(from < 6)` because `m.createAll()` does
-  /// not process raw index statements — fresh installs would otherwise miss
-  /// them and pay full-scan cost on every inbox / thread query (ticket #28).
-  Future<void> _createMessagesIndexes(Migrator m) async {
+  Future<void> _createChatIndexes(Migrator m) async {
     await m.database.customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_chats_last_message_at '
-      'ON chats (last_message_at DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_local_messages_channel_seq '
+      'ON local_messages (channel_id, message_seq DESC)',
     );
     await m.database.customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_messages_chat_created '
-      'ON messages (chat_id, created_at DESC)',
+      "CREATE INDEX IF NOT EXISTS idx_local_messages_pending "
+      "ON local_messages (channel_id, local_created_at ASC) "
+      "WHERE sync_status != 'sent'",
+    );
+    await m.database.customStatement(
+      "CREATE INDEX IF NOT EXISTS idx_outbox_pending_lane "
+      "ON outbox_operations (channel_id, created_at ASC) "
+      "WHERE status = 'pending' OR status = 'retry_wait'",
+    );
+    await m.database.customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_local_channels_last_message '
+      'ON local_channels (last_message_at DESC)',
     );
   }
 
-  /// Wipe local drift state on sign-out so a different user on the same
-  /// device never sees the previous user's data. Covers all messages cache
-  /// tables in addition to wizard drafts.
-  /// Deliveries entered but never accepted by the server.
-  ///
-  /// Sign-out wipes the whole database, so this exists to let the caller ask
-  /// "is anything about to be thrown away?" BEFORE that happens. Discarding a
-  /// scorer's unsent overs without telling them would be the worst possible
-  /// way for this feature to fail.
   Future<int> pendingScoringOps({
     String? matchId,
     int? inningsNumber,
   }) async {
     final rows = await (select(scoringOps)
           ..where((t) {
-            // Refused ops are excluded: they are still owed to nobody. The
-            // server answered and said no, so counting them as "unsent" would
-            // keep the screen claiming unsaved work that will never save.
             var w = t.syncedAt.isNull() & t.refusedAt.isNull();
             if (matchId != null) w = w & t.matchId.equals(matchId);
             if (inningsNumber != null) {
@@ -211,12 +208,15 @@ class AppDatabase extends _$AppDatabase {
   Future<void> clear() async {
     await batch((b) {
       b.deleteAll(wizardDrafts);
-      b.deleteAll(chats);
-      b.deleteAll(messages);
-      b.deleteAll(messageDrafts);
-      // Unsynced deliveries belong to the scorer who entered them. Callers
-      // MUST warn before reaching here with a non-empty outbox — see
-      // pendingScoringOps — because this discards them irrecoverably.
+      b.deleteAll(localChannels);
+      b.deleteAll(localChannelMembers);
+      b.deleteAll(localMessages);
+      b.deleteAll(localMessageAttachments);
+      b.deleteAll(localMessageReactions);
+      b.deleteAll(localMemberRestrictions);
+      b.deleteAll(outboxOperations);
+      b.deleteAll(channelSyncStates);
+      b.deleteAll(channelDrafts);
       b.deleteAll(scoringOps);
       b.deleteAll(scoringSnapshots);
       b.deleteAll(cachedMatches);
@@ -226,16 +226,6 @@ class AppDatabase extends _$AppDatabase {
   }
 }
 
-/// drift_flutter handles native sqlite3 setup, path resolution, and
-/// background isolate creation. The DB file lives in the app's
-/// documents directory.
-///
-/// The [DriftWebOptions] are ignored on native platforms but are REQUIRED on
-/// web (drift_flutter throws `ArgumentError` otherwise). They point at the
-/// `sqlite3.wasm` + `drift_worker.js` assets in `web/`, which drift loads to
-/// run SQLite via WebAssembly (OPFS / IndexedDB) in the browser. This keeps
-/// the wizard-draft store working when the app is run on web; native builds
-/// are unaffected. (App remains mobile-first — web is a convenience target.)
 QueryExecutor _openConnection() => driftDatabase(
       name: 'novex_clean_arch',
       web: DriftWebOptions(

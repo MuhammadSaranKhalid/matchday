@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
@@ -87,8 +88,10 @@ class AuthRemoteDataSource {
       }
       return UserDto.fromSupabaseUser(user);
     } on AuthException catch (e) {
+      debugPrint('[GoogleSignIn] Supabase AuthException: ${e.message}');
       throw UnauthorizedException(e.message);
     } on GoogleSignInException catch (e) {
+      debugPrint('[GoogleSignIn] GoogleSignInException code=${e.code}, description=${e.description}');
       // Distinguish a deliberate user cancellation (maps to AuthFailure, a
       // benign "you cancelled" message) from genuine config/network failures
       // (ServerFailure, "something's wrong"). Lumping them together shows
@@ -97,10 +100,29 @@ class AuthRemoteDataSource {
         throw UnauthorizedException('Google sign-in was cancelled');
       }
       throw ServerException(
-        'Google sign-in is unavailable right now. Try email instead or try again later.',
+        'Google sign-in is unavailable right now (${e.code.name}: ${e.description ?? "unknown error"}). Try email instead or try again later.',
       );
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[GoogleSignIn] Unexpected error: $e\n$st');
       throw ServerException('Google sign-in failed: $e');
+    }
+  }
+
+  // ─── Facebook OAuth ─────────────────────────────────────────────────────
+
+  /// Launches Facebook OAuth via Supabase browser/custom tab flow.
+  Future<void> signInWithFacebook() async {
+    try {
+      await _supabase.auth.signInWithOAuth(
+        OAuthProvider.facebook,
+        redirectTo: kIsWeb ? null : 'com.joinmatchday.app://login-callback',
+      );
+    } on AuthException catch (e) {
+      debugPrint('[FacebookSignIn] Supabase AuthException: ${e.message}');
+      throw UnauthorizedException(e.message);
+    } catch (e, st) {
+      debugPrint('[FacebookSignIn] Unexpected error: $e\n$st');
+      throw ServerException('Facebook sign-in failed: $e');
     }
   }
 
@@ -114,6 +136,13 @@ class AuthRemoteDataSource {
     } on AuthException catch (e) {
       throw ServerException(e.message);
     }
+  }
+
+  Future<void> deleteAccount() async {
+    final response = await _supabase.functions.invoke('delete-account', body: {'confirmation': 'DELETE'});
+    if (response.status != 200) throw ServerException('Account deletion failed. Please retry or contact support.');
+    // Local sign-out clears the persisted session after the server deletes it.
+    await _supabase.auth.signOut(scope: SignOutScope.local);
   }
 
   UserDto? currentUser() {

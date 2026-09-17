@@ -9,98 +9,234 @@ part of 'messages_datasource_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(messagesRemoteDataSource)
-final messagesRemoteDataSourceProvider = MessagesRemoteDataSourceProvider._();
+@ProviderFor(chatLocalDataSource)
+final chatLocalDataSourceProvider = ChatLocalDataSourceProvider._();
 
-final class MessagesRemoteDataSourceProvider
+final class ChatLocalDataSourceProvider
     extends
         $FunctionalProvider<
-          MessagesRemoteDataSource,
-          MessagesRemoteDataSource,
-          MessagesRemoteDataSource
+          ChatLocalDataSource,
+          ChatLocalDataSource,
+          ChatLocalDataSource
         >
-    with $Provider<MessagesRemoteDataSource> {
-  MessagesRemoteDataSourceProvider._()
+    with $Provider<ChatLocalDataSource> {
+  ChatLocalDataSourceProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'messagesRemoteDataSourceProvider',
+        name: r'chatLocalDataSourceProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$messagesRemoteDataSourceHash();
+  String debugGetCreateSourceHash() => _$chatLocalDataSourceHash();
 
   @$internal
   @override
-  $ProviderElement<MessagesRemoteDataSource> $createElement(
+  $ProviderElement<ChatLocalDataSource> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  MessagesRemoteDataSource create(Ref ref) {
-    return messagesRemoteDataSource(ref);
+  ChatLocalDataSource create(Ref ref) {
+    return chatLocalDataSource(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(MessagesRemoteDataSource value) {
+  Override overrideWithValue(ChatLocalDataSource value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<MessagesRemoteDataSource>(value),
+      providerOverride: $SyncValueProvider<ChatLocalDataSource>(value),
     );
   }
 }
 
-String _$messagesRemoteDataSourceHash() =>
-    r'1083a5437bce7ffaccd5928dd30dee1acd88d550';
+String _$chatLocalDataSourceHash() =>
+    r'd5d7518b8c22311f9e5ef052798bfcf3de5175f2';
 
-@ProviderFor(messagesLocalDataSource)
-final messagesLocalDataSourceProvider = MessagesLocalDataSourceProvider._();
+@ProviderFor(chatRemoteDataSource)
+final chatRemoteDataSourceProvider = ChatRemoteDataSourceProvider._();
 
-final class MessagesLocalDataSourceProvider
+final class ChatRemoteDataSourceProvider
     extends
         $FunctionalProvider<
-          MessagesLocalDataSource,
-          MessagesLocalDataSource,
-          MessagesLocalDataSource
+          ChatRemoteDataSource,
+          ChatRemoteDataSource,
+          ChatRemoteDataSource
         >
-    with $Provider<MessagesLocalDataSource> {
-  MessagesLocalDataSourceProvider._()
+    with $Provider<ChatRemoteDataSource> {
+  ChatRemoteDataSourceProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'messagesLocalDataSourceProvider',
+        name: r'chatRemoteDataSourceProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$messagesLocalDataSourceHash();
+  String debugGetCreateSourceHash() => _$chatRemoteDataSourceHash();
 
   @$internal
   @override
-  $ProviderElement<MessagesLocalDataSource> $createElement(
+  $ProviderElement<ChatRemoteDataSource> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  MessagesLocalDataSource create(Ref ref) {
-    return messagesLocalDataSource(ref);
+  ChatRemoteDataSource create(Ref ref) {
+    return chatRemoteDataSource(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(MessagesLocalDataSource value) {
+  Override overrideWithValue(ChatRemoteDataSource value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<MessagesLocalDataSource>(value),
+      providerOverride: $SyncValueProvider<ChatRemoteDataSource>(value),
     );
   }
 }
 
-String _$messagesLocalDataSourceHash() =>
-    r'00dd2c66aa07cf3a11eadfd525ba0a82012bf968';
+String _$chatRemoteDataSourceHash() =>
+    r'3d1ca931d01fc053654b2828db7ecb0c3af23186';
+
+@ProviderFor(outboxProcessor)
+final outboxProcessorProvider = OutboxProcessorProvider._();
+
+final class OutboxProcessorProvider
+    extends
+        $FunctionalProvider<OutboxProcessor, OutboxProcessor, OutboxProcessor>
+    with $Provider<OutboxProcessor> {
+  OutboxProcessorProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'outboxProcessorProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$outboxProcessorHash();
+
+  @$internal
+  @override
+  $ProviderElement<OutboxProcessor> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  OutboxProcessor create(Ref ref) {
+    return outboxProcessor(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(OutboxProcessor value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<OutboxProcessor>(value),
+    );
+  }
+}
+
+String _$outboxProcessorHash() => r'4595bfee96b98685f010a7c4f764fd88ffa0aa42';
+
+@ProviderFor(realtimeIngestor)
+final realtimeIngestorProvider = RealtimeIngestorProvider._();
+
+final class RealtimeIngestorProvider
+    extends
+        $FunctionalProvider<
+          RealtimeIngestor,
+          RealtimeIngestor,
+          RealtimeIngestor
+        >
+    with $Provider<RealtimeIngestor> {
+  RealtimeIngestorProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'realtimeIngestorProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$realtimeIngestorHash();
+
+  @$internal
+  @override
+  $ProviderElement<RealtimeIngestor> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  RealtimeIngestor create(Ref ref) {
+    return realtimeIngestor(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(RealtimeIngestor value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<RealtimeIngestor>(value),
+    );
+  }
+}
+
+String _$realtimeIngestorHash() => r'75d7c774f92ae64209aff514ed062a70283372fa';
+
+@ProviderFor(chatSyncCoordinator)
+final chatSyncCoordinatorProvider = ChatSyncCoordinatorProvider._();
+
+final class ChatSyncCoordinatorProvider
+    extends
+        $FunctionalProvider<
+          ChatSyncCoordinator,
+          ChatSyncCoordinator,
+          ChatSyncCoordinator
+        >
+    with $Provider<ChatSyncCoordinator> {
+  ChatSyncCoordinatorProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatSyncCoordinatorProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatSyncCoordinatorHash();
+
+  @$internal
+  @override
+  $ProviderElement<ChatSyncCoordinator> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ChatSyncCoordinator create(Ref ref) {
+    return chatSyncCoordinator(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChatSyncCoordinator value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChatSyncCoordinator>(value),
+    );
+  }
+}
+
+String _$chatSyncCoordinatorHash() =>
+    r'e78370fe450e456a2d46f0b8f6a16330804281c5';

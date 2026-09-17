@@ -1,4 +1,6 @@
 import 'chat.dart' show ChatId;
+import 'chat_message.dart' show MessageDeliveryStatus;
+import 'message_reaction.dart';
 
 /// One line in a chat ledger. Soft-delete semantics — [deletedAt] non-null
 /// means the message was removed by its sender; the row stays so quotes /
@@ -22,6 +24,7 @@ class Message {
     required this.body,
     required this.createdAt,
     required this.fromMe,
+    this.messageSeq,
     this.messageType = 'text',
     this.mediaUrl,
     this.replyToId,
@@ -29,9 +32,12 @@ class Message {
     this.replyToAuthor,
     this.editedAt,
     this.deletedAt,
+    this.deliveryStatus = MessageDeliveryStatus.sent,
+    this.reactions = const [],
   });
 
   final MessageId id;
+  final int? messageSeq;
   final ChatId chatId;
   final String? senderId;
   final String? senderDisplayName;
@@ -45,6 +51,8 @@ class Message {
   final String? replyToAuthor;
   final DateTime? editedAt;
   final DateTime? deletedAt;
+  final MessageDeliveryStatus deliveryStatus;
+  final List<MessageReaction> reactions;
 
   bool get isDeleted => deletedAt != null;
   bool get isEdited => editedAt != null;

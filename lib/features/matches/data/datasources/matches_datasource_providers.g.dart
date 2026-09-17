@@ -55,7 +55,7 @@ final class MatchesRemoteDataSourceProvider
 }
 
 String _$matchesRemoteDataSourceHash() =>
-    r'82e29ea716805238a33591f14befcff1be63e192';
+    r'621616beb887caeb64fb035222a3b09167cae11a';
 
 @ProviderFor(matchRequestsRemoteDataSource)
 final matchRequestsRemoteDataSourceProvider =

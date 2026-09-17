@@ -11,6 +11,7 @@ import '../../domain/entities/app_notification.dart';
 import '../providers/notifications_providers.dart';
 import '../state/notifications_view.dart';
 import '../widgets/notification_icon.dart';
+import '../widgets/notifications_shimmer_skeleton.dart';
 
 /// Notifications inbox — bell-tap destination. Live feed via the
 /// `user:<id>:notifications` broadcast channel, tier-grouped into REPLY NOW
@@ -32,10 +33,7 @@ class NotificationsScreen extends ConsumerWidget {
             const _Header(),
             Expanded(
               child: async.when(
-                loading:
-                    () => const Center(
-                      child: CircularProgressIndicator(color: CkColors.ink),
-                    ),
+                loading: () => const NotificationsShimmerSkeleton(),
                 error:
                     (e, _) => _Error(
                       message:

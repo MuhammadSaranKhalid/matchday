@@ -700,3 +700,89 @@ final class TeamPendingJoinRequestsFamily extends $Family
   @override
   String toString() => r'teamPendingJoinRequestsProvider';
 }
+
+/// Pending invite for the current signed-in user to join [teamId].
+
+@ProviderFor(myPendingInviteForTeam)
+final myPendingInviteForTeamProvider = MyPendingInviteForTeamFamily._();
+
+/// Pending invite for the current signed-in user to join [teamId].
+
+final class MyPendingInviteForTeamProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<TeamInvite?>,
+          TeamInvite?,
+          FutureOr<TeamInvite?>
+        >
+    with $FutureModifier<TeamInvite?>, $FutureProvider<TeamInvite?> {
+  /// Pending invite for the current signed-in user to join [teamId].
+  MyPendingInviteForTeamProvider._({
+    required MyPendingInviteForTeamFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'myPendingInviteForTeamProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$myPendingInviteForTeamHash();
+
+  @override
+  String toString() {
+    return r'myPendingInviteForTeamProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<TeamInvite?> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<TeamInvite?> create(Ref ref) {
+    final argument = this.argument as String;
+    return myPendingInviteForTeam(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MyPendingInviteForTeamProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$myPendingInviteForTeamHash() =>
+    r'c22aab51c2636138f36036fe3f26e5abe64c7752';
+
+/// Pending invite for the current signed-in user to join [teamId].
+
+final class MyPendingInviteForTeamFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<TeamInvite?>, String> {
+  MyPendingInviteForTeamFamily._()
+    : super(
+        retry: null,
+        name: r'myPendingInviteForTeamProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Pending invite for the current signed-in user to join [teamId].
+
+  MyPendingInviteForTeamProvider call(String teamId) =>
+      MyPendingInviteForTeamProvider._(argument: teamId, from: this);
+
+  @override
+  String toString() => r'myPendingInviteForTeamProvider';
+}

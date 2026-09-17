@@ -1,223 +1,175 @@
 -- =============================================================================
--- 0802 · messages — chat ledger + realtime + read receipts + inbox queries
--- =============================================================================
--- WHAT THIS TABLE IS
--- ------------------
--- The source-of-truth ledger for every line of text in every chat. Soft-
--- deleted (deleted_at) instead of removed so quotes / replies always
--- resolve and an audit of "what was sent here" is possible.
+-- 0802 · messages, attachments, reactions, and sync events
 -- =============================================================================
 
+-- -----------------------------------------------------------------------------
+-- 1. messages
+-- -----------------------------------------------------------------------------
 create table public.messages (
-  message_id      uuid primary key default gen_random_uuid(),
-  chat_id         uuid not null references public.chats(chat_id) on delete cascade,
-  sender_id       uuid references public.profiles(user_id) on delete set null,
-  body            text not null check (length(body) between 1 and 4000),
-  message_type    text not null default 'text',
-  payload         jsonb default '{}'::jsonb,
-  reply_to_id     uuid references public.messages(message_id) on delete set null,
-  created_at      timestamptz not null default now(),
-  edited_at       timestamptz,
-  deleted_at      timestamptz
+  message_id          uuid primary key default gen_random_uuid(),
+  message_seq         bigint generated always as identity unique,
+  channel_id          uuid not null
+                        references public.chat_channels(channel_id) on delete cascade,
+  sender_id           uuid references public.profiles(user_id) on delete set null,
+  message_type        public.chat_message_type not null default 'text',
+  body                text,
+  payload             jsonb not null default '{}'::jsonb,
+  reply_to_message_id uuid references public.messages(message_id) on delete set null,
+  version             integer not null default 1,
+  counts_as_unread    boolean not null default true,
+
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now(),
+  edited_at           timestamptz,
+  deleted_at          timestamptz,
+  deleted_by          uuid references public.profiles(user_id),
+
+  constraint message_version_positive check (version >= 1),
+  constraint message_body_length check (
+    body is null or char_length(body) <= 20000
+  )
 );
 
--- Hot read path: "latest messages in this chat", paginated by created_at.
-create index messages_chat_created on public.messages (chat_id, created_at desc);
-create index messages_reply_to on public.messages (reply_to_id) where reply_to_id is not null;
+create unique index messages_channel_seq_unique
+  on public.messages(channel_id, message_seq);
+
+create index messages_channel_page_idx
+  on public.messages(channel_id, message_seq desc);
+
+create index messages_sender_idx
+  on public.messages(sender_id, created_at desc);
+
+create index messages_reply_idx
+  on public.messages(reply_to_message_id)
+  where reply_to_message_id is not null;
+
+create trigger messages_set_updated_at
+  before update on public.messages
+  for each row execute function public.set_updated_at();
 
 alter table public.messages enable row level security;
 
--- =============================================================================
--- RLS
--- =============================================================================
+-- -----------------------------------------------------------------------------
+-- 2. message_attachments
+-- -----------------------------------------------------------------------------
+create table public.message_attachments (
+  attachment_id       uuid primary key,
+  message_id          uuid not null
+                        references public.messages(message_id) on delete cascade,
+  storage_path        text not null,
+  mime_type           text not null,
+  file_name           text,
+  size_bytes          bigint,
+  width               integer,
+  height              integer,
+  duration_ms         bigint,
+  created_at          timestamptz not null default now()
+);
+
+create index message_attachments_message_idx
+  on public.message_attachments(message_id);
+
+alter table public.message_attachments enable row level security;
+
+-- -----------------------------------------------------------------------------
+-- 3. message_reactions
+-- -----------------------------------------------------------------------------
+create table public.message_reactions (
+  message_id          uuid not null
+                        references public.messages(message_id) on delete cascade,
+  user_id             uuid not null
+                        references public.profiles(user_id) on delete cascade,
+  reaction            text not null,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now(),
+  removed_at          timestamptz,
+  primary key (message_id, user_id, reaction),
+  constraint reaction_length check (char_length(reaction) between 1 and 32)
+);
+
+create index message_reactions_message_idx
+  on public.message_reactions(message_id)
+  where removed_at is null;
+
+create trigger message_reactions_set_updated_at
+  before update on public.message_reactions
+  for each row execute function public.set_updated_at();
+
+alter table public.message_reactions enable row level security;
+
+-- -----------------------------------------------------------------------------
+-- 4. message_user_state (delete for me)
+-- -----------------------------------------------------------------------------
+create table public.message_user_state (
+  message_id          uuid not null
+                        references public.messages(message_id) on delete cascade,
+  user_id             uuid not null
+                        references public.profiles(user_id) on delete cascade,
+  hidden_at           timestamptz,
+  primary key (message_id, user_id)
+);
+
+alter table public.message_user_state enable row level security;
+
+-- -----------------------------------------------------------------------------
+-- 5. private.chat_sync_events
+-- -----------------------------------------------------------------------------
+create table if not exists private.chat_sync_events (
+  event_seq           bigint generated always as identity primary key,
+  event_id            uuid not null default gen_random_uuid() unique,
+  channel_id          uuid,
+  actor_id            uuid,
+  event_type          text not null,
+  entity_type         text not null,
+  entity_id           uuid,
+  entity_version      integer,
+  payload             jsonb not null default '{}'::jsonb,
+  created_at          timestamptz not null default now(),
+  published_at        timestamptz,
+  publish_attempts    integer not null default 0
+);
+
+-- -----------------------------------------------------------------------------
+-- 6. RLS Policies
+-- -----------------------------------------------------------------------------
+-- messages RLS
 create policy "messages_read_for_members"
   on public.messages for select
   to authenticated
-  using (public.is_chat_member(chat_id));
+  using (public.is_chat_member(channel_id));
 
-create policy "messages_insert_self"
-  on public.messages for insert
+-- message_attachments RLS
+create policy "message_attachments_read_for_members"
+  on public.message_attachments for select
   to authenticated
-  with check (
-    sender_id = (select auth.uid())
-    and public.is_chat_member(chat_id)
+  using (
+    exists (
+      select 1 from public.messages m
+       where m.message_id = message_attachments.message_id
+         and public.is_chat_member(m.channel_id)
+    )
   );
 
-create policy "messages_update_own"
-  on public.messages for update
+-- message_reactions RLS
+create policy "message_reactions_read_for_members"
+  on public.message_reactions for select
   to authenticated
-  using (sender_id = (select auth.uid()))
-  with check (
-    sender_id = (select auth.uid())
-    and (edited_at is null or deleted_at is null)
+  using (
+    exists (
+      select 1 from public.messages m
+       where m.message_id = message_reactions.message_id
+         and public.is_chat_member(m.channel_id)
+    )
   );
 
--- =============================================================================
--- bump_chat_last_message_at — keep the inbox sorted in sync
--- =============================================================================
-create or replace function public.bump_chat_last_message_at()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, auth, pg_temp
-as $$
-begin
-  update public.chats
-     set last_message_at = new.created_at,
-         updated_at = now()
-   where chat_id = new.chat_id;
-  return new;
-end;
-$$;
+-- message_user_state RLS
+create policy "message_user_state_read_self"
+  on public.message_user_state for select
+  to authenticated
+  using (user_id = (select auth.uid()));
 
-create trigger messages_after_insert_bump_chat
-  after insert on public.messages
-  for each row execute function public.bump_chat_last_message_at();
-
--- =============================================================================
--- RPC: mark_chat_read
--- =============================================================================
-create or replace function public.mark_chat_read(p_chat_id uuid)
-returns timestamptz
-language sql
-security definer
-set search_path = public, pg_temp
-as $$
-  update public.chat_members
-     set last_read_at = now()
-   where chat_id = p_chat_id
-     and user_id = (select auth.uid())
-     and left_at is null
-  returning last_read_at;
-$$;
-
-revoke all on function public.mark_chat_read(uuid) from public;
-grant execute on function public.mark_chat_read(uuid) to authenticated;
-
--- =============================================================================
--- RPC: list_my_chats — fast polymorphic inbox query
--- =============================================================================
-create or replace function public.list_my_chats()
-returns table (
-  chat_id                  uuid,
-  type                     public.chat_type,
-  team_id                  uuid,
-  last_message_at          timestamptz,
-  created_at               timestamptz,
-  updated_at               timestamptz,
-  team_name                text,
-  team_logo_url            text,
-  team_logo_monogram       text,
-  team_primary_color       text,
-  dm_other_user_id         uuid,
-  dm_other_user_name       text,
-  dm_other_user_username   text,
-  dm_other_user_avatar_url text,
-  you_follow               boolean,
-  they_follow_you          boolean,
-  last_message_body        text,
-  last_message_sender_id   uuid,
-  last_message_from_me     boolean,
-  unread_count             int
-)
-language plpgsql
-security definer
-set search_path = public, auth, pg_temp
-as $$
-declare
-  v_actor uuid := auth.uid();
-begin
-  if v_actor is null then
-    return;
-  end if;
-
-  return query
-  select
-    c.chat_id,
-    c.type,
-    c.team_id,
-    c.last_message_at,
-    c.created_at,
-    c.updated_at,
-    t.team_name,
-    t.logo_url as team_logo_url,
-    t.logo_monogram as team_logo_monogram,
-    (t.team_colors->>'primary') as team_primary_color,
-    other_p.user_id as dm_other_user_id,
-    other_p.display_name as dm_other_user_name,
-    other_p.username as dm_other_user_username,
-    other_p.profile_photo_url as dm_other_user_avatar_url,
-    case
-      when other_p.user_id is not null then
-        exists (
-          select 1 from public.follows
-           where follower_id = v_actor
-             and target_type = 'user'
-             and target_id = other_p.user_id
-        )
-      else false
-    end as you_follow,
-    case
-      when other_p.user_id is not null then
-        exists (
-          select 1 from public.follows
-           where follower_id = other_p.user_id
-             and target_type = 'user'
-             and target_id = v_actor
-        )
-      else false
-    end as they_follow_you,
-    lm.body as last_message_body,
-    lm.sender_id as last_message_sender_id,
-    (lm.sender_id is not distinct from v_actor)::boolean as last_message_from_me,
-    (
-      select count(*)::int from (
-        select 1 from public.messages m
-         where m.chat_id = c.chat_id
-           and m.created_at > coalesce(cm.last_read_at, 'epoch'::timestamptz)
-           and m.sender_id is distinct from v_actor
-           and m.deleted_at is null
-         limit 100
-      ) capped
-    ) as unread_count
-  from public.chats c
-  join public.chat_members cm
-    on cm.chat_id = c.chat_id
-   and cm.user_id = v_actor
-   and cm.left_at is null
-  left join public.teams t on t.team_id = c.team_id
-  -- For DM chats, join the other participant's profile
-  left join lateral (
-    select p.user_id, p.display_name, p.username, p.profile_photo_url
-      from public.chat_members other_cm
-      join public.profiles p on p.user_id = other_cm.user_id
-     where other_cm.chat_id = c.chat_id
-       and other_cm.user_id <> v_actor
-     limit 1
-  ) other_p on c.type = 'dm'
-  left join lateral (
-    select m.body, m.sender_id
-      from public.messages m
-     where m.chat_id = c.chat_id
-       and m.deleted_at is null
-     order by m.created_at desc
-     limit 1
-  ) lm on true
-  order by c.last_message_at desc nulls last;
-end;
-$$;
-
-revoke all on function public.list_my_chats() from public;
-grant execute on function public.list_my_chats() to authenticated;
-
--- -----------------------------------------------------------------------------
--- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
--- -----------------------------------------------------------------------------
--- Postgres does NOT index the referencing side of a foreign key for you. Every
--- one of these columns points at a parent that gets deleted or updated
--- (profiles on account deletion, matches/teams on cascade), and without an
--- index each such statement seq-scans this table once per affected parent row.
--- They are also the columns joined on when reading.
-
-create index if not exists idx_messages_sender_id
-  on public.messages (sender_id);
+create policy "message_user_state_write_self"
+  on public.message_user_state for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));

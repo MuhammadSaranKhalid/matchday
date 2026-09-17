@@ -61,6 +61,20 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> signInWithFacebook() async {
+    try {
+      await _remote.signInWithFacebook();
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, Unit>> signOut() async {
     try {
       await _remote.signOut();
@@ -79,6 +93,16 @@ class AuthRepositoryImpl implements AuthRepository {
       return Right(dto?.toEntity());
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> deleteAccount() async {
+    try {
+      await _remote.deleteAccount();
+      return const Right(unit);
+    } catch (_) {
+      return const Left(ServerFailure('Account deletion could not be completed. Retry or contact support. Some uploaded files may already have been removed.'));
     }
   }
 

@@ -310,3 +310,68 @@ drop trigger if exists match_challenges_notify_decision on public.match_challeng
 create trigger match_challenges_notify_decision
   after update of status on public.match_challenges
   for each row execute function public.notify_on_match_request_decision();
+
+-- -----------------------------------------------------------------------------
+-- posts INSERT / UPDATE → team.post.published
+-- Audience: active team members + followers of the team.
+-- -----------------------------------------------------------------------------
+create or replace function public.notify_on_team_post()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_recipients uuid[];
+begin
+  -- Only fire when a post is active and speaking on behalf of a team
+  if new.status <> 'active'
+     or new.author_context <> 'team_manager'
+     or new.context_entity_id is null then
+    return new;
+  end if;
+
+  -- On UPDATE, only fire if transitioning into active status from inactive/draft
+  if tg_op = 'UPDATE' and old.status = new.status then
+    return new;
+  end if;
+
+  select coalesce(array_agg(distinct u.user_id), '{}') into v_recipients
+    from (
+      select tm.user_id
+        from public.team_members tm
+       where tm.team_id = new.context_entity_id
+         and tm.status = 'active'
+         and tm.user_id is not null
+      union
+      select f.follower_id as user_id
+        from public.follows f
+       where f.target_type = 'team'
+         and f.target_id = new.context_entity_id
+    ) u;
+
+  if cardinality(v_recipients) > 0 then
+    perform public.notify(
+      v_recipients,
+      'team.post.published',
+      jsonb_build_object(
+        'team_id', new.context_entity_id,
+        'post_id', new.post_id
+      ),
+      new.author_id,
+      'team',
+      new.context_entity_id
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.notify_on_team_post() from public;
+
+drop trigger if exists posts_notify_team_post on public.posts;
+create trigger posts_notify_team_post
+  after insert or update of status on public.posts
+  for each row execute function public.notify_on_team_post();
+

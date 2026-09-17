@@ -105,6 +105,17 @@ class AuthController extends _$AuthController {
     }, AuthAuthenticated.new);
   }
 
+  Future<void> signInWithFacebook() async {
+    state = const AuthSigningInWithFacebook();
+    final result = await ref.read(authRepositoryProvider).signInWithFacebook();
+    state = result.fold((failure) {
+      if (failure.message.toLowerCase().contains('cancelled')) {
+        return const AuthInitial();
+      }
+      return AuthFailed(failure);
+    }, (_) => const AuthInitial());
+  }
+
   // ─── Sign out ───────────────────────────────────────────────────────────
 
   Future<void> signOut() async {

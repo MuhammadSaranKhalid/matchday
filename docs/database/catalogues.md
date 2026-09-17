@@ -243,7 +243,7 @@ Seeded configuration from the empty replay. These are definitions, not user fixt
 | --- | --- | --- | --- |
 | abandon_stale_matches | 7 * * * * | True | select public.abandon_stale_matches(); |
 | expire_stale_match_requests | */15 * * * * | True | select public.expire_stale_match_requests(); |
-| notification-push-worker | 15 seconds | True | select public.wake_notification_worker() |
+| notification-push-worker | * * * * * | True | select public.wake_notification_worker(); |
 
 ## Publication membership
 

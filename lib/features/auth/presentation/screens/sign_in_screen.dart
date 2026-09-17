@@ -1,3 +1,4 @@
+import '../../../settings/presentation/screens/legal_screen.dart';
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
@@ -67,7 +68,8 @@ class _EmailFormState extends ConsumerState<_EmailForm> {
     final state = ref.watch(authControllerProvider);
     final isSendingOtp = state is AuthSendingOtp;
     final isGoogleLoading = state is AuthSigningInWithGoogle;
-    final isBusy = isSendingOtp || isGoogleLoading;
+    final isFacebookLoading = state is AuthSigningInWithFacebook;
+    final isBusy = isSendingOtp || isGoogleLoading || isFacebookLoading;
     final failure = state is AuthFailed ? state.failure : null;
 
     // Preserve a valid address after a dispatch failure, so a retry costs one
@@ -193,6 +195,29 @@ class _EmailFormState extends ConsumerState<_EmailForm> {
                                     ? const _BtnSpinner(color: CkColors.ink)
                                     : const GoogleG(size: 20),
                             label: const Text('Continue with Google'),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Facebook — secondary.
+                          OutlinedButton.icon(
+                            onPressed:
+                                isBusy
+                                    ? null
+                                    : () =>
+                                        ref
+                                            .read(
+                                              authControllerProvider.notifier,
+                                            )
+                                            .signInWithFacebook(),
+                            icon:
+                                isFacebookLoading
+                                    ? const _BtnSpinner(color: CkColors.ink)
+                                    : const Icon(
+                                        Icons.facebook,
+                                        size: 20,
+                                        color: Color(0xFF1877F2),
+                                      ),
+                            label: const Text('Continue with Facebook'),
                           ),
                           const SizedBox(height: 18),
 
@@ -526,27 +551,13 @@ class _OrDivider extends StatelessWidget {
 
 class _TermsFooter extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    final link = CkType.body(
-      fontSize: 11,
-      color: CkColors.ink2,
-    ).copyWith(decoration: TextDecoration.underline);
-    return Center(
-      child: Text.rich(
-        textAlign: TextAlign.center,
-        TextSpan(
-          style: CkType.body(fontSize: 11, height: 1.5, color: CkColors.soft),
-          children: [
-            const TextSpan(text: 'By continuing you agree to our '),
-            TextSpan(text: 'Terms', style: link),
-            const TextSpan(text: ' & '),
-            TextSpan(text: 'Privacy Policy', style: link),
-            const TextSpan(text: '.'),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Column(children: [
+    const Text('By continuing, you confirm you are 18 or older and agree to our', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
+    Wrap(alignment: WrapAlignment.center, children: [
+      TextButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LegalScreen(document: 'terms'))), child: const Text('Terms & community standards')),
+      TextButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LegalScreen(document: 'privacy'))), child: const Text('Privacy policy')),
+    ]),
+  ]);
 }
 
 GestureRecognizer _tap(VoidCallback onTap) =>

@@ -474,6 +474,63 @@ do $$ begin
 exception when duplicate_object then null;
 end $$;
 
+do $$ begin
+  create type public.chat_channel_kind as enum ('direct', 'group', 'broadcast');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.chat_channel_context as enum ('none', 'team', 'match', 'tournament', 'club');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.chat_channel_visibility as enum ('private', 'public');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.chat_member_role as enum ('owner', 'admin', 'moderator', 'member');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.chat_member_status as enum ('pending', 'active', 'declined', 'left', 'removed', 'banned');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.chat_message_type as enum ('text', 'image', 'video', 'audio', 'file', 'system');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.chat_posting_mode as enum ('members', 'moderators', 'admins', 'owner');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.chat_permission as enum (
+    'view_channel',
+    'send_messages',
+    'send_media',
+    'add_reactions',
+    'reply_to_messages',
+    'edit_own_messages',
+    'delete_own_messages',
+    'delete_any_message',
+    'pin_messages',
+    'invite_members',
+    'remove_members',
+    'restrict_members',
+    'manage_roles',
+    'manage_channel',
+    'delete_channel',
+    'view_member_receipts'
+  );
+exception when duplicate_object then null;
+end $$;
+
 -- -----------------------------------------------------------------------------
 -- 3.9 Notifications
 -- -----------------------------------------------------------------------------

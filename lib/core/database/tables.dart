@@ -17,141 +17,209 @@ class WizardDrafts extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-// ─── Messages cache (read-through; ticket #23) ──────────────────────────────
-//
-// EXEMPTION from the online-only rule, scoped to MESSAGES ONLY. The cache
-// makes inbox + thread cold-starts paint instantly and lets in-progress
-// composer drafts survive app restarts. Writes still go to Supabase first;
-// these tables are a read-through cache + a tiny drafts store. There is NO
-// pending-ops queue, NO sync service, NO LWW. Sign-out wipes everything via
-// AppDatabase.clear().
-//
-// Naming mirrors the Supabase schema 1:1 (`chats`, `messages`,
-// `message_drafts`) so the mental model "local row N is the cached counterpart
-// of remote row N" is immediate. Other features (teams / posts / matches /
-// pavilion / profile) remain online-only.
+// ─── Local-First Chat Architecture Tables (Spec §7) ────────────────────────
 
-/// Inbox row mirror. Denormalised — the columns track the shape returned by
-/// the `list-my-chats` edge function so a single SELECT can paint the inbox
-/// without joins.
-@DataClassName('ChatRow')
-class Chats extends Table {
-  TextColumn get chatId => text()();
-  TextColumn get type => text()();
+/// Mirrors target chat_channels. Stores channel metadata for instant inbox
+/// rendering and offline discovery.
+@DataClassName('LocalChannelRow')
+class LocalChannels extends Table {
+  TextColumn get channelId => text()();
+  TextColumn get channelKey => text()();
+  TextColumn get kind => text()();
+  TextColumn get contextType => text()();
+  TextColumn get visibility => text().withDefault(const Constant('private'))();
+  TextColumn get purpose => text().withDefault(const Constant('main'))();
+
+  TextColumn get title => text().nullable()();
+  TextColumn get description => text().nullable()();
+  TextColumn get avatarUrl => text().nullable()();
+
   TextColumn get teamId => text().nullable()();
-  TextColumn get teamName => text().nullable()();
-  TextColumn get teamLogoUrl => text().nullable()();
-  TextColumn get teamLogoMonogram => text().nullable()();
-  TextColumn get teamPrimaryColorHex => text().nullable()();
+  TextColumn get matchId => text().nullable()();
+  TextColumn get tournamentId => text().nullable()();
+  TextColumn get clubId => text().nullable()();
+
+  IntColumn get lastMessageSeq => integer().nullable()();
   DateTimeColumn get lastMessageAt => dateTime().nullable()();
-  TextColumn get lastMessageBody => text().nullable()();
-  TextColumn get lastMessageSenderId => text().nullable()();
-  BoolColumn get lastMessageFromMe =>
-      boolean().withDefault(const Constant(false))();
-  IntColumn get unreadCount => integer().withDefault(const Constant(0))();
-  DateTimeColumn get createdAt => dateTime()();
-  DateTimeColumn get updatedAt => dateTime()();
-  DateTimeColumn get cachedAt => dateTime()();
+
+  DateTimeColumn get serverUpdatedAt => dateTime()();
+  DateTimeColumn get localUpdatedAt => dateTime()();
 
   @override
-  Set<Column> get primaryKey => {chatId};
+  Set<Column> get primaryKey => {channelId};
 }
 
-/// Thread message mirror. `senderDisplayName` is the joined value from the
-/// `profiles` table at the time the message was cached; rare display-name
-/// updates may go stale until the next thread re-fetch.
-@DataClassName('MessageRow')
-class Messages extends Table {
+/// Mirrors target channel_members. Crucial for unread calculation, read/delivery
+/// horizons, and channel permissions.
+@DataClassName('LocalChannelMemberRow')
+class LocalChannelMembers extends Table {
+  TextColumn get channelId => text()();
+  TextColumn get userId => text()();
+  TextColumn get role => text().withDefault(const Constant('member'))();
+  TextColumn get status => text().withDefault(const Constant('active'))();
+
+  DateTimeColumn get joinedAt => dateTime().nullable()();
+  DateTimeColumn get leftAt => dateTime().nullable()();
+
+  IntColumn get lastDeliveredMessageSeq => integer().nullable()();
+  DateTimeColumn get lastDeliveredAt => dateTime().nullable()();
+
+  IntColumn get lastReadMessageSeq => integer().nullable()();
+  DateTimeColumn get lastReadAt => dateTime().nullable()();
+
+  DateTimeColumn get notificationsMutedUntil => dateTime().nullable()();
+  DateTimeColumn get archivedAt => dateTime().nullable()();
+  DateTimeColumn get pinnedAt => dateTime().nullable()();
+
+  DateTimeColumn get serverUpdatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {channelId, userId};
+}
+
+/// Local message store for both confirmed server messages and pending outbox sends.
+@DataClassName('LocalMessageRow')
+class LocalMessages extends Table {
   TextColumn get messageId => text()();
-  TextColumn get chatId => text()();
+  IntColumn get messageSeq => integer().nullable()();
+  TextColumn get channelId => text()();
   TextColumn get senderId => text().nullable()();
   TextColumn get senderDisplayName => text().nullable()();
-  TextColumn get body => text()();
-  DateTimeColumn get createdAt => dateTime()();
+  TextColumn get messageType => text().withDefault(const Constant('text'))();
+  TextColumn get body => text().nullable()();
+  TextColumn get payloadJson => text().withDefault(const Constant('{}'))();
+  TextColumn get replyToMessageId => text().nullable()();
+  IntColumn get version => integer().withDefault(const Constant(1))();
+  BoolColumn get countsAsUnread => boolean().withDefault(const Constant(true))();
+
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
   DateTimeColumn get editedAt => dateTime().nullable()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
-  BoolColumn get fromMe => boolean().withDefault(const Constant(false))();
+
+  DateTimeColumn get localCreatedAt => dateTime()();
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))(); // pending | sending | sent | failed
+  TextColumn get sendErrorCode => text().nullable()();
+  TextColumn get sendErrorMessage => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {messageId};
 }
 
-/// One draft per chat. Persists the composer's current text so a killed app
-/// can resume mid-message.
-@DataClassName('MessageDraftRow')
-class MessageDrafts extends Table {
-  TextColumn get chatId => text()();
-  TextColumn get body => text()();
+/// Local attachments metadata (upload status, local file path, and storage path).
+@DataClassName('LocalMessageAttachmentRow')
+class LocalMessageAttachments extends Table {
+  TextColumn get attachmentId => text()();
+  TextColumn get messageId => text()();
+  TextColumn get storagePath => text().nullable()();
+  TextColumn get mimeType => text()();
+  TextColumn get fileName => text().nullable()();
+  IntColumn get sizeBytes => integer().nullable()();
+  IntColumn get width => integer().nullable()();
+  IntColumn get height => integer().nullable()();
+  IntColumn get durationMs => integer().nullable()();
+  TextColumn get localPath => text().nullable()();
+  TextColumn get thumbnailLocalPath => text().nullable()();
+  TextColumn get uploadStatus => text().withDefault(const Constant('pending'))(); // pending | uploading | uploaded | failed
+  RealColumn get uploadProgress => real().nullable()();
+  TextColumn get uploadError => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {attachmentId};
+}
+
+/// Cached message emoji reactions.
+@DataClassName('LocalMessageReactionRow')
+class LocalMessageReactions extends Table {
+  TextColumn get messageId => text()();
+  TextColumn get userId => text()();
+  TextColumn get reaction => text()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get removedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {messageId, userId, reaction};
+}
+
+/// Cached member posting restrictions and timeouts.
+@DataClassName('LocalMemberRestrictionRow')
+class LocalMemberRestrictions extends Table {
+  TextColumn get restrictionId => text()();
+  TextColumn get channelId => text()();
+  TextColumn get userId => text()();
+  TextColumn get permission => text()();
+  DateTimeColumn get startsAt => dateTime()();
+  DateTimeColumn get expiresAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {restrictionId};
+}
+
+/// Mandatory transactional outbox for reliable offline-first writes.
+@DataClassName('OutboxOperationRow')
+class OutboxOperations extends Table {
+  TextColumn get operationId => text()();
+  TextColumn get channelId => text()();
+  TextColumn get entityId => text().nullable()();
+  TextColumn get operationType => text()(); // send_message, edit_message, mark_read, mark_delivered, set_reaction, etc.
+  TextColumn get payloadJson => text()();
+  TextColumn get status => text().withDefault(const Constant('pending'))(); // pending | processing | retry_wait | failed
+  TextColumn get coalesceKey => text().nullable()();
+  TextColumn get dependsOnOperationId => text().nullable()();
+  IntColumn get attemptCount => integer().withDefault(const Constant(0))();
+  DateTimeColumn get nextAttemptAt => dateTime().nullable()();
+  TextColumn get lastErrorCode => text().nullable()();
+  TextColumn get lastErrorMessage => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
-  Set<Column> get primaryKey => {chatId};
+  Set<Column> get primaryKey => {operationId};
+}
+
+/// Channel synchronization cursor and gap tracking.
+@DataClassName('ChannelSyncStateRow')
+class ChannelSyncStates extends Table {
+  TextColumn get channelId => text()();
+  IntColumn get newestSyncedMessageSeq => integer().nullable()();
+  IntColumn get oldestCachedMessageSeq => integer().nullable()();
+  BoolColumn get hasMoreHistory => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get lastMemberSyncAt => dateTime().nullable()();
+  DateTimeColumn get lastFullSyncAt => dateTime().nullable()();
+  TextColumn get syncStatus => text().withDefault(const Constant('idle'))();
+  TextColumn get lastSyncError => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {channelId};
+}
+
+/// One composer draft per channel.
+@DataClassName('ChannelDraftRow')
+class ChannelDrafts extends Table {
+  TextColumn get channelId => text()();
+  TextColumn get body => text()();
+  TextColumn get replyToMessageId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {channelId};
 }
 
 // ─── Scoring write-ahead log (offline scoring; design doc §10) ──────────────
-//
-// EXEMPTION from the online-only rule, scoped to LIVE SCORING ONLY. Unlike the
-// messages cache above — which is a read-through optimisation — this is an
-// offline WRITE path. A scorer on a ground with no signal must be able to keep
-// scoring, and nothing they enter may be lost.
-//
-// The design that makes this safe is in docs/offline-scoring-design.md §3:
-// scoring is single-writer, append-only, deterministic and bounded (~250
-// deliveries a match). Those four properties are why this needs no CRDT, no
-// vector clock, and no merge logic — it is a queue with an idempotency key,
-// not a sync engine. If anyone finds themselves writing merge logic here, the
-// design has been misread.
-//
-// Do NOT generalise this to other features.
 
-/// The log of deliveries the scorer has entered, whether or not the server has
-/// them yet.
-///
-/// Append-only. This records INTENT — the delivery as entered — not the
-/// engine's computed result. That distinction is what makes the log safe
-/// independently of whether the client engine is correct: the server recomputes
-/// every op authoritatively on sync, so a client-side rules bug can produce a
-/// wrong provisional *display* but can never lose or corrupt a delivery.
+/// Append-only scoring write-ahead log.
 @DataClassName('ScoringOpRow')
 class ScoringOps extends Table {
-  /// Client-generated uuid, created ONCE when the scorer taps and reused on
-  /// every retry. This is the idempotency key the server dedupes on, and it is
-  /// why "the server committed it but the reply was lost" is safe to retry.
   TextColumn get opId => text()();
-
   TextColumn get matchId => text()();
   IntColumn get inningsNumber => integer()();
-
-  /// Monotonic per (match, innings) — the order the scorer entered them, which
-  /// is the order the server must receive them. Deliveries are sequential; out
-  /// of order they are meaningless.
   IntColumn get localSeq => integer()();
-
-  /// 'ball' | 'undo'.
   TextColumn get kind => text().withDefault(const Constant('ball'))();
-
-  /// The delivery as entered, JSON-encoded.
   TextColumn get payload => text()();
-
   DateTimeColumn get createdAt => dateTime()();
-
-  /// Null while the server still owes us this one. The outbox drains exactly
-  /// the null rows, in localSeq order.
   DateTimeColumn get syncedAt => dateTime().nullable()();
-
-  /// Set when the server REFUSED this op — it answered, and the answer was no
-  /// (a rule violation, a closed innings, a match already finished). Distinct
-  /// from a transport failure, which leaves both timestamps null so the outbox
-  /// retries.
-  ///
-  /// A refusal is terminal: no amount of retrying changes a no. The row is
-  /// kept rather than deleted because design doc §19.3 forbids discarding a
-  /// refused write — the scorer must still be able to read what could not be
-  /// applied. Excluding it from `pendingOps` is what stops one permanently
-  /// refused delivery from blocking the queue behind it (and, via
-  /// `pendingOpsCount`, disabling undo forever).
   DateTimeColumn get refusedAt => dateTime().nullable()();
-
   IntColumn get attempts => integer().withDefault(const Constant(0))();
   TextColumn get lastError => text().nullable()();
 
@@ -159,23 +227,13 @@ class ScoringOps extends Table {
   Set<Column> get primaryKey => {opId};
 }
 
-/// Innings state at the last synced op, so resuming does not mean replaying an
-/// innings from ball one.
-///
-/// Local state is a fold of this snapshot plus the ops after it — recomputable
-/// at any moment, which is what turns crash recovery into an ordinary read
-/// rather than a special case.
+/// Innings state at the last synced op.
 @DataClassName('ScoringSnapshotRow')
 class ScoringSnapshots extends Table {
   TextColumn get matchId => text()();
   IntColumn get inningsNumber => integer()();
-
-  /// JSON-encoded innings state as of [throughSeq].
   TextColumn get state => text()();
-
-  /// The localSeq this snapshot already accounts for.
   IntColumn get throughSeq => integer()();
-
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
@@ -188,7 +246,7 @@ class ScoringSnapshots extends Table {
 @DataClassName('CachedMatchRow')
 class CachedMatches extends Table {
   TextColumn get matchId => text()();
-  TextColumn get payload => text()(); // JSON-encoded MatchDto
+  TextColumn get payload => text()();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
@@ -199,7 +257,7 @@ class CachedMatches extends Table {
 @DataClassName('CachedMatchPlayersRow')
 class CachedMatchPlayers extends Table {
   TextColumn get matchId => text()();
-  TextColumn get payload => text()(); // JSON-encoded List<MatchPlayerDto>
+  TextColumn get payload => text()();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
@@ -211,10 +269,9 @@ class CachedMatchPlayers extends Table {
 class CachedInningsStates extends Table {
   TextColumn get matchId => text()();
   IntColumn get inningsNumber => integer()();
-  TextColumn get payload => text()(); // JSON-encoded MatchInningsStateDto
+  TextColumn get payload => text()();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
   Set<Column> get primaryKey => {matchId, inningsNumber};
 }
-

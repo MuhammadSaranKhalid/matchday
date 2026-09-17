@@ -273,28 +273,108 @@ class WizardDraftsCompanion extends UpdateCompanion<WizardDraftRow> {
   }
 }
 
-class $ChatsTable extends Chats with TableInfo<$ChatsTable, ChatRow> {
+class $LocalChannelsTable extends LocalChannels
+    with TableInfo<$LocalChannelsTable, LocalChannelRow> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $ChatsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _chatIdMeta = const VerificationMeta('chatId');
+  $LocalChannelsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
   @override
-  late final GeneratedColumn<String> chatId = GeneratedColumn<String>(
-    'chat_id',
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  static const VerificationMeta _channelKeyMeta = const VerificationMeta(
+    'channelKey',
+  );
   @override
-  late final GeneratedColumn<String> type = GeneratedColumn<String>(
-    'type',
+  late final GeneratedColumn<String> channelKey = GeneratedColumn<String>(
+    'channel_key',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contextTypeMeta = const VerificationMeta(
+    'contextType',
+  );
+  @override
+  late final GeneratedColumn<String> contextType = GeneratedColumn<String>(
+    'context_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _visibilityMeta = const VerificationMeta(
+    'visibility',
+  );
+  @override
+  late final GeneratedColumn<String> visibility = GeneratedColumn<String>(
+    'visibility',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('private'),
+  );
+  static const VerificationMeta _purposeMeta = const VerificationMeta(
+    'purpose',
+  );
+  @override
+  late final GeneratedColumn<String> purpose = GeneratedColumn<String>(
+    'purpose',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('main'),
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _avatarUrlMeta = const VerificationMeta(
+    'avatarUrl',
+  );
+  @override
+  late final GeneratedColumn<String> avatarUrl = GeneratedColumn<String>(
+    'avatar_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _teamIdMeta = const VerificationMeta('teamId');
   @override
@@ -305,50 +385,48 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, ChatRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _teamNameMeta = const VerificationMeta(
-    'teamName',
+  static const VerificationMeta _matchIdMeta = const VerificationMeta(
+    'matchId',
   );
   @override
-  late final GeneratedColumn<String> teamName = GeneratedColumn<String>(
-    'team_name',
+  late final GeneratedColumn<String> matchId = GeneratedColumn<String>(
+    'match_id',
     aliasedName,
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _teamLogoUrlMeta = const VerificationMeta(
-    'teamLogoUrl',
+  static const VerificationMeta _tournamentIdMeta = const VerificationMeta(
+    'tournamentId',
   );
   @override
-  late final GeneratedColumn<String> teamLogoUrl = GeneratedColumn<String>(
-    'team_logo_url',
+  late final GeneratedColumn<String> tournamentId = GeneratedColumn<String>(
+    'tournament_id',
     aliasedName,
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _teamLogoMonogramMeta = const VerificationMeta(
-    'teamLogoMonogram',
-  );
+  static const VerificationMeta _clubIdMeta = const VerificationMeta('clubId');
   @override
-  late final GeneratedColumn<String> teamLogoMonogram = GeneratedColumn<String>(
-    'team_logo_monogram',
+  late final GeneratedColumn<String> clubId = GeneratedColumn<String>(
+    'club_id',
     aliasedName,
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _teamPrimaryColorHexMeta =
-      const VerificationMeta('teamPrimaryColorHex');
+  static const VerificationMeta _lastMessageSeqMeta = const VerificationMeta(
+    'lastMessageSeq',
+  );
   @override
-  late final GeneratedColumn<String> teamPrimaryColorHex =
-      GeneratedColumn<String>(
-        'team_primary_color_hex',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      );
+  late final GeneratedColumn<int> lastMessageSeq = GeneratedColumn<int>(
+    'last_message_seq',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _lastMessageAtMeta = const VerificationMeta(
     'lastMessageAt',
   );
@@ -361,133 +439,129 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, ChatRow> {
         type: DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
-  static const VerificationMeta _lastMessageBodyMeta = const VerificationMeta(
-    'lastMessageBody',
+  static const VerificationMeta _serverUpdatedAtMeta = const VerificationMeta(
+    'serverUpdatedAt',
   );
   @override
-  late final GeneratedColumn<String> lastMessageBody = GeneratedColumn<String>(
-    'last_message_body',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _lastMessageSenderIdMeta =
-      const VerificationMeta('lastMessageSenderId');
-  @override
-  late final GeneratedColumn<String> lastMessageSenderId =
-      GeneratedColumn<String>(
-        'last_message_sender_id',
+  late final GeneratedColumn<DateTime> serverUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'server_updated_at',
         aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
       );
-  static const VerificationMeta _lastMessageFromMeMeta = const VerificationMeta(
-    'lastMessageFromMe',
+  static const VerificationMeta _localUpdatedAtMeta = const VerificationMeta(
+    'localUpdatedAt',
   );
   @override
-  late final GeneratedColumn<bool> lastMessageFromMe = GeneratedColumn<bool>(
-    'last_message_from_me',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("last_message_from_me" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
-  static const VerificationMeta _unreadCountMeta = const VerificationMeta(
-    'unreadCount',
-  );
-  @override
-  late final GeneratedColumn<int> unreadCount = GeneratedColumn<int>(
-    'unread_count',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(0),
-  );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
-    'updatedAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-    'updated_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
-    'cachedAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
-    'cached_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumn<DateTime> localUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'local_updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
   @override
   List<GeneratedColumn> get $columns => [
-    chatId,
-    type,
+    channelId,
+    channelKey,
+    kind,
+    contextType,
+    visibility,
+    purpose,
+    title,
+    description,
+    avatarUrl,
     teamId,
-    teamName,
-    teamLogoUrl,
-    teamLogoMonogram,
-    teamPrimaryColorHex,
+    matchId,
+    tournamentId,
+    clubId,
+    lastMessageSeq,
     lastMessageAt,
-    lastMessageBody,
-    lastMessageSenderId,
-    lastMessageFromMe,
-    unreadCount,
-    createdAt,
-    updatedAt,
-    cachedAt,
+    serverUpdatedAt,
+    localUpdatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'chats';
+  static const String $name = 'local_channels';
   @override
   VerificationContext validateIntegrity(
-    Insertable<ChatRow> instance, {
+    Insertable<LocalChannelRow> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
-    if (data.containsKey('chat_id')) {
+    if (data.containsKey('channel_id')) {
       context.handle(
-        _chatIdMeta,
-        chatId.isAcceptableOrUnknown(data['chat_id']!, _chatIdMeta),
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
       );
     } else if (isInserting) {
-      context.missing(_chatIdMeta);
+      context.missing(_channelIdMeta);
     }
-    if (data.containsKey('type')) {
+    if (data.containsKey('channel_key')) {
       context.handle(
-        _typeMeta,
-        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+        _channelKeyMeta,
+        channelKey.isAcceptableOrUnknown(data['channel_key']!, _channelKeyMeta),
       );
     } else if (isInserting) {
-      context.missing(_typeMeta);
+      context.missing(_channelKeyMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('context_type')) {
+      context.handle(
+        _contextTypeMeta,
+        contextType.isAcceptableOrUnknown(
+          data['context_type']!,
+          _contextTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_contextTypeMeta);
+    }
+    if (data.containsKey('visibility')) {
+      context.handle(
+        _visibilityMeta,
+        visibility.isAcceptableOrUnknown(data['visibility']!, _visibilityMeta),
+      );
+    }
+    if (data.containsKey('purpose')) {
+      context.handle(
+        _purposeMeta,
+        purpose.isAcceptableOrUnknown(data['purpose']!, _purposeMeta),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('avatar_url')) {
+      context.handle(
+        _avatarUrlMeta,
+        avatarUrl.isAcceptableOrUnknown(data['avatar_url']!, _avatarUrlMeta),
+      );
     }
     if (data.containsKey('team_id')) {
       context.handle(
@@ -495,36 +569,33 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, ChatRow> {
         teamId.isAcceptableOrUnknown(data['team_id']!, _teamIdMeta),
       );
     }
-    if (data.containsKey('team_name')) {
+    if (data.containsKey('match_id')) {
       context.handle(
-        _teamNameMeta,
-        teamName.isAcceptableOrUnknown(data['team_name']!, _teamNameMeta),
+        _matchIdMeta,
+        matchId.isAcceptableOrUnknown(data['match_id']!, _matchIdMeta),
       );
     }
-    if (data.containsKey('team_logo_url')) {
+    if (data.containsKey('tournament_id')) {
       context.handle(
-        _teamLogoUrlMeta,
-        teamLogoUrl.isAcceptableOrUnknown(
-          data['team_logo_url']!,
-          _teamLogoUrlMeta,
+        _tournamentIdMeta,
+        tournamentId.isAcceptableOrUnknown(
+          data['tournament_id']!,
+          _tournamentIdMeta,
         ),
       );
     }
-    if (data.containsKey('team_logo_monogram')) {
+    if (data.containsKey('club_id')) {
       context.handle(
-        _teamLogoMonogramMeta,
-        teamLogoMonogram.isAcceptableOrUnknown(
-          data['team_logo_monogram']!,
-          _teamLogoMonogramMeta,
-        ),
+        _clubIdMeta,
+        clubId.isAcceptableOrUnknown(data['club_id']!, _clubIdMeta),
       );
     }
-    if (data.containsKey('team_primary_color_hex')) {
+    if (data.containsKey('last_message_seq')) {
       context.handle(
-        _teamPrimaryColorHexMeta,
-        teamPrimaryColorHex.isAcceptableOrUnknown(
-          data['team_primary_color_hex']!,
-          _teamPrimaryColorHexMeta,
+        _lastMessageSeqMeta,
+        lastMessageSeq.isAcceptableOrUnknown(
+          data['last_message_seq']!,
+          _lastMessageSeqMeta,
         ),
       );
     }
@@ -537,588 +608,583 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, ChatRow> {
         ),
       );
     }
-    if (data.containsKey('last_message_body')) {
+    if (data.containsKey('server_updated_at')) {
       context.handle(
-        _lastMessageBodyMeta,
-        lastMessageBody.isAcceptableOrUnknown(
-          data['last_message_body']!,
-          _lastMessageBodyMeta,
+        _serverUpdatedAtMeta,
+        serverUpdatedAt.isAcceptableOrUnknown(
+          data['server_updated_at']!,
+          _serverUpdatedAtMeta,
         ),
-      );
-    }
-    if (data.containsKey('last_message_sender_id')) {
-      context.handle(
-        _lastMessageSenderIdMeta,
-        lastMessageSenderId.isAcceptableOrUnknown(
-          data['last_message_sender_id']!,
-          _lastMessageSenderIdMeta,
-        ),
-      );
-    }
-    if (data.containsKey('last_message_from_me')) {
-      context.handle(
-        _lastMessageFromMeMeta,
-        lastMessageFromMe.isAcceptableOrUnknown(
-          data['last_message_from_me']!,
-          _lastMessageFromMeMeta,
-        ),
-      );
-    }
-    if (data.containsKey('unread_count')) {
-      context.handle(
-        _unreadCountMeta,
-        unreadCount.isAcceptableOrUnknown(
-          data['unread_count']!,
-          _unreadCountMeta,
-        ),
-      );
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     } else if (isInserting) {
-      context.missing(_createdAtMeta);
+      context.missing(_serverUpdatedAtMeta);
     }
-    if (data.containsKey('updated_at')) {
+    if (data.containsKey('local_updated_at')) {
       context.handle(
-        _updatedAtMeta,
-        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+        _localUpdatedAtMeta,
+        localUpdatedAt.isAcceptableOrUnknown(
+          data['local_updated_at']!,
+          _localUpdatedAtMeta,
+        ),
       );
     } else if (isInserting) {
-      context.missing(_updatedAtMeta);
-    }
-    if (data.containsKey('cached_at')) {
-      context.handle(
-        _cachedAtMeta,
-        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_cachedAtMeta);
+      context.missing(_localUpdatedAtMeta);
     }
     return context;
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {chatId};
+  Set<GeneratedColumn> get $primaryKey => {channelId};
   @override
-  ChatRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+  LocalChannelRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return ChatRow(
-      chatId:
+    return LocalChannelRow(
+      channelId:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
-            data['${effectivePrefix}chat_id'],
+            data['${effectivePrefix}channel_id'],
           )!,
-      type:
+      channelKey:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
-            data['${effectivePrefix}type'],
+            data['${effectivePrefix}channel_key'],
           )!,
+      kind:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}kind'],
+          )!,
+      contextType:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}context_type'],
+          )!,
+      visibility:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}visibility'],
+          )!,
+      purpose:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}purpose'],
+          )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      ),
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      avatarUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}avatar_url'],
+      ),
       teamId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}team_id'],
       ),
-      teamName: attachedDatabase.typeMapping.read(
+      matchId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}team_name'],
+        data['${effectivePrefix}match_id'],
       ),
-      teamLogoUrl: attachedDatabase.typeMapping.read(
+      tournamentId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}team_logo_url'],
+        data['${effectivePrefix}tournament_id'],
       ),
-      teamLogoMonogram: attachedDatabase.typeMapping.read(
+      clubId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}team_logo_monogram'],
+        data['${effectivePrefix}club_id'],
       ),
-      teamPrimaryColorHex: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}team_primary_color_hex'],
+      lastMessageSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_message_seq'],
       ),
       lastMessageAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_message_at'],
       ),
-      lastMessageBody: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}last_message_body'],
-      ),
-      lastMessageSenderId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}last_message_sender_id'],
-      ),
-      lastMessageFromMe:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.bool,
-            data['${effectivePrefix}last_message_from_me'],
-          )!,
-      unreadCount:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}unread_count'],
-          )!,
-      createdAt:
+      serverUpdatedAt:
           attachedDatabase.typeMapping.read(
             DriftSqlType.dateTime,
-            data['${effectivePrefix}created_at'],
+            data['${effectivePrefix}server_updated_at'],
           )!,
-      updatedAt:
+      localUpdatedAt:
           attachedDatabase.typeMapping.read(
             DriftSqlType.dateTime,
-            data['${effectivePrefix}updated_at'],
-          )!,
-      cachedAt:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.dateTime,
-            data['${effectivePrefix}cached_at'],
+            data['${effectivePrefix}local_updated_at'],
           )!,
     );
   }
 
   @override
-  $ChatsTable createAlias(String alias) {
-    return $ChatsTable(attachedDatabase, alias);
+  $LocalChannelsTable createAlias(String alias) {
+    return $LocalChannelsTable(attachedDatabase, alias);
   }
 }
 
-class ChatRow extends DataClass implements Insertable<ChatRow> {
-  final String chatId;
-  final String type;
+class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
+  final String channelId;
+  final String channelKey;
+  final String kind;
+  final String contextType;
+  final String visibility;
+  final String purpose;
+  final String? title;
+  final String? description;
+  final String? avatarUrl;
   final String? teamId;
-  final String? teamName;
-  final String? teamLogoUrl;
-  final String? teamLogoMonogram;
-  final String? teamPrimaryColorHex;
+  final String? matchId;
+  final String? tournamentId;
+  final String? clubId;
+  final int? lastMessageSeq;
   final DateTime? lastMessageAt;
-  final String? lastMessageBody;
-  final String? lastMessageSenderId;
-  final bool lastMessageFromMe;
-  final int unreadCount;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime cachedAt;
-  const ChatRow({
-    required this.chatId,
-    required this.type,
+  final DateTime serverUpdatedAt;
+  final DateTime localUpdatedAt;
+  const LocalChannelRow({
+    required this.channelId,
+    required this.channelKey,
+    required this.kind,
+    required this.contextType,
+    required this.visibility,
+    required this.purpose,
+    this.title,
+    this.description,
+    this.avatarUrl,
     this.teamId,
-    this.teamName,
-    this.teamLogoUrl,
-    this.teamLogoMonogram,
-    this.teamPrimaryColorHex,
+    this.matchId,
+    this.tournamentId,
+    this.clubId,
+    this.lastMessageSeq,
     this.lastMessageAt,
-    this.lastMessageBody,
-    this.lastMessageSenderId,
-    required this.lastMessageFromMe,
-    required this.unreadCount,
-    required this.createdAt,
-    required this.updatedAt,
-    required this.cachedAt,
+    required this.serverUpdatedAt,
+    required this.localUpdatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['chat_id'] = Variable<String>(chatId);
-    map['type'] = Variable<String>(type);
+    map['channel_id'] = Variable<String>(channelId);
+    map['channel_key'] = Variable<String>(channelKey);
+    map['kind'] = Variable<String>(kind);
+    map['context_type'] = Variable<String>(contextType);
+    map['visibility'] = Variable<String>(visibility);
+    map['purpose'] = Variable<String>(purpose);
+    if (!nullToAbsent || title != null) {
+      map['title'] = Variable<String>(title);
+    }
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || avatarUrl != null) {
+      map['avatar_url'] = Variable<String>(avatarUrl);
+    }
     if (!nullToAbsent || teamId != null) {
       map['team_id'] = Variable<String>(teamId);
     }
-    if (!nullToAbsent || teamName != null) {
-      map['team_name'] = Variable<String>(teamName);
+    if (!nullToAbsent || matchId != null) {
+      map['match_id'] = Variable<String>(matchId);
     }
-    if (!nullToAbsent || teamLogoUrl != null) {
-      map['team_logo_url'] = Variable<String>(teamLogoUrl);
+    if (!nullToAbsent || tournamentId != null) {
+      map['tournament_id'] = Variable<String>(tournamentId);
     }
-    if (!nullToAbsent || teamLogoMonogram != null) {
-      map['team_logo_monogram'] = Variable<String>(teamLogoMonogram);
+    if (!nullToAbsent || clubId != null) {
+      map['club_id'] = Variable<String>(clubId);
     }
-    if (!nullToAbsent || teamPrimaryColorHex != null) {
-      map['team_primary_color_hex'] = Variable<String>(teamPrimaryColorHex);
+    if (!nullToAbsent || lastMessageSeq != null) {
+      map['last_message_seq'] = Variable<int>(lastMessageSeq);
     }
     if (!nullToAbsent || lastMessageAt != null) {
       map['last_message_at'] = Variable<DateTime>(lastMessageAt);
     }
-    if (!nullToAbsent || lastMessageBody != null) {
-      map['last_message_body'] = Variable<String>(lastMessageBody);
-    }
-    if (!nullToAbsent || lastMessageSenderId != null) {
-      map['last_message_sender_id'] = Variable<String>(lastMessageSenderId);
-    }
-    map['last_message_from_me'] = Variable<bool>(lastMessageFromMe);
-    map['unread_count'] = Variable<int>(unreadCount);
-    map['created_at'] = Variable<DateTime>(createdAt);
-    map['updated_at'] = Variable<DateTime>(updatedAt);
-    map['cached_at'] = Variable<DateTime>(cachedAt);
+    map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt);
+    map['local_updated_at'] = Variable<DateTime>(localUpdatedAt);
     return map;
   }
 
-  ChatsCompanion toCompanion(bool nullToAbsent) {
-    return ChatsCompanion(
-      chatId: Value(chatId),
-      type: Value(type),
+  LocalChannelsCompanion toCompanion(bool nullToAbsent) {
+    return LocalChannelsCompanion(
+      channelId: Value(channelId),
+      channelKey: Value(channelKey),
+      kind: Value(kind),
+      contextType: Value(contextType),
+      visibility: Value(visibility),
+      purpose: Value(purpose),
+      title:
+          title == null && nullToAbsent ? const Value.absent() : Value(title),
+      description:
+          description == null && nullToAbsent
+              ? const Value.absent()
+              : Value(description),
+      avatarUrl:
+          avatarUrl == null && nullToAbsent
+              ? const Value.absent()
+              : Value(avatarUrl),
       teamId:
           teamId == null && nullToAbsent ? const Value.absent() : Value(teamId),
-      teamName:
-          teamName == null && nullToAbsent
+      matchId:
+          matchId == null && nullToAbsent
               ? const Value.absent()
-              : Value(teamName),
-      teamLogoUrl:
-          teamLogoUrl == null && nullToAbsent
+              : Value(matchId),
+      tournamentId:
+          tournamentId == null && nullToAbsent
               ? const Value.absent()
-              : Value(teamLogoUrl),
-      teamLogoMonogram:
-          teamLogoMonogram == null && nullToAbsent
+              : Value(tournamentId),
+      clubId:
+          clubId == null && nullToAbsent ? const Value.absent() : Value(clubId),
+      lastMessageSeq:
+          lastMessageSeq == null && nullToAbsent
               ? const Value.absent()
-              : Value(teamLogoMonogram),
-      teamPrimaryColorHex:
-          teamPrimaryColorHex == null && nullToAbsent
-              ? const Value.absent()
-              : Value(teamPrimaryColorHex),
+              : Value(lastMessageSeq),
       lastMessageAt:
           lastMessageAt == null && nullToAbsent
               ? const Value.absent()
               : Value(lastMessageAt),
-      lastMessageBody:
-          lastMessageBody == null && nullToAbsent
-              ? const Value.absent()
-              : Value(lastMessageBody),
-      lastMessageSenderId:
-          lastMessageSenderId == null && nullToAbsent
-              ? const Value.absent()
-              : Value(lastMessageSenderId),
-      lastMessageFromMe: Value(lastMessageFromMe),
-      unreadCount: Value(unreadCount),
-      createdAt: Value(createdAt),
-      updatedAt: Value(updatedAt),
-      cachedAt: Value(cachedAt),
+      serverUpdatedAt: Value(serverUpdatedAt),
+      localUpdatedAt: Value(localUpdatedAt),
     );
   }
 
-  factory ChatRow.fromJson(
+  factory LocalChannelRow.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return ChatRow(
-      chatId: serializer.fromJson<String>(json['chatId']),
-      type: serializer.fromJson<String>(json['type']),
+    return LocalChannelRow(
+      channelId: serializer.fromJson<String>(json['channelId']),
+      channelKey: serializer.fromJson<String>(json['channelKey']),
+      kind: serializer.fromJson<String>(json['kind']),
+      contextType: serializer.fromJson<String>(json['contextType']),
+      visibility: serializer.fromJson<String>(json['visibility']),
+      purpose: serializer.fromJson<String>(json['purpose']),
+      title: serializer.fromJson<String?>(json['title']),
+      description: serializer.fromJson<String?>(json['description']),
+      avatarUrl: serializer.fromJson<String?>(json['avatarUrl']),
       teamId: serializer.fromJson<String?>(json['teamId']),
-      teamName: serializer.fromJson<String?>(json['teamName']),
-      teamLogoUrl: serializer.fromJson<String?>(json['teamLogoUrl']),
-      teamLogoMonogram: serializer.fromJson<String?>(json['teamLogoMonogram']),
-      teamPrimaryColorHex: serializer.fromJson<String?>(
-        json['teamPrimaryColorHex'],
-      ),
+      matchId: serializer.fromJson<String?>(json['matchId']),
+      tournamentId: serializer.fromJson<String?>(json['tournamentId']),
+      clubId: serializer.fromJson<String?>(json['clubId']),
+      lastMessageSeq: serializer.fromJson<int?>(json['lastMessageSeq']),
       lastMessageAt: serializer.fromJson<DateTime?>(json['lastMessageAt']),
-      lastMessageBody: serializer.fromJson<String?>(json['lastMessageBody']),
-      lastMessageSenderId: serializer.fromJson<String?>(
-        json['lastMessageSenderId'],
-      ),
-      lastMessageFromMe: serializer.fromJson<bool>(json['lastMessageFromMe']),
-      unreadCount: serializer.fromJson<int>(json['unreadCount']),
-      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
-      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
-      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+      serverUpdatedAt: serializer.fromJson<DateTime>(json['serverUpdatedAt']),
+      localUpdatedAt: serializer.fromJson<DateTime>(json['localUpdatedAt']),
     );
   }
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'chatId': serializer.toJson<String>(chatId),
-      'type': serializer.toJson<String>(type),
+      'channelId': serializer.toJson<String>(channelId),
+      'channelKey': serializer.toJson<String>(channelKey),
+      'kind': serializer.toJson<String>(kind),
+      'contextType': serializer.toJson<String>(contextType),
+      'visibility': serializer.toJson<String>(visibility),
+      'purpose': serializer.toJson<String>(purpose),
+      'title': serializer.toJson<String?>(title),
+      'description': serializer.toJson<String?>(description),
+      'avatarUrl': serializer.toJson<String?>(avatarUrl),
       'teamId': serializer.toJson<String?>(teamId),
-      'teamName': serializer.toJson<String?>(teamName),
-      'teamLogoUrl': serializer.toJson<String?>(teamLogoUrl),
-      'teamLogoMonogram': serializer.toJson<String?>(teamLogoMonogram),
-      'teamPrimaryColorHex': serializer.toJson<String?>(teamPrimaryColorHex),
+      'matchId': serializer.toJson<String?>(matchId),
+      'tournamentId': serializer.toJson<String?>(tournamentId),
+      'clubId': serializer.toJson<String?>(clubId),
+      'lastMessageSeq': serializer.toJson<int?>(lastMessageSeq),
       'lastMessageAt': serializer.toJson<DateTime?>(lastMessageAt),
-      'lastMessageBody': serializer.toJson<String?>(lastMessageBody),
-      'lastMessageSenderId': serializer.toJson<String?>(lastMessageSenderId),
-      'lastMessageFromMe': serializer.toJson<bool>(lastMessageFromMe),
-      'unreadCount': serializer.toJson<int>(unreadCount),
-      'createdAt': serializer.toJson<DateTime>(createdAt),
-      'updatedAt': serializer.toJson<DateTime>(updatedAt),
-      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+      'serverUpdatedAt': serializer.toJson<DateTime>(serverUpdatedAt),
+      'localUpdatedAt': serializer.toJson<DateTime>(localUpdatedAt),
     };
   }
 
-  ChatRow copyWith({
-    String? chatId,
-    String? type,
+  LocalChannelRow copyWith({
+    String? channelId,
+    String? channelKey,
+    String? kind,
+    String? contextType,
+    String? visibility,
+    String? purpose,
+    Value<String?> title = const Value.absent(),
+    Value<String?> description = const Value.absent(),
+    Value<String?> avatarUrl = const Value.absent(),
     Value<String?> teamId = const Value.absent(),
-    Value<String?> teamName = const Value.absent(),
-    Value<String?> teamLogoUrl = const Value.absent(),
-    Value<String?> teamLogoMonogram = const Value.absent(),
-    Value<String?> teamPrimaryColorHex = const Value.absent(),
+    Value<String?> matchId = const Value.absent(),
+    Value<String?> tournamentId = const Value.absent(),
+    Value<String?> clubId = const Value.absent(),
+    Value<int?> lastMessageSeq = const Value.absent(),
     Value<DateTime?> lastMessageAt = const Value.absent(),
-    Value<String?> lastMessageBody = const Value.absent(),
-    Value<String?> lastMessageSenderId = const Value.absent(),
-    bool? lastMessageFromMe,
-    int? unreadCount,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    DateTime? cachedAt,
-  }) => ChatRow(
-    chatId: chatId ?? this.chatId,
-    type: type ?? this.type,
+    DateTime? serverUpdatedAt,
+    DateTime? localUpdatedAt,
+  }) => LocalChannelRow(
+    channelId: channelId ?? this.channelId,
+    channelKey: channelKey ?? this.channelKey,
+    kind: kind ?? this.kind,
+    contextType: contextType ?? this.contextType,
+    visibility: visibility ?? this.visibility,
+    purpose: purpose ?? this.purpose,
+    title: title.present ? title.value : this.title,
+    description: description.present ? description.value : this.description,
+    avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
     teamId: teamId.present ? teamId.value : this.teamId,
-    teamName: teamName.present ? teamName.value : this.teamName,
-    teamLogoUrl: teamLogoUrl.present ? teamLogoUrl.value : this.teamLogoUrl,
-    teamLogoMonogram:
-        teamLogoMonogram.present
-            ? teamLogoMonogram.value
-            : this.teamLogoMonogram,
-    teamPrimaryColorHex:
-        teamPrimaryColorHex.present
-            ? teamPrimaryColorHex.value
-            : this.teamPrimaryColorHex,
+    matchId: matchId.present ? matchId.value : this.matchId,
+    tournamentId: tournamentId.present ? tournamentId.value : this.tournamentId,
+    clubId: clubId.present ? clubId.value : this.clubId,
+    lastMessageSeq:
+        lastMessageSeq.present ? lastMessageSeq.value : this.lastMessageSeq,
     lastMessageAt:
         lastMessageAt.present ? lastMessageAt.value : this.lastMessageAt,
-    lastMessageBody:
-        lastMessageBody.present ? lastMessageBody.value : this.lastMessageBody,
-    lastMessageSenderId:
-        lastMessageSenderId.present
-            ? lastMessageSenderId.value
-            : this.lastMessageSenderId,
-    lastMessageFromMe: lastMessageFromMe ?? this.lastMessageFromMe,
-    unreadCount: unreadCount ?? this.unreadCount,
-    createdAt: createdAt ?? this.createdAt,
-    updatedAt: updatedAt ?? this.updatedAt,
-    cachedAt: cachedAt ?? this.cachedAt,
+    serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
+    localUpdatedAt: localUpdatedAt ?? this.localUpdatedAt,
   );
-  ChatRow copyWithCompanion(ChatsCompanion data) {
-    return ChatRow(
-      chatId: data.chatId.present ? data.chatId.value : this.chatId,
-      type: data.type.present ? data.type.value : this.type,
+  LocalChannelRow copyWithCompanion(LocalChannelsCompanion data) {
+    return LocalChannelRow(
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      channelKey:
+          data.channelKey.present ? data.channelKey.value : this.channelKey,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      contextType:
+          data.contextType.present ? data.contextType.value : this.contextType,
+      visibility:
+          data.visibility.present ? data.visibility.value : this.visibility,
+      purpose: data.purpose.present ? data.purpose.value : this.purpose,
+      title: data.title.present ? data.title.value : this.title,
+      description:
+          data.description.present ? data.description.value : this.description,
+      avatarUrl: data.avatarUrl.present ? data.avatarUrl.value : this.avatarUrl,
       teamId: data.teamId.present ? data.teamId.value : this.teamId,
-      teamName: data.teamName.present ? data.teamName.value : this.teamName,
-      teamLogoUrl:
-          data.teamLogoUrl.present ? data.teamLogoUrl.value : this.teamLogoUrl,
-      teamLogoMonogram:
-          data.teamLogoMonogram.present
-              ? data.teamLogoMonogram.value
-              : this.teamLogoMonogram,
-      teamPrimaryColorHex:
-          data.teamPrimaryColorHex.present
-              ? data.teamPrimaryColorHex.value
-              : this.teamPrimaryColorHex,
+      matchId: data.matchId.present ? data.matchId.value : this.matchId,
+      tournamentId:
+          data.tournamentId.present
+              ? data.tournamentId.value
+              : this.tournamentId,
+      clubId: data.clubId.present ? data.clubId.value : this.clubId,
+      lastMessageSeq:
+          data.lastMessageSeq.present
+              ? data.lastMessageSeq.value
+              : this.lastMessageSeq,
       lastMessageAt:
           data.lastMessageAt.present
               ? data.lastMessageAt.value
               : this.lastMessageAt,
-      lastMessageBody:
-          data.lastMessageBody.present
-              ? data.lastMessageBody.value
-              : this.lastMessageBody,
-      lastMessageSenderId:
-          data.lastMessageSenderId.present
-              ? data.lastMessageSenderId.value
-              : this.lastMessageSenderId,
-      lastMessageFromMe:
-          data.lastMessageFromMe.present
-              ? data.lastMessageFromMe.value
-              : this.lastMessageFromMe,
-      unreadCount:
-          data.unreadCount.present ? data.unreadCount.value : this.unreadCount,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
-      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+      serverUpdatedAt:
+          data.serverUpdatedAt.present
+              ? data.serverUpdatedAt.value
+              : this.serverUpdatedAt,
+      localUpdatedAt:
+          data.localUpdatedAt.present
+              ? data.localUpdatedAt.value
+              : this.localUpdatedAt,
     );
   }
 
   @override
   String toString() {
-    return (StringBuffer('ChatRow(')
-          ..write('chatId: $chatId, ')
-          ..write('type: $type, ')
+    return (StringBuffer('LocalChannelRow(')
+          ..write('channelId: $channelId, ')
+          ..write('channelKey: $channelKey, ')
+          ..write('kind: $kind, ')
+          ..write('contextType: $contextType, ')
+          ..write('visibility: $visibility, ')
+          ..write('purpose: $purpose, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('avatarUrl: $avatarUrl, ')
           ..write('teamId: $teamId, ')
-          ..write('teamName: $teamName, ')
-          ..write('teamLogoUrl: $teamLogoUrl, ')
-          ..write('teamLogoMonogram: $teamLogoMonogram, ')
-          ..write('teamPrimaryColorHex: $teamPrimaryColorHex, ')
+          ..write('matchId: $matchId, ')
+          ..write('tournamentId: $tournamentId, ')
+          ..write('clubId: $clubId, ')
+          ..write('lastMessageSeq: $lastMessageSeq, ')
           ..write('lastMessageAt: $lastMessageAt, ')
-          ..write('lastMessageBody: $lastMessageBody, ')
-          ..write('lastMessageSenderId: $lastMessageSenderId, ')
-          ..write('lastMessageFromMe: $lastMessageFromMe, ')
-          ..write('unreadCount: $unreadCount, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('cachedAt: $cachedAt')
+          ..write('serverUpdatedAt: $serverUpdatedAt, ')
+          ..write('localUpdatedAt: $localUpdatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(
-    chatId,
-    type,
+    channelId,
+    channelKey,
+    kind,
+    contextType,
+    visibility,
+    purpose,
+    title,
+    description,
+    avatarUrl,
     teamId,
-    teamName,
-    teamLogoUrl,
-    teamLogoMonogram,
-    teamPrimaryColorHex,
+    matchId,
+    tournamentId,
+    clubId,
+    lastMessageSeq,
     lastMessageAt,
-    lastMessageBody,
-    lastMessageSenderId,
-    lastMessageFromMe,
-    unreadCount,
-    createdAt,
-    updatedAt,
-    cachedAt,
+    serverUpdatedAt,
+    localUpdatedAt,
   );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is ChatRow &&
-          other.chatId == this.chatId &&
-          other.type == this.type &&
+      (other is LocalChannelRow &&
+          other.channelId == this.channelId &&
+          other.channelKey == this.channelKey &&
+          other.kind == this.kind &&
+          other.contextType == this.contextType &&
+          other.visibility == this.visibility &&
+          other.purpose == this.purpose &&
+          other.title == this.title &&
+          other.description == this.description &&
+          other.avatarUrl == this.avatarUrl &&
           other.teamId == this.teamId &&
-          other.teamName == this.teamName &&
-          other.teamLogoUrl == this.teamLogoUrl &&
-          other.teamLogoMonogram == this.teamLogoMonogram &&
-          other.teamPrimaryColorHex == this.teamPrimaryColorHex &&
+          other.matchId == this.matchId &&
+          other.tournamentId == this.tournamentId &&
+          other.clubId == this.clubId &&
+          other.lastMessageSeq == this.lastMessageSeq &&
           other.lastMessageAt == this.lastMessageAt &&
-          other.lastMessageBody == this.lastMessageBody &&
-          other.lastMessageSenderId == this.lastMessageSenderId &&
-          other.lastMessageFromMe == this.lastMessageFromMe &&
-          other.unreadCount == this.unreadCount &&
-          other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt &&
-          other.cachedAt == this.cachedAt);
+          other.serverUpdatedAt == this.serverUpdatedAt &&
+          other.localUpdatedAt == this.localUpdatedAt);
 }
 
-class ChatsCompanion extends UpdateCompanion<ChatRow> {
-  final Value<String> chatId;
-  final Value<String> type;
+class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
+  final Value<String> channelId;
+  final Value<String> channelKey;
+  final Value<String> kind;
+  final Value<String> contextType;
+  final Value<String> visibility;
+  final Value<String> purpose;
+  final Value<String?> title;
+  final Value<String?> description;
+  final Value<String?> avatarUrl;
   final Value<String?> teamId;
-  final Value<String?> teamName;
-  final Value<String?> teamLogoUrl;
-  final Value<String?> teamLogoMonogram;
-  final Value<String?> teamPrimaryColorHex;
+  final Value<String?> matchId;
+  final Value<String?> tournamentId;
+  final Value<String?> clubId;
+  final Value<int?> lastMessageSeq;
   final Value<DateTime?> lastMessageAt;
-  final Value<String?> lastMessageBody;
-  final Value<String?> lastMessageSenderId;
-  final Value<bool> lastMessageFromMe;
-  final Value<int> unreadCount;
-  final Value<DateTime> createdAt;
-  final Value<DateTime> updatedAt;
-  final Value<DateTime> cachedAt;
+  final Value<DateTime> serverUpdatedAt;
+  final Value<DateTime> localUpdatedAt;
   final Value<int> rowid;
-  const ChatsCompanion({
-    this.chatId = const Value.absent(),
-    this.type = const Value.absent(),
+  const LocalChannelsCompanion({
+    this.channelId = const Value.absent(),
+    this.channelKey = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.contextType = const Value.absent(),
+    this.visibility = const Value.absent(),
+    this.purpose = const Value.absent(),
+    this.title = const Value.absent(),
+    this.description = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
     this.teamId = const Value.absent(),
-    this.teamName = const Value.absent(),
-    this.teamLogoUrl = const Value.absent(),
-    this.teamLogoMonogram = const Value.absent(),
-    this.teamPrimaryColorHex = const Value.absent(),
+    this.matchId = const Value.absent(),
+    this.tournamentId = const Value.absent(),
+    this.clubId = const Value.absent(),
+    this.lastMessageSeq = const Value.absent(),
     this.lastMessageAt = const Value.absent(),
-    this.lastMessageBody = const Value.absent(),
-    this.lastMessageSenderId = const Value.absent(),
-    this.lastMessageFromMe = const Value.absent(),
-    this.unreadCount = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.updatedAt = const Value.absent(),
-    this.cachedAt = const Value.absent(),
+    this.serverUpdatedAt = const Value.absent(),
+    this.localUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  ChatsCompanion.insert({
-    required String chatId,
-    required String type,
+  LocalChannelsCompanion.insert({
+    required String channelId,
+    required String channelKey,
+    required String kind,
+    required String contextType,
+    this.visibility = const Value.absent(),
+    this.purpose = const Value.absent(),
+    this.title = const Value.absent(),
+    this.description = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
     this.teamId = const Value.absent(),
-    this.teamName = const Value.absent(),
-    this.teamLogoUrl = const Value.absent(),
-    this.teamLogoMonogram = const Value.absent(),
-    this.teamPrimaryColorHex = const Value.absent(),
+    this.matchId = const Value.absent(),
+    this.tournamentId = const Value.absent(),
+    this.clubId = const Value.absent(),
+    this.lastMessageSeq = const Value.absent(),
     this.lastMessageAt = const Value.absent(),
-    this.lastMessageBody = const Value.absent(),
-    this.lastMessageSenderId = const Value.absent(),
-    this.lastMessageFromMe = const Value.absent(),
-    this.unreadCount = const Value.absent(),
-    required DateTime createdAt,
-    required DateTime updatedAt,
-    required DateTime cachedAt,
+    required DateTime serverUpdatedAt,
+    required DateTime localUpdatedAt,
     this.rowid = const Value.absent(),
-  }) : chatId = Value(chatId),
-       type = Value(type),
-       createdAt = Value(createdAt),
-       updatedAt = Value(updatedAt),
-       cachedAt = Value(cachedAt);
-  static Insertable<ChatRow> custom({
-    Expression<String>? chatId,
-    Expression<String>? type,
+  }) : channelId = Value(channelId),
+       channelKey = Value(channelKey),
+       kind = Value(kind),
+       contextType = Value(contextType),
+       serverUpdatedAt = Value(serverUpdatedAt),
+       localUpdatedAt = Value(localUpdatedAt);
+  static Insertable<LocalChannelRow> custom({
+    Expression<String>? channelId,
+    Expression<String>? channelKey,
+    Expression<String>? kind,
+    Expression<String>? contextType,
+    Expression<String>? visibility,
+    Expression<String>? purpose,
+    Expression<String>? title,
+    Expression<String>? description,
+    Expression<String>? avatarUrl,
     Expression<String>? teamId,
-    Expression<String>? teamName,
-    Expression<String>? teamLogoUrl,
-    Expression<String>? teamLogoMonogram,
-    Expression<String>? teamPrimaryColorHex,
+    Expression<String>? matchId,
+    Expression<String>? tournamentId,
+    Expression<String>? clubId,
+    Expression<int>? lastMessageSeq,
     Expression<DateTime>? lastMessageAt,
-    Expression<String>? lastMessageBody,
-    Expression<String>? lastMessageSenderId,
-    Expression<bool>? lastMessageFromMe,
-    Expression<int>? unreadCount,
-    Expression<DateTime>? createdAt,
-    Expression<DateTime>? updatedAt,
-    Expression<DateTime>? cachedAt,
+    Expression<DateTime>? serverUpdatedAt,
+    Expression<DateTime>? localUpdatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
-      if (chatId != null) 'chat_id': chatId,
-      if (type != null) 'type': type,
+      if (channelId != null) 'channel_id': channelId,
+      if (channelKey != null) 'channel_key': channelKey,
+      if (kind != null) 'kind': kind,
+      if (contextType != null) 'context_type': contextType,
+      if (visibility != null) 'visibility': visibility,
+      if (purpose != null) 'purpose': purpose,
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
       if (teamId != null) 'team_id': teamId,
-      if (teamName != null) 'team_name': teamName,
-      if (teamLogoUrl != null) 'team_logo_url': teamLogoUrl,
-      if (teamLogoMonogram != null) 'team_logo_monogram': teamLogoMonogram,
-      if (teamPrimaryColorHex != null)
-        'team_primary_color_hex': teamPrimaryColorHex,
+      if (matchId != null) 'match_id': matchId,
+      if (tournamentId != null) 'tournament_id': tournamentId,
+      if (clubId != null) 'club_id': clubId,
+      if (lastMessageSeq != null) 'last_message_seq': lastMessageSeq,
       if (lastMessageAt != null) 'last_message_at': lastMessageAt,
-      if (lastMessageBody != null) 'last_message_body': lastMessageBody,
-      if (lastMessageSenderId != null)
-        'last_message_sender_id': lastMessageSenderId,
-      if (lastMessageFromMe != null) 'last_message_from_me': lastMessageFromMe,
-      if (unreadCount != null) 'unread_count': unreadCount,
-      if (createdAt != null) 'created_at': createdAt,
-      if (updatedAt != null) 'updated_at': updatedAt,
-      if (cachedAt != null) 'cached_at': cachedAt,
+      if (serverUpdatedAt != null) 'server_updated_at': serverUpdatedAt,
+      if (localUpdatedAt != null) 'local_updated_at': localUpdatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
-  ChatsCompanion copyWith({
-    Value<String>? chatId,
-    Value<String>? type,
+  LocalChannelsCompanion copyWith({
+    Value<String>? channelId,
+    Value<String>? channelKey,
+    Value<String>? kind,
+    Value<String>? contextType,
+    Value<String>? visibility,
+    Value<String>? purpose,
+    Value<String?>? title,
+    Value<String?>? description,
+    Value<String?>? avatarUrl,
     Value<String?>? teamId,
-    Value<String?>? teamName,
-    Value<String?>? teamLogoUrl,
-    Value<String?>? teamLogoMonogram,
-    Value<String?>? teamPrimaryColorHex,
+    Value<String?>? matchId,
+    Value<String?>? tournamentId,
+    Value<String?>? clubId,
+    Value<int?>? lastMessageSeq,
     Value<DateTime?>? lastMessageAt,
-    Value<String?>? lastMessageBody,
-    Value<String?>? lastMessageSenderId,
-    Value<bool>? lastMessageFromMe,
-    Value<int>? unreadCount,
-    Value<DateTime>? createdAt,
-    Value<DateTime>? updatedAt,
-    Value<DateTime>? cachedAt,
+    Value<DateTime>? serverUpdatedAt,
+    Value<DateTime>? localUpdatedAt,
     Value<int>? rowid,
   }) {
-    return ChatsCompanion(
-      chatId: chatId ?? this.chatId,
-      type: type ?? this.type,
+    return LocalChannelsCompanion(
+      channelId: channelId ?? this.channelId,
+      channelKey: channelKey ?? this.channelKey,
+      kind: kind ?? this.kind,
+      contextType: contextType ?? this.contextType,
+      visibility: visibility ?? this.visibility,
+      purpose: purpose ?? this.purpose,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       teamId: teamId ?? this.teamId,
-      teamName: teamName ?? this.teamName,
-      teamLogoUrl: teamLogoUrl ?? this.teamLogoUrl,
-      teamLogoMonogram: teamLogoMonogram ?? this.teamLogoMonogram,
-      teamPrimaryColorHex: teamPrimaryColorHex ?? this.teamPrimaryColorHex,
+      matchId: matchId ?? this.matchId,
+      tournamentId: tournamentId ?? this.tournamentId,
+      clubId: clubId ?? this.clubId,
+      lastMessageSeq: lastMessageSeq ?? this.lastMessageSeq,
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
-      lastMessageBody: lastMessageBody ?? this.lastMessageBody,
-      lastMessageSenderId: lastMessageSenderId ?? this.lastMessageSenderId,
-      lastMessageFromMe: lastMessageFromMe ?? this.lastMessageFromMe,
-      unreadCount: unreadCount ?? this.unreadCount,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      cachedAt: cachedAt ?? this.cachedAt,
+      serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
+      localUpdatedAt: localUpdatedAt ?? this.localUpdatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1126,54 +1192,56 @@ class ChatsCompanion extends UpdateCompanion<ChatRow> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    if (chatId.present) {
-      map['chat_id'] = Variable<String>(chatId.value);
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
     }
-    if (type.present) {
-      map['type'] = Variable<String>(type.value);
+    if (channelKey.present) {
+      map['channel_key'] = Variable<String>(channelKey.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (contextType.present) {
+      map['context_type'] = Variable<String>(contextType.value);
+    }
+    if (visibility.present) {
+      map['visibility'] = Variable<String>(visibility.value);
+    }
+    if (purpose.present) {
+      map['purpose'] = Variable<String>(purpose.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (avatarUrl.present) {
+      map['avatar_url'] = Variable<String>(avatarUrl.value);
     }
     if (teamId.present) {
       map['team_id'] = Variable<String>(teamId.value);
     }
-    if (teamName.present) {
-      map['team_name'] = Variable<String>(teamName.value);
+    if (matchId.present) {
+      map['match_id'] = Variable<String>(matchId.value);
     }
-    if (teamLogoUrl.present) {
-      map['team_logo_url'] = Variable<String>(teamLogoUrl.value);
+    if (tournamentId.present) {
+      map['tournament_id'] = Variable<String>(tournamentId.value);
     }
-    if (teamLogoMonogram.present) {
-      map['team_logo_monogram'] = Variable<String>(teamLogoMonogram.value);
+    if (clubId.present) {
+      map['club_id'] = Variable<String>(clubId.value);
     }
-    if (teamPrimaryColorHex.present) {
-      map['team_primary_color_hex'] = Variable<String>(
-        teamPrimaryColorHex.value,
-      );
+    if (lastMessageSeq.present) {
+      map['last_message_seq'] = Variable<int>(lastMessageSeq.value);
     }
     if (lastMessageAt.present) {
       map['last_message_at'] = Variable<DateTime>(lastMessageAt.value);
     }
-    if (lastMessageBody.present) {
-      map['last_message_body'] = Variable<String>(lastMessageBody.value);
+    if (serverUpdatedAt.present) {
+      map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt.value);
     }
-    if (lastMessageSenderId.present) {
-      map['last_message_sender_id'] = Variable<String>(
-        lastMessageSenderId.value,
-      );
-    }
-    if (lastMessageFromMe.present) {
-      map['last_message_from_me'] = Variable<bool>(lastMessageFromMe.value);
-    }
-    if (unreadCount.present) {
-      map['unread_count'] = Variable<int>(unreadCount.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<DateTime>(createdAt.value);
-    }
-    if (updatedAt.present) {
-      map['updated_at'] = Variable<DateTime>(updatedAt.value);
-    }
-    if (cachedAt.present) {
-      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    if (localUpdatedAt.present) {
+      map['local_updated_at'] = Variable<DateTime>(localUpdatedAt.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1183,34 +1251,919 @@ class ChatsCompanion extends UpdateCompanion<ChatRow> {
 
   @override
   String toString() {
-    return (StringBuffer('ChatsCompanion(')
-          ..write('chatId: $chatId, ')
-          ..write('type: $type, ')
+    return (StringBuffer('LocalChannelsCompanion(')
+          ..write('channelId: $channelId, ')
+          ..write('channelKey: $channelKey, ')
+          ..write('kind: $kind, ')
+          ..write('contextType: $contextType, ')
+          ..write('visibility: $visibility, ')
+          ..write('purpose: $purpose, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('avatarUrl: $avatarUrl, ')
           ..write('teamId: $teamId, ')
-          ..write('teamName: $teamName, ')
-          ..write('teamLogoUrl: $teamLogoUrl, ')
-          ..write('teamLogoMonogram: $teamLogoMonogram, ')
-          ..write('teamPrimaryColorHex: $teamPrimaryColorHex, ')
+          ..write('matchId: $matchId, ')
+          ..write('tournamentId: $tournamentId, ')
+          ..write('clubId: $clubId, ')
+          ..write('lastMessageSeq: $lastMessageSeq, ')
           ..write('lastMessageAt: $lastMessageAt, ')
-          ..write('lastMessageBody: $lastMessageBody, ')
-          ..write('lastMessageSenderId: $lastMessageSenderId, ')
-          ..write('lastMessageFromMe: $lastMessageFromMe, ')
-          ..write('unreadCount: $unreadCount, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('cachedAt: $cachedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt, ')
+          ..write('localUpdatedAt: $localUpdatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
 }
 
-class $MessagesTable extends Messages
-    with TableInfo<$MessagesTable, MessageRow> {
+class $LocalChannelMembersTable extends LocalChannelMembers
+    with TableInfo<$LocalChannelMembersTable, LocalChannelMemberRow> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $MessagesTable(this.attachedDatabase, [this._alias]);
+  $LocalChannelMembersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  @override
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('member'),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('active'),
+  );
+  static const VerificationMeta _joinedAtMeta = const VerificationMeta(
+    'joinedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> joinedAt = GeneratedColumn<DateTime>(
+    'joined_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _leftAtMeta = const VerificationMeta('leftAt');
+  @override
+  late final GeneratedColumn<DateTime> leftAt = GeneratedColumn<DateTime>(
+    'left_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastDeliveredMessageSeqMeta =
+      const VerificationMeta('lastDeliveredMessageSeq');
+  @override
+  late final GeneratedColumn<int> lastDeliveredMessageSeq =
+      GeneratedColumn<int>(
+        'last_delivered_message_seq',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastDeliveredAtMeta = const VerificationMeta(
+    'lastDeliveredAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastDeliveredAt =
+      GeneratedColumn<DateTime>(
+        'last_delivered_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastReadMessageSeqMeta =
+      const VerificationMeta('lastReadMessageSeq');
+  @override
+  late final GeneratedColumn<int> lastReadMessageSeq = GeneratedColumn<int>(
+    'last_read_message_seq',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastReadAtMeta = const VerificationMeta(
+    'lastReadAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastReadAt = GeneratedColumn<DateTime>(
+    'last_read_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notificationsMutedUntilMeta =
+      const VerificationMeta('notificationsMutedUntil');
+  @override
+  late final GeneratedColumn<DateTime> notificationsMutedUntil =
+      GeneratedColumn<DateTime>(
+        'notifications_muted_until',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _archivedAtMeta = const VerificationMeta(
+    'archivedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> archivedAt = GeneratedColumn<DateTime>(
+    'archived_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pinnedAtMeta = const VerificationMeta(
+    'pinnedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> pinnedAt = GeneratedColumn<DateTime>(
+    'pinned_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serverUpdatedAtMeta = const VerificationMeta(
+    'serverUpdatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> serverUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'server_updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    channelId,
+    userId,
+    role,
+    status,
+    joinedAt,
+    leftAt,
+    lastDeliveredMessageSeq,
+    lastDeliveredAt,
+    lastReadMessageSeq,
+    lastReadAt,
+    notificationsMutedUntil,
+    archivedAt,
+    pinnedAt,
+    serverUpdatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_channel_members';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalChannelMemberRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('channel_id')) {
+      context.handle(
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('role')) {
+      context.handle(
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('joined_at')) {
+      context.handle(
+        _joinedAtMeta,
+        joinedAt.isAcceptableOrUnknown(data['joined_at']!, _joinedAtMeta),
+      );
+    }
+    if (data.containsKey('left_at')) {
+      context.handle(
+        _leftAtMeta,
+        leftAt.isAcceptableOrUnknown(data['left_at']!, _leftAtMeta),
+      );
+    }
+    if (data.containsKey('last_delivered_message_seq')) {
+      context.handle(
+        _lastDeliveredMessageSeqMeta,
+        lastDeliveredMessageSeq.isAcceptableOrUnknown(
+          data['last_delivered_message_seq']!,
+          _lastDeliveredMessageSeqMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_delivered_at')) {
+      context.handle(
+        _lastDeliveredAtMeta,
+        lastDeliveredAt.isAcceptableOrUnknown(
+          data['last_delivered_at']!,
+          _lastDeliveredAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_read_message_seq')) {
+      context.handle(
+        _lastReadMessageSeqMeta,
+        lastReadMessageSeq.isAcceptableOrUnknown(
+          data['last_read_message_seq']!,
+          _lastReadMessageSeqMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_read_at')) {
+      context.handle(
+        _lastReadAtMeta,
+        lastReadAt.isAcceptableOrUnknown(
+          data['last_read_at']!,
+          _lastReadAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('notifications_muted_until')) {
+      context.handle(
+        _notificationsMutedUntilMeta,
+        notificationsMutedUntil.isAcceptableOrUnknown(
+          data['notifications_muted_until']!,
+          _notificationsMutedUntilMeta,
+        ),
+      );
+    }
+    if (data.containsKey('archived_at')) {
+      context.handle(
+        _archivedAtMeta,
+        archivedAt.isAcceptableOrUnknown(data['archived_at']!, _archivedAtMeta),
+      );
+    }
+    if (data.containsKey('pinned_at')) {
+      context.handle(
+        _pinnedAtMeta,
+        pinnedAt.isAcceptableOrUnknown(data['pinned_at']!, _pinnedAtMeta),
+      );
+    }
+    if (data.containsKey('server_updated_at')) {
+      context.handle(
+        _serverUpdatedAtMeta,
+        serverUpdatedAt.isAcceptableOrUnknown(
+          data['server_updated_at']!,
+          _serverUpdatedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_serverUpdatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {channelId, userId};
+  @override
+  LocalChannelMemberRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalChannelMemberRow(
+      channelId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}channel_id'],
+          )!,
+      userId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}user_id'],
+          )!,
+      role:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}role'],
+          )!,
+      status:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}status'],
+          )!,
+      joinedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}joined_at'],
+      ),
+      leftAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}left_at'],
+      ),
+      lastDeliveredMessageSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_delivered_message_seq'],
+      ),
+      lastDeliveredAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_delivered_at'],
+      ),
+      lastReadMessageSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_read_message_seq'],
+      ),
+      lastReadAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_read_at'],
+      ),
+      notificationsMutedUntil: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}notifications_muted_until'],
+      ),
+      archivedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}archived_at'],
+      ),
+      pinnedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}pinned_at'],
+      ),
+      serverUpdatedAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}server_updated_at'],
+          )!,
+    );
+  }
+
+  @override
+  $LocalChannelMembersTable createAlias(String alias) {
+    return $LocalChannelMembersTable(attachedDatabase, alias);
+  }
+}
+
+class LocalChannelMemberRow extends DataClass
+    implements Insertable<LocalChannelMemberRow> {
+  final String channelId;
+  final String userId;
+  final String role;
+  final String status;
+  final DateTime? joinedAt;
+  final DateTime? leftAt;
+  final int? lastDeliveredMessageSeq;
+  final DateTime? lastDeliveredAt;
+  final int? lastReadMessageSeq;
+  final DateTime? lastReadAt;
+  final DateTime? notificationsMutedUntil;
+  final DateTime? archivedAt;
+  final DateTime? pinnedAt;
+  final DateTime serverUpdatedAt;
+  const LocalChannelMemberRow({
+    required this.channelId,
+    required this.userId,
+    required this.role,
+    required this.status,
+    this.joinedAt,
+    this.leftAt,
+    this.lastDeliveredMessageSeq,
+    this.lastDeliveredAt,
+    this.lastReadMessageSeq,
+    this.lastReadAt,
+    this.notificationsMutedUntil,
+    this.archivedAt,
+    this.pinnedAt,
+    required this.serverUpdatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['channel_id'] = Variable<String>(channelId);
+    map['user_id'] = Variable<String>(userId);
+    map['role'] = Variable<String>(role);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || joinedAt != null) {
+      map['joined_at'] = Variable<DateTime>(joinedAt);
+    }
+    if (!nullToAbsent || leftAt != null) {
+      map['left_at'] = Variable<DateTime>(leftAt);
+    }
+    if (!nullToAbsent || lastDeliveredMessageSeq != null) {
+      map['last_delivered_message_seq'] = Variable<int>(
+        lastDeliveredMessageSeq,
+      );
+    }
+    if (!nullToAbsent || lastDeliveredAt != null) {
+      map['last_delivered_at'] = Variable<DateTime>(lastDeliveredAt);
+    }
+    if (!nullToAbsent || lastReadMessageSeq != null) {
+      map['last_read_message_seq'] = Variable<int>(lastReadMessageSeq);
+    }
+    if (!nullToAbsent || lastReadAt != null) {
+      map['last_read_at'] = Variable<DateTime>(lastReadAt);
+    }
+    if (!nullToAbsent || notificationsMutedUntil != null) {
+      map['notifications_muted_until'] = Variable<DateTime>(
+        notificationsMutedUntil,
+      );
+    }
+    if (!nullToAbsent || archivedAt != null) {
+      map['archived_at'] = Variable<DateTime>(archivedAt);
+    }
+    if (!nullToAbsent || pinnedAt != null) {
+      map['pinned_at'] = Variable<DateTime>(pinnedAt);
+    }
+    map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt);
+    return map;
+  }
+
+  LocalChannelMembersCompanion toCompanion(bool nullToAbsent) {
+    return LocalChannelMembersCompanion(
+      channelId: Value(channelId),
+      userId: Value(userId),
+      role: Value(role),
+      status: Value(status),
+      joinedAt:
+          joinedAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(joinedAt),
+      leftAt:
+          leftAt == null && nullToAbsent ? const Value.absent() : Value(leftAt),
+      lastDeliveredMessageSeq:
+          lastDeliveredMessageSeq == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastDeliveredMessageSeq),
+      lastDeliveredAt:
+          lastDeliveredAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastDeliveredAt),
+      lastReadMessageSeq:
+          lastReadMessageSeq == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastReadMessageSeq),
+      lastReadAt:
+          lastReadAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastReadAt),
+      notificationsMutedUntil:
+          notificationsMutedUntil == null && nullToAbsent
+              ? const Value.absent()
+              : Value(notificationsMutedUntil),
+      archivedAt:
+          archivedAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(archivedAt),
+      pinnedAt:
+          pinnedAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(pinnedAt),
+      serverUpdatedAt: Value(serverUpdatedAt),
+    );
+  }
+
+  factory LocalChannelMemberRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalChannelMemberRow(
+      channelId: serializer.fromJson<String>(json['channelId']),
+      userId: serializer.fromJson<String>(json['userId']),
+      role: serializer.fromJson<String>(json['role']),
+      status: serializer.fromJson<String>(json['status']),
+      joinedAt: serializer.fromJson<DateTime?>(json['joinedAt']),
+      leftAt: serializer.fromJson<DateTime?>(json['leftAt']),
+      lastDeliveredMessageSeq: serializer.fromJson<int?>(
+        json['lastDeliveredMessageSeq'],
+      ),
+      lastDeliveredAt: serializer.fromJson<DateTime?>(json['lastDeliveredAt']),
+      lastReadMessageSeq: serializer.fromJson<int?>(json['lastReadMessageSeq']),
+      lastReadAt: serializer.fromJson<DateTime?>(json['lastReadAt']),
+      notificationsMutedUntil: serializer.fromJson<DateTime?>(
+        json['notificationsMutedUntil'],
+      ),
+      archivedAt: serializer.fromJson<DateTime?>(json['archivedAt']),
+      pinnedAt: serializer.fromJson<DateTime?>(json['pinnedAt']),
+      serverUpdatedAt: serializer.fromJson<DateTime>(json['serverUpdatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'channelId': serializer.toJson<String>(channelId),
+      'userId': serializer.toJson<String>(userId),
+      'role': serializer.toJson<String>(role),
+      'status': serializer.toJson<String>(status),
+      'joinedAt': serializer.toJson<DateTime?>(joinedAt),
+      'leftAt': serializer.toJson<DateTime?>(leftAt),
+      'lastDeliveredMessageSeq': serializer.toJson<int?>(
+        lastDeliveredMessageSeq,
+      ),
+      'lastDeliveredAt': serializer.toJson<DateTime?>(lastDeliveredAt),
+      'lastReadMessageSeq': serializer.toJson<int?>(lastReadMessageSeq),
+      'lastReadAt': serializer.toJson<DateTime?>(lastReadAt),
+      'notificationsMutedUntil': serializer.toJson<DateTime?>(
+        notificationsMutedUntil,
+      ),
+      'archivedAt': serializer.toJson<DateTime?>(archivedAt),
+      'pinnedAt': serializer.toJson<DateTime?>(pinnedAt),
+      'serverUpdatedAt': serializer.toJson<DateTime>(serverUpdatedAt),
+    };
+  }
+
+  LocalChannelMemberRow copyWith({
+    String? channelId,
+    String? userId,
+    String? role,
+    String? status,
+    Value<DateTime?> joinedAt = const Value.absent(),
+    Value<DateTime?> leftAt = const Value.absent(),
+    Value<int?> lastDeliveredMessageSeq = const Value.absent(),
+    Value<DateTime?> lastDeliveredAt = const Value.absent(),
+    Value<int?> lastReadMessageSeq = const Value.absent(),
+    Value<DateTime?> lastReadAt = const Value.absent(),
+    Value<DateTime?> notificationsMutedUntil = const Value.absent(),
+    Value<DateTime?> archivedAt = const Value.absent(),
+    Value<DateTime?> pinnedAt = const Value.absent(),
+    DateTime? serverUpdatedAt,
+  }) => LocalChannelMemberRow(
+    channelId: channelId ?? this.channelId,
+    userId: userId ?? this.userId,
+    role: role ?? this.role,
+    status: status ?? this.status,
+    joinedAt: joinedAt.present ? joinedAt.value : this.joinedAt,
+    leftAt: leftAt.present ? leftAt.value : this.leftAt,
+    lastDeliveredMessageSeq:
+        lastDeliveredMessageSeq.present
+            ? lastDeliveredMessageSeq.value
+            : this.lastDeliveredMessageSeq,
+    lastDeliveredAt:
+        lastDeliveredAt.present ? lastDeliveredAt.value : this.lastDeliveredAt,
+    lastReadMessageSeq:
+        lastReadMessageSeq.present
+            ? lastReadMessageSeq.value
+            : this.lastReadMessageSeq,
+    lastReadAt: lastReadAt.present ? lastReadAt.value : this.lastReadAt,
+    notificationsMutedUntil:
+        notificationsMutedUntil.present
+            ? notificationsMutedUntil.value
+            : this.notificationsMutedUntil,
+    archivedAt: archivedAt.present ? archivedAt.value : this.archivedAt,
+    pinnedAt: pinnedAt.present ? pinnedAt.value : this.pinnedAt,
+    serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
+  );
+  LocalChannelMemberRow copyWithCompanion(LocalChannelMembersCompanion data) {
+    return LocalChannelMemberRow(
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      role: data.role.present ? data.role.value : this.role,
+      status: data.status.present ? data.status.value : this.status,
+      joinedAt: data.joinedAt.present ? data.joinedAt.value : this.joinedAt,
+      leftAt: data.leftAt.present ? data.leftAt.value : this.leftAt,
+      lastDeliveredMessageSeq:
+          data.lastDeliveredMessageSeq.present
+              ? data.lastDeliveredMessageSeq.value
+              : this.lastDeliveredMessageSeq,
+      lastDeliveredAt:
+          data.lastDeliveredAt.present
+              ? data.lastDeliveredAt.value
+              : this.lastDeliveredAt,
+      lastReadMessageSeq:
+          data.lastReadMessageSeq.present
+              ? data.lastReadMessageSeq.value
+              : this.lastReadMessageSeq,
+      lastReadAt:
+          data.lastReadAt.present ? data.lastReadAt.value : this.lastReadAt,
+      notificationsMutedUntil:
+          data.notificationsMutedUntil.present
+              ? data.notificationsMutedUntil.value
+              : this.notificationsMutedUntil,
+      archivedAt:
+          data.archivedAt.present ? data.archivedAt.value : this.archivedAt,
+      pinnedAt: data.pinnedAt.present ? data.pinnedAt.value : this.pinnedAt,
+      serverUpdatedAt:
+          data.serverUpdatedAt.present
+              ? data.serverUpdatedAt.value
+              : this.serverUpdatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalChannelMemberRow(')
+          ..write('channelId: $channelId, ')
+          ..write('userId: $userId, ')
+          ..write('role: $role, ')
+          ..write('status: $status, ')
+          ..write('joinedAt: $joinedAt, ')
+          ..write('leftAt: $leftAt, ')
+          ..write('lastDeliveredMessageSeq: $lastDeliveredMessageSeq, ')
+          ..write('lastDeliveredAt: $lastDeliveredAt, ')
+          ..write('lastReadMessageSeq: $lastReadMessageSeq, ')
+          ..write('lastReadAt: $lastReadAt, ')
+          ..write('notificationsMutedUntil: $notificationsMutedUntil, ')
+          ..write('archivedAt: $archivedAt, ')
+          ..write('pinnedAt: $pinnedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    channelId,
+    userId,
+    role,
+    status,
+    joinedAt,
+    leftAt,
+    lastDeliveredMessageSeq,
+    lastDeliveredAt,
+    lastReadMessageSeq,
+    lastReadAt,
+    notificationsMutedUntil,
+    archivedAt,
+    pinnedAt,
+    serverUpdatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalChannelMemberRow &&
+          other.channelId == this.channelId &&
+          other.userId == this.userId &&
+          other.role == this.role &&
+          other.status == this.status &&
+          other.joinedAt == this.joinedAt &&
+          other.leftAt == this.leftAt &&
+          other.lastDeliveredMessageSeq == this.lastDeliveredMessageSeq &&
+          other.lastDeliveredAt == this.lastDeliveredAt &&
+          other.lastReadMessageSeq == this.lastReadMessageSeq &&
+          other.lastReadAt == this.lastReadAt &&
+          other.notificationsMutedUntil == this.notificationsMutedUntil &&
+          other.archivedAt == this.archivedAt &&
+          other.pinnedAt == this.pinnedAt &&
+          other.serverUpdatedAt == this.serverUpdatedAt);
+}
+
+class LocalChannelMembersCompanion
+    extends UpdateCompanion<LocalChannelMemberRow> {
+  final Value<String> channelId;
+  final Value<String> userId;
+  final Value<String> role;
+  final Value<String> status;
+  final Value<DateTime?> joinedAt;
+  final Value<DateTime?> leftAt;
+  final Value<int?> lastDeliveredMessageSeq;
+  final Value<DateTime?> lastDeliveredAt;
+  final Value<int?> lastReadMessageSeq;
+  final Value<DateTime?> lastReadAt;
+  final Value<DateTime?> notificationsMutedUntil;
+  final Value<DateTime?> archivedAt;
+  final Value<DateTime?> pinnedAt;
+  final Value<DateTime> serverUpdatedAt;
+  final Value<int> rowid;
+  const LocalChannelMembersCompanion({
+    this.channelId = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.role = const Value.absent(),
+    this.status = const Value.absent(),
+    this.joinedAt = const Value.absent(),
+    this.leftAt = const Value.absent(),
+    this.lastDeliveredMessageSeq = const Value.absent(),
+    this.lastDeliveredAt = const Value.absent(),
+    this.lastReadMessageSeq = const Value.absent(),
+    this.lastReadAt = const Value.absent(),
+    this.notificationsMutedUntil = const Value.absent(),
+    this.archivedAt = const Value.absent(),
+    this.pinnedAt = const Value.absent(),
+    this.serverUpdatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalChannelMembersCompanion.insert({
+    required String channelId,
+    required String userId,
+    this.role = const Value.absent(),
+    this.status = const Value.absent(),
+    this.joinedAt = const Value.absent(),
+    this.leftAt = const Value.absent(),
+    this.lastDeliveredMessageSeq = const Value.absent(),
+    this.lastDeliveredAt = const Value.absent(),
+    this.lastReadMessageSeq = const Value.absent(),
+    this.lastReadAt = const Value.absent(),
+    this.notificationsMutedUntil = const Value.absent(),
+    this.archivedAt = const Value.absent(),
+    this.pinnedAt = const Value.absent(),
+    required DateTime serverUpdatedAt,
+    this.rowid = const Value.absent(),
+  }) : channelId = Value(channelId),
+       userId = Value(userId),
+       serverUpdatedAt = Value(serverUpdatedAt);
+  static Insertable<LocalChannelMemberRow> custom({
+    Expression<String>? channelId,
+    Expression<String>? userId,
+    Expression<String>? role,
+    Expression<String>? status,
+    Expression<DateTime>? joinedAt,
+    Expression<DateTime>? leftAt,
+    Expression<int>? lastDeliveredMessageSeq,
+    Expression<DateTime>? lastDeliveredAt,
+    Expression<int>? lastReadMessageSeq,
+    Expression<DateTime>? lastReadAt,
+    Expression<DateTime>? notificationsMutedUntil,
+    Expression<DateTime>? archivedAt,
+    Expression<DateTime>? pinnedAt,
+    Expression<DateTime>? serverUpdatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (channelId != null) 'channel_id': channelId,
+      if (userId != null) 'user_id': userId,
+      if (role != null) 'role': role,
+      if (status != null) 'status': status,
+      if (joinedAt != null) 'joined_at': joinedAt,
+      if (leftAt != null) 'left_at': leftAt,
+      if (lastDeliveredMessageSeq != null)
+        'last_delivered_message_seq': lastDeliveredMessageSeq,
+      if (lastDeliveredAt != null) 'last_delivered_at': lastDeliveredAt,
+      if (lastReadMessageSeq != null)
+        'last_read_message_seq': lastReadMessageSeq,
+      if (lastReadAt != null) 'last_read_at': lastReadAt,
+      if (notificationsMutedUntil != null)
+        'notifications_muted_until': notificationsMutedUntil,
+      if (archivedAt != null) 'archived_at': archivedAt,
+      if (pinnedAt != null) 'pinned_at': pinnedAt,
+      if (serverUpdatedAt != null) 'server_updated_at': serverUpdatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalChannelMembersCompanion copyWith({
+    Value<String>? channelId,
+    Value<String>? userId,
+    Value<String>? role,
+    Value<String>? status,
+    Value<DateTime?>? joinedAt,
+    Value<DateTime?>? leftAt,
+    Value<int?>? lastDeliveredMessageSeq,
+    Value<DateTime?>? lastDeliveredAt,
+    Value<int?>? lastReadMessageSeq,
+    Value<DateTime?>? lastReadAt,
+    Value<DateTime?>? notificationsMutedUntil,
+    Value<DateTime?>? archivedAt,
+    Value<DateTime?>? pinnedAt,
+    Value<DateTime>? serverUpdatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalChannelMembersCompanion(
+      channelId: channelId ?? this.channelId,
+      userId: userId ?? this.userId,
+      role: role ?? this.role,
+      status: status ?? this.status,
+      joinedAt: joinedAt ?? this.joinedAt,
+      leftAt: leftAt ?? this.leftAt,
+      lastDeliveredMessageSeq:
+          lastDeliveredMessageSeq ?? this.lastDeliveredMessageSeq,
+      lastDeliveredAt: lastDeliveredAt ?? this.lastDeliveredAt,
+      lastReadMessageSeq: lastReadMessageSeq ?? this.lastReadMessageSeq,
+      lastReadAt: lastReadAt ?? this.lastReadAt,
+      notificationsMutedUntil:
+          notificationsMutedUntil ?? this.notificationsMutedUntil,
+      archivedAt: archivedAt ?? this.archivedAt,
+      pinnedAt: pinnedAt ?? this.pinnedAt,
+      serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (joinedAt.present) {
+      map['joined_at'] = Variable<DateTime>(joinedAt.value);
+    }
+    if (leftAt.present) {
+      map['left_at'] = Variable<DateTime>(leftAt.value);
+    }
+    if (lastDeliveredMessageSeq.present) {
+      map['last_delivered_message_seq'] = Variable<int>(
+        lastDeliveredMessageSeq.value,
+      );
+    }
+    if (lastDeliveredAt.present) {
+      map['last_delivered_at'] = Variable<DateTime>(lastDeliveredAt.value);
+    }
+    if (lastReadMessageSeq.present) {
+      map['last_read_message_seq'] = Variable<int>(lastReadMessageSeq.value);
+    }
+    if (lastReadAt.present) {
+      map['last_read_at'] = Variable<DateTime>(lastReadAt.value);
+    }
+    if (notificationsMutedUntil.present) {
+      map['notifications_muted_until'] = Variable<DateTime>(
+        notificationsMutedUntil.value,
+      );
+    }
+    if (archivedAt.present) {
+      map['archived_at'] = Variable<DateTime>(archivedAt.value);
+    }
+    if (pinnedAt.present) {
+      map['pinned_at'] = Variable<DateTime>(pinnedAt.value);
+    }
+    if (serverUpdatedAt.present) {
+      map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalChannelMembersCompanion(')
+          ..write('channelId: $channelId, ')
+          ..write('userId: $userId, ')
+          ..write('role: $role, ')
+          ..write('status: $status, ')
+          ..write('joinedAt: $joinedAt, ')
+          ..write('leftAt: $leftAt, ')
+          ..write('lastDeliveredMessageSeq: $lastDeliveredMessageSeq, ')
+          ..write('lastDeliveredAt: $lastDeliveredAt, ')
+          ..write('lastReadMessageSeq: $lastReadMessageSeq, ')
+          ..write('lastReadAt: $lastReadAt, ')
+          ..write('notificationsMutedUntil: $notificationsMutedUntil, ')
+          ..write('archivedAt: $archivedAt, ')
+          ..write('pinnedAt: $pinnedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LocalMessagesTable extends LocalMessages
+    with TableInfo<$LocalMessagesTable, LocalMessageRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalMessagesTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _messageIdMeta = const VerificationMeta(
     'messageId',
   );
@@ -1222,10 +2175,23 @@ class $MessagesTable extends Messages
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _chatIdMeta = const VerificationMeta('chatId');
+  static const VerificationMeta _messageSeqMeta = const VerificationMeta(
+    'messageSeq',
+  );
   @override
-  late final GeneratedColumn<String> chatId = GeneratedColumn<String>(
-    'chat_id',
+  late final GeneratedColumn<int> messageSeq = GeneratedColumn<int>(
+    'message_seq',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
@@ -1254,14 +2220,76 @@ class $MessagesTable extends Messages
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _messageTypeMeta = const VerificationMeta(
+    'messageType',
+  );
+  @override
+  late final GeneratedColumn<String> messageType = GeneratedColumn<String>(
+    'message_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('text'),
+  );
   static const VerificationMeta _bodyMeta = const VerificationMeta('body');
   @override
   late final GeneratedColumn<String> body = GeneratedColumn<String>(
     'body',
     aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
     false,
     type: DriftSqlType.string,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _replyToMessageIdMeta = const VerificationMeta(
+    'replyToMessageId',
+  );
+  @override
+  late final GeneratedColumn<String> replyToMessageId = GeneratedColumn<String>(
+    'reply_to_message_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _countsAsUnreadMeta = const VerificationMeta(
+    'countsAsUnread',
+  );
+  @override
+  late final GeneratedColumn<bool> countsAsUnread = GeneratedColumn<bool>(
+    'counts_as_unread',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("counts_as_unread" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
   );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
@@ -1270,9 +2298,20 @@ class $MessagesTable extends Messages
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
     'created_at',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _editedAtMeta = const VerificationMeta(
     'editedAt',
@@ -1296,39 +2335,82 @@ class $MessagesTable extends Messages
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _fromMeMeta = const VerificationMeta('fromMe');
+  static const VerificationMeta _localCreatedAtMeta = const VerificationMeta(
+    'localCreatedAt',
+  );
   @override
-  late final GeneratedColumn<bool> fromMe = GeneratedColumn<bool>(
-    'from_me',
+  late final GeneratedColumn<DateTime> localCreatedAt =
+      GeneratedColumn<DateTime>(
+        'local_created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
     aliasedName,
     false,
-    type: DriftSqlType.bool,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("from_me" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _sendErrorCodeMeta = const VerificationMeta(
+    'sendErrorCode',
+  );
+  @override
+  late final GeneratedColumn<String> sendErrorCode = GeneratedColumn<String>(
+    'send_error_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sendErrorMessageMeta = const VerificationMeta(
+    'sendErrorMessage',
+  );
+  @override
+  late final GeneratedColumn<String> sendErrorMessage = GeneratedColumn<String>(
+    'send_error_message',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   @override
   List<GeneratedColumn> get $columns => [
     messageId,
-    chatId,
+    messageSeq,
+    channelId,
     senderId,
     senderDisplayName,
+    messageType,
     body,
+    payloadJson,
+    replyToMessageId,
+    version,
+    countsAsUnread,
     createdAt,
+    updatedAt,
     editedAt,
     deletedAt,
-    fromMe,
+    localCreatedAt,
+    syncStatus,
+    sendErrorCode,
+    sendErrorMessage,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'messages';
+  static const String $name = 'local_messages';
   @override
   VerificationContext validateIntegrity(
-    Insertable<MessageRow> instance, {
+    Insertable<LocalMessageRow> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -1341,13 +2423,19 @@ class $MessagesTable extends Messages
     } else if (isInserting) {
       context.missing(_messageIdMeta);
     }
-    if (data.containsKey('chat_id')) {
+    if (data.containsKey('message_seq')) {
       context.handle(
-        _chatIdMeta,
-        chatId.isAcceptableOrUnknown(data['chat_id']!, _chatIdMeta),
+        _messageSeqMeta,
+        messageSeq.isAcceptableOrUnknown(data['message_seq']!, _messageSeqMeta),
+      );
+    }
+    if (data.containsKey('channel_id')) {
+      context.handle(
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
       );
     } else if (isInserting) {
-      context.missing(_chatIdMeta);
+      context.missing(_channelIdMeta);
     }
     if (data.containsKey('sender_id')) {
       context.handle(
@@ -1364,21 +2452,65 @@ class $MessagesTable extends Messages
         ),
       );
     }
+    if (data.containsKey('message_type')) {
+      context.handle(
+        _messageTypeMeta,
+        messageType.isAcceptableOrUnknown(
+          data['message_type']!,
+          _messageTypeMeta,
+        ),
+      );
+    }
     if (data.containsKey('body')) {
       context.handle(
         _bodyMeta,
         body.isAcceptableOrUnknown(data['body']!, _bodyMeta),
       );
-    } else if (isInserting) {
-      context.missing(_bodyMeta);
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reply_to_message_id')) {
+      context.handle(
+        _replyToMessageIdMeta,
+        replyToMessageId.isAcceptableOrUnknown(
+          data['reply_to_message_id']!,
+          _replyToMessageIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    if (data.containsKey('counts_as_unread')) {
+      context.handle(
+        _countsAsUnreadMeta,
+        countsAsUnread.isAcceptableOrUnknown(
+          data['counts_as_unread']!,
+          _countsAsUnreadMeta,
+        ),
+      );
     }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
     }
     if (data.containsKey('edited_at')) {
       context.handle(
@@ -1392,10 +2524,39 @@ class $MessagesTable extends Messages
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
       );
     }
-    if (data.containsKey('from_me')) {
+    if (data.containsKey('local_created_at')) {
       context.handle(
-        _fromMeMeta,
-        fromMe.isAcceptableOrUnknown(data['from_me']!, _fromMeMeta),
+        _localCreatedAtMeta,
+        localCreatedAt.isAcceptableOrUnknown(
+          data['local_created_at']!,
+          _localCreatedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_localCreatedAtMeta);
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('send_error_code')) {
+      context.handle(
+        _sendErrorCodeMeta,
+        sendErrorCode.isAcceptableOrUnknown(
+          data['send_error_code']!,
+          _sendErrorCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('send_error_message')) {
+      context.handle(
+        _sendErrorMessageMeta,
+        sendErrorMessage.isAcceptableOrUnknown(
+          data['send_error_message']!,
+          _sendErrorMessageMeta,
+        ),
       );
     }
     return context;
@@ -1404,18 +2565,22 @@ class $MessagesTable extends Messages
   @override
   Set<GeneratedColumn> get $primaryKey => {messageId};
   @override
-  MessageRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+  LocalMessageRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return MessageRow(
+    return LocalMessageRow(
       messageId:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
             data['${effectivePrefix}message_id'],
           )!,
-      chatId:
+      messageSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}message_seq'],
+      ),
+      channelId:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
-            data['${effectivePrefix}chat_id'],
+            data['${effectivePrefix}channel_id'],
           )!,
       senderId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -1425,16 +2590,42 @@ class $MessagesTable extends Messages
         DriftSqlType.string,
         data['${effectivePrefix}sender_display_name'],
       ),
-      body:
+      messageType:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
-            data['${effectivePrefix}body'],
+            data['${effectivePrefix}message_type'],
           )!,
-      createdAt:
+      body: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}body'],
+      ),
+      payloadJson:
           attachedDatabase.typeMapping.read(
-            DriftSqlType.dateTime,
-            data['${effectivePrefix}created_at'],
+            DriftSqlType.string,
+            data['${effectivePrefix}payload_json'],
           )!,
+      replyToMessageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_to_message_id'],
+      ),
+      version:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}version'],
+          )!,
+      countsAsUnread:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}counts_as_unread'],
+          )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
       editedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}edited_at'],
@@ -1443,68 +2634,129 @@ class $MessagesTable extends Messages
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
       ),
-      fromMe:
+      localCreatedAt:
           attachedDatabase.typeMapping.read(
-            DriftSqlType.bool,
-            data['${effectivePrefix}from_me'],
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}local_created_at'],
           )!,
+      syncStatus:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}sync_status'],
+          )!,
+      sendErrorCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}send_error_code'],
+      ),
+      sendErrorMessage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}send_error_message'],
+      ),
     );
   }
 
   @override
-  $MessagesTable createAlias(String alias) {
-    return $MessagesTable(attachedDatabase, alias);
+  $LocalMessagesTable createAlias(String alias) {
+    return $LocalMessagesTable(attachedDatabase, alias);
   }
 }
 
-class MessageRow extends DataClass implements Insertable<MessageRow> {
+class LocalMessageRow extends DataClass implements Insertable<LocalMessageRow> {
   final String messageId;
-  final String chatId;
+  final int? messageSeq;
+  final String channelId;
   final String? senderId;
   final String? senderDisplayName;
-  final String body;
-  final DateTime createdAt;
+  final String messageType;
+  final String? body;
+  final String payloadJson;
+  final String? replyToMessageId;
+  final int version;
+  final bool countsAsUnread;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
   final DateTime? editedAt;
   final DateTime? deletedAt;
-  final bool fromMe;
-  const MessageRow({
+  final DateTime localCreatedAt;
+  final String syncStatus;
+  final String? sendErrorCode;
+  final String? sendErrorMessage;
+  const LocalMessageRow({
     required this.messageId,
-    required this.chatId,
+    this.messageSeq,
+    required this.channelId,
     this.senderId,
     this.senderDisplayName,
-    required this.body,
-    required this.createdAt,
+    required this.messageType,
+    this.body,
+    required this.payloadJson,
+    this.replyToMessageId,
+    required this.version,
+    required this.countsAsUnread,
+    this.createdAt,
+    this.updatedAt,
     this.editedAt,
     this.deletedAt,
-    required this.fromMe,
+    required this.localCreatedAt,
+    required this.syncStatus,
+    this.sendErrorCode,
+    this.sendErrorMessage,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['message_id'] = Variable<String>(messageId);
-    map['chat_id'] = Variable<String>(chatId);
+    if (!nullToAbsent || messageSeq != null) {
+      map['message_seq'] = Variable<int>(messageSeq);
+    }
+    map['channel_id'] = Variable<String>(channelId);
     if (!nullToAbsent || senderId != null) {
       map['sender_id'] = Variable<String>(senderId);
     }
     if (!nullToAbsent || senderDisplayName != null) {
       map['sender_display_name'] = Variable<String>(senderDisplayName);
     }
-    map['body'] = Variable<String>(body);
-    map['created_at'] = Variable<DateTime>(createdAt);
+    map['message_type'] = Variable<String>(messageType);
+    if (!nullToAbsent || body != null) {
+      map['body'] = Variable<String>(body);
+    }
+    map['payload_json'] = Variable<String>(payloadJson);
+    if (!nullToAbsent || replyToMessageId != null) {
+      map['reply_to_message_id'] = Variable<String>(replyToMessageId);
+    }
+    map['version'] = Variable<int>(version);
+    map['counts_as_unread'] = Variable<bool>(countsAsUnread);
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
     if (!nullToAbsent || editedAt != null) {
       map['edited_at'] = Variable<DateTime>(editedAt);
     }
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
-    map['from_me'] = Variable<bool>(fromMe);
+    map['local_created_at'] = Variable<DateTime>(localCreatedAt);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || sendErrorCode != null) {
+      map['send_error_code'] = Variable<String>(sendErrorCode);
+    }
+    if (!nullToAbsent || sendErrorMessage != null) {
+      map['send_error_message'] = Variable<String>(sendErrorMessage);
+    }
     return map;
   }
 
-  MessagesCompanion toCompanion(bool nullToAbsent) {
-    return MessagesCompanion(
+  LocalMessagesCompanion toCompanion(bool nullToAbsent) {
+    return LocalMessagesCompanion(
       messageId: Value(messageId),
-      chatId: Value(chatId),
+      messageSeq:
+          messageSeq == null && nullToAbsent
+              ? const Value.absent()
+              : Value(messageSeq),
+      channelId: Value(channelId),
       senderId:
           senderId == null && nullToAbsent
               ? const Value.absent()
@@ -1513,8 +2765,23 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           senderDisplayName == null && nullToAbsent
               ? const Value.absent()
               : Value(senderDisplayName),
-      body: Value(body),
-      createdAt: Value(createdAt),
+      messageType: Value(messageType),
+      body: body == null && nullToAbsent ? const Value.absent() : Value(body),
+      payloadJson: Value(payloadJson),
+      replyToMessageId:
+          replyToMessageId == null && nullToAbsent
+              ? const Value.absent()
+              : Value(replyToMessageId),
+      version: Value(version),
+      countsAsUnread: Value(countsAsUnread),
+      createdAt:
+          createdAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(createdAt),
+      updatedAt:
+          updatedAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(updatedAt),
       editedAt:
           editedAt == null && nullToAbsent
               ? const Value.absent()
@@ -1523,27 +2790,46 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           deletedAt == null && nullToAbsent
               ? const Value.absent()
               : Value(deletedAt),
-      fromMe: Value(fromMe),
+      localCreatedAt: Value(localCreatedAt),
+      syncStatus: Value(syncStatus),
+      sendErrorCode:
+          sendErrorCode == null && nullToAbsent
+              ? const Value.absent()
+              : Value(sendErrorCode),
+      sendErrorMessage:
+          sendErrorMessage == null && nullToAbsent
+              ? const Value.absent()
+              : Value(sendErrorMessage),
     );
   }
 
-  factory MessageRow.fromJson(
+  factory LocalMessageRow.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return MessageRow(
+    return LocalMessageRow(
       messageId: serializer.fromJson<String>(json['messageId']),
-      chatId: serializer.fromJson<String>(json['chatId']),
+      messageSeq: serializer.fromJson<int?>(json['messageSeq']),
+      channelId: serializer.fromJson<String>(json['channelId']),
       senderId: serializer.fromJson<String?>(json['senderId']),
       senderDisplayName: serializer.fromJson<String?>(
         json['senderDisplayName'],
       ),
-      body: serializer.fromJson<String>(json['body']),
-      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      messageType: serializer.fromJson<String>(json['messageType']),
+      body: serializer.fromJson<String?>(json['body']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      replyToMessageId: serializer.fromJson<String?>(json['replyToMessageId']),
+      version: serializer.fromJson<int>(json['version']),
+      countsAsUnread: serializer.fromJson<bool>(json['countsAsUnread']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       editedAt: serializer.fromJson<DateTime?>(json['editedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
-      fromMe: serializer.fromJson<bool>(json['fromMe']),
+      localCreatedAt: serializer.fromJson<DateTime>(json['localCreatedAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      sendErrorCode: serializer.fromJson<String?>(json['sendErrorCode']),
+      sendErrorMessage: serializer.fromJson<String?>(json['sendErrorMessage']),
     );
   }
   @override
@@ -1551,70 +2837,146 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'messageId': serializer.toJson<String>(messageId),
-      'chatId': serializer.toJson<String>(chatId),
+      'messageSeq': serializer.toJson<int?>(messageSeq),
+      'channelId': serializer.toJson<String>(channelId),
       'senderId': serializer.toJson<String?>(senderId),
       'senderDisplayName': serializer.toJson<String?>(senderDisplayName),
-      'body': serializer.toJson<String>(body),
-      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'messageType': serializer.toJson<String>(messageType),
+      'body': serializer.toJson<String?>(body),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'replyToMessageId': serializer.toJson<String?>(replyToMessageId),
+      'version': serializer.toJson<int>(version),
+      'countsAsUnread': serializer.toJson<bool>(countsAsUnread),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'editedAt': serializer.toJson<DateTime?>(editedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
-      'fromMe': serializer.toJson<bool>(fromMe),
+      'localCreatedAt': serializer.toJson<DateTime>(localCreatedAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'sendErrorCode': serializer.toJson<String?>(sendErrorCode),
+      'sendErrorMessage': serializer.toJson<String?>(sendErrorMessage),
     };
   }
 
-  MessageRow copyWith({
+  LocalMessageRow copyWith({
     String? messageId,
-    String? chatId,
+    Value<int?> messageSeq = const Value.absent(),
+    String? channelId,
     Value<String?> senderId = const Value.absent(),
     Value<String?> senderDisplayName = const Value.absent(),
-    String? body,
-    DateTime? createdAt,
+    String? messageType,
+    Value<String?> body = const Value.absent(),
+    String? payloadJson,
+    Value<String?> replyToMessageId = const Value.absent(),
+    int? version,
+    bool? countsAsUnread,
+    Value<DateTime?> createdAt = const Value.absent(),
+    Value<DateTime?> updatedAt = const Value.absent(),
     Value<DateTime?> editedAt = const Value.absent(),
     Value<DateTime?> deletedAt = const Value.absent(),
-    bool? fromMe,
-  }) => MessageRow(
+    DateTime? localCreatedAt,
+    String? syncStatus,
+    Value<String?> sendErrorCode = const Value.absent(),
+    Value<String?> sendErrorMessage = const Value.absent(),
+  }) => LocalMessageRow(
     messageId: messageId ?? this.messageId,
-    chatId: chatId ?? this.chatId,
+    messageSeq: messageSeq.present ? messageSeq.value : this.messageSeq,
+    channelId: channelId ?? this.channelId,
     senderId: senderId.present ? senderId.value : this.senderId,
     senderDisplayName:
         senderDisplayName.present
             ? senderDisplayName.value
             : this.senderDisplayName,
-    body: body ?? this.body,
-    createdAt: createdAt ?? this.createdAt,
+    messageType: messageType ?? this.messageType,
+    body: body.present ? body.value : this.body,
+    payloadJson: payloadJson ?? this.payloadJson,
+    replyToMessageId:
+        replyToMessageId.present
+            ? replyToMessageId.value
+            : this.replyToMessageId,
+    version: version ?? this.version,
+    countsAsUnread: countsAsUnread ?? this.countsAsUnread,
+    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
     editedAt: editedAt.present ? editedAt.value : this.editedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
-    fromMe: fromMe ?? this.fromMe,
+    localCreatedAt: localCreatedAt ?? this.localCreatedAt,
+    syncStatus: syncStatus ?? this.syncStatus,
+    sendErrorCode:
+        sendErrorCode.present ? sendErrorCode.value : this.sendErrorCode,
+    sendErrorMessage:
+        sendErrorMessage.present
+            ? sendErrorMessage.value
+            : this.sendErrorMessage,
   );
-  MessageRow copyWithCompanion(MessagesCompanion data) {
-    return MessageRow(
+  LocalMessageRow copyWithCompanion(LocalMessagesCompanion data) {
+    return LocalMessageRow(
       messageId: data.messageId.present ? data.messageId.value : this.messageId,
-      chatId: data.chatId.present ? data.chatId.value : this.chatId,
+      messageSeq:
+          data.messageSeq.present ? data.messageSeq.value : this.messageSeq,
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
       senderId: data.senderId.present ? data.senderId.value : this.senderId,
       senderDisplayName:
           data.senderDisplayName.present
               ? data.senderDisplayName.value
               : this.senderDisplayName,
+      messageType:
+          data.messageType.present ? data.messageType.value : this.messageType,
       body: data.body.present ? data.body.value : this.body,
+      payloadJson:
+          data.payloadJson.present ? data.payloadJson.value : this.payloadJson,
+      replyToMessageId:
+          data.replyToMessageId.present
+              ? data.replyToMessageId.value
+              : this.replyToMessageId,
+      version: data.version.present ? data.version.value : this.version,
+      countsAsUnread:
+          data.countsAsUnread.present
+              ? data.countsAsUnread.value
+              : this.countsAsUnread,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       editedAt: data.editedAt.present ? data.editedAt.value : this.editedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
-      fromMe: data.fromMe.present ? data.fromMe.value : this.fromMe,
+      localCreatedAt:
+          data.localCreatedAt.present
+              ? data.localCreatedAt.value
+              : this.localCreatedAt,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      sendErrorCode:
+          data.sendErrorCode.present
+              ? data.sendErrorCode.value
+              : this.sendErrorCode,
+      sendErrorMessage:
+          data.sendErrorMessage.present
+              ? data.sendErrorMessage.value
+              : this.sendErrorMessage,
     );
   }
 
   @override
   String toString() {
-    return (StringBuffer('MessageRow(')
+    return (StringBuffer('LocalMessageRow(')
           ..write('messageId: $messageId, ')
-          ..write('chatId: $chatId, ')
+          ..write('messageSeq: $messageSeq, ')
+          ..write('channelId: $channelId, ')
           ..write('senderId: $senderId, ')
           ..write('senderDisplayName: $senderDisplayName, ')
+          ..write('messageType: $messageType, ')
           ..write('body: $body, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('replyToMessageId: $replyToMessageId, ')
+          ..write('version: $version, ')
+          ..write('countsAsUnread: $countsAsUnread, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('editedAt: $editedAt, ')
           ..write('deletedAt: $deletedAt, ')
-          ..write('fromMe: $fromMe')
+          ..write('localCreatedAt: $localCreatedAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('sendErrorCode: $sendErrorCode, ')
+          ..write('sendErrorMessage: $sendErrorMessage')
           ..write(')'))
         .toString();
   }
@@ -1622,116 +2984,205 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
   @override
   int get hashCode => Object.hash(
     messageId,
-    chatId,
+    messageSeq,
+    channelId,
     senderId,
     senderDisplayName,
+    messageType,
     body,
+    payloadJson,
+    replyToMessageId,
+    version,
+    countsAsUnread,
     createdAt,
+    updatedAt,
     editedAt,
     deletedAt,
-    fromMe,
+    localCreatedAt,
+    syncStatus,
+    sendErrorCode,
+    sendErrorMessage,
   );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is MessageRow &&
+      (other is LocalMessageRow &&
           other.messageId == this.messageId &&
-          other.chatId == this.chatId &&
+          other.messageSeq == this.messageSeq &&
+          other.channelId == this.channelId &&
           other.senderId == this.senderId &&
           other.senderDisplayName == this.senderDisplayName &&
+          other.messageType == this.messageType &&
           other.body == this.body &&
+          other.payloadJson == this.payloadJson &&
+          other.replyToMessageId == this.replyToMessageId &&
+          other.version == this.version &&
+          other.countsAsUnread == this.countsAsUnread &&
           other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
           other.editedAt == this.editedAt &&
           other.deletedAt == this.deletedAt &&
-          other.fromMe == this.fromMe);
+          other.localCreatedAt == this.localCreatedAt &&
+          other.syncStatus == this.syncStatus &&
+          other.sendErrorCode == this.sendErrorCode &&
+          other.sendErrorMessage == this.sendErrorMessage);
 }
 
-class MessagesCompanion extends UpdateCompanion<MessageRow> {
+class LocalMessagesCompanion extends UpdateCompanion<LocalMessageRow> {
   final Value<String> messageId;
-  final Value<String> chatId;
+  final Value<int?> messageSeq;
+  final Value<String> channelId;
   final Value<String?> senderId;
   final Value<String?> senderDisplayName;
-  final Value<String> body;
-  final Value<DateTime> createdAt;
+  final Value<String> messageType;
+  final Value<String?> body;
+  final Value<String> payloadJson;
+  final Value<String?> replyToMessageId;
+  final Value<int> version;
+  final Value<bool> countsAsUnread;
+  final Value<DateTime?> createdAt;
+  final Value<DateTime?> updatedAt;
   final Value<DateTime?> editedAt;
   final Value<DateTime?> deletedAt;
-  final Value<bool> fromMe;
+  final Value<DateTime> localCreatedAt;
+  final Value<String> syncStatus;
+  final Value<String?> sendErrorCode;
+  final Value<String?> sendErrorMessage;
   final Value<int> rowid;
-  const MessagesCompanion({
+  const LocalMessagesCompanion({
     this.messageId = const Value.absent(),
-    this.chatId = const Value.absent(),
+    this.messageSeq = const Value.absent(),
+    this.channelId = const Value.absent(),
     this.senderId = const Value.absent(),
     this.senderDisplayName = const Value.absent(),
+    this.messageType = const Value.absent(),
     this.body = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.replyToMessageId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.countsAsUnread = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.editedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
-    this.fromMe = const Value.absent(),
+    this.localCreatedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.sendErrorCode = const Value.absent(),
+    this.sendErrorMessage = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  MessagesCompanion.insert({
+  LocalMessagesCompanion.insert({
     required String messageId,
-    required String chatId,
+    this.messageSeq = const Value.absent(),
+    required String channelId,
     this.senderId = const Value.absent(),
     this.senderDisplayName = const Value.absent(),
-    required String body,
-    required DateTime createdAt,
+    this.messageType = const Value.absent(),
+    this.body = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.replyToMessageId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.countsAsUnread = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.editedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
-    this.fromMe = const Value.absent(),
+    required DateTime localCreatedAt,
+    this.syncStatus = const Value.absent(),
+    this.sendErrorCode = const Value.absent(),
+    this.sendErrorMessage = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : messageId = Value(messageId),
-       chatId = Value(chatId),
-       body = Value(body),
-       createdAt = Value(createdAt);
-  static Insertable<MessageRow> custom({
+       channelId = Value(channelId),
+       localCreatedAt = Value(localCreatedAt);
+  static Insertable<LocalMessageRow> custom({
     Expression<String>? messageId,
-    Expression<String>? chatId,
+    Expression<int>? messageSeq,
+    Expression<String>? channelId,
     Expression<String>? senderId,
     Expression<String>? senderDisplayName,
+    Expression<String>? messageType,
     Expression<String>? body,
+    Expression<String>? payloadJson,
+    Expression<String>? replyToMessageId,
+    Expression<int>? version,
+    Expression<bool>? countsAsUnread,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
     Expression<DateTime>? editedAt,
     Expression<DateTime>? deletedAt,
-    Expression<bool>? fromMe,
+    Expression<DateTime>? localCreatedAt,
+    Expression<String>? syncStatus,
+    Expression<String>? sendErrorCode,
+    Expression<String>? sendErrorMessage,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (messageId != null) 'message_id': messageId,
-      if (chatId != null) 'chat_id': chatId,
+      if (messageSeq != null) 'message_seq': messageSeq,
+      if (channelId != null) 'channel_id': channelId,
       if (senderId != null) 'sender_id': senderId,
       if (senderDisplayName != null) 'sender_display_name': senderDisplayName,
+      if (messageType != null) 'message_type': messageType,
       if (body != null) 'body': body,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
+      if (version != null) 'version': version,
+      if (countsAsUnread != null) 'counts_as_unread': countsAsUnread,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (editedAt != null) 'edited_at': editedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
-      if (fromMe != null) 'from_me': fromMe,
+      if (localCreatedAt != null) 'local_created_at': localCreatedAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (sendErrorCode != null) 'send_error_code': sendErrorCode,
+      if (sendErrorMessage != null) 'send_error_message': sendErrorMessage,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
-  MessagesCompanion copyWith({
+  LocalMessagesCompanion copyWith({
     Value<String>? messageId,
-    Value<String>? chatId,
+    Value<int?>? messageSeq,
+    Value<String>? channelId,
     Value<String?>? senderId,
     Value<String?>? senderDisplayName,
-    Value<String>? body,
-    Value<DateTime>? createdAt,
+    Value<String>? messageType,
+    Value<String?>? body,
+    Value<String>? payloadJson,
+    Value<String?>? replyToMessageId,
+    Value<int>? version,
+    Value<bool>? countsAsUnread,
+    Value<DateTime?>? createdAt,
+    Value<DateTime?>? updatedAt,
     Value<DateTime?>? editedAt,
     Value<DateTime?>? deletedAt,
-    Value<bool>? fromMe,
+    Value<DateTime>? localCreatedAt,
+    Value<String>? syncStatus,
+    Value<String?>? sendErrorCode,
+    Value<String?>? sendErrorMessage,
     Value<int>? rowid,
   }) {
-    return MessagesCompanion(
+    return LocalMessagesCompanion(
       messageId: messageId ?? this.messageId,
-      chatId: chatId ?? this.chatId,
+      messageSeq: messageSeq ?? this.messageSeq,
+      channelId: channelId ?? this.channelId,
       senderId: senderId ?? this.senderId,
       senderDisplayName: senderDisplayName ?? this.senderDisplayName,
+      messageType: messageType ?? this.messageType,
       body: body ?? this.body,
+      payloadJson: payloadJson ?? this.payloadJson,
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
+      version: version ?? this.version,
+      countsAsUnread: countsAsUnread ?? this.countsAsUnread,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       editedAt: editedAt ?? this.editedAt,
       deletedAt: deletedAt ?? this.deletedAt,
-      fromMe: fromMe ?? this.fromMe,
+      localCreatedAt: localCreatedAt ?? this.localCreatedAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      sendErrorCode: sendErrorCode ?? this.sendErrorCode,
+      sendErrorMessage: sendErrorMessage ?? this.sendErrorMessage,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1742,8 +3193,11 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     if (messageId.present) {
       map['message_id'] = Variable<String>(messageId.value);
     }
-    if (chatId.present) {
-      map['chat_id'] = Variable<String>(chatId.value);
+    if (messageSeq.present) {
+      map['message_seq'] = Variable<int>(messageSeq.value);
+    }
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
     }
     if (senderId.present) {
       map['sender_id'] = Variable<String>(senderId.value);
@@ -1751,11 +3205,29 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     if (senderDisplayName.present) {
       map['sender_display_name'] = Variable<String>(senderDisplayName.value);
     }
+    if (messageType.present) {
+      map['message_type'] = Variable<String>(messageType.value);
+    }
     if (body.present) {
       map['body'] = Variable<String>(body.value);
     }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (replyToMessageId.present) {
+      map['reply_to_message_id'] = Variable<String>(replyToMessageId.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (countsAsUnread.present) {
+      map['counts_as_unread'] = Variable<bool>(countsAsUnread.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (editedAt.present) {
       map['edited_at'] = Variable<DateTime>(editedAt.value);
@@ -1763,8 +3235,17 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
     }
-    if (fromMe.present) {
-      map['from_me'] = Variable<bool>(fromMe.value);
+    if (localCreatedAt.present) {
+      map['local_created_at'] = Variable<DateTime>(localCreatedAt.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (sendErrorCode.present) {
+      map['send_error_code'] = Variable<String>(sendErrorCode.value);
+    }
+    if (sendErrorMessage.present) {
+      map['send_error_message'] = Variable<String>(sendErrorMessage.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1774,44 +3255,1913 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
 
   @override
   String toString() {
-    return (StringBuffer('MessagesCompanion(')
+    return (StringBuffer('LocalMessagesCompanion(')
           ..write('messageId: $messageId, ')
-          ..write('chatId: $chatId, ')
+          ..write('messageSeq: $messageSeq, ')
+          ..write('channelId: $channelId, ')
           ..write('senderId: $senderId, ')
           ..write('senderDisplayName: $senderDisplayName, ')
+          ..write('messageType: $messageType, ')
           ..write('body: $body, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('replyToMessageId: $replyToMessageId, ')
+          ..write('version: $version, ')
+          ..write('countsAsUnread: $countsAsUnread, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('editedAt: $editedAt, ')
           ..write('deletedAt: $deletedAt, ')
-          ..write('fromMe: $fromMe, ')
+          ..write('localCreatedAt: $localCreatedAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('sendErrorCode: $sendErrorCode, ')
+          ..write('sendErrorMessage: $sendErrorMessage, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
 }
 
-class $MessageDraftsTable extends MessageDrafts
-    with TableInfo<$MessageDraftsTable, MessageDraftRow> {
+class $LocalMessageAttachmentsTable extends LocalMessageAttachments
+    with TableInfo<$LocalMessageAttachmentsTable, LocalMessageAttachmentRow> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $MessageDraftsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _chatIdMeta = const VerificationMeta('chatId');
+  $LocalMessageAttachmentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _attachmentIdMeta = const VerificationMeta(
+    'attachmentId',
+  );
   @override
-  late final GeneratedColumn<String> chatId = GeneratedColumn<String>(
-    'chat_id',
+  late final GeneratedColumn<String> attachmentId = GeneratedColumn<String>(
+    'attachment_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
   @override
-  late final GeneratedColumn<String> body = GeneratedColumn<String>(
-    'body',
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+    'message_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _storagePathMeta = const VerificationMeta(
+    'storagePath',
+  );
+  @override
+  late final GeneratedColumn<String> storagePath = GeneratedColumn<String>(
+    'storage_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mimeTypeMeta = const VerificationMeta(
+    'mimeType',
+  );
+  @override
+  late final GeneratedColumn<String> mimeType = GeneratedColumn<String>(
+    'mime_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fileNameMeta = const VerificationMeta(
+    'fileName',
+  );
+  @override
+  late final GeneratedColumn<String> fileName = GeneratedColumn<String>(
+    'file_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sizeBytesMeta = const VerificationMeta(
+    'sizeBytes',
+  );
+  @override
+  late final GeneratedColumn<int> sizeBytes = GeneratedColumn<int>(
+    'size_bytes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _widthMeta = const VerificationMeta('width');
+  @override
+  late final GeneratedColumn<int> width = GeneratedColumn<int>(
+    'width',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _heightMeta = const VerificationMeta('height');
+  @override
+  late final GeneratedColumn<int> height = GeneratedColumn<int>(
+    'height',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _durationMsMeta = const VerificationMeta(
+    'durationMs',
+  );
+  @override
+  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
+    'duration_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _localPathMeta = const VerificationMeta(
+    'localPath',
+  );
+  @override
+  late final GeneratedColumn<String> localPath = GeneratedColumn<String>(
+    'local_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _thumbnailLocalPathMeta =
+      const VerificationMeta('thumbnailLocalPath');
+  @override
+  late final GeneratedColumn<String> thumbnailLocalPath =
+      GeneratedColumn<String>(
+        'thumbnail_local_path',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _uploadStatusMeta = const VerificationMeta(
+    'uploadStatus',
+  );
+  @override
+  late final GeneratedColumn<String> uploadStatus = GeneratedColumn<String>(
+    'upload_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _uploadProgressMeta = const VerificationMeta(
+    'uploadProgress',
+  );
+  @override
+  late final GeneratedColumn<double> uploadProgress = GeneratedColumn<double>(
+    'upload_progress',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _uploadErrorMeta = const VerificationMeta(
+    'uploadError',
+  );
+  @override
+  late final GeneratedColumn<String> uploadError = GeneratedColumn<String>(
+    'upload_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    attachmentId,
+    messageId,
+    storagePath,
+    mimeType,
+    fileName,
+    sizeBytes,
+    width,
+    height,
+    durationMs,
+    localPath,
+    thumbnailLocalPath,
+    uploadStatus,
+    uploadProgress,
+    uploadError,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_message_attachments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalMessageAttachmentRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('attachment_id')) {
+      context.handle(
+        _attachmentIdMeta,
+        attachmentId.isAcceptableOrUnknown(
+          data['attachment_id']!,
+          _attachmentIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_attachmentIdMeta);
+    }
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('storage_path')) {
+      context.handle(
+        _storagePathMeta,
+        storagePath.isAcceptableOrUnknown(
+          data['storage_path']!,
+          _storagePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mime_type')) {
+      context.handle(
+        _mimeTypeMeta,
+        mimeType.isAcceptableOrUnknown(data['mime_type']!, _mimeTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_mimeTypeMeta);
+    }
+    if (data.containsKey('file_name')) {
+      context.handle(
+        _fileNameMeta,
+        fileName.isAcceptableOrUnknown(data['file_name']!, _fileNameMeta),
+      );
+    }
+    if (data.containsKey('size_bytes')) {
+      context.handle(
+        _sizeBytesMeta,
+        sizeBytes.isAcceptableOrUnknown(data['size_bytes']!, _sizeBytesMeta),
+      );
+    }
+    if (data.containsKey('width')) {
+      context.handle(
+        _widthMeta,
+        width.isAcceptableOrUnknown(data['width']!, _widthMeta),
+      );
+    }
+    if (data.containsKey('height')) {
+      context.handle(
+        _heightMeta,
+        height.isAcceptableOrUnknown(data['height']!, _heightMeta),
+      );
+    }
+    if (data.containsKey('duration_ms')) {
+      context.handle(
+        _durationMsMeta,
+        durationMs.isAcceptableOrUnknown(data['duration_ms']!, _durationMsMeta),
+      );
+    }
+    if (data.containsKey('local_path')) {
+      context.handle(
+        _localPathMeta,
+        localPath.isAcceptableOrUnknown(data['local_path']!, _localPathMeta),
+      );
+    }
+    if (data.containsKey('thumbnail_local_path')) {
+      context.handle(
+        _thumbnailLocalPathMeta,
+        thumbnailLocalPath.isAcceptableOrUnknown(
+          data['thumbnail_local_path']!,
+          _thumbnailLocalPathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('upload_status')) {
+      context.handle(
+        _uploadStatusMeta,
+        uploadStatus.isAcceptableOrUnknown(
+          data['upload_status']!,
+          _uploadStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('upload_progress')) {
+      context.handle(
+        _uploadProgressMeta,
+        uploadProgress.isAcceptableOrUnknown(
+          data['upload_progress']!,
+          _uploadProgressMeta,
+        ),
+      );
+    }
+    if (data.containsKey('upload_error')) {
+      context.handle(
+        _uploadErrorMeta,
+        uploadError.isAcceptableOrUnknown(
+          data['upload_error']!,
+          _uploadErrorMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {attachmentId};
+  @override
+  LocalMessageAttachmentRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalMessageAttachmentRow(
+      attachmentId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}attachment_id'],
+          )!,
+      messageId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}message_id'],
+          )!,
+      storagePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}storage_path'],
+      ),
+      mimeType:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}mime_type'],
+          )!,
+      fileName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_name'],
+      ),
+      sizeBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}size_bytes'],
+      ),
+      width: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}width'],
+      ),
+      height: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}height'],
+      ),
+      durationMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_ms'],
+      ),
+      localPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_path'],
+      ),
+      thumbnailLocalPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}thumbnail_local_path'],
+      ),
+      uploadStatus:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}upload_status'],
+          )!,
+      uploadProgress: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}upload_progress'],
+      ),
+      uploadError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}upload_error'],
+      ),
+    );
+  }
+
+  @override
+  $LocalMessageAttachmentsTable createAlias(String alias) {
+    return $LocalMessageAttachmentsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalMessageAttachmentRow extends DataClass
+    implements Insertable<LocalMessageAttachmentRow> {
+  final String attachmentId;
+  final String messageId;
+  final String? storagePath;
+  final String mimeType;
+  final String? fileName;
+  final int? sizeBytes;
+  final int? width;
+  final int? height;
+  final int? durationMs;
+  final String? localPath;
+  final String? thumbnailLocalPath;
+  final String uploadStatus;
+  final double? uploadProgress;
+  final String? uploadError;
+  const LocalMessageAttachmentRow({
+    required this.attachmentId,
+    required this.messageId,
+    this.storagePath,
+    required this.mimeType,
+    this.fileName,
+    this.sizeBytes,
+    this.width,
+    this.height,
+    this.durationMs,
+    this.localPath,
+    this.thumbnailLocalPath,
+    required this.uploadStatus,
+    this.uploadProgress,
+    this.uploadError,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['attachment_id'] = Variable<String>(attachmentId);
+    map['message_id'] = Variable<String>(messageId);
+    if (!nullToAbsent || storagePath != null) {
+      map['storage_path'] = Variable<String>(storagePath);
+    }
+    map['mime_type'] = Variable<String>(mimeType);
+    if (!nullToAbsent || fileName != null) {
+      map['file_name'] = Variable<String>(fileName);
+    }
+    if (!nullToAbsent || sizeBytes != null) {
+      map['size_bytes'] = Variable<int>(sizeBytes);
+    }
+    if (!nullToAbsent || width != null) {
+      map['width'] = Variable<int>(width);
+    }
+    if (!nullToAbsent || height != null) {
+      map['height'] = Variable<int>(height);
+    }
+    if (!nullToAbsent || durationMs != null) {
+      map['duration_ms'] = Variable<int>(durationMs);
+    }
+    if (!nullToAbsent || localPath != null) {
+      map['local_path'] = Variable<String>(localPath);
+    }
+    if (!nullToAbsent || thumbnailLocalPath != null) {
+      map['thumbnail_local_path'] = Variable<String>(thumbnailLocalPath);
+    }
+    map['upload_status'] = Variable<String>(uploadStatus);
+    if (!nullToAbsent || uploadProgress != null) {
+      map['upload_progress'] = Variable<double>(uploadProgress);
+    }
+    if (!nullToAbsent || uploadError != null) {
+      map['upload_error'] = Variable<String>(uploadError);
+    }
+    return map;
+  }
+
+  LocalMessageAttachmentsCompanion toCompanion(bool nullToAbsent) {
+    return LocalMessageAttachmentsCompanion(
+      attachmentId: Value(attachmentId),
+      messageId: Value(messageId),
+      storagePath:
+          storagePath == null && nullToAbsent
+              ? const Value.absent()
+              : Value(storagePath),
+      mimeType: Value(mimeType),
+      fileName:
+          fileName == null && nullToAbsent
+              ? const Value.absent()
+              : Value(fileName),
+      sizeBytes:
+          sizeBytes == null && nullToAbsent
+              ? const Value.absent()
+              : Value(sizeBytes),
+      width:
+          width == null && nullToAbsent ? const Value.absent() : Value(width),
+      height:
+          height == null && nullToAbsent ? const Value.absent() : Value(height),
+      durationMs:
+          durationMs == null && nullToAbsent
+              ? const Value.absent()
+              : Value(durationMs),
+      localPath:
+          localPath == null && nullToAbsent
+              ? const Value.absent()
+              : Value(localPath),
+      thumbnailLocalPath:
+          thumbnailLocalPath == null && nullToAbsent
+              ? const Value.absent()
+              : Value(thumbnailLocalPath),
+      uploadStatus: Value(uploadStatus),
+      uploadProgress:
+          uploadProgress == null && nullToAbsent
+              ? const Value.absent()
+              : Value(uploadProgress),
+      uploadError:
+          uploadError == null && nullToAbsent
+              ? const Value.absent()
+              : Value(uploadError),
+    );
+  }
+
+  factory LocalMessageAttachmentRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalMessageAttachmentRow(
+      attachmentId: serializer.fromJson<String>(json['attachmentId']),
+      messageId: serializer.fromJson<String>(json['messageId']),
+      storagePath: serializer.fromJson<String?>(json['storagePath']),
+      mimeType: serializer.fromJson<String>(json['mimeType']),
+      fileName: serializer.fromJson<String?>(json['fileName']),
+      sizeBytes: serializer.fromJson<int?>(json['sizeBytes']),
+      width: serializer.fromJson<int?>(json['width']),
+      height: serializer.fromJson<int?>(json['height']),
+      durationMs: serializer.fromJson<int?>(json['durationMs']),
+      localPath: serializer.fromJson<String?>(json['localPath']),
+      thumbnailLocalPath: serializer.fromJson<String?>(
+        json['thumbnailLocalPath'],
+      ),
+      uploadStatus: serializer.fromJson<String>(json['uploadStatus']),
+      uploadProgress: serializer.fromJson<double?>(json['uploadProgress']),
+      uploadError: serializer.fromJson<String?>(json['uploadError']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'attachmentId': serializer.toJson<String>(attachmentId),
+      'messageId': serializer.toJson<String>(messageId),
+      'storagePath': serializer.toJson<String?>(storagePath),
+      'mimeType': serializer.toJson<String>(mimeType),
+      'fileName': serializer.toJson<String?>(fileName),
+      'sizeBytes': serializer.toJson<int?>(sizeBytes),
+      'width': serializer.toJson<int?>(width),
+      'height': serializer.toJson<int?>(height),
+      'durationMs': serializer.toJson<int?>(durationMs),
+      'localPath': serializer.toJson<String?>(localPath),
+      'thumbnailLocalPath': serializer.toJson<String?>(thumbnailLocalPath),
+      'uploadStatus': serializer.toJson<String>(uploadStatus),
+      'uploadProgress': serializer.toJson<double?>(uploadProgress),
+      'uploadError': serializer.toJson<String?>(uploadError),
+    };
+  }
+
+  LocalMessageAttachmentRow copyWith({
+    String? attachmentId,
+    String? messageId,
+    Value<String?> storagePath = const Value.absent(),
+    String? mimeType,
+    Value<String?> fileName = const Value.absent(),
+    Value<int?> sizeBytes = const Value.absent(),
+    Value<int?> width = const Value.absent(),
+    Value<int?> height = const Value.absent(),
+    Value<int?> durationMs = const Value.absent(),
+    Value<String?> localPath = const Value.absent(),
+    Value<String?> thumbnailLocalPath = const Value.absent(),
+    String? uploadStatus,
+    Value<double?> uploadProgress = const Value.absent(),
+    Value<String?> uploadError = const Value.absent(),
+  }) => LocalMessageAttachmentRow(
+    attachmentId: attachmentId ?? this.attachmentId,
+    messageId: messageId ?? this.messageId,
+    storagePath: storagePath.present ? storagePath.value : this.storagePath,
+    mimeType: mimeType ?? this.mimeType,
+    fileName: fileName.present ? fileName.value : this.fileName,
+    sizeBytes: sizeBytes.present ? sizeBytes.value : this.sizeBytes,
+    width: width.present ? width.value : this.width,
+    height: height.present ? height.value : this.height,
+    durationMs: durationMs.present ? durationMs.value : this.durationMs,
+    localPath: localPath.present ? localPath.value : this.localPath,
+    thumbnailLocalPath:
+        thumbnailLocalPath.present
+            ? thumbnailLocalPath.value
+            : this.thumbnailLocalPath,
+    uploadStatus: uploadStatus ?? this.uploadStatus,
+    uploadProgress:
+        uploadProgress.present ? uploadProgress.value : this.uploadProgress,
+    uploadError: uploadError.present ? uploadError.value : this.uploadError,
+  );
+  LocalMessageAttachmentRow copyWithCompanion(
+    LocalMessageAttachmentsCompanion data,
+  ) {
+    return LocalMessageAttachmentRow(
+      attachmentId:
+          data.attachmentId.present
+              ? data.attachmentId.value
+              : this.attachmentId,
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      storagePath:
+          data.storagePath.present ? data.storagePath.value : this.storagePath,
+      mimeType: data.mimeType.present ? data.mimeType.value : this.mimeType,
+      fileName: data.fileName.present ? data.fileName.value : this.fileName,
+      sizeBytes: data.sizeBytes.present ? data.sizeBytes.value : this.sizeBytes,
+      width: data.width.present ? data.width.value : this.width,
+      height: data.height.present ? data.height.value : this.height,
+      durationMs:
+          data.durationMs.present ? data.durationMs.value : this.durationMs,
+      localPath: data.localPath.present ? data.localPath.value : this.localPath,
+      thumbnailLocalPath:
+          data.thumbnailLocalPath.present
+              ? data.thumbnailLocalPath.value
+              : this.thumbnailLocalPath,
+      uploadStatus:
+          data.uploadStatus.present
+              ? data.uploadStatus.value
+              : this.uploadStatus,
+      uploadProgress:
+          data.uploadProgress.present
+              ? data.uploadProgress.value
+              : this.uploadProgress,
+      uploadError:
+          data.uploadError.present ? data.uploadError.value : this.uploadError,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalMessageAttachmentRow(')
+          ..write('attachmentId: $attachmentId, ')
+          ..write('messageId: $messageId, ')
+          ..write('storagePath: $storagePath, ')
+          ..write('mimeType: $mimeType, ')
+          ..write('fileName: $fileName, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('width: $width, ')
+          ..write('height: $height, ')
+          ..write('durationMs: $durationMs, ')
+          ..write('localPath: $localPath, ')
+          ..write('thumbnailLocalPath: $thumbnailLocalPath, ')
+          ..write('uploadStatus: $uploadStatus, ')
+          ..write('uploadProgress: $uploadProgress, ')
+          ..write('uploadError: $uploadError')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    attachmentId,
+    messageId,
+    storagePath,
+    mimeType,
+    fileName,
+    sizeBytes,
+    width,
+    height,
+    durationMs,
+    localPath,
+    thumbnailLocalPath,
+    uploadStatus,
+    uploadProgress,
+    uploadError,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalMessageAttachmentRow &&
+          other.attachmentId == this.attachmentId &&
+          other.messageId == this.messageId &&
+          other.storagePath == this.storagePath &&
+          other.mimeType == this.mimeType &&
+          other.fileName == this.fileName &&
+          other.sizeBytes == this.sizeBytes &&
+          other.width == this.width &&
+          other.height == this.height &&
+          other.durationMs == this.durationMs &&
+          other.localPath == this.localPath &&
+          other.thumbnailLocalPath == this.thumbnailLocalPath &&
+          other.uploadStatus == this.uploadStatus &&
+          other.uploadProgress == this.uploadProgress &&
+          other.uploadError == this.uploadError);
+}
+
+class LocalMessageAttachmentsCompanion
+    extends UpdateCompanion<LocalMessageAttachmentRow> {
+  final Value<String> attachmentId;
+  final Value<String> messageId;
+  final Value<String?> storagePath;
+  final Value<String> mimeType;
+  final Value<String?> fileName;
+  final Value<int?> sizeBytes;
+  final Value<int?> width;
+  final Value<int?> height;
+  final Value<int?> durationMs;
+  final Value<String?> localPath;
+  final Value<String?> thumbnailLocalPath;
+  final Value<String> uploadStatus;
+  final Value<double?> uploadProgress;
+  final Value<String?> uploadError;
+  final Value<int> rowid;
+  const LocalMessageAttachmentsCompanion({
+    this.attachmentId = const Value.absent(),
+    this.messageId = const Value.absent(),
+    this.storagePath = const Value.absent(),
+    this.mimeType = const Value.absent(),
+    this.fileName = const Value.absent(),
+    this.sizeBytes = const Value.absent(),
+    this.width = const Value.absent(),
+    this.height = const Value.absent(),
+    this.durationMs = const Value.absent(),
+    this.localPath = const Value.absent(),
+    this.thumbnailLocalPath = const Value.absent(),
+    this.uploadStatus = const Value.absent(),
+    this.uploadProgress = const Value.absent(),
+    this.uploadError = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalMessageAttachmentsCompanion.insert({
+    required String attachmentId,
+    required String messageId,
+    this.storagePath = const Value.absent(),
+    required String mimeType,
+    this.fileName = const Value.absent(),
+    this.sizeBytes = const Value.absent(),
+    this.width = const Value.absent(),
+    this.height = const Value.absent(),
+    this.durationMs = const Value.absent(),
+    this.localPath = const Value.absent(),
+    this.thumbnailLocalPath = const Value.absent(),
+    this.uploadStatus = const Value.absent(),
+    this.uploadProgress = const Value.absent(),
+    this.uploadError = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : attachmentId = Value(attachmentId),
+       messageId = Value(messageId),
+       mimeType = Value(mimeType);
+  static Insertable<LocalMessageAttachmentRow> custom({
+    Expression<String>? attachmentId,
+    Expression<String>? messageId,
+    Expression<String>? storagePath,
+    Expression<String>? mimeType,
+    Expression<String>? fileName,
+    Expression<int>? sizeBytes,
+    Expression<int>? width,
+    Expression<int>? height,
+    Expression<int>? durationMs,
+    Expression<String>? localPath,
+    Expression<String>? thumbnailLocalPath,
+    Expression<String>? uploadStatus,
+    Expression<double>? uploadProgress,
+    Expression<String>? uploadError,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (attachmentId != null) 'attachment_id': attachmentId,
+      if (messageId != null) 'message_id': messageId,
+      if (storagePath != null) 'storage_path': storagePath,
+      if (mimeType != null) 'mime_type': mimeType,
+      if (fileName != null) 'file_name': fileName,
+      if (sizeBytes != null) 'size_bytes': sizeBytes,
+      if (width != null) 'width': width,
+      if (height != null) 'height': height,
+      if (durationMs != null) 'duration_ms': durationMs,
+      if (localPath != null) 'local_path': localPath,
+      if (thumbnailLocalPath != null)
+        'thumbnail_local_path': thumbnailLocalPath,
+      if (uploadStatus != null) 'upload_status': uploadStatus,
+      if (uploadProgress != null) 'upload_progress': uploadProgress,
+      if (uploadError != null) 'upload_error': uploadError,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalMessageAttachmentsCompanion copyWith({
+    Value<String>? attachmentId,
+    Value<String>? messageId,
+    Value<String?>? storagePath,
+    Value<String>? mimeType,
+    Value<String?>? fileName,
+    Value<int?>? sizeBytes,
+    Value<int?>? width,
+    Value<int?>? height,
+    Value<int?>? durationMs,
+    Value<String?>? localPath,
+    Value<String?>? thumbnailLocalPath,
+    Value<String>? uploadStatus,
+    Value<double?>? uploadProgress,
+    Value<String?>? uploadError,
+    Value<int>? rowid,
+  }) {
+    return LocalMessageAttachmentsCompanion(
+      attachmentId: attachmentId ?? this.attachmentId,
+      messageId: messageId ?? this.messageId,
+      storagePath: storagePath ?? this.storagePath,
+      mimeType: mimeType ?? this.mimeType,
+      fileName: fileName ?? this.fileName,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      durationMs: durationMs ?? this.durationMs,
+      localPath: localPath ?? this.localPath,
+      thumbnailLocalPath: thumbnailLocalPath ?? this.thumbnailLocalPath,
+      uploadStatus: uploadStatus ?? this.uploadStatus,
+      uploadProgress: uploadProgress ?? this.uploadProgress,
+      uploadError: uploadError ?? this.uploadError,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (attachmentId.present) {
+      map['attachment_id'] = Variable<String>(attachmentId.value);
+    }
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (storagePath.present) {
+      map['storage_path'] = Variable<String>(storagePath.value);
+    }
+    if (mimeType.present) {
+      map['mime_type'] = Variable<String>(mimeType.value);
+    }
+    if (fileName.present) {
+      map['file_name'] = Variable<String>(fileName.value);
+    }
+    if (sizeBytes.present) {
+      map['size_bytes'] = Variable<int>(sizeBytes.value);
+    }
+    if (width.present) {
+      map['width'] = Variable<int>(width.value);
+    }
+    if (height.present) {
+      map['height'] = Variable<int>(height.value);
+    }
+    if (durationMs.present) {
+      map['duration_ms'] = Variable<int>(durationMs.value);
+    }
+    if (localPath.present) {
+      map['local_path'] = Variable<String>(localPath.value);
+    }
+    if (thumbnailLocalPath.present) {
+      map['thumbnail_local_path'] = Variable<String>(thumbnailLocalPath.value);
+    }
+    if (uploadStatus.present) {
+      map['upload_status'] = Variable<String>(uploadStatus.value);
+    }
+    if (uploadProgress.present) {
+      map['upload_progress'] = Variable<double>(uploadProgress.value);
+    }
+    if (uploadError.present) {
+      map['upload_error'] = Variable<String>(uploadError.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalMessageAttachmentsCompanion(')
+          ..write('attachmentId: $attachmentId, ')
+          ..write('messageId: $messageId, ')
+          ..write('storagePath: $storagePath, ')
+          ..write('mimeType: $mimeType, ')
+          ..write('fileName: $fileName, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('width: $width, ')
+          ..write('height: $height, ')
+          ..write('durationMs: $durationMs, ')
+          ..write('localPath: $localPath, ')
+          ..write('thumbnailLocalPath: $thumbnailLocalPath, ')
+          ..write('uploadStatus: $uploadStatus, ')
+          ..write('uploadProgress: $uploadProgress, ')
+          ..write('uploadError: $uploadError, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LocalMessageReactionsTable extends LocalMessageReactions
+    with TableInfo<$LocalMessageReactionsTable, LocalMessageReactionRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalMessageReactionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+    'message_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reactionMeta = const VerificationMeta(
+    'reaction',
+  );
+  @override
+  late final GeneratedColumn<String> reaction = GeneratedColumn<String>(
+    'reaction',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _removedAtMeta = const VerificationMeta(
+    'removedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> removedAt = GeneratedColumn<DateTime>(
+    'removed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    messageId,
+    userId,
+    reaction,
+    createdAt,
+    updatedAt,
+    removedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_message_reactions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalMessageReactionRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('reaction')) {
+      context.handle(
+        _reactionMeta,
+        reaction.isAcceptableOrUnknown(data['reaction']!, _reactionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reactionMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('removed_at')) {
+      context.handle(
+        _removedAtMeta,
+        removedAt.isAcceptableOrUnknown(data['removed_at']!, _removedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {messageId, userId, reaction};
+  @override
+  LocalMessageReactionRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalMessageReactionRow(
+      messageId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}message_id'],
+          )!,
+      userId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}user_id'],
+          )!,
+      reaction:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}reaction'],
+          )!,
+      createdAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}created_at'],
+          )!,
+      updatedAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}updated_at'],
+          )!,
+      removedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}removed_at'],
+      ),
+    );
+  }
+
+  @override
+  $LocalMessageReactionsTable createAlias(String alias) {
+    return $LocalMessageReactionsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalMessageReactionRow extends DataClass
+    implements Insertable<LocalMessageReactionRow> {
+  final String messageId;
+  final String userId;
+  final String reaction;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? removedAt;
+  const LocalMessageReactionRow({
+    required this.messageId,
+    required this.userId,
+    required this.reaction,
+    required this.createdAt,
+    required this.updatedAt,
+    this.removedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['message_id'] = Variable<String>(messageId);
+    map['user_id'] = Variable<String>(userId);
+    map['reaction'] = Variable<String>(reaction);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || removedAt != null) {
+      map['removed_at'] = Variable<DateTime>(removedAt);
+    }
+    return map;
+  }
+
+  LocalMessageReactionsCompanion toCompanion(bool nullToAbsent) {
+    return LocalMessageReactionsCompanion(
+      messageId: Value(messageId),
+      userId: Value(userId),
+      reaction: Value(reaction),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      removedAt:
+          removedAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(removedAt),
+    );
+  }
+
+  factory LocalMessageReactionRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalMessageReactionRow(
+      messageId: serializer.fromJson<String>(json['messageId']),
+      userId: serializer.fromJson<String>(json['userId']),
+      reaction: serializer.fromJson<String>(json['reaction']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      removedAt: serializer.fromJson<DateTime?>(json['removedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'messageId': serializer.toJson<String>(messageId),
+      'userId': serializer.toJson<String>(userId),
+      'reaction': serializer.toJson<String>(reaction),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'removedAt': serializer.toJson<DateTime?>(removedAt),
+    };
+  }
+
+  LocalMessageReactionRow copyWith({
+    String? messageId,
+    String? userId,
+    String? reaction,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> removedAt = const Value.absent(),
+  }) => LocalMessageReactionRow(
+    messageId: messageId ?? this.messageId,
+    userId: userId ?? this.userId,
+    reaction: reaction ?? this.reaction,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    removedAt: removedAt.present ? removedAt.value : this.removedAt,
+  );
+  LocalMessageReactionRow copyWithCompanion(
+    LocalMessageReactionsCompanion data,
+  ) {
+    return LocalMessageReactionRow(
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      reaction: data.reaction.present ? data.reaction.value : this.reaction,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      removedAt: data.removedAt.present ? data.removedAt.value : this.removedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalMessageReactionRow(')
+          ..write('messageId: $messageId, ')
+          ..write('userId: $userId, ')
+          ..write('reaction: $reaction, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('removedAt: $removedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(messageId, userId, reaction, createdAt, updatedAt, removedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalMessageReactionRow &&
+          other.messageId == this.messageId &&
+          other.userId == this.userId &&
+          other.reaction == this.reaction &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.removedAt == this.removedAt);
+}
+
+class LocalMessageReactionsCompanion
+    extends UpdateCompanion<LocalMessageReactionRow> {
+  final Value<String> messageId;
+  final Value<String> userId;
+  final Value<String> reaction;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> removedAt;
+  final Value<int> rowid;
+  const LocalMessageReactionsCompanion({
+    this.messageId = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.reaction = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.removedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalMessageReactionsCompanion.insert({
+    required String messageId,
+    required String userId,
+    required String reaction,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.removedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : messageId = Value(messageId),
+       userId = Value(userId),
+       reaction = Value(reaction),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<LocalMessageReactionRow> custom({
+    Expression<String>? messageId,
+    Expression<String>? userId,
+    Expression<String>? reaction,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? removedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (messageId != null) 'message_id': messageId,
+      if (userId != null) 'user_id': userId,
+      if (reaction != null) 'reaction': reaction,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (removedAt != null) 'removed_at': removedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalMessageReactionsCompanion copyWith({
+    Value<String>? messageId,
+    Value<String>? userId,
+    Value<String>? reaction,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? removedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalMessageReactionsCompanion(
+      messageId: messageId ?? this.messageId,
+      userId: userId ?? this.userId,
+      reaction: reaction ?? this.reaction,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      removedAt: removedAt ?? this.removedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (reaction.present) {
+      map['reaction'] = Variable<String>(reaction.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (removedAt.present) {
+      map['removed_at'] = Variable<DateTime>(removedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalMessageReactionsCompanion(')
+          ..write('messageId: $messageId, ')
+          ..write('userId: $userId, ')
+          ..write('reaction: $reaction, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('removedAt: $removedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LocalMemberRestrictionsTable extends LocalMemberRestrictions
+    with TableInfo<$LocalMemberRestrictionsTable, LocalMemberRestrictionRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalMemberRestrictionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _restrictionIdMeta = const VerificationMeta(
+    'restrictionId',
+  );
+  @override
+  late final GeneratedColumn<String> restrictionId = GeneratedColumn<String>(
+    'restriction_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _permissionMeta = const VerificationMeta(
+    'permission',
+  );
+  @override
+  late final GeneratedColumn<String> permission = GeneratedColumn<String>(
+    'permission',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _startsAtMeta = const VerificationMeta(
+    'startsAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startsAt = GeneratedColumn<DateTime>(
+    'starts_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _expiresAtMeta = const VerificationMeta(
+    'expiresAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> expiresAt = GeneratedColumn<DateTime>(
+    'expires_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    restrictionId,
+    channelId,
+    userId,
+    permission,
+    startsAt,
+    expiresAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_member_restrictions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalMemberRestrictionRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('restriction_id')) {
+      context.handle(
+        _restrictionIdMeta,
+        restrictionId.isAcceptableOrUnknown(
+          data['restriction_id']!,
+          _restrictionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_restrictionIdMeta);
+    }
+    if (data.containsKey('channel_id')) {
+      context.handle(
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('permission')) {
+      context.handle(
+        _permissionMeta,
+        permission.isAcceptableOrUnknown(data['permission']!, _permissionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_permissionMeta);
+    }
+    if (data.containsKey('starts_at')) {
+      context.handle(
+        _startsAtMeta,
+        startsAt.isAcceptableOrUnknown(data['starts_at']!, _startsAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startsAtMeta);
+    }
+    if (data.containsKey('expires_at')) {
+      context.handle(
+        _expiresAtMeta,
+        expiresAt.isAcceptableOrUnknown(data['expires_at']!, _expiresAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {restrictionId};
+  @override
+  LocalMemberRestrictionRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalMemberRestrictionRow(
+      restrictionId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}restriction_id'],
+          )!,
+      channelId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}channel_id'],
+          )!,
+      userId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}user_id'],
+          )!,
+      permission:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}permission'],
+          )!,
+      startsAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}starts_at'],
+          )!,
+      expiresAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}expires_at'],
+      ),
+    );
+  }
+
+  @override
+  $LocalMemberRestrictionsTable createAlias(String alias) {
+    return $LocalMemberRestrictionsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalMemberRestrictionRow extends DataClass
+    implements Insertable<LocalMemberRestrictionRow> {
+  final String restrictionId;
+  final String channelId;
+  final String userId;
+  final String permission;
+  final DateTime startsAt;
+  final DateTime? expiresAt;
+  const LocalMemberRestrictionRow({
+    required this.restrictionId,
+    required this.channelId,
+    required this.userId,
+    required this.permission,
+    required this.startsAt,
+    this.expiresAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['restriction_id'] = Variable<String>(restrictionId);
+    map['channel_id'] = Variable<String>(channelId);
+    map['user_id'] = Variable<String>(userId);
+    map['permission'] = Variable<String>(permission);
+    map['starts_at'] = Variable<DateTime>(startsAt);
+    if (!nullToAbsent || expiresAt != null) {
+      map['expires_at'] = Variable<DateTime>(expiresAt);
+    }
+    return map;
+  }
+
+  LocalMemberRestrictionsCompanion toCompanion(bool nullToAbsent) {
+    return LocalMemberRestrictionsCompanion(
+      restrictionId: Value(restrictionId),
+      channelId: Value(channelId),
+      userId: Value(userId),
+      permission: Value(permission),
+      startsAt: Value(startsAt),
+      expiresAt:
+          expiresAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(expiresAt),
+    );
+  }
+
+  factory LocalMemberRestrictionRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalMemberRestrictionRow(
+      restrictionId: serializer.fromJson<String>(json['restrictionId']),
+      channelId: serializer.fromJson<String>(json['channelId']),
+      userId: serializer.fromJson<String>(json['userId']),
+      permission: serializer.fromJson<String>(json['permission']),
+      startsAt: serializer.fromJson<DateTime>(json['startsAt']),
+      expiresAt: serializer.fromJson<DateTime?>(json['expiresAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'restrictionId': serializer.toJson<String>(restrictionId),
+      'channelId': serializer.toJson<String>(channelId),
+      'userId': serializer.toJson<String>(userId),
+      'permission': serializer.toJson<String>(permission),
+      'startsAt': serializer.toJson<DateTime>(startsAt),
+      'expiresAt': serializer.toJson<DateTime?>(expiresAt),
+    };
+  }
+
+  LocalMemberRestrictionRow copyWith({
+    String? restrictionId,
+    String? channelId,
+    String? userId,
+    String? permission,
+    DateTime? startsAt,
+    Value<DateTime?> expiresAt = const Value.absent(),
+  }) => LocalMemberRestrictionRow(
+    restrictionId: restrictionId ?? this.restrictionId,
+    channelId: channelId ?? this.channelId,
+    userId: userId ?? this.userId,
+    permission: permission ?? this.permission,
+    startsAt: startsAt ?? this.startsAt,
+    expiresAt: expiresAt.present ? expiresAt.value : this.expiresAt,
+  );
+  LocalMemberRestrictionRow copyWithCompanion(
+    LocalMemberRestrictionsCompanion data,
+  ) {
+    return LocalMemberRestrictionRow(
+      restrictionId:
+          data.restrictionId.present
+              ? data.restrictionId.value
+              : this.restrictionId,
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      permission:
+          data.permission.present ? data.permission.value : this.permission,
+      startsAt: data.startsAt.present ? data.startsAt.value : this.startsAt,
+      expiresAt: data.expiresAt.present ? data.expiresAt.value : this.expiresAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalMemberRestrictionRow(')
+          ..write('restrictionId: $restrictionId, ')
+          ..write('channelId: $channelId, ')
+          ..write('userId: $userId, ')
+          ..write('permission: $permission, ')
+          ..write('startsAt: $startsAt, ')
+          ..write('expiresAt: $expiresAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    restrictionId,
+    channelId,
+    userId,
+    permission,
+    startsAt,
+    expiresAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalMemberRestrictionRow &&
+          other.restrictionId == this.restrictionId &&
+          other.channelId == this.channelId &&
+          other.userId == this.userId &&
+          other.permission == this.permission &&
+          other.startsAt == this.startsAt &&
+          other.expiresAt == this.expiresAt);
+}
+
+class LocalMemberRestrictionsCompanion
+    extends UpdateCompanion<LocalMemberRestrictionRow> {
+  final Value<String> restrictionId;
+  final Value<String> channelId;
+  final Value<String> userId;
+  final Value<String> permission;
+  final Value<DateTime> startsAt;
+  final Value<DateTime?> expiresAt;
+  final Value<int> rowid;
+  const LocalMemberRestrictionsCompanion({
+    this.restrictionId = const Value.absent(),
+    this.channelId = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.permission = const Value.absent(),
+    this.startsAt = const Value.absent(),
+    this.expiresAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalMemberRestrictionsCompanion.insert({
+    required String restrictionId,
+    required String channelId,
+    required String userId,
+    required String permission,
+    required DateTime startsAt,
+    this.expiresAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : restrictionId = Value(restrictionId),
+       channelId = Value(channelId),
+       userId = Value(userId),
+       permission = Value(permission),
+       startsAt = Value(startsAt);
+  static Insertable<LocalMemberRestrictionRow> custom({
+    Expression<String>? restrictionId,
+    Expression<String>? channelId,
+    Expression<String>? userId,
+    Expression<String>? permission,
+    Expression<DateTime>? startsAt,
+    Expression<DateTime>? expiresAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (restrictionId != null) 'restriction_id': restrictionId,
+      if (channelId != null) 'channel_id': channelId,
+      if (userId != null) 'user_id': userId,
+      if (permission != null) 'permission': permission,
+      if (startsAt != null) 'starts_at': startsAt,
+      if (expiresAt != null) 'expires_at': expiresAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalMemberRestrictionsCompanion copyWith({
+    Value<String>? restrictionId,
+    Value<String>? channelId,
+    Value<String>? userId,
+    Value<String>? permission,
+    Value<DateTime>? startsAt,
+    Value<DateTime?>? expiresAt,
+    Value<int>? rowid,
+  }) {
+    return LocalMemberRestrictionsCompanion(
+      restrictionId: restrictionId ?? this.restrictionId,
+      channelId: channelId ?? this.channelId,
+      userId: userId ?? this.userId,
+      permission: permission ?? this.permission,
+      startsAt: startsAt ?? this.startsAt,
+      expiresAt: expiresAt ?? this.expiresAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (restrictionId.present) {
+      map['restriction_id'] = Variable<String>(restrictionId.value);
+    }
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (permission.present) {
+      map['permission'] = Variable<String>(permission.value);
+    }
+    if (startsAt.present) {
+      map['starts_at'] = Variable<DateTime>(startsAt.value);
+    }
+    if (expiresAt.present) {
+      map['expires_at'] = Variable<DateTime>(expiresAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalMemberRestrictionsCompanion(')
+          ..write('restrictionId: $restrictionId, ')
+          ..write('channelId: $channelId, ')
+          ..write('userId: $userId, ')
+          ..write('permission: $permission, ')
+          ..write('startsAt: $startsAt, ')
+          ..write('expiresAt: $expiresAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $OutboxOperationsTable extends OutboxOperations
+    with TableInfo<$OutboxOperationsTable, OutboxOperationRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OutboxOperationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _operationIdMeta = const VerificationMeta(
+    'operationId',
+  );
+  @override
+  late final GeneratedColumn<String> operationId = GeneratedColumn<String>(
+    'operation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entityIdMeta = const VerificationMeta(
+    'entityId',
+  );
+  @override
+  late final GeneratedColumn<String> entityId = GeneratedColumn<String>(
+    'entity_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _operationTypeMeta = const VerificationMeta(
+    'operationType',
+  );
+  @override
+  late final GeneratedColumn<String> operationType = GeneratedColumn<String>(
+    'operation_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _coalesceKeyMeta = const VerificationMeta(
+    'coalesceKey',
+  );
+  @override
+  late final GeneratedColumn<String> coalesceKey = GeneratedColumn<String>(
+    'coalesce_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dependsOnOperationIdMeta =
+      const VerificationMeta('dependsOnOperationId');
+  @override
+  late final GeneratedColumn<String> dependsOnOperationId =
+      GeneratedColumn<String>(
+        'depends_on_operation_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _attemptCountMeta = const VerificationMeta(
+    'attemptCount',
+  );
+  @override
+  late final GeneratedColumn<int> attemptCount = GeneratedColumn<int>(
+    'attempt_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _nextAttemptAtMeta = const VerificationMeta(
+    'nextAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextAttemptAt =
+      GeneratedColumn<DateTime>(
+        'next_attempt_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastErrorCodeMeta = const VerificationMeta(
+    'lastErrorCode',
+  );
+  @override
+  late final GeneratedColumn<String> lastErrorCode = GeneratedColumn<String>(
+    'last_error_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastErrorMessageMeta = const VerificationMeta(
+    'lastErrorMessage',
+  );
+  @override
+  late final GeneratedColumn<String> lastErrorMessage = GeneratedColumn<String>(
+    'last_error_message',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
@@ -1826,34 +5176,148 @@ class $MessageDraftsTable extends MessageDrafts
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [chatId, body, updatedAt];
+  List<GeneratedColumn> get $columns => [
+    operationId,
+    channelId,
+    entityId,
+    operationType,
+    payloadJson,
+    status,
+    coalesceKey,
+    dependsOnOperationId,
+    attemptCount,
+    nextAttemptAt,
+    lastErrorCode,
+    lastErrorMessage,
+    createdAt,
+    updatedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'message_drafts';
+  static const String $name = 'outbox_operations';
   @override
   VerificationContext validateIntegrity(
-    Insertable<MessageDraftRow> instance, {
+    Insertable<OutboxOperationRow> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
-    if (data.containsKey('chat_id')) {
+    if (data.containsKey('operation_id')) {
       context.handle(
-        _chatIdMeta,
-        chatId.isAcceptableOrUnknown(data['chat_id']!, _chatIdMeta),
+        _operationIdMeta,
+        operationId.isAcceptableOrUnknown(
+          data['operation_id']!,
+          _operationIdMeta,
+        ),
       );
     } else if (isInserting) {
-      context.missing(_chatIdMeta);
+      context.missing(_operationIdMeta);
     }
-    if (data.containsKey('body')) {
+    if (data.containsKey('channel_id')) {
       context.handle(
-        _bodyMeta,
-        body.isAcceptableOrUnknown(data['body']!, _bodyMeta),
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
       );
     } else if (isInserting) {
-      context.missing(_bodyMeta);
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('entity_id')) {
+      context.handle(
+        _entityIdMeta,
+        entityId.isAcceptableOrUnknown(data['entity_id']!, _entityIdMeta),
+      );
+    }
+    if (data.containsKey('operation_type')) {
+      context.handle(
+        _operationTypeMeta,
+        operationType.isAcceptableOrUnknown(
+          data['operation_type']!,
+          _operationTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_operationTypeMeta);
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('coalesce_key')) {
+      context.handle(
+        _coalesceKeyMeta,
+        coalesceKey.isAcceptableOrUnknown(
+          data['coalesce_key']!,
+          _coalesceKeyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('depends_on_operation_id')) {
+      context.handle(
+        _dependsOnOperationIdMeta,
+        dependsOnOperationId.isAcceptableOrUnknown(
+          data['depends_on_operation_id']!,
+          _dependsOnOperationIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('attempt_count')) {
+      context.handle(
+        _attemptCountMeta,
+        attemptCount.isAcceptableOrUnknown(
+          data['attempt_count']!,
+          _attemptCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('next_attempt_at')) {
+      context.handle(
+        _nextAttemptAtMeta,
+        nextAttemptAt.isAcceptableOrUnknown(
+          data['next_attempt_at']!,
+          _nextAttemptAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_error_code')) {
+      context.handle(
+        _lastErrorCodeMeta,
+        lastErrorCode.isAcceptableOrUnknown(
+          data['last_error_code']!,
+          _lastErrorCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_error_message')) {
+      context.handle(
+        _lastErrorMessageMeta,
+        lastErrorMessage.isAcceptableOrUnknown(
+          data['last_error_message']!,
+          _lastErrorMessageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
     }
     if (data.containsKey('updated_at')) {
       context.handle(
@@ -1867,20 +5331,69 @@ class $MessageDraftsTable extends MessageDrafts
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {chatId};
+  Set<GeneratedColumn> get $primaryKey => {operationId};
   @override
-  MessageDraftRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+  OutboxOperationRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return MessageDraftRow(
-      chatId:
+    return OutboxOperationRow(
+      operationId:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
-            data['${effectivePrefix}chat_id'],
+            data['${effectivePrefix}operation_id'],
           )!,
-      body:
+      channelId:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
-            data['${effectivePrefix}body'],
+            data['${effectivePrefix}channel_id'],
+          )!,
+      entityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_id'],
+      ),
+      operationType:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}operation_type'],
+          )!,
+      payloadJson:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}payload_json'],
+          )!,
+      status:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}status'],
+          )!,
+      coalesceKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}coalesce_key'],
+      ),
+      dependsOnOperationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}depends_on_operation_id'],
+      ),
+      attemptCount:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}attempt_count'],
+          )!,
+      nextAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_attempt_at'],
+      ),
+      lastErrorCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error_code'],
+      ),
+      lastErrorMessage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error_message'],
+      ),
+      createdAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}created_at'],
           )!,
       updatedAt:
           attachedDatabase.typeMapping.read(
@@ -1891,45 +5404,133 @@ class $MessageDraftsTable extends MessageDrafts
   }
 
   @override
-  $MessageDraftsTable createAlias(String alias) {
-    return $MessageDraftsTable(attachedDatabase, alias);
+  $OutboxOperationsTable createAlias(String alias) {
+    return $OutboxOperationsTable(attachedDatabase, alias);
   }
 }
 
-class MessageDraftRow extends DataClass implements Insertable<MessageDraftRow> {
-  final String chatId;
-  final String body;
+class OutboxOperationRow extends DataClass
+    implements Insertable<OutboxOperationRow> {
+  final String operationId;
+  final String channelId;
+  final String? entityId;
+  final String operationType;
+  final String payloadJson;
+  final String status;
+  final String? coalesceKey;
+  final String? dependsOnOperationId;
+  final int attemptCount;
+  final DateTime? nextAttemptAt;
+  final String? lastErrorCode;
+  final String? lastErrorMessage;
+  final DateTime createdAt;
   final DateTime updatedAt;
-  const MessageDraftRow({
-    required this.chatId,
-    required this.body,
+  const OutboxOperationRow({
+    required this.operationId,
+    required this.channelId,
+    this.entityId,
+    required this.operationType,
+    required this.payloadJson,
+    required this.status,
+    this.coalesceKey,
+    this.dependsOnOperationId,
+    required this.attemptCount,
+    this.nextAttemptAt,
+    this.lastErrorCode,
+    this.lastErrorMessage,
+    required this.createdAt,
     required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['chat_id'] = Variable<String>(chatId);
-    map['body'] = Variable<String>(body);
+    map['operation_id'] = Variable<String>(operationId);
+    map['channel_id'] = Variable<String>(channelId);
+    if (!nullToAbsent || entityId != null) {
+      map['entity_id'] = Variable<String>(entityId);
+    }
+    map['operation_type'] = Variable<String>(operationType);
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || coalesceKey != null) {
+      map['coalesce_key'] = Variable<String>(coalesceKey);
+    }
+    if (!nullToAbsent || dependsOnOperationId != null) {
+      map['depends_on_operation_id'] = Variable<String>(dependsOnOperationId);
+    }
+    map['attempt_count'] = Variable<int>(attemptCount);
+    if (!nullToAbsent || nextAttemptAt != null) {
+      map['next_attempt_at'] = Variable<DateTime>(nextAttemptAt);
+    }
+    if (!nullToAbsent || lastErrorCode != null) {
+      map['last_error_code'] = Variable<String>(lastErrorCode);
+    }
+    if (!nullToAbsent || lastErrorMessage != null) {
+      map['last_error_message'] = Variable<String>(lastErrorMessage);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
-  MessageDraftsCompanion toCompanion(bool nullToAbsent) {
-    return MessageDraftsCompanion(
-      chatId: Value(chatId),
-      body: Value(body),
+  OutboxOperationsCompanion toCompanion(bool nullToAbsent) {
+    return OutboxOperationsCompanion(
+      operationId: Value(operationId),
+      channelId: Value(channelId),
+      entityId:
+          entityId == null && nullToAbsent
+              ? const Value.absent()
+              : Value(entityId),
+      operationType: Value(operationType),
+      payloadJson: Value(payloadJson),
+      status: Value(status),
+      coalesceKey:
+          coalesceKey == null && nullToAbsent
+              ? const Value.absent()
+              : Value(coalesceKey),
+      dependsOnOperationId:
+          dependsOnOperationId == null && nullToAbsent
+              ? const Value.absent()
+              : Value(dependsOnOperationId),
+      attemptCount: Value(attemptCount),
+      nextAttemptAt:
+          nextAttemptAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(nextAttemptAt),
+      lastErrorCode:
+          lastErrorCode == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastErrorCode),
+      lastErrorMessage:
+          lastErrorMessage == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastErrorMessage),
+      createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
   }
 
-  factory MessageDraftRow.fromJson(
+  factory OutboxOperationRow.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return MessageDraftRow(
-      chatId: serializer.fromJson<String>(json['chatId']),
-      body: serializer.fromJson<String>(json['body']),
+    return OutboxOperationRow(
+      operationId: serializer.fromJson<String>(json['operationId']),
+      channelId: serializer.fromJson<String>(json['channelId']),
+      entityId: serializer.fromJson<String?>(json['entityId']),
+      operationType: serializer.fromJson<String>(json['operationType']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      status: serializer.fromJson<String>(json['status']),
+      coalesceKey: serializer.fromJson<String?>(json['coalesceKey']),
+      dependsOnOperationId: serializer.fromJson<String?>(
+        json['dependsOnOperationId'],
+      ),
+      attemptCount: serializer.fromJson<int>(json['attemptCount']),
+      nextAttemptAt: serializer.fromJson<DateTime?>(json['nextAttemptAt']),
+      lastErrorCode: serializer.fromJson<String?>(json['lastErrorCode']),
+      lastErrorMessage: serializer.fromJson<String?>(json['lastErrorMessage']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -1937,92 +5538,283 @@ class MessageDraftRow extends DataClass implements Insertable<MessageDraftRow> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'chatId': serializer.toJson<String>(chatId),
-      'body': serializer.toJson<String>(body),
+      'operationId': serializer.toJson<String>(operationId),
+      'channelId': serializer.toJson<String>(channelId),
+      'entityId': serializer.toJson<String?>(entityId),
+      'operationType': serializer.toJson<String>(operationType),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'status': serializer.toJson<String>(status),
+      'coalesceKey': serializer.toJson<String?>(coalesceKey),
+      'dependsOnOperationId': serializer.toJson<String?>(dependsOnOperationId),
+      'attemptCount': serializer.toJson<int>(attemptCount),
+      'nextAttemptAt': serializer.toJson<DateTime?>(nextAttemptAt),
+      'lastErrorCode': serializer.toJson<String?>(lastErrorCode),
+      'lastErrorMessage': serializer.toJson<String?>(lastErrorMessage),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
-  MessageDraftRow copyWith({
-    String? chatId,
-    String? body,
+  OutboxOperationRow copyWith({
+    String? operationId,
+    String? channelId,
+    Value<String?> entityId = const Value.absent(),
+    String? operationType,
+    String? payloadJson,
+    String? status,
+    Value<String?> coalesceKey = const Value.absent(),
+    Value<String?> dependsOnOperationId = const Value.absent(),
+    int? attemptCount,
+    Value<DateTime?> nextAttemptAt = const Value.absent(),
+    Value<String?> lastErrorCode = const Value.absent(),
+    Value<String?> lastErrorMessage = const Value.absent(),
+    DateTime? createdAt,
     DateTime? updatedAt,
-  }) => MessageDraftRow(
-    chatId: chatId ?? this.chatId,
-    body: body ?? this.body,
+  }) => OutboxOperationRow(
+    operationId: operationId ?? this.operationId,
+    channelId: channelId ?? this.channelId,
+    entityId: entityId.present ? entityId.value : this.entityId,
+    operationType: operationType ?? this.operationType,
+    payloadJson: payloadJson ?? this.payloadJson,
+    status: status ?? this.status,
+    coalesceKey: coalesceKey.present ? coalesceKey.value : this.coalesceKey,
+    dependsOnOperationId:
+        dependsOnOperationId.present
+            ? dependsOnOperationId.value
+            : this.dependsOnOperationId,
+    attemptCount: attemptCount ?? this.attemptCount,
+    nextAttemptAt:
+        nextAttemptAt.present ? nextAttemptAt.value : this.nextAttemptAt,
+    lastErrorCode:
+        lastErrorCode.present ? lastErrorCode.value : this.lastErrorCode,
+    lastErrorMessage:
+        lastErrorMessage.present
+            ? lastErrorMessage.value
+            : this.lastErrorMessage,
+    createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
-  MessageDraftRow copyWithCompanion(MessageDraftsCompanion data) {
-    return MessageDraftRow(
-      chatId: data.chatId.present ? data.chatId.value : this.chatId,
-      body: data.body.present ? data.body.value : this.body,
+  OutboxOperationRow copyWithCompanion(OutboxOperationsCompanion data) {
+    return OutboxOperationRow(
+      operationId:
+          data.operationId.present ? data.operationId.value : this.operationId,
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      entityId: data.entityId.present ? data.entityId.value : this.entityId,
+      operationType:
+          data.operationType.present
+              ? data.operationType.value
+              : this.operationType,
+      payloadJson:
+          data.payloadJson.present ? data.payloadJson.value : this.payloadJson,
+      status: data.status.present ? data.status.value : this.status,
+      coalesceKey:
+          data.coalesceKey.present ? data.coalesceKey.value : this.coalesceKey,
+      dependsOnOperationId:
+          data.dependsOnOperationId.present
+              ? data.dependsOnOperationId.value
+              : this.dependsOnOperationId,
+      attemptCount:
+          data.attemptCount.present
+              ? data.attemptCount.value
+              : this.attemptCount,
+      nextAttemptAt:
+          data.nextAttemptAt.present
+              ? data.nextAttemptAt.value
+              : this.nextAttemptAt,
+      lastErrorCode:
+          data.lastErrorCode.present
+              ? data.lastErrorCode.value
+              : this.lastErrorCode,
+      lastErrorMessage:
+          data.lastErrorMessage.present
+              ? data.lastErrorMessage.value
+              : this.lastErrorMessage,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
   @override
   String toString() {
-    return (StringBuffer('MessageDraftRow(')
-          ..write('chatId: $chatId, ')
-          ..write('body: $body, ')
+    return (StringBuffer('OutboxOperationRow(')
+          ..write('operationId: $operationId, ')
+          ..write('channelId: $channelId, ')
+          ..write('entityId: $entityId, ')
+          ..write('operationType: $operationType, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('status: $status, ')
+          ..write('coalesceKey: $coalesceKey, ')
+          ..write('dependsOnOperationId: $dependsOnOperationId, ')
+          ..write('attemptCount: $attemptCount, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('lastErrorCode: $lastErrorCode, ')
+          ..write('lastErrorMessage: $lastErrorMessage, ')
+          ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(chatId, body, updatedAt);
+  int get hashCode => Object.hash(
+    operationId,
+    channelId,
+    entityId,
+    operationType,
+    payloadJson,
+    status,
+    coalesceKey,
+    dependsOnOperationId,
+    attemptCount,
+    nextAttemptAt,
+    lastErrorCode,
+    lastErrorMessage,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is MessageDraftRow &&
-          other.chatId == this.chatId &&
-          other.body == this.body &&
+      (other is OutboxOperationRow &&
+          other.operationId == this.operationId &&
+          other.channelId == this.channelId &&
+          other.entityId == this.entityId &&
+          other.operationType == this.operationType &&
+          other.payloadJson == this.payloadJson &&
+          other.status == this.status &&
+          other.coalesceKey == this.coalesceKey &&
+          other.dependsOnOperationId == this.dependsOnOperationId &&
+          other.attemptCount == this.attemptCount &&
+          other.nextAttemptAt == this.nextAttemptAt &&
+          other.lastErrorCode == this.lastErrorCode &&
+          other.lastErrorMessage == this.lastErrorMessage &&
+          other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
 
-class MessageDraftsCompanion extends UpdateCompanion<MessageDraftRow> {
-  final Value<String> chatId;
-  final Value<String> body;
+class OutboxOperationsCompanion extends UpdateCompanion<OutboxOperationRow> {
+  final Value<String> operationId;
+  final Value<String> channelId;
+  final Value<String?> entityId;
+  final Value<String> operationType;
+  final Value<String> payloadJson;
+  final Value<String> status;
+  final Value<String?> coalesceKey;
+  final Value<String?> dependsOnOperationId;
+  final Value<int> attemptCount;
+  final Value<DateTime?> nextAttemptAt;
+  final Value<String?> lastErrorCode;
+  final Value<String?> lastErrorMessage;
+  final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
-  const MessageDraftsCompanion({
-    this.chatId = const Value.absent(),
-    this.body = const Value.absent(),
+  const OutboxOperationsCompanion({
+    this.operationId = const Value.absent(),
+    this.channelId = const Value.absent(),
+    this.entityId = const Value.absent(),
+    this.operationType = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.coalesceKey = const Value.absent(),
+    this.dependsOnOperationId = const Value.absent(),
+    this.attemptCount = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.lastErrorCode = const Value.absent(),
+    this.lastErrorMessage = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  MessageDraftsCompanion.insert({
-    required String chatId,
-    required String body,
+  OutboxOperationsCompanion.insert({
+    required String operationId,
+    required String channelId,
+    this.entityId = const Value.absent(),
+    required String operationType,
+    required String payloadJson,
+    this.status = const Value.absent(),
+    this.coalesceKey = const Value.absent(),
+    this.dependsOnOperationId = const Value.absent(),
+    this.attemptCount = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.lastErrorCode = const Value.absent(),
+    this.lastErrorMessage = const Value.absent(),
+    required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
-  }) : chatId = Value(chatId),
-       body = Value(body),
+  }) : operationId = Value(operationId),
+       channelId = Value(channelId),
+       operationType = Value(operationType),
+       payloadJson = Value(payloadJson),
+       createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
-  static Insertable<MessageDraftRow> custom({
-    Expression<String>? chatId,
-    Expression<String>? body,
+  static Insertable<OutboxOperationRow> custom({
+    Expression<String>? operationId,
+    Expression<String>? channelId,
+    Expression<String>? entityId,
+    Expression<String>? operationType,
+    Expression<String>? payloadJson,
+    Expression<String>? status,
+    Expression<String>? coalesceKey,
+    Expression<String>? dependsOnOperationId,
+    Expression<int>? attemptCount,
+    Expression<DateTime>? nextAttemptAt,
+    Expression<String>? lastErrorCode,
+    Expression<String>? lastErrorMessage,
+    Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
-      if (chatId != null) 'chat_id': chatId,
-      if (body != null) 'body': body,
+      if (operationId != null) 'operation_id': operationId,
+      if (channelId != null) 'channel_id': channelId,
+      if (entityId != null) 'entity_id': entityId,
+      if (operationType != null) 'operation_type': operationType,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (status != null) 'status': status,
+      if (coalesceKey != null) 'coalesce_key': coalesceKey,
+      if (dependsOnOperationId != null)
+        'depends_on_operation_id': dependsOnOperationId,
+      if (attemptCount != null) 'attempt_count': attemptCount,
+      if (nextAttemptAt != null) 'next_attempt_at': nextAttemptAt,
+      if (lastErrorCode != null) 'last_error_code': lastErrorCode,
+      if (lastErrorMessage != null) 'last_error_message': lastErrorMessage,
+      if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
-  MessageDraftsCompanion copyWith({
-    Value<String>? chatId,
-    Value<String>? body,
+  OutboxOperationsCompanion copyWith({
+    Value<String>? operationId,
+    Value<String>? channelId,
+    Value<String?>? entityId,
+    Value<String>? operationType,
+    Value<String>? payloadJson,
+    Value<String>? status,
+    Value<String?>? coalesceKey,
+    Value<String?>? dependsOnOperationId,
+    Value<int>? attemptCount,
+    Value<DateTime?>? nextAttemptAt,
+    Value<String?>? lastErrorCode,
+    Value<String?>? lastErrorMessage,
+    Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
-    return MessageDraftsCompanion(
-      chatId: chatId ?? this.chatId,
-      body: body ?? this.body,
+    return OutboxOperationsCompanion(
+      operationId: operationId ?? this.operationId,
+      channelId: channelId ?? this.channelId,
+      entityId: entityId ?? this.entityId,
+      operationType: operationType ?? this.operationType,
+      payloadJson: payloadJson ?? this.payloadJson,
+      status: status ?? this.status,
+      coalesceKey: coalesceKey ?? this.coalesceKey,
+      dependsOnOperationId: dependsOnOperationId ?? this.dependsOnOperationId,
+      attemptCount: attemptCount ?? this.attemptCount,
+      nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
+      lastErrorCode: lastErrorCode ?? this.lastErrorCode,
+      lastErrorMessage: lastErrorMessage ?? this.lastErrorMessage,
+      createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -2031,11 +5823,46 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraftRow> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    if (chatId.present) {
-      map['chat_id'] = Variable<String>(chatId.value);
+    if (operationId.present) {
+      map['operation_id'] = Variable<String>(operationId.value);
     }
-    if (body.present) {
-      map['body'] = Variable<String>(body.value);
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (entityId.present) {
+      map['entity_id'] = Variable<String>(entityId.value);
+    }
+    if (operationType.present) {
+      map['operation_type'] = Variable<String>(operationType.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (coalesceKey.present) {
+      map['coalesce_key'] = Variable<String>(coalesceKey.value);
+    }
+    if (dependsOnOperationId.present) {
+      map['depends_on_operation_id'] = Variable<String>(
+        dependsOnOperationId.value,
+      );
+    }
+    if (attemptCount.present) {
+      map['attempt_count'] = Variable<int>(attemptCount.value);
+    }
+    if (nextAttemptAt.present) {
+      map['next_attempt_at'] = Variable<DateTime>(nextAttemptAt.value);
+    }
+    if (lastErrorCode.present) {
+      map['last_error_code'] = Variable<String>(lastErrorCode.value);
+    }
+    if (lastErrorMessage.present) {
+      map['last_error_message'] = Variable<String>(lastErrorMessage.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -2048,9 +5875,944 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraftRow> {
 
   @override
   String toString() {
-    return (StringBuffer('MessageDraftsCompanion(')
-          ..write('chatId: $chatId, ')
+    return (StringBuffer('OutboxOperationsCompanion(')
+          ..write('operationId: $operationId, ')
+          ..write('channelId: $channelId, ')
+          ..write('entityId: $entityId, ')
+          ..write('operationType: $operationType, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('status: $status, ')
+          ..write('coalesceKey: $coalesceKey, ')
+          ..write('dependsOnOperationId: $dependsOnOperationId, ')
+          ..write('attemptCount: $attemptCount, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('lastErrorCode: $lastErrorCode, ')
+          ..write('lastErrorMessage: $lastErrorMessage, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ChannelSyncStatesTable extends ChannelSyncStates
+    with TableInfo<$ChannelSyncStatesTable, ChannelSyncStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ChannelSyncStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _newestSyncedMessageSeqMeta =
+      const VerificationMeta('newestSyncedMessageSeq');
+  @override
+  late final GeneratedColumn<int> newestSyncedMessageSeq = GeneratedColumn<int>(
+    'newest_synced_message_seq',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _oldestCachedMessageSeqMeta =
+      const VerificationMeta('oldestCachedMessageSeq');
+  @override
+  late final GeneratedColumn<int> oldestCachedMessageSeq = GeneratedColumn<int>(
+    'oldest_cached_message_seq',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _hasMoreHistoryMeta = const VerificationMeta(
+    'hasMoreHistory',
+  );
+  @override
+  late final GeneratedColumn<bool> hasMoreHistory = GeneratedColumn<bool>(
+    'has_more_history',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_more_history" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _lastMemberSyncAtMeta = const VerificationMeta(
+    'lastMemberSyncAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastMemberSyncAt =
+      GeneratedColumn<DateTime>(
+        'last_member_sync_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastFullSyncAtMeta = const VerificationMeta(
+    'lastFullSyncAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastFullSyncAt =
+      GeneratedColumn<DateTime>(
+        'last_full_sync_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('idle'),
+  );
+  static const VerificationMeta _lastSyncErrorMeta = const VerificationMeta(
+    'lastSyncError',
+  );
+  @override
+  late final GeneratedColumn<String> lastSyncError = GeneratedColumn<String>(
+    'last_sync_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    channelId,
+    newestSyncedMessageSeq,
+    oldestCachedMessageSeq,
+    hasMoreHistory,
+    lastMemberSyncAt,
+    lastFullSyncAt,
+    syncStatus,
+    lastSyncError,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'channel_sync_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ChannelSyncStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('channel_id')) {
+      context.handle(
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('newest_synced_message_seq')) {
+      context.handle(
+        _newestSyncedMessageSeqMeta,
+        newestSyncedMessageSeq.isAcceptableOrUnknown(
+          data['newest_synced_message_seq']!,
+          _newestSyncedMessageSeqMeta,
+        ),
+      );
+    }
+    if (data.containsKey('oldest_cached_message_seq')) {
+      context.handle(
+        _oldestCachedMessageSeqMeta,
+        oldestCachedMessageSeq.isAcceptableOrUnknown(
+          data['oldest_cached_message_seq']!,
+          _oldestCachedMessageSeqMeta,
+        ),
+      );
+    }
+    if (data.containsKey('has_more_history')) {
+      context.handle(
+        _hasMoreHistoryMeta,
+        hasMoreHistory.isAcceptableOrUnknown(
+          data['has_more_history']!,
+          _hasMoreHistoryMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_member_sync_at')) {
+      context.handle(
+        _lastMemberSyncAtMeta,
+        lastMemberSyncAt.isAcceptableOrUnknown(
+          data['last_member_sync_at']!,
+          _lastMemberSyncAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_full_sync_at')) {
+      context.handle(
+        _lastFullSyncAtMeta,
+        lastFullSyncAt.isAcceptableOrUnknown(
+          data['last_full_sync_at']!,
+          _lastFullSyncAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('last_sync_error')) {
+      context.handle(
+        _lastSyncErrorMeta,
+        lastSyncError.isAcceptableOrUnknown(
+          data['last_sync_error']!,
+          _lastSyncErrorMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {channelId};
+  @override
+  ChannelSyncStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ChannelSyncStateRow(
+      channelId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}channel_id'],
+          )!,
+      newestSyncedMessageSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}newest_synced_message_seq'],
+      ),
+      oldestCachedMessageSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}oldest_cached_message_seq'],
+      ),
+      hasMoreHistory:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}has_more_history'],
+          )!,
+      lastMemberSyncAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_member_sync_at'],
+      ),
+      lastFullSyncAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_full_sync_at'],
+      ),
+      syncStatus:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}sync_status'],
+          )!,
+      lastSyncError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_sync_error'],
+      ),
+    );
+  }
+
+  @override
+  $ChannelSyncStatesTable createAlias(String alias) {
+    return $ChannelSyncStatesTable(attachedDatabase, alias);
+  }
+}
+
+class ChannelSyncStateRow extends DataClass
+    implements Insertable<ChannelSyncStateRow> {
+  final String channelId;
+  final int? newestSyncedMessageSeq;
+  final int? oldestCachedMessageSeq;
+  final bool hasMoreHistory;
+  final DateTime? lastMemberSyncAt;
+  final DateTime? lastFullSyncAt;
+  final String syncStatus;
+  final String? lastSyncError;
+  const ChannelSyncStateRow({
+    required this.channelId,
+    this.newestSyncedMessageSeq,
+    this.oldestCachedMessageSeq,
+    required this.hasMoreHistory,
+    this.lastMemberSyncAt,
+    this.lastFullSyncAt,
+    required this.syncStatus,
+    this.lastSyncError,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['channel_id'] = Variable<String>(channelId);
+    if (!nullToAbsent || newestSyncedMessageSeq != null) {
+      map['newest_synced_message_seq'] = Variable<int>(newestSyncedMessageSeq);
+    }
+    if (!nullToAbsent || oldestCachedMessageSeq != null) {
+      map['oldest_cached_message_seq'] = Variable<int>(oldestCachedMessageSeq);
+    }
+    map['has_more_history'] = Variable<bool>(hasMoreHistory);
+    if (!nullToAbsent || lastMemberSyncAt != null) {
+      map['last_member_sync_at'] = Variable<DateTime>(lastMemberSyncAt);
+    }
+    if (!nullToAbsent || lastFullSyncAt != null) {
+      map['last_full_sync_at'] = Variable<DateTime>(lastFullSyncAt);
+    }
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || lastSyncError != null) {
+      map['last_sync_error'] = Variable<String>(lastSyncError);
+    }
+    return map;
+  }
+
+  ChannelSyncStatesCompanion toCompanion(bool nullToAbsent) {
+    return ChannelSyncStatesCompanion(
+      channelId: Value(channelId),
+      newestSyncedMessageSeq:
+          newestSyncedMessageSeq == null && nullToAbsent
+              ? const Value.absent()
+              : Value(newestSyncedMessageSeq),
+      oldestCachedMessageSeq:
+          oldestCachedMessageSeq == null && nullToAbsent
+              ? const Value.absent()
+              : Value(oldestCachedMessageSeq),
+      hasMoreHistory: Value(hasMoreHistory),
+      lastMemberSyncAt:
+          lastMemberSyncAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastMemberSyncAt),
+      lastFullSyncAt:
+          lastFullSyncAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastFullSyncAt),
+      syncStatus: Value(syncStatus),
+      lastSyncError:
+          lastSyncError == null && nullToAbsent
+              ? const Value.absent()
+              : Value(lastSyncError),
+    );
+  }
+
+  factory ChannelSyncStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ChannelSyncStateRow(
+      channelId: serializer.fromJson<String>(json['channelId']),
+      newestSyncedMessageSeq: serializer.fromJson<int?>(
+        json['newestSyncedMessageSeq'],
+      ),
+      oldestCachedMessageSeq: serializer.fromJson<int?>(
+        json['oldestCachedMessageSeq'],
+      ),
+      hasMoreHistory: serializer.fromJson<bool>(json['hasMoreHistory']),
+      lastMemberSyncAt: serializer.fromJson<DateTime?>(
+        json['lastMemberSyncAt'],
+      ),
+      lastFullSyncAt: serializer.fromJson<DateTime?>(json['lastFullSyncAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      lastSyncError: serializer.fromJson<String?>(json['lastSyncError']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'channelId': serializer.toJson<String>(channelId),
+      'newestSyncedMessageSeq': serializer.toJson<int?>(newestSyncedMessageSeq),
+      'oldestCachedMessageSeq': serializer.toJson<int?>(oldestCachedMessageSeq),
+      'hasMoreHistory': serializer.toJson<bool>(hasMoreHistory),
+      'lastMemberSyncAt': serializer.toJson<DateTime?>(lastMemberSyncAt),
+      'lastFullSyncAt': serializer.toJson<DateTime?>(lastFullSyncAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'lastSyncError': serializer.toJson<String?>(lastSyncError),
+    };
+  }
+
+  ChannelSyncStateRow copyWith({
+    String? channelId,
+    Value<int?> newestSyncedMessageSeq = const Value.absent(),
+    Value<int?> oldestCachedMessageSeq = const Value.absent(),
+    bool? hasMoreHistory,
+    Value<DateTime?> lastMemberSyncAt = const Value.absent(),
+    Value<DateTime?> lastFullSyncAt = const Value.absent(),
+    String? syncStatus,
+    Value<String?> lastSyncError = const Value.absent(),
+  }) => ChannelSyncStateRow(
+    channelId: channelId ?? this.channelId,
+    newestSyncedMessageSeq:
+        newestSyncedMessageSeq.present
+            ? newestSyncedMessageSeq.value
+            : this.newestSyncedMessageSeq,
+    oldestCachedMessageSeq:
+        oldestCachedMessageSeq.present
+            ? oldestCachedMessageSeq.value
+            : this.oldestCachedMessageSeq,
+    hasMoreHistory: hasMoreHistory ?? this.hasMoreHistory,
+    lastMemberSyncAt:
+        lastMemberSyncAt.present
+            ? lastMemberSyncAt.value
+            : this.lastMemberSyncAt,
+    lastFullSyncAt:
+        lastFullSyncAt.present ? lastFullSyncAt.value : this.lastFullSyncAt,
+    syncStatus: syncStatus ?? this.syncStatus,
+    lastSyncError:
+        lastSyncError.present ? lastSyncError.value : this.lastSyncError,
+  );
+  ChannelSyncStateRow copyWithCompanion(ChannelSyncStatesCompanion data) {
+    return ChannelSyncStateRow(
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      newestSyncedMessageSeq:
+          data.newestSyncedMessageSeq.present
+              ? data.newestSyncedMessageSeq.value
+              : this.newestSyncedMessageSeq,
+      oldestCachedMessageSeq:
+          data.oldestCachedMessageSeq.present
+              ? data.oldestCachedMessageSeq.value
+              : this.oldestCachedMessageSeq,
+      hasMoreHistory:
+          data.hasMoreHistory.present
+              ? data.hasMoreHistory.value
+              : this.hasMoreHistory,
+      lastMemberSyncAt:
+          data.lastMemberSyncAt.present
+              ? data.lastMemberSyncAt.value
+              : this.lastMemberSyncAt,
+      lastFullSyncAt:
+          data.lastFullSyncAt.present
+              ? data.lastFullSyncAt.value
+              : this.lastFullSyncAt,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      lastSyncError:
+          data.lastSyncError.present
+              ? data.lastSyncError.value
+              : this.lastSyncError,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelSyncStateRow(')
+          ..write('channelId: $channelId, ')
+          ..write('newestSyncedMessageSeq: $newestSyncedMessageSeq, ')
+          ..write('oldestCachedMessageSeq: $oldestCachedMessageSeq, ')
+          ..write('hasMoreHistory: $hasMoreHistory, ')
+          ..write('lastMemberSyncAt: $lastMemberSyncAt, ')
+          ..write('lastFullSyncAt: $lastFullSyncAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncError: $lastSyncError')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    channelId,
+    newestSyncedMessageSeq,
+    oldestCachedMessageSeq,
+    hasMoreHistory,
+    lastMemberSyncAt,
+    lastFullSyncAt,
+    syncStatus,
+    lastSyncError,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ChannelSyncStateRow &&
+          other.channelId == this.channelId &&
+          other.newestSyncedMessageSeq == this.newestSyncedMessageSeq &&
+          other.oldestCachedMessageSeq == this.oldestCachedMessageSeq &&
+          other.hasMoreHistory == this.hasMoreHistory &&
+          other.lastMemberSyncAt == this.lastMemberSyncAt &&
+          other.lastFullSyncAt == this.lastFullSyncAt &&
+          other.syncStatus == this.syncStatus &&
+          other.lastSyncError == this.lastSyncError);
+}
+
+class ChannelSyncStatesCompanion extends UpdateCompanion<ChannelSyncStateRow> {
+  final Value<String> channelId;
+  final Value<int?> newestSyncedMessageSeq;
+  final Value<int?> oldestCachedMessageSeq;
+  final Value<bool> hasMoreHistory;
+  final Value<DateTime?> lastMemberSyncAt;
+  final Value<DateTime?> lastFullSyncAt;
+  final Value<String> syncStatus;
+  final Value<String?> lastSyncError;
+  final Value<int> rowid;
+  const ChannelSyncStatesCompanion({
+    this.channelId = const Value.absent(),
+    this.newestSyncedMessageSeq = const Value.absent(),
+    this.oldestCachedMessageSeq = const Value.absent(),
+    this.hasMoreHistory = const Value.absent(),
+    this.lastMemberSyncAt = const Value.absent(),
+    this.lastFullSyncAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncError = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ChannelSyncStatesCompanion.insert({
+    required String channelId,
+    this.newestSyncedMessageSeq = const Value.absent(),
+    this.oldestCachedMessageSeq = const Value.absent(),
+    this.hasMoreHistory = const Value.absent(),
+    this.lastMemberSyncAt = const Value.absent(),
+    this.lastFullSyncAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncError = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : channelId = Value(channelId);
+  static Insertable<ChannelSyncStateRow> custom({
+    Expression<String>? channelId,
+    Expression<int>? newestSyncedMessageSeq,
+    Expression<int>? oldestCachedMessageSeq,
+    Expression<bool>? hasMoreHistory,
+    Expression<DateTime>? lastMemberSyncAt,
+    Expression<DateTime>? lastFullSyncAt,
+    Expression<String>? syncStatus,
+    Expression<String>? lastSyncError,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (channelId != null) 'channel_id': channelId,
+      if (newestSyncedMessageSeq != null)
+        'newest_synced_message_seq': newestSyncedMessageSeq,
+      if (oldestCachedMessageSeq != null)
+        'oldest_cached_message_seq': oldestCachedMessageSeq,
+      if (hasMoreHistory != null) 'has_more_history': hasMoreHistory,
+      if (lastMemberSyncAt != null) 'last_member_sync_at': lastMemberSyncAt,
+      if (lastFullSyncAt != null) 'last_full_sync_at': lastFullSyncAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (lastSyncError != null) 'last_sync_error': lastSyncError,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ChannelSyncStatesCompanion copyWith({
+    Value<String>? channelId,
+    Value<int?>? newestSyncedMessageSeq,
+    Value<int?>? oldestCachedMessageSeq,
+    Value<bool>? hasMoreHistory,
+    Value<DateTime?>? lastMemberSyncAt,
+    Value<DateTime?>? lastFullSyncAt,
+    Value<String>? syncStatus,
+    Value<String?>? lastSyncError,
+    Value<int>? rowid,
+  }) {
+    return ChannelSyncStatesCompanion(
+      channelId: channelId ?? this.channelId,
+      newestSyncedMessageSeq:
+          newestSyncedMessageSeq ?? this.newestSyncedMessageSeq,
+      oldestCachedMessageSeq:
+          oldestCachedMessageSeq ?? this.oldestCachedMessageSeq,
+      hasMoreHistory: hasMoreHistory ?? this.hasMoreHistory,
+      lastMemberSyncAt: lastMemberSyncAt ?? this.lastMemberSyncAt,
+      lastFullSyncAt: lastFullSyncAt ?? this.lastFullSyncAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncError: lastSyncError ?? this.lastSyncError,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (newestSyncedMessageSeq.present) {
+      map['newest_synced_message_seq'] = Variable<int>(
+        newestSyncedMessageSeq.value,
+      );
+    }
+    if (oldestCachedMessageSeq.present) {
+      map['oldest_cached_message_seq'] = Variable<int>(
+        oldestCachedMessageSeq.value,
+      );
+    }
+    if (hasMoreHistory.present) {
+      map['has_more_history'] = Variable<bool>(hasMoreHistory.value);
+    }
+    if (lastMemberSyncAt.present) {
+      map['last_member_sync_at'] = Variable<DateTime>(lastMemberSyncAt.value);
+    }
+    if (lastFullSyncAt.present) {
+      map['last_full_sync_at'] = Variable<DateTime>(lastFullSyncAt.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (lastSyncError.present) {
+      map['last_sync_error'] = Variable<String>(lastSyncError.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelSyncStatesCompanion(')
+          ..write('channelId: $channelId, ')
+          ..write('newestSyncedMessageSeq: $newestSyncedMessageSeq, ')
+          ..write('oldestCachedMessageSeq: $oldestCachedMessageSeq, ')
+          ..write('hasMoreHistory: $hasMoreHistory, ')
+          ..write('lastMemberSyncAt: $lastMemberSyncAt, ')
+          ..write('lastFullSyncAt: $lastFullSyncAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncError: $lastSyncError, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ChannelDraftsTable extends ChannelDrafts
+    with TableInfo<$ChannelDraftsTable, ChannelDraftRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ChannelDraftsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
+  @override
+  late final GeneratedColumn<String> body = GeneratedColumn<String>(
+    'body',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _replyToMessageIdMeta = const VerificationMeta(
+    'replyToMessageId',
+  );
+  @override
+  late final GeneratedColumn<String> replyToMessageId = GeneratedColumn<String>(
+    'reply_to_message_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    channelId,
+    body,
+    replyToMessageId,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'channel_drafts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ChannelDraftRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('channel_id')) {
+      context.handle(
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('body')) {
+      context.handle(
+        _bodyMeta,
+        body.isAcceptableOrUnknown(data['body']!, _bodyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bodyMeta);
+    }
+    if (data.containsKey('reply_to_message_id')) {
+      context.handle(
+        _replyToMessageIdMeta,
+        replyToMessageId.isAcceptableOrUnknown(
+          data['reply_to_message_id']!,
+          _replyToMessageIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {channelId};
+  @override
+  ChannelDraftRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ChannelDraftRow(
+      channelId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}channel_id'],
+          )!,
+      body:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}body'],
+          )!,
+      replyToMessageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_to_message_id'],
+      ),
+      updatedAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}updated_at'],
+          )!,
+    );
+  }
+
+  @override
+  $ChannelDraftsTable createAlias(String alias) {
+    return $ChannelDraftsTable(attachedDatabase, alias);
+  }
+}
+
+class ChannelDraftRow extends DataClass implements Insertable<ChannelDraftRow> {
+  final String channelId;
+  final String body;
+  final String? replyToMessageId;
+  final DateTime updatedAt;
+  const ChannelDraftRow({
+    required this.channelId,
+    required this.body,
+    this.replyToMessageId,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['channel_id'] = Variable<String>(channelId);
+    map['body'] = Variable<String>(body);
+    if (!nullToAbsent || replyToMessageId != null) {
+      map['reply_to_message_id'] = Variable<String>(replyToMessageId);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  ChannelDraftsCompanion toCompanion(bool nullToAbsent) {
+    return ChannelDraftsCompanion(
+      channelId: Value(channelId),
+      body: Value(body),
+      replyToMessageId:
+          replyToMessageId == null && nullToAbsent
+              ? const Value.absent()
+              : Value(replyToMessageId),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ChannelDraftRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ChannelDraftRow(
+      channelId: serializer.fromJson<String>(json['channelId']),
+      body: serializer.fromJson<String>(json['body']),
+      replyToMessageId: serializer.fromJson<String?>(json['replyToMessageId']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'channelId': serializer.toJson<String>(channelId),
+      'body': serializer.toJson<String>(body),
+      'replyToMessageId': serializer.toJson<String?>(replyToMessageId),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ChannelDraftRow copyWith({
+    String? channelId,
+    String? body,
+    Value<String?> replyToMessageId = const Value.absent(),
+    DateTime? updatedAt,
+  }) => ChannelDraftRow(
+    channelId: channelId ?? this.channelId,
+    body: body ?? this.body,
+    replyToMessageId:
+        replyToMessageId.present
+            ? replyToMessageId.value
+            : this.replyToMessageId,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ChannelDraftRow copyWithCompanion(ChannelDraftsCompanion data) {
+    return ChannelDraftRow(
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      body: data.body.present ? data.body.value : this.body,
+      replyToMessageId:
+          data.replyToMessageId.present
+              ? data.replyToMessageId.value
+              : this.replyToMessageId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelDraftRow(')
+          ..write('channelId: $channelId, ')
           ..write('body: $body, ')
+          ..write('replyToMessageId: $replyToMessageId, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(channelId, body, replyToMessageId, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ChannelDraftRow &&
+          other.channelId == this.channelId &&
+          other.body == this.body &&
+          other.replyToMessageId == this.replyToMessageId &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ChannelDraftsCompanion extends UpdateCompanion<ChannelDraftRow> {
+  final Value<String> channelId;
+  final Value<String> body;
+  final Value<String?> replyToMessageId;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const ChannelDraftsCompanion({
+    this.channelId = const Value.absent(),
+    this.body = const Value.absent(),
+    this.replyToMessageId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ChannelDraftsCompanion.insert({
+    required String channelId,
+    required String body,
+    this.replyToMessageId = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : channelId = Value(channelId),
+       body = Value(body),
+       updatedAt = Value(updatedAt);
+  static Insertable<ChannelDraftRow> custom({
+    Expression<String>? channelId,
+    Expression<String>? body,
+    Expression<String>? replyToMessageId,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (channelId != null) 'channel_id': channelId,
+      if (body != null) 'body': body,
+      if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ChannelDraftsCompanion copyWith({
+    Value<String>? channelId,
+    Value<String>? body,
+    Value<String?>? replyToMessageId,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return ChannelDraftsCompanion(
+      channelId: channelId ?? this.channelId,
+      body: body ?? this.body,
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (body.present) {
+      map['body'] = Variable<String>(body.value);
+    }
+    if (replyToMessageId.present) {
+      map['reply_to_message_id'] = Variable<String>(replyToMessageId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelDraftsCompanion(')
+          ..write('channelId: $channelId, ')
+          ..write('body: $body, ')
+          ..write('replyToMessageId: $replyToMessageId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -2361,40 +7123,14 @@ class $ScoringOpsTable extends ScoringOps
 }
 
 class ScoringOpRow extends DataClass implements Insertable<ScoringOpRow> {
-  /// Client-generated uuid, created ONCE when the scorer taps and reused on
-  /// every retry. This is the idempotency key the server dedupes on, and it is
-  /// why "the server committed it but the reply was lost" is safe to retry.
   final String opId;
   final String matchId;
   final int inningsNumber;
-
-  /// Monotonic per (match, innings) — the order the scorer entered them, which
-  /// is the order the server must receive them. Deliveries are sequential; out
-  /// of order they are meaningless.
   final int localSeq;
-
-  /// 'ball' | 'undo'.
   final String kind;
-
-  /// The delivery as entered, JSON-encoded.
   final String payload;
   final DateTime createdAt;
-
-  /// Null while the server still owes us this one. The outbox drains exactly
-  /// the null rows, in localSeq order.
   final DateTime? syncedAt;
-
-  /// Set when the server REFUSED this op — it answered, and the answer was no
-  /// (a rule violation, a closed innings, a match already finished). Distinct
-  /// from a transport failure, which leaves both timestamps null so the outbox
-  /// retries.
-  ///
-  /// A refusal is terminal: no amount of retrying changes a no. The row is
-  /// kept rather than deleted because design doc §19.3 forbids discarding a
-  /// refused write — the scorer must still be able to read what could not be
-  /// applied. Excluding it from `pendingOps` is what stops one permanently
-  /// refused delivery from blocking the queue behind it (and, via
-  /// `pendingOpsCount`, disabling undo forever).
   final DateTime? refusedAt;
   final int attempts;
   final String? lastError;
@@ -2926,11 +7662,7 @@ class ScoringSnapshotRow extends DataClass
     implements Insertable<ScoringSnapshotRow> {
   final String matchId;
   final int inningsNumber;
-
-  /// JSON-encoded innings state as of [throughSeq].
   final String state;
-
-  /// The localSeq this snapshot already accounts for.
   final int throughSeq;
   final DateTime updatedAt;
   const ScoringSnapshotRow({
@@ -4022,9 +8754,22 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $WizardDraftsTable wizardDrafts = $WizardDraftsTable(this);
-  late final $ChatsTable chats = $ChatsTable(this);
-  late final $MessagesTable messages = $MessagesTable(this);
-  late final $MessageDraftsTable messageDrafts = $MessageDraftsTable(this);
+  late final $LocalChannelsTable localChannels = $LocalChannelsTable(this);
+  late final $LocalChannelMembersTable localChannelMembers =
+      $LocalChannelMembersTable(this);
+  late final $LocalMessagesTable localMessages = $LocalMessagesTable(this);
+  late final $LocalMessageAttachmentsTable localMessageAttachments =
+      $LocalMessageAttachmentsTable(this);
+  late final $LocalMessageReactionsTable localMessageReactions =
+      $LocalMessageReactionsTable(this);
+  late final $LocalMemberRestrictionsTable localMemberRestrictions =
+      $LocalMemberRestrictionsTable(this);
+  late final $OutboxOperationsTable outboxOperations = $OutboxOperationsTable(
+    this,
+  );
+  late final $ChannelSyncStatesTable channelSyncStates =
+      $ChannelSyncStatesTable(this);
+  late final $ChannelDraftsTable channelDrafts = $ChannelDraftsTable(this);
   late final $ScoringOpsTable scoringOps = $ScoringOpsTable(this);
   late final $ScoringSnapshotsTable scoringSnapshots = $ScoringSnapshotsTable(
     this,
@@ -4040,9 +8785,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     wizardDrafts,
-    chats,
-    messages,
-    messageDrafts,
+    localChannels,
+    localChannelMembers,
+    localMessages,
+    localMessageAttachments,
+    localMessageReactions,
+    localMemberRestrictions,
+    outboxOperations,
+    channelSyncStates,
+    channelDrafts,
     scoringOps,
     scoringSnapshots,
     cachedMatches,
@@ -4221,60 +8972,100 @@ typedef $$WizardDraftsTableProcessedTableManager =
       WizardDraftRow,
       PrefetchHooks Function()
     >;
-typedef $$ChatsTableCreateCompanionBuilder =
-    ChatsCompanion Function({
-      required String chatId,
-      required String type,
+typedef $$LocalChannelsTableCreateCompanionBuilder =
+    LocalChannelsCompanion Function({
+      required String channelId,
+      required String channelKey,
+      required String kind,
+      required String contextType,
+      Value<String> visibility,
+      Value<String> purpose,
+      Value<String?> title,
+      Value<String?> description,
+      Value<String?> avatarUrl,
       Value<String?> teamId,
-      Value<String?> teamName,
-      Value<String?> teamLogoUrl,
-      Value<String?> teamLogoMonogram,
-      Value<String?> teamPrimaryColorHex,
+      Value<String?> matchId,
+      Value<String?> tournamentId,
+      Value<String?> clubId,
+      Value<int?> lastMessageSeq,
       Value<DateTime?> lastMessageAt,
-      Value<String?> lastMessageBody,
-      Value<String?> lastMessageSenderId,
-      Value<bool> lastMessageFromMe,
-      Value<int> unreadCount,
-      required DateTime createdAt,
-      required DateTime updatedAt,
-      required DateTime cachedAt,
+      required DateTime serverUpdatedAt,
+      required DateTime localUpdatedAt,
       Value<int> rowid,
     });
-typedef $$ChatsTableUpdateCompanionBuilder =
-    ChatsCompanion Function({
-      Value<String> chatId,
-      Value<String> type,
+typedef $$LocalChannelsTableUpdateCompanionBuilder =
+    LocalChannelsCompanion Function({
+      Value<String> channelId,
+      Value<String> channelKey,
+      Value<String> kind,
+      Value<String> contextType,
+      Value<String> visibility,
+      Value<String> purpose,
+      Value<String?> title,
+      Value<String?> description,
+      Value<String?> avatarUrl,
       Value<String?> teamId,
-      Value<String?> teamName,
-      Value<String?> teamLogoUrl,
-      Value<String?> teamLogoMonogram,
-      Value<String?> teamPrimaryColorHex,
+      Value<String?> matchId,
+      Value<String?> tournamentId,
+      Value<String?> clubId,
+      Value<int?> lastMessageSeq,
       Value<DateTime?> lastMessageAt,
-      Value<String?> lastMessageBody,
-      Value<String?> lastMessageSenderId,
-      Value<bool> lastMessageFromMe,
-      Value<int> unreadCount,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<DateTime> cachedAt,
+      Value<DateTime> serverUpdatedAt,
+      Value<DateTime> localUpdatedAt,
       Value<int> rowid,
     });
 
-class $$ChatsTableFilterComposer extends Composer<_$AppDatabase, $ChatsTable> {
-  $$ChatsTableFilterComposer({
+class $$LocalChannelsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalChannelsTable> {
+  $$LocalChannelsTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<String> get chatId => $composableBuilder(
-    column: $table.chatId,
+  ColumnFilters<String> get channelId => $composableBuilder(
+    column: $table.channelId,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get type => $composableBuilder(
-    column: $table.type,
+  ColumnFilters<String> get channelKey => $composableBuilder(
+    column: $table.channelKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contextType => $composableBuilder(
+    column: $table.contextType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get visibility => $composableBuilder(
+    column: $table.visibility,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get purpose => $composableBuilder(
+    column: $table.purpose,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4283,23 +9074,23 @@ class $$ChatsTableFilterComposer extends Composer<_$AppDatabase, $ChatsTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get teamName => $composableBuilder(
-    column: $table.teamName,
+  ColumnFilters<String> get matchId => $composableBuilder(
+    column: $table.matchId,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get teamLogoUrl => $composableBuilder(
-    column: $table.teamLogoUrl,
+  ColumnFilters<String> get tournamentId => $composableBuilder(
+    column: $table.tournamentId,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get teamLogoMonogram => $composableBuilder(
-    column: $table.teamLogoMonogram,
+  ColumnFilters<String> get clubId => $composableBuilder(
+    column: $table.clubId,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get teamPrimaryColorHex => $composableBuilder(
-    column: $table.teamPrimaryColorHex,
+  ColumnFilters<int> get lastMessageSeq => $composableBuilder(
+    column: $table.lastMessageSeq,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4308,58 +9099,68 @@ class $$ChatsTableFilterComposer extends Composer<_$AppDatabase, $ChatsTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get lastMessageBody => $composableBuilder(
-    column: $table.lastMessageBody,
+  ColumnFilters<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get lastMessageSenderId => $composableBuilder(
-    column: $table.lastMessageSenderId,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get lastMessageFromMe => $composableBuilder(
-    column: $table.lastMessageFromMe,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get unreadCount => $composableBuilder(
-    column: $table.unreadCount,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
-    column: $table.cachedAt,
+  ColumnFilters<DateTime> get localUpdatedAt => $composableBuilder(
+    column: $table.localUpdatedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
 
-class $$ChatsTableOrderingComposer
-    extends Composer<_$AppDatabase, $ChatsTable> {
-  $$ChatsTableOrderingComposer({
+class $$LocalChannelsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalChannelsTable> {
+  $$LocalChannelsTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<String> get chatId => $composableBuilder(
-    column: $table.chatId,
+  ColumnOrderings<String> get channelId => $composableBuilder(
+    column: $table.channelId,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get type => $composableBuilder(
-    column: $table.type,
+  ColumnOrderings<String> get channelKey => $composableBuilder(
+    column: $table.channelKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contextType => $composableBuilder(
+    column: $table.contextType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get visibility => $composableBuilder(
+    column: $table.visibility,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get purpose => $composableBuilder(
+    column: $table.purpose,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4368,23 +9169,23 @@ class $$ChatsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get teamName => $composableBuilder(
-    column: $table.teamName,
+  ColumnOrderings<String> get matchId => $composableBuilder(
+    column: $table.matchId,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get teamLogoUrl => $composableBuilder(
-    column: $table.teamLogoUrl,
+  ColumnOrderings<String> get tournamentId => $composableBuilder(
+    column: $table.tournamentId,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get teamLogoMonogram => $composableBuilder(
-    column: $table.teamLogoMonogram,
+  ColumnOrderings<String> get clubId => $composableBuilder(
+    column: $table.clubId,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get teamPrimaryColorHex => $composableBuilder(
-    column: $table.teamPrimaryColorHex,
+  ColumnOrderings<int> get lastMessageSeq => $composableBuilder(
+    column: $table.lastMessageSeq,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4393,75 +9194,77 @@ class $$ChatsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get lastMessageBody => $composableBuilder(
-    column: $table.lastMessageBody,
+  ColumnOrderings<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get lastMessageSenderId => $composableBuilder(
-    column: $table.lastMessageSenderId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get lastMessageFromMe => $composableBuilder(
-    column: $table.lastMessageFromMe,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get unreadCount => $composableBuilder(
-    column: $table.unreadCount,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
-    column: $table.cachedAt,
+  ColumnOrderings<DateTime> get localUpdatedAt => $composableBuilder(
+    column: $table.localUpdatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 }
 
-class $$ChatsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $ChatsTable> {
-  $$ChatsTableAnnotationComposer({
+class $$LocalChannelsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalChannelsTable> {
+  $$LocalChannelsTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<String> get chatId =>
-      $composableBuilder(column: $table.chatId, builder: (column) => column);
+  GeneratedColumn<String> get channelId =>
+      $composableBuilder(column: $table.channelId, builder: (column) => column);
 
-  GeneratedColumn<String> get type =>
-      $composableBuilder(column: $table.type, builder: (column) => column);
+  GeneratedColumn<String> get channelKey => $composableBuilder(
+    column: $table.channelKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get contextType => $composableBuilder(
+    column: $table.contextType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get visibility => $composableBuilder(
+    column: $table.visibility,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get purpose =>
+      $composableBuilder(column: $table.purpose, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get avatarUrl =>
+      $composableBuilder(column: $table.avatarUrl, builder: (column) => column);
 
   GeneratedColumn<String> get teamId =>
       $composableBuilder(column: $table.teamId, builder: (column) => column);
 
-  GeneratedColumn<String> get teamName =>
-      $composableBuilder(column: $table.teamName, builder: (column) => column);
+  GeneratedColumn<String> get matchId =>
+      $composableBuilder(column: $table.matchId, builder: (column) => column);
 
-  GeneratedColumn<String> get teamLogoUrl => $composableBuilder(
-    column: $table.teamLogoUrl,
+  GeneratedColumn<String> get tournamentId => $composableBuilder(
+    column: $table.tournamentId,
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get teamLogoMonogram => $composableBuilder(
-    column: $table.teamLogoMonogram,
-    builder: (column) => column,
-  );
+  GeneratedColumn<String> get clubId =>
+      $composableBuilder(column: $table.clubId, builder: (column) => column);
 
-  GeneratedColumn<String> get teamPrimaryColorHex => $composableBuilder(
-    column: $table.teamPrimaryColorHex,
+  GeneratedColumn<int> get lastMessageSeq => $composableBuilder(
+    column: $table.lastMessageSeq,
     builder: (column) => column,
   );
 
@@ -4470,132 +9273,128 @@ class $$ChatsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get lastMessageBody => $composableBuilder(
-    column: $table.lastMessageBody,
+  GeneratedColumn<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get lastMessageSenderId => $composableBuilder(
-    column: $table.lastMessageSenderId,
+  GeneratedColumn<DateTime> get localUpdatedAt => $composableBuilder(
+    column: $table.localUpdatedAt,
     builder: (column) => column,
   );
-
-  GeneratedColumn<bool> get lastMessageFromMe => $composableBuilder(
-    column: $table.lastMessageFromMe,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get unreadCount => $composableBuilder(
-    column: $table.unreadCount,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<DateTime> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get updatedAt =>
-      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get cachedAt =>
-      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
 }
 
-class $$ChatsTableTableManager
+class $$LocalChannelsTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $ChatsTable,
-          ChatRow,
-          $$ChatsTableFilterComposer,
-          $$ChatsTableOrderingComposer,
-          $$ChatsTableAnnotationComposer,
-          $$ChatsTableCreateCompanionBuilder,
-          $$ChatsTableUpdateCompanionBuilder,
-          (ChatRow, BaseReferences<_$AppDatabase, $ChatsTable, ChatRow>),
-          ChatRow,
+          $LocalChannelsTable,
+          LocalChannelRow,
+          $$LocalChannelsTableFilterComposer,
+          $$LocalChannelsTableOrderingComposer,
+          $$LocalChannelsTableAnnotationComposer,
+          $$LocalChannelsTableCreateCompanionBuilder,
+          $$LocalChannelsTableUpdateCompanionBuilder,
+          (
+            LocalChannelRow,
+            BaseReferences<_$AppDatabase, $LocalChannelsTable, LocalChannelRow>,
+          ),
+          LocalChannelRow,
           PrefetchHooks Function()
         > {
-  $$ChatsTableTableManager(_$AppDatabase db, $ChatsTable table)
+  $$LocalChannelsTableTableManager(_$AppDatabase db, $LocalChannelsTable table)
     : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer:
-              () => $$ChatsTableFilterComposer($db: db, $table: table),
+              () => $$LocalChannelsTableFilterComposer($db: db, $table: table),
           createOrderingComposer:
-              () => $$ChatsTableOrderingComposer($db: db, $table: table),
+              () =>
+                  $$LocalChannelsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer:
-              () => $$ChatsTableAnnotationComposer($db: db, $table: table),
+              () => $$LocalChannelsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
           updateCompanionCallback:
               ({
-                Value<String> chatId = const Value.absent(),
-                Value<String> type = const Value.absent(),
+                Value<String> channelId = const Value.absent(),
+                Value<String> channelKey = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> contextType = const Value.absent(),
+                Value<String> visibility = const Value.absent(),
+                Value<String> purpose = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
                 Value<String?> teamId = const Value.absent(),
-                Value<String?> teamName = const Value.absent(),
-                Value<String?> teamLogoUrl = const Value.absent(),
-                Value<String?> teamLogoMonogram = const Value.absent(),
-                Value<String?> teamPrimaryColorHex = const Value.absent(),
+                Value<String?> matchId = const Value.absent(),
+                Value<String?> tournamentId = const Value.absent(),
+                Value<String?> clubId = const Value.absent(),
+                Value<int?> lastMessageSeq = const Value.absent(),
                 Value<DateTime?> lastMessageAt = const Value.absent(),
-                Value<String?> lastMessageBody = const Value.absent(),
-                Value<String?> lastMessageSenderId = const Value.absent(),
-                Value<bool> lastMessageFromMe = const Value.absent(),
-                Value<int> unreadCount = const Value.absent(),
-                Value<DateTime> createdAt = const Value.absent(),
-                Value<DateTime> updatedAt = const Value.absent(),
-                Value<DateTime> cachedAt = const Value.absent(),
+                Value<DateTime> serverUpdatedAt = const Value.absent(),
+                Value<DateTime> localUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => ChatsCompanion(
-                chatId: chatId,
-                type: type,
+              }) => LocalChannelsCompanion(
+                channelId: channelId,
+                channelKey: channelKey,
+                kind: kind,
+                contextType: contextType,
+                visibility: visibility,
+                purpose: purpose,
+                title: title,
+                description: description,
+                avatarUrl: avatarUrl,
                 teamId: teamId,
-                teamName: teamName,
-                teamLogoUrl: teamLogoUrl,
-                teamLogoMonogram: teamLogoMonogram,
-                teamPrimaryColorHex: teamPrimaryColorHex,
+                matchId: matchId,
+                tournamentId: tournamentId,
+                clubId: clubId,
+                lastMessageSeq: lastMessageSeq,
                 lastMessageAt: lastMessageAt,
-                lastMessageBody: lastMessageBody,
-                lastMessageSenderId: lastMessageSenderId,
-                lastMessageFromMe: lastMessageFromMe,
-                unreadCount: unreadCount,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                cachedAt: cachedAt,
+                serverUpdatedAt: serverUpdatedAt,
+                localUpdatedAt: localUpdatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                required String chatId,
-                required String type,
+                required String channelId,
+                required String channelKey,
+                required String kind,
+                required String contextType,
+                Value<String> visibility = const Value.absent(),
+                Value<String> purpose = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
                 Value<String?> teamId = const Value.absent(),
-                Value<String?> teamName = const Value.absent(),
-                Value<String?> teamLogoUrl = const Value.absent(),
-                Value<String?> teamLogoMonogram = const Value.absent(),
-                Value<String?> teamPrimaryColorHex = const Value.absent(),
+                Value<String?> matchId = const Value.absent(),
+                Value<String?> tournamentId = const Value.absent(),
+                Value<String?> clubId = const Value.absent(),
+                Value<int?> lastMessageSeq = const Value.absent(),
                 Value<DateTime?> lastMessageAt = const Value.absent(),
-                Value<String?> lastMessageBody = const Value.absent(),
-                Value<String?> lastMessageSenderId = const Value.absent(),
-                Value<bool> lastMessageFromMe = const Value.absent(),
-                Value<int> unreadCount = const Value.absent(),
-                required DateTime createdAt,
-                required DateTime updatedAt,
-                required DateTime cachedAt,
+                required DateTime serverUpdatedAt,
+                required DateTime localUpdatedAt,
                 Value<int> rowid = const Value.absent(),
-              }) => ChatsCompanion.insert(
-                chatId: chatId,
-                type: type,
+              }) => LocalChannelsCompanion.insert(
+                channelId: channelId,
+                channelKey: channelKey,
+                kind: kind,
+                contextType: contextType,
+                visibility: visibility,
+                purpose: purpose,
+                title: title,
+                description: description,
+                avatarUrl: avatarUrl,
                 teamId: teamId,
-                teamName: teamName,
-                teamLogoUrl: teamLogoUrl,
-                teamLogoMonogram: teamLogoMonogram,
-                teamPrimaryColorHex: teamPrimaryColorHex,
+                matchId: matchId,
+                tournamentId: tournamentId,
+                clubId: clubId,
+                lastMessageSeq: lastMessageSeq,
                 lastMessageAt: lastMessageAt,
-                lastMessageBody: lastMessageBody,
-                lastMessageSenderId: lastMessageSenderId,
-                lastMessageFromMe: lastMessageFromMe,
-                unreadCount: unreadCount,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                cachedAt: cachedAt,
+                serverUpdatedAt: serverUpdatedAt,
+                localUpdatedAt: localUpdatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper:
@@ -4613,50 +9412,484 @@ class $$ChatsTableTableManager
       );
 }
 
-typedef $$ChatsTableProcessedTableManager =
+typedef $$LocalChannelsTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $ChatsTable,
-      ChatRow,
-      $$ChatsTableFilterComposer,
-      $$ChatsTableOrderingComposer,
-      $$ChatsTableAnnotationComposer,
-      $$ChatsTableCreateCompanionBuilder,
-      $$ChatsTableUpdateCompanionBuilder,
-      (ChatRow, BaseReferences<_$AppDatabase, $ChatsTable, ChatRow>),
-      ChatRow,
+      $LocalChannelsTable,
+      LocalChannelRow,
+      $$LocalChannelsTableFilterComposer,
+      $$LocalChannelsTableOrderingComposer,
+      $$LocalChannelsTableAnnotationComposer,
+      $$LocalChannelsTableCreateCompanionBuilder,
+      $$LocalChannelsTableUpdateCompanionBuilder,
+      (
+        LocalChannelRow,
+        BaseReferences<_$AppDatabase, $LocalChannelsTable, LocalChannelRow>,
+      ),
+      LocalChannelRow,
       PrefetchHooks Function()
     >;
-typedef $$MessagesTableCreateCompanionBuilder =
-    MessagesCompanion Function({
-      required String messageId,
-      required String chatId,
-      Value<String?> senderId,
-      Value<String?> senderDisplayName,
-      required String body,
-      required DateTime createdAt,
-      Value<DateTime?> editedAt,
-      Value<DateTime?> deletedAt,
-      Value<bool> fromMe,
+typedef $$LocalChannelMembersTableCreateCompanionBuilder =
+    LocalChannelMembersCompanion Function({
+      required String channelId,
+      required String userId,
+      Value<String> role,
+      Value<String> status,
+      Value<DateTime?> joinedAt,
+      Value<DateTime?> leftAt,
+      Value<int?> lastDeliveredMessageSeq,
+      Value<DateTime?> lastDeliveredAt,
+      Value<int?> lastReadMessageSeq,
+      Value<DateTime?> lastReadAt,
+      Value<DateTime?> notificationsMutedUntil,
+      Value<DateTime?> archivedAt,
+      Value<DateTime?> pinnedAt,
+      required DateTime serverUpdatedAt,
       Value<int> rowid,
     });
-typedef $$MessagesTableUpdateCompanionBuilder =
-    MessagesCompanion Function({
-      Value<String> messageId,
-      Value<String> chatId,
-      Value<String?> senderId,
-      Value<String?> senderDisplayName,
-      Value<String> body,
-      Value<DateTime> createdAt,
-      Value<DateTime?> editedAt,
-      Value<DateTime?> deletedAt,
-      Value<bool> fromMe,
+typedef $$LocalChannelMembersTableUpdateCompanionBuilder =
+    LocalChannelMembersCompanion Function({
+      Value<String> channelId,
+      Value<String> userId,
+      Value<String> role,
+      Value<String> status,
+      Value<DateTime?> joinedAt,
+      Value<DateTime?> leftAt,
+      Value<int?> lastDeliveredMessageSeq,
+      Value<DateTime?> lastDeliveredAt,
+      Value<int?> lastReadMessageSeq,
+      Value<DateTime?> lastReadAt,
+      Value<DateTime?> notificationsMutedUntil,
+      Value<DateTime?> archivedAt,
+      Value<DateTime?> pinnedAt,
+      Value<DateTime> serverUpdatedAt,
       Value<int> rowid,
     });
 
-class $$MessagesTableFilterComposer
-    extends Composer<_$AppDatabase, $MessagesTable> {
-  $$MessagesTableFilterComposer({
+class $$LocalChannelMembersTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalChannelMembersTable> {
+  $$LocalChannelMembersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get channelId => $composableBuilder(
+    column: $table.channelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get joinedAt => $composableBuilder(
+    column: $table.joinedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get leftAt => $composableBuilder(
+    column: $table.leftAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastDeliveredMessageSeq => $composableBuilder(
+    column: $table.lastDeliveredMessageSeq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastDeliveredAt => $composableBuilder(
+    column: $table.lastDeliveredAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastReadMessageSeq => $composableBuilder(
+    column: $table.lastReadMessageSeq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastReadAt => $composableBuilder(
+    column: $table.lastReadAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get notificationsMutedUntil => $composableBuilder(
+    column: $table.notificationsMutedUntil,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get pinnedAt => $composableBuilder(
+    column: $table.pinnedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalChannelMembersTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalChannelMembersTable> {
+  $$LocalChannelMembersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get channelId => $composableBuilder(
+    column: $table.channelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get joinedAt => $composableBuilder(
+    column: $table.joinedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get leftAt => $composableBuilder(
+    column: $table.leftAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastDeliveredMessageSeq => $composableBuilder(
+    column: $table.lastDeliveredMessageSeq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastDeliveredAt => $composableBuilder(
+    column: $table.lastDeliveredAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastReadMessageSeq => $composableBuilder(
+    column: $table.lastReadMessageSeq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastReadAt => $composableBuilder(
+    column: $table.lastReadAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get notificationsMutedUntil => $composableBuilder(
+    column: $table.notificationsMutedUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get pinnedAt => $composableBuilder(
+    column: $table.pinnedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalChannelMembersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalChannelMembersTable> {
+  $$LocalChannelMembersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get channelId =>
+      $composableBuilder(column: $table.channelId, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get joinedAt =>
+      $composableBuilder(column: $table.joinedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get leftAt =>
+      $composableBuilder(column: $table.leftAt, builder: (column) => column);
+
+  GeneratedColumn<int> get lastDeliveredMessageSeq => $composableBuilder(
+    column: $table.lastDeliveredMessageSeq,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastDeliveredAt => $composableBuilder(
+    column: $table.lastDeliveredAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastReadMessageSeq => $composableBuilder(
+    column: $table.lastReadMessageSeq,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastReadAt => $composableBuilder(
+    column: $table.lastReadAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get notificationsMutedUntil => $composableBuilder(
+    column: $table.notificationsMutedUntil,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get pinnedAt =>
+      $composableBuilder(column: $table.pinnedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$LocalChannelMembersTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalChannelMembersTable,
+          LocalChannelMemberRow,
+          $$LocalChannelMembersTableFilterComposer,
+          $$LocalChannelMembersTableOrderingComposer,
+          $$LocalChannelMembersTableAnnotationComposer,
+          $$LocalChannelMembersTableCreateCompanionBuilder,
+          $$LocalChannelMembersTableUpdateCompanionBuilder,
+          (
+            LocalChannelMemberRow,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalChannelMembersTable,
+              LocalChannelMemberRow
+            >,
+          ),
+          LocalChannelMemberRow,
+          PrefetchHooks Function()
+        > {
+  $$LocalChannelMembersTableTableManager(
+    _$AppDatabase db,
+    $LocalChannelMembersTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$LocalChannelMembersTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer:
+              () => $$LocalChannelMembersTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$LocalChannelMembersTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> channelId = const Value.absent(),
+                Value<String> userId = const Value.absent(),
+                Value<String> role = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<DateTime?> joinedAt = const Value.absent(),
+                Value<DateTime?> leftAt = const Value.absent(),
+                Value<int?> lastDeliveredMessageSeq = const Value.absent(),
+                Value<DateTime?> lastDeliveredAt = const Value.absent(),
+                Value<int?> lastReadMessageSeq = const Value.absent(),
+                Value<DateTime?> lastReadAt = const Value.absent(),
+                Value<DateTime?> notificationsMutedUntil = const Value.absent(),
+                Value<DateTime?> archivedAt = const Value.absent(),
+                Value<DateTime?> pinnedAt = const Value.absent(),
+                Value<DateTime> serverUpdatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalChannelMembersCompanion(
+                channelId: channelId,
+                userId: userId,
+                role: role,
+                status: status,
+                joinedAt: joinedAt,
+                leftAt: leftAt,
+                lastDeliveredMessageSeq: lastDeliveredMessageSeq,
+                lastDeliveredAt: lastDeliveredAt,
+                lastReadMessageSeq: lastReadMessageSeq,
+                lastReadAt: lastReadAt,
+                notificationsMutedUntil: notificationsMutedUntil,
+                archivedAt: archivedAt,
+                pinnedAt: pinnedAt,
+                serverUpdatedAt: serverUpdatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String channelId,
+                required String userId,
+                Value<String> role = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<DateTime?> joinedAt = const Value.absent(),
+                Value<DateTime?> leftAt = const Value.absent(),
+                Value<int?> lastDeliveredMessageSeq = const Value.absent(),
+                Value<DateTime?> lastDeliveredAt = const Value.absent(),
+                Value<int?> lastReadMessageSeq = const Value.absent(),
+                Value<DateTime?> lastReadAt = const Value.absent(),
+                Value<DateTime?> notificationsMutedUntil = const Value.absent(),
+                Value<DateTime?> archivedAt = const Value.absent(),
+                Value<DateTime?> pinnedAt = const Value.absent(),
+                required DateTime serverUpdatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalChannelMembersCompanion.insert(
+                channelId: channelId,
+                userId: userId,
+                role: role,
+                status: status,
+                joinedAt: joinedAt,
+                leftAt: leftAt,
+                lastDeliveredMessageSeq: lastDeliveredMessageSeq,
+                lastDeliveredAt: lastDeliveredAt,
+                lastReadMessageSeq: lastReadMessageSeq,
+                lastReadAt: lastReadAt,
+                notificationsMutedUntil: notificationsMutedUntil,
+                archivedAt: archivedAt,
+                pinnedAt: pinnedAt,
+                serverUpdatedAt: serverUpdatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalChannelMembersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalChannelMembersTable,
+      LocalChannelMemberRow,
+      $$LocalChannelMembersTableFilterComposer,
+      $$LocalChannelMembersTableOrderingComposer,
+      $$LocalChannelMembersTableAnnotationComposer,
+      $$LocalChannelMembersTableCreateCompanionBuilder,
+      $$LocalChannelMembersTableUpdateCompanionBuilder,
+      (
+        LocalChannelMemberRow,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalChannelMembersTable,
+          LocalChannelMemberRow
+        >,
+      ),
+      LocalChannelMemberRow,
+      PrefetchHooks Function()
+    >;
+typedef $$LocalMessagesTableCreateCompanionBuilder =
+    LocalMessagesCompanion Function({
+      required String messageId,
+      Value<int?> messageSeq,
+      required String channelId,
+      Value<String?> senderId,
+      Value<String?> senderDisplayName,
+      Value<String> messageType,
+      Value<String?> body,
+      Value<String> payloadJson,
+      Value<String?> replyToMessageId,
+      Value<int> version,
+      Value<bool> countsAsUnread,
+      Value<DateTime?> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> editedAt,
+      Value<DateTime?> deletedAt,
+      required DateTime localCreatedAt,
+      Value<String> syncStatus,
+      Value<String?> sendErrorCode,
+      Value<String?> sendErrorMessage,
+      Value<int> rowid,
+    });
+typedef $$LocalMessagesTableUpdateCompanionBuilder =
+    LocalMessagesCompanion Function({
+      Value<String> messageId,
+      Value<int?> messageSeq,
+      Value<String> channelId,
+      Value<String?> senderId,
+      Value<String?> senderDisplayName,
+      Value<String> messageType,
+      Value<String?> body,
+      Value<String> payloadJson,
+      Value<String?> replyToMessageId,
+      Value<int> version,
+      Value<bool> countsAsUnread,
+      Value<DateTime?> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> editedAt,
+      Value<DateTime?> deletedAt,
+      Value<DateTime> localCreatedAt,
+      Value<String> syncStatus,
+      Value<String?> sendErrorCode,
+      Value<String?> sendErrorMessage,
+      Value<int> rowid,
+    });
+
+class $$LocalMessagesTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalMessagesTable> {
+  $$LocalMessagesTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -4668,8 +9901,13 @@ class $$MessagesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get chatId => $composableBuilder(
-    column: $table.chatId,
+  ColumnFilters<int> get messageSeq => $composableBuilder(
+    column: $table.messageSeq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get channelId => $composableBuilder(
+    column: $table.channelId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4683,13 +9921,43 @@ class $$MessagesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get messageType => $composableBuilder(
+    column: $table.messageType,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get body => $composableBuilder(
     column: $table.body,
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyToMessageId => $composableBuilder(
+    column: $table.replyToMessageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get countsAsUnread => $composableBuilder(
+    column: $table.countsAsUnread,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4703,15 +9971,30 @@ class $$MessagesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<bool> get fromMe => $composableBuilder(
-    column: $table.fromMe,
+  ColumnFilters<DateTime> get localCreatedAt => $composableBuilder(
+    column: $table.localCreatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sendErrorCode => $composableBuilder(
+    column: $table.sendErrorCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sendErrorMessage => $composableBuilder(
+    column: $table.sendErrorMessage,
     builder: (column) => ColumnFilters(column),
   );
 }
 
-class $$MessagesTableOrderingComposer
-    extends Composer<_$AppDatabase, $MessagesTable> {
-  $$MessagesTableOrderingComposer({
+class $$LocalMessagesTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalMessagesTable> {
+  $$LocalMessagesTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -4723,8 +10006,13 @@ class $$MessagesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get chatId => $composableBuilder(
-    column: $table.chatId,
+  ColumnOrderings<int> get messageSeq => $composableBuilder(
+    column: $table.messageSeq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get channelId => $composableBuilder(
+    column: $table.channelId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4738,13 +10026,43 @@ class $$MessagesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get messageType => $composableBuilder(
+    column: $table.messageType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get body => $composableBuilder(
     column: $table.body,
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyToMessageId => $composableBuilder(
+    column: $table.replyToMessageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get countsAsUnread => $composableBuilder(
+    column: $table.countsAsUnread,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4758,15 +10076,30 @@ class $$MessagesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get fromMe => $composableBuilder(
-    column: $table.fromMe,
+  ColumnOrderings<DateTime> get localCreatedAt => $composableBuilder(
+    column: $table.localCreatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sendErrorCode => $composableBuilder(
+    column: $table.sendErrorCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sendErrorMessage => $composableBuilder(
+    column: $table.sendErrorMessage,
     builder: (column) => ColumnOrderings(column),
   );
 }
 
-class $$MessagesTableAnnotationComposer
-    extends Composer<_$AppDatabase, $MessagesTable> {
-  $$MessagesTableAnnotationComposer({
+class $$LocalMessagesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalMessagesTable> {
+  $$LocalMessagesTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -4776,8 +10109,13 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumn<String> get messageId =>
       $composableBuilder(column: $table.messageId, builder: (column) => column);
 
-  GeneratedColumn<String> get chatId =>
-      $composableBuilder(column: $table.chatId, builder: (column) => column);
+  GeneratedColumn<int> get messageSeq => $composableBuilder(
+    column: $table.messageSeq,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get channelId =>
+      $composableBuilder(column: $table.channelId, builder: (column) => column);
 
   GeneratedColumn<String> get senderId =>
       $composableBuilder(column: $table.senderId, builder: (column) => column);
@@ -4787,11 +10125,37 @@ class $$MessagesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get messageType => $composableBuilder(
+    column: $table.messageType,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get body =>
       $composableBuilder(column: $table.body, builder: (column) => column);
 
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get replyToMessageId => $composableBuilder(
+    column: $table.replyToMessageId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<bool> get countsAsUnread => $composableBuilder(
+    column: $table.countsAsUnread,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   GeneratedColumn<DateTime> get editedAt =>
       $composableBuilder(column: $table.editedAt, builder: (column) => column);
@@ -4799,85 +10163,146 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumn<DateTime> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 
-  GeneratedColumn<bool> get fromMe =>
-      $composableBuilder(column: $table.fromMe, builder: (column) => column);
+  GeneratedColumn<DateTime> get localCreatedAt => $composableBuilder(
+    column: $table.localCreatedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sendErrorCode => $composableBuilder(
+    column: $table.sendErrorCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sendErrorMessage => $composableBuilder(
+    column: $table.sendErrorMessage,
+    builder: (column) => column,
+  );
 }
 
-class $$MessagesTableTableManager
+class $$LocalMessagesTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $MessagesTable,
-          MessageRow,
-          $$MessagesTableFilterComposer,
-          $$MessagesTableOrderingComposer,
-          $$MessagesTableAnnotationComposer,
-          $$MessagesTableCreateCompanionBuilder,
-          $$MessagesTableUpdateCompanionBuilder,
+          $LocalMessagesTable,
+          LocalMessageRow,
+          $$LocalMessagesTableFilterComposer,
+          $$LocalMessagesTableOrderingComposer,
+          $$LocalMessagesTableAnnotationComposer,
+          $$LocalMessagesTableCreateCompanionBuilder,
+          $$LocalMessagesTableUpdateCompanionBuilder,
           (
-            MessageRow,
-            BaseReferences<_$AppDatabase, $MessagesTable, MessageRow>,
+            LocalMessageRow,
+            BaseReferences<_$AppDatabase, $LocalMessagesTable, LocalMessageRow>,
           ),
-          MessageRow,
+          LocalMessageRow,
           PrefetchHooks Function()
         > {
-  $$MessagesTableTableManager(_$AppDatabase db, $MessagesTable table)
+  $$LocalMessagesTableTableManager(_$AppDatabase db, $LocalMessagesTable table)
     : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer:
-              () => $$MessagesTableFilterComposer($db: db, $table: table),
+              () => $$LocalMessagesTableFilterComposer($db: db, $table: table),
           createOrderingComposer:
-              () => $$MessagesTableOrderingComposer($db: db, $table: table),
+              () =>
+                  $$LocalMessagesTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer:
-              () => $$MessagesTableAnnotationComposer($db: db, $table: table),
+              () => $$LocalMessagesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
           updateCompanionCallback:
               ({
                 Value<String> messageId = const Value.absent(),
-                Value<String> chatId = const Value.absent(),
+                Value<int?> messageSeq = const Value.absent(),
+                Value<String> channelId = const Value.absent(),
                 Value<String?> senderId = const Value.absent(),
                 Value<String?> senderDisplayName = const Value.absent(),
-                Value<String> body = const Value.absent(),
-                Value<DateTime> createdAt = const Value.absent(),
+                Value<String> messageType = const Value.absent(),
+                Value<String?> body = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<String?> replyToMessageId = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<bool> countsAsUnread = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<DateTime?> editedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
-                Value<bool> fromMe = const Value.absent(),
+                Value<DateTime> localCreatedAt = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<String?> sendErrorCode = const Value.absent(),
+                Value<String?> sendErrorMessage = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => MessagesCompanion(
+              }) => LocalMessagesCompanion(
                 messageId: messageId,
-                chatId: chatId,
+                messageSeq: messageSeq,
+                channelId: channelId,
                 senderId: senderId,
                 senderDisplayName: senderDisplayName,
+                messageType: messageType,
                 body: body,
+                payloadJson: payloadJson,
+                replyToMessageId: replyToMessageId,
+                version: version,
+                countsAsUnread: countsAsUnread,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 editedAt: editedAt,
                 deletedAt: deletedAt,
-                fromMe: fromMe,
+                localCreatedAt: localCreatedAt,
+                syncStatus: syncStatus,
+                sendErrorCode: sendErrorCode,
+                sendErrorMessage: sendErrorMessage,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String messageId,
-                required String chatId,
+                Value<int?> messageSeq = const Value.absent(),
+                required String channelId,
                 Value<String?> senderId = const Value.absent(),
                 Value<String?> senderDisplayName = const Value.absent(),
-                required String body,
-                required DateTime createdAt,
+                Value<String> messageType = const Value.absent(),
+                Value<String?> body = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<String?> replyToMessageId = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<bool> countsAsUnread = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<DateTime?> editedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
-                Value<bool> fromMe = const Value.absent(),
+                required DateTime localCreatedAt,
+                Value<String> syncStatus = const Value.absent(),
+                Value<String?> sendErrorCode = const Value.absent(),
+                Value<String?> sendErrorMessage = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => MessagesCompanion.insert(
+              }) => LocalMessagesCompanion.insert(
                 messageId: messageId,
-                chatId: chatId,
+                messageSeq: messageSeq,
+                channelId: channelId,
                 senderId: senderId,
                 senderDisplayName: senderDisplayName,
+                messageType: messageType,
                 body: body,
+                payloadJson: payloadJson,
+                replyToMessageId: replyToMessageId,
+                version: version,
+                countsAsUnread: countsAsUnread,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 editedAt: editedAt,
                 deletedAt: deletedAt,
-                fromMe: fromMe,
+                localCreatedAt: localCreatedAt,
+                syncStatus: syncStatus,
+                sendErrorCode: sendErrorCode,
+                sendErrorMessage: sendErrorMessage,
                 rowid: rowid,
               ),
           withReferenceMapper:
@@ -4895,51 +10320,1036 @@ class $$MessagesTableTableManager
       );
 }
 
-typedef $$MessagesTableProcessedTableManager =
+typedef $$LocalMessagesTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $MessagesTable,
-      MessageRow,
-      $$MessagesTableFilterComposer,
-      $$MessagesTableOrderingComposer,
-      $$MessagesTableAnnotationComposer,
-      $$MessagesTableCreateCompanionBuilder,
-      $$MessagesTableUpdateCompanionBuilder,
-      (MessageRow, BaseReferences<_$AppDatabase, $MessagesTable, MessageRow>),
-      MessageRow,
+      $LocalMessagesTable,
+      LocalMessageRow,
+      $$LocalMessagesTableFilterComposer,
+      $$LocalMessagesTableOrderingComposer,
+      $$LocalMessagesTableAnnotationComposer,
+      $$LocalMessagesTableCreateCompanionBuilder,
+      $$LocalMessagesTableUpdateCompanionBuilder,
+      (
+        LocalMessageRow,
+        BaseReferences<_$AppDatabase, $LocalMessagesTable, LocalMessageRow>,
+      ),
+      LocalMessageRow,
       PrefetchHooks Function()
     >;
-typedef $$MessageDraftsTableCreateCompanionBuilder =
-    MessageDraftsCompanion Function({
-      required String chatId,
-      required String body,
-      required DateTime updatedAt,
+typedef $$LocalMessageAttachmentsTableCreateCompanionBuilder =
+    LocalMessageAttachmentsCompanion Function({
+      required String attachmentId,
+      required String messageId,
+      Value<String?> storagePath,
+      required String mimeType,
+      Value<String?> fileName,
+      Value<int?> sizeBytes,
+      Value<int?> width,
+      Value<int?> height,
+      Value<int?> durationMs,
+      Value<String?> localPath,
+      Value<String?> thumbnailLocalPath,
+      Value<String> uploadStatus,
+      Value<double?> uploadProgress,
+      Value<String?> uploadError,
       Value<int> rowid,
     });
-typedef $$MessageDraftsTableUpdateCompanionBuilder =
-    MessageDraftsCompanion Function({
-      Value<String> chatId,
-      Value<String> body,
-      Value<DateTime> updatedAt,
+typedef $$LocalMessageAttachmentsTableUpdateCompanionBuilder =
+    LocalMessageAttachmentsCompanion Function({
+      Value<String> attachmentId,
+      Value<String> messageId,
+      Value<String?> storagePath,
+      Value<String> mimeType,
+      Value<String?> fileName,
+      Value<int?> sizeBytes,
+      Value<int?> width,
+      Value<int?> height,
+      Value<int?> durationMs,
+      Value<String?> localPath,
+      Value<String?> thumbnailLocalPath,
+      Value<String> uploadStatus,
+      Value<double?> uploadProgress,
+      Value<String?> uploadError,
       Value<int> rowid,
     });
 
-class $$MessageDraftsTableFilterComposer
-    extends Composer<_$AppDatabase, $MessageDraftsTable> {
-  $$MessageDraftsTableFilterComposer({
+class $$LocalMessageAttachmentsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalMessageAttachmentsTable> {
+  $$LocalMessageAttachmentsTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<String> get chatId => $composableBuilder(
-    column: $table.chatId,
+  ColumnFilters<String> get attachmentId => $composableBuilder(
+    column: $table.attachmentId,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get body => $composableBuilder(
-    column: $table.body,
+  ColumnFilters<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get storagePath => $composableBuilder(
+    column: $table.storagePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mimeType => $composableBuilder(
+    column: $table.mimeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sizeBytes => $composableBuilder(
+    column: $table.sizeBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get width => $composableBuilder(
+    column: $table.width,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get height => $composableBuilder(
+    column: $table.height,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get localPath => $composableBuilder(
+    column: $table.localPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get thumbnailLocalPath => $composableBuilder(
+    column: $table.thumbnailLocalPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get uploadStatus => $composableBuilder(
+    column: $table.uploadStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get uploadProgress => $composableBuilder(
+    column: $table.uploadProgress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get uploadError => $composableBuilder(
+    column: $table.uploadError,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalMessageAttachmentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalMessageAttachmentsTable> {
+  $$LocalMessageAttachmentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get attachmentId => $composableBuilder(
+    column: $table.attachmentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get storagePath => $composableBuilder(
+    column: $table.storagePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mimeType => $composableBuilder(
+    column: $table.mimeType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sizeBytes => $composableBuilder(
+    column: $table.sizeBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get width => $composableBuilder(
+    column: $table.width,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get height => $composableBuilder(
+    column: $table.height,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get localPath => $composableBuilder(
+    column: $table.localPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get thumbnailLocalPath => $composableBuilder(
+    column: $table.thumbnailLocalPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get uploadStatus => $composableBuilder(
+    column: $table.uploadStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get uploadProgress => $composableBuilder(
+    column: $table.uploadProgress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get uploadError => $composableBuilder(
+    column: $table.uploadError,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalMessageAttachmentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalMessageAttachmentsTable> {
+  $$LocalMessageAttachmentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get attachmentId => $composableBuilder(
+    column: $table.attachmentId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get messageId =>
+      $composableBuilder(column: $table.messageId, builder: (column) => column);
+
+  GeneratedColumn<String> get storagePath => $composableBuilder(
+    column: $table.storagePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mimeType =>
+      $composableBuilder(column: $table.mimeType, builder: (column) => column);
+
+  GeneratedColumn<String> get fileName =>
+      $composableBuilder(column: $table.fileName, builder: (column) => column);
+
+  GeneratedColumn<int> get sizeBytes =>
+      $composableBuilder(column: $table.sizeBytes, builder: (column) => column);
+
+  GeneratedColumn<int> get width =>
+      $composableBuilder(column: $table.width, builder: (column) => column);
+
+  GeneratedColumn<int> get height =>
+      $composableBuilder(column: $table.height, builder: (column) => column);
+
+  GeneratedColumn<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get localPath =>
+      $composableBuilder(column: $table.localPath, builder: (column) => column);
+
+  GeneratedColumn<String> get thumbnailLocalPath => $composableBuilder(
+    column: $table.thumbnailLocalPath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get uploadStatus => $composableBuilder(
+    column: $table.uploadStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get uploadProgress => $composableBuilder(
+    column: $table.uploadProgress,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get uploadError => $composableBuilder(
+    column: $table.uploadError,
+    builder: (column) => column,
+  );
+}
+
+class $$LocalMessageAttachmentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalMessageAttachmentsTable,
+          LocalMessageAttachmentRow,
+          $$LocalMessageAttachmentsTableFilterComposer,
+          $$LocalMessageAttachmentsTableOrderingComposer,
+          $$LocalMessageAttachmentsTableAnnotationComposer,
+          $$LocalMessageAttachmentsTableCreateCompanionBuilder,
+          $$LocalMessageAttachmentsTableUpdateCompanionBuilder,
+          (
+            LocalMessageAttachmentRow,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalMessageAttachmentsTable,
+              LocalMessageAttachmentRow
+            >,
+          ),
+          LocalMessageAttachmentRow,
+          PrefetchHooks Function()
+        > {
+  $$LocalMessageAttachmentsTableTableManager(
+    _$AppDatabase db,
+    $LocalMessageAttachmentsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$LocalMessageAttachmentsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer:
+              () => $$LocalMessageAttachmentsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$LocalMessageAttachmentsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> attachmentId = const Value.absent(),
+                Value<String> messageId = const Value.absent(),
+                Value<String?> storagePath = const Value.absent(),
+                Value<String> mimeType = const Value.absent(),
+                Value<String?> fileName = const Value.absent(),
+                Value<int?> sizeBytes = const Value.absent(),
+                Value<int?> width = const Value.absent(),
+                Value<int?> height = const Value.absent(),
+                Value<int?> durationMs = const Value.absent(),
+                Value<String?> localPath = const Value.absent(),
+                Value<String?> thumbnailLocalPath = const Value.absent(),
+                Value<String> uploadStatus = const Value.absent(),
+                Value<double?> uploadProgress = const Value.absent(),
+                Value<String?> uploadError = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalMessageAttachmentsCompanion(
+                attachmentId: attachmentId,
+                messageId: messageId,
+                storagePath: storagePath,
+                mimeType: mimeType,
+                fileName: fileName,
+                sizeBytes: sizeBytes,
+                width: width,
+                height: height,
+                durationMs: durationMs,
+                localPath: localPath,
+                thumbnailLocalPath: thumbnailLocalPath,
+                uploadStatus: uploadStatus,
+                uploadProgress: uploadProgress,
+                uploadError: uploadError,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String attachmentId,
+                required String messageId,
+                Value<String?> storagePath = const Value.absent(),
+                required String mimeType,
+                Value<String?> fileName = const Value.absent(),
+                Value<int?> sizeBytes = const Value.absent(),
+                Value<int?> width = const Value.absent(),
+                Value<int?> height = const Value.absent(),
+                Value<int?> durationMs = const Value.absent(),
+                Value<String?> localPath = const Value.absent(),
+                Value<String?> thumbnailLocalPath = const Value.absent(),
+                Value<String> uploadStatus = const Value.absent(),
+                Value<double?> uploadProgress = const Value.absent(),
+                Value<String?> uploadError = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalMessageAttachmentsCompanion.insert(
+                attachmentId: attachmentId,
+                messageId: messageId,
+                storagePath: storagePath,
+                mimeType: mimeType,
+                fileName: fileName,
+                sizeBytes: sizeBytes,
+                width: width,
+                height: height,
+                durationMs: durationMs,
+                localPath: localPath,
+                thumbnailLocalPath: thumbnailLocalPath,
+                uploadStatus: uploadStatus,
+                uploadProgress: uploadProgress,
+                uploadError: uploadError,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalMessageAttachmentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalMessageAttachmentsTable,
+      LocalMessageAttachmentRow,
+      $$LocalMessageAttachmentsTableFilterComposer,
+      $$LocalMessageAttachmentsTableOrderingComposer,
+      $$LocalMessageAttachmentsTableAnnotationComposer,
+      $$LocalMessageAttachmentsTableCreateCompanionBuilder,
+      $$LocalMessageAttachmentsTableUpdateCompanionBuilder,
+      (
+        LocalMessageAttachmentRow,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalMessageAttachmentsTable,
+          LocalMessageAttachmentRow
+        >,
+      ),
+      LocalMessageAttachmentRow,
+      PrefetchHooks Function()
+    >;
+typedef $$LocalMessageReactionsTableCreateCompanionBuilder =
+    LocalMessageReactionsCompanion Function({
+      required String messageId,
+      required String userId,
+      required String reaction,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> removedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalMessageReactionsTableUpdateCompanionBuilder =
+    LocalMessageReactionsCompanion Function({
+      Value<String> messageId,
+      Value<String> userId,
+      Value<String> reaction,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> removedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalMessageReactionsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalMessageReactionsTable> {
+  $$LocalMessageReactionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reaction => $composableBuilder(
+    column: $table.reaction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get removedAt => $composableBuilder(
+    column: $table.removedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalMessageReactionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalMessageReactionsTable> {
+  $$LocalMessageReactionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reaction => $composableBuilder(
+    column: $table.reaction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get removedAt => $composableBuilder(
+    column: $table.removedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalMessageReactionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalMessageReactionsTable> {
+  $$LocalMessageReactionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get messageId =>
+      $composableBuilder(column: $table.messageId, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get reaction =>
+      $composableBuilder(column: $table.reaction, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get removedAt =>
+      $composableBuilder(column: $table.removedAt, builder: (column) => column);
+}
+
+class $$LocalMessageReactionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalMessageReactionsTable,
+          LocalMessageReactionRow,
+          $$LocalMessageReactionsTableFilterComposer,
+          $$LocalMessageReactionsTableOrderingComposer,
+          $$LocalMessageReactionsTableAnnotationComposer,
+          $$LocalMessageReactionsTableCreateCompanionBuilder,
+          $$LocalMessageReactionsTableUpdateCompanionBuilder,
+          (
+            LocalMessageReactionRow,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalMessageReactionsTable,
+              LocalMessageReactionRow
+            >,
+          ),
+          LocalMessageReactionRow,
+          PrefetchHooks Function()
+        > {
+  $$LocalMessageReactionsTableTableManager(
+    _$AppDatabase db,
+    $LocalMessageReactionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$LocalMessageReactionsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer:
+              () => $$LocalMessageReactionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$LocalMessageReactionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> messageId = const Value.absent(),
+                Value<String> userId = const Value.absent(),
+                Value<String> reaction = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> removedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalMessageReactionsCompanion(
+                messageId: messageId,
+                userId: userId,
+                reaction: reaction,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                removedAt: removedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String messageId,
+                required String userId,
+                required String reaction,
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> removedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalMessageReactionsCompanion.insert(
+                messageId: messageId,
+                userId: userId,
+                reaction: reaction,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                removedAt: removedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalMessageReactionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalMessageReactionsTable,
+      LocalMessageReactionRow,
+      $$LocalMessageReactionsTableFilterComposer,
+      $$LocalMessageReactionsTableOrderingComposer,
+      $$LocalMessageReactionsTableAnnotationComposer,
+      $$LocalMessageReactionsTableCreateCompanionBuilder,
+      $$LocalMessageReactionsTableUpdateCompanionBuilder,
+      (
+        LocalMessageReactionRow,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalMessageReactionsTable,
+          LocalMessageReactionRow
+        >,
+      ),
+      LocalMessageReactionRow,
+      PrefetchHooks Function()
+    >;
+typedef $$LocalMemberRestrictionsTableCreateCompanionBuilder =
+    LocalMemberRestrictionsCompanion Function({
+      required String restrictionId,
+      required String channelId,
+      required String userId,
+      required String permission,
+      required DateTime startsAt,
+      Value<DateTime?> expiresAt,
+      Value<int> rowid,
+    });
+typedef $$LocalMemberRestrictionsTableUpdateCompanionBuilder =
+    LocalMemberRestrictionsCompanion Function({
+      Value<String> restrictionId,
+      Value<String> channelId,
+      Value<String> userId,
+      Value<String> permission,
+      Value<DateTime> startsAt,
+      Value<DateTime?> expiresAt,
+      Value<int> rowid,
+    });
+
+class $$LocalMemberRestrictionsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalMemberRestrictionsTable> {
+  $$LocalMemberRestrictionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get restrictionId => $composableBuilder(
+    column: $table.restrictionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get channelId => $composableBuilder(
+    column: $table.channelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get permission => $composableBuilder(
+    column: $table.permission,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startsAt => $composableBuilder(
+    column: $table.startsAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get expiresAt => $composableBuilder(
+    column: $table.expiresAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalMemberRestrictionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalMemberRestrictionsTable> {
+  $$LocalMemberRestrictionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get restrictionId => $composableBuilder(
+    column: $table.restrictionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get channelId => $composableBuilder(
+    column: $table.channelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get permission => $composableBuilder(
+    column: $table.permission,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startsAt => $composableBuilder(
+    column: $table.startsAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get expiresAt => $composableBuilder(
+    column: $table.expiresAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalMemberRestrictionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalMemberRestrictionsTable> {
+  $$LocalMemberRestrictionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get restrictionId => $composableBuilder(
+    column: $table.restrictionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get channelId =>
+      $composableBuilder(column: $table.channelId, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get permission => $composableBuilder(
+    column: $table.permission,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get startsAt =>
+      $composableBuilder(column: $table.startsAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get expiresAt =>
+      $composableBuilder(column: $table.expiresAt, builder: (column) => column);
+}
+
+class $$LocalMemberRestrictionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalMemberRestrictionsTable,
+          LocalMemberRestrictionRow,
+          $$LocalMemberRestrictionsTableFilterComposer,
+          $$LocalMemberRestrictionsTableOrderingComposer,
+          $$LocalMemberRestrictionsTableAnnotationComposer,
+          $$LocalMemberRestrictionsTableCreateCompanionBuilder,
+          $$LocalMemberRestrictionsTableUpdateCompanionBuilder,
+          (
+            LocalMemberRestrictionRow,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalMemberRestrictionsTable,
+              LocalMemberRestrictionRow
+            >,
+          ),
+          LocalMemberRestrictionRow,
+          PrefetchHooks Function()
+        > {
+  $$LocalMemberRestrictionsTableTableManager(
+    _$AppDatabase db,
+    $LocalMemberRestrictionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$LocalMemberRestrictionsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer:
+              () => $$LocalMemberRestrictionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$LocalMemberRestrictionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> restrictionId = const Value.absent(),
+                Value<String> channelId = const Value.absent(),
+                Value<String> userId = const Value.absent(),
+                Value<String> permission = const Value.absent(),
+                Value<DateTime> startsAt = const Value.absent(),
+                Value<DateTime?> expiresAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalMemberRestrictionsCompanion(
+                restrictionId: restrictionId,
+                channelId: channelId,
+                userId: userId,
+                permission: permission,
+                startsAt: startsAt,
+                expiresAt: expiresAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String restrictionId,
+                required String channelId,
+                required String userId,
+                required String permission,
+                required DateTime startsAt,
+                Value<DateTime?> expiresAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalMemberRestrictionsCompanion.insert(
+                restrictionId: restrictionId,
+                channelId: channelId,
+                userId: userId,
+                permission: permission,
+                startsAt: startsAt,
+                expiresAt: expiresAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalMemberRestrictionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalMemberRestrictionsTable,
+      LocalMemberRestrictionRow,
+      $$LocalMemberRestrictionsTableFilterComposer,
+      $$LocalMemberRestrictionsTableOrderingComposer,
+      $$LocalMemberRestrictionsTableAnnotationComposer,
+      $$LocalMemberRestrictionsTableCreateCompanionBuilder,
+      $$LocalMemberRestrictionsTableUpdateCompanionBuilder,
+      (
+        LocalMemberRestrictionRow,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalMemberRestrictionsTable,
+          LocalMemberRestrictionRow
+        >,
+      ),
+      LocalMemberRestrictionRow,
+      PrefetchHooks Function()
+    >;
+typedef $$OutboxOperationsTableCreateCompanionBuilder =
+    OutboxOperationsCompanion Function({
+      required String operationId,
+      required String channelId,
+      Value<String?> entityId,
+      required String operationType,
+      required String payloadJson,
+      Value<String> status,
+      Value<String?> coalesceKey,
+      Value<String?> dependsOnOperationId,
+      Value<int> attemptCount,
+      Value<DateTime?> nextAttemptAt,
+      Value<String?> lastErrorCode,
+      Value<String?> lastErrorMessage,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$OutboxOperationsTableUpdateCompanionBuilder =
+    OutboxOperationsCompanion Function({
+      Value<String> operationId,
+      Value<String> channelId,
+      Value<String?> entityId,
+      Value<String> operationType,
+      Value<String> payloadJson,
+      Value<String> status,
+      Value<String?> coalesceKey,
+      Value<String?> dependsOnOperationId,
+      Value<int> attemptCount,
+      Value<DateTime?> nextAttemptAt,
+      Value<String?> lastErrorCode,
+      Value<String?> lastErrorMessage,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$OutboxOperationsTableFilterComposer
+    extends Composer<_$AppDatabase, $OutboxOperationsTable> {
+  $$OutboxOperationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get channelId => $composableBuilder(
+    column: $table.channelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get operationType => $composableBuilder(
+    column: $table.operationType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get coalesceKey => $composableBuilder(
+    column: $table.coalesceKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dependsOnOperationId => $composableBuilder(
+    column: $table.dependsOnOperationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastErrorCode => $composableBuilder(
+    column: $table.lastErrorCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastErrorMessage => $composableBuilder(
+    column: $table.lastErrorMessage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4949,22 +11359,77 @@ class $$MessageDraftsTableFilterComposer
   );
 }
 
-class $$MessageDraftsTableOrderingComposer
-    extends Composer<_$AppDatabase, $MessageDraftsTable> {
-  $$MessageDraftsTableOrderingComposer({
+class $$OutboxOperationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $OutboxOperationsTable> {
+  $$OutboxOperationsTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<String> get chatId => $composableBuilder(
-    column: $table.chatId,
+  ColumnOrderings<String> get operationId => $composableBuilder(
+    column: $table.operationId,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get body => $composableBuilder(
-    column: $table.body,
+  ColumnOrderings<String> get channelId => $composableBuilder(
+    column: $table.channelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get operationType => $composableBuilder(
+    column: $table.operationType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get coalesceKey => $composableBuilder(
+    column: $table.coalesceKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dependsOnOperationId => $composableBuilder(
+    column: $table.dependsOnOperationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastErrorCode => $composableBuilder(
+    column: $table.lastErrorCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastErrorMessage => $composableBuilder(
+    column: $table.lastErrorMessage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4974,79 +11439,183 @@ class $$MessageDraftsTableOrderingComposer
   );
 }
 
-class $$MessageDraftsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $MessageDraftsTable> {
-  $$MessageDraftsTableAnnotationComposer({
+class $$OutboxOperationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OutboxOperationsTable> {
+  $$OutboxOperationsTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<String> get chatId =>
-      $composableBuilder(column: $table.chatId, builder: (column) => column);
+  GeneratedColumn<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => column,
+  );
 
-  GeneratedColumn<String> get body =>
-      $composableBuilder(column: $table.body, builder: (column) => column);
+  GeneratedColumn<String> get channelId =>
+      $composableBuilder(column: $table.channelId, builder: (column) => column);
+
+  GeneratedColumn<String> get entityId =>
+      $composableBuilder(column: $table.entityId, builder: (column) => column);
+
+  GeneratedColumn<String> get operationType => $composableBuilder(
+    column: $table.operationType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get coalesceKey => $composableBuilder(
+    column: $table.coalesceKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get dependsOnOperationId => $composableBuilder(
+    column: $table.dependsOnOperationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastErrorCode => $composableBuilder(
+    column: $table.lastErrorCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastErrorMessage => $composableBuilder(
+    column: $table.lastErrorMessage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
-class $$MessageDraftsTableTableManager
+class $$OutboxOperationsTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $MessageDraftsTable,
-          MessageDraftRow,
-          $$MessageDraftsTableFilterComposer,
-          $$MessageDraftsTableOrderingComposer,
-          $$MessageDraftsTableAnnotationComposer,
-          $$MessageDraftsTableCreateCompanionBuilder,
-          $$MessageDraftsTableUpdateCompanionBuilder,
+          $OutboxOperationsTable,
+          OutboxOperationRow,
+          $$OutboxOperationsTableFilterComposer,
+          $$OutboxOperationsTableOrderingComposer,
+          $$OutboxOperationsTableAnnotationComposer,
+          $$OutboxOperationsTableCreateCompanionBuilder,
+          $$OutboxOperationsTableUpdateCompanionBuilder,
           (
-            MessageDraftRow,
-            BaseReferences<_$AppDatabase, $MessageDraftsTable, MessageDraftRow>,
+            OutboxOperationRow,
+            BaseReferences<
+              _$AppDatabase,
+              $OutboxOperationsTable,
+              OutboxOperationRow
+            >,
           ),
-          MessageDraftRow,
+          OutboxOperationRow,
           PrefetchHooks Function()
         > {
-  $$MessageDraftsTableTableManager(_$AppDatabase db, $MessageDraftsTable table)
-    : super(
+  $$OutboxOperationsTableTableManager(
+    _$AppDatabase db,
+    $OutboxOperationsTable table,
+  ) : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer:
-              () => $$MessageDraftsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer:
               () =>
-                  $$MessageDraftsTableOrderingComposer($db: db, $table: table),
+                  $$OutboxOperationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer:
+              () => $$OutboxOperationsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
           createComputedFieldComposer:
-              () => $$MessageDraftsTableAnnotationComposer(
+              () => $$OutboxOperationsTableAnnotationComposer(
                 $db: db,
                 $table: table,
               ),
           updateCompanionCallback:
               ({
-                Value<String> chatId = const Value.absent(),
-                Value<String> body = const Value.absent(),
+                Value<String> operationId = const Value.absent(),
+                Value<String> channelId = const Value.absent(),
+                Value<String?> entityId = const Value.absent(),
+                Value<String> operationType = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> coalesceKey = const Value.absent(),
+                Value<String?> dependsOnOperationId = const Value.absent(),
+                Value<int> attemptCount = const Value.absent(),
+                Value<DateTime?> nextAttemptAt = const Value.absent(),
+                Value<String?> lastErrorCode = const Value.absent(),
+                Value<String?> lastErrorMessage = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => MessageDraftsCompanion(
-                chatId: chatId,
-                body: body,
+              }) => OutboxOperationsCompanion(
+                operationId: operationId,
+                channelId: channelId,
+                entityId: entityId,
+                operationType: operationType,
+                payloadJson: payloadJson,
+                status: status,
+                coalesceKey: coalesceKey,
+                dependsOnOperationId: dependsOnOperationId,
+                attemptCount: attemptCount,
+                nextAttemptAt: nextAttemptAt,
+                lastErrorCode: lastErrorCode,
+                lastErrorMessage: lastErrorMessage,
+                createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                required String chatId,
-                required String body,
+                required String operationId,
+                required String channelId,
+                Value<String?> entityId = const Value.absent(),
+                required String operationType,
+                required String payloadJson,
+                Value<String> status = const Value.absent(),
+                Value<String?> coalesceKey = const Value.absent(),
+                Value<String?> dependsOnOperationId = const Value.absent(),
+                Value<int> attemptCount = const Value.absent(),
+                Value<DateTime?> nextAttemptAt = const Value.absent(),
+                Value<String?> lastErrorCode = const Value.absent(),
+                Value<String?> lastErrorMessage = const Value.absent(),
+                required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
-              }) => MessageDraftsCompanion.insert(
-                chatId: chatId,
-                body: body,
+              }) => OutboxOperationsCompanion.insert(
+                operationId: operationId,
+                channelId: channelId,
+                entityId: entityId,
+                operationType: operationType,
+                payloadJson: payloadJson,
+                status: status,
+                coalesceKey: coalesceKey,
+                dependsOnOperationId: dependsOnOperationId,
+                attemptCount: attemptCount,
+                nextAttemptAt: nextAttemptAt,
+                lastErrorCode: lastErrorCode,
+                lastErrorMessage: lastErrorMessage,
+                createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -5065,21 +11634,516 @@ class $$MessageDraftsTableTableManager
       );
 }
 
-typedef $$MessageDraftsTableProcessedTableManager =
+typedef $$OutboxOperationsTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $MessageDraftsTable,
-      MessageDraftRow,
-      $$MessageDraftsTableFilterComposer,
-      $$MessageDraftsTableOrderingComposer,
-      $$MessageDraftsTableAnnotationComposer,
-      $$MessageDraftsTableCreateCompanionBuilder,
-      $$MessageDraftsTableUpdateCompanionBuilder,
+      $OutboxOperationsTable,
+      OutboxOperationRow,
+      $$OutboxOperationsTableFilterComposer,
+      $$OutboxOperationsTableOrderingComposer,
+      $$OutboxOperationsTableAnnotationComposer,
+      $$OutboxOperationsTableCreateCompanionBuilder,
+      $$OutboxOperationsTableUpdateCompanionBuilder,
       (
-        MessageDraftRow,
-        BaseReferences<_$AppDatabase, $MessageDraftsTable, MessageDraftRow>,
+        OutboxOperationRow,
+        BaseReferences<
+          _$AppDatabase,
+          $OutboxOperationsTable,
+          OutboxOperationRow
+        >,
       ),
-      MessageDraftRow,
+      OutboxOperationRow,
+      PrefetchHooks Function()
+    >;
+typedef $$ChannelSyncStatesTableCreateCompanionBuilder =
+    ChannelSyncStatesCompanion Function({
+      required String channelId,
+      Value<int?> newestSyncedMessageSeq,
+      Value<int?> oldestCachedMessageSeq,
+      Value<bool> hasMoreHistory,
+      Value<DateTime?> lastMemberSyncAt,
+      Value<DateTime?> lastFullSyncAt,
+      Value<String> syncStatus,
+      Value<String?> lastSyncError,
+      Value<int> rowid,
+    });
+typedef $$ChannelSyncStatesTableUpdateCompanionBuilder =
+    ChannelSyncStatesCompanion Function({
+      Value<String> channelId,
+      Value<int?> newestSyncedMessageSeq,
+      Value<int?> oldestCachedMessageSeq,
+      Value<bool> hasMoreHistory,
+      Value<DateTime?> lastMemberSyncAt,
+      Value<DateTime?> lastFullSyncAt,
+      Value<String> syncStatus,
+      Value<String?> lastSyncError,
+      Value<int> rowid,
+    });
+
+class $$ChannelSyncStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $ChannelSyncStatesTable> {
+  $$ChannelSyncStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get channelId => $composableBuilder(
+    column: $table.channelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get newestSyncedMessageSeq => $composableBuilder(
+    column: $table.newestSyncedMessageSeq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get oldestCachedMessageSeq => $composableBuilder(
+    column: $table.oldestCachedMessageSeq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasMoreHistory => $composableBuilder(
+    column: $table.hasMoreHistory,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastMemberSyncAt => $composableBuilder(
+    column: $table.lastMemberSyncAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastFullSyncAt => $composableBuilder(
+    column: $table.lastFullSyncAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastSyncError => $composableBuilder(
+    column: $table.lastSyncError,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ChannelSyncStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ChannelSyncStatesTable> {
+  $$ChannelSyncStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get channelId => $composableBuilder(
+    column: $table.channelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get newestSyncedMessageSeq => $composableBuilder(
+    column: $table.newestSyncedMessageSeq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get oldestCachedMessageSeq => $composableBuilder(
+    column: $table.oldestCachedMessageSeq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hasMoreHistory => $composableBuilder(
+    column: $table.hasMoreHistory,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastMemberSyncAt => $composableBuilder(
+    column: $table.lastMemberSyncAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastFullSyncAt => $composableBuilder(
+    column: $table.lastFullSyncAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastSyncError => $composableBuilder(
+    column: $table.lastSyncError,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ChannelSyncStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ChannelSyncStatesTable> {
+  $$ChannelSyncStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get channelId =>
+      $composableBuilder(column: $table.channelId, builder: (column) => column);
+
+  GeneratedColumn<int> get newestSyncedMessageSeq => $composableBuilder(
+    column: $table.newestSyncedMessageSeq,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get oldestCachedMessageSeq => $composableBuilder(
+    column: $table.oldestCachedMessageSeq,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get hasMoreHistory => $composableBuilder(
+    column: $table.hasMoreHistory,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastMemberSyncAt => $composableBuilder(
+    column: $table.lastMemberSyncAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastFullSyncAt => $composableBuilder(
+    column: $table.lastFullSyncAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastSyncError => $composableBuilder(
+    column: $table.lastSyncError,
+    builder: (column) => column,
+  );
+}
+
+class $$ChannelSyncStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ChannelSyncStatesTable,
+          ChannelSyncStateRow,
+          $$ChannelSyncStatesTableFilterComposer,
+          $$ChannelSyncStatesTableOrderingComposer,
+          $$ChannelSyncStatesTableAnnotationComposer,
+          $$ChannelSyncStatesTableCreateCompanionBuilder,
+          $$ChannelSyncStatesTableUpdateCompanionBuilder,
+          (
+            ChannelSyncStateRow,
+            BaseReferences<
+              _$AppDatabase,
+              $ChannelSyncStatesTable,
+              ChannelSyncStateRow
+            >,
+          ),
+          ChannelSyncStateRow,
+          PrefetchHooks Function()
+        > {
+  $$ChannelSyncStatesTableTableManager(
+    _$AppDatabase db,
+    $ChannelSyncStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$ChannelSyncStatesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer:
+              () => $$ChannelSyncStatesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$ChannelSyncStatesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> channelId = const Value.absent(),
+                Value<int?> newestSyncedMessageSeq = const Value.absent(),
+                Value<int?> oldestCachedMessageSeq = const Value.absent(),
+                Value<bool> hasMoreHistory = const Value.absent(),
+                Value<DateTime?> lastMemberSyncAt = const Value.absent(),
+                Value<DateTime?> lastFullSyncAt = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<String?> lastSyncError = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ChannelSyncStatesCompanion(
+                channelId: channelId,
+                newestSyncedMessageSeq: newestSyncedMessageSeq,
+                oldestCachedMessageSeq: oldestCachedMessageSeq,
+                hasMoreHistory: hasMoreHistory,
+                lastMemberSyncAt: lastMemberSyncAt,
+                lastFullSyncAt: lastFullSyncAt,
+                syncStatus: syncStatus,
+                lastSyncError: lastSyncError,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String channelId,
+                Value<int?> newestSyncedMessageSeq = const Value.absent(),
+                Value<int?> oldestCachedMessageSeq = const Value.absent(),
+                Value<bool> hasMoreHistory = const Value.absent(),
+                Value<DateTime?> lastMemberSyncAt = const Value.absent(),
+                Value<DateTime?> lastFullSyncAt = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<String?> lastSyncError = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ChannelSyncStatesCompanion.insert(
+                channelId: channelId,
+                newestSyncedMessageSeq: newestSyncedMessageSeq,
+                oldestCachedMessageSeq: oldestCachedMessageSeq,
+                hasMoreHistory: hasMoreHistory,
+                lastMemberSyncAt: lastMemberSyncAt,
+                lastFullSyncAt: lastFullSyncAt,
+                syncStatus: syncStatus,
+                lastSyncError: lastSyncError,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ChannelSyncStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ChannelSyncStatesTable,
+      ChannelSyncStateRow,
+      $$ChannelSyncStatesTableFilterComposer,
+      $$ChannelSyncStatesTableOrderingComposer,
+      $$ChannelSyncStatesTableAnnotationComposer,
+      $$ChannelSyncStatesTableCreateCompanionBuilder,
+      $$ChannelSyncStatesTableUpdateCompanionBuilder,
+      (
+        ChannelSyncStateRow,
+        BaseReferences<
+          _$AppDatabase,
+          $ChannelSyncStatesTable,
+          ChannelSyncStateRow
+        >,
+      ),
+      ChannelSyncStateRow,
+      PrefetchHooks Function()
+    >;
+typedef $$ChannelDraftsTableCreateCompanionBuilder =
+    ChannelDraftsCompanion Function({
+      required String channelId,
+      required String body,
+      Value<String?> replyToMessageId,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$ChannelDraftsTableUpdateCompanionBuilder =
+    ChannelDraftsCompanion Function({
+      Value<String> channelId,
+      Value<String> body,
+      Value<String?> replyToMessageId,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$ChannelDraftsTableFilterComposer
+    extends Composer<_$AppDatabase, $ChannelDraftsTable> {
+  $$ChannelDraftsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get channelId => $composableBuilder(
+    column: $table.channelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyToMessageId => $composableBuilder(
+    column: $table.replyToMessageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ChannelDraftsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ChannelDraftsTable> {
+  $$ChannelDraftsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get channelId => $composableBuilder(
+    column: $table.channelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyToMessageId => $composableBuilder(
+    column: $table.replyToMessageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ChannelDraftsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ChannelDraftsTable> {
+  $$ChannelDraftsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get channelId =>
+      $composableBuilder(column: $table.channelId, builder: (column) => column);
+
+  GeneratedColumn<String> get body =>
+      $composableBuilder(column: $table.body, builder: (column) => column);
+
+  GeneratedColumn<String> get replyToMessageId => $composableBuilder(
+    column: $table.replyToMessageId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ChannelDraftsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ChannelDraftsTable,
+          ChannelDraftRow,
+          $$ChannelDraftsTableFilterComposer,
+          $$ChannelDraftsTableOrderingComposer,
+          $$ChannelDraftsTableAnnotationComposer,
+          $$ChannelDraftsTableCreateCompanionBuilder,
+          $$ChannelDraftsTableUpdateCompanionBuilder,
+          (
+            ChannelDraftRow,
+            BaseReferences<_$AppDatabase, $ChannelDraftsTable, ChannelDraftRow>,
+          ),
+          ChannelDraftRow,
+          PrefetchHooks Function()
+        > {
+  $$ChannelDraftsTableTableManager(_$AppDatabase db, $ChannelDraftsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$ChannelDraftsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer:
+              () =>
+                  $$ChannelDraftsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer:
+              () => $$ChannelDraftsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> channelId = const Value.absent(),
+                Value<String> body = const Value.absent(),
+                Value<String?> replyToMessageId = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ChannelDraftsCompanion(
+                channelId: channelId,
+                body: body,
+                replyToMessageId: replyToMessageId,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String channelId,
+                required String body,
+                Value<String?> replyToMessageId = const Value.absent(),
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ChannelDraftsCompanion.insert(
+                channelId: channelId,
+                body: body,
+                replyToMessageId: replyToMessageId,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ChannelDraftsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ChannelDraftsTable,
+      ChannelDraftRow,
+      $$ChannelDraftsTableFilterComposer,
+      $$ChannelDraftsTableOrderingComposer,
+      $$ChannelDraftsTableAnnotationComposer,
+      $$ChannelDraftsTableCreateCompanionBuilder,
+      $$ChannelDraftsTableUpdateCompanionBuilder,
+      (
+        ChannelDraftRow,
+        BaseReferences<_$AppDatabase, $ChannelDraftsTable, ChannelDraftRow>,
+      ),
+      ChannelDraftRow,
       PrefetchHooks Function()
     >;
 typedef $$ScoringOpsTableCreateCompanionBuilder =
@@ -6209,12 +13273,30 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$WizardDraftsTableTableManager get wizardDrafts =>
       $$WizardDraftsTableTableManager(_db, _db.wizardDrafts);
-  $$ChatsTableTableManager get chats =>
-      $$ChatsTableTableManager(_db, _db.chats);
-  $$MessagesTableTableManager get messages =>
-      $$MessagesTableTableManager(_db, _db.messages);
-  $$MessageDraftsTableTableManager get messageDrafts =>
-      $$MessageDraftsTableTableManager(_db, _db.messageDrafts);
+  $$LocalChannelsTableTableManager get localChannels =>
+      $$LocalChannelsTableTableManager(_db, _db.localChannels);
+  $$LocalChannelMembersTableTableManager get localChannelMembers =>
+      $$LocalChannelMembersTableTableManager(_db, _db.localChannelMembers);
+  $$LocalMessagesTableTableManager get localMessages =>
+      $$LocalMessagesTableTableManager(_db, _db.localMessages);
+  $$LocalMessageAttachmentsTableTableManager get localMessageAttachments =>
+      $$LocalMessageAttachmentsTableTableManager(
+        _db,
+        _db.localMessageAttachments,
+      );
+  $$LocalMessageReactionsTableTableManager get localMessageReactions =>
+      $$LocalMessageReactionsTableTableManager(_db, _db.localMessageReactions);
+  $$LocalMemberRestrictionsTableTableManager get localMemberRestrictions =>
+      $$LocalMemberRestrictionsTableTableManager(
+        _db,
+        _db.localMemberRestrictions,
+      );
+  $$OutboxOperationsTableTableManager get outboxOperations =>
+      $$OutboxOperationsTableTableManager(_db, _db.outboxOperations);
+  $$ChannelSyncStatesTableTableManager get channelSyncStates =>
+      $$ChannelSyncStatesTableTableManager(_db, _db.channelSyncStates);
+  $$ChannelDraftsTableTableManager get channelDrafts =>
+      $$ChannelDraftsTableTableManager(_db, _db.channelDrafts);
   $$ScoringOpsTableTableManager get scoringOps =>
       $$ScoringOpsTableTableManager(_db, _db.scoringOps);
   $$ScoringSnapshotsTableTableManager get scoringSnapshots =>

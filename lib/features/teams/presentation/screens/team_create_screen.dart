@@ -364,70 +364,48 @@ class _DoneView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // pushReplacement, not go: `go` resets the whole stack, which threw away
-    // My Teams (and the tab shell) behind the wizard — back from the
-    // destination then had nothing to pop. Replacing just the wizard's own
-    // route keeps everything below it and drops the celebration screen, so
-    // back walks destination → My Teams → Menu.
-    void onAddPlayers() => context.pushReplacement(
-      '/teams/${state.createdTeamId}/manage?justCreated=true',
-    );
     void onOpenTeam() =>
         context.pushReplacement('/teams/${state.createdTeamId}');
-    void onScheduleFriendly() =>
-        context.pushReplacement('/matches/setup/${state.createdTeamId}');
-    void onRegisterTournament() {
-      // No tournament route yet — a brief snack so the tap isn't silent.
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tournament registration coming soon.')),
-      );
-    }
-
-    void onCreateAnother() =>
-        ref.read(teamCreateControllerProvider.notifier).reset();
 
     return Container(
       color: CkColors.paper,
       child: SafeArea(
         child: Column(
           children: [
-            // Top bar: "TEAM CREATED" eyebrow right-aligned.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 10, 18, 4),
-              child: Row(
-                children: [
-                  const Spacer(),
-                  Text(
-                    'TEAM CREATED',
-                    style: CkType.mono(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.12,
-                      color: CkColors.muted,
-                    ),
+            // Top bar: Minimal close action
+            Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12, top: 8),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    size: 22,
+                    color: CkColors.ink,
                   ),
-                ],
+                  tooltip: 'Close',
+                  onPressed: onOpenTeam,
+                ),
               ),
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 children: [
                   Center(
                     child: Stack(
                       alignment: Alignment.center,
+                      clipBehavior: Clip.none,
                       children: [
-                        _Confetti(primaryHex: state.primaryColor),
+                        // Crest container with crisp, natural shadow
                         Container(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(28),
+                            shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(
-                                  0xFF281E0F,
-                                ).withValues(alpha: 0.18),
-                                offset: const Offset(0, 12),
-                                blurRadius: 36,
+                                color: Colors.black.withValues(alpha: 0.08),
+                                offset: const Offset(0, 10),
+                                blurRadius: 28,
                               ),
                             ],
                           ),
@@ -436,106 +414,130 @@ class _DoneView extends ConsumerWidget {
                             primaryHex: state.primaryColor,
                             monogram: state.monogram,
                             logoPath: state.logoUrl,
+                            size: 130,
+                          ),
+                        ),
+                        // Verified badge on crest
+                        Positioned(
+                          right: 4,
+                          bottom: 4,
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: CkColors.green,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: CkColors.paper,
+                                width: 3,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  offset: const Offset(0, 2),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.check_rounded,
+                              size: 18,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 24),
                   Text(
                     '${state.name.trim().isEmpty ? 'Your team' : state.name} is live.',
                     textAlign: TextAlign.center,
                     style: CkType.display(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -0.03,
-                      height: 1.1,
+                      letterSpacing: -0.025,
+                      height: 1.15,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(
-                    "You're the owner. Next: add your squad.",
+                    "You're all set as the team owner.",
                     textAlign: TextAlign.center,
                     style: CkType.body(
-                      fontSize: 14,
+                      fontSize: 15,
                       color: CkColors.muted,
                       height: 1.4,
                     ),
                   ),
-                  if (state.tagline.trim().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-                      child: Text(
-                        '“${state.tagline}”',
-                        textAlign: TextAlign.center,
-                        style: CkType.display(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: -0.01,
-                          height: 1.4,
-                          color: CkColors.ink2,
-                        ).copyWith(fontStyle: FontStyle.italic),
+                  if (state.tagline.trim().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: CkColors.paper2,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '“${state.tagline.trim()}”',
+                          textAlign: TextAlign.center,
+                          style: CkType.body(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: CkColors.ink2,
+                          ).copyWith(fontStyle: FontStyle.italic),
+                        ),
                       ),
                     ),
-                  const SizedBox(height: 24),
+                  ],
+                  const SizedBox(height: 28),
                   _Receipt(state: state),
-                  const SizedBox(height: 22),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 8),
-                    child: Text(
-                      'WHAT NEXT',
-                      style: CkType.mono(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.10,
-                        color: CkColors.muted,
-                      ),
-                    ),
-                  ),
-                  _NextRow(
-                    primary: true,
-                    label: 'Add players',
-                    sub: 'Up to 25 · search, SMS, or unclaimed',
-                    icon: Icons.person_add_alt_1,
-                    onTap: onAddPlayers,
-                  ),
-                  const SizedBox(height: 8),
-                  _NextRow(
-                    label: 'Open team page',
-                    sub: 'See your public profile',
-                    icon: Icons.east,
-                    onTap: onOpenTeam,
-                  ),
-                  const SizedBox(height: 8),
-                  _NextRow(
-                    label: 'Schedule a friendly',
-                    sub: 'Challenge another team',
-                    icon: Icons.calendar_month,
-                    onTap: onScheduleFriendly,
-                  ),
-                  const SizedBox(height: 8),
-                  _NextRow(
-                    label: 'Register for a tournament',
-                    sub:
-                        'Find one near ${state.city.trim().isEmpty ? 'you' : state.city}',
-                    icon: Icons.emoji_events,
-                    onTap: onRegisterTournament,
-                  ),
                 ],
               ),
             ),
-            InkWell(
-              onTap: onCreateAnother,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
-                child: Center(
-                  child: Text(
-                    '← CREATE ANOTHER TEAM',
-                    style: CkType.mono(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.10,
-                      color: CkColors.muted,
+            // Bottom action area
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+              decoration: const BoxDecoration(
+                color: CkColors.paper,
+                border: Border(
+                  top: BorderSide(color: CkColors.hairline),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: InkWell(
+                  onTap: onOpenTeam,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    height: 52,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: CkColors.ink,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Open team page',
+                          style: CkType.body(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: CkColors.paper,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 18,
+                          color: CkColors.paper,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -2192,47 +2194,67 @@ class _Receipt extends StatelessWidget {
   const _Receipt({required this.state});
   final TeamCreateState state;
 
+  static String _capitalize(String s) {
+    if (s.isEmpty) return s;
+    return s[0].toUpperCase() + s.substring(1).toLowerCase();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final locationParts = [
+      state.area,
+      state.city,
+    ].where((p) => p.trim().isNotEmpty).toList();
+    final locationText = locationParts.isNotEmpty
+        ? locationParts.join(', ')
+        : (state.locationLabel?.trim().isNotEmpty == true
+            ? state.locationLabel!.trim()
+            : '');
+
+    final typeFormatted = _capitalize(state.type.wire);
+    final privacyFormatted = _capitalize(state.privacy.wire);
+    final crestFormatted = state.crestKind == CrestKind.upload
+        ? 'Custom crest'
+        : '${_kindLabel(state.crestKind)} style';
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
       decoration: BoxDecoration(
         color: CkColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: CkColors.hairline),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CkColors.line),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            offset: const Offset(0, 4),
+            blurRadius: 16,
+          ),
+        ],
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
       child: Column(
         children: [
           _ReceiptRow(
-            iconColor: CkColors.green,
-            label: 'Team profile created',
-            detail: '${state.type.wire} · ${state.privacy.wire}',
+            icon: Icons.shield_outlined,
+            label: 'Type & Visibility',
+            detail: '$typeFormatted · $privacyFormatted',
             isFirst: true,
           ),
+          if (locationText.isNotEmpty)
+            _ReceiptRow(
+              icon: Icons.place_outlined,
+              label: 'Location',
+              detail: locationText,
+            ),
           _ReceiptRow(
-            iconColor: CkColors.green,
-            label: 'Located in',
-            detail: [
-              state.area,
-              state.city,
-            ].where((p) => p.trim().isNotEmpty).join(', '),
-          ),
-          _ReceiptRow(
-            iconColor: CkColors.green,
-            label:
-                state.crestKind == CrestKind.upload
-                    ? 'Logo uploaded'
-                    : 'Crest set',
-            detail:
-                state.crestKind == CrestKind.upload
-                    ? (state.logoName ?? 'team-logo.png')
-                    : '${_kindLabel(state.crestKind)} style',
+            icon: Icons.palette_outlined,
+            label: 'Crest',
+            detail: crestFormatted,
           ),
           const _ReceiptRow(
-            iconColor: CkColors.muted,
-            iconIsDot: true,
-            label: 'Squad pending',
-            detail: 'Add players from the team page',
+            icon: Icons.verified_user_outlined,
+            label: 'Your role',
+            detail: 'Team Owner',
+            isLast: true,
           ),
         ],
       ),
@@ -2255,200 +2277,56 @@ class _Receipt extends StatelessWidget {
 
 class _ReceiptRow extends StatelessWidget {
   const _ReceiptRow({
-    required this.iconColor,
+    required this.icon,
     required this.label,
     required this.detail,
-    this.iconIsDot = false,
     this.isFirst = false,
+    this.isLast = false,
   });
 
-  final Color iconColor;
+  final IconData icon;
   final String label;
   final String detail;
-  final bool iconIsDot;
   final bool isFirst;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        border:
-            isFirst
-                ? null
-                : const Border(top: BorderSide(color: CkColors.hairline)),
+        border: isLast
+            ? null
+            : const Border(bottom: BorderSide(color: CkColors.hairline)),
       ),
       child: Row(
         children: [
-          SizedBox(
-            width: 22,
-            child: Icon(
-              iconIsDot ? Icons.circle_outlined : Icons.check_rounded,
-              size: iconIsDot ? 12 : 16,
-              color: iconColor,
-            ),
+          Icon(
+            icon,
+            size: 18,
+            color: CkColors.muted,
           ),
           const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: CkType.body(fontSize: 13, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  detail,
-                  style: CkType.body(fontSize: 11, color: CkColors.muted),
-                ),
-              ],
+          Text(
+            label,
+            style: CkType.body(
+              fontSize: 14,
+              color: CkColors.ink2,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            detail,
+            style: CkType.body(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: CkColors.ink,
             ),
           ),
         ],
       ),
     );
   }
-}
-
-class _NextRow extends StatelessWidget {
-  const _NextRow({
-    required this.label,
-    required this.sub,
-    required this.icon,
-    this.primary = false,
-    this.onTap,
-  });
-
-  final String label;
-  final String sub;
-  final IconData icon;
-  final bool primary;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: primary ? CkColors.ink : CkColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: primary ? null : Border.all(color: CkColors.hairline),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color:
-                    primary
-                        ? CkColors.paper.withValues(alpha: 0.12)
-                        : CkColors.paper2,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                icon,
-                size: 16,
-                color: primary ? CkColors.paper : CkColors.ink,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: CkType.body(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: primary ? CkColors.paper : CkColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    sub,
-                    style: CkType.body(
-                      fontSize: 11,
-                      color:
-                          primary
-                              ? CkColors.paper.withValues(alpha: 0.7)
-                              : CkColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right,
-              size: 18,
-              color:
-                  primary
-                      ? CkColors.paper.withValues(alpha: 0.7)
-                      : CkColors.muted,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Confetti extends StatelessWidget {
-  const _Confetti({required this.primaryHex});
-  final String primaryHex;
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = parseHexColor(primaryHex, fallback: CkColors.ink);
-    return SizedBox(
-      width: 220,
-      height: 220,
-      child: CustomPaint(
-        painter: _ConfettiPainter(
-          palette: [primary, CkColors.amber, CkColors.ink],
-        ),
-      ),
-    );
-  }
-}
-
-class _ConfettiPainter extends CustomPainter {
-  _ConfettiPainter({required this.palette});
-  final List<Color> palette;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final positions = <(double, double, double, int)>[
-      (0.10, 0.18, 4, 0),
-      (0.22, 0.62, 3, 1),
-      (0.38, 0.08, 5, 2),
-      (0.55, 0.78, 4, 0),
-      (0.78, 0.34, 3, 1),
-      (0.92, 0.12, 4, 2),
-      (0.18, 0.84, 3, 0),
-      (0.68, 0.58, 5, 1),
-      (0.46, 0.92, 3, 2),
-      (0.04, 0.48, 4, 1),
-    ];
-    for (final p in positions) {
-      final paint = Paint()..color = palette[p.$4 % palette.length];
-      canvas.drawCircle(
-        Offset(size.width * p.$1, size.height * p.$2),
-        p.$3,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

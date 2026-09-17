@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">matchday</string>
+    <string name="facebook_app_id">835952476247708</string>
+    <string name="fb_login_protocol_scheme">fb835952476247708</string>
+    <string name="facebook_client_token">b97f7268177ea92641a02a74e3c15caa</string>
+</resources>

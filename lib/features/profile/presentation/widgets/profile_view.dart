@@ -20,6 +20,7 @@ import '../../../posts/presentation/widgets/post_card.dart';
 import '../../../teams/domain/entities/user_team_affiliation.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/player_profile.dart';
+import '../../../safety/presentation/widgets/safety_menu.dart';
 import '../../domain/entities/profile.dart';
 
 // ── Profile Main Views ────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ class ProfileView extends ConsumerWidget {
                           clipBehavior: Clip.none,
                           children: [
                             _coverPhoto(),
+                            if (!isSelf) Positioned(top: 12, right: 14, child: Material(color: CkColors.paper, shape: const CircleBorder(), child: SafetyMenu(userId: profile.userId.value, kind: 'user', targetId: profile.userId.value))),
                             Positioned(
                               left: 22,
                               bottom: -40,

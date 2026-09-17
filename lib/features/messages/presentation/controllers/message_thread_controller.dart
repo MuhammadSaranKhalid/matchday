@@ -34,8 +34,13 @@ part 'message_thread_controller.g.dart';
 @riverpod
 class MessageThread extends _$MessageThread {
   @override
-  Stream<List<Message>> build(String chatId) =>
-      ref.watch(messagesRepositoryProvider).watchMessages(ChatId(chatId));
+  Stream<List<Message>> build(String chatId) {
+    final chatRepo = ref.read(chatRepositoryProvider);
+    ref.onDispose(() {
+      chatRepo.closeChannel(chatId);
+    });
+    return ref.watch(messagesRepositoryProvider).watchMessages(ChatId(chatId));
+  }
 
   /// Validate via the [MessageBody] value object, then send. Returns the
   /// inserted message on success so the widget can react (clear input,
@@ -81,15 +86,15 @@ class MessageThread extends _$MessageThread {
   Future<Either<Failure, int>> loadOlder() =>
       ref.read(messagesRepositoryProvider).loadOlderMessages(ChatId(chatId));
 
-  /// Stamp `chat_members.last_read_at`. On success, invalidate the inbox
-  /// list so its unread badges re-emit reactively (server doesn't broadcast
-  /// `chat_updated` for read-marker changes — they only fire on message
-  /// insert).
-  Future<Either<Failure, Unit>> markRead() async {
-    final result =
-        await ref.read(messagesRepositoryProvider).markRead(ChatId(chatId));
-    if (result.isRight()) {
+  /// Stamp `channel_members.last_read_message_seq`. On success, invalidate the inbox
+  /// list so its unread badges re-emit reactively.
+  Future<Either<Failure, Unit>> markRead({int? throughSeq}) async {
+    final result = await ref
+        .read(messagesRepositoryProvider)
+        .markRead(ChatId(chatId), throughMessageSeq: throughSeq);
+    if (ref.mounted && result.isRight()) {
       ref.invalidate(myChatsProvider);
+      ref.invalidate(myChatChannelsProvider);
     }
     return result;
   }
@@ -99,7 +104,7 @@ class MessageThread extends _$MessageThread {
     final result = await ref
         .read(messagesRepositoryProvider)
         .acceptDmRequest(ChatId(chatId));
-    if (result.isRight()) {
+    if (ref.mounted && result.isRight()) {
       ref.invalidate(myChatsProvider);
     }
     return result;
@@ -110,7 +115,7 @@ class MessageThread extends _$MessageThread {
     final result = await ref
         .read(messagesRepositoryProvider)
         .declineDmRequest(ChatId(chatId));
-    if (result.isRight()) {
+    if (ref.mounted && result.isRight()) {
       ref.invalidate(myChatsProvider);
     }
     return result;

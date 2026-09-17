@@ -85,4 +85,13 @@ Future<List<TeamJoinRequest>> teamPendingJoinRequests(
   return res.getOrElse((_) => const []);
 }
 
+/// Pending invite for the current signed-in user to join [teamId].
+@riverpod
+Future<TeamInvite?> myPendingInviteForTeam(Ref ref, String teamId) async {
+  final res =
+      await ref.watch(teamsRepositoryProvider).getMyPendingInviteForTeam(teamId);
+  return res.fold((_) => null, (invite) => invite);
+}
+
+
 

@@ -38,6 +38,8 @@
 -- (See full delete script at the bottom of this file.)
 -- =============================================================================
 
+SET search_path = public, extensions;
+
 -- =============================================================================
 -- 0) Resolve "me" — fail loudly if your account isn't here
 -- =============================================================================
@@ -61,7 +63,7 @@ begin
     values (
       '00000000-0000-0000-0000-000000000000',
       v_me, 'authenticated', 'authenticated', 'muhammadsarankhalid@gmail.com',
-      crypt('pass1234', gen_salt('bf')),
+      extensions.crypt('pass1234', extensions.gen_salt('bf')),
       now(),
       jsonb_build_object('display_name', 'Muhammad Saran'),
       jsonb_build_object('provider', 'email', 'providers', array['email']),
@@ -149,7 +151,7 @@ begin
     values (
       '00000000-0000-0000-0000-000000000000',
       v.id, 'authenticated', 'authenticated', v.email,
-      crypt('pass1234', gen_salt('bf')),
+      extensions.crypt('pass1234', extensions.gen_salt('bf')),
       now(),
       jsonb_build_object('display_name', v.display_name),
       jsonb_build_object('provider', 'email', 'providers', array['email']),
@@ -364,11 +366,11 @@ declare
 begin
   select id into v_me from auth.users
     where email = 'muhammadsarankhalid@gmail.com';
-  select chat_id into v_chat
-    from public.chats
-   where team_id = '11111111-1111-1111-1111-111111111101';
+  select channel_id into v_chat
+    from public.chat_channels
+   where team_id = '11111111-1111-1111-1111-111111111101' and purpose = 'main';
 
-  insert into public.messages (chat_id, sender_id, body, created_at) values
+  insert into public.messages (channel_id, sender_id, body, created_at) values
     -- Day -3 (you announce the friendly)
     (v_chat, v_me,     'Alright everyone, we''ve locked in a friendly with Karachi Eagles for Saturday. Toss at 3:45pm, match starts 4pm sharp.', now() - interval '3 days' + interval '10 hours'),
     (v_chat, v_bilal,  'Ground?',                                                                                                                  now() - interval '3 days' + interval '10 hours' + interval '2 minutes'),
@@ -453,19 +455,19 @@ declare
   v_count int := 250;
   i int;
 begin
-  select chat_id into v_chat
-    from public.chats
-   where team_id = '11111111-1111-1111-1111-111111111103';
+  select channel_id into v_chat
+    from public.chat_channels
+   where team_id = '11111111-1111-1111-1111-111111111103' and purpose = 'main';
 
   select array_agg(user_id) into v_members
-    from public.chat_members
-   where chat_id = v_chat
+    from public.channel_members
+   where channel_id = v_chat
      and user_id is not null
      and left_at is null;
 
   for i in 1..v_count loop
     v_sender := v_members[1 + floor(random() * array_length(v_members, 1))::int];
-    insert into public.messages (chat_id, sender_id, body, created_at)
+    insert into public.messages (channel_id, sender_id, body, created_at)
     values (
       v_chat,
       v_sender,
@@ -526,16 +528,17 @@ declare
   i int;
 begin
   for v_chat in
-    select c.chat_id, t.team_name
-      from public.chats c
+    select c.channel_id, t.team_name
+      from public.chat_channels c
       join public.teams t on t.team_id = c.team_id
      where t.team_name not in (
        'Lahore Lions', 'Karachi Eagles', 'Hyderabad Hawks', 'Bahawalpur Bears'
      )
+     and c.purpose = 'main'
   loop
     select array_agg(user_id) into v_members
-      from public.chat_members
-     where chat_id = v_chat.chat_id
+      from public.channel_members
+     where channel_id = v_chat.channel_id
        and user_id is not null
        and left_at is null;
 
@@ -546,9 +549,9 @@ begin
     v_count := 30 + (random() * 70)::int;
     for i in 1..v_count loop
       v_sender := v_members[1 + floor(random() * array_length(v_members, 1))::int];
-      insert into public.messages (chat_id, sender_id, body, created_at)
+      insert into public.messages (channel_id, sender_id, body, created_at)
       values (
-        v_chat.chat_id,
+        v_chat.channel_id,
         v_sender,
         v_bodies[1 + floor(random() * array_length(v_bodies, 1))::int],
         now() - (random() * interval '30 days')
@@ -735,7 +738,7 @@ begin
     (
       '00000000-0000-0000-0000-000000000000',
       v_babar_uid, 'authenticated', 'authenticated', 'babar@cricket.pk',
-      crypt('pass1234', gen_salt('bf')),
+      extensions.crypt('pass1234', extensions.gen_salt('bf')),
       now(),
       jsonb_build_object('display_name', 'Babar Azam'),
       jsonb_build_object('provider', 'email', 'providers', array['email']),
@@ -744,7 +747,7 @@ begin
     (
       '00000000-0000-0000-0000-000000000000',
       v_shaheen_uid, 'authenticated', 'authenticated', 'shaheen@cricket.pk',
-      crypt('pass1234', gen_salt('bf')),
+      extensions.crypt('pass1234', extensions.gen_salt('bf')),
       now(),
       jsonb_build_object('display_name', 'Shaheen Afridi'),
       jsonb_build_object('provider', 'email', 'providers', array['email']),
@@ -753,7 +756,7 @@ begin
     (
       '00000000-0000-0000-0000-000000000000',
       v_rizwan_uid, 'authenticated', 'authenticated', 'rizwan@cricket.pk',
-      crypt('pass1234', gen_salt('bf')),
+      extensions.crypt('pass1234', extensions.gen_salt('bf')),
       now(),
       jsonb_build_object('display_name', 'Mohammad Rizwan'),
       jsonb_build_object('provider', 'email', 'providers', array['email']),
@@ -762,7 +765,7 @@ begin
     (
       '00000000-0000-0000-0000-000000000000',
       v_shadab_uid, 'authenticated', 'authenticated', 'shadab@cricket.pk',
-      crypt('pass1234', gen_salt('bf')),
+      extensions.crypt('pass1234', extensions.gen_salt('bf')),
       now(),
       jsonb_build_object('display_name', 'Shadab Khan'),
       jsonb_build_object('provider', 'email', 'providers', array['email']),
@@ -1147,6 +1150,7 @@ declare
   v_user_b      uuid;
   v_chat_id     uuid;
   c_chat_id     constant uuid := '40000000-0000-0000-0000-000000000001';
+  v_channel_key text;
 begin
   select id into v_saran_uid from auth.users where email = 'muhammadsarankhalid@gmail.com' limit 1;
   if v_saran_uid is null then
@@ -1169,56 +1173,51 @@ begin
     v_user_b := v_saran_uid;
   end if;
 
-  select chat_id into v_chat_id
-    from public.dm_channels
-   where user_a = v_user_a and user_b = v_user_b;
+  v_channel_key := 'dm:' || v_user_a::text || ':' || v_user_b::text;
+
+  select channel_id into v_chat_id
+    from public.chat_channels
+   where channel_key = v_channel_key;
 
   if v_chat_id is null then
     v_chat_id := c_chat_id;
-    delete from public.messages where chat_id = v_chat_id;
-    delete from public.chat_members where chat_id = v_chat_id;
-    delete from public.dm_channels where chat_id = v_chat_id;
-    delete from public.chats where chat_id = v_chat_id;
+    delete from public.messages where channel_id = v_chat_id;
+    delete from public.channel_members where channel_id = v_chat_id;
+    delete from public.chat_channels where channel_id = v_chat_id;
 
-    insert into public.chats (chat_id, type, last_message_at, created_at, updated_at)
-    values (v_chat_id, 'dm', now() - interval '25 minutes', now() - interval '2 days', now());
+    insert into public.chat_channels (channel_id, channel_key, kind, context_type, visibility, created_by, last_message_at, created_at, updated_at)
+    values (v_chat_id, v_channel_key, 'direct', 'none', 'private', v_sender_uid, now() - interval '25 minutes', now() - interval '2 days', now());
 
-    insert into public.dm_channels (chat_id, user_a, user_b, created_at, accepted_at, accepted_by)
-    values (v_chat_id, v_user_a, v_user_b, now() - interval '2 days', null, null);
-  else
-    update public.dm_channels
-       set accepted_at = null,
-           accepted_by = null
-     where chat_id = v_chat_id;
+    insert into public.channel_policies (channel_id) values (v_chat_id) on conflict do nothing;
   end if;
 
-  insert into public.chat_members (chat_id, user_id, role, joined_at, last_read_at, left_at)
+  insert into public.channel_members (channel_id, user_id, role, status, invited_by, invited_at, joined_at, last_read_at, left_at)
   values
-    (v_chat_id, v_sender_uid, 'member', now() - interval '2 days', now() - interval '10 minutes', null),
-    (v_chat_id, v_saran_uid,  'member', now() - interval '2 days', null, null)
-  on conflict (chat_id, user_id) do update set
+    (v_chat_id, v_sender_uid, 'member', 'active', v_sender_uid, now() - interval '2 days', now() - interval '2 days', now() - interval '10 minutes', null),
+    (v_chat_id, v_saran_uid,  'member', 'pending', v_sender_uid, now() - interval '2 days', null, null, null)
+  on conflict (channel_id, user_id) do update set
+    status = excluded.status,
     last_read_at = excluded.last_read_at,
     left_at = null;
 
-  delete from public.messages where chat_id = v_chat_id;
+  delete from public.messages where channel_id = v_chat_id;
 
   insert into public.messages (
-    message_id, chat_id, sender_id, body, message_type, payload, created_at
+    message_id, channel_id, sender_id, body, message_type, payload, created_at
   )
-  values
-    (
-      '41000000-0000-0000-0000-000000000001',
-      v_chat_id,
-      v_sender_uid,
-      'Salam Saran! I saw your post regarding Lahore Lions trials. I am an off-spin all-rounder playing in Faisalabad Premier League. Would love to join the trial session this Tuesday at Model Town.',
-      'text',
-      '{}'::jsonb,
-      now() - interval '25 minutes'
-    );
+  values (
+    '41000000-0000-0000-0000-000000000001',
+    v_chat_id,
+    v_sender_uid,
+    'Salam Saran! I saw your post regarding Lahore Lions trials. I am an off-spin all-rounder playing in Faisalabad Premier League. Would love to join the trial session this Tuesday at Model Town.',
+    'text',
+    '{}'::jsonb,
+    now() - interval '25 minutes'
+  );
 
-  update public.chats
+  update public.chat_channels
      set last_message_at = now() - interval '25 minutes'
-   where chat_id = v_chat_id;
+   where channel_id = v_chat_id;
 
   raise notice 'Message request DM seeded successfully from Adeel Saeed to Saran.';
 end $seed_dm$;

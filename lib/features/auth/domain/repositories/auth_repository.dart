@@ -25,7 +25,12 @@ abstract class AuthRepository {
   /// exchanging the ID token with Supabase.
   Future<Either<Failure, User>> signInWithGoogle();
 
+  /// Facebook OAuth sign-in via Supabase browser/custom tab flow.
+  Future<Either<Failure, Unit>> signInWithFacebook();
+
   Future<Either<Failure, Unit>> signOut();
+
+  Future<Either<Failure, Unit>> deleteAccount();
 
   Future<Either<Failure, User?>> getCurrentUser();
 

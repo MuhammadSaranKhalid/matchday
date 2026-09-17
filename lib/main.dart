@@ -1,7 +1,13 @@
+import 'dart:ui' show PlatformDispatcher;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart'
-    show kIsWeb, LicenseRegistry, LicenseEntryWithLineBreaks;
+    show
+        kIsWeb,
+        LicenseRegistry,
+        LicenseEntryWithLineBreaks,
+        defaultTargetPlatform,
+        TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,8 +25,31 @@ import 'firebase_options.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
 
+/// Logs unhandled provider failures to the terminal so errors are never silent.
+final class _AppLogObserver extends ProviderObserver {
+  @override
+  void providerDidFail(
+    ProviderObserverContext context,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    debugPrint('[Riverpod Error] ${context.provider.name ?? context.provider.runtimeType}: $error');
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Forward framework and async platform errors to console
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('[FlutterError] ${details.exceptionAsString()}');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('[PlatformDispatcher] Unhandled error: $error\n$stack');
+    return true;
+  };
+
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks([
       'Tabler Icons',
@@ -60,15 +89,22 @@ Future<void> main() async {
   //    on mobile.
   //    On web, serverClientId is rejected outright ("not supported on Web"),
   //    so it must be null there; the web client ID goes in clientId instead.
-  final clientId = kIsWeb ? config.googleWebClientId : config.googleIosClientId;
+  final clientId = kIsWeb
+      ? config.googleWebClientId
+      : (defaultTargetPlatform == TargetPlatform.iOS
+          ? config.googleIosClientId
+          : null);
   final serverClientId = kIsWeb ? '' : config.googleWebClientId;
   await GoogleSignIn.instance.initialize(
     serverClientId: serverClientId.isEmpty ? null : serverClientId,
-    clientId: clientId.isEmpty ? null : clientId,
+    clientId: (clientId == null || clientId.isEmpty) ? null : clientId,
   );
 
   runApp(
     ProviderScope(
+      observers: [
+        _AppLogObserver(),
+      ],
       overrides: [
         // Optionally override the provider with our initialized config instance
         appConfigProvider.overrideWithValue(config),

@@ -80,6 +80,8 @@ class _LoadedBody extends ConsumerWidget {
               (m) => m.teamAId.value == teamId || m.teamBId.value == teamId,
             )
             .toList();
+    final pendingInvite =
+        ref.watch(myPendingInviteForTeamProvider(teamId)).value;
 
     return TeamPageBody(
       teamId: teamId,
@@ -89,6 +91,7 @@ class _LoadedBody extends ConsumerWidget {
         matches: matchesForTeam,
         viewerUserId: userId,
       ),
+      pendingInvite: pendingInvite,
       onBack: onBack,
     );
   }

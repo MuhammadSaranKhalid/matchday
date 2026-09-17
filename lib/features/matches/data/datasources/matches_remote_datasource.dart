@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io' show SocketException;
 
+import 'package:ably_flutter/ably_flutter.dart' as ably;
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/realtime/ably_service.dart';
 import '../models/ball_dto.dart';
 import '../models/match_dto.dart';
 import '../models/match_innings_state_dto.dart';
@@ -21,8 +23,9 @@ import '../models/match_wicket_dto.dart';
 /// separate concerns with their own data sources:
 /// [FormatPresetsRemoteDataSource] and [MatchRequestsRemoteDataSource].
 class MatchesRemoteDataSource {
-  MatchesRemoteDataSource(this._supabase);
+  MatchesRemoteDataSource(this._supabase, this._ablyService);
   final SupabaseClient _supabase;
+  final AblyService _ablyService;
 
   static const _matches = 'matches';
   static const _matchPlayers = 'match_players';
@@ -48,37 +51,10 @@ class MatchesRemoteDataSource {
   static const _wickets = 'match_wickets';
   static const _scorerLeases = 'match_scorer_leases';
 
-  // ─── Realtime resilience knobs ──────────────────────────────────────────
-  // See [watchMatch] for why these exist. Tuned for the match-start flow,
-  // where a stalled screen means two captains standing on a pitch waiting.
-
-  /// How far back Supabase is asked to replay on (re)subscribe. Long enough
-  /// to cover a dropped socket, short enough to stay inside the ~72h that
-  /// `realtime.messages` retains.
-  static const _replayWindow = Duration(minutes: 10);
-
-  /// Server-side maximum is 25.
-  static const _replayLimit = 25;
-
-  /// Snapshot cadence. The backstop that makes a dead socket slow, not fatal.
-  static const _pollInterval = Duration(seconds: 15);
-
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
     if (id == null) throw UnauthorizedException('Must be signed in');
     return id;
-  }
-
-  /// Broadcast payloads arrive wrapped as `{event, payload: {...}}` from
-  /// `realtime.send()`, but bare from some paths. Accept both.
-  static Map<String, dynamic> _unwrapBroadcast(Map<String, dynamic> payload) =>
-      (payload['payload'] as Map<String, dynamic>?) ?? payload;
-
-  /// True when Supabase re-delivered this frame via Broadcast Replay rather
-  /// than it arriving live. Diagnostic only — both are applied identically.
-  static bool _wasReplayed(Map<String, dynamic> payload) {
-    final meta = payload['meta'];
-    return meta is Map && meta['replayed'] == true;
   }
 
   // ─── Matches ────────────────────────────────────────────────────────────
@@ -291,50 +267,26 @@ class MatchesRemoteDataSource {
       }
     }
 
-    final channel = _supabase.channel(
-      'match:$matchId:state',
-      opts: RealtimeChannelConfig(
-        self: true,
-        private: true,
-        replay: ReplayOption(
-          since: DateTime.now()
-              .subtract(_replayWindow)
-              .millisecondsSinceEpoch,
-          limit: _replayLimit,
-        ),
-      ),
-    );
+    final channelName = 'match:$matchId:state';
+    final channel = _ablyService.getChannel(channelName);
 
-    channel
-        .onBroadcast(
-          event: 'match_state_updated',
-          callback: (payload) {
-            try {
-              final replayed = _wasReplayed(payload);
-              emit(
-                MatchDto.fromJson(_unwrapBroadcast(payload)),
-                replayed ? 'replay' : 'live',
-              );
-            } catch (_) {
-              resnapshot('bad-frame');
-            }
-          },
-        )
-        .subscribe((status, error) {
-          if (status == RealtimeSubscribeStatus.subscribed) {
-            resnapshot('subscribed');
-          }
-        });
+    final subscription = channel.subscribe(name: 'match_state_updated').listen((ably.Message msg) {
+      if (msg.data is Map) {
+        try {
+          final dto = MatchDto.fromJson(Map<String, dynamic>.from(msg.data as Map));
+          emit(dto, 'live');
+        } catch (_) {
+          resnapshot('bad-frame');
+        }
+      }
+    });
 
-    // First paint. Not awaited: if the channel never reaches `subscribed`
-    // (auth failure, dead socket) this is the only thing that paints.
+    // First paint snapshot
     unawaited(resnapshot('open'));
 
-    final poll = Timer.periodic(_pollInterval, (_) => resnapshot('poll'));
-
     controller.onCancel = () async {
-      poll.cancel();
-      await _supabase.removeChannel(channel);
+      await subscription.cancel();
+      await _ablyService.releaseChannel(channelName);
       await controller.close();
     };
 
@@ -452,49 +404,27 @@ class MatchesRemoteDataSource {
       }
     }
 
-    final channel = _supabase.channel(
-      'match:$matchId:state',
-      opts: RealtimeChannelConfig(
-        self: true,
-        private: true,
-        replay: ReplayOption(
-          since: DateTime.now()
-              .subtract(_replayWindow)
-              .millisecondsSinceEpoch,
-          limit: _replayLimit,
-        ),
-      ),
-    );
+    final channelName = 'match:$matchId:state';
+    final channel = _ablyService.getChannel(channelName);
 
-    channel
-        .onBroadcast(
-          event: 'innings_state_updated',
-          callback: (payload) {
-            try {
-              final replayed = _wasReplayed(payload);
-              final dto =
-                  MatchInningsStateDto.fromJson(_unwrapBroadcast(payload));
-              // The topic carries every innings; ignore the others.
-              if (dto.inningsNumber != inningsNumber) return;
-              emit(dto, replayed ? 'replay' : 'live');
-            } catch (_) {
-              resnapshot('bad-frame');
-            }
-          },
-        )
-        .subscribe((status, error) {
-          if (status == RealtimeSubscribeStatus.subscribed) {
-            resnapshot('subscribed');
+    final subscription = channel.subscribe(name: 'innings_state_updated').listen((ably.Message msg) {
+      if (msg.data is Map) {
+        try {
+          final dto = MatchInningsStateDto.fromJson(Map<String, dynamic>.from(msg.data as Map));
+          if (dto.inningsNumber == inningsNumber) {
+            emit(dto, 'live');
           }
-        });
+        } catch (_) {
+          resnapshot('bad-frame');
+        }
+      }
+    });
 
     unawaited(resnapshot('open'));
 
-    final poll = Timer.periodic(_pollInterval, (_) => resnapshot('poll'));
-
     controller.onCancel = () async {
-      poll.cancel();
-      await _supabase.removeChannel(channel);
+      await subscription.cancel();
+      await _ablyService.releaseChannel(channelName);
       await controller.close();
     };
 
@@ -588,47 +518,37 @@ class MatchesRemoteDataSource {
     yield current;
 
     final controller = StreamController<List<BallDto>>();
-    final channel = _supabase.channel(
-      'match:$matchId:balls',
-      opts: const RealtimeChannelConfig(self: true, private: true),
-    );
+    final channelName = 'match:$matchId:balls';
+    final channel = _ablyService.getChannel(channelName);
 
-    channel
-        .onBroadcast(
-          event: 'ball_recorded',
-          callback: (payload) {
-            final data =
-                (payload['payload'] as Map<String, dynamic>?) ?? payload;
-            try {
-              final dto = BallDto.fromJson(data);
-              if (dto.inningsNumber != inningsNumber) return;
-              current = [...current, dto]..sort((a, b) => a.seq.compareTo(b.seq));
-              controller.add(List.unmodifiable(current));
-            } catch (e) {
-              controller.addError(ServerException(e.toString()));
-            }
-          },
-        )
-        .onBroadcast(
-          event: 'ball_deleted',
-          callback: (payload) {
-            final data =
-                (payload['payload'] as Map<String, dynamic>?) ?? payload;
-            // The removed row arrives as `to_jsonb(OLD)`, so its key is
-            // `delivery_id` — `ball_id` has not been a column since the schema
-            // reset, and reading only that quietly dropped every removal.
-            final deletedId =
-                (data['delivery_id'] ?? data['ball_id']) as String?;
-            if (deletedId == null) return;
-            current = current.where((b) => b.ballId != deletedId).toList();
-            controller.add(List.unmodifiable(current));
-          },
-        )
-        .subscribe();
+    final subRecorded = channel.subscribe(name: 'ball_recorded').listen((ably.Message msg) {
+      if (msg.data is Map) {
+        try {
+          final dto = BallDto.fromJson(Map<String, dynamic>.from(msg.data as Map));
+          if (dto.inningsNumber != inningsNumber) return;
+          current = [...current, dto]..sort((a, b) => a.seq.compareTo(b.seq));
+          controller.add(List.unmodifiable(current));
+        } catch (e) {
+          controller.addError(ServerException(e.toString()));
+        }
+      }
+    });
+
+    final subDeleted = channel.subscribe(name: 'ball_deleted').listen((ably.Message msg) {
+      if (msg.data is Map) {
+        final data = Map<String, dynamic>.from(msg.data as Map);
+        final deletedId = (data['delivery_id'] ?? data['ball_id']) as String?;
+        if (deletedId == null) return;
+        current = current.where((b) => b.ballId != deletedId).toList();
+        controller.add(List.unmodifiable(current));
+      }
+    });
 
     yield* controller.stream.asBroadcastStream(
       onCancel: (sub) async {
-        await _supabase.removeChannel(channel);
+        await subRecorded.cancel();
+        await subDeleted.cancel();
+        await _ablyService.releaseChannel(channelName);
         await controller.close();
       },
     );

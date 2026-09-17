@@ -15,6 +15,8 @@ class TeamInvite {
     this.inviteeName,
     this.inviteeUsername,
     this.inviteePhotoUrl,
+    this.inviterName,
+    this.inviterUsername,
   });
 
   final String inviteId;
@@ -29,6 +31,8 @@ class TeamInvite {
   final String? inviteeName;
   final String? inviteeUsername;
   final String? inviteePhotoUrl;
+  final String? inviterName;
+  final String? inviterUsername;
 
   @override
   bool operator ==(Object other) =>

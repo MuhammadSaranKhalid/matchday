@@ -4,8 +4,16 @@
 -- the extension catalogue. Creating the OBJECTS they provide belongs here; the
 -- `create extension` lines do not. pg_cron was previously declared both here
 -- and in 0610, with two different schema clauses, neither of which took effect.
+-- Ensure clean state if queues exist from prior runs or partial resets
+do $$
+begin
+  perform pgmq.drop_queue('notifications_push');
+  perform pgmq.drop_queue('notifications_push_bulk');
+exception when others then null;
+end $$;
 select pgmq.create('notifications_push');
 select pgmq.create('notifications_push_bulk');
+
 
 create or replace function public._notify_deliver(p_notification_ids uuid[], p_queue_name text)
 returns void language plpgsql security definer set search_path = public, pg_temp as $$
@@ -131,9 +139,16 @@ end;
 $$;
 revoke all on function public.wake_notification_worker() from public, anon, authenticated;
 grant execute on function public.wake_notification_worker() to service_role;
--- Every 15s, not every minute. pg_cron 1.5+ accepts interval syntax; 1.6.4 is
--- installed here. cron.schedule() upserts by jobname, so re-running is safe.
--- If a future pg_cron rejects sub-minute syntax this raises at migration time
--- rather than silently degrading — fall back to '* * * * *' and raise the
--- batch sizes above to compensate.
-select cron.schedule('notification-push-worker', '15 seconds', 'select public.wake_notification_worker()');
+do $$
+begin
+  if exists (select 1 from cron.job where jobname = 'notification-push-worker') then
+    perform cron.unschedule('notification-push-worker');
+  end if;
+  perform cron.schedule(
+    'notification-push-worker',
+    '* * * * *',
+    $sql$select public.wake_notification_worker();$sql$
+  );
+end $$;
+
+

@@ -2,8 +2,8 @@
 -- seed_dm_non_follower.sql — Direct Message from a Non-Follower
 -- =============================================================================
 -- Scenario:
---   A user (e.g. Adeel Saeed, @adeel or a new player Tariq Mehmood) sends a
---   direct message (DM) to the primary logged-in user (Muhammad Saran, @saran).
+--   A user (e.g. Adeel Saeed, @adeel) sends a direct message (DM) to the primary
+--   user (Muhammad Saran, @saran).
 --   Neither user follows the other (mutual non-followers) to test incoming
 --   message requests / non-follower DM conversations.
 -- =============================================================================
@@ -16,6 +16,7 @@ declare
   v_user_b      uuid;
   v_chat_id     uuid;
   c_chat_id     constant uuid := '40000000-0000-0000-0000-000000000001';
+  v_channel_key text;
 begin
   -- 1) Resolve Primary User ("me")
   select id into v_saran_uid from auth.users where email = 'muhammadsarankhalid@gmail.com' limit 1;
@@ -26,7 +27,7 @@ begin
     v_saran_uid := '00000000-0000-0000-0000-000000000001'::uuid;
   end if;
 
-  -- 2) Explicitly remove any follow relationship between Saran and Adeel (guarantee non-follower state)
+  -- 2) Remove any follow relationship
   delete from public.follows
    where (follower_id = v_saran_uid and target_type = 'user' and target_id = v_sender_uid)
       or (follower_id = v_sender_uid and target_type = 'user' and target_id = v_saran_uid);
@@ -40,62 +41,63 @@ begin
     v_user_b := v_saran_uid;
   end if;
 
+  v_channel_key := 'dm:' || v_user_a::text || ':' || v_user_b::text;
+
   -- 4) Check or Create Chat Container
-  select chat_id into v_chat_id
-    from public.dm_channels
-   where user_a = v_user_a and user_b = v_user_b;
+  select channel_id into v_chat_id
+    from public.chat_channels
+   where channel_key = v_channel_key;
 
   if v_chat_id is null then
     v_chat_id := c_chat_id;
 
-    -- Clean any stale references if re-running
-    delete from public.messages where chat_id = v_chat_id;
-    delete from public.chat_members where chat_id = v_chat_id;
-    delete from public.dm_channels where chat_id = v_chat_id;
-    delete from public.chats where chat_id = v_chat_id;
+    delete from public.messages where channel_id = v_chat_id;
+    delete from public.channel_members where channel_id = v_chat_id;
+    delete from public.chat_channels where channel_id = v_chat_id;
 
-    insert into public.chats (chat_id, type, last_message_at, created_at, updated_at)
-    values (v_chat_id, 'dm', now() - interval '10 minutes', now() - interval '2 days', now());
+    insert into public.chat_channels (
+      channel_id, channel_key, kind, context_type, visibility, created_by,
+      last_message_at, created_at, updated_at
+    )
+    values (
+      v_chat_id, v_channel_key, 'direct', 'none', 'private', v_sender_uid,
+      now() - interval '25 minutes', now() - interval '2 days', now()
+    );
 
-    insert into public.dm_channels (chat_id, user_a, user_b, created_at, accepted_at, accepted_by)
-    values (v_chat_id, v_user_a, v_user_b, now() - interval '2 days', null, null);
-  else
-    update public.dm_channels
-       set accepted_at = null,
-           accepted_by = null
-     where chat_id = v_chat_id;
+    insert into public.channel_policies (channel_id) values (v_chat_id) on conflict do nothing;
   end if;
 
-  -- 5) Ensure Chat Memberships (both members present)
-  insert into public.chat_members (chat_id, user_id, role, joined_at, last_read_at, left_at)
+  -- 5) Ensure Channel Memberships (Saran is pending, Adeel is active)
+  insert into public.channel_members (
+    channel_id, user_id, role, status, invited_by, invited_at, joined_at, last_read_at, left_at
+  )
   values
-    (v_chat_id, v_sender_uid, 'member', now() - interval '2 days', now() - interval '10 minutes', null),
-    (v_chat_id, v_saran_uid,  'member', now() - interval '2 days', null, null) -- Unread for Saran
-  on conflict (chat_id, user_id) do update set
+    (v_chat_id, v_sender_uid, 'member', 'active', v_sender_uid, now() - interval '2 days', now() - interval '2 days', now() - interval '10 minutes', null),
+    (v_chat_id, v_saran_uid,  'member', 'pending', v_sender_uid, now() - interval '2 days', null, null, null)
+  on conflict (channel_id, user_id) do update set
+    status = excluded.status,
     last_read_at = excluded.last_read_at,
     left_at = null;
 
-  -- 6) Seed 1 Initial Message from Adeel (the non-follower) to Saran (Message Request)
-  delete from public.messages where chat_id = v_chat_id;
+  -- 6) Seed 1 Initial Message from Adeel (Message Request)
+  delete from public.messages where channel_id = v_chat_id;
 
   insert into public.messages (
-    message_id, chat_id, sender_id, body, message_type, payload, created_at
+    message_id, channel_id, sender_id, body, message_type, payload, created_at
   )
-  values
-    (
-      '41000000-0000-0000-0000-000000000001',
-      v_chat_id,
-      v_sender_uid,
-      'Salam Saran! I saw your post regarding Lahore Lions trials. I am an off-spin all-rounder playing in Faisalabad Premier League. Would love to join the trial session this Tuesday at Model Town.',
-      'text',
-      '{}'::jsonb,
-      now() - interval '25 minutes'
-    );
+  values (
+    '41000000-0000-0000-0000-000000000001',
+    v_chat_id,
+    v_sender_uid,
+    'Salam Saran! I saw your post regarding Lahore Lions trials. I am an off-spin all-rounder playing in Faisalabad Premier League. Would love to join the trial session this Tuesday at Model Town.',
+    'text',
+    '{}'::jsonb,
+    now() - interval '25 minutes'
+  );
 
-  -- 7) Update chat last_message_at
-  update public.chats
+  -- 7) Update channel last_message_at
+  update public.chat_channels
      set last_message_at = now() - interval '25 minutes'
-   where chat_id = v_chat_id;
+   where channel_id = v_chat_id;
 
 end $seed_dm$;
-

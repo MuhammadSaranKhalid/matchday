@@ -1,0 +1,17 @@
+{
+  "architecture-gate": {
+    "enabled": true,
+    "PostToolUse": [
+      {
+        "matcher": "replace_file_content|write_to_file|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "../scripts/check_domain_purity.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

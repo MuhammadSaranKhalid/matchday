@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDAcvWLiZmbO1OZ2tJBFmxvFYP_TX4rS28',
-    appId: '1:45146159151:android:7c09684764d0a6070a6eda',
+    appId: '1:45146159151:android:fe744d8c8e7f806b0a6eda',
     messagingSenderId: '45146159151',
     projectId: 'matchday-44ed4',
     storageBucket: 'matchday-44ed4.firebasestorage.app',

@@ -1,0 +1,5 @@
+-- =============================================================================
+-- 20260915010000 · match_chats_and_inbox (Consolidated into 0804_chat_lifecycle.sql)
+-- =============================================================================
+-- Match chat automated creation, match player synchronization, and polymorphic
+-- inbox queries are now handled natively within public.chat_channels in 0804_chat_lifecycle.sql.

@@ -10,6 +10,8 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../follows/presentation/controllers/follow_toggle_controller.dart';
 import '../../../teams/presentation/widgets/team_crest.dart';
 import '../../domain/entities/post.dart';
+import '../../../safety/presentation/widgets/safety_menu.dart';
+import '../../../safety/presentation/providers/safety_providers.dart';
 import '../../domain/entities/post_media.dart';
 
 class FeedPostCard extends ConsumerWidget {
@@ -54,6 +56,8 @@ class FeedPostCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final blocked = ref.watch(blockedAccountsProvider).value ?? [];
+    if (blocked.any((u) => u.id == post.authorId)) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: const BoxDecoration(
@@ -63,6 +67,7 @@ class FeedPostCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (!showAuthor) Align(alignment: Alignment.centerRight, child: SafetyMenu(userId: post.authorId, kind: 'post', targetId: post.id.value, onShare: onShare)),
           if (showAuthor) ...[
             _header(context, ref),
             const SizedBox(height: 10),
@@ -227,13 +232,7 @@ class FeedPostCard extends ConsumerWidget {
           ),
         ],
 
-        // 3-dots more menu
-        IconButton(
-          icon: const Icon(Icons.more_horiz_rounded, size: 20, color: CkColors.muted),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          onPressed: onShare,
-        ),
+        SafetyMenu(userId: post.authorId, kind: 'post', targetId: post.id.value, onShare: onShare),
       ],
     );
   }

@@ -64,6 +64,7 @@ class Chat {
   bool get isEmpty => lastMessageAt == null;
   bool get isDm => kind == ChatKind.dm;
   bool get isTeam => kind == ChatKind.team;
+  bool get isMatch => kind == ChatKind.match;
 
   /// Whether this conversation is an incoming message request for the current user.
   bool get isRequest => isDm && !isAccepted && !lastMessageFromMe && !youFollow;
@@ -90,6 +91,9 @@ class Chat {
     if (isDm) {
       final n = displayName;
       return n.isNotEmpty ? n[0].toUpperCase() : '?';
+    }
+    if (isMatch) {
+      return 'VS';
     }
     return teamLogoMonogram?.toUpperCase() ?? '?';
   }

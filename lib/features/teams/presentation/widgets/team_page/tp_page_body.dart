@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
+import '../../../domain/entities/team_invite.dart';
 import '../../utils/team_share.dart';
 import 'tabs/tp_about_tab.dart';
 import 'tabs/tp_matches_tab.dart';
@@ -9,6 +10,7 @@ import 'tabs/tp_squad_tab.dart';
 import 'tabs/tp_stats_tab.dart';
 import 'tp_banners.dart';
 import 'tp_hero.dart';
+import 'tp_invite_banner.dart';
 import 'tp_options_sheet.dart';
 import 'tp_tabs_bar.dart';
 import 'tp_view.dart';
@@ -20,11 +22,13 @@ class TeamPageBody extends StatefulWidget {
     super.key,
     required this.teamId,
     required this.view,
+    this.pendingInvite,
     this.onBack,
   });
 
   final String teamId;
   final TeamPageView view;
+  final TeamInvite? pendingInvite;
   final VoidCallback? onBack;
 
   @override
@@ -112,6 +116,7 @@ class _TeamPageBodyState extends State<TeamPageBody> {
   @override
   Widget build(BuildContext context) {
     final v = widget.view;
+    final invite = widget.pendingInvite;
     final items = [
       for (final t in v.tabs)
         TpTabItem(id: t, label: tpTabLabel(t), badge: _tabBadge(t)),
@@ -125,6 +130,7 @@ class _TeamPageBodyState extends State<TeamPageBody> {
             team: v.team,
             viewer: v.viewer,
             badges: v.badges,
+            hasPendingInvite: invite != null,
             onBack: widget.onBack,
             onShare: () => shareTeam(
               context,
@@ -139,6 +145,12 @@ class _TeamPageBodyState extends State<TeamPageBody> {
               viewerMembershipId: v.viewerPlayerId,
             ),
           ),
+          if (invite != null)
+            TpInviteBanner(
+              invite: invite,
+              teamId: widget.teamId,
+              teamName: v.team.name,
+            ),
           if (v.team.live != null) TpLiveBanner(data: v.team.live!),
           if (v.banner != null)
             TpInfoBannerWidget(banner: v.banner!, teamId: widget.teamId),

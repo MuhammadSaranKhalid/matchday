@@ -54,6 +54,29 @@ Deno.serve(async (req) => {
   try {
     const out = await scoringService.recordDelivery(actor, validation.data!);
 
+    // Broadcast to Ably channels for live spectators (non-blocking)
+    const ablyKey = Deno.env.get("ABLY_API_KEY");
+    if (ablyKey && !out.duplicate) {
+      try {
+        const ably = new (await import("npm:ably@2.4.1")).default.Rest(ablyKey);
+        const matchId = validation.data!.matchId;
+        // Broadcast ball to spectator feed
+        ably.channels.get(`match:${matchId}:balls`).publish("ball_recorded", {
+          ball: out.ball,
+          innings: out.innings,
+          transition: out.transition,
+        }).catch((e: unknown) => console.error("[record-ball] Ably balls broadcast failed:", e));
+
+        // Broadcast updated state to match state feed
+        ably.channels.get(`match:${matchId}:state`).publish("match_state_updated", {
+          innings: out.innings,
+          transition: out.transition,
+        }).catch((e: unknown) => console.error("[record-ball] Ably state broadcast failed:", e));
+      } catch (ablyErr) {
+        console.error("[record-ball] Could not initialize Ably broadcast:", ablyErr);
+      }
+    }
+
     return json(200, {
       ok: true,
       ball: out.ball,

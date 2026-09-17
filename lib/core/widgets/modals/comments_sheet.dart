@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../features/posts/domain/entities/comment.dart';
+import '../../../features/safety/presentation/widgets/safety_menu.dart';
+import '../../../features/safety/presentation/providers/safety_providers.dart';
 import '../../../features/posts/domain/entities/post.dart';
 import '../../../features/posts/presentation/controllers/comments_controller.dart';
 import '../../../features/posts/presentation/controllers/feed_controller.dart';
@@ -546,7 +548,7 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
   }
 }
 
-class _InstagramCommentRow extends StatelessWidget {
+class _InstagramCommentRow extends ConsumerWidget {
   const _InstagramCommentRow({
     required this.comment,
     required this.isMe,
@@ -622,7 +624,8 @@ class _InstagramCommentRow extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(blockedAccountsProvider).value?.any((u) => u.id == comment.authorId) ?? false) return const SizedBox.shrink();
     final timeStr = timeago.format(comment.createdAt, locale: 'en_short');
     final authorHandle = (comment.authorUsername != null && comment.authorUsername!.trim().isNotEmpty)
         ? comment.authorUsername!.trim().replaceAll('@', '')
@@ -694,6 +697,7 @@ class _InstagramCommentRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
 
+                if (!isMe) Align(alignment: Alignment.centerRight, child: SafetyMenu(userId: comment.authorId, kind: 'comment', targetId: comment.id)),
                 // Comment body text
                 RichText(
                   text: TextSpan(

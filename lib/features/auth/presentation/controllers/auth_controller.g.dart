@@ -56,7 +56,7 @@ final class AuthControllerProvider
   }
 }
 
-String _$authControllerHash() => r'55c20877bcd88f8eba6dab546c8f10bfe4699944';
+String _$authControllerHash() => r'f02e19925565b6ce3f1c05e256b2d738db45556c';
 
 /// Auth controller for email-OTP + Google sign-in.
 ///

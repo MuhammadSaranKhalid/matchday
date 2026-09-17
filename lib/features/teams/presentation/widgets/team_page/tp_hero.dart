@@ -18,7 +18,6 @@ import 'tp_view.dart';
 /// of twelve owner-chosen swatches spanning near-black to pale cream. White
 /// chrome fails on the pale two, so the whole hero carries an ink ramp that
 /// flips on the ground's WCAG luminance ([surfaceModeFor]) rather than
-/// assuming a dark backdrop.
 class TpHero extends StatelessWidget {
   const TpHero({
     super.key,
@@ -26,6 +25,7 @@ class TpHero extends StatelessWidget {
     required this.team,
     required this.viewer,
     required this.badges,
+    this.hasPendingInvite = false,
     this.onBack,
     this.onShare,
     this.onOptions,
@@ -35,6 +35,7 @@ class TpHero extends StatelessWidget {
   final TpTeam team;
   final TeamPageViewer viewer;
   final List<TpHeroBadge> badges;
+  final bool hasPendingInvite;
   final VoidCallback? onBack;
   final VoidCallback? onShare;
   final VoidCallback? onOptions;
@@ -157,6 +158,7 @@ class TpHero extends StatelessWidget {
                         viewer: viewer,
                         team: team,
                         mode: mode,
+                        hasPendingInvite: hasPendingInvite,
                       ),
                     ),
                   ],
@@ -488,12 +490,14 @@ class TpActionRow extends ConsumerWidget {
     required this.viewer,
     required this.team,
     required this.mode,
+    this.hasPendingInvite = false,
   });
 
   final String teamId;
   final TeamPageViewer viewer;
   final TpTeam team;
   final CkSurfaceMode mode;
+  final bool hasPendingInvite;
 
   List<_Action> _actionsFor(BuildContext context, WidgetRef ref) {
     switch (viewer) {
@@ -537,9 +541,14 @@ class TpActionRow extends ConsumerWidget {
           const _Action(label: 'Notify', icon: Icons.notifications_none),
         ];
       case TeamPageViewer.strangerPrivate:
-        return [_joinAction(context, primary: true)];
+        return hasPendingInvite
+            ? const []
+            : [_joinAction(context, primary: true)];
       case TeamPageViewer.stranger:
-        return [_followAction(ref), _joinAction(context, primary: false)];
+        return [
+          _followAction(ref),
+          if (!hasPendingInvite) _joinAction(context, primary: false),
+        ];
     }
   }
 

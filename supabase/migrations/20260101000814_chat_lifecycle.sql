@@ -324,12 +324,16 @@ begin
 
   select exists (
     select 1 from public.follows
-     where follower_id = v_caller_id and following_id = p_target_user_id
+     where follower_id = v_caller_id
+       and target_type = 'user'
+       and target_id = p_target_user_id
   ) into v_caller_follows;
 
   select exists (
     select 1 from public.follows
-     where follower_id = p_target_user_id and following_id = v_caller_id
+     where follower_id = p_target_user_id
+       and target_type = 'user'
+       and target_id = v_caller_id
   ) into v_target_follows;
 
   if v_caller_follows and v_target_follows then
@@ -1086,14 +1090,16 @@ as $$
     select exists (
       select 1 from public.follows f
       where f.follower_id = dm_other.user_id
-        and f.following_id = (select auth.uid())
+        and f.target_type = 'user'
+        and f.target_id = (select auth.uid())
     ) as they_follow
   ) tf on true
   left join lateral (
     select exists (
       select 1 from public.follows f
       where f.follower_id = (select auth.uid())
-        and f.following_id = dm_other.user_id
+        and f.target_type = 'user'
+        and f.target_id = dm_other.user_id
     ) as you_follow
   ) yf on true
   left join lateral (

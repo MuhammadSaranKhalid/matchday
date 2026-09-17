@@ -187,6 +187,7 @@ class OutboxOperations extends Table {
 class ChannelSyncStates extends Table {
   TextColumn get channelId => text()();
   IntColumn get newestSyncedMessageSeq => integer().nullable()();
+  IntColumn get newestAppliedChangeSeq => integer().nullable()();
   IntColumn get oldestCachedMessageSeq => integer().nullable()();
   BoolColumn get hasMoreHistory => boolean().withDefault(const Constant(true))();
   DateTimeColumn get lastMemberSyncAt => dateTime().nullable()();

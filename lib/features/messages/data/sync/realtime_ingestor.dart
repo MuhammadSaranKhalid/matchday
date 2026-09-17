@@ -181,9 +181,13 @@ class RealtimeIngestor {
         case 'message.created':
           final msgData = _extractMessagePayload(data);
           final dto = ChatMessageDto.fromJson(msgData);
+          final existingCreated = await _local.getMessage(dto.messageId);
+          if (existingCreated != null && existingCreated.version >= dto.version) {
+            // Stale or duplicate created event (e.g. already edited or deleted locally)
+            break;
+          }
           if (dto.senderId == currentUserId) {
-            final existing = await _local.getMessage(dto.messageId);
-            if (existing != null) {
+            if (existingCreated != null) {
               await _local.updateMessageSyncStatus(
                 dto.messageId,
                 syncStatus: 'sent',
@@ -219,8 +223,15 @@ class RealtimeIngestor {
           final payload = _extractMessagePayload(data);
           final messageId =
               payload['message_id'] as String? ?? data['entity_id'] as String?;
+          final version = (payload['version'] as num?)?.toInt() ??
+              (data['entity_version'] as num?)?.toInt();
           if (messageId != null) {
-            await _local.softDeleteMessageLocally(messageId);
+            final existing = await _local.getMessage(messageId);
+            if (existing != null && version != null && existing.version > version) {
+              // Stale delete event
+              break;
+            }
+            await _local.softDeleteMessageLocally(messageId, version: version);
           }
           break;
 

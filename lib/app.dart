@@ -19,7 +19,7 @@ class MatchdayApp extends ConsumerWidget {
     ref.listen(currentUserStreamProvider, (prev, next) {
       final prevUser = prev?.value;
       final nextUser = next.value;
-      if (prevUser != null && nextUser == null) {
+      if (prevUser != null && (nextUser == null || prevUser.id != nextUser.id)) {
         final db = ref.read(appDatabaseProvider);
         unawaited(db.clear());
       }

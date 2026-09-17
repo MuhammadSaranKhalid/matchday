@@ -7,6 +7,7 @@ import 'package:drift/drift.dart';
 import '../../../../core/database/app_database.dart';
 import '../datasources/chat_local_data_source.dart';
 import '../datasources/chat_remote_data_source.dart';
+import '../models/chat_message_dto.dart';
 
 /// Bounded, prioritized background scheduler that hydrates recent/missing messages
 /// for conversations without requiring the user to open them (Spec §4, §5, §6, §12).
@@ -37,6 +38,7 @@ class CatchUpScheduler {
   bool _isProcessingQueue = false;
   String? _activeUserId;
   int _sessionGeneration = 0;
+  Completer<void>? _activeRunCompleter;
 
   /// Updates the active user session or cancels work on logout.
   void setSessionUser(String? userId) {
@@ -45,6 +47,9 @@ class CatchUpScheduler {
       _activeUserId = userId;
       _queuedHighPriority.clear();
       _queuedNormalPriority.clear();
+      if (_activeRunCompleter != null && !_activeRunCompleter!.isCompleted) {
+        _activeRunCompleter!.complete();
+      }
     }
   }
 
@@ -86,6 +91,8 @@ class CatchUpScheduler {
         return (channel: ch, member: member);
       }).where((item) => item.member.archivedAt == null).toList();
 
+      if (channelItems.isEmpty) return;
+
       channelItems.sort((a, b) {
         final aUnread = a.channel.unreadCount > 0 ? 1 : 0;
         final bUnread = b.channel.unreadCount > 0 ? 1 : 0;
@@ -100,6 +107,8 @@ class CatchUpScheduler {
         return bTime.compareTo(aTime);
       });
 
+      _activeRunCompleter = Completer<void>();
+
       for (final item in channelItems) {
         if (!_queuedHighPriority.contains(item.channel.channelId)) {
           _queuedNormalPriority.add(item.channel.channelId);
@@ -107,6 +116,8 @@ class CatchUpScheduler {
       }
 
       _processQueue();
+
+      await _activeRunCompleter?.future;
     } catch (e, st) {
       debugPrint('[CatchUpScheduler] Error collecting channels: $e\n$st');
     }
@@ -160,6 +171,10 @@ class CatchUpScheduler {
       _inFlightChannels.remove(channelId);
       if (_queuedHighPriority.isNotEmpty || _queuedNormalPriority.isNotEmpty) {
         _processQueue();
+      } else if (_inFlightChannels.isEmpty) {
+        if (_activeRunCompleter != null && !_activeRunCompleter!.isCompleted) {
+          _activeRunCompleter!.complete();
+        }
       }
     }
   }
@@ -252,6 +267,107 @@ class CatchUpScheduler {
             break;
           }
         }
+      }
+
+      // Catch up durable mutations from chat_changes ledger (Spec §12, Items 17 & 19)
+      final afterChangeSeq = syncState?.newestAppliedChangeSeq ?? 0;
+      var currentChangeCursor = afterChangeSeq;
+
+      while (true) {
+        if (_sessionGeneration != activeGen) return;
+
+        final changes = await remote.fetchChannelChanges(
+          channelId,
+          afterChangeSeq: currentChangeCursor,
+          limit: deltaPageSize,
+        );
+
+        if (_sessionGeneration != activeGen) return;
+        if (changes.isEmpty) break;
+
+        for (final change in changes) {
+          final entityType = change['entity_type'] as String?;
+          final operation = change['operation'] as String?;
+          final payload = change['payload'] is Map
+              ? (change['payload'] as Map<String, dynamic>)
+              : <String, dynamic>{};
+          final changeSeq =
+              (change['change_seq'] as num?)?.toInt() ?? currentChangeCursor;
+          if (changeSeq > currentChangeCursor) {
+            currentChangeCursor = changeSeq;
+          }
+
+          if (entityType == 'message') {
+            if (operation == 'delete') {
+              final messageId = payload['message_id'] as String? ??
+                  change['entity_id'] as String?;
+              final version = (payload['version'] as num?)?.toInt();
+              if (messageId != null) {
+                final existing = await local.getMessage(messageId);
+                if (existing != null &&
+                    version != null &&
+                    existing.version > version) {
+                  // Stale delete
+                  continue;
+                }
+                await local.softDeleteMessageLocally(messageId, version: version);
+              }
+            } else if (operation == 'update' || operation == 'insert') {
+              try {
+                final dto = ChatMessageDto.fromJson(payload);
+                final existing = await local.getMessage(dto.messageId);
+                if (existing != null && existing.version >= dto.version) {
+                  // Stale update
+                  continue;
+                }
+                await local.upsertMessagesFromDto([dto], currentUserId);
+              } catch (_) {}
+            }
+          } else if (entityType == 'reaction') {
+            final messageId = payload['message_id'] as String? ??
+                change['entity_id'] as String?;
+            final userId = payload['user_id'] as String?;
+            final reaction = payload['reaction'] as String?;
+            final selected =
+                payload['selected'] as bool? ?? (operation == 'insert');
+            final occurredAtStr = change['occurred_at'] as String?;
+            final occurredAt = occurredAtStr != null
+                ? DateTime.tryParse(occurredAtStr) ?? DateTime.now().toUtc()
+                : DateTime.now().toUtc();
+
+            if (messageId != null && userId != null && reaction != null) {
+              await local.upsertReaction(
+                messageId: messageId,
+                userId: userId,
+                reaction: reaction,
+                createdAt: occurredAt,
+                removedAt: selected ? null : occurredAt,
+              );
+            }
+          } else if (entityType == 'receipt') {
+            final type = payload['type'] as String?;
+            final userId = payload['user_id'] as String? ??
+                change['entity_id'] as String?;
+            final throughSeq =
+                (payload['through_message_seq'] ?? payload['through_seq'])
+                    as int?;
+            if (userId != null && throughSeq != null) {
+              if (type == 'read') {
+                await local.updateMemberHorizons(channelId, userId,
+                    readSeq: throughSeq);
+              } else if (type == 'delivered') {
+                await local.updateMemberHorizons(channelId, userId,
+                    deliveredSeq: throughSeq);
+              }
+            }
+          }
+        }
+
+        if (currentChangeCursor > afterChangeSeq) {
+          await local.updateNewestAppliedChangeSeq(channelId, currentChangeCursor);
+        }
+
+        if (changes.length < deltaPageSize) break;
       }
     } catch (e) {
       await local.markChannelSyncFailed(channelId, e);

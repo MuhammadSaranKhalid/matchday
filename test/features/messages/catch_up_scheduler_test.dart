@@ -23,6 +23,11 @@ void main() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     local = ChatLocalDataSource(db);
     remote = _MockRemoteDataSource();
+    when(() => remote.fetchChannelChanges(
+          any(),
+          afterChangeSeq: any(named: 'afterChangeSeq'),
+          limit: any(named: 'limit'),
+        )).thenAnswer((_) async => []);
     scheduler = CatchUpScheduler(
       local: local,
       remote: remote,

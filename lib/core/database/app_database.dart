@@ -39,8 +39,9 @@ class AppDatabase extends _$AppDatabase {
   /// - v10: Target local-first chat architecture (Spec §7).
   /// - v11: messageId primary key on LocalMessages.
   /// - v12: LocalChannels authoritative inbox projection.
+  /// - v13: ChannelSyncStates.newestAppliedChangeSeq durable mutation cursor.
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -162,6 +163,9 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(localChannels, localChannels.lastMessageSenderId);
             await m.addColumn(localChannels, localChannels.lastMessageFromMe);
             await m.addColumn(localChannels, localChannels.unreadCount);
+          }
+          if (from < 13) {
+            await m.addColumn(channelSyncStates, channelSyncStates.newestAppliedChangeSeq);
           }
         },
       );

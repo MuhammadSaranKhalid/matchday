@@ -46,10 +46,23 @@ class OutboxProcessor {
         channelLanes.putIfAbsent(op.channelId, () => []).add(op);
       }
 
-      // Execute channels in parallel, but operations within each channel sequentially
-      await Future.wait(
-        channelLanes.entries.map((entry) => _processChannelLane(entry.key, entry.value)),
+      // Execute channels with max 4 concurrent lanes, operations within each channel sequentially
+      const maxConcurrentLanes = 4;
+      final entries = channelLanes.entries.toList();
+      var nextIdx = 0;
+      Future<void> runWorker() async {
+        while (true) {
+          if (nextIdx >= entries.length) break;
+          final entry = entries[nextIdx++];
+          await _processChannelLane(entry.key, entry.value);
+        }
+      }
+
+      final workers = List.generate(
+        min(maxConcurrentLanes, entries.length),
+        (_) => runWorker(),
       );
+      await Future.wait(workers);
     } catch (e, st) {
       debugPrint('[OutboxProcessor] Error draining outbox: $e\n$st');
     } finally {
@@ -90,10 +103,29 @@ class OutboxProcessor {
               sendErrorCode: _extractErrorCode(e),
               sendErrorMessage: e.toString(),
             );
+
+            // Clean up storage object on terminal failure to prevent orphaned media (Spec §8.4)
+            try {
+              final attachments = await _local.getAttachmentsForMessage(op.entityId!);
+              for (final att in attachments) {
+                if (att.storagePath != null && att.storagePath!.isNotEmpty) {
+                  await _remote.deleteStorageAttachment(att.storagePath!);
+                }
+              }
+            } catch (cleanupErr) {
+              debugPrint('[OutboxProcessor] Non-critical error cleaning storage attachment: $cleanupErr');
+            }
           }
         } else {
-          // Retryable error: apply exponential backoff
-          final backoffSeconds = pow(2, nextAttempt).toInt();
+          // Retryable error: apply exponential backoff with jitter or honor slow-mode cooldown
+          final cooldownSeconds = _extractSlowModeWaitSeconds(e);
+          final int backoffSeconds;
+          if (cooldownSeconds != null && cooldownSeconds > 0) {
+            backoffSeconds = cooldownSeconds + 1;
+          } else {
+            final jitter = 0.8 + (Random().nextDouble() * 0.4);
+            backoffSeconds = max(1, (pow(2, nextAttempt) * jitter).round());
+          }
           final nextAttemptAt = DateTime.now().toUtc().add(Duration(seconds: backoffSeconds));
 
           debugPrint(
@@ -134,14 +166,19 @@ class OutboxProcessor {
           final attachmentId = payload['attachment_id'] as String?;
           final extension = payload['extension'] as String? ?? 'jpg';
           final mimeType = payload['mime_type'] as String? ?? 'image/jpeg';
+          final fileName = payload['file_name'] as String?;
+          final width = payload['width'] as int?;
+          final height = payload['height'] as int?;
 
-          if (localPath != null &&
-              attachmentId != null &&
-              (msgPayload == null || msgPayload['media_url'] == null)) {
+          String? storageUrl = msgPayload?['media_url'] as String?;
+          int? sizeBytes;
+
+          if (storageUrl == null && localPath != null && attachmentId != null) {
             final file = io.File(localPath);
             if (await file.exists()) {
               final bytes = await file.readAsBytes();
-              final storageUrl = await _remote.uploadMediaAttachment(
+              sizeBytes = bytes.length;
+              storageUrl = await _remote.uploadMediaAttachment(
                 bytes: bytes,
                 channelId: channelId,
                 messageId: messageId,
@@ -154,11 +191,23 @@ class OutboxProcessor {
                 storagePath: storageUrl,
                 uploadStatus: 'uploaded',
               );
-              msgPayload = {
-                ...?msgPayload,
-                'media_url': storageUrl,
-              };
             }
+          }
+
+          if (storageUrl != null) {
+            msgPayload = {
+              ...?msgPayload,
+              'media_url': storageUrl,
+              'attachment': {
+                if (attachmentId != null) 'attachment_id': attachmentId,
+                'storage_path': storageUrl,
+                'mime_type': mimeType,
+                if (fileName != null) 'file_name': fileName,
+                if (sizeBytes != null) 'size_bytes': sizeBytes,
+                if (width != null) 'width': width,
+                if (height != null) 'height': height,
+              },
+            };
           }
         }
 
@@ -295,6 +344,33 @@ class OutboxProcessor {
       }
     }
     return false;
+  }
+
+  int? _extractSlowModeWaitSeconds(dynamic e) {
+    if (e is PostgrestException) {
+      if (e.details != null) {
+        if (e.details is Map) {
+          final val = (e.details as Map)['retry_after_seconds'];
+          if (val is int) return val;
+          if (val is String) return int.tryParse(val);
+        } else if (e.details is String) {
+          try {
+            final decoded = jsonDecode(e.details as String);
+            if (decoded is Map && decoded['retry_after_seconds'] != null) {
+              final val = decoded['retry_after_seconds'];
+              if (val is int) return val;
+              if (val is String) return int.tryParse(val);
+            }
+          } catch (_) {}
+        }
+      }
+      // Fallback regex on message: "Please wait (\d+) seconds"
+      final match = RegExp(r'(\d+)\s*seconds').firstMatch(e.message);
+      if (match != null) {
+        return int.tryParse(match.group(1)!);
+      }
+    }
+    return null;
   }
 
   String? _extractErrorCode(dynamic e) {

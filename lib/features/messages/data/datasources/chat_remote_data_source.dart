@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -254,6 +253,34 @@ class ChatRemoteDataSource {
     return _supabase.storage
         .from('chat-media')
         .createSignedUrl(storagePath, expiresInSeconds);
+  }
+
+  /// Deletes an uploaded attachment object from private chat-media storage on terminal send failure (Spec §26).
+  Future<void> deleteStorageAttachment(String storagePath) async {
+    try {
+      await _supabase.storage.from('chat-media').remove([storagePath]);
+    } catch (e) {
+      debugPrint('[ChatRemoteDataSource] Error cleaning up storage object: $e');
+    }
+  }
+
+  /// Fetches durable changes from `chat_changes` ledger occurring after [afterChangeSeq] (Spec §12).
+  Future<List<Map<String, dynamic>>> fetchChannelChanges(
+    String channelId, {
+    int? afterChangeSeq,
+    int limit = 100,
+  }) async {
+    var query = _supabase
+        .from('chat_changes')
+        .select('*')
+        .eq('channel_id', channelId);
+
+    if (afterChangeSeq != null && afterChangeSeq > 0) {
+      query = query.gt('change_seq', afterChangeSeq);
+    }
+
+    final res = await query.order('change_seq', ascending: true).limit(limit);
+    return List<Map<String, dynamic>>.from(res as List);
   }
 
   List<ChatMessageDto> _parseMessageDtos(List<dynamic> rows) {

@@ -6156,6 +6156,16 @@ class $ChannelSyncStatesTable extends ChannelSyncStates
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _newestAppliedChangeSeqMeta =
+      const VerificationMeta('newestAppliedChangeSeq');
+  @override
+  late final GeneratedColumn<int> newestAppliedChangeSeq = GeneratedColumn<int>(
+    'newest_applied_change_seq',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _oldestCachedMessageSeqMeta =
       const VerificationMeta('oldestCachedMessageSeq');
   @override
@@ -6232,6 +6242,7 @@ class $ChannelSyncStatesTable extends ChannelSyncStates
   List<GeneratedColumn> get $columns => [
     channelId,
     newestSyncedMessageSeq,
+    newestAppliedChangeSeq,
     oldestCachedMessageSeq,
     hasMoreHistory,
     lastMemberSyncAt,
@@ -6265,6 +6276,15 @@ class $ChannelSyncStatesTable extends ChannelSyncStates
         newestSyncedMessageSeq.isAcceptableOrUnknown(
           data['newest_synced_message_seq']!,
           _newestSyncedMessageSeqMeta,
+        ),
+      );
+    }
+    if (data.containsKey('newest_applied_change_seq')) {
+      context.handle(
+        _newestAppliedChangeSeqMeta,
+        newestAppliedChangeSeq.isAcceptableOrUnknown(
+          data['newest_applied_change_seq']!,
+          _newestAppliedChangeSeqMeta,
         ),
       );
     }
@@ -6337,6 +6357,10 @@ class $ChannelSyncStatesTable extends ChannelSyncStates
         DriftSqlType.int,
         data['${effectivePrefix}newest_synced_message_seq'],
       ),
+      newestAppliedChangeSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}newest_applied_change_seq'],
+      ),
       oldestCachedMessageSeq: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}oldest_cached_message_seq'],
@@ -6376,6 +6400,7 @@ class ChannelSyncStateRow extends DataClass
     implements Insertable<ChannelSyncStateRow> {
   final String channelId;
   final int? newestSyncedMessageSeq;
+  final int? newestAppliedChangeSeq;
   final int? oldestCachedMessageSeq;
   final bool hasMoreHistory;
   final DateTime? lastMemberSyncAt;
@@ -6385,6 +6410,7 @@ class ChannelSyncStateRow extends DataClass
   const ChannelSyncStateRow({
     required this.channelId,
     this.newestSyncedMessageSeq,
+    this.newestAppliedChangeSeq,
     this.oldestCachedMessageSeq,
     required this.hasMoreHistory,
     this.lastMemberSyncAt,
@@ -6398,6 +6424,9 @@ class ChannelSyncStateRow extends DataClass
     map['channel_id'] = Variable<String>(channelId);
     if (!nullToAbsent || newestSyncedMessageSeq != null) {
       map['newest_synced_message_seq'] = Variable<int>(newestSyncedMessageSeq);
+    }
+    if (!nullToAbsent || newestAppliedChangeSeq != null) {
+      map['newest_applied_change_seq'] = Variable<int>(newestAppliedChangeSeq);
     }
     if (!nullToAbsent || oldestCachedMessageSeq != null) {
       map['oldest_cached_message_seq'] = Variable<int>(oldestCachedMessageSeq);
@@ -6423,6 +6452,10 @@ class ChannelSyncStateRow extends DataClass
           newestSyncedMessageSeq == null && nullToAbsent
               ? const Value.absent()
               : Value(newestSyncedMessageSeq),
+      newestAppliedChangeSeq:
+          newestAppliedChangeSeq == null && nullToAbsent
+              ? const Value.absent()
+              : Value(newestAppliedChangeSeq),
       oldestCachedMessageSeq:
           oldestCachedMessageSeq == null && nullToAbsent
               ? const Value.absent()
@@ -6454,6 +6487,9 @@ class ChannelSyncStateRow extends DataClass
       newestSyncedMessageSeq: serializer.fromJson<int?>(
         json['newestSyncedMessageSeq'],
       ),
+      newestAppliedChangeSeq: serializer.fromJson<int?>(
+        json['newestAppliedChangeSeq'],
+      ),
       oldestCachedMessageSeq: serializer.fromJson<int?>(
         json['oldestCachedMessageSeq'],
       ),
@@ -6472,6 +6508,7 @@ class ChannelSyncStateRow extends DataClass
     return <String, dynamic>{
       'channelId': serializer.toJson<String>(channelId),
       'newestSyncedMessageSeq': serializer.toJson<int?>(newestSyncedMessageSeq),
+      'newestAppliedChangeSeq': serializer.toJson<int?>(newestAppliedChangeSeq),
       'oldestCachedMessageSeq': serializer.toJson<int?>(oldestCachedMessageSeq),
       'hasMoreHistory': serializer.toJson<bool>(hasMoreHistory),
       'lastMemberSyncAt': serializer.toJson<DateTime?>(lastMemberSyncAt),
@@ -6484,6 +6521,7 @@ class ChannelSyncStateRow extends DataClass
   ChannelSyncStateRow copyWith({
     String? channelId,
     Value<int?> newestSyncedMessageSeq = const Value.absent(),
+    Value<int?> newestAppliedChangeSeq = const Value.absent(),
     Value<int?> oldestCachedMessageSeq = const Value.absent(),
     bool? hasMoreHistory,
     Value<DateTime?> lastMemberSyncAt = const Value.absent(),
@@ -6496,6 +6534,10 @@ class ChannelSyncStateRow extends DataClass
         newestSyncedMessageSeq.present
             ? newestSyncedMessageSeq.value
             : this.newestSyncedMessageSeq,
+    newestAppliedChangeSeq:
+        newestAppliedChangeSeq.present
+            ? newestAppliedChangeSeq.value
+            : this.newestAppliedChangeSeq,
     oldestCachedMessageSeq:
         oldestCachedMessageSeq.present
             ? oldestCachedMessageSeq.value
@@ -6518,6 +6560,10 @@ class ChannelSyncStateRow extends DataClass
           data.newestSyncedMessageSeq.present
               ? data.newestSyncedMessageSeq.value
               : this.newestSyncedMessageSeq,
+      newestAppliedChangeSeq:
+          data.newestAppliedChangeSeq.present
+              ? data.newestAppliedChangeSeq.value
+              : this.newestAppliedChangeSeq,
       oldestCachedMessageSeq:
           data.oldestCachedMessageSeq.present
               ? data.oldestCachedMessageSeq.value
@@ -6548,6 +6594,7 @@ class ChannelSyncStateRow extends DataClass
     return (StringBuffer('ChannelSyncStateRow(')
           ..write('channelId: $channelId, ')
           ..write('newestSyncedMessageSeq: $newestSyncedMessageSeq, ')
+          ..write('newestAppliedChangeSeq: $newestAppliedChangeSeq, ')
           ..write('oldestCachedMessageSeq: $oldestCachedMessageSeq, ')
           ..write('hasMoreHistory: $hasMoreHistory, ')
           ..write('lastMemberSyncAt: $lastMemberSyncAt, ')
@@ -6562,6 +6609,7 @@ class ChannelSyncStateRow extends DataClass
   int get hashCode => Object.hash(
     channelId,
     newestSyncedMessageSeq,
+    newestAppliedChangeSeq,
     oldestCachedMessageSeq,
     hasMoreHistory,
     lastMemberSyncAt,
@@ -6575,6 +6623,7 @@ class ChannelSyncStateRow extends DataClass
       (other is ChannelSyncStateRow &&
           other.channelId == this.channelId &&
           other.newestSyncedMessageSeq == this.newestSyncedMessageSeq &&
+          other.newestAppliedChangeSeq == this.newestAppliedChangeSeq &&
           other.oldestCachedMessageSeq == this.oldestCachedMessageSeq &&
           other.hasMoreHistory == this.hasMoreHistory &&
           other.lastMemberSyncAt == this.lastMemberSyncAt &&
@@ -6586,6 +6635,7 @@ class ChannelSyncStateRow extends DataClass
 class ChannelSyncStatesCompanion extends UpdateCompanion<ChannelSyncStateRow> {
   final Value<String> channelId;
   final Value<int?> newestSyncedMessageSeq;
+  final Value<int?> newestAppliedChangeSeq;
   final Value<int?> oldestCachedMessageSeq;
   final Value<bool> hasMoreHistory;
   final Value<DateTime?> lastMemberSyncAt;
@@ -6596,6 +6646,7 @@ class ChannelSyncStatesCompanion extends UpdateCompanion<ChannelSyncStateRow> {
   const ChannelSyncStatesCompanion({
     this.channelId = const Value.absent(),
     this.newestSyncedMessageSeq = const Value.absent(),
+    this.newestAppliedChangeSeq = const Value.absent(),
     this.oldestCachedMessageSeq = const Value.absent(),
     this.hasMoreHistory = const Value.absent(),
     this.lastMemberSyncAt = const Value.absent(),
@@ -6607,6 +6658,7 @@ class ChannelSyncStatesCompanion extends UpdateCompanion<ChannelSyncStateRow> {
   ChannelSyncStatesCompanion.insert({
     required String channelId,
     this.newestSyncedMessageSeq = const Value.absent(),
+    this.newestAppliedChangeSeq = const Value.absent(),
     this.oldestCachedMessageSeq = const Value.absent(),
     this.hasMoreHistory = const Value.absent(),
     this.lastMemberSyncAt = const Value.absent(),
@@ -6618,6 +6670,7 @@ class ChannelSyncStatesCompanion extends UpdateCompanion<ChannelSyncStateRow> {
   static Insertable<ChannelSyncStateRow> custom({
     Expression<String>? channelId,
     Expression<int>? newestSyncedMessageSeq,
+    Expression<int>? newestAppliedChangeSeq,
     Expression<int>? oldestCachedMessageSeq,
     Expression<bool>? hasMoreHistory,
     Expression<DateTime>? lastMemberSyncAt,
@@ -6630,6 +6683,8 @@ class ChannelSyncStatesCompanion extends UpdateCompanion<ChannelSyncStateRow> {
       if (channelId != null) 'channel_id': channelId,
       if (newestSyncedMessageSeq != null)
         'newest_synced_message_seq': newestSyncedMessageSeq,
+      if (newestAppliedChangeSeq != null)
+        'newest_applied_change_seq': newestAppliedChangeSeq,
       if (oldestCachedMessageSeq != null)
         'oldest_cached_message_seq': oldestCachedMessageSeq,
       if (hasMoreHistory != null) 'has_more_history': hasMoreHistory,
@@ -6644,6 +6699,7 @@ class ChannelSyncStatesCompanion extends UpdateCompanion<ChannelSyncStateRow> {
   ChannelSyncStatesCompanion copyWith({
     Value<String>? channelId,
     Value<int?>? newestSyncedMessageSeq,
+    Value<int?>? newestAppliedChangeSeq,
     Value<int?>? oldestCachedMessageSeq,
     Value<bool>? hasMoreHistory,
     Value<DateTime?>? lastMemberSyncAt,
@@ -6656,6 +6712,8 @@ class ChannelSyncStatesCompanion extends UpdateCompanion<ChannelSyncStateRow> {
       channelId: channelId ?? this.channelId,
       newestSyncedMessageSeq:
           newestSyncedMessageSeq ?? this.newestSyncedMessageSeq,
+      newestAppliedChangeSeq:
+          newestAppliedChangeSeq ?? this.newestAppliedChangeSeq,
       oldestCachedMessageSeq:
           oldestCachedMessageSeq ?? this.oldestCachedMessageSeq,
       hasMoreHistory: hasMoreHistory ?? this.hasMoreHistory,
@@ -6676,6 +6734,11 @@ class ChannelSyncStatesCompanion extends UpdateCompanion<ChannelSyncStateRow> {
     if (newestSyncedMessageSeq.present) {
       map['newest_synced_message_seq'] = Variable<int>(
         newestSyncedMessageSeq.value,
+      );
+    }
+    if (newestAppliedChangeSeq.present) {
+      map['newest_applied_change_seq'] = Variable<int>(
+        newestAppliedChangeSeq.value,
       );
     }
     if (oldestCachedMessageSeq.present) {
@@ -6709,6 +6772,7 @@ class ChannelSyncStatesCompanion extends UpdateCompanion<ChannelSyncStateRow> {
     return (StringBuffer('ChannelSyncStatesCompanion(')
           ..write('channelId: $channelId, ')
           ..write('newestSyncedMessageSeq: $newestSyncedMessageSeq, ')
+          ..write('newestAppliedChangeSeq: $newestAppliedChangeSeq, ')
           ..write('oldestCachedMessageSeq: $oldestCachedMessageSeq, ')
           ..write('hasMoreHistory: $hasMoreHistory, ')
           ..write('lastMemberSyncAt: $lastMemberSyncAt, ')
@@ -11976,6 +12040,7 @@ typedef $$ChannelSyncStatesTableCreateCompanionBuilder =
     ChannelSyncStatesCompanion Function({
       required String channelId,
       Value<int?> newestSyncedMessageSeq,
+      Value<int?> newestAppliedChangeSeq,
       Value<int?> oldestCachedMessageSeq,
       Value<bool> hasMoreHistory,
       Value<DateTime?> lastMemberSyncAt,
@@ -11988,6 +12053,7 @@ typedef $$ChannelSyncStatesTableUpdateCompanionBuilder =
     ChannelSyncStatesCompanion Function({
       Value<String> channelId,
       Value<int?> newestSyncedMessageSeq,
+      Value<int?> newestAppliedChangeSeq,
       Value<int?> oldestCachedMessageSeq,
       Value<bool> hasMoreHistory,
       Value<DateTime?> lastMemberSyncAt,
@@ -12013,6 +12079,11 @@ class $$ChannelSyncStatesTableFilterComposer
 
   ColumnFilters<int> get newestSyncedMessageSeq => $composableBuilder(
     column: $table.newestSyncedMessageSeq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get newestAppliedChangeSeq => $composableBuilder(
+    column: $table.newestAppliedChangeSeq,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12066,6 +12137,11 @@ class $$ChannelSyncStatesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get newestAppliedChangeSeq => $composableBuilder(
+    column: $table.newestAppliedChangeSeq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get oldestCachedMessageSeq => $composableBuilder(
     column: $table.oldestCachedMessageSeq,
     builder: (column) => ColumnOrderings(column),
@@ -12111,6 +12187,11 @@ class $$ChannelSyncStatesTableAnnotationComposer
 
   GeneratedColumn<int> get newestSyncedMessageSeq => $composableBuilder(
     column: $table.newestSyncedMessageSeq,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get newestAppliedChangeSeq => $composableBuilder(
+    column: $table.newestAppliedChangeSeq,
     builder: (column) => column,
   );
 
@@ -12193,6 +12274,7 @@ class $$ChannelSyncStatesTableTableManager
               ({
                 Value<String> channelId = const Value.absent(),
                 Value<int?> newestSyncedMessageSeq = const Value.absent(),
+                Value<int?> newestAppliedChangeSeq = const Value.absent(),
                 Value<int?> oldestCachedMessageSeq = const Value.absent(),
                 Value<bool> hasMoreHistory = const Value.absent(),
                 Value<DateTime?> lastMemberSyncAt = const Value.absent(),
@@ -12203,6 +12285,7 @@ class $$ChannelSyncStatesTableTableManager
               }) => ChannelSyncStatesCompanion(
                 channelId: channelId,
                 newestSyncedMessageSeq: newestSyncedMessageSeq,
+                newestAppliedChangeSeq: newestAppliedChangeSeq,
                 oldestCachedMessageSeq: oldestCachedMessageSeq,
                 hasMoreHistory: hasMoreHistory,
                 lastMemberSyncAt: lastMemberSyncAt,
@@ -12215,6 +12298,7 @@ class $$ChannelSyncStatesTableTableManager
               ({
                 required String channelId,
                 Value<int?> newestSyncedMessageSeq = const Value.absent(),
+                Value<int?> newestAppliedChangeSeq = const Value.absent(),
                 Value<int?> oldestCachedMessageSeq = const Value.absent(),
                 Value<bool> hasMoreHistory = const Value.absent(),
                 Value<DateTime?> lastMemberSyncAt = const Value.absent(),
@@ -12225,6 +12309,7 @@ class $$ChannelSyncStatesTableTableManager
               }) => ChannelSyncStatesCompanion.insert(
                 channelId: channelId,
                 newestSyncedMessageSeq: newestSyncedMessageSeq,
+                newestAppliedChangeSeq: newestAppliedChangeSeq,
                 oldestCachedMessageSeq: oldestCachedMessageSeq,
                 hasMoreHistory: hasMoreHistory,
                 lastMemberSyncAt: lastMemberSyncAt,

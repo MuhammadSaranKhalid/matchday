@@ -20,17 +20,7 @@ class ChatSyncCoordinator {
     required this.catchUpScheduler,
     required this.receiptCoordinator,
     required this.db,
-  }) {
-    ingestor.onMessageDelivered = (channelId, throughSeq) {
-      if (_activeUserId != null) {
-        unawaited(receiptCoordinator.markDelivered(
-          channelId,
-          _activeUserId!,
-          throughSeq,
-        ));
-      }
-    };
-  }
+  });
 
   final ChatLocalDataSource local;
   final ChatRemoteDataSource remote;
@@ -42,11 +32,9 @@ class ChatSyncCoordinator {
 
   bool _isSyncingInbox = false;
   String? _activeChannelId;
-  String? _activeUserId;
 
   /// Synchronizes the user's inbox list from Supabase into Drift.
   Future<void> syncInbox(String currentUserId) async {
-    _activeUserId = currentUserId;
     if (_isSyncingInbox) return;
     _isSyncingInbox = true;
 
@@ -67,7 +55,6 @@ class ChatSyncCoordinator {
   /// 4. Drain pending outbox operations.
   Future<void> openChannel(String channelId, String currentUserId) async {
     _activeChannelId = channelId;
-    _activeUserId = currentUserId;
 
     try {
       // 1. Subscribe to Ably real-time channel

@@ -27,7 +27,7 @@ class ChatLocalDataSource {
   Stream<List<ChatChannel>> watchInbox(String currentUserId) {
     // Watch localChannels joined with current user's localChannelMembers
     final channelQuery = _db.select(_db.localChannels).join([
-      leftOuterJoin(
+      innerJoin(
         _db.localChannelMembers,
         _db.localChannelMembers.channelId.equalsExp(_db.localChannels.channelId) &
             _db.localChannelMembers.userId.equals(currentUserId),
@@ -319,6 +319,16 @@ class ChatLocalDataSource {
         final deliveredAt =
             dto.lastDeliveredAt != null ? DateTime.tryParse(dto.lastDeliveredAt!) : null;
 
+        final pinnedAt = dto.pinnedAt != null
+            ? DateTime.tryParse(dto.pinnedAt!)
+            : (dto.isPinned ? now : null);
+        final archivedAt = dto.archivedAt != null
+            ? DateTime.tryParse(dto.archivedAt!)
+            : (dto.isArchived ? now : null);
+        final mutedUntil = dto.notificationsMutedUntil != null
+            ? DateTime.tryParse(dto.notificationsMutedUntil!)
+            : (dto.isMuted ? now.add(const Duration(days: 365)) : null);
+
         b.insert(
           _db.localChannelMembers,
           LocalChannelMembersCompanion.insert(
@@ -329,10 +339,9 @@ class ChatLocalDataSource {
             lastReadAt: Value(readAt),
             lastDeliveredMessageSeq: Value(dto.lastDeliveredMessageSeq),
             lastDeliveredAt: Value(deliveredAt),
-            pinnedAt: Value(dto.isPinned ? now : null),
-            archivedAt: Value(dto.isArchived ? now : null),
-            notificationsMutedUntil:
-                Value(dto.isMuted ? now.add(const Duration(days: 365)) : null),
+            pinnedAt: Value(pinnedAt),
+            archivedAt: Value(archivedAt),
+            notificationsMutedUntil: Value(mutedUntil),
             serverUpdatedAt: DateTime.parse(dto.updatedAt),
           ),
           onConflict: DoUpdate(
@@ -347,10 +356,9 @@ class ChatLocalDataSource {
                   : const Value.absent(),
               lastDeliveredAt:
                   deliveredAt != null ? Value(deliveredAt) : const Value.absent(),
-              pinnedAt: Value(dto.isPinned ? now : null),
-              archivedAt: Value(dto.isArchived ? now : null),
-              notificationsMutedUntil:
-                  Value(dto.isMuted ? now.add(const Duration(days: 365)) : null),
+              pinnedAt: Value(pinnedAt),
+              archivedAt: Value(archivedAt),
+              notificationsMutedUntil: Value(mutedUntil),
               serverUpdatedAt: Value(DateTime.parse(dto.updatedAt)),
             ),
           ),
@@ -476,7 +484,7 @@ class ChatLocalDataSource {
           mode: InsertMode.insertOrReplace,
         );
 
-        // Upsert attachments
+        // Upsert attachments (preserving local-only cache fields)
         for (final att in dto.attachments) {
           b.insert(
             _db.localMessageAttachments,
@@ -492,7 +500,17 @@ class ChatLocalDataSource {
               durationMs: Value(att.durationMs),
               uploadStatus: const Value('uploaded'),
             ),
-            mode: InsertMode.insertOrReplace,
+            onConflict: DoUpdate(
+              (old) => LocalMessageAttachmentsCompanion(
+                storagePath: Value(att.storagePath),
+                fileName: Value(att.fileName),
+                sizeBytes: Value(att.sizeBytes),
+                width: Value(att.width),
+                height: Value(att.height),
+                durationMs: Value(att.durationMs),
+                uploadStatus: const Value('uploaded'),
+              ),
+            ),
           );
         }
 
@@ -541,13 +559,14 @@ class ChatLocalDataSource {
           .getSingleOrNull();
 
   /// Soft-deletes a message locally.
-  Future<void> softDeleteMessageLocally(String messageId) async {
+  Future<void> softDeleteMessageLocally(String messageId, {int? version}) async {
     final now = DateTime.now().toUtc();
     await (_db.update(_db.localMessages)
           ..where((m) => m.messageId.equals(messageId)))
         .write(LocalMessagesCompanion(
       deletedAt: Value(now),
       body: const Value('This message was deleted'),
+      version: version != null ? Value(version) : const Value.absent(),
     ));
   }
 
@@ -643,6 +662,7 @@ class ChatLocalDataSource {
   Future<void> markChannelSyncSucceeded(
     String channelId, {
     required int newestSeq,
+    int? newestChangeSeq,
     int? oldestSeq,
     bool? hasMore,
   }) async {
@@ -651,6 +671,11 @@ class ChatLocalDataSource {
 
     final currentNewest = existing?.newestSyncedMessageSeq ?? 0;
     final updatedNewest = newestSeq > currentNewest ? newestSeq : currentNewest;
+
+    final currentChange = existing?.newestAppliedChangeSeq ?? 0;
+    final updatedChange = (newestChangeSeq != null && newestChangeSeq > currentChange)
+        ? newestChangeSeq
+        : existing?.newestAppliedChangeSeq;
 
     final currentOldest = existing?.oldestCachedMessageSeq;
     final updatedOldest = (oldestSeq != null && currentOldest != null)
@@ -661,6 +686,7 @@ class ChatLocalDataSource {
           ChannelSyncStatesCompanion.insert(
             channelId: channelId,
             newestSyncedMessageSeq: Value(updatedNewest),
+            newestAppliedChangeSeq: Value(updatedChange),
             oldestCachedMessageSeq: Value(updatedOldest),
             hasMoreHistory: Value(hasMore ?? existing?.hasMoreHistory ?? true),
             lastFullSyncAt: Value(now),
@@ -670,6 +696,7 @@ class ChatLocalDataSource {
           onConflict: DoUpdate(
             (old) => ChannelSyncStatesCompanion(
               newestSyncedMessageSeq: Value(updatedNewest),
+              newestAppliedChangeSeq: Value(updatedChange),
               oldestCachedMessageSeq: Value(updatedOldest),
               hasMoreHistory: Value(hasMore ?? existing?.hasMoreHistory ?? true),
               lastFullSyncAt: Value(now),
@@ -678,6 +705,25 @@ class ChatLocalDataSource {
             ),
           ),
         );
+  }
+
+  /// Advances the durable change stream cursor for [channelId] monotonically (Spec §12).
+  Future<void> updateNewestAppliedChangeSeq(String channelId, int changeSeq) async {
+    final existing = await getChannelSyncState(channelId);
+    final current = existing?.newestAppliedChangeSeq ?? 0;
+    if (changeSeq > current) {
+      await _db.into(_db.channelSyncStates).insert(
+            ChannelSyncStatesCompanion.insert(
+              channelId: channelId,
+              newestAppliedChangeSeq: Value(changeSeq),
+            ),
+            onConflict: DoUpdate(
+              (old) => ChannelSyncStatesCompanion(
+                newestAppliedChangeSeq: Value(changeSeq),
+              ),
+            ),
+          );
+    }
   }
 
   /// Marks synchronization as failed.
@@ -899,6 +945,7 @@ class ChatLocalDataSource {
     required OutboxOperationsCompanion operation,
     List<LocalMessageAttachmentsCompanion>? attachments,
   }) async {
+    final now = DateTime.now().toUtc();
     await _db.transaction(() async {
       await _db.into(_db.localMessages).insert(message);
       if (attachments != null && attachments.isNotEmpty) {
@@ -908,11 +955,15 @@ class ChatLocalDataSource {
       }
       await _db.into(_db.outboxOperations).insert(operation);
 
-      // Update channel's localUpdatedAt so inbox moves this channel to top immediately
+      // Optimistically update channel preview, sender and timestamp immediately (Spec §18, Item 36)
       await (_db.update(_db.localChannels)
             ..where((c) => c.channelId.equals(message.channelId.value)))
           .write(LocalChannelsCompanion(
-        localUpdatedAt: Value(DateTime.now().toUtc()),
+        localUpdatedAt: Value(now),
+        lastMessagePreview: message.body.present ? message.body : const Value.absent(),
+        lastMessageSenderId: message.senderId.present ? message.senderId : const Value.absent(),
+        lastMessageFromMe: const Value(true),
+        lastMessageAt: Value(message.createdAt.value ?? now),
       ));
     });
   }

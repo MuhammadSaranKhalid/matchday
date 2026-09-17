@@ -43,6 +43,9 @@ class ChatLocalFirstEngine {
   /// Starts a session for [userId], attaching realtime subscription and reconciling (Spec §8).
   Future<void> startSession(String userId) async {
     if (_isDisposed) return;
+    if (_activeUserId != null && _activeUserId != userId) {
+      endSession();
+    }
     _sessionGeneration++;
     _activeUserId = userId;
     catchUp.setSessionUser(userId);

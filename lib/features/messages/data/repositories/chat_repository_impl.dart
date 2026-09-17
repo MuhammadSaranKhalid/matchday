@@ -422,13 +422,17 @@ class ChatRepositoryImpl implements ChatRepository {
     bool selected,
   ) async {
     try {
+      final msg = await _local.getMessage(messageId);
+      final channelId = msg?.channelId ?? '';
+
       final opComp = OutboxOperationsCompanion.insert(
         operationId: _uuid.v4(),
-        channelId: '',
+        channelId: channelId,
         entityId: Value(messageId),
         operationType: 'set_reaction',
         coalesceKey: Value('reaction:$messageId:$reaction'),
         payloadJson: jsonEncode({
+          'message_id': messageId,
           'reaction': reaction,
           'selected': selected,
         }),

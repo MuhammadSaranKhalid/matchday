@@ -1022,13 +1022,13 @@ as $$
     c.kind,
     c.context_type,
     case
-      when c.kind = 'direct' then dm_user.full_name
+      when c.kind = 'direct' then dm_user.display_name
       when c.context_type = 'team' then t.team_name
-      when c.context_type = 'tournament' then tourn.title
+      when c.context_type = 'tournament' then tourn.tournament_name
       else c.title
     end as title,
     case
-      when c.kind = 'direct' then dm_user.avatar_url
+      when c.kind = 'direct' then dm_user.profile_photo_url
       when c.context_type = 'team' then t.logo_url
       when c.context_type = 'tournament' then tourn.logo_url
       else c.avatar_url
@@ -1039,7 +1039,7 @@ as $$
     t.team_name,
     t.logo_url as team_logo_url,
     t.logo_monogram as team_logo_monogram,
-    t.primary_color as team_primary_color,
+    (t.team_colors->>'primary') as team_primary_color,
     (m.status = 'active') as is_accepted,
     coalesce((
       select count(*)
@@ -1066,9 +1066,9 @@ as $$
     (m.notifications_muted_until is not null and m.notifications_muted_until > now()) as is_muted,
     m.notifications_muted_until,
     dm_user.user_id as dm_other_user_id,
-    dm_user.full_name as dm_other_user_name,
+    dm_user.display_name as dm_other_user_name,
     dm_user.username as dm_other_user_username,
-    dm_user.avatar_url as dm_other_user_avatar_url,
+    dm_user.profile_photo_url as dm_other_user_avatar_url,
     coalesce(tf.they_follow, false) as they_follow_you,
     coalesce(yf.you_follow, false) as you_follow,
     c.created_at,

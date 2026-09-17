@@ -53,7 +53,7 @@ begin
     return new;
   end if;
 
-  select full_name, avatar_url, username
+  select display_name, profile_photo_url, username
     into v_sender_name, v_sender_avatar, v_sender_username
     from public.profiles
    where user_id = new.sender_id;

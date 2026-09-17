@@ -132,7 +132,7 @@ class ChatRemoteDataSource {
       'mark_channel_read',
       params: {
         'p_channel_id': channelId,
-        'p_through_message_seq': throughSeq,
+        'p_through_seq': throughSeq,
       },
     );
   }
@@ -146,7 +146,7 @@ class ChatRemoteDataSource {
       'mark_channel_delivered',
       params: {
         'p_channel_id': channelId,
-        'p_through_message_seq': throughSeq,
+        'p_through_seq': throughSeq,
       },
     );
   }

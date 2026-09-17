@@ -755,12 +755,13 @@ begin
     raise exception 'Not authenticated' using errcode = '28000';
   end if;
 
-  select last_read_message_seq into v_current_horizon
+  select coalesce(last_read_message_seq, 0) into v_current_horizon
     from public.channel_members
    where channel_id = p_channel_id
-     and user_id = v_actor;
+     and user_id = v_actor
+     and status in ('active', 'pending');
 
-  if v_current_horizon is null then
+  if not found then
     raise exception 'User is not a member of channel' using errcode = '42501';
   end if;
 
@@ -814,12 +815,13 @@ begin
     raise exception 'Not authenticated' using errcode = '28000';
   end if;
 
-  select last_delivered_message_seq into v_current_horizon
+  select coalesce(last_delivered_message_seq, 0) into v_current_horizon
     from public.channel_members
    where channel_id = p_channel_id
-     and user_id = v_actor;
+     and user_id = v_actor
+     and status in ('active', 'pending');
 
-  if v_current_horizon is null then
+  if not found then
     raise exception 'User is not a member of channel' using errcode = '42501';
   end if;
 

@@ -38,6 +38,7 @@ class InboxScreen extends ConsumerWidget {
               chats: value,
               showBack: showBack,
               showHeader: showHeader,
+              onBell: onBell,
               onRefresh: () async {
                 ref.invalidate(myChatsProvider);
                 try {
@@ -71,12 +72,14 @@ class _Loaded extends StatelessWidget {
     required this.onRefresh,
     this.showBack = false,
     this.showHeader = true,
+    this.onBell,
   });
 
   final List<Chat> chats;
   final Future<void> Function() onRefresh;
   final bool showBack;
   final bool showHeader;
+  final VoidCallback? onBell;
 
   @override
   Widget build(BuildContext context) {
@@ -215,76 +218,7 @@ class _Loaded extends StatelessWidget {
             ),
           ),
 
-        if (!showHeader && requestChats.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: GestureDetector(
-              onTap: () => context.push('/messages/requests'),
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: ChatTheme.softSandFill,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: ChatTheme.hairlineSand),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: ChatTheme.pureSurface,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.mark_email_unread_outlined,
-                        size: 18,
-                        color: ChatTheme.charcoalInk,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Message Requests',
-                            style: ChatTheme.rowTitle(),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${requestChats.length} pending ${requestChats.length == 1 ? 'request' : 'requests'}',
-                            style: ChatTheme.bodySm(),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: ChatTheme.matchDayCoral,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '${requestChats.length}',
-                        style: ChatTheme.badge(color: ChatTheme.pureSurface)
-                            .copyWith(fontSize: 11, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      size: 20,
-                      color: ChatTheme.mutedStone,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-        // Conversation List
+        // Conversation List (Scrollable body including Messages & Requests header)
         Expanded(
           child: Container(
             color: ChatTheme.pureSurface,
@@ -292,22 +226,100 @@ class _Loaded extends StatelessWidget {
               onRefresh: onRefresh,
               color: ChatTheme.matchDayCoral,
               backgroundColor: ChatTheme.pureSurface,
-              child: visible.isEmpty
-                  ? const _EmptyList()
-                  : ListView.separated(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      itemCount: visible.length,
-                      separatorBuilder: (_, __) => const Divider(
-                        height: 1,
-                        thickness: 1,
-                        indent: 72,
-                        color: ChatTheme.hairlineSand,
-                      ),
-                      itemBuilder: (context, i) => _ChatRowItem(
-                        chat: visible[i],
-                        onOpen: () => context.push('/messages/${visible[i].id.value}'),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  if (!showHeader)
+                    SliverToBoxAdapter(
+                      child: Container(
+                        color: ChatTheme.pureSurface,
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Messages',
+                              style: ChatTheme.headlineMd(color: ChatTheme.charcoalInk).copyWith(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                context.push('/messages/requests');
+                              },
+                              behavior: HitTestBehavior.opaque,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      'Requests',
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: ChatTheme.matchDayCoral,
+                                      ),
+                                    ),
+                                    if (requestChats.isNotEmpty) ...[
+                                      const SizedBox(width: 5),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 1.5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: ChatTheme.matchDayCoral,
+                                          borderRadius: BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          '${requestChats.length}',
+                                          style: const TextStyle(
+                                            fontFamily: 'Inter',
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: ChatTheme.pureSurface,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
+                  if (visible.isEmpty)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyList(),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      sliver: SliverList.separated(
+                        itemCount: visible.length,
+                        separatorBuilder: (_, __) => const Divider(
+                          height: 1,
+                          thickness: 1,
+                          indent: 72,
+                          color: ChatTheme.hairlineSand,
+                        ),
+                        itemBuilder: (context, i) => _ChatRowItem(
+                          chat: visible[i],
+                          onOpen: () => context.push('/messages/${visible[i].id.value}'),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

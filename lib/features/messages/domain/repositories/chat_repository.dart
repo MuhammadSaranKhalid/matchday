@@ -10,6 +10,9 @@ abstract interface class ChatRepository {
   /// Reactive stream of the user's active inbox channels, backed by Drift.
   Stream<List<ChatChannel>> watchInbox();
 
+  /// Forces authoritative synchronization of the user's inbox list from Supabase into Drift.
+  Future<Either<Failure, Unit>> refreshInbox();
+
   /// Reactive stream of chronological messages in [channelId], backed by Drift.
   Stream<List<ChatMessage>> watchMessages(
     String channelId, {

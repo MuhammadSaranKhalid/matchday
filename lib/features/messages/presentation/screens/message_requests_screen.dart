@@ -24,10 +24,7 @@ class MessageRequestsScreen extends ConsumerWidget {
           AsyncData(:final value) => _RequestsBody(
               requests: value.where((c) => c.isRequest).toList(),
               onRefresh: () async {
-                ref.invalidate(myChatsProvider);
-                try {
-                  await ref.read(myChatsProvider.future);
-                } catch (_) {}
+                await ref.read(chatRepositoryProvider).refreshInbox();
               },
             ),
           AsyncError() => Center(
@@ -48,7 +45,7 @@ class MessageRequestsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     OutlinedButton(
-                      onPressed: () => ref.invalidate(myChatsProvider),
+                      onPressed: () => ref.read(chatRepositoryProvider).refreshInbox(),
                       child: const Text('Retry'),
                     ),
                   ],
@@ -174,7 +171,7 @@ class _RequestsBody extends StatelessWidget {
 
         // Hidden Requests Shortcut Row
         Container(
-          color: ChatTheme.pureSurface,
+          color: ChatTheme.clubhouseCanvas,
           child: InkWell(
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -249,11 +246,11 @@ class _RequestsBody extends StatelessWidget {
         // Request Tiles List
         Expanded(
           child: Container(
-            color: ChatTheme.pureSurface,
+            color: ChatTheme.clubhouseCanvas,
             child: RefreshIndicator(
               onRefresh: onRefresh,
               color: ChatTheme.matchDayCoral,
-              backgroundColor: ChatTheme.pureSurface,
+              backgroundColor: ChatTheme.clubhouseCanvas,
               child: requests.isEmpty
                   ? const _EmptyRequests()
                   : ListView.separated(
@@ -264,7 +261,6 @@ class _RequestsBody extends StatelessWidget {
                         return const Divider(
                           height: 1,
                           thickness: 1,
-                          indent: 72,
                           color: ChatTheme.hairlineSand,
                         );
                       },
@@ -321,121 +317,127 @@ class _RequestTile extends StatelessWidget {
     final timeStr = _formatTime(chat.lastMessageAt);
     final preview = chat.lastMessagePreview ?? 'Sent a message';
 
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 44px Avatar with cricket sport badge
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: ChatTheme.softSandFill,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: ChatTheme.hairlineSand),
-                  ),
-                  child: Text(
-                    mono,
-                    style: ChatTheme.badge(
-                      color: ChatTheme.charcoalInk,
-                    ).copyWith(fontSize: 15, fontWeight: FontWeight.w700),
-                  ),
-                ),
-                Positioned(
-                  bottom: -1,
-                  right: -1,
-                  child: Container(
-                    width: 16,
-                    height: 16,
+    return Material(
+      color: ChatTheme.clubhouseCanvas,
+      child: InkWell(
+        onTap: onTap,
+        splashColor: ChatTheme.charcoalInk.withValues(alpha: 0.04),
+        highlightColor: ChatTheme.charcoalInk.withValues(alpha: 0.02),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 44px Avatar with cricket sport badge
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: ChatTheme.matchDayCoral,
+                      color: ChatTheme.softSandFill,
                       shape: BoxShape.circle,
-                      border: Border.all(color: ChatTheme.pureSurface, width: 1.5),
+                      border: Border.all(color: ChatTheme.hairlineSand),
                     ),
-                    child: const Icon(
-                      Icons.sports_cricket_rounded,
-                      size: 9,
-                      color: ChatTheme.pureSurface,
+                    child: Text(
+                      mono,
+                      style: ChatTheme.badge(
+                        color: ChatTheme.charcoalInk,
+                      ).copyWith(fontSize: 15, fontWeight: FontWeight.w700),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 12),
-
-            // Middle info column
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Row 1: Name and Timestamp
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: ChatTheme.rowTitle(),
-                        ),
+                  Positioned(
+                    bottom: -1,
+                    right: -1,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: ChatTheme.matchDayCoral,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: ChatTheme.pureSurface, width: 1.5),
                       ),
-                      if (timeStr.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          timeStr,
-                          style: ChatTheme.timestamp(),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-
-                  // Row 2: Handle & Context
-                  Text(
-                    handle != null && handle.isNotEmpty
-                        ? '@$handle • Direct Message'
-                        : 'Player Inquiry',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: ChatTheme.metadata(color: ChatTheme.mutedStone),
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Row 3: Snippet Preview with Coral Unread Dot
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '"$preview"',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: ChatTheme.bodySm(color: ChatTheme.charcoalInk),
-                        ),
+                      child: const Icon(
+                        Icons.sports_cricket_rounded,
+                        size: 9.5,
+                        color: ChatTheme.pureSurface,
                       ),
-                      const SizedBox(width: 6),
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: ChatTheme.matchDayCoral,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+
+              // Middle Info Column
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Row 1: Name + Category badge + Timestamp
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: ChatTheme.rowTitle(
+                              color: ChatTheme.charcoalInk,
+                            ),
+                          ),
+                        ),
+                        if (timeStr.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            timeStr,
+                            style: ChatTheme.timestamp(color: ChatTheme.charcoalInk),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+
+                    // Row 2: Subtitle / context
+                    Text(
+                      handle != null && handle.isNotEmpty
+                          ? '@$handle • Direct Message'
+                          : 'Player Inquiry',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ChatTheme.metadata(color: ChatTheme.mutedStone),
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Row 3: Snippet Preview with Coral Unread Dot
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '"$preview"',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: ChatTheme.bodySm(color: ChatTheme.charcoalInk),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: const BoxDecoration(
+                            color: ChatTheme.matchDayCoral,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

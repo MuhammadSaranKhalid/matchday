@@ -65,6 +65,20 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> refreshInbox() async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return left(const AuthFailure('User not authenticated'));
+    }
+    try {
+      await _syncCoordinator.syncInbox(userId);
+      return right(unit);
+    } catch (e) {
+      return left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Stream<List<ChatMessage>> watchMessages(
     String channelId, {
     int? beforeMessageSeq,

@@ -58,6 +58,7 @@ class ChatChannel extends Equatable {
     this.dmOtherUserName,
     this.dmOtherUserUsername,
     this.dmOtherUserAvatarUrl,
+    this.dmOtherMemberStatus,
     this.youFollow = false,
     this.theyFollowYou = false,
     this.teamName,
@@ -98,6 +99,7 @@ class ChatChannel extends Equatable {
   final String? dmOtherUserName;
   final String? dmOtherUserUsername;
   final String? dmOtherUserAvatarUrl;
+  final String? dmOtherMemberStatus;
   final bool youFollow;
   final bool theyFollowYou;
 
@@ -121,7 +123,10 @@ class ChatChannel extends Equatable {
   bool get isRequest => isDm && !isAccepted && !lastMessageFromMe && !youFollow;
 
   /// Outgoing message request waiting for recipient approval
-  bool get isPendingOutgoingRequest => isDm && !isAccepted && lastMessageFromMe && !theyFollowYou;
+  bool get isPendingOutgoingRequest =>
+      isDm &&
+      ((!isAccepted && lastMessageFromMe && !theyFollowYou) ||
+       (isAccepted && dmOtherMemberStatus == 'pending' && !theyFollowYou));
 
   String get displayName {
     if (isDm) {
@@ -130,6 +135,9 @@ class ChatChannel extends Equatable {
       }
       if (dmOtherUserUsername != null && dmOtherUserUsername!.trim().isNotEmpty) {
         return '@${dmOtherUserUsername!.trim()}';
+      }
+      if (name.trim().isNotEmpty && name.trim().toLowerCase() != 'direct message') {
+        return name.trim();
       }
       return 'Direct Message';
     }
@@ -179,6 +187,7 @@ class ChatChannel extends Equatable {
         dmOtherUserName,
         dmOtherUserUsername,
         dmOtherUserAvatarUrl,
+        dmOtherMemberStatus,
         youFollow,
         theyFollowYou,
         teamName,

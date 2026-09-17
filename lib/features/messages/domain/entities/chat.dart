@@ -21,6 +21,7 @@ class Chat {
     this.dmOtherUserName,
     this.dmOtherUserUsername,
     this.dmOtherUserAvatarUrl,
+    this.dmOtherMemberStatus,
     this.youFollow = false,
     this.theyFollowYou = false,
     this.isAccepted = true,
@@ -44,6 +45,7 @@ class Chat {
   final String? dmOtherUserName;
   final String? dmOtherUserUsername;
   final String? dmOtherUserAvatarUrl;
+  final String? dmOtherMemberStatus;
   final bool youFollow;
   final bool theyFollowYou;
   final bool isAccepted;
@@ -70,7 +72,10 @@ class Chat {
   bool get isRequest => isDm && !isAccepted && !lastMessageFromMe && !youFollow;
 
   /// Whether this conversation is an outgoing message request waiting for recipient approval.
-  bool get isPendingOutgoingRequest => isDm && !isAccepted && lastMessageFromMe && !theyFollowYou;
+  bool get isPendingOutgoingRequest =>
+      isDm &&
+      ((!isAccepted && lastMessageFromMe && !theyFollowYou) ||
+       (isAccepted && dmOtherMemberStatus == 'pending' && !theyFollowYou));
 
   String get displayName {
     if (isDm) {
@@ -79,6 +84,9 @@ class Chat {
       }
       if (dmOtherUserUsername != null && dmOtherUserUsername!.trim().isNotEmpty) {
         return '@${dmOtherUserUsername!.trim()}';
+      }
+      if (name.trim().isNotEmpty && name.trim().toLowerCase() != 'direct message') {
+        return name.trim();
       }
       return 'Direct Message';
     }
@@ -117,6 +125,7 @@ class Chat {
       other.dmOtherUserName == dmOtherUserName &&
       other.dmOtherUserUsername == dmOtherUserUsername &&
       other.dmOtherUserAvatarUrl == dmOtherUserAvatarUrl &&
+      other.dmOtherMemberStatus == dmOtherMemberStatus &&
       other.youFollow == youFollow &&
       other.theyFollowYou == theyFollowYou &&
       other.isAccepted == isAccepted &&
@@ -141,6 +150,7 @@ class Chat {
         dmOtherUserName,
         dmOtherUserUsername,
         dmOtherUserAvatarUrl,
+        dmOtherMemberStatus,
         youFollow,
         theyFollowYou,
         isAccepted,

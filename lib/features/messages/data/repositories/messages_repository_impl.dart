@@ -24,6 +24,9 @@ class MessagesRepositoryImpl implements MessagesRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> refreshInbox() => _chatRepo.refreshInbox();
+
+  @override
   Stream<List<Message>> watchMessages(ChatId chatId) {
     return _chatRepo.watchMessages(chatId.value).map((messages) => messages.map(_messageFromChatMessage).toList());
   }
@@ -130,6 +133,7 @@ class MessagesRepositoryImpl implements MessagesRepository {
       dmOtherUserName: c.dmOtherUserName,
       dmOtherUserUsername: c.dmOtherUserUsername,
       dmOtherUserAvatarUrl: c.dmOtherUserAvatarUrl,
+      dmOtherMemberStatus: c.dmOtherMemberStatus,
       youFollow: c.youFollow,
       theyFollowYou: c.theyFollowYou,
       isAccepted: c.isAccepted,

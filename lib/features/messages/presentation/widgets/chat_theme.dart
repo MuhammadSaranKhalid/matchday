@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/circk_theme.dart';
+
 /// Design tokens derived directly from the Matchday Stitch Design System
 /// (Clubhouse Utility aesthetic).
 abstract final class ChatTheme {
   // ─── Colors ─────────────────────────────────────────────────────────────
-  /// Warm, organic off-white foundation canvas (#F7F5F0).
-  static const clubhouseCanvas = Color(0xFFF7F5F0);
+  /// Warm, organic off-white foundation canvas matching main pages (CkColors.paper #FBFAF6).
+  static const clubhouseCanvas = CkColors.paper;
 
   /// Dense charcoal for primary text, titles, and self-sent bubbles (#24231F).
   static const charcoalInk = Color(0xFF24231F);

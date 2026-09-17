@@ -40,19 +40,16 @@ class InboxScreen extends ConsumerWidget {
               showHeader: showHeader,
               onBell: onBell,
               onRefresh: () async {
-                ref.invalidate(myChatsProvider);
-                try {
-                  await ref.read(myChatsProvider.future);
-                } catch (_) {}
+                await ref.read(chatRepositoryProvider).refreshInbox();
               },
             ),
           AsyncError(:final error) => _ErrorView(
               message: _messageFor(error),
               onRetry: () {
-                ref.invalidate(myChatsProvider);
+                ref.read(chatRepositoryProvider).refreshInbox();
               },
             ),
-          _ => const _Skeleton(),
+          _ => _Skeleton(showHeader: showHeader),
         },
       ),
     );
@@ -221,18 +218,18 @@ class _Loaded extends StatelessWidget {
         // Conversation List (Scrollable body including Messages & Requests header)
         Expanded(
           child: Container(
-            color: ChatTheme.pureSurface,
+            color: ChatTheme.clubhouseCanvas,
             child: RefreshIndicator(
               onRefresh: onRefresh,
               color: ChatTheme.matchDayCoral,
-              backgroundColor: ChatTheme.pureSurface,
+              backgroundColor: ChatTheme.clubhouseCanvas,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   if (!showHeader)
                     SliverToBoxAdapter(
                       child: Container(
-                        color: ChatTheme.pureSurface,
+                        color: ChatTheme.clubhouseCanvas,
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -309,7 +306,6 @@ class _Loaded extends StatelessWidget {
                         separatorBuilder: (_, __) => const Divider(
                           height: 1,
                           thickness: 1,
-                          indent: 72,
                           color: ChatTheme.hairlineSand,
                         ),
                         itemBuilder: (context, i) => _ChatRowItem(
@@ -363,12 +359,12 @@ class _ChatRowItem extends StatelessWidget {
     final mono = chat.displayMonogram;
 
     return Material(
-      color: ChatTheme.pureSurface,
+      color: ChatTheme.clubhouseCanvas,
       child: InkWell(
         onTap: onOpen,
         onLongPress: () => _showContextMenu(context),
         splashColor: ChatTheme.charcoalInk.withValues(alpha: 0.04),
-        highlightColor: ChatTheme.clubhouseCanvas,
+        highlightColor: ChatTheme.charcoalInk.withValues(alpha: 0.02),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
@@ -442,7 +438,7 @@ class _ChatRowItem extends StatelessWidget {
                           ),
                         ),
                         if (timeStr.isNotEmpty) ...[
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 8),
                           Text(
                             timeStr,
                             style: ChatTheme.timestamp(),
@@ -582,32 +578,33 @@ class _ChatRowItem extends StatelessWidget {
               ),
               const Divider(height: 1, color: ChatTheme.hairlineSand),
               ListTile(
-                leading: const Icon(
-                  Icons.reply_rounded,
-                  color: ChatTheme.matchDayCoral,
-                ),
-                title: Text(
-                  'Open & Reply',
-                  style: ChatTheme.bodyMd(fontWeight: FontWeight.w600),
-                ),
+                leading: const Icon(Icons.notifications_off_outlined, color: ChatTheme.charcoalInk),
+                title: Text('Mute Notifications', style: ChatTheme.rowTitle()),
                 onTap: () {
-                  Navigator.pop(ctx);
-                  onOpen();
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Notifications muted')),
+                  );
                 },
               ),
               ListTile(
-                leading: const Icon(
-                  Icons.mark_chat_read_outlined,
-                  color: ChatTheme.charcoalInk,
-                ),
-                title: Text(
-                  'Mark as Read',
-                  style: ChatTheme.bodyMd(),
-                ),
+                leading: const Icon(Icons.mark_email_read_outlined, color: ChatTheme.charcoalInk),
+                title: Text('Mark as read', style: ChatTheme.rowTitle()),
                 onTap: () {
-                  Navigator.pop(ctx);
+                  Navigator.of(ctx).pop();
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.archive_outlined, color: ChatTheme.charcoalInk),
+                title: Text('Archive Chat', style: ChatTheme.rowTitle()),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Chat archived')),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -619,24 +616,27 @@ class _ChatRowItem extends StatelessWidget {
 // ─── Skeletons & Empty States ────────────────────────────────────────────────
 
 class _Skeleton extends StatelessWidget {
-  const _Skeleton();
+  const _Skeleton({this.showHeader = true});
+
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
-          decoration: const BoxDecoration(
-            color: ChatTheme.clubhouseCanvas,
-            border: Border(bottom: BorderSide(color: ChatTheme.hairlineSand)),
+        if (showHeader)
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
+            decoration: const BoxDecoration(
+              color: ChatTheme.clubhouseCanvas,
+              border: Border(bottom: BorderSide(color: ChatTheme.hairlineSand)),
+            ),
+            child: Row(
+              children: [
+                Text('Chats', style: ChatTheme.headlineLg()),
+              ],
+            ),
           ),
-          child: Row(
-            children: [
-              Text('Chats', style: ChatTheme.headlineLg()),
-            ],
-          ),
-        ),
         const Expanded(
           child: InboxShimmerSkeleton(),
         ),

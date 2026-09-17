@@ -56,7 +56,7 @@ class ChatLocalFirstEngine {
     ingestor.subscribeToUserInbox(
       userId,
       onUpdated: () {
-        // Realtime notification of activity on inbox
+        unawaited(reconcile('inbox_realtime_event'));
       },
     );
 

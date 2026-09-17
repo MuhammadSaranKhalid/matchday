@@ -16,6 +16,9 @@ abstract class MessagesRepository {
   /// Streams the current user's chats, sorted by `last_message_at` desc.
   Stream<List<Chat>> watchMyChats();
 
+  /// Forces authoritative synchronization of the user's inbox list from Supabase into Drift.
+  Future<Either<Failure, Unit>> refreshInbox();
+
   /// Streams the messages in a chat, sorted by `created_at` asc. Backed by
   /// an initial fetch of the LATEST 50 messages + a Supabase broadcast
   /// subscription on `chat:<chat_id>:messages` (event `new_message`, fired

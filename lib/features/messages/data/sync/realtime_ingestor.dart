@@ -58,7 +58,7 @@ class RealtimeIngestor {
                 final createdAt = dateStr != null
                     ? DateTime.tryParse(dateStr) ?? DateTime.now().toUtc()
                     : DateTime.now().toUtc();
-                await _local.updateChannelSummaryFromRealtime(
+                final updated = await _local.updateChannelSummaryFromRealtime(
                   channelId: channelId,
                   lastMessageSeq: seq,
                   lastMessageAt: createdAt,
@@ -71,7 +71,9 @@ class RealtimeIngestor {
                 );
 
                 // Targeted catch-up for missing deltas (Spec §10, §11)
-                onTargetedCatchUpRequested?.call(channelId);
+                if (updated) {
+                  onTargetedCatchUpRequested?.call(channelId);
+                }
               }
             }
           } catch (e) {

@@ -29,12 +29,9 @@ class AppDatabase extends _$AppDatabase {
   /// An instance over a caller-supplied executor, for tests.
   AppDatabase.forTesting(super.executor);
 
-  /// Canonical production baseline schema (v1).
-  ///
-  /// In pre-release development, all legacy incremental upgrade ladders
-  /// have been consolidated into the canonical v1 baseline schema.
+  /// Canonical production baseline schema (v2).
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -44,6 +41,15 @@ class AppDatabase extends _$AppDatabase {
           await _createScoringIndexes(m);
         },
         onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(localChannels, localChannels.dmOtherUserId);
+            await m.addColumn(localChannels, localChannels.dmOtherUserName);
+            await m.addColumn(localChannels, localChannels.dmOtherUserUsername);
+            await m.addColumn(localChannels, localChannels.dmOtherUserAvatarUrl);
+            await m.addColumn(localChannels, localChannels.dmOtherMemberStatus);
+            await m.addColumn(localChannels, localChannels.youFollow);
+            await m.addColumn(localChannels, localChannels.theyFollowYou);
+          }
           // Pre-release development: ensure all tables and indexes exist cleanly
           await m.createAll();
           await _createChatIndexes(m);

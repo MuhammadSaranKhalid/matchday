@@ -49,6 +49,15 @@ class LocalChannels extends Table {
   DateTimeColumn get serverUpdatedAt => dateTime()();
   DateTimeColumn get localUpdatedAt => dateTime()();
 
+  // DM Counterparty metadata & relationship state (Spec §7)
+  TextColumn get dmOtherUserId => text().nullable()();
+  TextColumn get dmOtherUserName => text().nullable()();
+  TextColumn get dmOtherUserUsername => text().nullable()();
+  TextColumn get dmOtherUserAvatarUrl => text().nullable()();
+  TextColumn get dmOtherMemberStatus => text().nullable()();
+  BoolColumn get youFollow => boolean().withDefault(const Constant(false))();
+  BoolColumn get theyFollowYou => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {channelId};
 }

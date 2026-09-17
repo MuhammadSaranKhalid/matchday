@@ -512,6 +512,91 @@ class $LocalChannelsTable extends LocalChannels
         type: DriftSqlType.dateTime,
         requiredDuringInsert: true,
       );
+  static const VerificationMeta _dmOtherUserIdMeta = const VerificationMeta(
+    'dmOtherUserId',
+  );
+  @override
+  late final GeneratedColumn<String> dmOtherUserId = GeneratedColumn<String>(
+    'dm_other_user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dmOtherUserNameMeta = const VerificationMeta(
+    'dmOtherUserName',
+  );
+  @override
+  late final GeneratedColumn<String> dmOtherUserName = GeneratedColumn<String>(
+    'dm_other_user_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dmOtherUserUsernameMeta =
+      const VerificationMeta('dmOtherUserUsername');
+  @override
+  late final GeneratedColumn<String> dmOtherUserUsername =
+      GeneratedColumn<String>(
+        'dm_other_user_username',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _dmOtherUserAvatarUrlMeta =
+      const VerificationMeta('dmOtherUserAvatarUrl');
+  @override
+  late final GeneratedColumn<String> dmOtherUserAvatarUrl =
+      GeneratedColumn<String>(
+        'dm_other_user_avatar_url',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _dmOtherMemberStatusMeta =
+      const VerificationMeta('dmOtherMemberStatus');
+  @override
+  late final GeneratedColumn<String> dmOtherMemberStatus =
+      GeneratedColumn<String>(
+        'dm_other_member_status',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _youFollowMeta = const VerificationMeta(
+    'youFollow',
+  );
+  @override
+  late final GeneratedColumn<bool> youFollow = GeneratedColumn<bool>(
+    'you_follow',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("you_follow" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _theyFollowYouMeta = const VerificationMeta(
+    'theyFollowYou',
+  );
+  @override
+  late final GeneratedColumn<bool> theyFollowYou = GeneratedColumn<bool>(
+    'they_follow_you',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("they_follow_you" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     channelId,
@@ -535,6 +620,13 @@ class $LocalChannelsTable extends LocalChannels
     unreadCount,
     serverUpdatedAt,
     localUpdatedAt,
+    dmOtherUserId,
+    dmOtherUserName,
+    dmOtherUserUsername,
+    dmOtherUserAvatarUrl,
+    dmOtherMemberStatus,
+    youFollow,
+    theyFollowYou,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -719,6 +811,66 @@ class $LocalChannelsTable extends LocalChannels
     } else if (isInserting) {
       context.missing(_localUpdatedAtMeta);
     }
+    if (data.containsKey('dm_other_user_id')) {
+      context.handle(
+        _dmOtherUserIdMeta,
+        dmOtherUserId.isAcceptableOrUnknown(
+          data['dm_other_user_id']!,
+          _dmOtherUserIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dm_other_user_name')) {
+      context.handle(
+        _dmOtherUserNameMeta,
+        dmOtherUserName.isAcceptableOrUnknown(
+          data['dm_other_user_name']!,
+          _dmOtherUserNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dm_other_user_username')) {
+      context.handle(
+        _dmOtherUserUsernameMeta,
+        dmOtherUserUsername.isAcceptableOrUnknown(
+          data['dm_other_user_username']!,
+          _dmOtherUserUsernameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dm_other_user_avatar_url')) {
+      context.handle(
+        _dmOtherUserAvatarUrlMeta,
+        dmOtherUserAvatarUrl.isAcceptableOrUnknown(
+          data['dm_other_user_avatar_url']!,
+          _dmOtherUserAvatarUrlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dm_other_member_status')) {
+      context.handle(
+        _dmOtherMemberStatusMeta,
+        dmOtherMemberStatus.isAcceptableOrUnknown(
+          data['dm_other_member_status']!,
+          _dmOtherMemberStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('you_follow')) {
+      context.handle(
+        _youFollowMeta,
+        youFollow.isAcceptableOrUnknown(data['you_follow']!, _youFollowMeta),
+      );
+    }
+    if (data.containsKey('they_follow_you')) {
+      context.handle(
+        _theyFollowYouMeta,
+        theyFollowYou.isAcceptableOrUnknown(
+          data['they_follow_you']!,
+          _theyFollowYouMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -822,6 +974,36 @@ class $LocalChannelsTable extends LocalChannels
             DriftSqlType.dateTime,
             data['${effectivePrefix}local_updated_at'],
           )!,
+      dmOtherUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dm_other_user_id'],
+      ),
+      dmOtherUserName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dm_other_user_name'],
+      ),
+      dmOtherUserUsername: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dm_other_user_username'],
+      ),
+      dmOtherUserAvatarUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dm_other_user_avatar_url'],
+      ),
+      dmOtherMemberStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dm_other_member_status'],
+      ),
+      youFollow:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}you_follow'],
+          )!,
+      theyFollowYou:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}they_follow_you'],
+          )!,
     );
   }
 
@@ -853,6 +1035,13 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
   final int unreadCount;
   final DateTime serverUpdatedAt;
   final DateTime localUpdatedAt;
+  final String? dmOtherUserId;
+  final String? dmOtherUserName;
+  final String? dmOtherUserUsername;
+  final String? dmOtherUserAvatarUrl;
+  final String? dmOtherMemberStatus;
+  final bool youFollow;
+  final bool theyFollowYou;
   const LocalChannelRow({
     required this.channelId,
     required this.channelKey,
@@ -875,6 +1064,13 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
     required this.unreadCount,
     required this.serverUpdatedAt,
     required this.localUpdatedAt,
+    this.dmOtherUserId,
+    this.dmOtherUserName,
+    this.dmOtherUserUsername,
+    this.dmOtherUserAvatarUrl,
+    this.dmOtherMemberStatus,
+    required this.youFollow,
+    required this.theyFollowYou,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -922,6 +1118,23 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
     map['unread_count'] = Variable<int>(unreadCount);
     map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt);
     map['local_updated_at'] = Variable<DateTime>(localUpdatedAt);
+    if (!nullToAbsent || dmOtherUserId != null) {
+      map['dm_other_user_id'] = Variable<String>(dmOtherUserId);
+    }
+    if (!nullToAbsent || dmOtherUserName != null) {
+      map['dm_other_user_name'] = Variable<String>(dmOtherUserName);
+    }
+    if (!nullToAbsent || dmOtherUserUsername != null) {
+      map['dm_other_user_username'] = Variable<String>(dmOtherUserUsername);
+    }
+    if (!nullToAbsent || dmOtherUserAvatarUrl != null) {
+      map['dm_other_user_avatar_url'] = Variable<String>(dmOtherUserAvatarUrl);
+    }
+    if (!nullToAbsent || dmOtherMemberStatus != null) {
+      map['dm_other_member_status'] = Variable<String>(dmOtherMemberStatus);
+    }
+    map['you_follow'] = Variable<bool>(youFollow);
+    map['they_follow_you'] = Variable<bool>(theyFollowYou);
     return map;
   }
 
@@ -975,6 +1188,28 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
       unreadCount: Value(unreadCount),
       serverUpdatedAt: Value(serverUpdatedAt),
       localUpdatedAt: Value(localUpdatedAt),
+      dmOtherUserId:
+          dmOtherUserId == null && nullToAbsent
+              ? const Value.absent()
+              : Value(dmOtherUserId),
+      dmOtherUserName:
+          dmOtherUserName == null && nullToAbsent
+              ? const Value.absent()
+              : Value(dmOtherUserName),
+      dmOtherUserUsername:
+          dmOtherUserUsername == null && nullToAbsent
+              ? const Value.absent()
+              : Value(dmOtherUserUsername),
+      dmOtherUserAvatarUrl:
+          dmOtherUserAvatarUrl == null && nullToAbsent
+              ? const Value.absent()
+              : Value(dmOtherUserAvatarUrl),
+      dmOtherMemberStatus:
+          dmOtherMemberStatus == null && nullToAbsent
+              ? const Value.absent()
+              : Value(dmOtherMemberStatus),
+      youFollow: Value(youFollow),
+      theyFollowYou: Value(theyFollowYou),
     );
   }
 
@@ -1009,6 +1244,19 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
       unreadCount: serializer.fromJson<int>(json['unreadCount']),
       serverUpdatedAt: serializer.fromJson<DateTime>(json['serverUpdatedAt']),
       localUpdatedAt: serializer.fromJson<DateTime>(json['localUpdatedAt']),
+      dmOtherUserId: serializer.fromJson<String?>(json['dmOtherUserId']),
+      dmOtherUserName: serializer.fromJson<String?>(json['dmOtherUserName']),
+      dmOtherUserUsername: serializer.fromJson<String?>(
+        json['dmOtherUserUsername'],
+      ),
+      dmOtherUserAvatarUrl: serializer.fromJson<String?>(
+        json['dmOtherUserAvatarUrl'],
+      ),
+      dmOtherMemberStatus: serializer.fromJson<String?>(
+        json['dmOtherMemberStatus'],
+      ),
+      youFollow: serializer.fromJson<bool>(json['youFollow']),
+      theyFollowYou: serializer.fromJson<bool>(json['theyFollowYou']),
     );
   }
   @override
@@ -1036,6 +1284,13 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
       'unreadCount': serializer.toJson<int>(unreadCount),
       'serverUpdatedAt': serializer.toJson<DateTime>(serverUpdatedAt),
       'localUpdatedAt': serializer.toJson<DateTime>(localUpdatedAt),
+      'dmOtherUserId': serializer.toJson<String?>(dmOtherUserId),
+      'dmOtherUserName': serializer.toJson<String?>(dmOtherUserName),
+      'dmOtherUserUsername': serializer.toJson<String?>(dmOtherUserUsername),
+      'dmOtherUserAvatarUrl': serializer.toJson<String?>(dmOtherUserAvatarUrl),
+      'dmOtherMemberStatus': serializer.toJson<String?>(dmOtherMemberStatus),
+      'youFollow': serializer.toJson<bool>(youFollow),
+      'theyFollowYou': serializer.toJson<bool>(theyFollowYou),
     };
   }
 
@@ -1061,6 +1316,13 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
     int? unreadCount,
     DateTime? serverUpdatedAt,
     DateTime? localUpdatedAt,
+    Value<String?> dmOtherUserId = const Value.absent(),
+    Value<String?> dmOtherUserName = const Value.absent(),
+    Value<String?> dmOtherUserUsername = const Value.absent(),
+    Value<String?> dmOtherUserAvatarUrl = const Value.absent(),
+    Value<String?> dmOtherMemberStatus = const Value.absent(),
+    bool? youFollow,
+    bool? theyFollowYou,
   }) => LocalChannelRow(
     channelId: channelId ?? this.channelId,
     channelKey: channelKey ?? this.channelKey,
@@ -1091,6 +1353,24 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
     unreadCount: unreadCount ?? this.unreadCount,
     serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
     localUpdatedAt: localUpdatedAt ?? this.localUpdatedAt,
+    dmOtherUserId:
+        dmOtherUserId.present ? dmOtherUserId.value : this.dmOtherUserId,
+    dmOtherUserName:
+        dmOtherUserName.present ? dmOtherUserName.value : this.dmOtherUserName,
+    dmOtherUserUsername:
+        dmOtherUserUsername.present
+            ? dmOtherUserUsername.value
+            : this.dmOtherUserUsername,
+    dmOtherUserAvatarUrl:
+        dmOtherUserAvatarUrl.present
+            ? dmOtherUserAvatarUrl.value
+            : this.dmOtherUserAvatarUrl,
+    dmOtherMemberStatus:
+        dmOtherMemberStatus.present
+            ? dmOtherMemberStatus.value
+            : this.dmOtherMemberStatus,
+    youFollow: youFollow ?? this.youFollow,
+    theyFollowYou: theyFollowYou ?? this.theyFollowYou,
   );
   LocalChannelRow copyWithCompanion(LocalChannelsCompanion data) {
     return LocalChannelRow(
@@ -1144,6 +1424,31 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
           data.localUpdatedAt.present
               ? data.localUpdatedAt.value
               : this.localUpdatedAt,
+      dmOtherUserId:
+          data.dmOtherUserId.present
+              ? data.dmOtherUserId.value
+              : this.dmOtherUserId,
+      dmOtherUserName:
+          data.dmOtherUserName.present
+              ? data.dmOtherUserName.value
+              : this.dmOtherUserName,
+      dmOtherUserUsername:
+          data.dmOtherUserUsername.present
+              ? data.dmOtherUserUsername.value
+              : this.dmOtherUserUsername,
+      dmOtherUserAvatarUrl:
+          data.dmOtherUserAvatarUrl.present
+              ? data.dmOtherUserAvatarUrl.value
+              : this.dmOtherUserAvatarUrl,
+      dmOtherMemberStatus:
+          data.dmOtherMemberStatus.present
+              ? data.dmOtherMemberStatus.value
+              : this.dmOtherMemberStatus,
+      youFollow: data.youFollow.present ? data.youFollow.value : this.youFollow,
+      theyFollowYou:
+          data.theyFollowYou.present
+              ? data.theyFollowYou.value
+              : this.theyFollowYou,
     );
   }
 
@@ -1170,7 +1475,14 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
           ..write('lastMessageFromMe: $lastMessageFromMe, ')
           ..write('unreadCount: $unreadCount, ')
           ..write('serverUpdatedAt: $serverUpdatedAt, ')
-          ..write('localUpdatedAt: $localUpdatedAt')
+          ..write('localUpdatedAt: $localUpdatedAt, ')
+          ..write('dmOtherUserId: $dmOtherUserId, ')
+          ..write('dmOtherUserName: $dmOtherUserName, ')
+          ..write('dmOtherUserUsername: $dmOtherUserUsername, ')
+          ..write('dmOtherUserAvatarUrl: $dmOtherUserAvatarUrl, ')
+          ..write('dmOtherMemberStatus: $dmOtherMemberStatus, ')
+          ..write('youFollow: $youFollow, ')
+          ..write('theyFollowYou: $theyFollowYou')
           ..write(')'))
         .toString();
   }
@@ -1198,6 +1510,13 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
     unreadCount,
     serverUpdatedAt,
     localUpdatedAt,
+    dmOtherUserId,
+    dmOtherUserName,
+    dmOtherUserUsername,
+    dmOtherUserAvatarUrl,
+    dmOtherMemberStatus,
+    youFollow,
+    theyFollowYou,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1223,7 +1542,14 @@ class LocalChannelRow extends DataClass implements Insertable<LocalChannelRow> {
           other.lastMessageFromMe == this.lastMessageFromMe &&
           other.unreadCount == this.unreadCount &&
           other.serverUpdatedAt == this.serverUpdatedAt &&
-          other.localUpdatedAt == this.localUpdatedAt);
+          other.localUpdatedAt == this.localUpdatedAt &&
+          other.dmOtherUserId == this.dmOtherUserId &&
+          other.dmOtherUserName == this.dmOtherUserName &&
+          other.dmOtherUserUsername == this.dmOtherUserUsername &&
+          other.dmOtherUserAvatarUrl == this.dmOtherUserAvatarUrl &&
+          other.dmOtherMemberStatus == this.dmOtherMemberStatus &&
+          other.youFollow == this.youFollow &&
+          other.theyFollowYou == this.theyFollowYou);
 }
 
 class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
@@ -1248,6 +1574,13 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
   final Value<int> unreadCount;
   final Value<DateTime> serverUpdatedAt;
   final Value<DateTime> localUpdatedAt;
+  final Value<String?> dmOtherUserId;
+  final Value<String?> dmOtherUserName;
+  final Value<String?> dmOtherUserUsername;
+  final Value<String?> dmOtherUserAvatarUrl;
+  final Value<String?> dmOtherMemberStatus;
+  final Value<bool> youFollow;
+  final Value<bool> theyFollowYou;
   final Value<int> rowid;
   const LocalChannelsCompanion({
     this.channelId = const Value.absent(),
@@ -1271,6 +1604,13 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
     this.unreadCount = const Value.absent(),
     this.serverUpdatedAt = const Value.absent(),
     this.localUpdatedAt = const Value.absent(),
+    this.dmOtherUserId = const Value.absent(),
+    this.dmOtherUserName = const Value.absent(),
+    this.dmOtherUserUsername = const Value.absent(),
+    this.dmOtherUserAvatarUrl = const Value.absent(),
+    this.dmOtherMemberStatus = const Value.absent(),
+    this.youFollow = const Value.absent(),
+    this.theyFollowYou = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalChannelsCompanion.insert({
@@ -1295,6 +1635,13 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
     this.unreadCount = const Value.absent(),
     required DateTime serverUpdatedAt,
     required DateTime localUpdatedAt,
+    this.dmOtherUserId = const Value.absent(),
+    this.dmOtherUserName = const Value.absent(),
+    this.dmOtherUserUsername = const Value.absent(),
+    this.dmOtherUserAvatarUrl = const Value.absent(),
+    this.dmOtherMemberStatus = const Value.absent(),
+    this.youFollow = const Value.absent(),
+    this.theyFollowYou = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : channelId = Value(channelId),
        channelKey = Value(channelKey),
@@ -1324,6 +1671,13 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
     Expression<int>? unreadCount,
     Expression<DateTime>? serverUpdatedAt,
     Expression<DateTime>? localUpdatedAt,
+    Expression<String>? dmOtherUserId,
+    Expression<String>? dmOtherUserName,
+    Expression<String>? dmOtherUserUsername,
+    Expression<String>? dmOtherUserAvatarUrl,
+    Expression<String>? dmOtherMemberStatus,
+    Expression<bool>? youFollow,
+    Expression<bool>? theyFollowYou,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1350,6 +1704,16 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
       if (unreadCount != null) 'unread_count': unreadCount,
       if (serverUpdatedAt != null) 'server_updated_at': serverUpdatedAt,
       if (localUpdatedAt != null) 'local_updated_at': localUpdatedAt,
+      if (dmOtherUserId != null) 'dm_other_user_id': dmOtherUserId,
+      if (dmOtherUserName != null) 'dm_other_user_name': dmOtherUserName,
+      if (dmOtherUserUsername != null)
+        'dm_other_user_username': dmOtherUserUsername,
+      if (dmOtherUserAvatarUrl != null)
+        'dm_other_user_avatar_url': dmOtherUserAvatarUrl,
+      if (dmOtherMemberStatus != null)
+        'dm_other_member_status': dmOtherMemberStatus,
+      if (youFollow != null) 'you_follow': youFollow,
+      if (theyFollowYou != null) 'they_follow_you': theyFollowYou,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1376,6 +1740,13 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
     Value<int>? unreadCount,
     Value<DateTime>? serverUpdatedAt,
     Value<DateTime>? localUpdatedAt,
+    Value<String?>? dmOtherUserId,
+    Value<String?>? dmOtherUserName,
+    Value<String?>? dmOtherUserUsername,
+    Value<String?>? dmOtherUserAvatarUrl,
+    Value<String?>? dmOtherMemberStatus,
+    Value<bool>? youFollow,
+    Value<bool>? theyFollowYou,
     Value<int>? rowid,
   }) {
     return LocalChannelsCompanion(
@@ -1400,6 +1771,13 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
       unreadCount: unreadCount ?? this.unreadCount,
       serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
       localUpdatedAt: localUpdatedAt ?? this.localUpdatedAt,
+      dmOtherUserId: dmOtherUserId ?? this.dmOtherUserId,
+      dmOtherUserName: dmOtherUserName ?? this.dmOtherUserName,
+      dmOtherUserUsername: dmOtherUserUsername ?? this.dmOtherUserUsername,
+      dmOtherUserAvatarUrl: dmOtherUserAvatarUrl ?? this.dmOtherUserAvatarUrl,
+      dmOtherMemberStatus: dmOtherMemberStatus ?? this.dmOtherMemberStatus,
+      youFollow: youFollow ?? this.youFollow,
+      theyFollowYou: theyFollowYou ?? this.theyFollowYou,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1472,6 +1850,33 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
     if (localUpdatedAt.present) {
       map['local_updated_at'] = Variable<DateTime>(localUpdatedAt.value);
     }
+    if (dmOtherUserId.present) {
+      map['dm_other_user_id'] = Variable<String>(dmOtherUserId.value);
+    }
+    if (dmOtherUserName.present) {
+      map['dm_other_user_name'] = Variable<String>(dmOtherUserName.value);
+    }
+    if (dmOtherUserUsername.present) {
+      map['dm_other_user_username'] = Variable<String>(
+        dmOtherUserUsername.value,
+      );
+    }
+    if (dmOtherUserAvatarUrl.present) {
+      map['dm_other_user_avatar_url'] = Variable<String>(
+        dmOtherUserAvatarUrl.value,
+      );
+    }
+    if (dmOtherMemberStatus.present) {
+      map['dm_other_member_status'] = Variable<String>(
+        dmOtherMemberStatus.value,
+      );
+    }
+    if (youFollow.present) {
+      map['you_follow'] = Variable<bool>(youFollow.value);
+    }
+    if (theyFollowYou.present) {
+      map['they_follow_you'] = Variable<bool>(theyFollowYou.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1502,6 +1907,13 @@ class LocalChannelsCompanion extends UpdateCompanion<LocalChannelRow> {
           ..write('unreadCount: $unreadCount, ')
           ..write('serverUpdatedAt: $serverUpdatedAt, ')
           ..write('localUpdatedAt: $localUpdatedAt, ')
+          ..write('dmOtherUserId: $dmOtherUserId, ')
+          ..write('dmOtherUserName: $dmOtherUserName, ')
+          ..write('dmOtherUserUsername: $dmOtherUserUsername, ')
+          ..write('dmOtherUserAvatarUrl: $dmOtherUserAvatarUrl, ')
+          ..write('dmOtherMemberStatus: $dmOtherMemberStatus, ')
+          ..write('youFollow: $youFollow, ')
+          ..write('theyFollowYou: $theyFollowYou, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9292,6 +9704,13 @@ typedef $$LocalChannelsTableCreateCompanionBuilder =
       Value<int> unreadCount,
       required DateTime serverUpdatedAt,
       required DateTime localUpdatedAt,
+      Value<String?> dmOtherUserId,
+      Value<String?> dmOtherUserName,
+      Value<String?> dmOtherUserUsername,
+      Value<String?> dmOtherUserAvatarUrl,
+      Value<String?> dmOtherMemberStatus,
+      Value<bool> youFollow,
+      Value<bool> theyFollowYou,
       Value<int> rowid,
     });
 typedef $$LocalChannelsTableUpdateCompanionBuilder =
@@ -9317,6 +9736,13 @@ typedef $$LocalChannelsTableUpdateCompanionBuilder =
       Value<int> unreadCount,
       Value<DateTime> serverUpdatedAt,
       Value<DateTime> localUpdatedAt,
+      Value<String?> dmOtherUserId,
+      Value<String?> dmOtherUserName,
+      Value<String?> dmOtherUserUsername,
+      Value<String?> dmOtherUserAvatarUrl,
+      Value<String?> dmOtherMemberStatus,
+      Value<bool> youFollow,
+      Value<bool> theyFollowYou,
       Value<int> rowid,
     });
 
@@ -9431,6 +9857,41 @@ class $$LocalChannelsTableFilterComposer
 
   ColumnFilters<DateTime> get localUpdatedAt => $composableBuilder(
     column: $table.localUpdatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dmOtherUserId => $composableBuilder(
+    column: $table.dmOtherUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dmOtherUserName => $composableBuilder(
+    column: $table.dmOtherUserName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dmOtherUserUsername => $composableBuilder(
+    column: $table.dmOtherUserUsername,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dmOtherUserAvatarUrl => $composableBuilder(
+    column: $table.dmOtherUserAvatarUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dmOtherMemberStatus => $composableBuilder(
+    column: $table.dmOtherMemberStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get youFollow => $composableBuilder(
+    column: $table.youFollow,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get theyFollowYou => $composableBuilder(
+    column: $table.theyFollowYou,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -9548,6 +10009,41 @@ class $$LocalChannelsTableOrderingComposer
     column: $table.localUpdatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get dmOtherUserId => $composableBuilder(
+    column: $table.dmOtherUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dmOtherUserName => $composableBuilder(
+    column: $table.dmOtherUserName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dmOtherUserUsername => $composableBuilder(
+    column: $table.dmOtherUserUsername,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dmOtherUserAvatarUrl => $composableBuilder(
+    column: $table.dmOtherUserAvatarUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dmOtherMemberStatus => $composableBuilder(
+    column: $table.dmOtherMemberStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get youFollow => $composableBuilder(
+    column: $table.youFollow,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get theyFollowYou => $composableBuilder(
+    column: $table.theyFollowYou,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalChannelsTableAnnotationComposer
@@ -9647,6 +10143,39 @@ class $$LocalChannelsTableAnnotationComposer
     column: $table.localUpdatedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get dmOtherUserId => $composableBuilder(
+    column: $table.dmOtherUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get dmOtherUserName => $composableBuilder(
+    column: $table.dmOtherUserName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get dmOtherUserUsername => $composableBuilder(
+    column: $table.dmOtherUserUsername,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get dmOtherUserAvatarUrl => $composableBuilder(
+    column: $table.dmOtherUserAvatarUrl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get dmOtherMemberStatus => $composableBuilder(
+    column: $table.dmOtherMemberStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get youFollow =>
+      $composableBuilder(column: $table.youFollow, builder: (column) => column);
+
+  GeneratedColumn<bool> get theyFollowYou => $composableBuilder(
+    column: $table.theyFollowYou,
+    builder: (column) => column,
+  );
 }
 
 class $$LocalChannelsTableTableManager
@@ -9705,6 +10234,13 @@ class $$LocalChannelsTableTableManager
                 Value<int> unreadCount = const Value.absent(),
                 Value<DateTime> serverUpdatedAt = const Value.absent(),
                 Value<DateTime> localUpdatedAt = const Value.absent(),
+                Value<String?> dmOtherUserId = const Value.absent(),
+                Value<String?> dmOtherUserName = const Value.absent(),
+                Value<String?> dmOtherUserUsername = const Value.absent(),
+                Value<String?> dmOtherUserAvatarUrl = const Value.absent(),
+                Value<String?> dmOtherMemberStatus = const Value.absent(),
+                Value<bool> youFollow = const Value.absent(),
+                Value<bool> theyFollowYou = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalChannelsCompanion(
                 channelId: channelId,
@@ -9728,6 +10264,13 @@ class $$LocalChannelsTableTableManager
                 unreadCount: unreadCount,
                 serverUpdatedAt: serverUpdatedAt,
                 localUpdatedAt: localUpdatedAt,
+                dmOtherUserId: dmOtherUserId,
+                dmOtherUserName: dmOtherUserName,
+                dmOtherUserUsername: dmOtherUserUsername,
+                dmOtherUserAvatarUrl: dmOtherUserAvatarUrl,
+                dmOtherMemberStatus: dmOtherMemberStatus,
+                youFollow: youFollow,
+                theyFollowYou: theyFollowYou,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9753,6 +10296,13 @@ class $$LocalChannelsTableTableManager
                 Value<int> unreadCount = const Value.absent(),
                 required DateTime serverUpdatedAt,
                 required DateTime localUpdatedAt,
+                Value<String?> dmOtherUserId = const Value.absent(),
+                Value<String?> dmOtherUserName = const Value.absent(),
+                Value<String?> dmOtherUserUsername = const Value.absent(),
+                Value<String?> dmOtherUserAvatarUrl = const Value.absent(),
+                Value<String?> dmOtherMemberStatus = const Value.absent(),
+                Value<bool> youFollow = const Value.absent(),
+                Value<bool> theyFollowYou = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalChannelsCompanion.insert(
                 channelId: channelId,
@@ -9776,6 +10326,13 @@ class $$LocalChannelsTableTableManager
                 unreadCount: unreadCount,
                 serverUpdatedAt: serverUpdatedAt,
                 localUpdatedAt: localUpdatedAt,
+                dmOtherUserId: dmOtherUserId,
+                dmOtherUserName: dmOtherUserName,
+                dmOtherUserUsername: dmOtherUserUsername,
+                dmOtherUserAvatarUrl: dmOtherUserAvatarUrl,
+                dmOtherMemberStatus: dmOtherMemberStatus,
+                youFollow: youFollow,
+                theyFollowYou: theyFollowYou,
                 rowid: rowid,
               ),
           withReferenceMapper:

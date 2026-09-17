@@ -166,5 +166,53 @@ void main() {
       expect(matchChat.isRequest, isFalse);
       expect(matchChat.isPendingOutgoingRequest, isFalse);
     });
+
+    test('isPendingOutgoingRequest is true when sender is active but recipient is pending', () {
+      final chat = Chat(
+        id: const ChatId('c7'),
+        kind: ChatKind.dm,
+        name: 'The Art Of Pleasure',
+        teamId: null,
+        unreadCount: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        isAccepted: true,
+        dmOtherMemberStatus: 'pending',
+        lastMessageFromMe: true,
+        youFollow: false,
+        theyFollowYou: false,
+      );
+
+      expect(chat.isRequest, isFalse);
+      expect(chat.isPendingOutgoingRequest, isTrue);
+    });
+
+    test('displayName falls back to name when counterparty display fields are null', () {
+      final chat = Chat(
+        id: const ChatId('c8'),
+        kind: ChatKind.dm,
+        name: 'The Art Of Pleasure',
+        teamId: null,
+        unreadCount: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      expect(chat.displayName, 'The Art Of Pleasure');
+    });
+
+    test('displayName returns Direct Message when all name fields are empty', () {
+      final chat = Chat(
+        id: const ChatId('c9'),
+        kind: ChatKind.dm,
+        name: '',
+        teamId: null,
+        unreadCount: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      expect(chat.displayName, 'Direct Message');
+    });
   });
 }

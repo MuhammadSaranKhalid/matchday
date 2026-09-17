@@ -84,7 +84,13 @@ class ChatLocalDataSource {
           isArchived: member?.archivedAt != null,
           isMuted: member?.notificationsMutedUntil != null &&
               member!.notificationsMutedUntil!.isAfter(now),
-          dmOtherUserId: otherMember?.userId,
+          dmOtherUserId: ch.dmOtherUserId ?? otherMember?.userId,
+          dmOtherUserName: ch.dmOtherUserName,
+          dmOtherUserUsername: ch.dmOtherUserUsername,
+          dmOtherUserAvatarUrl: ch.dmOtherUserAvatarUrl,
+          dmOtherMemberStatus: ch.dmOtherMemberStatus ?? otherMember?.status,
+          youFollow: ch.youFollow,
+          theyFollowYou: ch.theyFollowYou,
           createdAt: ch.serverUpdatedAt,
           updatedAt: ch.localUpdatedAt,
         ));
@@ -310,6 +316,13 @@ class ChatLocalDataSource {
             unreadCount: Value(dto.unreadCount),
             serverUpdatedAt: DateTime.parse(dto.updatedAt),
             localUpdatedAt: now,
+            dmOtherUserId: Value(dto.dmOtherUserId),
+            dmOtherUserName: Value(dto.dmOtherUserName),
+            dmOtherUserUsername: Value(dto.dmOtherUserUsername),
+            dmOtherUserAvatarUrl: Value(dto.dmOtherUserAvatarUrl),
+            dmOtherMemberStatus: Value(dto.dmOtherMemberStatus),
+            youFollow: Value(dto.youFollow),
+            theyFollowYou: Value(dto.theyFollowYou),
           ),
           mode: InsertMode.insertOrReplace,
         );
@@ -371,10 +384,12 @@ class ChatLocalDataSource {
             LocalChannelMembersCompanion.insert(
               channelId: dto.channelId,
               userId: dto.dmOtherUserId!,
+              status: Value(dto.dmOtherMemberStatus ?? 'active'),
               serverUpdatedAt: DateTime.parse(dto.updatedAt),
             ),
             onConflict: DoUpdate(
               (old) => LocalChannelMembersCompanion(
+                status: Value(dto.dmOtherMemberStatus ?? 'active'),
                 serverUpdatedAt: Value(DateTime.parse(dto.updatedAt)),
               ),
             ),
@@ -387,7 +402,10 @@ class ChatLocalDataSource {
   /// Atomically updates a channel's last message summary from real-time events.
   /// Updates local_channels projection directly from real-time events without inserting
   /// incomplete stubs into local_messages (Spec §10, §11).
-  Future<void> updateChannelSummaryFromRealtime({
+  ///
+  /// Returns `true` if the channel was found and updated locally, or `false` if the
+  /// channel is not yet in Drift (e.g. brand-new DM request) requiring inbox reconciliation.
+  Future<bool> updateChannelSummaryFromRealtime({
     required String channelId,
     required int lastMessageSeq,
     required DateTime lastMessageAt,
@@ -401,12 +419,12 @@ class ChatLocalDataSource {
     bool? countsAsUnread,
   }) async {
     final now = DateTime.now().toUtc();
-    await _db.transaction(() async {
+    return await _db.transaction(() async {
       final currentChannel = await (_db.select(_db.localChannels)
             ..where((c) => c.channelId.equals(channelId)))
           .getSingleOrNull();
 
-      if (currentChannel == null) return;
+      if (currentChannel == null) return false;
 
       final newSeq = currentChannel.lastMessageSeq != null
           ? (currentChannel.lastMessageSeq! > lastMessageSeq
@@ -443,6 +461,7 @@ class ChatLocalDataSource {
           localUpdatedAt: Value(now),
         ),
       );
+      return true;
     });
   }
 

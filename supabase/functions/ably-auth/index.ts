@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     };
 
     for (const row of memberships ?? []) {
-      capability[`chat:${row.channel_id}`] = ["subscribe", "presence"];
+      capability[`chat:${row.channel_id}`] = ["subscribe", "presence", "publish"];
     }
 
     // 5. Generate Ably Token Request

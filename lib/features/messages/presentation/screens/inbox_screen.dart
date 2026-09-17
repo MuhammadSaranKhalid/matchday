@@ -545,15 +545,17 @@ class _ChatRowItem extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: ChatTheme.pureSurface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          border: Border(top: BorderSide(color: ChatTheme.hairlineSand)),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: SafeArea(
-          child: Column(
+      builder: (ctx) => Material(
+        color: ChatTheme.pureSurface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: Container(
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: ChatTheme.hairlineSand)),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: SafeArea(
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
@@ -609,8 +611,9 @@ class _ChatRowItem extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ─── Skeletons & Empty States ────────────────────────────────────────────────

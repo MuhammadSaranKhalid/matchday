@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matchday/core/database/app_database.dart';
@@ -305,6 +306,63 @@ void main() {
       final state = await local.getChannelSyncState(channelId);
       expect(state!.oldestCachedMessageSeq, 200);
       expect(state.newestSyncedMessageSeq, 300); // Unaltered!
+    });
+
+    test('replays receipt changes from chat_changes ledger updating member horizons', () async {
+      final now = DateTime.now().toUtc();
+      const otherUserId = 'user-counterparty-999';
+
+      await local.upsertChannelsFromDto([
+        ChatChannelDto(
+          channelId: channelId,
+          channelKey: 'direct:1:2',
+          kind: 'direct',
+          contextType: 'none',
+          title: 'Direct Chat',
+          lastMessageSeq: 100,
+          createdAt: now.toIso8601String(),
+          updatedAt: now.toIso8601String(),
+        ),
+      ], currentUserId);
+
+      // Seed sync state so it queries after seq 100
+      await local.markChannelSyncSucceeded(
+        channelId,
+        newestSeq: 100,
+        oldestSeq: 1,
+      );
+
+      when(() => remote.fetchDeltaMessages(channelId, 100, limit: any(named: 'limit')))
+          .thenAnswer((_) async => []);
+
+      // Mock chat_changes ledger containing a read receipt from counterparty
+      when(() => remote.fetchChannelChanges(
+            channelId,
+            afterChangeSeq: 0,
+            limit: any(named: 'limit'),
+          )).thenAnswer((_) async => [
+            {
+              'change_seq': 1,
+              'channel_id': channelId,
+              'entity_type': 'receipt',
+              'entity_id': otherUserId,
+              'operation': 'insert',
+              'payload': {
+                'type': 'read',
+                'user_id': otherUserId,
+                'through_message_seq': 100,
+              },
+              'created_at': now.toIso8601String(),
+            },
+          ]);
+
+      await scheduler.syncChannel(channelId, currentUserId);
+
+      final members = await (db.select(db.localChannelMembers)
+            ..where((m) => m.channelId.equals(channelId) & m.userId.equals(otherUserId)))
+          .getSingle();
+
+      expect(members.lastReadMessageSeq, 100);
     });
   });
 }

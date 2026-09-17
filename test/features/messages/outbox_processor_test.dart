@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
@@ -165,6 +166,76 @@ void main() {
           .getSingle();
       expect(opRow.status, 'failed');
       expect(opRow.lastErrorCode, '42501');
+    });
+
+    test('preserves attemptCount and keeps retry_wait on offline SocketException', () async {
+      final now = DateTime.now().toUtc();
+      const messageId = 'msg-offline-1';
+      const opId = 'op-offline-1';
+
+      await local.enqueueOutgoingMessage(
+        message: LocalMessagesCompanion.insert(
+          messageId: messageId,
+          channelId: channelId,
+          senderId: const drift.Value(currentUserId),
+          body: const drift.Value('Offline message'),
+          localCreatedAt: now,
+          syncStatus: const drift.Value('pending'),
+        ),
+        operation: OutboxOperationsCompanion.insert(
+          operationId: opId,
+          channelId: channelId,
+          entityId: const drift.Value(messageId),
+          operationType: 'send_message',
+          payloadJson: jsonEncode({
+            'message_id': messageId,
+            'channel_id': channelId,
+            'body': 'Offline message',
+            'message_type': 'text',
+          }),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      when(() => remote.sendChannelMessage(
+            messageId: messageId,
+            channelId: channelId,
+            messageType: 'text',
+            body: 'Offline message',
+            replyToMessageId: null,
+            payload: null,
+          )).thenThrow(
+        const SocketException('Failed host lookup: api.supabase.co'),
+      );
+
+      // Attempt 1 offline
+      await outbox.drain();
+
+      var opRow = await (db.select(db.outboxOperations)
+            ..where((o) => o.operationId.equals(opId)))
+          .getSingle();
+      expect(opRow.status, 'retry_wait');
+      // Retry budget must NOT be consumed!
+      expect(opRow.attemptCount, 0);
+      expect(opRow.lastErrorCode, 'NETWORK_OFFLINE');
+
+      // Attempt 2, 3, 4, 5, 6 offline
+      for (var i = 0; i < 5; i++) {
+        await outbox.drain();
+      }
+
+      opRow = await (db.select(db.outboxOperations)
+            ..where((o) => o.operationId.equals(opId)))
+          .getSingle();
+      // Still NOT failed!
+      expect(opRow.status, 'retry_wait');
+      expect(opRow.attemptCount, 0);
+
+      // Message in local table must NOT be marked failed
+      final messages = await local.watchMessages(channelId, currentUserId).first;
+      expect(messages.first.syncStatus, 'pending');
+      expect(messages.first.isFailed, isFalse);
     });
   });
 }

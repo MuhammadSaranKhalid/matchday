@@ -359,3 +359,179 @@ final class ChatTypingFamily extends $Family
   @override
   String toString() => r'chatTypingProvider';
 }
+
+/// Streams the set of user IDs currently present (online) in [chatId].
+
+@ProviderFor(chatPresence)
+final chatPresenceProvider = ChatPresenceFamily._();
+
+/// Streams the set of user IDs currently present (online) in [chatId].
+
+final class ChatPresenceProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Set<String>>,
+          Set<String>,
+          Stream<Set<String>>
+        >
+    with $FutureModifier<Set<String>>, $StreamProvider<Set<String>> {
+  /// Streams the set of user IDs currently present (online) in [chatId].
+  ChatPresenceProvider._({
+    required ChatPresenceFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'chatPresenceProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatPresenceHash();
+
+  @override
+  String toString() {
+    return r'chatPresenceProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<Set<String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<Set<String>> create(Ref ref) {
+    final argument = this.argument as String;
+    return chatPresence(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChatPresenceProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$chatPresenceHash() => r'4c4cdf815b126c737a208e4f31db1b9d40dea168';
+
+/// Streams the set of user IDs currently present (online) in [chatId].
+
+final class ChatPresenceFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<Set<String>>, String> {
+  ChatPresenceFamily._()
+    : super(
+        retry: null,
+        name: r'chatPresenceProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Streams the set of user IDs currently present (online) in [chatId].
+
+  ChatPresenceProvider call(String chatId) =>
+      ChatPresenceProvider._(argument: chatId, from: this);
+
+  @override
+  String toString() => r'chatPresenceProvider';
+}
+
+/// Streams whether a specific user is currently online in [chatId].
+
+@ProviderFor(isUserOnlineInChat)
+final isUserOnlineInChatProvider = IsUserOnlineInChatFamily._();
+
+/// Streams whether a specific user is currently online in [chatId].
+
+final class IsUserOnlineInChatProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
+    with $FutureModifier<bool>, $StreamProvider<bool> {
+  /// Streams whether a specific user is currently online in [chatId].
+  IsUserOnlineInChatProvider._({
+    required IsUserOnlineInChatFamily super.from,
+    required ({String chatId, String userId}) super.argument,
+  }) : super(
+         retry: null,
+         name: r'isUserOnlineInChatProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$isUserOnlineInChatHash();
+
+  @override
+  String toString() {
+    return r'isUserOnlineInChatProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<bool> create(Ref ref) {
+    final argument = this.argument as ({String chatId, String userId});
+    return isUserOnlineInChat(
+      ref,
+      chatId: argument.chatId,
+      userId: argument.userId,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is IsUserOnlineInChatProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$isUserOnlineInChatHash() =>
+    r'4513031f5bb05d20630401ca24435056e7988003';
+
+/// Streams whether a specific user is currently online in [chatId].
+
+final class IsUserOnlineInChatFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          Stream<bool>,
+          ({String chatId, String userId})
+        > {
+  IsUserOnlineInChatFamily._()
+    : super(
+        retry: null,
+        name: r'isUserOnlineInChatProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Streams whether a specific user is currently online in [chatId].
+
+  IsUserOnlineInChatProvider call({
+    required String chatId,
+    required String userId,
+  }) => IsUserOnlineInChatProvider._(
+    argument: (chatId: chatId, userId: userId),
+    from: this,
+  );
+
+  @override
+  String toString() => r'isUserOnlineInChatProvider';
+}

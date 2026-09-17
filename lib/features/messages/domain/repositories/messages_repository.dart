@@ -103,4 +103,8 @@ abstract class MessagesRepository {
 
   /// Broadcasts typing activity for the current user in [chatId].
   Future<void> setTyping(ChatId chatId, bool isTyping);
+
+  /// Streams the set of user IDs currently present (online) in [chatId] via Ably.
+  Stream<Set<String>> watchPresence(ChatId chatId);
 }
+

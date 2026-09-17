@@ -107,7 +107,12 @@ class MessagesRepositoryImpl implements MessagesRepository {
   Future<void> setTyping(ChatId chatId, bool isTyping) =>
       _chatRepo.setTyping(chatId.value, isTyping);
 
+  @override
+  Stream<Set<String>> watchPresence(ChatId chatId) =>
+      _chatRepo.watchPresence(chatId.value);
+
   // ─── Mappers ─────────────────────────────────────────────────────────────
+
 
   Chat _chatFromChannel(ChatChannel c) {
     return Chat(

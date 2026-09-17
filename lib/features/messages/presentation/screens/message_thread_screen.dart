@@ -692,26 +692,58 @@ class _ThreadHeader extends ConsumerWidget {
     final mono = chat?.displayMonogram ?? '?';
     final isTeam = chat?.isTeam == true;
     final isDm = chat?.isDm == true;
+    final otherUserId = chat?.dmOtherUserId;
+
+    // Ephemeral typing state
+    final isTyping = ref.watch(chatTypingProvider(chatId)).value ?? false;
+
+    // Real-time Ably presence state
+    final isOnline = (isDm && otherUserId != null)
+        ? (ref
+                .watch(
+                  isUserOnlineInChatProvider(
+                    chatId: chatId,
+                    userId: otherUserId,
+                  ),
+                )
+                .value ??
+            false)
+        : false;
 
     // Subtitle logic
     final Widget subtitleWidget;
-    if (isTeam && chat?.teamId != null) {
+    if (isTyping) {
+      subtitleWidget = Text(
+        'typing...',
+        style: ChatTheme.metadata(color: ChatTheme.matchDayCoral).copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    } else if (isTeam && chat?.teamId != null) {
       final rosterAsync = ref.watch(rosterProvider(chat!.teamId!.value));
       final count = rosterAsync.value?.length;
+      final onlineSet =
+          ref.watch(chatPresenceProvider(chatId)).value ?? const <String>{};
+      final onlineCount = onlineSet.length;
       subtitleWidget = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 6,
             height: 6,
-            decoration: const BoxDecoration(
-              color: ChatTheme.successMintText,
+            decoration: BoxDecoration(
+              color:
+                  onlineCount > 0
+                      ? ChatTheme.successMintText
+                      : ChatTheme.mutedStone,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 5),
           Text(
-            count != null ? '$count Members • Active' : 'Team Chat',
+            onlineCount > 0
+                ? '$onlineCount Online • ${count ?? 0} Members'
+                : (count != null ? '$count Members' : 'Team Chat'),
             style: ChatTheme.metadata(color: ChatTheme.mutedStone),
           ),
         ],
@@ -723,15 +755,23 @@ class _ThreadHeader extends ConsumerWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: const BoxDecoration(
-              color: ChatTheme.successMintText,
+            decoration: BoxDecoration(
+              color:
+                  isOnline
+                      ? ChatTheme.successMintText
+                      : ChatTheme.hairlineSand,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 5),
           Text(
-            'Active • Online now',
-            style: ChatTheme.metadata(color: ChatTheme.successMintText),
+            isOnline ? 'Online now' : 'Offline',
+            style: ChatTheme.metadata(
+              color:
+                  isOnline
+                      ? ChatTheme.successMintText
+                      : ChatTheme.mutedStone,
+            ),
           ),
         ],
       );
@@ -805,7 +845,7 @@ class _ThreadHeader extends ConsumerWidget {
                           ).copyWith(fontWeight: FontWeight.w700),
                         ),
                       ),
-                      if (isDm)
+                      if (isDm && isOnline)
                         Positioned(
                           bottom: 0,
                           right: 0,
@@ -825,6 +865,7 @@ class _ThreadHeader extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(width: 10),
+
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,

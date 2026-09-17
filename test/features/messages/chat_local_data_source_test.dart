@@ -214,5 +214,102 @@ void main() {
       final emptyOps = await dataSource.getPendingOperations(channelId: channelId);
       expect(emptyOps, isEmpty);
     });
+
+    test('prunes channels absent from server unless pending outbox operations exist', () async {
+      final now = DateTime.now().toUtc();
+
+      // 1. Initially user has 3 channels: ch-A, ch-B, ch-C
+      await dataSource.upsertChannelsFromDto([
+        ChatChannelDto(
+          channelId: 'ch-A',
+          channelKey: 'team:t1:main',
+          kind: 'group',
+          contextType: 'team',
+          title: 'Chat A',
+          createdAt: now.toIso8601String(),
+          updatedAt: now.toIso8601String(),
+        ),
+        ChatChannelDto(
+          channelId: 'ch-B',
+          channelKey: 'team:t2:main',
+          kind: 'group',
+          contextType: 'team',
+          title: 'Chat B',
+          createdAt: now.toIso8601String(),
+          updatedAt: now.toIso8601String(),
+        ),
+        ChatChannelDto(
+          channelId: 'ch-C',
+          channelKey: 'team:t3:main',
+          kind: 'group',
+          contextType: 'team',
+          title: 'Chat C',
+          createdAt: now.toIso8601String(),
+          updatedAt: now.toIso8601String(),
+        ),
+      ], currentUserId);
+
+      var inbox = await dataSource.watchInbox(currentUserId).first;
+      expect(inbox.map((c) => c.id).toSet(), {'ch-A', 'ch-B', 'ch-C'});
+
+      // 2. Queue a pending outbox operation in ch-C
+      await dataSource.enqueueOperation(OutboxOperationsCompanion.insert(
+        operationId: 'op-ch-c',
+        channelId: 'ch-C',
+        operationType: 'send_message',
+        payloadJson: '{"message_id": "m-c"}',
+        createdAt: now,
+        updatedAt: now,
+      ));
+
+      // 3. Authoritative server sync returns ONLY ch-A (ch-B and ch-C are absent from server)
+      await dataSource.upsertChannelsFromDto([
+        ChatChannelDto(
+          channelId: 'ch-A',
+          channelKey: 'team:t1:main',
+          kind: 'group',
+          contextType: 'team',
+          title: 'Chat A',
+          createdAt: now.toIso8601String(),
+          updatedAt: now.toIso8601String(),
+        ),
+      ], currentUserId);
+
+      inbox = await dataSource.watchInbox(currentUserId).first;
+      final inboxIds = inbox.map((c) => c.id).toSet();
+
+      // ch-A must be present
+      expect(inboxIds.contains('ch-A'), isTrue);
+      // ch-B had no pending outbox ops and was absent from server -> must be PRUNED!
+      expect(inboxIds.contains('ch-B'), isFalse);
+      // ch-C was absent from server BUT has a pending outbox op -> must be PROTECTED!
+      expect(inboxIds.contains('ch-C'), isTrue);
+    });
+
+    test('watchInbox excludes channels where membership is declined or left', () async {
+      final now = DateTime.now().toUtc();
+
+      await dataSource.upsertChannelsFromDto([
+        ChatChannelDto(
+          channelId: 'ch-declined',
+          channelKey: 'dm:u1:u2',
+          kind: 'direct',
+          contextType: 'direct',
+          title: 'Declined DM',
+          createdAt: now.toIso8601String(),
+          updatedAt: now.toIso8601String(),
+        ),
+      ], currentUserId);
+
+      // Verify initially visible as pending/active
+      var inbox = await dataSource.watchInbox(currentUserId).first;
+      expect(inbox.length, 1);
+
+      // Mark declined
+      await dataSource.updateMemberStatus('ch-declined', currentUserId, 'declined');
+
+      inbox = await dataSource.watchInbox(currentUserId).first;
+      expect(inbox, isEmpty);
+    });
   });
 }

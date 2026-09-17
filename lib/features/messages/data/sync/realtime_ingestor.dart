@@ -17,9 +17,14 @@ class RealtimeIngestor {
 
   final Map<String, StreamSubscription<ably.Message>> _channelSubscriptions =
       {};
+  final Map<String, StreamSubscription<ably.PresenceMessage>>
+      _presenceSubscriptions = {};
+  final Map<String, StreamController<Set<String>>> _presenceControllers = {};
+  final Map<String, Set<String>> _onlineUsersByChannel = {};
   final Map<String, StreamController<bool>> _typingControllers = {};
   final Map<String, Timer> _typingTimers = {};
   StreamSubscription<ably.Message>? _userInboxSubscription;
+
   String? _subscribedUserId;
   VoidCallback? onInboxUpdated;
   void Function(String channelId, int throughSeq)? onMessageDelivered;
@@ -100,7 +105,7 @@ class RealtimeIngestor {
     }
   }
 
-  /// Subscribes to a channel's hot message stream `chat:<channelId>`.
+  /// Subscribes to a channel's hot message stream and presence set `chat:<channelId>`.
   void subscribeToChannel(String channelId, String currentUserId) {
     if (_channelSubscriptions.containsKey(channelId)) return;
 
@@ -120,6 +125,65 @@ class RealtimeIngestor {
       );
 
       _channelSubscriptions[channelId] = sub;
+
+      // ─── Presence Management ───
+      final presenceController = _presenceControllers.putIfAbsent(
+        channelId,
+        () => StreamController<Set<String>>.broadcast(),
+      );
+      final onlineSet =
+          _onlineUsersByChannel.putIfAbsent(channelId, () => <String>{});
+
+      // Announce entering presence and load initial active members
+      unawaited(() async {
+        try {
+          await channel.presence.enter({'status': 'online'});
+          final members = await channel.presence.get();
+          for (final m in members) {
+            if (m.clientId != null && m.clientId!.isNotEmpty) {
+              onlineSet.add(m.clientId!);
+            }
+          }
+          if (!presenceController.isClosed) {
+            presenceController.add(Set<String>.from(onlineSet));
+          }
+        } catch (e) {
+          debugPrint(
+            '[RealtimeIngestor] Error entering/getting presence for $channelId: $e',
+          );
+        }
+      }());
+
+      // Listen for presence member transitions (enter, leave, present, update)
+      final presenceSub = channel.presence.subscribe().listen(
+        (ably.PresenceMessage msg) {
+          final clientId = msg.clientId;
+          if (clientId == null || clientId.isEmpty) return;
+
+          switch (msg.action) {
+            case ably.PresenceAction.enter:
+            case ably.PresenceAction.present:
+            case ably.PresenceAction.update:
+              onlineSet.add(clientId);
+              break;
+            case ably.PresenceAction.leave:
+              onlineSet.remove(clientId);
+              break;
+            default:
+              break;
+          }
+
+          if (!presenceController.isClosed) {
+            presenceController.add(Set<String>.from(onlineSet));
+          }
+        },
+        onError: (Object e) {
+          debugPrint(
+            '[RealtimeIngestor] Error on presence stream for $channelId: $e',
+          );
+        },
+      );
+      _presenceSubscriptions[channelId] = presenceSub;
     } catch (e) {
       debugPrint(
         '[RealtimeIngestor] Failed to subscribe to channel $channelId: $e',
@@ -131,12 +195,49 @@ class RealtimeIngestor {
   void unsubscribeFromChannel(String channelId) {
     final sub = _channelSubscriptions.remove(channelId);
     sub?.cancel();
-    _ablyService.releaseChannel('chat:$channelId');
+
+    final presenceSub = _presenceSubscriptions.remove(channelId);
+    presenceSub?.cancel();
+
+    unawaited(() async {
+      try {
+        final channelName = 'chat:$channelId';
+        final channel = _ablyService.getChannel(channelName);
+        await channel.presence.leave();
+      } catch (e) {
+        debugPrint(
+          '[RealtimeIngestor] Error leaving presence for $channelId: $e',
+        );
+      } finally {
+        await _ablyService.releaseChannel('chat:$channelId');
+      }
+    }());
+
+    _onlineUsersByChannel.remove(channelId);
+    _presenceControllers[channelId]?.close();
+    _presenceControllers.remove(channelId);
 
     _typingTimers[channelId]?.cancel();
     _typingTimers.remove(channelId);
     _typingControllers[channelId]?.close();
     _typingControllers.remove(channelId);
+  }
+
+  /// Returns a stream of present (online) client IDs for [channelId].
+  Stream<Set<String>> watchPresence(String channelId) {
+    final controller = _presenceControllers.putIfAbsent(
+      channelId,
+      () => StreamController<Set<String>>.broadcast(),
+    );
+    final current = _onlineUsersByChannel[channelId];
+    if (current != null && current.isNotEmpty) {
+      scheduleMicrotask(() {
+        if (!controller.isClosed) {
+          controller.add(Set<String>.from(current));
+        }
+      });
+    }
+    return controller.stream;
   }
 
   /// Returns a stream of typing indicator booleans for [channelId].
@@ -145,6 +246,7 @@ class RealtimeIngestor {
         .putIfAbsent(channelId, () => StreamController<bool>.broadcast())
         .stream;
   }
+
 
   /// Publishes typing status for [currentUserId] on channel `chat:<channelId>`.
   Future<void> publishTyping(
@@ -380,6 +482,15 @@ class RealtimeIngestor {
       sub.cancel();
     }
     _channelSubscriptions.clear();
+    for (final sub in _presenceSubscriptions.values) {
+      sub.cancel();
+    }
+    _presenceSubscriptions.clear();
+    for (final controller in _presenceControllers.values) {
+      controller.close();
+    }
+    _presenceControllers.clear();
+    _onlineUsersByChannel.clear();
     for (final timer in _typingTimers.values) {
       timer.cancel();
     }
@@ -390,3 +501,4 @@ class RealtimeIngestor {
     _typingControllers.clear();
   }
 }
+

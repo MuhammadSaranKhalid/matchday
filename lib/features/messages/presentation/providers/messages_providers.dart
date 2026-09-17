@@ -117,3 +117,24 @@ int unreadMessagesCount(Ref ref) {
 Stream<bool> chatTyping(Ref ref, String chatId) {
   return ref.watch(chatRepositoryProvider).watchTyping(chatId);
 }
+
+/// Streams the set of user IDs currently present (online) in [chatId].
+@riverpod
+Stream<Set<String>> chatPresence(Ref ref, String chatId) {
+  return ref.watch(chatRepositoryProvider).watchPresence(chatId);
+}
+
+/// Streams whether a specific user is currently online in [chatId].
+@riverpod
+Stream<bool> isUserOnlineInChat(
+  Ref ref, {
+  required String chatId,
+  required String userId,
+}) {
+  return ref
+      .watch(chatRepositoryProvider)
+      .watchPresence(chatId)
+      .map((set) => set.contains(userId))
+      .distinct();
+}
+

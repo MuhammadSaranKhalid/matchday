@@ -30,7 +30,8 @@ class ChatLocalDataSource {
       innerJoin(
         _db.localChannelMembers,
         _db.localChannelMembers.channelId.equalsExp(_db.localChannels.channelId) &
-            _db.localChannelMembers.userId.equals(currentUserId),
+            _db.localChannelMembers.userId.equals(currentUserId) &
+            _db.localChannelMembers.status.isIn(const ['active', 'pending']),
       ),
     ]);
 
@@ -287,12 +288,44 @@ class ChatLocalDataSource {
   // Upserts & Updates (Server Sync / Realtime Ingest)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Upserts channels returned from `list_my_chats` RPC.
+  /// Upserts channels returned from `list_my_chats` RPC, and prunes local channels
+  /// that are absent from the authoritative server result (unless pending outbox operations exist).
   Future<void> upsertChannelsFromDto(
     List<ChatChannelDto> dtos,
     String currentUserId,
   ) async {
     final now = DateTime.now().toUtc();
+    final serverChannelIds = dtos.map((d) => d.channelId).toSet();
+
+    // Query local memberships for the current user to detect absent channels
+    final localMembers = await (_db.select(_db.localChannelMembers)
+          ..where((m) => m.userId.equals(currentUserId)))
+        .get();
+    final localChannelIds = localMembers.map((m) => m.channelId).toSet();
+    final candidateAbsentIds = localChannelIds.difference(serverChannelIds);
+
+    if (candidateAbsentIds.isNotEmpty) {
+      // Preserve any channel that has pending/processing/retry_wait outbox operations
+      final pendingOps = await (_db.select(_db.outboxOperations)
+            ..where((o) =>
+                o.channelId.isIn(candidateAbsentIds) &
+                o.status.isIn(const ['pending', 'processing', 'retry_wait'])))
+          .get();
+      final protectedChannelIds = pendingOps.map((o) => o.channelId).toSet();
+      final prunableChannelIds = candidateAbsentIds.difference(protectedChannelIds);
+
+      if (prunableChannelIds.isNotEmpty) {
+        await (_db.delete(_db.localChannelMembers)
+              ..where((m) =>
+                  m.channelId.isIn(prunableChannelIds) &
+                  m.userId.equals(currentUserId)))
+            .go();
+        await (_db.delete(_db.localChannels)
+              ..where((c) => c.channelId.isIn(prunableChannelIds)))
+            .go();
+      }
+    }
+
     await _db.batch((b) {
       for (final dto in dtos) {
         b.insert(
@@ -931,6 +964,19 @@ class ChatLocalDataSource {
             .write(const LocalChannelsCompanion(unreadCount: Value(0)));
       }
     }
+  }
+
+  /// Updates local membership status (e.g. 'active', 'pending', 'declined', 'left').
+  Future<void> updateMemberStatus(
+    String channelId,
+    String userId,
+    String status,
+  ) async {
+    await (_db.update(_db.localChannelMembers)
+          ..where((m) => m.channelId.equals(channelId) & m.userId.equals(userId)))
+        .write(LocalChannelMembersCompanion(
+      status: Value(status),
+    ));
   }
 
   /// Gets the highest message sequence known locally for a channel.

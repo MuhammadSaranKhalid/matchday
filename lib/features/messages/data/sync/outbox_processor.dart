@@ -83,10 +83,11 @@ class OutboxProcessor {
         // Successful execution: delete operation
         await _local.deleteOutboxOperation(op.operationId);
       } catch (e) {
+        final isOffline = _isNetworkOrOfflineError(e);
         final isTerminal = _isTerminalError(e);
-        final nextAttempt = op.attemptCount + 1;
 
-        if (isTerminal || nextAttempt >= _maxRetries) {
+        if (!isOffline && (isTerminal || op.attemptCount + 1 >= _maxRetries)) {
+          final nextAttempt = op.attemptCount + 1;
           debugPrint('[OutboxProcessor] Terminal error for op ${op.operationId}: $e');
           await _local.updateOutboxOperation(
             op.operationId,
@@ -116,8 +117,21 @@ class OutboxProcessor {
               debugPrint('[OutboxProcessor] Non-critical error cleaning storage attachment: $cleanupErr');
             }
           }
+        } else if (isOffline) {
+          debugPrint(
+            '[OutboxProcessor] Op ${op.operationId} network/offline error. Preserving attempt count (${op.attemptCount}). Retrying when online.',
+          );
+          await _local.updateOutboxOperation(
+            op.operationId,
+            status: 'retry_wait',
+            attemptCount: op.attemptCount,
+            nextAttemptAt: DateTime.now().toUtc().add(const Duration(seconds: 15)),
+            lastErrorCode: 'NETWORK_OFFLINE',
+            lastErrorMessage: e.toString(),
+          );
         } else {
           // Retryable error: apply exponential backoff with jitter or honor slow-mode cooldown
+          final nextAttempt = op.attemptCount + 1;
           final cooldownSeconds = _extractSlowModeWaitSeconds(e);
           final int backoffSeconds;
           if (cooldownSeconds != null && cooldownSeconds > 0) {
@@ -318,6 +332,40 @@ class OutboxProcessor {
       default:
         debugPrint('[OutboxProcessor] Unknown operation type: ${op.operationType}');
     }
+  }
+
+  bool _isNetworkOrOfflineError(dynamic e) {
+    if (e is io.SocketException ||
+        e is io.HttpException ||
+        e is TimeoutException) {
+      return true;
+    }
+    final str = e.toString().toLowerCase();
+    if (str.contains('socketexception') ||
+        str.contains('failed host lookup') ||
+        str.contains('network is unreachable') ||
+        str.contains('network error') ||
+        str.contains('connection refused') ||
+        str.contains('connection timed out') ||
+        str.contains('connection reset') ||
+        str.contains('connection closed') ||
+        str.contains('clientexception') ||
+        str.contains('handshakeexception') ||
+        str.contains('tls exception') ||
+        str.contains('os error') ||
+        str.contains('software caused connection abort')) {
+      return true;
+    }
+    if (e is PostgrestException) {
+      if (e.code == null &&
+          (e.message.isEmpty ||
+              str.contains('network') ||
+              str.contains('socket') ||
+              str.contains('failed host lookup'))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool _isTerminalError(dynamic e) {

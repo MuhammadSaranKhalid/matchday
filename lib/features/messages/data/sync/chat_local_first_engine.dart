@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ably_flutter/ably_flutter.dart' as ably;
 import 'package:flutter/foundation.dart';
 import '../../../../core/realtime/ably_service.dart';
 import '../datasources/chat_local_data_source.dart';
@@ -22,6 +23,7 @@ class ChatLocalFirstEngine {
     this.ablyService,
   }) {
     ablyService?.addResumeListener(_onResume);
+    ablyService?.addConnectionStateListener(_onAblyConnectionStateChanged);
   }
 
   final ChatLocalDataSource local;
@@ -76,6 +78,16 @@ class ChatLocalFirstEngine {
   void _onResume() {
     debugPrint('[ChatLocalFirstEngine] App resumed into foreground.');
     unawaited(reconcile('app_resumed'));
+  }
+
+  void _onAblyConnectionStateChanged(ably.ConnectionStateChange change) {
+    if (change.current == ably.ConnectionState.connected &&
+        change.previous != ably.ConnectionState.connected) {
+      debugPrint(
+        '[ChatLocalFirstEngine] Ably socket connected (${change.previous} -> ${change.current}). Triggering reconciliation.',
+      );
+      unawaited(reconcile('ably_connected'));
+    }
   }
 
   /// Single-flight reconciliation pipeline (Spec §8, §16, §17).
@@ -146,6 +158,7 @@ class ChatLocalFirstEngine {
     _isDisposed = true;
     _sessionGeneration++;
     ablyService?.removeResumeListener(_onResume);
+    ablyService?.removeConnectionStateListener(_onAblyConnectionStateChanged);
     ingestor.unsubscribeFromUserInbox();
   }
 }

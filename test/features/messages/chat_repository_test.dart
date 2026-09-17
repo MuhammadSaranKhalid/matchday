@@ -201,5 +201,78 @@ void main() {
       expect(rows.first.body, 'Idempotency test');
       expect(rows.first.messageSeq, 105);
     });
+
+    test('watchPresence delegates to realtimeIngestor', () {
+      when(() => ingestor.watchPresence(channelId))
+          .thenAnswer((_) => Stream.value({'user-1', 'user-2'}));
+
+      final stream = repo.watchPresence(channelId);
+
+      expect(stream, emits({'user-1', 'user-2'}));
+      verify(() => ingestor.watchPresence(channelId)).called(1);
+    });
+
+    test('acceptDirectRequest updates local membership active and enqueues outbox op without network call', () async {
+      final now = DateTime.now().toUtc();
+      await local.upsertChannelsFromDto([
+        ChatChannelDto(
+          channelId: channelId,
+          channelKey: 'dm:1:2',
+          kind: 'direct',
+          contextType: 'none',
+          title: 'Direct Chat',
+          isAccepted: false,
+          createdAt: now.toIso8601String(),
+          updatedAt: now.toIso8601String(),
+        ),
+      ], currentUserId);
+
+      final result = await repo.acceptDirectRequest(channelId);
+      expect(result.isRight(), isTrue);
+
+      final member = await (db.select(db.localChannelMembers)
+            ..where((m) => m.channelId.equals(channelId) & m.userId.equals(currentUserId)))
+          .getSingle();
+      expect(member.status, 'active');
+
+      final op = await (db.select(db.outboxOperations)
+            ..where((o) => o.channelId.equals(channelId) & o.operationType.equals('accept_invite')))
+          .getSingle();
+      expect(op.status, 'pending');
+      verify(() => outbox.notify()).called(1);
+      verifyZeroInteractions(remote);
+    });
+
+    test('declineDirectRequest updates local membership declined and enqueues outbox op without network call', () async {
+      final now = DateTime.now().toUtc();
+      await local.upsertChannelsFromDto([
+        ChatChannelDto(
+          channelId: channelId,
+          channelKey: 'dm:1:2',
+          kind: 'direct',
+          contextType: 'none',
+          title: 'Direct Chat',
+          isAccepted: false,
+          createdAt: now.toIso8601String(),
+          updatedAt: now.toIso8601String(),
+        ),
+      ], currentUserId);
+
+      final result = await repo.declineDirectRequest(channelId);
+      expect(result.isRight(), isTrue);
+
+      final member = await (db.select(db.localChannelMembers)
+            ..where((m) => m.channelId.equals(channelId) & m.userId.equals(currentUserId)))
+          .getSingle();
+      expect(member.status, 'declined');
+
+      final op = await (db.select(db.outboxOperations)
+            ..where((o) => o.channelId.equals(channelId) & o.operationType.equals('decline_invite')))
+          .getSingle();
+      expect(op.status, 'pending');
+      verify(() => outbox.notify()).called(1);
+      verifyZeroInteractions(remote);
+    });
   });
 }
+

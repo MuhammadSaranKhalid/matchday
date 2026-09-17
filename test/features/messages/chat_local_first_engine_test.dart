@@ -1,7 +1,9 @@
-import 'package:drift/drift.dart';
+import 'package:ably_flutter/ably_flutter.dart' as ably;
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matchday/core/database/app_database.dart';
+import 'package:matchday/core/realtime/ably_service.dart';
 import 'package:matchday/features/messages/data/datasources/chat_local_data_source.dart';
 import 'package:matchday/features/messages/data/datasources/chat_remote_data_source.dart';
 import 'package:matchday/features/messages/data/models/chat_channel_dto.dart';
@@ -21,6 +23,7 @@ class _MockOutboxProcessor extends Mock implements OutboxProcessor {}
 class _MockCatchUpScheduler extends Mock implements CatchUpScheduler {}
 class _MockSupabaseClient extends Mock implements SupabaseClient {}
 class _MockGoTrueClient extends Mock implements GoTrueClient {}
+class _MockAblyService extends Mock implements AblyService {}
 
 void main() {
   late AppDatabase db;
@@ -215,6 +218,50 @@ void main() {
 
       // Verify ZERO network calls were made to remote.listMyChats
       verifyNever(() => remote.listMyChats());
+    });
+
+    test('Ably connection recovery triggers reconciliation pass', () async {
+      final mockAbly = _MockAblyService();
+      void Function(ably.ConnectionStateChange)? connectionListener;
+
+      when(() => mockAbly.addResumeListener(any())).thenReturn(null);
+      when(() => mockAbly.removeResumeListener(any())).thenReturn(null);
+      when(() => mockAbly.addConnectionStateListener(any())).thenAnswer((inv) {
+        connectionListener = inv.positionalArguments.first as void Function(ably.ConnectionStateChange);
+      });
+      when(() => mockAbly.removeConnectionStateListener(any())).thenReturn(null);
+
+      final testEngine = ChatLocalFirstEngine(
+        local: local,
+        remote: remote,
+        outbox: outbox,
+        ingestor: ingestor,
+        catchUp: catchUp,
+        ablyService: mockAbly,
+      );
+
+      await testEngine.startSession(userIdA);
+      clearInteractions(remote);
+      clearInteractions(outbox);
+
+      expect(connectionListener, isNotNull);
+
+      // Simulate connection recovered: disconnected -> connected
+      final change = ably.ConnectionStateChange(
+        current: ably.ConnectionState.connected,
+        previous: ably.ConnectionState.disconnected,
+        event: ably.ConnectionEvent.connected,
+      );
+      connectionListener!(change);
+
+      // Allow async single-flight reconciliation pass to run
+      await pumpEventQueue();
+
+      verify(() => remote.listMyChats()).called(1);
+      verify(() => outbox.drain()).called(1);
+
+      testEngine.dispose();
+      verify(() => mockAbly.removeConnectionStateListener(any())).called(1);
     });
   });
 }

@@ -92,4 +92,8 @@ abstract interface class ChatRepository {
 
   /// Broadcasts typing activity for the current user in [channelId].
   Future<void> setTyping(String channelId, bool isTyping);
+
+  /// Streams the set of user/client IDs currently present (online) in [channelId] via Ably.
+  Stream<Set<String>> watchPresence(String channelId);
 }
+

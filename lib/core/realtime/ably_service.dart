@@ -56,6 +56,7 @@ class AblyService with WidgetsBindingObserver {
 
     debugPrint('[AblyService] Initializing Realtime client for user: ${_supabase.auth.currentUser?.id}');
     _realtime = ably.Realtime(options: clientOptions);
+    _listenToConnectionChanges(_realtime!);
     return _realtime!;
   }
 
@@ -80,12 +81,38 @@ class AblyService with WidgetsBindingObserver {
 
   Timer? _backgroundGraceTimer;
   final List<VoidCallback> _resumeListeners = [];
+  final List<void Function(ably.ConnectionStateChange change)> _connectionStateListeners = [];
+  StreamSubscription<ably.ConnectionStateChange>? _connectionSubscription;
 
   /// Registers a listener to be notified when the app resumes into foreground.
   void addResumeListener(VoidCallback listener) => _resumeListeners.add(listener);
 
   /// Unregisters a resume listener.
   void removeResumeListener(VoidCallback listener) => _resumeListeners.remove(listener);
+
+  /// Registers a listener for Ably connection state transitions.
+  void addConnectionStateListener(void Function(ably.ConnectionStateChange change) listener) {
+    _connectionStateListeners.add(listener);
+  }
+
+  /// Unregisters a connection state listener.
+  void removeConnectionStateListener(void Function(ably.ConnectionStateChange change) listener) {
+    _connectionStateListeners.remove(listener);
+  }
+
+  void _listenToConnectionChanges(ably.Realtime client) {
+    _connectionSubscription?.cancel();
+    _connectionSubscription = client.connection.on().listen((change) {
+      debugPrint('[AblyService] Connection state changed: ${change.previous} -> ${change.current}');
+      for (final listener in List.of(_connectionStateListeners)) {
+        try {
+          listener(change);
+        } catch (e) {
+          debugPrint('[AblyService] Error in connection state listener: $e');
+        }
+      }
+    });
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -118,6 +145,8 @@ class AblyService with WidgetsBindingObserver {
   void dispose() {
     _backgroundGraceTimer?.cancel();
     _resumeListeners.clear();
+    _connectionSubscription?.cancel();
+    _connectionStateListeners.clear();
     WidgetsBinding.instance.removeObserver(this);
     _realtime?.close();
     _realtime = null;

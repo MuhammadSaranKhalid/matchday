@@ -481,33 +481,61 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<Either<Failure, Unit>> acceptDirectRequest(String channelId) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return left(const AuthFailure('User not authenticated'));
+    }
+
     try {
-      await _remote.acceptChannelInvite(channelId);
-      final userId = _currentUserId;
-      if (userId != null) {
-        await _syncCoordinator.syncInbox(userId);
-      }
+      final now = DateTime.now().toUtc();
+      await _local.updateMemberStatus(channelId, userId, 'active');
+
+      final opComp = OutboxOperationsCompanion.insert(
+        operationId: _uuid.v4(),
+        channelId: channelId,
+        entityId: Value(channelId),
+        operationType: 'accept_invite',
+        payloadJson: jsonEncode({'channel_id': channelId}),
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await _local.enqueueOperation(opComp);
+      _outbox.notify();
+
       return right(unit);
-    } on PostgrestException catch (e) {
-      return left(ServerFailure(e.message));
     } catch (e) {
-      return left(ServerFailure('Failed to accept chat: $e'));
+      return left(CacheFailure('Failed to accept chat: $e'));
     }
   }
 
   @override
   Future<Either<Failure, Unit>> declineDirectRequest(String channelId) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return left(const AuthFailure('User not authenticated'));
+    }
+
     try {
-      await _remote.declineChannelInvite(channelId);
-      final userId = _currentUserId;
-      if (userId != null) {
-        await _syncCoordinator.syncInbox(userId);
-      }
+      final now = DateTime.now().toUtc();
+      await _local.updateMemberStatus(channelId, userId, 'declined');
+
+      final opComp = OutboxOperationsCompanion.insert(
+        operationId: _uuid.v4(),
+        channelId: channelId,
+        entityId: Value(channelId),
+        operationType: 'decline_invite',
+        payloadJson: jsonEncode({'channel_id': channelId}),
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await _local.enqueueOperation(opComp);
+      _outbox.notify();
+
       return right(unit);
-    } on PostgrestException catch (e) {
-      return left(ServerFailure(e.message));
     } catch (e) {
-      return left(ServerFailure('Failed to decline chat: $e'));
+      return left(CacheFailure('Failed to decline chat: $e'));
     }
   }
 
@@ -544,4 +572,9 @@ class ChatRepositoryImpl implements ChatRepository {
       await _ingestor.publishTyping(channelId, userId, isTyping);
     }
   }
+
+  @override
+  Stream<Set<String>> watchPresence(String channelId) =>
+      _ingestor.watchPresence(channelId);
 }
+

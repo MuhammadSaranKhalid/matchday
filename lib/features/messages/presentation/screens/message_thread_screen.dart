@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/error/failures.dart';
+import '../../../../core/push/push_provider.dart';
 import '../../../safety/presentation/providers/safety_providers.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/chat.dart';
@@ -54,28 +55,45 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   int? _lastMarkedReadSeq;
 
+  /// Saved in [didChangeDependencies] so [_checkAndMarkVisibleRead] and
+  /// [dispose] never call [ModalRoute.of] on a defunct element.
+  ModalRoute<dynamic>? _currentRoute;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ref.read(pushMessagingServiceProvider).setActiveChat(widget.chatId);
     _scrollController.addListener(_onScrollChanged);
     _restoreDraft();
     _textController.addListener(_onComposerChanged);
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Cache the route here — safe context lookup per Flutter framework guidance.
+    _currentRoute = ModalRoute.of(context);
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _lifecycleState = state;
     if (state == AppLifecycleState.resumed) {
+      ref.read(pushMessagingServiceProvider).setActiveChat(widget.chatId);
       _checkAndMarkVisibleRead();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      ref.read(pushMessagingServiceProvider).setActiveChat(null);
     }
   }
 
   void _checkAndMarkVisibleRead([List<Message>? currentMessages]) {
     if (!mounted) return;
     if (_lifecycleState != AppLifecycleState.resumed) return;
-    final route = ModalRoute.of(context);
-    if (route == null || !route.isCurrent) return;
+    // Use the route reference saved in didChangeDependencies to avoid unsafe
+    // ancestor lookups on a deactivated element (e.g. during navigation away).
+    if (_currentRoute == null || !_currentRoute!.isCurrent) return;
     if (_isScrolledUp) return;
 
     final msgs = currentMessages ??
@@ -167,6 +185,7 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
 
   @override
   void dispose() {
+    ref.read(pushMessagingServiceProvider).setActiveChat(null);
     WidgetsBinding.instance.removeObserver(this);
     _draftSaveDebounce?.cancel();
     _typingDebounce?.cancel();

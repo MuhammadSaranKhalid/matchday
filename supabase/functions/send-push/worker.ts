@@ -13,6 +13,9 @@ export interface Job {
     route: string | null;
     type_key: string;
     importance: string;
+    chat_id?: string | null;
+    message_id?: string | null;
+    sender_id?: string | null;
   };
 }
 export interface SendResult {
@@ -100,6 +103,9 @@ export function fcmMessage(job: Job, token: string) {
         notification_id: n.notification_id,
         type_key: n.type_key,
         route: n.route ?? "/notifications",
+        ...(n.chat_id ? { chat_id: n.chat_id } : {}),
+        ...(n.message_id ? { message_id: n.message_id } : {}),
+        ...(n.sender_id ? { sender_id: n.sender_id } : {}),
       },
       android: {
         priority: n.importance === "high" ? "HIGH" : "NORMAL",

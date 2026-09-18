@@ -89,9 +89,26 @@ class PushMessagingService {
     FirebaseMessaging.onMessage.listen(_showForeground);
   }
 
+  /// Track the chat thread ID currently in focus on this device.
+  /// When non-null and matching an incoming chat push, local heads-up
+  /// notification is suppressed because messages are rendered live via Ably.
+  String? activeChatId;
+
+  void setActiveChat(String? chatId) {
+    activeChatId = chatId;
+  }
+
   void _showForeground(RemoteMessage message) {
     final n = message.notification;
     if (n == null) return; // data-only message — nothing to display
+
+    // If the user is actively viewing this exact chat thread on this device,
+    // suppress the foreground heads-up banner.
+    final chatId = message.data['chat_id'];
+    if (chatId != null && chatId == activeChatId) {
+      return;
+    }
+
     final route = message.data['route'];
     _local.show(
       message.hashCode,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
-import '../../../../core/supabase/supabase_client_provider.dart';
+import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/domain/entities/team_member.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
@@ -23,8 +23,8 @@ part 'my_matches_providers.g.dart';
 /// pull-to-refresh invalidates self.
 @riverpod
 Future<MyMatchesView> myMatchesView(Ref ref) async {
-  final user = ref.watch(supabaseClientProvider).auth.currentUser;
-  if (user == null) return const MyMatchesView.empty();
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return const MyMatchesView.empty();
 
   final matchesResult =
       await ref.watch(matchesRepositoryProvider).listMyMatches();
@@ -133,7 +133,7 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   final confirmedRows = [
     for (final m in upcoming)
       _confirmedFor(m, teamsById,
-          currentUserId: user.id,
+          currentUserId: userId,
           myRoles: myRoles,
           tournamentNames: tournamentNames),
   ];
@@ -141,7 +141,7 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
     for (final m in past)
       _pastFor(m, teamsById,
           innings: inningsByMatch[m.id] ?? const [],
-          currentUserId: user.id,
+          currentUserId: userId,
           myRoles: myRoles,
           tournamentNames: tournamentNames),
   ];

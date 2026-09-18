@@ -74,7 +74,7 @@ final class PushRegistrarProvider
   }
 }
 
-String _$pushRegistrarHash() => r'b973c585f0251a34d1281d4435f543972df5da97';
+String _$pushRegistrarHash() => r'9f4ce05a8827b325486b74a019c9301e811949ff';
 
 /// Drives the FCM token lifecycle + notification-tap deep links for the
 /// signed-in user. Activated once (app.dart watches it); keepAlive for the

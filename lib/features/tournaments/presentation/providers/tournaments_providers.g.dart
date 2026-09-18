@@ -1041,7 +1041,7 @@ final class TournamentDraftStreamProvider
 }
 
 String _$tournamentDraftStreamHash() =>
-    r'6b8a3b9eeafb551426701e82233df547814860db';
+    r'cf478186000379d9b0bd70ef963f66a73f77235e';
 
 /// The fee ledger for one cup (artboard 24c). Organiser-only on the server,
 /// so a manager who reaches the route gets an error rather than an empty list.

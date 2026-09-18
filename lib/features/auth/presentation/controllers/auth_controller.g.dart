@@ -23,7 +23,7 @@ final authControllerProvider = AuthControllerProvider._();
 /// (AuthInitial) and the multiple sub-states of the OTP flow are better
 /// represented by a sealed class than by AsyncValue.
 final class AuthControllerProvider
-    extends $NotifierProvider<AuthController, AuthState> {
+    extends $NotifierProvider<AuthController, AuthFlowState> {
   /// Auth controller for email-OTP + Google sign-in.
   ///
   /// Notifier (not AsyncNotifier) because the initial state is synchronous
@@ -48,15 +48,15 @@ final class AuthControllerProvider
   AuthController create() => AuthController();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(AuthState value) {
+  Override overrideWithValue(AuthFlowState value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<AuthState>(value),
+      providerOverride: $SyncValueProvider<AuthFlowState>(value),
     );
   }
 }
 
-String _$authControllerHash() => r'09f5f2a1d5f1f35f3d9ffd031df5f83af4c267c8';
+String _$authControllerHash() => r'beedbe1c5a3435c2946931046d3854c03c5adde5';
 
 /// Auth controller for email-OTP + Google sign-in.
 ///
@@ -64,17 +64,17 @@ String _$authControllerHash() => r'09f5f2a1d5f1f35f3d9ffd031df5f83af4c267c8';
 /// (AuthInitial) and the multiple sub-states of the OTP flow are better
 /// represented by a sealed class than by AsyncValue.
 
-abstract class _$AuthController extends $Notifier<AuthState> {
-  AuthState build();
+abstract class _$AuthController extends $Notifier<AuthFlowState> {
+  AuthFlowState build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<AuthState, AuthState>;
+    final ref = this.ref as $Ref<AuthFlowState, AuthFlowState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AuthState, AuthState>,
-              AuthState,
+              AnyNotifier<AuthFlowState, AuthFlowState>,
+              AuthFlowState,
               Object?,
               Object?
             >;

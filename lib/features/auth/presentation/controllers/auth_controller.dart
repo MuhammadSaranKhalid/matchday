@@ -17,7 +17,7 @@ part 'auth_controller.g.dart';
 @riverpod
 class AuthController extends _$AuthController {
   @override
-  AuthState build() => const AuthInitial();
+  AuthFlowState build() => const AuthInitial();
 
   // ─── Email OTP ──────────────────────────────────────────────────────────
 

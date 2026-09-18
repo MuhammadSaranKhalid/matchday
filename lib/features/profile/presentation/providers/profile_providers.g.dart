@@ -140,7 +140,7 @@ final class MyProfileProvider
   }
 }
 
-String _$myProfileHash() => r'a3fcd6aedcc4d843ca21788663b79236c7ed574e';
+String _$myProfileHash() => r'4e3a804dc5573fbfbaff3130581535b09243628f';
 
 /// Any user's public profile by [username] — backs the `/u/:username` route
 /// and shared-link landing (a tapped `joinmatchday.com/u/<username>` opens

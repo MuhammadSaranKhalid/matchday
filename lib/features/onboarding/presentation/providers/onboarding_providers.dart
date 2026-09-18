@@ -1,6 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/supabase/supabase_auth_state_provider.dart';
-import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
 
 part 'onboarding_providers.g.dart';
@@ -13,10 +12,8 @@ part 'onboarding_providers.g.dart';
 /// pokes the router's refreshListenable to re-run the redirect.
 @Riverpod(keepAlive: true)
 Future<bool> onboardingStatus(Ref ref) async {
-  // Watch the stream so this provider re-evaluates on sign-in/out.
-  ref.watch(authStateProvider);
-  final user = ref.read(supabaseClientProvider).auth.currentUser;
-  if (user == null) return false;
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return false;
 
   final result = await ref.read(profileRepositoryProvider).getMyProfile();
   return result.fold(

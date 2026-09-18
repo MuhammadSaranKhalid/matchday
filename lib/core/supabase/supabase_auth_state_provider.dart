@@ -4,6 +4,7 @@ import 'supabase_client_provider.dart';
 
 export 'package:supabase_flutter/supabase_flutter.dart'
     show AuthState, AuthChangeEvent, Session, SignOutReason;
+export 'supabase_current_user_id_provider.dart' show currentUserIdProvider;
 
 part 'supabase_auth_state_provider.g.dart';
 

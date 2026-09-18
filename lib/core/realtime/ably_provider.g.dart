@@ -9,16 +9,31 @@ part of 'ably_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Provides the singleton [AblyService] across the application.
+///
+/// Watches [currentUserIdProvider] so the service is torn down and rebuilt
+/// whenever the signed-in user changes (sign-out → sign-in, or account
+/// switch). This ensures the Ably [clientId] always matches the current
+/// Supabase identity and prevents a stale clientId/JWT mismatch.
 
 @ProviderFor(ablyService)
 final ablyServiceProvider = AblyServiceProvider._();
 
 /// Provides the singleton [AblyService] across the application.
+///
+/// Watches [currentUserIdProvider] so the service is torn down and rebuilt
+/// whenever the signed-in user changes (sign-out → sign-in, or account
+/// switch). This ensures the Ably [clientId] always matches the current
+/// Supabase identity and prevents a stale clientId/JWT mismatch.
 
 final class AblyServiceProvider
     extends $FunctionalProvider<AblyService, AblyService, AblyService>
     with $Provider<AblyService> {
   /// Provides the singleton [AblyService] across the application.
+  ///
+  /// Watches [currentUserIdProvider] so the service is torn down and rebuilt
+  /// whenever the signed-in user changes (sign-out → sign-in, or account
+  /// switch). This ensures the Ably [clientId] always matches the current
+  /// Supabase identity and prevents a stale clientId/JWT mismatch.
   AblyServiceProvider._()
     : super(
         from: null,
@@ -52,4 +67,4 @@ final class AblyServiceProvider
   }
 }
 
-String _$ablyServiceHash() => r'e61defabd190ae3bce521124174c41adb15be4f5';
+String _$ablyServiceHash() => r'c62787e32fca233ba4d310dbdcd10df93886d4a2';

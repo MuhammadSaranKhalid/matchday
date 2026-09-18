@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../core/supabase/supabase_client_provider.dart';
+import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../../follows/presentation/providers/follows_providers.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
@@ -184,7 +184,7 @@ Future<MatchesBoardView> matchesBoard(Ref ref, MatchesBoardTab tab) async {
 /// is deliberately not a factor: a follow is a stated interest, a GPS radius
 /// is a guess.
 Future<List<Match>> _narrowToForYou(Ref ref, List<Match> matches) async {
-  final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
+  final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return const [];
 
   final myTeams = await ref.watch(myTeamsProvider.future);
@@ -215,7 +215,7 @@ Future<MatchesBoardView> _group(
     return MatchesBoardView(groups: const [], liveCount: liveCount);
   }
 
-  final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
+  final userId = ref.watch(currentUserIdProvider);
   final myTeams = await ref.watch(myTeamsProvider.future);
   final myTeamIds = userId == null
       ? <String>{}

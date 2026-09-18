@@ -5,7 +5,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:matchday/core/error/failures.dart';
 import 'package:matchday/core/supabase/supabase_auth_state_provider.dart';
 import 'package:matchday/features/matches/domain/entities/match.dart';
-import '../../../../helpers/mock_auth.dart';
 import 'package:matchday/features/matches/domain/repositories/matches_repository.dart';
 import 'package:matchday/features/matches/presentation/providers/matches_providers.dart';
 import 'package:matchday/features/teams/domain/entities/team.dart';
@@ -78,8 +77,7 @@ void main() {
             )),
         allTeamsProvider.overrideWith((ref) => Stream.value(cached)),
         matchesRepositoryProvider.overrideWithValue(matchesRepo),
-        authStateProvider
-            .overrideWith((ref) => Stream.value(createMockAuthState(id: userId))),
+        currentUserIdProvider.overrideWithValue(userId),
       ],
     );
     addTearDown(container.dispose);

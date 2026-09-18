@@ -5,6 +5,7 @@ import '../core/theme/circk_theme.dart';
 import '../features/settings/presentation/screens/settings_screen.dart';
 import '../core/widgets/ck_push_nav.dart';
 import '../core/supabase/supabase_auth_state_provider.dart';
+import '../core/supabase/supabase_client_provider.dart';
 import '../features/auth/presentation/screens/sign_in_screen.dart';
 import '../features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../features/onboarding/presentation/screens/onboarding_screen.dart';
@@ -105,17 +106,20 @@ GoRouter appRouter(Ref ref) {
         // storage. Do not redirect yet; avoid flashing /sign-in prematurely.
         AsyncLoading() => null,
 
-        // 2. Stream/network error during refresh: preserve existing view,
-        // do not prematurely kick the user to /sign-in.
-        AsyncError() => null,
+        // 2. Stream/network error (e.g. transient token-refresh failure):
+        // - If a user is already authenticated, preserve their current page —
+        //   a network hiccup is not a sign-out.
+        // - If no user exists (e.g. very first launch), redirect to sign-in.
+        AsyncError() =>
+          ref.read(supabaseClientProvider).auth.currentUser != null
+              ? null
+              : goingToSignIn ? null : '/sign-in',
 
         // 3. Resolved AuthState:
         AsyncData(:final value) => switch (value.event) {
           AuthChangeEvent.signedOut => goingToSignIn ? null : '/sign-in',
           AuthChangeEvent.initialSession when value.session == null =>
             goingToSignIn ? null : '/sign-in',
-          // ignore: deprecated_member_use
-          AuthChangeEvent.userDeleted => goingToSignIn ? null : '/sign-in',
           _ when value.session != null => () {
             // Signed in. Gate on onboarding completion (has the user claimed a
             // username?). `.value` is null while the profile status is still

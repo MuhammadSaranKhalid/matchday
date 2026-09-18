@@ -1,5 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import '../../../../core/supabase/supabase_client_provider.dart';
+import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../data/datasources/teams_datasource_providers.dart';
 import '../../data/repositories/teams_repository_impl.dart';
 import '../../domain/entities/roster_member.dart';
@@ -23,7 +23,7 @@ TeamsRepository teamsRepository(Ref ref) => TeamsRepositoryImpl(
 /// Teams owned/managed by the signed-in user. Empty when signed out.
 @riverpod
 Stream<List<Team>> myTeams(Ref ref) {
-  final userId = ref.read(supabaseClientProvider).auth.currentUser?.id;
+  final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value(const []);
   return ref.watch(teamsRepositoryProvider).watchMyTeams(userId);
 }
@@ -48,7 +48,7 @@ Stream<List<RosterMember>> roster(Ref ref, String teamId) =>
 /// docs/team-roles-design.md.
 @riverpod
 Stream<Map<String, MemberRole>> myTeamRoles(Ref ref) {
-  final userId = ref.read(supabaseClientProvider).auth.currentUser?.id;
+  final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value(const {});
   return ref.watch(teamsRepositoryProvider).watchMyTeamRoles(userId);
 }

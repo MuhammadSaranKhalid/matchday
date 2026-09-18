@@ -1,9 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/push/push_provider.dart';
 import '../../../../core/supabase/supabase_auth_state_provider.dart';
-import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../router/app_router.dart';
 import '../../domain/entities/app_notification.dart';
 import '../providers/notifications_providers.dart';
@@ -25,14 +26,16 @@ part 'push_registrar.g.dart';
 class PushRegistrar extends _$PushRegistrar {
   @override
   void build() {
-    // Register whenever a user becomes present (fresh sign-in).
-    ref.listen(authStateProvider, (prev, next) {
-      final prevUser = prev?.value?.session?.user;
-      final nextUser = next.value?.session?.user;
-      if (prevUser == null && nextUser != null) _register();
-    });
-    // ...and once now if a session already exists at startup.
-    if (ref.read(supabaseClientProvider).auth.currentUser != null) _register();
+    // Register when a user becomes present. fireImmediately covers cold-start
+    // (session already restored before build runs); the next != previous guard
+    // prevents re-registration on tokenRefreshed or other non-identity events.
+    ref.listen<String?>(
+      currentUserIdProvider,
+      (previous, next) {
+        if (next != null && next != previous) unawaited(_register());
+      },
+      fireImmediately: true,
+    );
 
     final push = ref.read(pushMessagingServiceProvider);
 

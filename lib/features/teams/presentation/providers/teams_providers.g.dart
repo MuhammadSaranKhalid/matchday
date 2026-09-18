@@ -92,7 +92,7 @@ final class MyTeamsProvider
   }
 }
 
-String _$myTeamsHash() => r'a21da1b7bcb1dc1ab7e6b297d94f011e11404aa4';
+String _$myTeamsHash() => r'51fb83f482e069c179b1f9d6825e8e1fd5de2f11';
 
 /// All teams visible to the signed-in user (used by match setup's opponent picker).
 
@@ -351,7 +351,7 @@ final class MyTeamRolesProvider
   }
 }
 
-String _$myTeamRolesHash() => r'a63b74002e6e7b1accf84fccdce4e6360aa0acbc';
+String _$myTeamRolesHash() => r'66d4c63afa0a1b1757dbcfe48784167034c00d57';
 
 /// Real-time stream of all teams affiliated with a user (captained and played for).
 

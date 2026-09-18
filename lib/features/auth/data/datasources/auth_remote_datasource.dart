@@ -152,26 +152,15 @@ class AuthRemoteDataSource {
     }
   }
 
-  User? currentUser() => _supabase.auth.currentUser;
-
-  /// Returns the in-memory session synchronously, or null if none exists.
-  Session? currentSession() => _supabase.auth.currentSession;
-
-  /// Asynchronously retrieves the current session, automatically refreshing
-  /// an expired access token if necessary.
-  Future<Session?> getSession() async {
-    try {
-      return await _supabase.auth.getSession();
-    } on AuthException catch (e) {
-      throw UnauthorizedException(e.message);
-    } catch (e) {
-      throw ServerException('Failed to get session: $e');
-    }
-  }
-
-  /// Emits native Supabase [AuthState] events containing the event type,
-  /// session, token state, and sign-out context.
-  Stream<AuthState> watchAuthState() => _supabase.auth.onAuthStateChange;
+  /// Speaks Supabase. Throws low-level exceptions on failure.
+  ///
+  /// Responsibility is strictly command-oriented:
+  ///   send OTP · verify OTP · Google auth · Facebook auth · sign out · delete account
+  ///
+  /// Auth identity and session state are accessed directly by infrastructure
+  /// providers (supabase_auth_state_provider, supabase_current_user_id_provider)
+  /// rather than being delegated through this data source.
+  ///
+  /// Note: GoogleSignIn.instance is initialized once at app boot in main.dart.
+  /// This data source just calls authenticate() / authorizeScopes() on it.
 }
-
-

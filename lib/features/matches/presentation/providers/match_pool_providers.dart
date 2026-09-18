@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../core/supabase/supabase_client_provider.dart';
+import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../data/datasources/matches_datasource_providers.dart';
@@ -284,7 +284,7 @@ Future<List<OpenMatchPoolItem>> filteredOpenMatchPool(Ref ref) async {
 /// "only team managers can post challenges or apply to play".
 @riverpod
 Future<bool> viewerManagesTeam(Ref ref) async {
-  final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
+  final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return false;
   // 2026-09-10: was `teams.any((t) => t.isManagedBy(userId))`, which read the
   // dead `teams.managers` array. Same rule ("only team managers can post

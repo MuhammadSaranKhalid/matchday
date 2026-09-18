@@ -43,27 +43,25 @@ ChatLocalFirstEngine chatLocalFirstEngine(Ref ref) {
     },
   );
 
-  // Current User listener (Auth session boundaries)
-  ref.listen<AsyncValue<AuthState>>(
-    authStateProvider,
-    (prev, next) {
-      final prevUserId = prev?.value?.session?.user.id;
-      final nextUserId = next.value?.session?.user.id;
-
-      if (prevUserId != nextUserId) {
-        if (nextUserId != null) {
-          unawaited(engine.startSession(nextUserId));
-        } else {
-          engine.endSession();
-        }
+  // Auth session boundaries — one fireImmediately listener handles cold
+  // start, user switch, and sign-out without the double-start risk.
+  //
+  // We listen to currentUserIdProvider (not authStateProvider) so that a
+  // transient token-refresh *error* from the stream does NOT trigger
+  // endSession: currentUser remains non-null during network glitches, so
+  // the UID stays unchanged and the session is preserved.
+  ref.listen<String?>(
+    currentUserIdProvider,
+    (previous, next) {
+      if (previous == next) return;
+      if (next == null) {
+        engine.endSession();
+      } else {
+        unawaited(engine.startSession(next));
       }
     },
+    fireImmediately: true,
   );
-
-  final initialUserId = ref.read(supabaseClientProvider).auth.currentUser?.id;
-  if (initialUserId != null) {
-    unawaited(engine.startSession(initialUserId));
-  }
 
   return engine;
 }

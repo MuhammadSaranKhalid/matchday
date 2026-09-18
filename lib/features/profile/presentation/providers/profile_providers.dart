@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
-import '../../../../core/supabase/supabase_client_provider.dart';
+import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../data/datasources/avatar_picker_impl.dart';
 import '../../data/datasources/profile_datasource_providers.dart';
 import '../../data/repositories/profile_repository_impl.dart';
@@ -22,8 +22,8 @@ AvatarPicker avatarPicker(Ref ref) => const AvatarPickerImpl();
 /// keepAlive so it's fetched once and shared, not refetched per screen.
 @Riverpod(keepAlive: true)
 Future<Profile?> myProfile(Ref ref) async {
-  final user = ref.read(supabaseClientProvider).auth.currentUser;
-  if (user == null) return null;
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return null;
   final result = await ref.read(profileRepositoryProvider).getMyProfile();
   return result.fold((f) => throw FailureWrapper(f), (p) => p);
 }

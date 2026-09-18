@@ -55,7 +55,7 @@ final class ChatLocalFirstEngineProvider
 }
 
 String _$chatLocalFirstEngineHash() =>
-    r'f0163b7cfbfa11406ff2d6072dc41b7444aaee40';
+    r'd040f25540590bb2befcd5bd5afd00c29e6a6cab';
 
 @ProviderFor(chatRepository)
 final chatRepositoryProvider = ChatRepositoryProvider._();

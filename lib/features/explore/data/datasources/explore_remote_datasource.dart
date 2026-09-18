@@ -28,12 +28,13 @@ class ExploreRemoteDataSource {
     String query, {
     String? kind,
     int? limit,
+    Future<void>? cancelSignal,
   }) async {
     final data = await _invoke({
       'q': query,
       if (kind != null) 'kind': kind,
       if (limit != null) 'limit': limit,
-    });
+    }, abortSignal: cancelSignal);
     return (
       players: _list(data, 'players', PlayerResultDto.fromJson),
       teams: _list(data, 'teams', TeamResultDto.fromJson),
@@ -59,9 +60,16 @@ class ExploreRemoteDataSource {
     );
   }
 
-  Future<Map<String, dynamic>> _invoke(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> _invoke(
+    Map<String, dynamic> body, {
+    Future<void>? abortSignal,
+  }) async {
     try {
-      final res = await _supabase.functions.invoke(_fn, body: body);
+      final res = await _supabase.functions.invoke(
+        _fn,
+        body: body,
+        abortSignal: abortSignal,
+      );
       final data = res.data;
       if (data is! Map<String, dynamic>) {
         throw ServerException('Unexpected search response shape');
@@ -74,14 +82,32 @@ class ExploreRemoteDataSource {
         throw ServerException(message);
       }
       return data;
-    } on FunctionException catch (e) {
-      // `details` carries the function's JSON body when it returned one.
+    } on RequestAbortedException {
+      throw const OperationCancelledException();
+    } on FunctionsHttpException catch (e) {
       final details = e.details;
       final message = details is Map && details['error'] is Map
           ? '${(details['error'] as Map)['message']}'
           : 'Search failed (${e.status})';
       if (e.status == 401) throw UnauthorizedException(message);
-      throw ServerException(message);
+      throw ServerException(message, statusCode: e.status);
+    } on FunctionsFetchException catch (e) {
+      throw NetworkException(
+        e.reasonPhrase ?? 'Failed to reach search service',
+      );
+    } on FunctionsRelayException catch (e) {
+      throw ServerException(
+        'Search relay failure: ${e.reasonPhrase ?? ''}',
+        statusCode: e.status,
+      );
+    } on FunctionException catch (e) {
+      // Details carries the function's JSON body when it returned one.
+      final details = e.details;
+      final message = details is Map && details['error'] is Map
+          ? '${(details['error'] as Map)['message']}'
+          : 'Search failed (${e.status})';
+      if (e.status == 401) throw UnauthorizedException(message);
+      throw ServerException(message, statusCode: e.status);
     }
   }
 

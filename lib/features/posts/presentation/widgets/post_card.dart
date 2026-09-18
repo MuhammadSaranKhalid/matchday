@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/ck_feed_image.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../follows/presentation/controllers/follow_toggle_controller.dart';
 import '../../../teams/presentation/widgets/team_crest.dart';
 import '../../domain/entities/post.dart';
@@ -98,7 +98,7 @@ class FeedPostCard extends ConsumerWidget {
   Widget _header(BuildContext context, WidgetRef ref) {
     final time = timeago.format(post.createdAt, locale: 'en_short');
     final isTeam = post.authorContext == PostAuthorContext.teamManager;
-    final currentUserId = ref.watch(currentUserStreamProvider).value?.id.value;
+    final currentUserId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
 
     final targetType = isTeam ? 'team' : 'user';
     final targetId = isTeam ? (post.linkedTeamId ?? post.contextEntityId) : post.authorId;

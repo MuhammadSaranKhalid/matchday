@@ -26,7 +26,10 @@ class AblyService with WidgetsBindingObserver {
       clientId: _supabase.auth.currentUser?.id,
       autoConnect: true,
       authCallback: (ably.TokenParams params) async {
-        final session = _supabase.auth.currentSession;
+        // getSession() returns the current session, automatically refreshing
+        // the access token asynchronously if expired, eliminating competing
+        // refresh race conditions with Supabase Flutter's lifecycle observer.
+        final session = await _supabase.auth.getSession();
         if (session == null) {
           throw Exception('[AblyService] User is not authenticated with Supabase.');
         }

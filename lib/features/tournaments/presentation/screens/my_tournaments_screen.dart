@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_push_nav.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../domain/entities/my_tournament_entry.dart';
 import '../../domain/entities/tournament_live_match.dart';
 import '../../domain/entities/tournament.dart';
@@ -33,7 +33,7 @@ class _MyTournamentsScreenState extends ConsumerState<MyTournamentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final userId = ref.watch(currentUserStreamProvider).value?.id.value;
+    final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
     final mineAsync = ref.watch(myTournamentsProvider);
     final playingAsync = ref.watch(myPlayingTournamentsProvider);
     final draftAsync = ref.watch(tournamentDraftStreamProvider);

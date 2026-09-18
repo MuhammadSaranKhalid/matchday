@@ -64,3 +64,13 @@ class PermissionException implements Exception {
   @override
   String toString() => 'PermissionException: $message';
 }
+
+/// The operation was aborted or cancelled (e.g. via abortSignal or user cancellation).
+class OperationCancelledException implements Exception {
+  const OperationCancelledException([this.message = 'Operation was cancelled']);
+  final String message;
+
+  @override
+  String toString() => 'OperationCancelledException: $message';
+}
+

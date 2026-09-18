@@ -6,8 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../controllers/profile_edit_controller.dart';
 
 /// Edit profile — artboard **1a · Single scroll (recommended)**.
@@ -96,7 +96,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(profileEditControllerProvider);
     final c = ref.read(profileEditControllerProvider.notifier);
-    final email = ref.watch(currentUserStreamProvider).value?.email.value ?? '';
+    final email =
+        ref.read(supabaseClientProvider).auth.currentUser?.email ?? '';
 
     return PopScope(
       canPop: false,

@@ -11,7 +11,7 @@ part of 'onboarding_providers.dart';
 /// Whether the signed-in user has finished onboarding (has a username).
 ///
 /// The router's redirect reads this via `.value` to gate `/onboarding`. It
-/// depends on [currentUserStreamProvider] so it recomputes on sign-in/out, and
+/// depends on [authStateProvider] so it recomputes on sign-in/out, and
 /// is invalidated by the onboarding controller when the user finishes, which
 /// pokes the router's refreshListenable to re-run the redirect.
 
@@ -21,7 +21,7 @@ final onboardingStatusProvider = OnboardingStatusProvider._();
 /// Whether the signed-in user has finished onboarding (has a username).
 ///
 /// The router's redirect reads this via `.value` to gate `/onboarding`. It
-/// depends on [currentUserStreamProvider] so it recomputes on sign-in/out, and
+/// depends on [authStateProvider] so it recomputes on sign-in/out, and
 /// is invalidated by the onboarding controller when the user finishes, which
 /// pokes the router's refreshListenable to re-run the redirect.
 
@@ -31,7 +31,7 @@ final class OnboardingStatusProvider
   /// Whether the signed-in user has finished onboarding (has a username).
   ///
   /// The router's redirect reads this via `.value` to gate `/onboarding`. It
-  /// depends on [currentUserStreamProvider] so it recomputes on sign-in/out, and
+  /// depends on [authStateProvider] so it recomputes on sign-in/out, and
   /// is invalidated by the onboarding controller when the user finishes, which
   /// pokes the router's refreshListenable to re-run the redirect.
   OnboardingStatusProvider._()
@@ -59,4 +59,4 @@ final class OnboardingStatusProvider
   }
 }
 
-String _$onboardingStatusHash() => r'1d5f9171f54620515913d206ff33f319fe949a5c';
+String _$onboardingStatusHash() => r'f2bf0f19ca5ab0a82e88b9c3d4bfa629da5ef5ee';

@@ -4,9 +4,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/connectivity/connectivity_provider.dart';
 import '../../../../core/realtime/ably_provider.dart';
+import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../../../core/supabase/supabase_client_provider.dart';
-import '../../../auth/domain/entities/user.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../safety/presentation/providers/safety_providers.dart';
 import '../../data/datasources/messages_datasource_providers.dart';
 import '../../data/repositories/chat_repository_impl.dart';
@@ -45,15 +44,15 @@ ChatLocalFirstEngine chatLocalFirstEngine(Ref ref) {
   );
 
   // Current User listener (Auth session boundaries)
-  ref.listen<AsyncValue<User?>>(
-    currentUserStreamProvider,
+  ref.listen<AsyncValue<AuthState>>(
+    authStateProvider,
     (prev, next) {
-      final prevUser = prev?.value;
-      final nextUser = next.value;
+      final prevUserId = prev?.value?.session?.user.id;
+      final nextUserId = next.value?.session?.user.id;
 
-      if (prevUser?.id != nextUser?.id) {
-        if (nextUser != null) {
-          unawaited(engine.startSession(nextUser.id.value));
+      if (prevUserId != nextUserId) {
+        if (nextUserId != null) {
+          unawaited(engine.startSession(nextUserId));
         } else {
           engine.endSession();
         }
@@ -61,9 +60,9 @@ ChatLocalFirstEngine chatLocalFirstEngine(Ref ref) {
     },
   );
 
-  final initialUser = ref.read(currentUserStreamProvider).value;
-  if (initialUser != null) {
-    unawaited(engine.startSession(initialUser.id.value));
+  final initialUserId = ref.read(supabaseClientProvider).auth.currentUser?.id;
+  if (initialUserId != null) {
+    unawaited(engine.startSession(initialUserId));
   }
 
   return engine;

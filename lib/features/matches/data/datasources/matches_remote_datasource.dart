@@ -660,6 +660,17 @@ class MatchesRemoteDataSource {
   /// returns a structured `{ ok:false, error:{ code, message } }` (or
   /// `{ conflict:true }`) body, surfaced on [FunctionException.details].
   Exception _functionException(FunctionException e) {
+    if (e is FunctionsFetchException) {
+      return NetworkException(
+        e.reasonPhrase ?? 'No connection to scoring service',
+      );
+    }
+    if (e is FunctionsRelayException) {
+      return ServerException(
+        'Scoring relay failure: ${e.reasonPhrase ?? ''}',
+        statusCode: e.status,
+      );
+    }
     final msg = _functionErrorMessage(e);
 
     switch (e.status) {

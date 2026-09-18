@@ -83,7 +83,7 @@ class PostsRemoteDataSource {
       final teamRows = await _supabase
           .from('teams')
           .select('team_id, team_name, logo_url, logo_monogram, team_colors')
-          .filter('team_id', 'in', teamIds);
+          .inFilter('team_id', teamIds);
 
       final teamsById = {
         for (final r in (teamRows as List))

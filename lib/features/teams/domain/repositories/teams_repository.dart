@@ -229,6 +229,7 @@ abstract class TeamsRepository {
     double? scaleKm,
     String? countryCode,
     int? limit,
+    Future<void>? cancelSignal,
   });
 
   /// City chips for the search filter row. Cap is top-100; chips are sorted
@@ -236,5 +237,6 @@ abstract class TeamsRepository {
   /// profile country.
   Future<Either<Failure, List<PlaceFacet>>> teamPlaceFacets({
     String? countryCode,
+    Future<void>? cancelSignal,
   });
 }

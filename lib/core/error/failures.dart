@@ -59,6 +59,12 @@ class UnknownFailure extends Failure {
   const UnknownFailure([super.message = 'Unknown error']);
 }
 
+/// The operation was deliberately cancelled before completing (e.g. superseded by a newer query).
+class CancelledFailure extends Failure {
+  const CancelledFailure([super.message = 'Operation cancelled']);
+}
+
+
 /// Adapts a [Failure] into a throwable so it can travel as an error through a
 /// `Stream` or `AsyncNotifier`, then be recovered in the UI via
 /// `error is FailureWrapper`. Keeps the typed [Failure] intact across the

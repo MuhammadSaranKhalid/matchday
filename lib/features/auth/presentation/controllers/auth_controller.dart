@@ -65,7 +65,7 @@ class AuthController extends _$AuthController {
             .verifyEmailOtp(email: email, code: code);
         state = result.fold(
           (f) => AuthFailed(f, email: email, showOtpForm: true),
-          AuthAuthenticated.new,
+          (_) => const AuthInitial(),
         );
     }
   }
@@ -102,7 +102,7 @@ class AuthController extends _$AuthController {
         return const AuthInitial();
       }
       return AuthFailed(failure);
-    }, AuthAuthenticated.new);
+    }, (_) => const AuthInitial());
   }
 
   Future<void> signInWithFacebook() async {

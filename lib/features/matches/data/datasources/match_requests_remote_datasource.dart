@@ -282,6 +282,17 @@ class MatchRequestsRemoteDataSource {
   /// always returns `{ ok:false, error:{ code, message } }` on failure with
   /// an appropriate HTTP status (see `send-match-request/index.ts`).
   Exception _functionException(FunctionException e) {
+    if (e is FunctionsFetchException) {
+      return NetworkException(
+        e.reasonPhrase ?? 'No connection to match request service',
+      );
+    }
+    if (e is FunctionsRelayException) {
+      return ServerException(
+        'Relay error: ${e.reasonPhrase ?? ''}',
+        statusCode: e.status,
+      );
+    }
     String? msg;
     final d = e.details;
     if (d is Map && d['error'] is Map) {

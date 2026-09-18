@@ -1,7 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
-import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/value_objects/email.dart';
 import '../../domain/value_objects/otp_code.dart';
@@ -27,16 +26,16 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, User>> verifyEmailOtp({
+  Future<Either<Failure, Unit>> verifyEmailOtp({
     required Email email,
     required OtpCode code,
   }) async {
     try {
-      final dto = await _remote.verifyEmailOtp(
+      await _remote.verifyEmailOtp(
         email: email.value,
         code: code.value,
       );
-      return Right(dto.toEntity());
+      return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
@@ -47,10 +46,10 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, User>> signInWithGoogle() async {
+  Future<Either<Failure, Unit>> signInWithGoogle() async {
     try {
-      final dto = await _remote.signInWithGoogle();
-      return Right(dto.toEntity());
+      await _remote.signInWithGoogle();
+      return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
@@ -87,16 +86,6 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, User?>> getCurrentUser() async {
-    try {
-      final dto = _remote.currentUser();
-      return Right(dto?.toEntity());
-    } catch (e) {
-      return Left(UnknownFailure(e.toString()));
-    }
-  }
-
-  @override
   Future<Either<Failure, Unit>> deleteAccount() async {
     try {
       await _remote.deleteAccount();
@@ -105,8 +94,4 @@ class AuthRepositoryImpl implements AuthRepository {
       return const Left(ServerFailure('Account deletion could not be completed. Retry or contact support. Some uploaded files may already have been removed.'));
     }
   }
-
-  @override
-  Stream<User?> watchCurrentUser() =>
-      _remote.watchUser().map((dto) => dto?.toEntity());
 }

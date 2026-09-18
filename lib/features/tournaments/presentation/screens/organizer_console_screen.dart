@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../domain/draw/draw_plan.dart';
 import '../../domain/entities/scorer_candidate.dart';
 import '../../domain/entities/tournament.dart';
@@ -689,8 +689,8 @@ class _OrganizerConsoleScreenState
   // ─── The console ⋮ menu (artboard 27c, left) ───────────────────────────────
 
   Future<void> _onConsoleMenu(Tournament tournament) async {
-    final me = ref.read(currentUserStreamProvider).value;
-    final isOwner = me != null && tournament.createdBy == me.id.value;
+    final me = ref.read(supabaseClientProvider).auth.currentUser;
+    final isOwner = me != null && tournament.createdBy == me.id;
     final inRegistration = tournament.status == TournamentStatus.registration;
     final action = await showConsoleMenu(
       context,

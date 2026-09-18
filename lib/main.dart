@@ -66,11 +66,17 @@ Future<void> main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // 1. Supabase — PKCE flow is the v2 default; safer on mobile than implicit.
+  // detectSessionInUriPredicate isolates OAuth deep links from non-auth deep links.
   await Supabase.initialize(
     url: config.supabaseUrl,
-    anonKey: config.supabaseAnonKey,
-    authOptions: const FlutterAuthClientOptions(
+    publishableKey: config.supabasePublishableKey,
+    authOptions: FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
+      detectSessionInUriPredicate: kIsWeb
+          ? null
+          : (uri) =>
+              uri.scheme == 'com.joinmatchday.app' &&
+              uri.host == 'login-callback',
     ),
   );
 

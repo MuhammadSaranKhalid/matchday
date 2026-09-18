@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
-import '../models/user_dto.dart';
 
 /// Speaks Supabase. Returns DTOs. Throws low-level exceptions.
 ///
@@ -27,21 +26,16 @@ class AuthRemoteDataSource {
     }
   }
 
-  Future<UserDto> verifyEmailOtp({
+  Future<void> verifyEmailOtp({
     required String email,
     required String code,
   }) async {
     try {
-      final response = await _supabase.auth.verifyOTP(
+      await _supabase.auth.verifyOTP(
         email: email,
         token: code,
         type: OtpType.email,
       );
-      final user = response.user;
-      if (user == null) {
-        throw ServerException('Verification succeeded but no user returned');
-      }
-      return UserDto.fromSupabaseUser(user);
     } on AuthException catch (e) {
       // 'Token has expired or is invalid' lands here.
       throw UnauthorizedException(e.message);
@@ -55,7 +49,7 @@ class AuthRemoteDataSource {
   /// Performs native Google sign-in via google_sign_in v7+ and exchanges
   /// the ID token with Supabase. GoogleSignIn.instance must have been
   /// initialized at app startup (see main.dart).
-  Future<UserDto> signInWithGoogle() async {
+  Future<void> signInWithGoogle() async {
     try {
       final google = GoogleSignIn.instance;
 
@@ -76,22 +70,18 @@ class AuthRemoteDataSource {
         throw ServerException('Google did not return an ID token');
       }
 
-      final response = await _supabase.auth.signInWithIdToken(
+      await _supabase.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
         accessToken: authorization.accessToken,
       );
-
-      final user = response.user;
-      if (user == null) {
-        throw ServerException('Supabase did not return a user');
-      }
-      return UserDto.fromSupabaseUser(user);
     } on AuthException catch (e) {
       debugPrint('[GoogleSignIn] Supabase AuthException: ${e.message}');
       throw UnauthorizedException(e.message);
     } on GoogleSignInException catch (e) {
-      debugPrint('[GoogleSignIn] GoogleSignInException code=${e.code}, description=${e.description}');
+      debugPrint(
+        '[GoogleSignIn] GoogleSignInException code=${e.code}, description=${e.description}',
+      );
       // Distinguish a deliberate user cancellation (maps to AuthFailure, a
       // benign "you cancelled" message) from genuine config/network failures
       // (ServerFailure, "something's wrong"). Lumping them together shows
@@ -139,23 +129,49 @@ class AuthRemoteDataSource {
   }
 
   Future<void> deleteAccount() async {
-    final response = await _supabase.functions.invoke('delete-account', body: {'confirmation': 'DELETE'});
-    if (response.status != 200) throw ServerException('Account deletion failed. Please retry or contact support.');
-    // Local sign-out clears the persisted session after the server deletes it.
-    await _supabase.auth.signOut(scope: SignOutScope.local);
+    try {
+      final response = await _supabase.functions.invoke(
+        'delete-account',
+        body: {'confirmation': 'DELETE'},
+      );
+      if (response.status != 200) {
+        throw ServerException(
+          'Account deletion failed. Please retry or contact support.',
+        );
+      }
+      // Local sign-out clears the persisted session after the server deletes it.
+      await _supabase.auth.signOut(scope: SignOutScope.local);
+    } on FunctionsFetchException catch (e) {
+      throw NetworkException(
+        e.reasonPhrase ?? 'Network failure during account deletion',
+      );
+    } on FunctionException catch (e) {
+      throw ServerException(
+        e.reasonPhrase ?? 'Account deletion failed (${e.status}).',
+      );
+    }
   }
 
-  UserDto? currentUser() {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return null;
-    return UserDto.fromSupabaseUser(user);
+  User? currentUser() => _supabase.auth.currentUser;
+
+  /// Returns the in-memory session synchronously, or null if none exists.
+  Session? currentSession() => _supabase.auth.currentSession;
+
+  /// Asynchronously retrieves the current session, automatically refreshing
+  /// an expired access token if necessary.
+  Future<Session?> getSession() async {
+    try {
+      return await _supabase.auth.getSession();
+    } on AuthException catch (e) {
+      throw UnauthorizedException(e.message);
+    } catch (e) {
+      throw ServerException('Failed to get session: $e');
+    }
   }
 
-  /// Emits the current user (or null) on every auth state change.
-  Stream<UserDto?> watchUser() {
-    return _supabase.auth.onAuthStateChange.map((data) {
-      final user = data.session?.user;
-      return user == null ? null : UserDto.fromSupabaseUser(user);
-    });
-  }
+  /// Emits native Supabase [AuthState] events containing the event type,
+  /// session, token state, and sign-out context.
+  Stream<AuthState> watchAuthState() => _supabase.auth.onAuthStateChange;
 }
+
+

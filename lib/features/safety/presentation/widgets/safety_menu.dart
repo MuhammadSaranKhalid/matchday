@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../providers/safety_providers.dart';
 
 class SafetyMenu extends ConsumerWidget {
@@ -11,7 +11,7 @@ class SafetyMenu extends ConsumerWidget {
   final VoidCallback? onShare;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final self = ref.watch(currentUserStreamProvider).value?.id.value == userId;
+    final self = ref.watch(supabaseClientProvider).auth.currentUser?.id == userId;
     final blocked = ref.watch(blockedAccountsProvider).value?.any((u) => u.id == userId) ?? false;
     return PopupMenuButton<String>(
       tooltip: 'Safety and options',

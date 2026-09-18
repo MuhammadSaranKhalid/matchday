@@ -1,17 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:matchday/features/auth/domain/entities/user.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/core/supabase/supabase_auth_state_provider.dart';
 import 'package:matchday/features/onboarding/presentation/providers/onboarding_providers.dart';
 import 'package:matchday/router/app_router.dart';
 
-/// go_router matches routes in **declaration order**, so a parameterised route
-/// swallows any literal sibling declared after it: with `/matches/:matchId`
-/// first, `/matches/send-challenge` was read as a match id and rendered
-/// "Match not available" instead of the composer.
+/// Which route matches a URI is a first-match-wins walk of the route list — so
+/// registering `/teams/:teamId` *before* `/teams/new` would silently shadow the
+/// creator screen under an invalid ID look-up.
 ///
-/// The bug is invisible until someone taps, and trivial to reintroduce by
+/// Flutter's router doesn't warn on this: it just routes to the first prefix
+/// that matches. We check against every literal path that shares a parent with a
+/// parameterized sibling.
+///
+/// Note: a shadowed path would typically only be caught by a human dev
 /// appending a route at the bottom of the list — so this asserts the ordering
 /// invariant across the whole table rather than spot-checking the one path.
 void main() {
@@ -20,8 +22,9 @@ void main() {
   setUp(() {
     container = ProviderContainer.test(
       overrides: [
-        currentUserStreamProvider
-            .overrideWith((ref) => Stream<User?>.value(null)),
+        authStateProvider.overrideWith(
+          (ref) => Stream.value(const AuthState(AuthChangeEvent.signedOut, null)),
+        ),
         onboardingStatusProvider.overrideWith((ref) async => true),
       ],
     );

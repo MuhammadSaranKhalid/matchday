@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:matchday/core/error/failures.dart';
 import 'package:matchday/features/explore/domain/entities/explore_results.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -14,13 +15,13 @@ part 'explore_controller.g.dart';
 /// A stateful [Notifier] rather than an `AsyncNotifier<ExploreResults>`,
 /// because three concerns need state an AsyncValue cannot carry:
 ///   1. Debounced keystrokes (300 ms) so we do not fire a request per letter.
-///   2. Race-defeat — a slow "lah" must not overwrite a faster "lahore"
+///   2. In-flight abort signal to cancel the superseded Supabase Edge Function request.
+///   3. Race-defeat — a slow "lah" must not overwrite a faster "lahore"
 ///      reply. [_ticket] increments per dispatch; only the newest may write.
-///   3. Loading that PRESERVES the previous list, so the results never blank
+///   4. Loading that PRESERVES the previous list, so the results never blank
 ///      between keystrokes (artboard 06 is explicit about this).
 ///
-/// The debounce timer is cancelled in [Ref.onDispose] — otherwise it fires
-/// after the autodispose notifier is gone.
+/// The debounce timer and in-flight request are cancelled in [Ref.onDispose].
 @riverpod
 class ExploreController extends _$ExploreController {
   /// 300 ms: the spec's figure (§7.5.1), the industry norm, and what the
@@ -30,6 +31,7 @@ class ExploreController extends _$ExploreController {
   static const int _minQueryLen = 2;
 
   Timer? _debounce;
+  Completer<void>? _inFlightAbort;
   int _ticket = 0;
 
   @override
@@ -37,8 +39,16 @@ class ExploreController extends _$ExploreController {
     ref.onDispose(() {
       _debounce?.cancel();
       _debounce = null;
+      _cancelInFlight();
     });
     return ExploreState.initial();
+  }
+
+  void _cancelInFlight() {
+    if (_inFlightAbort != null && !_inFlightAbort!.isCompleted) {
+      _inFlightAbort!.complete();
+    }
+    _inFlightAbort = null;
   }
 
   // ─── Actions ───────────────────────────────────────────────────────────────
@@ -49,6 +59,7 @@ class ExploreController extends _$ExploreController {
   void setQuery(String q) {
     state = state.copyWith(query: q);
     _debounce?.cancel();
+    _cancelInFlight();
 
     if (q.trim().length < _minQueryLen) {
       // Invalidate any in-flight reply so it cannot land after the user has
@@ -67,6 +78,7 @@ class ExploreController extends _$ExploreController {
   /// Clear the field and return to browse.
   void clearQuery() {
     _debounce?.cancel();
+    _cancelInFlight();
     _ticket++;
     state = state.copyWith(
       query: '',
@@ -82,6 +94,7 @@ class ExploreController extends _$ExploreController {
   /// explicit submission rather than a keystroke.
   Future<void> submitQuery(String q) async {
     _debounce?.cancel();
+    _cancelInFlight();
     state = state.copyWith(query: q, searchFocused: false);
     if (q.trim().length < _minQueryLen) return;
     await ref.read(recentSearchesProvider.notifier).record(q);
@@ -105,16 +118,26 @@ class ExploreController extends _$ExploreController {
 
   Future<void> _run() async {
     final ticket = ++_ticket;
+    _cancelInFlight();
+    final abort = Completer<void>();
+    _inFlightAbort = abort;
+
     state = state.copyWith(loading: true, error: null);
 
     final q = state.query.trim();
-    final res = await ref.read(exploreRepositoryProvider).search(q);
+    final res = await ref.read(exploreRepositoryProvider).search(
+          q,
+          cancelSignal: abort.future,
+        );
 
     // Race-defeat: a newer search already started, or the notifier is gone.
     if (ticket != _ticket || !ref.mounted) return;
 
     state = res.fold(
-      (failure) => state.copyWith(loading: false, error: failure),
+      (failure) {
+        if (failure is CancelledFailure) return state;
+        return state.copyWith(loading: false, error: failure);
+      },
       (results) => state.copyWith(
         loading: false,
         results: results,

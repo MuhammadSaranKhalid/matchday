@@ -24,6 +24,7 @@ class ExploreRepositoryImpl implements ExploreRepository {
     String query, {
     ExploreCategory? category,
     int? limit,
+    Future<void>? cancelSignal,
   }) async {
     final q = query.trim();
     if (q.length < _minQueryLen) return const Right(ExploreResults.empty);
@@ -32,6 +33,7 @@ class ExploreRepositoryImpl implements ExploreRepository {
         q,
         kind: category?.wireName,
         limit: limit,
+        cancelSignal: cancelSignal,
       );
       return Right(
         ExploreResults(
@@ -66,9 +68,12 @@ class ExploreRepositoryImpl implements ExploreRepository {
   /// Shared translation so search and browse cannot report the same
   /// condition differently.
   Failure _toFailure(Object e) => switch (e) {
+        OperationCancelledException(:final message) =>
+          CancelledFailure(message),
         UnauthorizedException(:final message) => AuthFailure(message),
         NotFoundException(:final message) => NotFoundFailure(message),
         ServerException(:final message) => ServerFailure(message),
+        NetworkException(:final message) => NetworkFailure(message),
         // Explore is the screen most likely to be opened on a bad connection,
         // so a socket error gets its own Failure rather than falling through
         // to Unknown — the UI offers "retry" for it specifically.

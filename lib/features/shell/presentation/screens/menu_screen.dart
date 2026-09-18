@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
 
 /// The "you" surface — artboard **2b · Nothing on the right**.
@@ -30,13 +30,13 @@ class MenuScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(myProfileProvider).value;
-    final user = ref.watch(currentUserStreamProvider).value;
+    final user = ref.watch(supabaseClientProvider).auth.currentUser;
 
     final name = profile?.displayName ?? profile?.username ?? '';
     // The canvas puts the email under the name, not "@handle · role · city".
     // It is the one line that says *which account you are signed into*, which
     // is the question this block exists to answer.
-    final email = user?.email.value ?? '';
+    final email = user?.email ?? '';
 
     return Scaffold(
       backgroundColor: CkColors.paper,

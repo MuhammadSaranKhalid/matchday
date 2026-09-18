@@ -1,7 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
-
-import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../../core/supabase/supabase_auth_state_provider.dart';
+import '../../../../core/supabase/supabase_client_provider.dart';
 
 import '../../data/datasources/notifications_datasource_providers.dart';
 import '../../data/repositories/notifications_repository_impl.dart';
@@ -22,7 +22,7 @@ NotificationsRepository notificationsRepository(Ref ref) =>
 /// across route changes.
 @Riverpod(keepAlive: true)
 Stream<NotificationFeed> liveNotifications(Ref ref) {
-  final user = ref.watch(currentUserStreamProvider).value;
+  final user = ref.watch(supabaseClientProvider).auth.currentUser;
   if (user == null) return Stream.value(const NotificationFeed());
   return ref.watch(notificationsRepositoryProvider).watchMine();
 }
@@ -42,7 +42,7 @@ int unreadNotificationsCount(Ref ref) =>
 
 @riverpod
 Future<List<NotificationSetting>> notificationSettings(Ref ref) async {
-  ref.watch(currentUserStreamProvider);
+  ref.watch(authStateProvider);
   final result = await ref.watch(notificationsRepositoryProvider).settings();
   return result.fold((f) => throw FailureWrapper(f), (settings) => settings);
 }

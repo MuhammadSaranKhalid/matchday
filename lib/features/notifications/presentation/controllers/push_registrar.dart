@@ -2,8 +2,9 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatf
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/push/push_provider.dart';
+import '../../../../core/supabase/supabase_auth_state_provider.dart';
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../router/app_router.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../domain/entities/app_notification.dart';
 import '../providers/notifications_providers.dart';
 
@@ -25,11 +26,13 @@ class PushRegistrar extends _$PushRegistrar {
   @override
   void build() {
     // Register whenever a user becomes present (fresh sign-in).
-    ref.listen(currentUserStreamProvider, (prev, next) {
-      if (prev?.value == null && next.value != null) _register();
+    ref.listen(authStateProvider, (prev, next) {
+      final prevUser = prev?.value?.session?.user;
+      final nextUser = next.value?.session?.user;
+      if (prevUser == null && nextUser != null) _register();
     });
     // ...and once now if a session already exists at startup.
-    if (ref.read(currentUserStreamProvider).value != null) _register();
+    if (ref.read(supabaseClientProvider).auth.currentUser != null) _register();
 
     final push = ref.read(pushMessagingServiceProvider);
 

@@ -449,6 +449,7 @@ class TeamsRemoteDataSource {
     double? scaleKm,
     String? countryCode,
     int? limit,
+    Future<void>? cancelSignal,
   }) async {
     try {
       final res = await _supabase.functions.invoke(
@@ -462,6 +463,7 @@ class TeamsRemoteDataSource {
           if (countryCode != null) 'countryCode': countryCode,
           if (limit != null) 'limit': limit,
         },
+        abortSignal: cancelSignal,
       );
       final data = res.data;
       if (data is! Map || data['results'] is! List) {
@@ -469,6 +471,22 @@ class TeamsRemoteDataSource {
       }
       final rows = (data['results'] as List).cast<Map<String, dynamic>>();
       return rows.map(TeamSearchResultDto.fromJson).toList();
+    } on RequestAbortedException {
+      throw const OperationCancelledException();
+    } on FunctionsHttpException catch (e) {
+      throw ServerException(
+        'search-teams HTTP error (${e.status}): ${e.details ?? e.reasonPhrase ?? ''}',
+        statusCode: e.status,
+      );
+    } on FunctionsFetchException catch (e) {
+      throw NetworkException(
+        e.reasonPhrase ?? 'Failed to reach team search service',
+      );
+    } on FunctionsRelayException catch (e) {
+      throw ServerException(
+        'search-teams relay failure: ${e.reasonPhrase ?? ''}',
+        statusCode: e.status,
+      );
     } on FunctionException catch (e) {
       throw ServerException('search-teams failed: ${e.details ?? e.reasonPhrase ?? ''}');
     } on PostgrestException catch (e) {
@@ -479,13 +497,17 @@ class TeamsRemoteDataSource {
   /// Calls `team-place-facets`. Returns the top cities by team count for the
   /// current country (defaulted to the caller's profile country when
   /// [countryCode] is null).
-  Future<List<PlaceFacetDto>> teamPlaceFacets({String? countryCode}) async {
+  Future<List<PlaceFacetDto>> teamPlaceFacets({
+    String? countryCode,
+    Future<void>? cancelSignal,
+  }) async {
     try {
       final res = await _supabase.functions.invoke(
         'team-place-facets',
         body: {
           if (countryCode != null) 'countryCode': countryCode,
         },
+        abortSignal: cancelSignal,
       );
       final data = res.data;
       if (data is! Map || data['facets'] is! List) {
@@ -493,6 +515,22 @@ class TeamsRemoteDataSource {
       }
       final rows = (data['facets'] as List).cast<Map<String, dynamic>>();
       return rows.map(PlaceFacetDto.fromJson).toList();
+    } on RequestAbortedException {
+      throw const OperationCancelledException();
+    } on FunctionsHttpException catch (e) {
+      throw ServerException(
+        'team-place-facets HTTP error (${e.status}): ${e.details ?? e.reasonPhrase ?? ''}',
+        statusCode: e.status,
+      );
+    } on FunctionsFetchException catch (e) {
+      throw NetworkException(
+        e.reasonPhrase ?? 'Failed to reach team facets service',
+      );
+    } on FunctionsRelayException catch (e) {
+      throw ServerException(
+        'team-place-facets relay failure: ${e.reasonPhrase ?? ''}',
+        statusCode: e.status,
+      );
     } on FunctionException catch (e) {
       throw ServerException('team-place-facets failed: ${e.details ?? e.reasonPhrase ?? ''}');
     } on PostgrestException catch (e) {

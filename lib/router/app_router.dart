@@ -4,7 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../core/theme/circk_theme.dart';
 import '../features/settings/presentation/screens/settings_screen.dart';
 import '../core/widgets/ck_push_nav.dart';
-import '../features/auth/presentation/providers/auth_providers.dart';
+import '../core/supabase/supabase_auth_state_provider.dart';
 import '../features/auth/presentation/screens/sign_in_screen.dart';
 import '../features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../features/onboarding/presentation/screens/onboarding_screen.dart';
@@ -95,23 +95,41 @@ GoRouter appRouter(Ref ref) {
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/home',
     redirect: (context, state) {
-      final user = ref.read(currentUserStreamProvider).value;
-      final isSignedIn = user != null;
+      final authAsync = ref.read(authStateProvider);
       final loc = state.matchedLocation;
       final goingToSignIn = loc == '/sign-in';
       final goingToOnboarding = loc == '/onboarding';
 
-      if (!isSignedIn) return goingToSignIn ? null : '/sign-in';
+      return switch (authAsync) {
+        // 1. Bootstrapping: Supabase is restoring credentials from device
+        // storage. Do not redirect yet; avoid flashing /sign-in prematurely.
+        AsyncLoading() => null,
 
-      // Signed in. Gate on onboarding completion (has the user claimed a
-      // username?). `.value` is null while the profile status is still
-      // loading — don't bounce during that window; the refreshListenable
-      // re-runs this redirect once it resolves.
-      final onboarded = ref.read(onboardingStatusProvider).value;
-      if (onboarded == null) return null;
-      if (!onboarded) return goingToOnboarding ? null : '/onboarding';
-      if (goingToSignIn || goingToOnboarding) return '/home';
-      return null;
+        // 2. Stream/network error during refresh: preserve existing view,
+        // do not prematurely kick the user to /sign-in.
+        AsyncError() => null,
+
+        // 3. Resolved AuthState:
+        AsyncData(:final value) => switch (value.event) {
+          AuthChangeEvent.signedOut => goingToSignIn ? null : '/sign-in',
+          AuthChangeEvent.initialSession when value.session == null =>
+            goingToSignIn ? null : '/sign-in',
+          // ignore: deprecated_member_use
+          AuthChangeEvent.userDeleted => goingToSignIn ? null : '/sign-in',
+          _ when value.session != null => () {
+            // Signed in. Gate on onboarding completion (has the user claimed a
+            // username?). `.value` is null while the profile status is still
+            // loading — don't bounce during that window; the refreshListenable
+            // re-runs this redirect once it resolves.
+            final onboarded = ref.read(onboardingStatusProvider).value;
+            if (onboarded == null) return null;
+            if (!onboarded) return goingToOnboarding ? null : '/onboarding';
+            if (goingToSignIn || goingToOnboarding) return '/home';
+            return null;
+          }(),
+          _ => null,
+        },
+      };
     },
     refreshListenable: _StreamListenable(ref),
     routes: [
@@ -647,7 +665,7 @@ void _openBell(BuildContext context) {
 /// onboarding controller invalidates it on finish).
 class _StreamListenable extends ChangeNotifier {
   _StreamListenable(this._ref) {
-    _ref.listen(currentUserStreamProvider, (_, __) => notifyListeners());
+    _ref.listen(authStateProvider, (_, __) => notifyListeners());
     _ref.listen(onboardingStatusProvider, (_, __) => notifyListeners());
   }
   final Ref _ref;

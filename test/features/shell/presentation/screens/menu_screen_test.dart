@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:matchday/features/auth/domain/entities/user.dart';
-import 'package:matchday/features/auth/domain/value_objects/email.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/core/supabase/supabase_client_provider.dart';
 import 'package:matchday/features/profile/domain/entities/profile.dart';
 import 'package:matchday/features/profile/presentation/providers/profile_providers.dart';
 import 'package:matchday/features/shell/presentation/screens/menu_screen.dart';
+import '../../../../helpers/mock_auth.dart';
 
 const _profile = Profile(
   userId: ProfileUserId('u1'),
@@ -24,10 +23,9 @@ Future<void> _pumpMenu(
   Profile? profile = _profile,
   double textScale = 1.0,
 }) async {
-  final user = User(
-    id: const UserId('u1'),
-    email: Email.create('saran@gmail.com').toOption().toNullable()!,
-    displayName: 'Muhammad Saran',
+  final supabase = createMockSupabaseClient(
+    id: 'u1',
+    email: 'saran@gmail.com',
   );
 
   // The artboard's viewport.
@@ -48,7 +46,7 @@ Future<void> _pumpMenu(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        currentUserStreamProvider.overrideWith((ref) => Stream.value(user)),
+        supabaseClientProvider.overrideWithValue(supabase),
         myProfileProvider.overrideWith((ref) => Future.value(profile)),
       ],
       child: MaterialApp.router(routerConfig: router),

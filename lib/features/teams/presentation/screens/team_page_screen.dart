@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../matches/presentation/providers/matches_providers.dart';
 import '../../domain/entities/team.dart';
 import '../providers/teams_providers.dart';
@@ -28,9 +28,7 @@ class TeamPageScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final teamAsync = ref.watch(teamProvider(teamId));
-    final userId = ref.watch(
-      currentUserStreamProvider.select((u) => u.value?.id.value),
-    );
+    final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
 
     return Scaffold(
       backgroundColor: CkColors.paper,

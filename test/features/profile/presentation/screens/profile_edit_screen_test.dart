@@ -4,9 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:go_router/go_router.dart';
 import 'package:matchday/features/auth/domain/entities/user.dart';
+import 'package:matchday/core/supabase/supabase_client_provider.dart';
 import 'package:matchday/features/auth/domain/value_objects/email.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
 import 'package:matchday/features/profile/domain/entities/profile.dart';
+import '../../../../helpers/mock_auth.dart';
 import 'package:matchday/features/profile/domain/repositories/avatar_picker.dart';
 import 'package:matchday/features/profile/domain/repositories/profile_repository.dart';
 import 'package:matchday/features/profile/presentation/providers/profile_providers.dart';
@@ -57,7 +58,9 @@ Future<void> _pump(WidgetTester tester) async {
       profileRepositoryProvider.overrideWithValue(repo),
       avatarPickerProvider.overrideWithValue(_MockPicker()),
       myProfileProvider.overrideWith((ref) => Future.value(_profile)),
-      currentUserStreamProvider.overrideWith((ref) => Stream.value(user)),
+      supabaseClientProvider.overrideWithValue(
+        createMockSupabaseClient(id: user.id.value, email: user.email.value),
+      ),
     ],
   );
   await container.read(myProfileProvider.future);

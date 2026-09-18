@@ -1,8 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:matchday/features/auth/domain/entities/user.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/core/supabase/supabase_auth_state_provider.dart';
 import 'package:matchday/features/onboarding/presentation/providers/onboarding_providers.dart';
 import 'package:matchday/router/app_router.dart';
 
@@ -20,8 +19,9 @@ void main() {
   setUp(() {
     container = ProviderContainer.test(
       overrides: [
-        currentUserStreamProvider
-            .overrideWith((ref) => Stream<User?>.value(null)),
+        authStateProvider.overrideWith(
+          (ref) => Stream.value(const AuthState(AuthChangeEvent.signedOut, null)),
+        ),
         onboardingStatusProvider.overrideWith((ref) async => true),
       ],
     );

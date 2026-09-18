@@ -105,7 +105,7 @@ final class LiveNotificationsProvider
   }
 }
 
-String _$liveNotificationsHash() => r'561f81b3709e0951dac682bb9356119dac3c0dc8';
+String _$liveNotificationsHash() => r'08c6ecfd64b3ec5d001650a9c8f012f7edd467d0';
 
 /// Tier-grouped view-model derived from [liveNotifications].
 
@@ -246,4 +246,4 @@ final class NotificationSettingsProvider
 }
 
 String _$notificationSettingsHash() =>
-    r'9735c566e756b4bfa0511b27aae70ace3f53ba78';
+    r'578c17e514c147b5ca8920cf25cf858fc4cf0df0';

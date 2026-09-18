@@ -1,8 +1,8 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../matches/domain/entities/match.dart';
 import '../../../matches/presentation/providers/matches_providers.dart';
 import '../../domain/entities/team.dart';
@@ -35,10 +35,9 @@ class TeamsListController extends _$TeamsListController {
     // Teams + the opponent cache are the local sources — await their streams.
     final teams = await ref.watch(myTeamsProvider.future);
     final cached = await ref.watch(allTeamsProvider.future);
-    // Await the user future (not .value) so build runs once with the resolved
+    // Await the auth future (not .value) so build runs once with the resolved
     // id, instead of an extra pass with an empty id while the stream loads.
-    final user = await ref.watch(currentUserStreamProvider.future);
-    final userId = user?.id.value ?? '';
+    final userId = ref.read(supabaseClientProvider).auth.currentUser?.id ?? "";
     // Roles come from team_member_roles now, not a column on the team. There
     // is no `created_by` fallback: that is history, and a creator who left
     // must not still read as the owner.

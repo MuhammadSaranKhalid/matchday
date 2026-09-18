@@ -1,5 +1,4 @@
 import '../../../../core/error/failures.dart';
-import '../../domain/entities/user.dart';
 import '../../domain/value_objects/email.dart';
 
 /// Sealed UI state for the auth flow.
@@ -47,12 +46,6 @@ class AuthSigningInWithGoogle extends AuthState {
 /// Facebook OAuth in progress.
 class AuthSigningInWithFacebook extends AuthState {
   const AuthSigningInWithFacebook();
-}
-
-/// Sign-in succeeded. Router redirects on this transition.
-class AuthAuthenticated extends AuthState {
-  const AuthAuthenticated(this.user);
-  final User user;
 }
 
 /// Any failure. UI shows the message + a way to retry the same flow.

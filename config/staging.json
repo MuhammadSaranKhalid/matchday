@@ -1,6 +1,7 @@
 {
     "ENVIRONMENT": "staging",
     "SUPABASE_URL": "https://your-staging-project.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "your-staging-publishable-key",
     "SUPABASE_ANON_KEY": "your-staging-anon-key",
     "GOOGLE_WEB_CLIENT_ID": "45146159151-r7p1gg5cpk8mefnb466sh758tga5fddh.apps.googleusercontent.com",
     "GOOGLE_IOS_CLIENT_ID": "...apps.googleusercontent.com",

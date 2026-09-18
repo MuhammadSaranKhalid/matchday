@@ -3,10 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:matchday/core/error/failures.dart';
-import 'package:matchday/features/auth/domain/entities/user.dart';
-import 'package:matchday/features/auth/domain/value_objects/email.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/core/supabase/supabase_auth_state_provider.dart';
 import 'package:matchday/features/matches/domain/entities/match.dart';
+import '../../../../helpers/mock_auth.dart';
 import 'package:matchday/features/matches/domain/repositories/matches_repository.dart';
 import 'package:matchday/features/matches/presentation/providers/matches_providers.dart';
 import 'package:matchday/features/teams/domain/entities/team.dart';
@@ -17,11 +16,6 @@ import 'package:matchday/features/teams/presentation/state/my_teams_view.dart';
 
 class _MockMatchesRepo extends Mock implements MatchesRepository {}
 
-User _user(String id) => User(
-      id: UserId(id),
-      email: Email.create('$id@example.com').toNullable()!,
-      displayName: id,
-    );
 
 Team _team(String id, {String name = 'Team', String? color, String owner = 'u1'}) =>
     Team(
@@ -84,8 +78,8 @@ void main() {
             )),
         allTeamsProvider.overrideWith((ref) => Stream.value(cached)),
         matchesRepositoryProvider.overrideWithValue(matchesRepo),
-        currentUserStreamProvider
-            .overrideWith((ref) => Stream.value(_user(userId))),
+        authStateProvider
+            .overrideWith((ref) => Stream.value(createMockAuthState(id: userId))),
       ],
     );
     addTearDown(container.dispose);

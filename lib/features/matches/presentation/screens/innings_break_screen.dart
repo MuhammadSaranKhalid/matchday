@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../teams/domain/entities/roster_member.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/match.dart';
@@ -88,7 +88,7 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
         battingSide == MatchTeamSide.a ? match.teamAId : match.teamBId;
     final battingTeam = ref.watch(teamProvider(battingTeamId.value)).value;
     final currentUserId =
-        ref.watch(currentUserStreamProvider).value?.id.value;
+        ref.watch(supabaseClientProvider).auth.currentUser?.id;
     // Match-day authority, not just staff: the captain of the side coming out
     // to bat is exactly who sets up the next innings. `isManagedBy` (removed
     // 2026-09-10) could not see them, so a captain-only user hit a dead

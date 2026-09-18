@@ -56,7 +56,7 @@ final class MyMatchesViewProvider
   }
 }
 
-String _$myMatchesViewHash() => r'b4fd10a8e416b6245aeddbeb71274d2007fc0728';
+String _$myMatchesViewHash() => r'7de7660710993c2f5c7cc9581b0e05d352fd598f';
 
 /// The one live match the side panel promotes into its hero card, with the
 /// current innings numbers attached. Null when nothing of the user's is live.

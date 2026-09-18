@@ -54,13 +54,17 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 400));
 
       verifyNever(() => repo.search(any(),
-          category: any(named: 'category'), limit: any(named: 'limit')));
+          category: any(named: 'category'),
+          limit: any(named: 'limit'),
+          cancelSignal: any(named: 'cancelSignal')));
       expect(c.read(exploreControllerProvider).hasQuery, isFalse);
     });
 
     test('a 2-char query does reach the repository', () async {
       when(() => repo.search(any(),
-              category: any(named: 'category'), limit: any(named: 'limit')))
+              category: any(named: 'category'),
+              limit: any(named: 'limit'),
+              cancelSignal: any(named: 'cancelSignal')))
           .thenAnswer((_) async => Right(_results([_player('p1')])));
 
       final c = makeContainer();
@@ -68,7 +72,9 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 400));
 
       verify(() => repo.search('la',
-          category: any(named: 'category'), limit: any(named: 'limit'))).called(1);
+          category: any(named: 'category'),
+          limit: any(named: 'limit'),
+          cancelSignal: any(named: 'cancelSignal'))).called(1);
       expect(c.read(exploreControllerProvider).results.players, hasLength(1));
     });
   });
@@ -76,7 +82,9 @@ void main() {
   group('debounce', () {
     test('rapid keystrokes coalesce into a single request', () async {
       when(() => repo.search(any(),
-              category: any(named: 'category'), limit: any(named: 'limit')))
+              category: any(named: 'category'),
+              limit: any(named: 'limit'),
+              cancelSignal: any(named: 'cancelSignal')))
           .thenAnswer((_) async => Right(_results([_player('p1')])));
 
       final c = makeContainer();
@@ -90,9 +98,13 @@ void main() {
 
       // Only the final query is dispatched.
       verify(() => repo.search('lahor',
-          category: any(named: 'category'), limit: any(named: 'limit'))).called(1);
+          category: any(named: 'category'),
+          limit: any(named: 'limit'),
+          cancelSignal: any(named: 'cancelSignal'))).called(1);
       verifyNever(() => repo.search('la',
-          category: any(named: 'category'), limit: any(named: 'limit')));
+          category: any(named: 'category'),
+          limit: any(named: 'limit'),
+          cancelSignal: any(named: 'cancelSignal')));
     });
   });
 
@@ -100,13 +112,17 @@ void main() {
     test('a slow earlier reply cannot overwrite a faster later one', () async {
       // "lah" resolves slowly with a stale result; "lahore" resolves fast.
       when(() => repo.search('lah',
-              category: any(named: 'category'), limit: any(named: 'limit')))
+              category: any(named: 'category'),
+              limit: any(named: 'limit'),
+              cancelSignal: any(named: 'cancelSignal')))
           .thenAnswer((_) async {
         await Future<void>.delayed(const Duration(milliseconds: 300));
         return Right(_results([_player('stale', name: 'Stale')]));
       });
       when(() => repo.search('lahore',
-              category: any(named: 'category'), limit: any(named: 'limit')))
+              category: any(named: 'category'),
+              limit: any(named: 'limit'),
+              cancelSignal: any(named: 'cancelSignal')))
           .thenAnswer((_) async => Right(_results([_player('fresh', name: 'Fresh')])));
 
       final c = makeContainer();
@@ -127,10 +143,14 @@ void main() {
     test('previous results are retained while a new request is in flight',
         () async {
       when(() => repo.search('lah',
-              category: any(named: 'category'), limit: any(named: 'limit')))
+              category: any(named: 'category'),
+              limit: any(named: 'limit'),
+              cancelSignal: any(named: 'cancelSignal')))
           .thenAnswer((_) async => Right(_results([_player('p1')])));
       when(() => repo.search('laho',
-              category: any(named: 'category'), limit: any(named: 'limit')))
+              category: any(named: 'category'),
+              limit: any(named: 'limit'),
+              cancelSignal: any(named: 'cancelSignal')))
           .thenAnswer((_) async {
         await Future<void>.delayed(const Duration(milliseconds: 300));
         return Right(_results([_player('p2')]));
@@ -157,10 +177,14 @@ void main() {
     test('a failure lands in state without clearing retained results',
         () async {
       when(() => repo.search('lah',
-              category: any(named: 'category'), limit: any(named: 'limit')))
+              category: any(named: 'category'),
+              limit: any(named: 'limit'),
+              cancelSignal: any(named: 'cancelSignal')))
           .thenAnswer((_) async => Right(_results([_player('p1')])));
       when(() => repo.search('laho',
-              category: any(named: 'category'), limit: any(named: 'limit')))
+              category: any(named: 'category'),
+              limit: any(named: 'limit'),
+              cancelSignal: any(named: 'cancelSignal')))
           .thenAnswer((_) async => const Left(NetworkFailure()));
 
       final c = makeContainer();
@@ -181,7 +205,9 @@ void main() {
   group('clearing', () {
     test('dropping below the threshold cancels the pending request', () async {
       when(() => repo.search(any(),
-              category: any(named: 'category'), limit: any(named: 'limit')))
+              category: any(named: 'category'),
+              limit: any(named: 'limit'),
+              cancelSignal: any(named: 'cancelSignal')))
           .thenAnswer((_) async => Right(_results([_player('p1')])));
 
       final c = makeContainer();
@@ -193,13 +219,17 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 400));
 
       verifyNever(() => repo.search(any(),
-          category: any(named: 'category'), limit: any(named: 'limit')));
+          category: any(named: 'category'),
+          limit: any(named: 'limit'),
+          cancelSignal: any(named: 'cancelSignal')));
       expect(c.read(exploreControllerProvider).loading, isFalse);
     });
 
     test('clearQuery empties results and returns to browse', () async {
       when(() => repo.search(any(),
-              category: any(named: 'category'), limit: any(named: 'limit')))
+              category: any(named: 'category'),
+              limit: any(named: 'limit'),
+              cancelSignal: any(named: 'cancelSignal')))
           .thenAnswer((_) async => Right(_results([_player('p1')])));
 
       final c = makeContainer();

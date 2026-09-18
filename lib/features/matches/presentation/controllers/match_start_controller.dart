@@ -2,7 +2,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_player.dart';
@@ -22,7 +22,7 @@ part 'match_start_controller.g.dart';
 class MatchStartController extends _$MatchStartController {
   @override
   Future<MatchStartState> build(String matchId) async {
-    final userId = ref.watch(currentUserStreamProvider).value?.id.value;
+    final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
 
     final match = ref.watch(liveMatchProvider(matchId)).value;
     if (match == null) {
@@ -133,7 +133,7 @@ class MatchStartController extends _$MatchStartController {
     );
   }
 
-  String? get _viewerId => ref.read(currentUserStreamProvider).value?.id.value;
+  String? get _viewerId => ref.read(supabaseClientProvider).auth.currentUser?.id;
 
   // ── Openers ──────────────────────────────────────────────────────────────
 

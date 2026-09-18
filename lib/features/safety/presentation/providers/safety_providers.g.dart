@@ -94,4 +94,4 @@ final class BlockedAccountsProvider
   }
 }
 
-String _$blockedAccountsHash() => r'ef2e15ca6591b7ec876312996614f06488cfbf3a';
+String _$blockedAccountsHash() => r'2722cfc0372b81ef2579606386194120d2090fea';

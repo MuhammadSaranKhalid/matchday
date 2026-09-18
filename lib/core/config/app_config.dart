@@ -9,14 +9,17 @@ enum AppEnvironment { dev, staging, prod }
 class AppConfig {
   final AppEnvironment environment;
   final String supabaseUrl;
-  final String supabaseAnonKey;
+  final String supabasePublishableKey;
   final String googleWebClientId;
   final String googleIosClientId;
+
+  @Deprecated('Use supabasePublishableKey instead')
+  String get supabaseAnonKey => supabasePublishableKey;
 
   const AppConfig({
     required this.environment,
     required this.supabaseUrl,
-    required this.supabaseAnonKey,
+    required this.supabasePublishableKey,
     required this.googleWebClientId,
     required this.googleIosClientId,
   });
@@ -30,7 +33,10 @@ class AppConfig {
     );
 
     var supabaseUrl = const String.fromEnvironment('SUPABASE_URL');
-    const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+    const pubKeyDefine = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
+    final supabasePublishableKey = pubKeyDefine.isNotEmpty
+        ? pubKeyDefine
+        : const String.fromEnvironment('SUPABASE_ANON_KEY');
 
     // Android emulator cannot access 127.0.0.1 of the host machine; it must use 10.0.2.2
     if (supabaseUrl.contains('127.0.0.1') && !kIsWeb && Platform.isAndroid) {
@@ -39,12 +45,15 @@ class AppConfig {
 
     // Fail fast in development if critical keys are missing
     assert(supabaseUrl.isNotEmpty, 'SUPABASE_URL environment variable is not set');
-    assert(supabaseAnonKey.isNotEmpty, 'SUPABASE_ANON_KEY environment variable is not set');
+    assert(
+      supabasePublishableKey.isNotEmpty,
+      'SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY) environment variable is not set',
+    );
 
     return AppConfig(
       environment: environment,
       supabaseUrl: supabaseUrl,
-      supabaseAnonKey: supabaseAnonKey,
+      supabasePublishableKey: supabasePublishableKey,
       googleWebClientId: const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: ''),
       googleIosClientId: const String.fromEnvironment('GOOGLE_IOS_CLIENT_ID', defaultValue: ''),
     );

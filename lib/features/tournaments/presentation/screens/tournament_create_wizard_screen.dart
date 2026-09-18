@@ -6,8 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/database/database_provider.dart';
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/datasources/tournaments_datasource_providers.dart';
 import '../../domain/entities/ground.dart';
 import '../../domain/entities/tournament.dart';
@@ -93,7 +93,7 @@ class _TournamentCreateWizardScreenState
 
   /// Resolved once the auth stream emits. Null means "no signed-in user yet",
   /// in which case the draft is neither loaded nor saved: reading
-  /// `currentUserStreamProvider.value` synchronously in initState races the
+  /// the user synchronously in initState races the
   /// stream and would key every early draft under a shared literal, letting a
   /// draft leak between accounts on the same device.
   String? _draftKey;
@@ -533,9 +533,9 @@ class _TournamentCreateWizardScreenState
   Widget build(BuildContext context) {
     final busy = ref.watch(tournamentsControllerProvider).isLoading;
 
-    final user = ref.watch(currentUserStreamProvider).value;
+    final user = ref.read(supabaseClientProvider).auth.currentUser;
     if (user != null) {
-      final key = 'tournament_create:${user.id.value}';
+      final key = 'tournament_create:${user.id}';
       if (key != _draftKey) _onUserResolved(key);
     }
 

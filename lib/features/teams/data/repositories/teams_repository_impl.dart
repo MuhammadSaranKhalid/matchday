@@ -803,6 +803,7 @@ class TeamsRepositoryImpl implements TeamsRepository {
     double? scaleKm,
     String? countryCode,
     int? limit,
+    Future<void>? cancelSignal,
   }) async {
     try {
       final dtos = await _remote.searchTeams(
@@ -813,8 +814,13 @@ class TeamsRepositoryImpl implements TeamsRepository {
         scaleKm: scaleKm,
         countryCode: countryCode,
         limit: limit,
+        cancelSignal: cancelSignal,
       );
       return Right(dtos.map((d) => d.toEntity()).toList());
+    } on OperationCancelledException catch (e) {
+      return Left(CancelledFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
@@ -827,10 +833,18 @@ class TeamsRepositoryImpl implements TeamsRepository {
   @override
   Future<Either<Failure, List<PlaceFacet>>> teamPlaceFacets({
     String? countryCode,
+    Future<void>? cancelSignal,
   }) async {
     try {
-      final dtos = await _remote.teamPlaceFacets(countryCode: countryCode);
+      final dtos = await _remote.teamPlaceFacets(
+        countryCode: countryCode,
+        cancelSignal: cancelSignal,
+      );
       return Right(dtos.map((d) => d.toEntity()).toList());
+    } on OperationCancelledException catch (e) {
+      return Left(CancelledFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {

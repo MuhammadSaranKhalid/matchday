@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../domain/entities/scorer_candidate.dart';
 import '../controllers/tournaments_controller.dart';
@@ -105,11 +105,11 @@ class _TournamentPeopleScreenState
         ref.watch(tournamentDetailProvider(widget.tournamentId));
     final peopleAsync =
         ref.watch(tournamentScorerCandidatesProvider(widget.tournamentId));
-    final me = ref.watch(currentUserStreamProvider).value;
+    final me = ref.read(supabaseClientProvider).auth.currentUser;
     final tournament = tournamentAsync.value;
     final isOwner = tournament != null &&
         me != null &&
-        tournament.createdBy == me.id.value;
+        tournament.createdBy == me.id;
 
     return Scaffold(
       backgroundColor: CkColors.paper,

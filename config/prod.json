@@ -1,6 +1,7 @@
 {
     "ENVIRONMENT": "prod",
     "SUPABASE_URL": "https://rqdenhgnmjuxzhjugspi.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_8IAHtqmGF6GmsXvHaQXYDA_Icl-hudu",
     "SUPABASE_ANON_KEY": "sb_publishable_8IAHtqmGF6GmsXvHaQXYDA_Icl-hudu",
     "GOOGLE_WEB_CLIENT_ID": "45146159151-r7p1gg5cpk8mefnb466sh758tga5fddh.apps.googleusercontent.com",
     "GOOGLE_IOS_CLIENT_ID": "...apps.googleusercontent.com",

@@ -59,7 +59,7 @@ final class MatchDetailProvider
   }
 }
 
-String _$matchDetailHash() => r'57f36b498f8ac4d074537e581aac60baf3278f0d';
+String _$matchDetailHash() => r'76b1ab63797143d6b4d8d61d0e678f935a5bd9e1';
 
 final class MatchDetailFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<PvMatch?>, String> {

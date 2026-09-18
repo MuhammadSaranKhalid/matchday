@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/database/database_provider.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../matches/domain/entities/match.dart';
 import '../../data/datasources/tournaments_datasource_providers.dart';
 import '../../data/repositories/tournaments_repository_impl.dart';
@@ -195,9 +195,9 @@ Future<List<ScorerCandidate>> tournamentScorerCandidates(
 
 @riverpod
 Stream<Map<String, dynamic>?> tournamentDraftStream(Ref ref) {
-  final user = ref.watch(currentUserStreamProvider).value;
+  final user = ref.read(supabaseClientProvider).auth.currentUser;
   if (user == null) return Stream.value(null);
-  return ref.watch(wizardDraftStoreProvider).watch('tournament_create:${user.id.value}');
+  return ref.watch(wizardDraftStoreProvider).watch('tournament_create:${user.id}');
 }
 
 /// The fee ledger for one cup (artboard 24c). Organiser-only on the server,

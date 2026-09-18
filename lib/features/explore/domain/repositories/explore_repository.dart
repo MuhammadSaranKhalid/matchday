@@ -22,6 +22,7 @@ abstract class ExploreRepository {
     String query, {
     ExploreCategory? category,
     int? limit,
+    Future<void>? cancelSignal,
   });
 
   /// The empty-query discovery state: live matches, open tournaments, recent

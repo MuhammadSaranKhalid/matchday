@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/error/failures.dart';
 import '../../../location/presentation/providers/location_providers.dart';
 import '../../domain/entities/place_facet.dart';
 import '../providers/teams_providers.dart';
@@ -16,15 +17,15 @@ part 'team_search_controller.g.dart';
 /// Three real concerns this Notifier manages that an `AsyncNotifier<List>`
 /// could not:
 ///   1. Debounced keystrokes (300 ms) so we don't fire a request per letter.
-///   2. Race-defeat — a slow "lah" must not stomp a faster "lahore" reply.
+///   2. In-flight abort signal to cancel the superseded Supabase Edge Function request.
+///   3. Race-defeat — a slow "lah" must not stomp a faster "lahore" reply.
 ///      [_ticket] increments on every dispatched search; only the latest
 ///      ticket's result is allowed to write state.
-///   3. Loading transitions that preserve the previous list (`state.loading
+///   4. Loading transitions that preserve the previous list (`state.loading
 ///      = true` with `state.results` retained) so the screen does not
 ///      flicker to a skeleton on every keystroke.
 ///
-/// The debounce timer is cancelled on dispose via [Ref.onDispose] —
-/// otherwise it would fire after the autodispose Notifier is gone.
+/// The debounce timer and in-flight request are cancelled in [Ref.onDispose].
 @riverpod
 class TeamSearchController extends _$TeamSearchController {
   /// 300 ms matches the doc (§14) and industry norm for type-ahead. Tune
@@ -37,6 +38,7 @@ class TeamSearchController extends _$TeamSearchController {
   static const int _minQueryLen = 2;
 
   Timer? _debounce;
+  Completer<void>? _inFlightAbort;
   int _ticket = 0;
 
   @override
@@ -44,8 +46,16 @@ class TeamSearchController extends _$TeamSearchController {
     ref.onDispose(() {
       _debounce?.cancel();
       _debounce = null;
+      _cancelInFlight();
     });
     return TeamSearchState.initial();
+  }
+
+  void _cancelInFlight() {
+    if (_inFlightAbort != null && !_inFlightAbort!.isCompleted) {
+      _inFlightAbort!.complete();
+    }
+    _inFlightAbort = null;
   }
 
   // ─── Setters / actions ───────────────────────────────────────────────────
@@ -56,6 +66,7 @@ class TeamSearchController extends _$TeamSearchController {
   void setQuery(String q) {
     state = state.copyWith(query: q);
     _debounce?.cancel();
+    _cancelInFlight();
     _debounce = Timer(_debounceWindow, _run);
   }
 
@@ -125,6 +136,10 @@ class TeamSearchController extends _$TeamSearchController {
 
   Future<void> _run() async {
     final ticket = ++_ticket;
+    _cancelInFlight();
+    final abort = Completer<void>();
+    _inFlightAbort = abort;
+
     state = state.copyWith(loading: true, error: null);
 
     final q = state.query.trim();
@@ -140,13 +155,17 @@ class TeamSearchController extends _$TeamSearchController {
           lat: state.centerLat,
           lng: state.centerLng,
           radiusKm: passRadius ? state.radiusKm : null,
+          cancelSignal: abort.future,
         );
 
     // Race-defeat: a newer search has already started; let it win.
-    if (ticket != _ticket) return;
+    if (ticket != _ticket || !ref.mounted) return;
 
     state = res.fold(
-      (failure) => state.copyWith(loading: false, error: failure),
+      (failure) {
+        if (failure is CancelledFailure) return state;
+        return state.copyWith(loading: false, error: failure);
+      },
       (list) => state.copyWith(loading: false, results: list, error: null),
     );
   }

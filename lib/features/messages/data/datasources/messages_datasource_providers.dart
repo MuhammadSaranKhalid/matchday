@@ -24,10 +24,16 @@ ChatRemoteDataSource chatRemoteDataSource(Ref ref) =>
     ChatRemoteDataSource(ref.watch(supabaseClientProvider));
 
 @Riverpod(keepAlive: true)
-OutboxProcessor outboxProcessor(Ref ref) => OutboxProcessor(
-      ref.watch(chatLocalDataSourceProvider),
-      ref.watch(chatRemoteDataSourceProvider),
-    );
+OutboxProcessor outboxProcessor(Ref ref) {
+  final processor = OutboxProcessor(
+    ref.watch(chatLocalDataSourceProvider),
+    ref.watch(chatRemoteDataSourceProvider),
+    currentUserId: () =>
+        ref.read(supabaseClientProvider).auth.currentUser?.id,
+  );
+  ref.onDispose(processor.dispose);
+  return processor;
+}
 
 @Riverpod(keepAlive: true)
 ReceiptCoordinator receiptCoordinator(Ref ref) => ReceiptCoordinator(
@@ -43,15 +49,23 @@ RealtimeIngestor realtimeIngestor(Ref ref) {
   );
   final receipts = ref.watch(receiptCoordinatorProvider);
   final scheduler = ref.watch(catchUpSchedulerProvider);
+
   ingestor.onMessageDelivered = (channelId, throughSeq) {
     final user = ref.read(supabaseClientProvider).auth.currentUser;
     if (user != null) {
-      unawaited(receipts.markDelivered(channelId, user.id, throughSeq));
+      unawaited(() async {
+        final local = ref.read(chatLocalDataSourceProvider);
+        if (await local.isActiveMembership(channelId, user.id)) {
+          await receipts.markDelivered(channelId, user.id, throughSeq);
+        }
+      }());
     }
   };
   ingestor.onTargetedCatchUpRequested = (channelId) {
     scheduler.enqueue(channelId, highPriority: true);
   };
+
+  ref.onDispose(ingestor.dispose);
   return ingestor;
 }
 
@@ -66,7 +80,12 @@ CatchUpScheduler catchUpScheduler(Ref ref) {
   scheduler.onMessagesDelivered = (channelId, throughSeq) {
     final user = ref.read(supabaseClientProvider).auth.currentUser;
     if (user != null) {
-      unawaited(receipts.markDelivered(channelId, user.id, throughSeq));
+      unawaited(() async {
+        final local = ref.read(chatLocalDataSourceProvider);
+        if (await local.isActiveMembership(channelId, user.id)) {
+          await receipts.markDelivered(channelId, user.id, throughSeq);
+        }
+      }());
     }
   };
   return scheduler;

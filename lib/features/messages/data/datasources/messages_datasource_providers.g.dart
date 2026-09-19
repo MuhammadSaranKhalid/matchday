@@ -145,7 +145,7 @@ final class OutboxProcessorProvider
   }
 }
 
-String _$outboxProcessorHash() => r'4595bfee96b98685f010a7c4f764fd88ffa0aa42';
+String _$outboxProcessorHash() => r'0c4c3bb78dcc6342cb7ec3b60ac283f25a250be9';
 
 @ProviderFor(receiptCoordinator)
 final receiptCoordinatorProvider = ReceiptCoordinatorProvider._();
@@ -239,7 +239,7 @@ final class RealtimeIngestorProvider
   }
 }
 
-String _$realtimeIngestorHash() => r'923ee95034e5283a79eb81f63b581226099a1bab';
+String _$realtimeIngestorHash() => r'd8a651117450a5fbc4485097b4f0255639da39cc';
 
 @ProviderFor(catchUpScheduler)
 final catchUpSchedulerProvider = CatchUpSchedulerProvider._();
@@ -285,7 +285,7 @@ final class CatchUpSchedulerProvider
   }
 }
 
-String _$catchUpSchedulerHash() => r'1c091971771411874ce8610d4d7bed6416154412';
+String _$catchUpSchedulerHash() => r'c65e1b0d643232592e7feec48789a1d18191d6dc';
 
 @ProviderFor(chatSyncCoordinator)
 final chatSyncCoordinatorProvider = ChatSyncCoordinatorProvider._();

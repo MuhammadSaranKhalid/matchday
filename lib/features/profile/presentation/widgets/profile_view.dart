@@ -866,7 +866,7 @@ class _MessageButtonState extends ConsumerState<_MessageButton> {
     if (widget.userId == null || _loading) return;
     setState(() => _loading = true);
     final result = await ref
-        .read(messagesRepositoryProvider)
+        .read(chatRepositoryProvider)
         .getOrCreateDmChat(widget.userId!);
     if (!mounted) return;
     setState(() => _loading = false);
@@ -878,7 +878,7 @@ class _MessageButtonState extends ConsumerState<_MessageButton> {
         );
       },
       (chatId) {
-        context.push('/messages/${chatId.value}');
+        context.push('/messages/${chatId}');
       },
     );
   }

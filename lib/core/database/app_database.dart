@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+
 import 'tables.dart';
 
 part 'app_database.g.dart';
@@ -26,12 +27,13 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
-  /// An instance over a caller-supplied executor, for tests.
   AppDatabase.forTesting(super.executor);
 
-  /// Canonical production baseline schema (v2).
+  /// v3 adds participant presentation metadata directly to
+  /// LocalChannelMembers. There is deliberately NO LocalChatParticipants
+  /// table.
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -50,7 +52,19 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(localChannels, localChannels.youFollow);
             await m.addColumn(localChannels, localChannels.theyFollowYou);
           }
-          // Pre-release development: ensure all tables and indexes exist cleanly
+
+          if (from < 3) {
+            await m.addColumn(localChannelMembers, localChannelMembers.displayName);
+            await m.addColumn(localChannelMembers, localChannelMembers.username);
+            await m.addColumn(localChannelMembers, localChannelMembers.avatarUrl);
+          }
+
+          if (from < 4) {
+            await m.addColumn(outboxOperations, outboxOperations.ownerUserId);
+          }
+
+          // Development-stage safety: create any newly declared tables and
+          // indexes after column migrations.
           await m.createAll();
           await _createChatIndexes(m);
           await _createScoringIndexes(m);
@@ -78,6 +92,11 @@ class AppDatabase extends _$AppDatabase {
     await m.database.customStatement(
       "CREATE INDEX IF NOT EXISTS idx_outbox_pending_lane "
       "ON outbox_operations (channel_id, created_at ASC) "
+      "WHERE status = 'pending' OR status = 'retry_wait'",
+    );
+    await m.database.customStatement(
+      "CREATE INDEX IF NOT EXISTS idx_outbox_owner_ready "
+      "ON outbox_operations (owner_user_id, created_at ASC) "
       "WHERE status = 'pending' OR status = 'retry_wait'",
     );
     await m.database.customStatement(

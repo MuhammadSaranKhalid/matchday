@@ -1,15 +1,14 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/error/failures.dart';
-import '../../domain/entities/chat.dart';
+import '../../domain/entities/chat_channel.dart';
 import '../providers/messages_providers.dart';
+import '../widgets/chat_avatar.dart';
 import '../widgets/chat_theme.dart';
+import '../widgets/inbox_search_bar.dart';
 import '../widgets/inbox_shimmer_skeleton.dart';
 
 class InboxScreen extends ConsumerWidget {
@@ -26,708 +25,370 @@ class InboxScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final chatsAsync = ref.watch(myChatsProvider);
+    final channels = ref.watch(myChatChannelsProvider);
 
     return Scaffold(
       backgroundColor: ChatTheme.clubhouseCanvas,
       body: SafeArea(
         top: false,
         bottom: false,
-        child: switch (chatsAsync) {
-          AsyncData(:final value) => _Loaded(
-              chats: value,
-              showBack: showBack,
-              showHeader: showHeader,
-              onBell: onBell,
-              onRefresh: () async {
-                await ref.read(chatRepositoryProvider).refreshInbox();
-              },
-            ),
-          AsyncError(:final error) => _ErrorView(
-              message: _messageFor(error),
-              onRetry: () {
-                ref.read(chatRepositoryProvider).refreshInbox();
-              },
-            ),
-          _ => _Skeleton(showHeader: showHeader),
-        },
+        child: channels.when(
+          data: (value) => _LoadedInbox(
+            channels: value,
+            showBack: showBack,
+            showHeader: showHeader,
+            onBell: onBell,
+          ),
+          loading: () => _InboxLoading(showHeader: showHeader),
+          error: (error, _) => _InboxError(
+            message: error is FailureWrapper
+                ? error.failure.message
+                : 'Could not load your chats.',
+            onRetry: () => ref.invalidate(myChatChannelsProvider),
+          ),
+        ),
       ),
     );
   }
-
-  String _messageFor(Object e) {
-    if (e is FailureWrapper) return e.failure.message;
-    return 'Could not load your chats.';
-  }
 }
 
-// ─── Loaded body ─────────────────────────────────────────────────────────────
-
-class _Loaded extends StatelessWidget {
-  const _Loaded({
-    required this.chats,
-    required this.onRefresh,
-    this.showBack = false,
-    this.showHeader = true,
+class _LoadedInbox extends ConsumerStatefulWidget {
+  const _LoadedInbox({
+    required this.channels,
+    required this.showBack,
+    required this.showHeader,
     this.onBell,
   });
 
-  final List<Chat> chats;
-  final Future<void> Function() onRefresh;
+  final List<ChatChannel> channels;
   final bool showBack;
   final bool showHeader;
   final VoidCallback? onBell;
 
   @override
+  ConsumerState<_LoadedInbox> createState() => _LoadedInboxState();
+}
+
+class _LoadedInboxState extends ConsumerState<_LoadedInbox> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    final result = await ref.read(chatRepositoryProvider).refreshInbox();
+    if (!mounted) return;
+    result.fold(
+      (failure) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      ),
+      (_) {},
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final requestChats = chats.where((c) => c.isRequest).toList();
-    final visible = chats.where((c) => !c.isRequest).toList();
+    final requests = widget.channels.where((channel) => channel.isRequest).toList();
+    var visible = widget.channels.where((channel) => !channel.isRequest).toList();
+
+    final query = _query.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      visible = visible.where((channel) {
+        return channel.displayName.toLowerCase().contains(query) ||
+            (channel.dmOtherUserUsername?.toLowerCase().contains(query) ?? false) ||
+            (channel.lastMessagePreview?.toLowerCase().contains(query) ?? false);
+      }).toList();
+    }
 
     return Column(
       children: [
-        // Stitch Chats Header
-        if (showHeader)
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
-            decoration: const BoxDecoration(
-              color: ChatTheme.clubhouseCanvas,
-              border: Border(bottom: BorderSide(color: ChatTheme.hairlineSand)),
-            ),
-            child: Row(
-              children: [
-                if (showBack)
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      margin: const EdgeInsets.only(right: 8),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: ChatTheme.softSandFill,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: ChatTheme.hairlineSand),
+        if (widget.showHeader)
+          _InboxHeader(
+            showBack: widget.showBack,
+            onBell: widget.onBell,
+            activeCount: widget.channels.where((c) => !c.isRequest).length,
+            requestCount: requests.length,
+          ),
+        InboxSearchBar(
+          controller: _searchController,
+          onChanged: (value) => setState(() => _query = value),
+        ),
+        Expanded(
+          child: visible.isEmpty
+              ? RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      const SizedBox(height: 100),
+                      Icon(
+                        query.isEmpty
+                            ? Icons.chat_bubble_outline_rounded
+                            : Icons.search_off_rounded,
+                        size: 42,
+                        color: ChatTheme.mutedStone,
                       ),
-                      child: const Icon(
-                        Icons.arrow_back_rounded,
-                        size: 20,
-                        color: ChatTheme.charcoalInk,
+                      const SizedBox(height: 12),
+                      Center(
+                        child: Text(
+                          query.isEmpty ? 'No chats yet' : 'No chats match “$_query”',
+                          style: ChatTheme.headlineSm(),
+                        ),
                       ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: 28),
+                    itemCount: visible.length,
+                    separatorBuilder: (_, __) => const Divider(
+                      height: 1,
+                      indent: 72,
+                      color: ChatTheme.hairlineSand,
+                    ),
+                    itemBuilder: (context, index) => _ChatRow(
+                      channel: visible[index],
+                      onOpen: () => context.push('/messages/${visible[index].id}'),
+                      onMarkRead: visible[index].unreadCount > 0 &&
+                              visible[index].lastMessageSeq != null
+                          ? () async {
+                              await ref.read(chatRepositoryProvider).markRead(
+                                    visible[index].id,
+                                    visible[index].lastMessageSeq,
+                                  );
+                            }
+                          : null,
                     ),
                   ),
-                Text(
-                  'Chats',
-                  style: ChatTheme.headlineLg(),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: ChatTheme.softSandFill,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: ChatTheme.hairlineSand),
+        ),
+      ],
+    );
+  }
+}
+
+class _InboxHeader extends StatelessWidget {
+  const _InboxHeader({
+    required this.showBack,
+    required this.activeCount,
+    required this.requestCount,
+    this.onBell,
+  });
+
+  final bool showBack;
+  final int activeCount;
+  final int requestCount;
+  final VoidCallback? onBell;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: ChatTheme.hairlineSand)),
+        ),
+        child: Row(
+          children: [
+            if (showBack)
+              IconButton(
+                onPressed: () => context.pop(),
+                icon: const Icon(Icons.arrow_back_rounded),
+              ),
+            Text('Chats', style: ChatTheme.headlineLg()),
+            const SizedBox(width: 8),
+            _CountChip(label: '$activeCount active'),
+            if (requestCount > 0) ...[
+              const SizedBox(width: 8),
+              InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: () => context.push('/messages/requests'),
+                child: _CountChip(
+                  label: '$requestCount request${requestCount == 1 ? '' : 's'}',
+                  emphasized: true,
+                ),
+              ),
+            ],
+            const Spacer(),
+            if (onBell != null)
+              IconButton(
+                onPressed: onBell,
+                icon: const Icon(Icons.notifications_none_rounded),
+              ),
+          ],
+        ),
+      );
+}
+
+class _CountChip extends StatelessWidget {
+  const _CountChip({required this.label, this.emphasized = false});
+  final String label;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: emphasized ? ChatTheme.destructiveCoralBg : ChatTheme.softSandFill,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: ChatTheme.hairlineSand),
+        ),
+        child: Text(
+          label,
+          style: ChatTheme.badge(
+            color: emphasized ? ChatTheme.destructiveCoralText : ChatTheme.mutedStone,
+          ),
+        ),
+      );
+}
+
+class _ChatRow extends StatelessWidget {
+  const _ChatRow({
+    required this.channel,
+    required this.onOpen,
+    this.onMarkRead,
+  });
+
+  final ChatChannel channel;
+  final VoidCallback onOpen;
+  final VoidCallback? onMarkRead;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = channel.lastMessagePreview?.trim();
+    final prefix = channel.lastMessageFromMe && preview?.isNotEmpty == true ? 'You: ' : '';
+
+    return InkWell(
+      onTap: onOpen,
+      onLongPress: onMarkRead,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
+          children: [
+            ChatAvatar(
+              label: channel.displayName,
+              imageUrl: channel.displayAvatarUrl,
+              size: 46,
+              backgroundColor:
+                  channel.isTeam ? ChatTheme.matchDayCoral : ChatTheme.softSandFill,
+              foregroundColor:
+                  channel.isTeam ? ChatTheme.pureSurface : ChatTheme.charcoalInk,
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    channel.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ChatTheme.rowTitle().copyWith(
+                      fontWeight:
+                          channel.unreadCount > 0 ? FontWeight.w700 : FontWeight.w600,
+                    ),
                   ),
-                  child: Text(
-                    '${visible.length} active',
+                  const SizedBox(height: 3),
+                  Text(
+                    preview?.isNotEmpty == true
+                        ? '$prefix$preview'
+                        : 'No messages yet',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ChatTheme.bodySm(color: ChatTheme.mutedStone),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (channel.lastMessageAt != null)
+                  Text(
+                    _inboxTime(channel.lastMessageAt!),
                     style: ChatTheme.timestamp(),
                   ),
-                ),
-                if (requestChats.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => context.push('/messages/requests'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: ChatTheme.pureSurface,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: ChatTheme.hairlineSand),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color.fromRGBO(36, 35, 31, 0.04),
-                            blurRadius: 3,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.mark_email_unread_outlined,
-                            size: 14,
-                            color: ChatTheme.mutedStone,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Requests',
-                            style: ChatTheme.badge(color: ChatTheme.charcoalInk),
-                          ),
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: ChatTheme.matchDayCoral,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              '${requestChats.length}',
-                              style: ChatTheme.badge(color: ChatTheme.pureSurface)
-                                  .copyWith(fontSize: 10, fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                // Compose button
-                IconButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Start a new chat by browsing teams or players'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  tooltip: 'Compose Chat',
-                  icon: const Icon(
-                    Icons.edit_note_rounded,
-                    size: 24,
-                    color: ChatTheme.charcoalInk,
-                  ),
-                ),
-                // Manage / Profile button
-                IconButton(
-                  onPressed: () {
-                    context.push('/profile');
-                  },
-                  tooltip: 'Profile and Settings',
-                  icon: const Icon(
-                    Icons.manage_accounts_outlined,
-                    size: 22,
-                    color: ChatTheme.charcoalInk,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-        // Conversation List (Scrollable body including Messages & Requests header)
-        Expanded(
-          child: Container(
-            color: ChatTheme.clubhouseCanvas,
-            child: RefreshIndicator(
-              onRefresh: onRefresh,
-              color: ChatTheme.matchDayCoral,
-              backgroundColor: ChatTheme.clubhouseCanvas,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  if (!showHeader)
-                    SliverToBoxAdapter(
-                      child: Container(
-                        color: ChatTheme.clubhouseCanvas,
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Messages',
-                              style: ChatTheme.headlineMd(color: ChatTheme.charcoalInk).copyWith(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                context.push('/messages/requests');
-                              },
-                              behavior: HitTestBehavior.opaque,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text(
-                                      'Requests',
-                                      style: TextStyle(
-                                        fontFamily: 'Inter',
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: ChatTheme.matchDayCoral,
-                                      ),
-                                    ),
-                                    if (requestChats.isNotEmpty) ...[
-                                      const SizedBox(width: 5),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 1.5,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: ChatTheme.matchDayCoral,
-                                          borderRadius: BorderRadius.circular(999),
-                                        ),
-                                        child: Text(
-                                          '${requestChats.length}',
-                                          style: const TextStyle(
-                                            fontFamily: 'Inter',
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: ChatTheme.pureSurface,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  if (visible.isEmpty)
-                    const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _EmptyList(),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      sliver: SliverList.separated(
-                        itemCount: visible.length,
-                        separatorBuilder: (_, __) => const Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: ChatTheme.hairlineSand,
-                        ),
-                        itemBuilder: (context, i) => _ChatRowItem(
-                          chat: visible[i],
-                          onOpen: () => context.push('/messages/${visible[i].id.value}'),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Chat Row Item (Stitch Design) ──────────────────────────────────────────
-
-class _ChatRowItem extends StatelessWidget {
-  const _ChatRowItem({required this.chat, required this.onOpen});
-
-  final Chat chat;
-  final VoidCallback onOpen;
-
-  static final _timeFmt = DateFormat('h:mm a');
-  static final _dayFmt = DateFormat('MMM d');
-
-  String _formatTime(DateTime? dt) {
-    if (dt == null) return '';
-    final now = DateTime.now();
-    final local = dt.toLocal();
-    final diff = now.difference(local);
-
-    if (diff.inDays == 0 && now.day == local.day) {
-      return _timeFmt.format(local);
-    } else if (diff.inDays < 2 && now.day - local.day == 1) {
-      return 'Yesterday';
-    } else if (diff.inDays < 7) {
-      return DateFormat('EEEE').format(local);
-    } else {
-      return _dayFmt.format(local);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final unread = chat.unreadCount > 0;
-    final timeStr = _formatTime(chat.lastMessageAt);
-    final mono = chat.displayMonogram;
-
-    return Material(
-      color: ChatTheme.clubhouseCanvas,
-      child: InkWell(
-        onTap: onOpen,
-        onLongPress: () => _showContextMenu(context),
-        splashColor: ChatTheme.charcoalInk.withValues(alpha: 0.04),
-        highlightColor: ChatTheme.charcoalInk.withValues(alpha: 0.02),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Avatar
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
+                const SizedBox(height: 5),
+                if (channel.unreadCount > 0)
                   Container(
-                    width: 44,
-                    height: 44,
+                    constraints: const BoxConstraints(minWidth: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: chat.isTeam
-                          ? ChatTheme.matchDayCoral
-                          : ChatTheme.softSandFill,
+                    decoration: const BoxDecoration(
+                      color: ChatTheme.matchDayCoral,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: chat.isTeam
-                            ? ChatTheme.matchDayCoral
-                            : ChatTheme.hairlineSand,
-                      ),
                     ),
                     child: Text(
-                      mono,
-                      style: ChatTheme.badge(
-                        color: chat.isTeam
-                            ? ChatTheme.pureSurface
-                            : ChatTheme.charcoalInk,
-                      ).copyWith(fontSize: 14, fontWeight: FontWeight.w700),
+                      channel.unreadCount > 99 ? '99+' : '${channel.unreadCount}',
+                      style: ChatTheme.badge(color: ChatTheme.pureSurface),
                     ),
                   ),
-                  // Online indicator pip for DMs
-                  if (chat.isDm)
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3BA653),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: ChatTheme.pureSurface,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 12),
-
-              // Title and preview column
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Row 1: Title & Timestamp
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            chat.displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: ChatTheme.rowTitle(),
-                          ),
-                        ),
-                        if (timeStr.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            timeStr,
-                            style: ChatTheme.timestamp(),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-
-                    // Row 2: Preview & Unread badge
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildPreview(),
-                        ),
-                        if (unread) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            constraints: const BoxConstraints(minWidth: 20),
-                            height: 20,
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: ChatTheme.matchDayCoral,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              chat.unreadCount > 99 ? '99+' : '${chat.unreadCount}',
-                              style: ChatTheme.badge(
-                                color: ChatTheme.pureSurface,
-                              ).copyWith(fontSize: 10.5, fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPreview() {
-    final preview = chat.lastMessagePreview;
-    final unread = chat.unreadCount > 0;
-
-    if (preview == null || preview.isEmpty) {
-      return Text(
-        'No messages yet',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: ChatTheme.bodySm(color: ChatTheme.mutedStone)
-            .copyWith(fontStyle: FontStyle.italic),
-      );
-    }
-
-    if (chat.lastMessageFromMe) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.done_all_rounded,
-            size: 15,
-            color: ChatTheme.mutedStone,
-          ),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text.rich(
-              TextSpan(
-                style: ChatTheme.bodySm(color: ChatTheme.mutedStone),
-                children: [
-                  const TextSpan(
-                    text: 'You: ',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  TextSpan(text: preview),
-                ],
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Text(
-      preview,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: ChatTheme.bodySm(
-        color: unread ? ChatTheme.charcoalInk : ChatTheme.mutedStone,
-        fontWeight: unread ? FontWeight.w500 : FontWeight.w400,
-      ),
-    );
-  }
-
-  void _showContextMenu(BuildContext context) {
-    HapticFeedback.mediumImpact();
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Material(
-        color: ChatTheme.pureSurface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        clipBehavior: Clip.antiAlias,
-        child: Container(
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: ChatTheme.hairlineSand)),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: SafeArea(
-            child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: ChatTheme.hairlineSand,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                child: Row(
-                  children: [
-                    Text(
-                      chat.displayName,
-                      style: ChatTheme.rowTitle(),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: ChatTheme.hairlineSand),
-              ListTile(
-                leading: const Icon(Icons.notifications_off_outlined, color: ChatTheme.charcoalInk),
-                title: Text('Mute Notifications', style: ChatTheme.rowTitle()),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Notifications muted')),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.mark_email_read_outlined, color: ChatTheme.charcoalInk),
-                title: Text('Mark as read', style: ChatTheme.rowTitle()),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.archive_outlined, color: ChatTheme.charcoalInk),
-                title: Text('Archive Chat', style: ChatTheme.rowTitle()),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Chat archived')),
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-}
-
-// ─── Skeletons & Empty States ────────────────────────────────────────────────
-
-class _Skeleton extends StatelessWidget {
-  const _Skeleton({this.showHeader = true});
-
-  final bool showHeader;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        if (showHeader)
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
-            decoration: const BoxDecoration(
-              color: ChatTheme.clubhouseCanvas,
-              border: Border(bottom: BorderSide(color: ChatTheme.hairlineSand)),
-            ),
-            child: Row(
-              children: [
-                Text('Chats', style: ChatTheme.headlineLg()),
               ],
-            ),
-          ),
-        const Expanded(
-          child: InboxShimmerSkeleton(),
-        ),
-      ],
-    );
-  }
-}
-
-class _EmptyList extends StatelessWidget {
-  const _EmptyList();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 36),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: ChatTheme.softSandFill,
-                shape: BoxShape.circle,
-                border: Border.all(color: ChatTheme.hairlineSand),
-              ),
-              child: const Icon(
-                Icons.forum_outlined,
-                size: 26,
-                color: ChatTheme.charcoalInk,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Your Inbox is quiet',
-              style: ChatTheme.headlineSm(),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Your team, match, and direct conversations will appear here.',
-              textAlign: TextAlign.center,
-              style: ChatTheme.bodySm(color: ChatTheme.mutedStone),
             ),
           ],
         ),
       ),
     );
   }
+
+  static String _inboxTime(DateTime value) {
+    final local = value.toLocal();
+    final now = DateTime.now();
+    if (local.year == now.year && local.month == now.month && local.day == now.day) {
+      return DateFormat('h:mm a').format(local);
+    }
+    return DateFormat('MMM d').format(local);
+  }
 }
 
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
+class _InboxLoading extends StatelessWidget {
+  const _InboxLoading({required this.showHeader});
+  final bool showHeader;
 
+  @override
+  Widget build(BuildContext context) => Column(
+        children: [
+          if (showHeader)
+            const SizedBox(
+              height: 62,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('Chats', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ),
+          const Expanded(child: InboxShimmerSkeleton()),
+        ],
+      );
+}
+
+class _InboxError extends StatelessWidget {
+  const _InboxError({required this.message, required this.onRetry});
   final String message;
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              size: 40,
-              color: ChatTheme.destructiveCoralText,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: ChatTheme.bodyMd(),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: onRetry,
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: ChatTheme.hairlineSand),
-              ),
-              child: const Text('Retry'),
-            ),
-          ],
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 40),
+              const SizedBox(height: 12),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }

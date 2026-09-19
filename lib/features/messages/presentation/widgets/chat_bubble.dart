@@ -6,339 +6,258 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import 'chat_theme.dart';
-import '../../../posts/domain/entities/post_media.dart';
-import '../../../posts/presentation/screens/photo_viewer_screen.dart';
 import '../../../safety/presentation/providers/safety_providers.dart';
-import '../../domain/entities/chat_message.dart' show MessageDeliveryStatus;
-import '../../domain/entities/message.dart';
+import '../../domain/entities/chat_message.dart';
+import '../providers/messages_providers.dart';
+import 'chat_avatar.dart';
+import 'chat_theme.dart';
 
 class ChatBubble extends ConsumerStatefulWidget {
   const ChatBubble({
     super.key,
     required this.message,
-    required this.isTeam,
+    required this.isMultiParticipant,
     this.showSender = true,
     this.isSelected = false,
     this.onReply,
     this.onDelete,
     this.onSelect,
+    this.onRetry,
     this.onReactionSelected,
   });
 
-  final Message message;
-  final bool isTeam;
+  final ChatMessage message;
+  final bool isMultiParticipant;
   final bool showSender;
   final bool isSelected;
-  final ValueChanged<Message>? onReply;
-  final ValueChanged<Message>? onDelete;
-  final ValueChanged<Message>? onSelect;
-  final void Function(Message message, String emoji)? onReactionSelected;
+  final ValueChanged<ChatMessage>? onReply;
+  final ValueChanged<ChatMessage>? onDelete;
+  final ValueChanged<ChatMessage>? onSelect;
+  final ValueChanged<ChatMessage>? onRetry;
+  final void Function(ChatMessage message, String emoji)? onReactionSelected;
 
   @override
   ConsumerState<ChatBubble> createState() => _ChatBubbleState();
 }
 
 class _ChatBubbleState extends ConsumerState<ChatBubble> {
-  static final _timeFmt = DateFormat('h:mm a');
-  double _dragOffset = 0.0;
-  bool _showingReactions = false;
+  static final DateFormat _time = DateFormat('h:mm a');
+  static const _quickReactions = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
+  double _dragOffset = 0;
+  bool _showReactions = false;
 
   @override
   Widget build(BuildContext context) {
-    if (ref.watch(blockedAccountsProvider).value?.any((u) => u.id == widget.message.senderId) ?? false) {
-      return const SizedBox.shrink();
-    }
+    final message = widget.message;
+    final blocked = ref.watch(blockedAccountsProvider).value?.any(
+              (user) => user.id == message.senderId,
+            ) ??
+        false;
+    if (blocked) return const SizedBox.shrink();
 
-    final m = widget.message;
-    final me = m.fromMe;
-    final isDeleted = m.isDeleted;
-    final senderName = m.senderDisplayName ?? 'Teammate';
-    final time = _timeFmt.format(m.createdAt.toLocal());
-    final isSelected = widget.isSelected;
-
-    // Sender initials monogram for team chat
-    final mono = senderName.isNotEmpty
-        ? senderName.trim().split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join().toUpperCase()
-        : '?';
+    final me = message.fromMe;
+    final senderName = message.senderDisplayName ?? 'Deleted user';
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Swipe-to-reply wrapper
         GestureDetector(
-          onHorizontalDragUpdate: (details) {
-            if (details.primaryDelta != null && details.primaryDelta! > 0) {
-              setState(() {
-                _dragOffset = (_dragOffset + details.primaryDelta!).clamp(0.0, 72.0);
-              });
-            } else if (details.primaryDelta != null && details.primaryDelta! < 0) {
-              setState(() {
-                _dragOffset = (_dragOffset + details.primaryDelta!).clamp(0.0, 72.0);
-              });
-            }
-          },
-          onHorizontalDragEnd: (details) {
-            if (_dragOffset >= 48) {
-              HapticFeedback.lightImpact();
-              widget.onReply?.call(m);
-            }
-            setState(() => _dragOffset = 0.0);
-          },
-          onHorizontalDragCancel: () => setState(() => _dragOffset = 0.0),
           behavior: HitTestBehavior.opaque,
+          onHorizontalDragUpdate: (details) {
+            final delta = details.primaryDelta ?? 0;
+            if (delta <= 0) return;
+            setState(() {
+              _dragOffset = (_dragOffset + delta).clamp(0.0, 72.0).toDouble();
+            });
+          },
+          onHorizontalDragEnd: (_) {
+            if (_dragOffset >= 48 && !message.isDeleted) {
+              HapticFeedback.lightImpact();
+              widget.onReply?.call(message);
+            }
+            setState(() => _dragOffset = 0);
+          },
+          onHorizontalDragCancel: () => setState(() => _dragOffset = 0),
           child: Transform.translate(
             offset: Offset(_dragOffset, 0),
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
-                mainAxisAlignment: me ? MainAxisAlignment.end : MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment:
+                    me ? MainAxisAlignment.end : MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // Left avatar for team incoming messages
-                  if (!me && widget.isTeam) ...[
-                    Container(
+                  if (!me && widget.isMultiParticipant) ...[
+                    SizedBox(
                       width: 32,
                       height: 32,
-                      margin: const EdgeInsets.only(right: 8, top: 2),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: ChatTheme.surfaceContainerHigh,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: ChatTheme.hairlineSand),
-                      ),
-                      child: Text(
-                        mono,
-                        style: ChatTheme.badge(
-                          color: ChatTheme.charcoalInk,
-                        ),
-                      ),
+                      child: widget.showSender
+                          ? ChatAvatar(
+                              label: senderName,
+                              imageUrl: message.senderAvatarUrl,
+                              size: 32,
+                            )
+                          : null,
                     ),
+                    const SizedBox(width: 8),
                   ],
-
-                  // Bubble body & sender name
                   Flexible(
                     child: Column(
-                      crossAxisAlignment: me ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                          me ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                       children: [
-                        // Team chat sender name above incoming message
-                        if (!me && widget.isTeam && widget.showSender && !isDeleted)
+                        if (!me &&
+                            widget.isMultiParticipant &&
+                            widget.showSender &&
+                            !message.isDeleted)
                           Padding(
                             padding: const EdgeInsets.only(left: 4, bottom: 3),
                             child: Text(
                               senderName,
-                              style: ChatTheme.rowTitle(
+                              style: ChatTheme.badge(
                                 color: ChatTheme.charcoalInk,
                               ),
                             ),
                           ),
-
-                        // Bubble container
                         GestureDetector(
-                          onLongPress: isDeleted ? null : () => _handleLongPress(context),
-                          onTap: () {
-                            if (_showingReactions) {
-                              setState(() => _showingReactions = false);
-                            }
-                            if (widget.onSelect != null && isSelected) {
-                              widget.onSelect!(m);
-                            }
-                          },
-                          behavior: HitTestBehavior.opaque,
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                constraints: BoxConstraints(
-                                  maxWidth: MediaQuery.of(context).size.width * (me ? 0.82 : 0.85),
-                                ),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: me ? ChatTheme.charcoalInk : ChatTheme.pureSurface,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(14),
-                                    topRight: const Radius.circular(14),
-                                    bottomLeft: Radius.circular(me ? 14 : 4),
-                                    bottomRight: Radius.circular(me ? 4 : 14),
+                          onLongPress: message.isDeleted
+                              ? null
+                              : () {
+                                  HapticFeedback.mediumImpact();
+                                  setState(() => _showReactions = true);
+                                  widget.onSelect?.call(message);
+                                },
+                          onTap: _showReactions
+                              ? () => setState(() => _showReactions = false)
+                              : null,
+                          child: Container(
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.sizeOf(context).width * 0.8,
+                            ),
+                            padding: const EdgeInsets.all(11),
+                            decoration: BoxDecoration(
+                              color: me
+                                  ? ChatTheme.charcoalInk
+                                  : ChatTheme.pureSurface,
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(14),
+                                topRight: const Radius.circular(14),
+                                bottomLeft: Radius.circular(me ? 14 : 4),
+                                bottomRight: Radius.circular(me ? 4 : 14),
+                              ),
+                              border: Border.all(
+                                color: widget.isSelected
+                                    ? ChatTheme.matchDayCoral
+                                    : me
+                                        ? ChatTheme.charcoalInk
+                                        : ChatTheme.hairlineSand,
+                                width: widget.isSelected ? 2 : 1,
+                              ),
+                              boxShadow: me ? null : ChatTheme.whisperShadow,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (message.replyToBody?.isNotEmpty == true &&
+                                    !message.isDeleted) ...[
+                                  _ReplyPreview(
+                                    author: message.replyToAuthor ?? 'Reply',
+                                    body: message.replyToBody!,
+                                    fromMe: me,
                                   ),
-                                  border: isSelected
-                                      ? Border.all(color: ChatTheme.matchDayCoral, width: 2)
-                                      : (me
-                                          ? null
-                                          : Border.all(color: ChatTheme.hairlineSand)),
-                                  boxShadow: isSelected
-                                      ? [
-                                          BoxShadow(
-                                            color: ChatTheme.matchDayCoral.withValues(alpha: 0.15),
-                                            offset: const Offset(0, 2),
-                                            blurRadius: 8,
-                                          ),
-                                        ]
-                                      : (me ? null : ChatTheme.whisperShadow),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      me ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                  const SizedBox(height: 7),
+                                ],
+                                if (message.isImage && !message.isDeleted) ...[
+                                  _PhotoAttachment(
+                                    localPath: message.localMediaPath,
+                                    storagePath: message.storageMediaPath,
+                                    fromMe: me,
+                                  ),
+                                  if ((message.body ?? '').trim().isNotEmpty)
+                                    const SizedBox(height: 6),
+                                ],
+                                if (!message.isImage ||
+                                    (message.body ?? '').trim().isNotEmpty ||
+                                    message.isDeleted)
+                                  Text(
+                                    message.isDeleted
+                                        ? 'This message was deleted'
+                                        : (message.body ?? ''),
+                                    style: ChatTheme.bodyMd(
+                                      color: me
+                                          ? ChatTheme.pureSurface
+                                          : ChatTheme.charcoalInk,
+                                    ).copyWith(
+                                      fontStyle: message.isDeleted
+                                          ? FontStyle.italic
+                                          : FontStyle.normal,
+                                    ),
+                                  ),
+                                const SizedBox(height: 5),
+                                Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // Nested Quoted Reply Card
-                                    if (m.replyToBody != null &&
-                                        m.replyToBody!.isNotEmpty &&
-                                        !isDeleted)
-                                      _NestedReplyCard(
-                                        author: m.replyToAuthor ?? 'Replying',
-                                        body: m.replyToBody!,
-                                        fromMe: me,
-                                      ),
-
-                                    // Photo Attachment
-                                    if (m.isImage &&
-                                        m.mediaUrl != null &&
-                                        m.mediaUrl!.isNotEmpty &&
-                                        !isDeleted)
-                                      _PhotoAttachment(
-                                        url: m.mediaUrl!,
-                                        fromMe: me,
-                                        caption: m.body != 'Photo' ? m.body : null,
-                                      ),
-
-                                    // Text Content
-                                    if (!m.isImage || (m.body != 'Photo' && !m.isImage))
+                                    if (message.isEdited && !message.isDeleted)
                                       Text(
-                                        isDeleted ? 'This message was deleted' : m.body,
-                                        style: isDeleted
-                                            ? ChatTheme.bodyMd(
-                                                color: me
-                                                    ? ChatTheme.pureSurface.withValues(alpha: 0.6)
-                                                    : ChatTheme.mutedStone,
-                                              ).copyWith(fontStyle: FontStyle.italic)
-                                            : ChatTheme.bodyMd(
-                                                color: me ? ChatTheme.pureSurface : ChatTheme.charcoalInk,
-                                              ),
+                                        'edited  ',
+                                        style: ChatTheme.timestamp(
+                                          color: me
+                                              ? Colors.white60
+                                              : ChatTheme.mutedStone,
+                                        ),
                                       ),
+                                    Text(
+                                      _time.format(message.createdAt.toLocal()),
+                                      style: ChatTheme.timestamp(
+                                        color: me
+                                            ? Colors.white60
+                                            : ChatTheme.mutedStone,
+                                      ),
+                                    ),
+                                    if (me) ...[
+                                      const SizedBox(width: 5),
+                                      _DeliveryIcon(
+                                        status: message.deliveryStatus,
+                                        onRetry: message.isFailed
+                                            ? () => widget.onRetry?.call(message)
+                                            : null,
+                                      ),
+                                    ],
                                   ],
                                 ),
-                              ),
-
-                              // Selected Checkmark Badge Indicator
-                              if (isSelected)
-                                Positioned(
-                                  top: -6,
-                                  right: -6,
-                                  child: Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: const BoxDecoration(
-                                      color: ChatTheme.matchDayCoral,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.check,
-                                      size: 13,
-                                      color: ChatTheme.pureSurface,
-                                    ),
-                                  ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-
-                        // Timestamp & Read Receipts Row
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4, left: 2, right: 2),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                time,
-                                style: ChatTheme.timestamp(),
-                              ),
-                              if (m.isEdited && !isDeleted) ...[
-                                const SizedBox(width: 4),
-                                Text(
-                                  '• edited',
-                                  style: ChatTheme.timestamp(),
-                                ),
-                              ],
-                              if (me && !isDeleted) ...[
-                                const SizedBox(width: 4),
-                                switch (m.deliveryStatus) {
-                                  MessageDeliveryStatus.pending ||
-                                  MessageDeliveryStatus.sending =>
-                                    const Icon(
-                                      Icons.access_time_rounded,
-                                      size: 13,
-                                      color: ChatTheme.mutedStone,
-                                    ),
-                                  MessageDeliveryStatus.sent =>
-                                    const Icon(
-                                      Icons.check_rounded,
-                                      size: 14,
-                                      color: ChatTheme.mutedStone,
-                                    ),
-                                  MessageDeliveryStatus.delivered =>
-                                    const Icon(
-                                      Icons.done_all_rounded,
-                                      size: 14,
-                                      color: ChatTheme.mutedStone,
-                                    ),
-                                  MessageDeliveryStatus.read =>
-                                    const Icon(
-                                      Icons.done_all_rounded,
-                                      size: 14,
-                                      color: ChatTheme.matchDayCoral,
-                                    ),
-                                  MessageDeliveryStatus.failed =>
-                                    const Icon(
-                                      Icons.error_outline_rounded,
-                                      size: 14,
-                                      color: ChatTheme.destructiveCoralText,
-                                    ),
-                                },
-                              ],
-                            ],
-                          ),
-                        ),
-
-                        // Reaction badges
-                        if (m.reactions.isNotEmpty && !isDeleted)
+                        if (message.reactions.isNotEmpty)
                           Padding(
-                            padding: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.only(top: 3),
                             child: Wrap(
                               spacing: 4,
-                              runSpacing: 4,
-                              children: () {
-                                final counts = <String, int>{};
-                                for (final r in m.reactions) {
-                                  counts[r.reaction] = (counts[r.reaction] ?? 0) + 1;
-                                }
-                                return counts.entries.map((entry) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: ChatTheme.softSandFill,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: ChatTheme.hairlineSand),
+                              children: _reactionCounts(message)
+                                  .entries
+                                  .map(
+                                    (entry) => Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 7,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: ChatTheme.softSandFill,
+                                        borderRadius: BorderRadius.circular(999),
+                                        border: Border.all(
+                                          color: ChatTheme.hairlineSand,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${entry.key} ${entry.value}',
+                                        style: ChatTheme.badge(),
+                                      ),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(entry.key, style: const TextStyle(fontSize: 12)),
-                                        if (entry.value > 1) ...[
-                                          const SizedBox(width: 3),
-                                          Text(
-                                            '${entry.value}',
-                                            style: ChatTheme.metadata(
-                                              color: ChatTheme.charcoalInk,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  );
-                                }).toList();
-                              }(),
+                                  )
+                                  .toList(),
                             ),
                           ),
                       ],
@@ -349,35 +268,54 @@ class _ChatBubbleState extends ConsumerState<ChatBubble> {
             ),
           ),
         ),
-
-        // Floating Reaction Pill Bar on Long-Press
-        if (_showingReactions)
+        if (_showReactions)
           Positioned(
-            top: -42,
-            left: me ? null : 40,
-            right: me ? 16 : null,
-            child: _FloatingReactionBar(
-              onSelectEmoji: (emoji) {
-                setState(() => _showingReactions = false);
-                widget.onReactionSelected?.call(m, emoji);
-              },
-              onClose: () => setState(() => _showingReactions = false),
+            top: -38,
+            left: me ? null : (widget.isMultiParticipant ? 40 : 0),
+            right: me ? 0 : null,
+            child: Material(
+              elevation: 5,
+              borderRadius: BorderRadius.circular(999),
+              color: ChatTheme.pureSurface,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _quickReactions
+                      .map(
+                        (emoji) => InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () {
+                            widget.onReactionSelected?.call(message, emoji);
+                            setState(() => _showReactions = false);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(5),
+                            child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
             ),
           ),
       ],
     );
   }
 
-  void _handleLongPress(BuildContext context) {
-    HapticFeedback.mediumImpact();
-    setState(() => _showingReactions = !_showingReactions);
-    widget.onSelect?.call(widget.message);
+  Map<String, int> _reactionCounts(ChatMessage message) {
+    final counts = <String, int>{};
+    for (final reaction in message.reactions) {
+      if (reaction.isRemoved) continue;
+      counts.update(reaction.reaction, (value) => value + 1, ifAbsent: () => 1);
+    }
+    return counts;
   }
 }
 
-// ─── Nested Quoted Reply Card ────────────────────────────────────────────────
-class _NestedReplyCard extends StatelessWidget {
-  const _NestedReplyCard({
+class _ReplyPreview extends StatelessWidget {
+  const _ReplyPreview({
     required this.author,
     required this.body,
     required this.fromMe,
@@ -391,39 +329,32 @@ class _NestedReplyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: fromMe
-            ? Colors.white.withValues(alpha: 0.12)
-            : ChatTheme.softSandFill,
+        color: fromMe ? Colors.white10 : ChatTheme.softSandFill,
         borderRadius: BorderRadius.circular(8),
-        border: const Border(
-          left: BorderSide(color: ChatTheme.matchDayCoral, width: 3),
+        border: Border(
+          left: BorderSide(
+            color: fromMe ? ChatTheme.pureSurface : ChatTheme.matchDayCoral,
+            width: 3,
+          ),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             author,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: ChatTheme.metadata(
-              color: ChatTheme.matchDayCoral,
-              fontWeight: FontWeight.w700,
+            style: ChatTheme.badge(
+              color: fromMe ? ChatTheme.pureSurface : ChatTheme.matchDayCoral,
             ),
           ),
-          const SizedBox(height: 2),
           Text(
             body,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: ChatTheme.bodySm(
-              color: fromMe
-                  ? ChatTheme.pureSurface.withValues(alpha: 0.8)
-                  : ChatTheme.mutedStone,
+              color: fromMe ? Colors.white70 : ChatTheme.mutedStone,
             ),
           ),
         ],
@@ -432,190 +363,168 @@ class _NestedReplyCard extends StatelessWidget {
   }
 }
 
-// ─── Floating Reaction Bar ───────────────────────────────────────────────────
-class _FloatingReactionBar extends StatelessWidget {
-  const _FloatingReactionBar({
-    required this.onSelectEmoji,
-    required this.onClose,
-  });
+class _DeliveryIcon extends StatelessWidget {
+  const _DeliveryIcon({required this.status, this.onRetry});
 
-  final ValueChanged<String> onSelectEmoji;
-  final VoidCallback onClose;
-
-  static const _emojis = ['🏏', '🔥', '👍', '❤️', '👏', '😂'];
+  final MessageDeliveryStatus status;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: ChatTheme.pureSurface,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: ChatTheme.hairlineSand),
-          boxShadow: ChatTheme.floatingCardShadow,
+    return switch (status) {
+      MessageDeliveryStatus.pending => const Icon(
+          Icons.schedule_rounded,
+          size: 14,
+          color: Colors.white60,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ..._emojis.map((emoji) => GestureDetector(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    onSelectEmoji(emoji);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    child: Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 19),
-                    ),
-                  ),
-                )),
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: onClose,
-              child: Container(
-                width: 24,
-                height: 24,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: ChatTheme.softSandFill,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: ChatTheme.hairlineSand),
-                ),
-                child: const Icon(
-                  Icons.close_rounded,
-                  size: 14,
-                  color: ChatTheme.mutedStone,
-                ),
-              ),
+      MessageDeliveryStatus.sending => const SizedBox(
+          width: 12,
+          height: 12,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: Colors.white60,
+          ),
+        ),
+      MessageDeliveryStatus.sent => const Icon(
+          Icons.done_rounded,
+          size: 14,
+          color: Colors.white60,
+        ),
+      MessageDeliveryStatus.delivered => const Icon(
+          Icons.done_all_rounded,
+          size: 14,
+          color: Colors.white60,
+        ),
+      MessageDeliveryStatus.read => const Icon(
+          Icons.done_all_rounded,
+          size: 14,
+          color: ChatTheme.matchDayCoral,
+        ),
+      MessageDeliveryStatus.failed => InkWell(
+          onTap: onRetry,
+          child: const Padding(
+            padding: EdgeInsets.all(2),
+            child: Icon(
+              Icons.refresh_rounded,
+              size: 15,
+              color: ChatTheme.destructiveCoralText,
             ),
-          ],
+          ),
         ),
-      ),
-    );
+    };
   }
 }
 
-// ─── Photo Attachment ────────────────────────────────────────────────────────
-class _PhotoAttachment extends StatelessWidget {
+class _PhotoAttachment extends ConsumerWidget {
   const _PhotoAttachment({
-    required this.url,
     required this.fromMe,
-    this.caption,
+    this.localPath,
+    this.storagePath,
   });
 
-  final String url;
   final bool fromMe;
-  final String? caption;
+  final String? localPath;
+  final String? storagePath;
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute<void>(
-            builder: (_) => PhotoViewerScreen(
-              media: [
-                PostMedia(
-                  url: url,
-                  blurhash: '',
-                  width: 800,
-                  height: 800,
-                ),
-              ],
-              initialIndex: 0,
+  Widget build(BuildContext context, WidgetRef ref) {
+    Widget frame(Widget child) => ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 220,
+            height: 180,
+            child: child,
+          ),
+        );
+
+    Widget broken() => frame(
+          Container(
+            color: fromMe ? Colors.white12 : ChatTheme.softSandFill,
+            child: const Center(
+              child: Icon(
+                Icons.broken_image_outlined,
+                color: ChatTheme.mutedStone,
+              ),
             ),
           ),
         );
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 6),
-          constraints: const BoxConstraints(
-            maxHeight: 220,
-            minWidth: 160,
-          ),
+
+    void showImage(Widget image) {
+      showDialog<void>(
+        context: context,
+        builder: (_) => Dialog.fullscreen(
+          backgroundColor: Colors.black,
           child: Stack(
-            fit: StackFit.passthrough,
             children: [
-              if (url.startsWith('/') || url.startsWith('file://'))
-                Image.file(
-                  io.File(url.replaceFirst('file://', '')),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 120,
-                    color: fromMe ? Colors.white12 : ChatTheme.softSandFill,
-                    child: const Center(
-                      child: Icon(
-                        Icons.broken_image_rounded,
-                        size: 28,
-                        color: ChatTheme.mutedStone,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                CachedNetworkImage(
-                  imageUrl: url,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
-                    height: 160,
-                    color: fromMe ? Colors.white12 : ChatTheme.softSandFill,
-                    child: const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: ChatTheme.matchDayCoral,
-                        ),
-                      ),
-                    ),
-                  ),
-                  errorWidget: (_, __, ___) => Container(
-                    height: 120,
-                    color: fromMe ? Colors.white12 : ChatTheme.softSandFill,
-                    child: const Center(
-                      child: Icon(
-                        Icons.broken_image_rounded,
-                        size: 28,
-                        color: ChatTheme.mutedStone,
-                      ),
-                    ),
-                  ),
+              Center(child: InteractiveViewer(child: image)),
+              SafeArea(
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: Colors.white),
                 ),
-              if (caption != null && caption!.isNotEmpty)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(8, 16, 8, 6),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [Colors.black87, Colors.transparent],
-                      ),
-                    ),
-                    child: Text(
-                      caption!,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
+              ),
             ],
           ),
         ),
-      ),
-    );
+      );
+    }
+
+    final local = localPath?.trim();
+    if (local != null && local.isNotEmpty) {
+      final file = io.File(local);
+      if (file.existsSync()) {
+        final image = Image.file(file, fit: BoxFit.cover);
+        return GestureDetector(
+          onTap: () => showImage(Image.file(file, fit: BoxFit.contain)),
+          child: frame(image),
+        );
+      }
+    }
+
+    final storage = storagePath?.trim();
+    if (storage == null || storage.isEmpty) return broken();
+
+    Widget network(String url) {
+      final image = CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Container(
+          color: fromMe ? Colors.white12 : ChatTheme.softSandFill,
+          child: const Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: ChatTheme.matchDayCoral,
+            ),
+          ),
+        ),
+        errorWidget: (_, __, ___) => broken(),
+      );
+      return GestureDetector(
+        onTap: () => showImage(
+          CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
+        ),
+        child: frame(image),
+      );
+    }
+
+    if (storage.startsWith('http://') || storage.startsWith('https://')) {
+      return network(storage);
+    }
+
+    return ref.watch(chatMediaUrlProvider(storage)).when(
+          data: network,
+          loading: () => frame(
+            Container(
+              color: fromMe ? Colors.white12 : ChatTheme.softSandFill,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: ChatTheme.matchDayCoral,
+                ),
+              ),
+            ),
+          ),
+          error: (_, __) => broken(),
+        );
   }
 }

@@ -1986,6 +1986,39 @@ class $LocalChannelMembersTable extends LocalChannelMembers
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _displayNameMeta = const VerificationMeta(
+    'displayName',
+  );
+  @override
+  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
+    'display_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _usernameMeta = const VerificationMeta(
+    'username',
+  );
+  @override
+  late final GeneratedColumn<String> username = GeneratedColumn<String>(
+    'username',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _avatarUrlMeta = const VerificationMeta(
+    'avatarUrl',
+  );
+  @override
+  late final GeneratedColumn<String> avatarUrl = GeneratedColumn<String>(
+    'avatar_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _lastDeliveredMessageSeqMeta =
       const VerificationMeta('lastDeliveredMessageSeq');
   @override
@@ -2083,6 +2116,9 @@ class $LocalChannelMembersTable extends LocalChannelMembers
     status,
     joinedAt,
     leftAt,
+    displayName,
+    username,
+    avatarUrl,
     lastDeliveredMessageSeq,
     lastDeliveredAt,
     lastReadMessageSeq,
@@ -2142,6 +2178,27 @@ class $LocalChannelMembersTable extends LocalChannelMembers
       context.handle(
         _leftAtMeta,
         leftAt.isAcceptableOrUnknown(data['left_at']!, _leftAtMeta),
+      );
+    }
+    if (data.containsKey('display_name')) {
+      context.handle(
+        _displayNameMeta,
+        displayName.isAcceptableOrUnknown(
+          data['display_name']!,
+          _displayNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('username')) {
+      context.handle(
+        _usernameMeta,
+        username.isAcceptableOrUnknown(data['username']!, _usernameMeta),
+      );
+    }
+    if (data.containsKey('avatar_url')) {
+      context.handle(
+        _avatarUrlMeta,
+        avatarUrl.isAcceptableOrUnknown(data['avatar_url']!, _avatarUrlMeta),
       );
     }
     if (data.containsKey('last_delivered_message_seq')) {
@@ -2249,6 +2306,18 @@ class $LocalChannelMembersTable extends LocalChannelMembers
         DriftSqlType.dateTime,
         data['${effectivePrefix}left_at'],
       ),
+      displayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}display_name'],
+      ),
+      username: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}username'],
+      ),
+      avatarUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}avatar_url'],
+      ),
       lastDeliveredMessageSeq: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}last_delivered_message_seq'],
@@ -2299,6 +2368,9 @@ class LocalChannelMemberRow extends DataClass
   final String status;
   final DateTime? joinedAt;
   final DateTime? leftAt;
+  final String? displayName;
+  final String? username;
+  final String? avatarUrl;
   final int? lastDeliveredMessageSeq;
   final DateTime? lastDeliveredAt;
   final int? lastReadMessageSeq;
@@ -2314,6 +2386,9 @@ class LocalChannelMemberRow extends DataClass
     required this.status,
     this.joinedAt,
     this.leftAt,
+    this.displayName,
+    this.username,
+    this.avatarUrl,
     this.lastDeliveredMessageSeq,
     this.lastDeliveredAt,
     this.lastReadMessageSeq,
@@ -2335,6 +2410,15 @@ class LocalChannelMemberRow extends DataClass
     }
     if (!nullToAbsent || leftAt != null) {
       map['left_at'] = Variable<DateTime>(leftAt);
+    }
+    if (!nullToAbsent || displayName != null) {
+      map['display_name'] = Variable<String>(displayName);
+    }
+    if (!nullToAbsent || username != null) {
+      map['username'] = Variable<String>(username);
+    }
+    if (!nullToAbsent || avatarUrl != null) {
+      map['avatar_url'] = Variable<String>(avatarUrl);
     }
     if (!nullToAbsent || lastDeliveredMessageSeq != null) {
       map['last_delivered_message_seq'] = Variable<int>(
@@ -2377,6 +2461,18 @@ class LocalChannelMemberRow extends DataClass
               : Value(joinedAt),
       leftAt:
           leftAt == null && nullToAbsent ? const Value.absent() : Value(leftAt),
+      displayName:
+          displayName == null && nullToAbsent
+              ? const Value.absent()
+              : Value(displayName),
+      username:
+          username == null && nullToAbsent
+              ? const Value.absent()
+              : Value(username),
+      avatarUrl:
+          avatarUrl == null && nullToAbsent
+              ? const Value.absent()
+              : Value(avatarUrl),
       lastDeliveredMessageSeq:
           lastDeliveredMessageSeq == null && nullToAbsent
               ? const Value.absent()
@@ -2421,6 +2517,9 @@ class LocalChannelMemberRow extends DataClass
       status: serializer.fromJson<String>(json['status']),
       joinedAt: serializer.fromJson<DateTime?>(json['joinedAt']),
       leftAt: serializer.fromJson<DateTime?>(json['leftAt']),
+      displayName: serializer.fromJson<String?>(json['displayName']),
+      username: serializer.fromJson<String?>(json['username']),
+      avatarUrl: serializer.fromJson<String?>(json['avatarUrl']),
       lastDeliveredMessageSeq: serializer.fromJson<int?>(
         json['lastDeliveredMessageSeq'],
       ),
@@ -2445,6 +2544,9 @@ class LocalChannelMemberRow extends DataClass
       'status': serializer.toJson<String>(status),
       'joinedAt': serializer.toJson<DateTime?>(joinedAt),
       'leftAt': serializer.toJson<DateTime?>(leftAt),
+      'displayName': serializer.toJson<String?>(displayName),
+      'username': serializer.toJson<String?>(username),
+      'avatarUrl': serializer.toJson<String?>(avatarUrl),
       'lastDeliveredMessageSeq': serializer.toJson<int?>(
         lastDeliveredMessageSeq,
       ),
@@ -2467,6 +2569,9 @@ class LocalChannelMemberRow extends DataClass
     String? status,
     Value<DateTime?> joinedAt = const Value.absent(),
     Value<DateTime?> leftAt = const Value.absent(),
+    Value<String?> displayName = const Value.absent(),
+    Value<String?> username = const Value.absent(),
+    Value<String?> avatarUrl = const Value.absent(),
     Value<int?> lastDeliveredMessageSeq = const Value.absent(),
     Value<DateTime?> lastDeliveredAt = const Value.absent(),
     Value<int?> lastReadMessageSeq = const Value.absent(),
@@ -2482,6 +2587,9 @@ class LocalChannelMemberRow extends DataClass
     status: status ?? this.status,
     joinedAt: joinedAt.present ? joinedAt.value : this.joinedAt,
     leftAt: leftAt.present ? leftAt.value : this.leftAt,
+    displayName: displayName.present ? displayName.value : this.displayName,
+    username: username.present ? username.value : this.username,
+    avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
     lastDeliveredMessageSeq:
         lastDeliveredMessageSeq.present
             ? lastDeliveredMessageSeq.value
@@ -2509,6 +2617,10 @@ class LocalChannelMemberRow extends DataClass
       status: data.status.present ? data.status.value : this.status,
       joinedAt: data.joinedAt.present ? data.joinedAt.value : this.joinedAt,
       leftAt: data.leftAt.present ? data.leftAt.value : this.leftAt,
+      displayName:
+          data.displayName.present ? data.displayName.value : this.displayName,
+      username: data.username.present ? data.username.value : this.username,
+      avatarUrl: data.avatarUrl.present ? data.avatarUrl.value : this.avatarUrl,
       lastDeliveredMessageSeq:
           data.lastDeliveredMessageSeq.present
               ? data.lastDeliveredMessageSeq.value
@@ -2546,6 +2658,9 @@ class LocalChannelMemberRow extends DataClass
           ..write('status: $status, ')
           ..write('joinedAt: $joinedAt, ')
           ..write('leftAt: $leftAt, ')
+          ..write('displayName: $displayName, ')
+          ..write('username: $username, ')
+          ..write('avatarUrl: $avatarUrl, ')
           ..write('lastDeliveredMessageSeq: $lastDeliveredMessageSeq, ')
           ..write('lastDeliveredAt: $lastDeliveredAt, ')
           ..write('lastReadMessageSeq: $lastReadMessageSeq, ')
@@ -2566,6 +2681,9 @@ class LocalChannelMemberRow extends DataClass
     status,
     joinedAt,
     leftAt,
+    displayName,
+    username,
+    avatarUrl,
     lastDeliveredMessageSeq,
     lastDeliveredAt,
     lastReadMessageSeq,
@@ -2585,6 +2703,9 @@ class LocalChannelMemberRow extends DataClass
           other.status == this.status &&
           other.joinedAt == this.joinedAt &&
           other.leftAt == this.leftAt &&
+          other.displayName == this.displayName &&
+          other.username == this.username &&
+          other.avatarUrl == this.avatarUrl &&
           other.lastDeliveredMessageSeq == this.lastDeliveredMessageSeq &&
           other.lastDeliveredAt == this.lastDeliveredAt &&
           other.lastReadMessageSeq == this.lastReadMessageSeq &&
@@ -2603,6 +2724,9 @@ class LocalChannelMembersCompanion
   final Value<String> status;
   final Value<DateTime?> joinedAt;
   final Value<DateTime?> leftAt;
+  final Value<String?> displayName;
+  final Value<String?> username;
+  final Value<String?> avatarUrl;
   final Value<int?> lastDeliveredMessageSeq;
   final Value<DateTime?> lastDeliveredAt;
   final Value<int?> lastReadMessageSeq;
@@ -2619,6 +2743,9 @@ class LocalChannelMembersCompanion
     this.status = const Value.absent(),
     this.joinedAt = const Value.absent(),
     this.leftAt = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.username = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
     this.lastDeliveredMessageSeq = const Value.absent(),
     this.lastDeliveredAt = const Value.absent(),
     this.lastReadMessageSeq = const Value.absent(),
@@ -2636,6 +2763,9 @@ class LocalChannelMembersCompanion
     this.status = const Value.absent(),
     this.joinedAt = const Value.absent(),
     this.leftAt = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.username = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
     this.lastDeliveredMessageSeq = const Value.absent(),
     this.lastDeliveredAt = const Value.absent(),
     this.lastReadMessageSeq = const Value.absent(),
@@ -2655,6 +2785,9 @@ class LocalChannelMembersCompanion
     Expression<String>? status,
     Expression<DateTime>? joinedAt,
     Expression<DateTime>? leftAt,
+    Expression<String>? displayName,
+    Expression<String>? username,
+    Expression<String>? avatarUrl,
     Expression<int>? lastDeliveredMessageSeq,
     Expression<DateTime>? lastDeliveredAt,
     Expression<int>? lastReadMessageSeq,
@@ -2672,6 +2805,9 @@ class LocalChannelMembersCompanion
       if (status != null) 'status': status,
       if (joinedAt != null) 'joined_at': joinedAt,
       if (leftAt != null) 'left_at': leftAt,
+      if (displayName != null) 'display_name': displayName,
+      if (username != null) 'username': username,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
       if (lastDeliveredMessageSeq != null)
         'last_delivered_message_seq': lastDeliveredMessageSeq,
       if (lastDeliveredAt != null) 'last_delivered_at': lastDeliveredAt,
@@ -2694,6 +2830,9 @@ class LocalChannelMembersCompanion
     Value<String>? status,
     Value<DateTime?>? joinedAt,
     Value<DateTime?>? leftAt,
+    Value<String?>? displayName,
+    Value<String?>? username,
+    Value<String?>? avatarUrl,
     Value<int?>? lastDeliveredMessageSeq,
     Value<DateTime?>? lastDeliveredAt,
     Value<int?>? lastReadMessageSeq,
@@ -2711,6 +2850,9 @@ class LocalChannelMembersCompanion
       status: status ?? this.status,
       joinedAt: joinedAt ?? this.joinedAt,
       leftAt: leftAt ?? this.leftAt,
+      displayName: displayName ?? this.displayName,
+      username: username ?? this.username,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       lastDeliveredMessageSeq:
           lastDeliveredMessageSeq ?? this.lastDeliveredMessageSeq,
       lastDeliveredAt: lastDeliveredAt ?? this.lastDeliveredAt,
@@ -2745,6 +2887,15 @@ class LocalChannelMembersCompanion
     }
     if (leftAt.present) {
       map['left_at'] = Variable<DateTime>(leftAt.value);
+    }
+    if (displayName.present) {
+      map['display_name'] = Variable<String>(displayName.value);
+    }
+    if (username.present) {
+      map['username'] = Variable<String>(username.value);
+    }
+    if (avatarUrl.present) {
+      map['avatar_url'] = Variable<String>(avatarUrl.value);
     }
     if (lastDeliveredMessageSeq.present) {
       map['last_delivered_message_seq'] = Variable<int>(
@@ -2789,6 +2940,9 @@ class LocalChannelMembersCompanion
           ..write('status: $status, ')
           ..write('joinedAt: $joinedAt, ')
           ..write('leftAt: $leftAt, ')
+          ..write('displayName: $displayName, ')
+          ..write('username: $username, ')
+          ..write('avatarUrl: $avatarUrl, ')
           ..write('lastDeliveredMessageSeq: $lastDeliveredMessageSeq, ')
           ..write('lastDeliveredAt: $lastDeliveredAt, ')
           ..write('lastReadMessageSeq: $lastReadMessageSeq, ')
@@ -3311,6 +3465,9 @@ class LocalMessageRow extends DataClass implements Insertable<LocalMessageRow> {
   final int? messageSeq;
   final String channelId;
   final String? senderId;
+
+  /// Historical/fallback sender-name snapshot. Active presentation should
+  /// resolve identity from LocalChannelMembers when possible.
   final String? senderDisplayName;
   final String messageType;
   final String? body;
@@ -5676,6 +5833,17 @@ class $OutboxOperationsTable extends OutboxOperations
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _channelIdMeta = const VerificationMeta(
     'channelId',
   );
@@ -5823,6 +5991,7 @@ class $OutboxOperationsTable extends OutboxOperations
   @override
   List<GeneratedColumn> get $columns => [
     operationId,
+    ownerUserId,
     channelId,
     entityId,
     operationType,
@@ -5859,6 +6028,15 @@ class $OutboxOperationsTable extends OutboxOperations
       );
     } else if (isInserting) {
       context.missing(_operationIdMeta);
+    }
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
     }
     if (data.containsKey('channel_id')) {
       context.handle(
@@ -5986,6 +6164,10 @@ class $OutboxOperationsTable extends OutboxOperations
             DriftSqlType.string,
             data['${effectivePrefix}operation_id'],
           )!,
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      ),
       channelId:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
@@ -6057,6 +6239,7 @@ class $OutboxOperationsTable extends OutboxOperations
 class OutboxOperationRow extends DataClass
     implements Insertable<OutboxOperationRow> {
   final String operationId;
+  final String? ownerUserId;
   final String channelId;
   final String? entityId;
   final String operationType;
@@ -6072,6 +6255,7 @@ class OutboxOperationRow extends DataClass
   final DateTime updatedAt;
   const OutboxOperationRow({
     required this.operationId,
+    this.ownerUserId,
     required this.channelId,
     this.entityId,
     required this.operationType,
@@ -6090,6 +6274,9 @@ class OutboxOperationRow extends DataClass
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['operation_id'] = Variable<String>(operationId);
+    if (!nullToAbsent || ownerUserId != null) {
+      map['owner_user_id'] = Variable<String>(ownerUserId);
+    }
     map['channel_id'] = Variable<String>(channelId);
     if (!nullToAbsent || entityId != null) {
       map['entity_id'] = Variable<String>(entityId);
@@ -6121,6 +6308,10 @@ class OutboxOperationRow extends DataClass
   OutboxOperationsCompanion toCompanion(bool nullToAbsent) {
     return OutboxOperationsCompanion(
       operationId: Value(operationId),
+      ownerUserId:
+          ownerUserId == null && nullToAbsent
+              ? const Value.absent()
+              : Value(ownerUserId),
       channelId: Value(channelId),
       entityId:
           entityId == null && nullToAbsent
@@ -6162,6 +6353,7 @@ class OutboxOperationRow extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return OutboxOperationRow(
       operationId: serializer.fromJson<String>(json['operationId']),
+      ownerUserId: serializer.fromJson<String?>(json['ownerUserId']),
       channelId: serializer.fromJson<String>(json['channelId']),
       entityId: serializer.fromJson<String?>(json['entityId']),
       operationType: serializer.fromJson<String>(json['operationType']),
@@ -6184,6 +6376,7 @@ class OutboxOperationRow extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'operationId': serializer.toJson<String>(operationId),
+      'ownerUserId': serializer.toJson<String?>(ownerUserId),
       'channelId': serializer.toJson<String>(channelId),
       'entityId': serializer.toJson<String?>(entityId),
       'operationType': serializer.toJson<String>(operationType),
@@ -6202,6 +6395,7 @@ class OutboxOperationRow extends DataClass
 
   OutboxOperationRow copyWith({
     String? operationId,
+    Value<String?> ownerUserId = const Value.absent(),
     String? channelId,
     Value<String?> entityId = const Value.absent(),
     String? operationType,
@@ -6217,6 +6411,7 @@ class OutboxOperationRow extends DataClass
     DateTime? updatedAt,
   }) => OutboxOperationRow(
     operationId: operationId ?? this.operationId,
+    ownerUserId: ownerUserId.present ? ownerUserId.value : this.ownerUserId,
     channelId: channelId ?? this.channelId,
     entityId: entityId.present ? entityId.value : this.entityId,
     operationType: operationType ?? this.operationType,
@@ -6243,6 +6438,8 @@ class OutboxOperationRow extends DataClass
     return OutboxOperationRow(
       operationId:
           data.operationId.present ? data.operationId.value : this.operationId,
+      ownerUserId:
+          data.ownerUserId.present ? data.ownerUserId.value : this.ownerUserId,
       channelId: data.channelId.present ? data.channelId.value : this.channelId,
       entityId: data.entityId.present ? data.entityId.value : this.entityId,
       operationType:
@@ -6283,6 +6480,7 @@ class OutboxOperationRow extends DataClass
   String toString() {
     return (StringBuffer('OutboxOperationRow(')
           ..write('operationId: $operationId, ')
+          ..write('ownerUserId: $ownerUserId, ')
           ..write('channelId: $channelId, ')
           ..write('entityId: $entityId, ')
           ..write('operationType: $operationType, ')
@@ -6303,6 +6501,7 @@ class OutboxOperationRow extends DataClass
   @override
   int get hashCode => Object.hash(
     operationId,
+    ownerUserId,
     channelId,
     entityId,
     operationType,
@@ -6322,6 +6521,7 @@ class OutboxOperationRow extends DataClass
       identical(this, other) ||
       (other is OutboxOperationRow &&
           other.operationId == this.operationId &&
+          other.ownerUserId == this.ownerUserId &&
           other.channelId == this.channelId &&
           other.entityId == this.entityId &&
           other.operationType == this.operationType &&
@@ -6339,6 +6539,7 @@ class OutboxOperationRow extends DataClass
 
 class OutboxOperationsCompanion extends UpdateCompanion<OutboxOperationRow> {
   final Value<String> operationId;
+  final Value<String?> ownerUserId;
   final Value<String> channelId;
   final Value<String?> entityId;
   final Value<String> operationType;
@@ -6355,6 +6556,7 @@ class OutboxOperationsCompanion extends UpdateCompanion<OutboxOperationRow> {
   final Value<int> rowid;
   const OutboxOperationsCompanion({
     this.operationId = const Value.absent(),
+    this.ownerUserId = const Value.absent(),
     this.channelId = const Value.absent(),
     this.entityId = const Value.absent(),
     this.operationType = const Value.absent(),
@@ -6372,6 +6574,7 @@ class OutboxOperationsCompanion extends UpdateCompanion<OutboxOperationRow> {
   });
   OutboxOperationsCompanion.insert({
     required String operationId,
+    this.ownerUserId = const Value.absent(),
     required String channelId,
     this.entityId = const Value.absent(),
     required String operationType,
@@ -6394,6 +6597,7 @@ class OutboxOperationsCompanion extends UpdateCompanion<OutboxOperationRow> {
        updatedAt = Value(updatedAt);
   static Insertable<OutboxOperationRow> custom({
     Expression<String>? operationId,
+    Expression<String>? ownerUserId,
     Expression<String>? channelId,
     Expression<String>? entityId,
     Expression<String>? operationType,
@@ -6411,6 +6615,7 @@ class OutboxOperationsCompanion extends UpdateCompanion<OutboxOperationRow> {
   }) {
     return RawValuesInsertable({
       if (operationId != null) 'operation_id': operationId,
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
       if (channelId != null) 'channel_id': channelId,
       if (entityId != null) 'entity_id': entityId,
       if (operationType != null) 'operation_type': operationType,
@@ -6431,6 +6636,7 @@ class OutboxOperationsCompanion extends UpdateCompanion<OutboxOperationRow> {
 
   OutboxOperationsCompanion copyWith({
     Value<String>? operationId,
+    Value<String?>? ownerUserId,
     Value<String>? channelId,
     Value<String?>? entityId,
     Value<String>? operationType,
@@ -6448,6 +6654,7 @@ class OutboxOperationsCompanion extends UpdateCompanion<OutboxOperationRow> {
   }) {
     return OutboxOperationsCompanion(
       operationId: operationId ?? this.operationId,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
       channelId: channelId ?? this.channelId,
       entityId: entityId ?? this.entityId,
       operationType: operationType ?? this.operationType,
@@ -6470,6 +6677,9 @@ class OutboxOperationsCompanion extends UpdateCompanion<OutboxOperationRow> {
     final map = <String, Expression>{};
     if (operationId.present) {
       map['operation_id'] = Variable<String>(operationId.value);
+    }
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
     }
     if (channelId.present) {
       map['channel_id'] = Variable<String>(channelId.value);
@@ -6522,6 +6732,7 @@ class OutboxOperationsCompanion extends UpdateCompanion<OutboxOperationRow> {
   String toString() {
     return (StringBuffer('OutboxOperationsCompanion(')
           ..write('operationId: $operationId, ')
+          ..write('ownerUserId: $ownerUserId, ')
           ..write('channelId: $channelId, ')
           ..write('entityId: $entityId, ')
           ..write('operationType: $operationType, ')
@@ -10375,6 +10586,9 @@ typedef $$LocalChannelMembersTableCreateCompanionBuilder =
       Value<String> status,
       Value<DateTime?> joinedAt,
       Value<DateTime?> leftAt,
+      Value<String?> displayName,
+      Value<String?> username,
+      Value<String?> avatarUrl,
       Value<int?> lastDeliveredMessageSeq,
       Value<DateTime?> lastDeliveredAt,
       Value<int?> lastReadMessageSeq,
@@ -10393,6 +10607,9 @@ typedef $$LocalChannelMembersTableUpdateCompanionBuilder =
       Value<String> status,
       Value<DateTime?> joinedAt,
       Value<DateTime?> leftAt,
+      Value<String?> displayName,
+      Value<String?> username,
+      Value<String?> avatarUrl,
       Value<int?> lastDeliveredMessageSeq,
       Value<DateTime?> lastDeliveredAt,
       Value<int?> lastReadMessageSeq,
@@ -10440,6 +10657,21 @@ class $$LocalChannelMembersTableFilterComposer
 
   ColumnFilters<DateTime> get leftAt => $composableBuilder(
     column: $table.leftAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10523,6 +10755,21 @@ class $$LocalChannelMembersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get lastDeliveredMessageSeq => $composableBuilder(
     column: $table.lastDeliveredMessageSeq,
     builder: (column) => ColumnOrderings(column),
@@ -10590,6 +10837,17 @@ class $$LocalChannelMembersTableAnnotationComposer
 
   GeneratedColumn<DateTime> get leftAt =>
       $composableBuilder(column: $table.leftAt, builder: (column) => column);
+
+  GeneratedColumn<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get username =>
+      $composableBuilder(column: $table.username, builder: (column) => column);
+
+  GeneratedColumn<String> get avatarUrl =>
+      $composableBuilder(column: $table.avatarUrl, builder: (column) => column);
 
   GeneratedColumn<int> get lastDeliveredMessageSeq => $composableBuilder(
     column: $table.lastDeliveredMessageSeq,
@@ -10682,6 +10940,9 @@ class $$LocalChannelMembersTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<DateTime?> joinedAt = const Value.absent(),
                 Value<DateTime?> leftAt = const Value.absent(),
+                Value<String?> displayName = const Value.absent(),
+                Value<String?> username = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
                 Value<int?> lastDeliveredMessageSeq = const Value.absent(),
                 Value<DateTime?> lastDeliveredAt = const Value.absent(),
                 Value<int?> lastReadMessageSeq = const Value.absent(),
@@ -10698,6 +10959,9 @@ class $$LocalChannelMembersTableTableManager
                 status: status,
                 joinedAt: joinedAt,
                 leftAt: leftAt,
+                displayName: displayName,
+                username: username,
+                avatarUrl: avatarUrl,
                 lastDeliveredMessageSeq: lastDeliveredMessageSeq,
                 lastDeliveredAt: lastDeliveredAt,
                 lastReadMessageSeq: lastReadMessageSeq,
@@ -10716,6 +10980,9 @@ class $$LocalChannelMembersTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<DateTime?> joinedAt = const Value.absent(),
                 Value<DateTime?> leftAt = const Value.absent(),
+                Value<String?> displayName = const Value.absent(),
+                Value<String?> username = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
                 Value<int?> lastDeliveredMessageSeq = const Value.absent(),
                 Value<DateTime?> lastDeliveredAt = const Value.absent(),
                 Value<int?> lastReadMessageSeq = const Value.absent(),
@@ -10732,6 +10999,9 @@ class $$LocalChannelMembersTableTableManager
                 status: status,
                 joinedAt: joinedAt,
                 leftAt: leftAt,
+                displayName: displayName,
+                username: username,
+                avatarUrl: avatarUrl,
                 lastDeliveredMessageSeq: lastDeliveredMessageSeq,
                 lastDeliveredAt: lastDeliveredAt,
                 lastReadMessageSeq: lastReadMessageSeq,
@@ -12183,6 +12453,7 @@ typedef $$LocalMemberRestrictionsTableProcessedTableManager =
 typedef $$OutboxOperationsTableCreateCompanionBuilder =
     OutboxOperationsCompanion Function({
       required String operationId,
+      Value<String?> ownerUserId,
       required String channelId,
       Value<String?> entityId,
       required String operationType,
@@ -12201,6 +12472,7 @@ typedef $$OutboxOperationsTableCreateCompanionBuilder =
 typedef $$OutboxOperationsTableUpdateCompanionBuilder =
     OutboxOperationsCompanion Function({
       Value<String> operationId,
+      Value<String?> ownerUserId,
       Value<String> channelId,
       Value<String?> entityId,
       Value<String> operationType,
@@ -12228,6 +12500,11 @@ class $$OutboxOperationsTableFilterComposer
   });
   ColumnFilters<String> get operationId => $composableBuilder(
     column: $table.operationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12311,6 +12588,11 @@ class $$OutboxOperationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get channelId => $composableBuilder(
     column: $table.channelId,
     builder: (column) => ColumnOrderings(column),
@@ -12388,6 +12670,11 @@ class $$OutboxOperationsTableAnnotationComposer
   });
   GeneratedColumn<String> get operationId => $composableBuilder(
     column: $table.operationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
     builder: (column) => column,
   );
 
@@ -12492,6 +12779,7 @@ class $$OutboxOperationsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> operationId = const Value.absent(),
+                Value<String?> ownerUserId = const Value.absent(),
                 Value<String> channelId = const Value.absent(),
                 Value<String?> entityId = const Value.absent(),
                 Value<String> operationType = const Value.absent(),
@@ -12508,6 +12796,7 @@ class $$OutboxOperationsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => OutboxOperationsCompanion(
                 operationId: operationId,
+                ownerUserId: ownerUserId,
                 channelId: channelId,
                 entityId: entityId,
                 operationType: operationType,
@@ -12526,6 +12815,7 @@ class $$OutboxOperationsTableTableManager
           createCompanionCallback:
               ({
                 required String operationId,
+                Value<String?> ownerUserId = const Value.absent(),
                 required String channelId,
                 Value<String?> entityId = const Value.absent(),
                 required String operationType,
@@ -12542,6 +12832,7 @@ class $$OutboxOperationsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => OutboxOperationsCompanion.insert(
                 operationId: operationId,
+                ownerUserId: ownerUserId,
                 channelId: channelId,
                 entityId: entityId,
                 operationType: operationType,

@@ -8,255 +8,400 @@ import '../../../../core/realtime/ably_service.dart';
 import '../datasources/chat_local_data_source.dart';
 import '../models/chat_message_dto.dart';
 
-/// Ingests real-time events from Ably into the local Drift database per Spec §5 & §8.
+/// Converts Ably events into the local Drift projection.
+///
+/// Lifecycle invariants:
+/// 1. One message subscription per chat channel.
+/// 2. The first attachment is explicitly configured with all channel modes
+///    allowed by the token BEFORE subscribe() can implicitly attach it.
+/// 3. A pending DM request may be attached in a Presence-capable mode without
+///    actually entering Presence.
+/// 4. Accepting that request only enters Presence; it does not rebuild the
+///    message subscription.
+/// 5. Close waits for an in-flight first attach before detaching, preventing a
+///    stale async detach from tearing down a newer subscription.
 class RealtimeIngestor {
   RealtimeIngestor(this._ablyService, this._local);
 
   final AblyService _ablyService;
   final ChatLocalDataSource _local;
 
-  final Map<String, StreamSubscription<ably.Message>> _channelSubscriptions =
-      {};
+  final Map<String, ably.RealtimeChannel> _channelsById = {};
+  final Map<String, StreamSubscription<ably.Message>> _channelSubscriptions = {};
+  final Map<String, Future<void>> _channelSubscribeFlights = {};
+  final Set<String> _desiredChannels = {};
+
   final Map<String, StreamSubscription<ably.PresenceMessage>>
       _presenceSubscriptions = {};
+  final Map<String, Future<void>> _presenceEnableFlights = {};
+  final Set<String> _presenceEnabledChannels = {};
   final Map<String, StreamController<Set<String>>> _presenceControllers = {};
   final Map<String, Set<String>> _onlineUsersByChannel = {};
-  final Map<String, StreamController<bool>> _typingControllers = {};
-  final Map<String, Timer> _typingTimers = {};
-  StreamSubscription<ably.Message>? _userInboxSubscription;
 
+  // Typing is per-user, not a channel boolean. This prevents one person
+  // stopping from incorrectly clearing another person's typing indicator.
+  final Map<String, StreamController<Set<String>>> _typingControllers = {};
+  final Map<String, Set<String>> _typingUsersByChannel = {};
+  final Map<String, Map<String, Timer>> _typingTimers = {};
+
+  StreamSubscription<ably.Message>? _userInboxSubscription;
   String? _subscribedUserId;
+
   VoidCallback? onInboxUpdated;
   void Function(String channelId, int throughSeq)? onMessageDelivered;
   void Function(String channelId)? onTargetedCatchUpRequested;
 
-  /// Subscribes to the user's private inbox channel `user:<userId>:chat`.
   void subscribeToUserInbox(String userId, {VoidCallback? onUpdated}) {
     if (_subscribedUserId == userId && _userInboxSubscription != null) return;
     if (_subscribedUserId != null && _subscribedUserId != userId) {
       unsubscribeFromUserInbox();
     }
+
     _subscribedUserId = userId;
     if (onUpdated != null) onInboxUpdated = onUpdated;
 
     try {
-      final channelName = 'user:$userId:chat';
-      final channel = _ablyService.getChannel(channelName);
+      final channel = _ablyService.getChannel('user:$userId:chat');
       _userInboxSubscription = channel.subscribe().listen(
-        (ably.Message msg) async {
-          debugPrint('[RealtimeIngestor] Received inbox event: ${msg.name}');
+        (event) async {
           try {
-            final data = _parseData(msg.data);
-            final eventName = msg.name ?? data['type'] as String?;
+            final data = _parseData(event.data);
+            final eventName = event.name ?? data['type'] as String?;
             if (eventName == 'channel.updated') {
-              final innerData = data['data'] as Map<String, dynamic>? ?? data;
-              final channelId = (data['channel_id'] ?? innerData['channel_id']) as String?;
-              final seq = (innerData['last_message_seq'] ?? data['last_message_seq']) as int?;
-              final dateStr = (innerData['created_at'] ?? data['created_at']) as String?;
-              final senderId = (innerData['sender_id']) as String?;
-              final senderName = (innerData['sender_display_name']) as String?;
-              final preview = (innerData['body_preview'] ?? innerData['body']) as String?;
-              final unreadCount = (innerData['unread_count']) as int?;
-              final countsAsUnread = (innerData['counts_as_unread']) as bool?;
-
+              final inner = data['data'] is Map
+                  ? _deepCastMap(data['data'] as Map)
+                  : data;
+              final channelId =
+                  (data['channel_id'] ?? inner['channel_id']) as String?;
+              final seq = (inner['last_message_seq'] ?? data['last_message_seq'])
+                  as int?;
               if (channelId != null && seq != null) {
-                final createdAt = dateStr != null
-                    ? DateTime.tryParse(dateStr) ?? DateTime.now().toUtc()
-                    : DateTime.now().toUtc();
+                final date =
+                    (inner['created_at'] ?? data['created_at']) as String?;
                 final updated = await _local.updateChannelSummaryFromRealtime(
                   channelId: channelId,
                   lastMessageSeq: seq,
-                  lastMessageAt: createdAt,
-                  bodyPreview: preview,
-                  senderId: senderId,
-                  senderDisplayName: senderName,
+                  lastMessageAt: date == null
+                      ? DateTime.now().toUtc()
+                      : DateTime.tryParse(date) ?? DateTime.now().toUtc(),
+                  bodyPreview:
+                      (inner['body_preview'] ?? inner['body']) as String?,
+                  senderId: inner['sender_id'] as String?,
+                  senderDisplayName: inner['sender_display_name'] as String?,
                   currentUserId: userId,
-                  unreadCount: unreadCount,
-                  countsAsUnread: countsAsUnread,
+                  unreadCount: (inner['unread_count'] as num?)?.toInt(),
+                  countsAsUnread: inner['counts_as_unread'] as bool?,
                 );
-
-                // Targeted catch-up for missing deltas (Spec §10, §11)
-                if (updated) {
-                  onTargetedCatchUpRequested?.call(channelId);
-                }
+                if (updated) onTargetedCatchUpRequested?.call(channelId);
               }
             }
-          } catch (e) {
-            debugPrint('[RealtimeIngestor] Error processing user inbox event: $e');
+          } catch (e, st) {
+            debugPrint('[RealtimeIngestor] inbox event failed: $e\n$st');
           }
           onInboxUpdated?.call();
         },
-        onError: (Object e) {
-          debugPrint('[RealtimeIngestor] Error on inbox stream: $e');
-        },
+        onError: (Object e) =>
+            debugPrint('[RealtimeIngestor] inbox stream error: $e'),
       );
     } catch (e) {
-      debugPrint('[RealtimeIngestor] Failed to subscribe to user inbox: $e');
+      debugPrint('[RealtimeIngestor] inbox subscribe failed: $e');
     }
   }
 
-  /// Unsubscribes from the user inbox channel and releases Ably channel resource.
   void unsubscribeFromUserInbox() {
     _userInboxSubscription?.cancel();
     _userInboxSubscription = null;
-    if (_subscribedUserId != null) {
-      _ablyService.releaseChannel('user:$_subscribedUserId:chat');
-      _subscribedUserId = null;
+    final userId = _subscribedUserId;
+    _subscribedUserId = null;
+    if (userId != null) {
+      unawaited(_ablyService.releaseChannel('user:$userId:chat'));
     }
   }
 
-  /// Subscribes to a channel's hot message stream and presence set `chat:<channelId>`.
-  void subscribeToChannel(String channelId, String currentUserId) {
-    if (_channelSubscriptions.containsKey(channelId)) return;
+  /// Creates exactly one message subscription for a chat channel.
+  ///
+  /// [enterPresence] controls whether this client becomes visible in Presence;
+  /// it does NOT control the channel attachment modes. Even a request preview
+  /// is attached as Presence-capable so a later Accept can enter Presence
+  /// without a detach/re-attach cycle.
+  Future<void> subscribeToChannel(
+    String channelId,
+    String currentUserId, {
+    bool enterPresence = true,
+  }) async {
+    _desiredChannels.add(channelId);
+
+    if (_channelSubscriptions.containsKey(channelId)) {
+      if (enterPresence) await enablePresence(channelId);
+      return;
+    }
+
+    final existingFlight = _channelSubscribeFlights[channelId];
+    if (existingFlight != null) {
+      await existingFlight;
+      if (enterPresence && _desiredChannels.contains(channelId)) {
+        await enablePresence(channelId);
+      }
+      return;
+    }
+
+    final flight = _subscribeToChannelInternal(channelId, currentUserId);
+    _channelSubscribeFlights[channelId] = flight;
 
     try {
-      final channelName = 'chat:$channelId';
-      final channel = _ablyService.getChannel(channelName);
-
-      final sub = channel.subscribe().listen(
-        (ably.Message msg) async {
-          await _handleChannelMessage(channelId, currentUserId, msg);
-        },
-        onError: (Object e) {
-          debugPrint(
-            '[RealtimeIngestor] Error on channel $channelId stream: $e',
-          );
-        },
-      );
-
-      _channelSubscriptions[channelId] = sub;
-
-      // ─── Presence Management ───
-      final presenceController = _presenceControllers.putIfAbsent(
-        channelId,
-        () => StreamController<Set<String>>.broadcast(),
-      );
-      final onlineSet =
-          _onlineUsersByChannel.putIfAbsent(channelId, () => <String>{});
-
-      // Announce entering presence and load initial active members
-      unawaited(() async {
-        try {
-          await channel.presence.enter({'status': 'online'});
-          final members = await channel.presence.get();
-          for (final m in members) {
-            if (m.clientId != null && m.clientId!.isNotEmpty) {
-              onlineSet.add(m.clientId!);
-            }
-          }
-          if (!presenceController.isClosed) {
-            presenceController.add(Set<String>.from(onlineSet));
-          }
-        } catch (e) {
-          debugPrint(
-            '[RealtimeIngestor] Error entering/getting presence for $channelId: $e',
-          );
-        }
-      }());
-
-      // Listen for presence member transitions (enter, leave, present, update)
-      final presenceSub = channel.presence.subscribe().listen(
-        (ably.PresenceMessage msg) {
-          final clientId = msg.clientId;
-          if (clientId == null || clientId.isEmpty) return;
-
-          switch (msg.action) {
-            case ably.PresenceAction.enter:
-            case ably.PresenceAction.present:
-            case ably.PresenceAction.update:
-              onlineSet.add(clientId);
-              break;
-            case ably.PresenceAction.leave:
-              onlineSet.remove(clientId);
-              break;
-            default:
-              break;
-          }
-
-          if (!presenceController.isClosed) {
-            presenceController.add(Set<String>.from(onlineSet));
-          }
-        },
-        onError: (Object e) {
-          debugPrint(
-            '[RealtimeIngestor] Error on presence stream for $channelId: $e',
-          );
-        },
-      );
-      _presenceSubscriptions[channelId] = presenceSub;
-    } catch (e) {
-      debugPrint(
-        '[RealtimeIngestor] Failed to subscribe to channel $channelId: $e',
-      );
+      await flight;
+      if (enterPresence && _desiredChannels.contains(channelId)) {
+        await enablePresence(channelId);
+      }
+    } finally {
+      if (identical(_channelSubscribeFlights[channelId], flight)) {
+        _channelSubscribeFlights.remove(channelId);
+      }
     }
   }
 
-  /// Unsubscribes from a channel when the user navigates away.
-  void unsubscribeFromChannel(String channelId) {
-    final sub = _channelSubscriptions.remove(channelId);
-    sub?.cancel();
+  Future<void> _subscribeToChannelInternal(
+    String channelId,
+    String currentUserId,
+  ) async {
+    final channelName = 'chat:$channelId';
 
-    final presenceSub = _presenceSubscriptions.remove(channelId);
-    presenceSub?.cancel();
+    try {
+      final channel = _ablyService.getChannel(channelName);
+      _channelsById[channelId] = channel;
 
-    unawaited(() async {
-      try {
-        final channelName = 'chat:$channelId';
-        final channel = _ablyService.getChannel(channelName);
-        await channel.presence.leave();
-      } catch (e) {
-        debugPrint(
-          '[RealtimeIngestor] Error leaving presence for $channelId: $e',
-        );
-      } finally {
-        await _ablyService.releaseChannel('chat:$channelId');
-      }
-    }());
+      // Ably channel modes are fixed at attachment time. subscribe() can cause
+      // an implicit attach, so configure modes FIRST. ChannelMode.values is
+      // intentionally used instead of hard-coding enum members: Ably assigns
+      // the intersection between requested modes and the token capabilities.
+      // Your ably-auth token already limits chat:<id> to subscribe/publish/
+      // presence, so this cannot grant capabilities the token does not have.
+      await channel.setOptions(
+        ably.RealtimeChannelOptions(
+          modes: ably.ChannelMode.values,
+        ),
+      );
 
-    _onlineUsersByChannel.remove(channelId);
-    _presenceControllers[channelId]?.close();
-    _presenceControllers.remove(channelId);
+      if (!_desiredChannels.contains(channelId)) return;
 
-    _typingTimers[channelId]?.cancel();
-    _typingTimers.remove(channelId);
-    _typingControllers[channelId]?.close();
-    _typingControllers.remove(channelId);
+      _channelSubscriptions[channelId] = channel.subscribe().listen(
+        (event) => _handleChannelMessage(channelId, currentUserId, event),
+        onError: (Object e) => debugPrint(
+          '[RealtimeIngestor] channel $channelId error: $e',
+        ),
+      );
+    } catch (e, st) {
+      debugPrint(
+        '[RealtimeIngestor] subscribe $channelId failed: $e\n$st',
+      );
+      rethrow;
+    }
   }
 
-  /// Returns a stream of present (online) client IDs for [channelId].
+  /// Enters and subscribes to Presence on an already-open chat channel.
+  ///
+  /// This is safe after a request is accepted because subscribeToChannel()
+  /// configured the original Ably attachment with Presence mode before the
+  /// first message subscription.
+  Future<void> enablePresence(String channelId) async {
+    if (_presenceEnabledChannels.contains(channelId)) return;
+    if (!_desiredChannels.contains(channelId)) return;
+    if (!_channelSubscriptions.containsKey(channelId)) return;
+
+    final existingFlight = _presenceEnableFlights[channelId];
+    if (existingFlight != null) {
+      await existingFlight;
+      return;
+    }
+
+    final channel = _channelsById[channelId];
+    if (channel == null) return;
+
+    final flight = _enablePresenceInternal(channelId, channel);
+    _presenceEnableFlights[channelId] = flight;
+
+    try {
+      await flight;
+    } finally {
+      if (identical(_presenceEnableFlights[channelId], flight)) {
+        _presenceEnableFlights.remove(channelId);
+      }
+    }
+  }
+
+  Future<void> _enablePresenceInternal(
+    String channelId,
+    ably.RealtimeChannel channel,
+  ) async {
+    final controller = _presenceControllers.putIfAbsent(
+      channelId,
+      () => StreamController<Set<String>>.broadcast(),
+    );
+    final online = _onlineUsersByChannel.putIfAbsent(
+      channelId,
+      () => <String>{},
+    );
+
+    // Subscribe to presence events only once. The attachment is already
+    // Presence-capable, so this does not need to rebuild the message stream.
+    _presenceSubscriptions[channelId] ??=
+        channel.presence.subscribe().listen(
+      (event) {
+        final id = event.clientId;
+        if (id == null || id.isEmpty) return;
+
+        switch (event.action) {
+          case ably.PresenceAction.enter:
+          case ably.PresenceAction.present:
+          case ably.PresenceAction.update:
+            online.add(id);
+            break;
+          case ably.PresenceAction.leave:
+            online.remove(id);
+            break;
+          default:
+            break;
+        }
+
+        if (!controller.isClosed) {
+          controller.add(Set<String>.from(online));
+        }
+      },
+      onError: (Object e) =>
+          debugPrint('[RealtimeIngestor] presence stream failed: $e'),
+    );
+
+    try {
+      await channel.presence.enter({'status': 'online'});
+
+      // The screen may have closed while enter() was awaiting the network.
+      if (!_desiredChannels.contains(channelId)) {
+        try {
+          await channel.presence.leave();
+        } catch (_) {}
+        return;
+      }
+
+      final members = await channel.presence.get();
+      online.clear();
+      for (final member in members) {
+        final id = member.clientId;
+        if (id != null && id.isNotEmpty) online.add(id);
+      }
+
+      _presenceEnabledChannels.add(channelId);
+
+      if (!controller.isClosed) {
+        controller.add(Set<String>.from(online));
+      }
+    } catch (e) {
+      _presenceEnabledChannels.remove(channelId);
+      debugPrint('[RealtimeIngestor] presence enter failed: $e');
+    }
+  }
+
+  /// Tears down a channel exactly once.
+  ///
+  /// If first attachment is still in flight, wait for it before cancelling and
+  /// detaching. This removes the old race where an async release from a stale
+  /// provider build could detach a newly-created subscription.
+  Future<void> unsubscribeFromChannel(String channelId) async {
+    _desiredChannels.remove(channelId);
+
+    final subscribeFlight = _channelSubscribeFlights[channelId];
+    if (subscribeFlight != null) {
+      try {
+        await subscribeFlight;
+      } catch (_) {
+        // Cleanup still needs to continue after a failed attach.
+      }
+    }
+
+    final presenceFlight = _presenceEnableFlights[channelId];
+    if (presenceFlight != null) {
+      try {
+        await presenceFlight;
+      } catch (_) {}
+    }
+
+    await _channelSubscriptions.remove(channelId)?.cancel();
+    await _presenceSubscriptions.remove(channelId)?.cancel();
+
+    final channel = _channelsById.remove(channelId);
+    final hadPresence = _presenceEnabledChannels.remove(channelId);
+
+    if (hadPresence && channel != null) {
+      try {
+        await channel.presence.leave();
+      } catch (e) {
+        // Leaving a channel that disconnected between the state check and the
+        // network call is non-fatal. Detach below is still the final cleanup.
+        debugPrint('[RealtimeIngestor] leave presence skipped/failed: $e');
+      }
+    }
+
+    _onlineUsersByChannel.remove(channelId);
+    final presenceController = _presenceControllers.remove(channelId);
+    if (presenceController != null && !presenceController.isClosed) {
+      await presenceController.close();
+    }
+
+    final timers = _typingTimers.remove(channelId);
+    for (final timer in timers?.values ?? const <Timer>[]) {
+      timer.cancel();
+    }
+    _typingUsersByChannel.remove(channelId);
+    final typingController = _typingControllers.remove(channelId);
+    if (typingController != null && !typingController.isClosed) {
+      await typingController.close();
+    }
+
+    // releaseChannel owns the actual Ably detach and active-channel bookkeeping.
+    await _ablyService.releaseChannel('chat:$channelId');
+  }
+
   Stream<Set<String>> watchPresence(String channelId) {
     final controller = _presenceControllers.putIfAbsent(
       channelId,
       () => StreamController<Set<String>>.broadcast(),
     );
-    final current = _onlineUsersByChannel[channelId];
-    if (current != null && current.isNotEmpty) {
-      scheduleMicrotask(() {
-        if (!controller.isClosed) {
-          controller.add(Set<String>.from(current));
-        }
-      });
-    }
+    scheduleMicrotask(() {
+      if (!controller.isClosed) {
+        controller.add(
+          Set<String>.from(_onlineUsersByChannel[channelId] ?? const {}),
+        );
+      }
+    });
     return controller.stream;
   }
 
-  /// Returns a stream of typing indicator booleans for [channelId].
-  Stream<bool> watchTyping(String channelId) {
-    return _typingControllers
-        .putIfAbsent(channelId, () => StreamController<bool>.broadcast())
-        .stream;
+  Stream<Set<String>> watchTypingUsers(String channelId) {
+    final controller = _typingControllers.putIfAbsent(
+      channelId,
+      () => StreamController<Set<String>>.broadcast(),
+    );
+    scheduleMicrotask(() {
+      if (!controller.isClosed) {
+        controller.add(
+          Set<String>.from(_typingUsersByChannel[channelId] ?? const {}),
+        );
+      }
+    });
+    return controller.stream;
   }
 
-
-  /// Publishes typing status for [currentUserId] on channel `chat:<channelId>`.
   Future<void> publishTyping(
     String channelId,
     String currentUserId,
     bool isTyping,
   ) async {
+    // Typing is only meaningful for an already-open thread. Do not create a
+    // new Ably channel merely because a delayed composer timer fired after the
+    // screen closed.
+    final channel = _channelsById[channelId];
+    if (channel == null || !_desiredChannels.contains(channelId)) return;
+
     try {
-      final channelName = 'chat:$channelId';
-      final channel = _ablyService.getChannel(channelName);
       await channel.publish(
         name: 'typing',
         data: jsonEncode({
@@ -266,73 +411,70 @@ class RealtimeIngestor {
         }),
       );
     } catch (e) {
-      debugPrint('[RealtimeIngestor] Error publishing typing: $e');
+      debugPrint('[RealtimeIngestor] typing publish failed: $e');
     }
   }
 
   Future<void> _handleChannelMessage(
     String channelId,
     String currentUserId,
-    ably.Message msg,
+    ably.Message event,
   ) async {
     try {
-      debugPrint('[RealtimeIngestor] Received message: $msg');
-      final data = _parseData(msg.data);
-      final eventName =
-          msg.name ?? data['event_type'] as String? ?? data['type'] as String?;
+      final data = _parseData(event.data);
+      final eventName = event.name ??
+          data['event_type'] as String? ??
+          data['type'] as String?;
 
       switch (eventName) {
         case 'message.created':
-          final msgData = _extractMessagePayload(data);
-          final dto = ChatMessageDto.fromJson(msgData);
-          final existingCreated = await _local.getMessage(dto.messageId);
-          if (existingCreated != null && existingCreated.version >= dto.version) {
-            // Stale or duplicate created event (e.g. already edited or deleted locally)
+          final dto = ChatMessageDto.fromJson(_extractMessagePayload(data));
+          final existing = await _local.getMessage(dto.messageId);
+          if (existing != null && existing.version >= dto.version) break;
+
+          if (dto.senderId == currentUserId && existing != null) {
+            await _local.updateMessageSyncStatus(
+              dto.messageId,
+              syncStatus: 'sent',
+              messageSeq: dto.messageSeq,
+              version: dto.version,
+            );
             break;
           }
-          if (dto.senderId == currentUserId) {
-            if (existingCreated != null) {
-              await _local.updateMessageSyncStatus(
-                dto.messageId,
-                syncStatus: 'sent',
-                messageSeq: dto.messageSeq,
-                version: dto.version,
-              );
-              break;
-            }
-          }
+
           await _local.upsertMessagesFromDto([dto], currentUserId);
           if (dto.senderId != currentUserId && dto.messageSeq != null) {
-            await _local.updateMemberHorizons(
-              channelId,
-              currentUserId,
-              deliveredSeq: dto.messageSeq,
-            );
-            onMessageDelivered?.call(channelId, dto.messageSeq!);
+            // Pending DM request recipients may preview the request message,
+            // but that preview is not an accepted-chat delivered receipt.
+            if (await _local.isActiveMembership(channelId, currentUserId)) {
+              await _local.updateMemberHorizons(
+                channelId,
+                currentUserId,
+                deliveredSeq: dto.messageSeq,
+              );
+              onMessageDelivered?.call(channelId, dto.messageSeq!);
+            }
           }
           break;
 
         case 'message.edited':
-          final msgData = _extractMessagePayload(data);
-          final dto = ChatMessageDto.fromJson(msgData);
+          final dto = ChatMessageDto.fromJson(_extractMessagePayload(data));
           final existing = await _local.getMessage(dto.messageId);
-          if (existing != null && existing.version >= dto.version) {
-            // Drop stale or out-of-order edit event (Spec §30)
-            break;
-          }
+          if (existing != null && existing.version >= dto.version) break;
           await _local.upsertMessagesFromDto([dto], currentUserId);
           break;
 
         case 'message.deleted':
           final payload = _extractMessagePayload(data);
-          final messageId =
-              payload['message_id'] as String? ?? data['entity_id'] as String?;
+          final messageId = payload['message_id'] as String? ??
+              data['entity_id'] as String?;
           final version = (payload['version'] as num?)?.toInt() ??
               (data['entity_version'] as num?)?.toInt();
           if (messageId != null) {
             final existing = await _local.getMessage(messageId);
-            if (existing != null && version != null && existing.version > version) {
-              // Stale delete event
+            if (existing != null &&
+                version != null &&
+                existing.version > version) {
               break;
             }
             await _local.softDeleteMessageLocally(messageId, version: version);
@@ -342,33 +484,27 @@ class RealtimeIngestor {
         case 'horizon.read':
         case 'receipt.read':
           final payload = _extractMessagePayload(data);
-          final userId =
-              payload['user_id'] as String? ?? data['entity_id'] as String?;
-          final throughSeq =
-              (payload['through_seq'] ?? payload['through_message_seq'])
-                  as int?;
-          if (userId != null && throughSeq != null) {
-            await _local.updateMemberHorizons(
-              channelId,
-              userId,
-              readSeq: throughSeq,
-            );
+          final userId = payload['user_id'] as String? ??
+              data['entity_id'] as String?;
+          final seq = (payload['through_seq'] ??
+                  payload['through_message_seq']) as int?;
+          if (userId != null && seq != null) {
+            await _local.updateMemberHorizons(channelId, userId, readSeq: seq);
           }
           break;
 
         case 'horizon.delivered':
         case 'receipt.delivered':
           final payload = _extractMessagePayload(data);
-          final userId =
-              payload['user_id'] as String? ?? data['entity_id'] as String?;
-          final throughSeq =
-              (payload['through_seq'] ?? payload['through_message_seq'])
-                  as int?;
-          if (userId != null && throughSeq != null) {
+          final userId = payload['user_id'] as String? ??
+              data['entity_id'] as String?;
+          final seq = (payload['through_seq'] ??
+                  payload['through_message_seq']) as int?;
+          if (userId != null && seq != null) {
             await _local.updateMemberHorizons(
               channelId,
               userId,
-              deliveredSeq: throughSeq,
+              deliveredSeq: seq,
             );
           }
           break;
@@ -379,80 +515,92 @@ class RealtimeIngestor {
               data['entity_id'] as String?;
           final userId = payload['user_id'] as String?;
           final reaction = payload['reaction'] as String?;
-          final isRemoved = payload['is_removed'] as bool? ?? false;
-          final createdAtStr = payload['created_at'] as String? ??
+          final removed = payload['is_removed'] as bool? ?? false;
+          final rawTime = payload['created_at'] as String? ??
               payload['occurred_at'] as String?;
-          final createdAt = createdAtStr != null
-              ? DateTime.tryParse(createdAtStr) ?? DateTime.now().toUtc()
-              : DateTime.now().toUtc();
-
+          final time = rawTime == null
+              ? DateTime.now().toUtc()
+              : DateTime.tryParse(rawTime) ?? DateTime.now().toUtc();
           if (messageId != null && userId != null && reaction != null) {
             await _local.upsertReaction(
               messageId: messageId,
               userId: userId,
               reaction: reaction,
-              createdAt: createdAt,
-              removedAt: isRemoved ? DateTime.now().toUtc() : null,
+              createdAt: time,
+              removedAt: removed ? time : null,
             );
           }
           break;
 
         case 'typing':
-          final payload = _extractMessagePayload(data);
-          final userId = payload['user_id'] as String?;
-          final isTyping = payload['is_typing'] as bool? ?? false;
-          if (userId != null && userId != currentUserId) {
-            final controller = _typingControllers[channelId];
-            if (controller != null && !controller.isClosed) {
-              controller.add(isTyping);
-              _typingTimers[channelId]?.cancel();
-              if (isTyping) {
-                // Auto-decay after 3 seconds
-                _typingTimers[channelId] = Timer(
-                  const Duration(seconds: 3),
-                  () {
-                    if (!controller.isClosed) {
-                      controller.add(false);
-                    }
-                  },
-                );
-              }
-            }
-          }
+          _applyTypingEvent(channelId, currentUserId, data);
           break;
 
         default:
-          debugPrint('[RealtimeIngestor] Unhandled event: $eventName');
+          debugPrint('[RealtimeIngestor] unhandled event: $eventName');
       }
     } catch (e, st) {
-      debugPrint('[RealtimeIngestor] Error handling realtime message: $e\n$st');
+      debugPrint('[RealtimeIngestor] event handling failed: $e\n$st');
+    }
+  }
+
+  void _applyTypingEvent(
+    String channelId,
+    String currentUserId,
+    Map<String, dynamic> envelope,
+  ) {
+    final payload = _extractMessagePayload(envelope);
+    final userId = payload['user_id'] as String?;
+    final isTyping = payload['is_typing'] as bool? ?? false;
+    if (userId == null || userId == currentUserId) return;
+
+    final users = _typingUsersByChannel.putIfAbsent(
+      channelId,
+      () => <String>{},
+    );
+    final timers = _typingTimers.putIfAbsent(
+      channelId,
+      () => <String, Timer>{},
+    );
+    timers[userId]?.cancel();
+
+    if (isTyping) {
+      users.add(userId);
+      timers[userId] = Timer(const Duration(seconds: 3), () {
+        users.remove(userId);
+        timers.remove(userId);
+        _emitTyping(channelId);
+      });
+    } else {
+      users.remove(userId);
+      timers.remove(userId);
+    }
+    _emitTyping(channelId);
+  }
+
+  void _emitTyping(String channelId) {
+    final controller = _typingControllers[channelId];
+    if (controller != null && !controller.isClosed) {
+      controller.add(
+        Set<String>.from(_typingUsersByChannel[channelId] ?? const {}),
+      );
     }
   }
 
   Map<String, dynamic> _extractMessagePayload(Map<String, dynamic> envelope) {
-    Map<String, dynamic> payload;
-    if (envelope['data'] is Map) {
-      payload = _deepCastMap(envelope['data'] as Map);
-    } else if (envelope['message'] is Map) {
-      payload = _deepCastMap(envelope['message'] as Map);
-    } else {
-      payload = _deepCastMap(envelope);
-    }
+    final payload = envelope['data'] is Map
+        ? _deepCastMap(envelope['data'] as Map)
+        : envelope['message'] is Map
+            ? _deepCastMap(envelope['message'] as Map)
+            : _deepCastMap(envelope);
 
-    // Fallbacks from envelope metadata if omitted in payload
-    if (payload['message_id'] == null && envelope['entity_id'] != null) {
-      payload['message_id'] = envelope['entity_id'];
-    }
-    if (payload['channel_id'] == null && envelope['channel_id'] != null) {
-      payload['channel_id'] = envelope['channel_id'];
-    }
-    if (payload['created_at'] == null && envelope['occurred_at'] != null) {
-      payload['created_at'] = envelope['occurred_at'];
-    }
+    payload['message_id'] ??= envelope['entity_id'];
+    payload['channel_id'] ??= envelope['channel_id'];
+    payload['created_at'] ??= envelope['occurred_at'];
     return payload;
   }
 
-  Map<String, dynamic> _parseData(dynamic raw) {
+  Map<String, dynamic> _parseData(Object? raw) {
     if (raw is Map) return _deepCastMap(raw);
     if (raw is String) {
       try {
@@ -463,42 +611,51 @@ class RealtimeIngestor {
     return {};
   }
 
-  Map<String, dynamic> _deepCastMap(Map<dynamic, dynamic> raw) {
-    return raw.map<String, dynamic>(
-      (key, val) => MapEntry(
-        key.toString(),
-        val is Map
-            ? _deepCastMap(val)
-            : (val is List
-                ? val.map((e) => e is Map ? _deepCastMap(e) : e).toList()
-                : val),
-      ),
-    );
-  }
+  Map<String, dynamic> _deepCastMap(Map<dynamic, dynamic> raw) =>
+      raw.map<String, dynamic>(
+        (key, value) => MapEntry(
+          key.toString(),
+          value is Map
+              ? _deepCastMap(value)
+              : value is List
+                  ? value
+                      .map((e) => e is Map ? _deepCastMap(e) : e)
+                      .toList()
+                  : value,
+        ),
+      );
 
   void dispose() {
-    _userInboxSubscription?.cancel();
-    for (final sub in _channelSubscriptions.values) {
-      sub.cancel();
+    unsubscribeFromUserInbox();
+
+    // Provider disposal cannot await, so serialize async channel cleanup in the
+    // background. Each channel cleanup is internally safe against in-flight
+    // first attach / Presence-enter operations.
+    for (final channelId in <String>{
+      ..._desiredChannels,
+      ..._channelsById.keys,
+      ..._channelSubscriptions.keys,
+    }) {
+      unawaited(unsubscribeFromChannel(channelId));
     }
-    _channelSubscriptions.clear();
-    for (final sub in _presenceSubscriptions.values) {
-      sub.cancel();
+
+    // Controllers that were watched before a channel ever opened are not part
+    // of the sets above; close those leftovers here.
+    for (final entry in _presenceControllers.entries.toList()) {
+      if (!_channelsById.containsKey(entry.key) && !entry.value.isClosed) {
+        unawaited(entry.value.close());
+      }
     }
-    _presenceSubscriptions.clear();
-    for (final controller in _presenceControllers.values) {
-      controller.close();
+    for (final entry in _typingControllers.entries.toList()) {
+      if (!_channelsById.containsKey(entry.key) && !entry.value.isClosed) {
+        unawaited(entry.value.close());
+      }
     }
-    _presenceControllers.clear();
-    _onlineUsersByChannel.clear();
-    for (final timer in _typingTimers.values) {
-      timer.cancel();
+
+    for (final channelTimers in _typingTimers.values) {
+      for (final timer in channelTimers.values) {
+        timer.cancel();
+      }
     }
-    _typingTimers.clear();
-    for (final controller in _typingControllers.values) {
-      controller.close();
-    }
-    _typingControllers.clear();
   }
 }
-

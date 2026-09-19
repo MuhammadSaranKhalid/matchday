@@ -2,124 +2,104 @@ import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
-import '../../domain/entities/chat.dart';
-import '../../domain/entities/message.dart';
+import '../../domain/entities/chat_message.dart';
 import '../../domain/value_objects/message_body.dart';
 import '../providers/messages_providers.dart';
 
 part 'message_thread_controller.g.dart';
 
-/// Streams the messages in a chat and exposes the write actions.
+/// Thread controller over the universal ChatRepository.
 ///
-/// Per the controller-action-returns convention used in matches/, action
-/// methods return `Future<Either<Failure, T>>` and the widget folds the
-/// result. The state stream itself carries the message list — no submit
-/// error slot.
+/// IMPORTANT LIFECYCLE RULE:
+/// This provider intentionally does NOT watch the inbox/channel projection.
+/// The previous implementation watched [myChatChannelsProvider] to decide
+/// whether Presence should be enabled. Every local inbox mutation (read
+/// horizon, participant hydration, unread count, request status, etc.) then
+/// recomputed this provider. Riverpod disposed the old build, which called
+/// closeChannel(), so the Ably channel repeatedly detached and re-attached.
 ///
-/// Family argument is a plain `String chatId` (Riverpod serialises args for
-/// the provider key; raw strings stringify cleanly). Internally we wrap in
-/// `ChatId(...)` before crossing the repository boundary.
-///
-/// Autodispose (bare `@riverpod`), matching every other family-based
-/// controller/provider in the codebase (`liveMatch`, `team`, `roster`,
-/// `authorPosts`, etc.). When the user leaves a thread the subscription
-/// drops; on re-entry the cache emits instantly so first paint is unchanged
-/// and the realtime channel reconnects in the background.
-///
-/// Why not `keepAlive`: the previous keepAlive posture made this the only
-/// family in the codebase that retained per-key state for the session — a
-/// user who opened 40 chats would hold 40 buffered message lists + 40 live
-/// `StreamSubscription`s simultaneously. The brief realtime re-handshake on
-/// re-entry is cheap; the memory savings are not (#47).
+/// Presence policy now belongs below the UI in ChatSyncCoordinator. The thread
+/// owns one message stream for the lifetime of the route, and closing the route
+/// is the only normal reason to close the realtime channel.
 @riverpod
 class MessageThread extends _$MessageThread {
   @override
-  Stream<List<Message>> build(String chatId) {
-    final chatRepo = ref.read(chatRepositoryProvider);
+  Stream<List<ChatMessage>> build(String chatId) {
+    final repository = ref.read(chatRepositoryProvider);
+
+    // Since this provider has no reactive inbox dependency, onDispose now means
+    // what we actually want here: the thread provider itself is going away
+    // (normally because the screen/route stopped listening).
     ref.onDispose(() {
-      chatRepo.closeChannel(chatId);
+      repository.closeChannel(chatId);
     });
-    return ref.watch(messagesRepositoryProvider).watchMessages(ChatId(chatId));
+
+    return repository.watchMessages(chatId);
   }
 
-  /// Validate via the [MessageBody] value object, then send. Returns the
-  /// inserted message on success so the widget can react (clear input,
-  /// scroll to bottom). On a validation failure the repo is never called.
-  Future<Either<Failure, Message>> send(String raw, {String? replyToId}) {
+  Future<Either<Failure, ChatMessage>> send(
+    String raw, {
+    String? replyToId,
+  }) {
     return MessageBody.create(raw).fold(
-      (failure) => Future.value(Left<Failure, Message>(failure)),
-      (body) => ref.read(messagesRepositoryProvider).sendMessage(
-            ChatId(chatId),
+      (failure) => Future.value(Left(failure)),
+      (body) => ref.read(chatRepositoryProvider).sendMessage(
+            chatId,
             body,
             replyToId: replyToId,
           ),
     );
   }
 
-  /// Send an image message with optional caption and quote reply.
-  Future<Either<Failure, Message>> sendImage({
+  Future<Either<Failure, ChatMessage>> sendImage({
     required List<int> imageBytes,
     required String extension,
     String? caption,
     String? replyToId,
-  }) {
-    return ref.read(messagesRepositoryProvider).sendImageMessage(
-          ChatId(chatId),
-          imageBytes: imageBytes,
-          extension: extension,
-          caption: caption,
-          replyToId: replyToId,
-        );
+  }) =>
+      ref.read(chatRepositoryProvider).sendImageMessage(
+            chatId,
+            imageBytes: imageBytes,
+            extension: extension,
+            caption: caption,
+            replyToId: replyToId,
+          );
+
+  Future<Either<Failure, ChatMessage>> editMessage(
+    ChatMessage message,
+    String raw,
+  ) {
+    return MessageBody.create(raw).fold(
+      (failure) => Future.value(Left(failure)),
+      (body) => ref.read(chatRepositoryProvider).editMessage(
+            message.id,
+            message.version,
+            body.value,
+          ),
+    );
   }
 
-  /// Soft delete a message.
-  Future<Either<Failure, Unit>> deleteMessage(String messageId) {
-    return ref.read(messagesRepositoryProvider).deleteMessage(
-          ChatId(chatId),
-          MessageId(messageId),
-        );
-  }
+  Future<Either<Failure, Unit>> deleteMessage(String messageId) =>
+      ref.read(chatRepositoryProvider).deleteMessage(chatId, messageId);
 
-  /// Load the next page of older messages (ticket #35). Returns the number
-  /// loaded — `0` or `< 50` means we hit the end of the thread; callers
-  /// use this to stop firing the scroll trigger.
+  Future<Either<Failure, Unit>> retryMessage(String messageId) =>
+      ref.read(chatRepositoryProvider).retryMessage(messageId);
+
   Future<Either<Failure, int>> loadOlder() =>
-      ref.read(messagesRepositoryProvider).loadOlderMessages(ChatId(chatId));
+      ref.read(chatRepositoryProvider).loadOlderMessages(chatId);
 
-  /// Stamp `channel_members.last_read_message_seq`. On success, invalidate the inbox
-  /// list so its unread badges re-emit reactively.
-  Future<Either<Failure, Unit>> markRead({int? throughSeq}) async {
-    final result = await ref
-        .read(messagesRepositoryProvider)
-        .markRead(ChatId(chatId), throughMessageSeq: throughSeq);
-    if (ref.mounted && result.isRight()) {
-      ref.invalidate(myChatsProvider);
-      ref.invalidate(myChatChannelsProvider);
-    }
-    return result;
-  }
+  /// Drift is already reactive. Do not invalidate the inbox provider after a
+  /// successful receipt mutation; invalidating it was one of the triggers that
+  /// caused the old thread provider to rebuild and detach Ably.
+  Future<Either<Failure, Unit>> markRead({int? throughSeq}) =>
+      ref.read(chatRepositoryProvider).markRead(chatId, throughSeq);
 
-  /// Accept an incoming DM message request.
-  Future<Either<Failure, Unit>> acceptRequest() async {
-    final result = await ref
-        .read(messagesRepositoryProvider)
-        .acceptDmRequest(ChatId(chatId));
-    if (ref.mounted && result.isRight()) {
-      ref.invalidate(myChatsProvider);
-    }
-    return result;
-  }
+  /// Accepting a request updates LocalChannelMembers immediately. The
+  /// repository/sync coordinator upgrades Presence on the existing open Ably
+  /// channel without rebuilding this provider.
+  Future<Either<Failure, Unit>> acceptRequest() =>
+      ref.read(chatRepositoryProvider).acceptDirectRequest(chatId);
 
-  /// Decline an incoming DM message request.
-  Future<Either<Failure, Unit>> declineRequest() async {
-    final result = await ref
-        .read(messagesRepositoryProvider)
-        .declineDmRequest(ChatId(chatId));
-    if (ref.mounted && result.isRight()) {
-      ref.invalidate(myChatsProvider);
-    }
-    return result;
-  }
+  Future<Either<Failure, Unit>> declineRequest() =>
+      ref.read(chatRepositoryProvider).declineDirectRequest(chatId);
 }
-
-

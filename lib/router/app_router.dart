@@ -14,7 +14,6 @@ import '../features/matches/presentation/screens/matches_v2_screen.dart';
 import '../features/messages/presentation/screens/message_thread_screen.dart';
 import '../features/messages/presentation/screens/message_requests_screen.dart';
 import '../features/messages/presentation/screens/chat_details_screen.dart';
-import '../features/messages/domain/entities/chat.dart';
 import '../features/profile/presentation/screens/my_profile_screen.dart';
 import '../features/profile/presentation/screens/profile_edit_screen.dart';
 import '../features/profile/presentation/screens/public_profile_screen.dart';
@@ -113,7 +112,9 @@ GoRouter appRouter(Ref ref) {
         AsyncError() =>
           ref.read(supabaseClientProvider).auth.currentUser != null
               ? null
-              : goingToSignIn ? null : '/sign-in',
+              : goingToSignIn
+              ? null
+              : '/sign-in',
 
         // 3. Resolved AuthState:
         AsyncData(:final value) => switch (value.event) {
@@ -137,22 +138,20 @@ GoRouter appRouter(Ref ref) {
     },
     refreshListenable: _StreamListenable(ref),
     routes: [
-      GoRoute(
-        path: '/sign-in',
-        builder: (_, __) => const SignInScreen(),
-      ),
+      GoRoute(path: '/sign-in', builder: (_, __) => const SignInScreen()),
       GoRoute(
         path: '/onboarding',
         builder: (_, __) => const OnboardingScreen(),
       ),
       StatefulShellRoute(
-        builder: (context, state, navigationShell) =>
-            AppShell(navigationShell: navigationShell),
+        builder:
+            (context, state, navigationShell) =>
+                AppShell(navigationShell: navigationShell),
         // Lay the four branch navigators out in a PageView so the tabs can be
         // swiped through with a smooth, finger-tracking transition (the
         // default .indexedStack snaps instantly). See SwipeableBranchView.
-        navigatorContainerBuilder: (context, navigationShell, children) =>
-            SwipeableBranchView(
+        navigatorContainerBuilder:
+            (context, navigationShell, children) => SwipeableBranchView(
               navigationShell: navigationShell,
               children: children,
             ),
@@ -166,13 +165,13 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: '/home',
-                builder: (context, _) => HomeFeedScreen(
-                  // Tap an author in the feed → push their public profile
-                  // by @username. Defined as `/u/:username` (root-level
-                  // route, full-screen over the shell — see below).
-                  onOpenProfile: (username) =>
-                      context.push('/u/$username'),
-                ),
+                builder:
+                    (context, _) => HomeFeedScreen(
+                      // Tap an author in the feed → push their public profile
+                      // by @username. Defined as `/u/:username` (root-level
+                      // route, full-screen over the shell — see below).
+                      onOpenProfile: (username) => context.push('/u/$username'),
+                    ),
               ),
             ],
           ),
@@ -202,11 +201,12 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: '/messages',
-                builder: (context, _) => InboxScreen(
-                  onBell: () => _openBell(context),
-                  showBack: false,
-                  showHeader: false,
-                ),
+                builder:
+                    (context, _) => InboxScreen(
+                      onBell: () => _openBell(context),
+                      showBack: false,
+                      showHeader: false,
+                    ),
               ),
             ],
           ),
@@ -217,24 +217,27 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/explore',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, _) => Scaffold(
-          backgroundColor: CkColors.paper,
-          body: SafeArea(
-            bottom: false,
-            child: ExploreScreen(
-              onOpenTeam: (teamId) => context.push('/teams/$teamId'),
-              onOpenProfile: (username) => context.push('/u/$username'),
-              onOpenMatch: (matchId) =>
-                  context.push('/matches/$matchId/scorecard'),
-              onOpenTournament: (tournamentId) =>
-                  context.push('/tournaments/$tournamentId'),
-              onCreateTeam: () => context.push('/teams/create'),
-              onSeeAll: (query, category) => context.push(
-                '/explore/all/${category.wireName}?q=${Uri.encodeQueryComponent(query)}',
+        builder:
+            (context, _) => Scaffold(
+              backgroundColor: CkColors.paper,
+              body: SafeArea(
+                bottom: false,
+                child: ExploreScreen(
+                  onOpenTeam: (teamId) => context.push('/teams/$teamId'),
+                  onOpenProfile: (username) => context.push('/u/$username'),
+                  onOpenMatch:
+                      (matchId) => context.push('/matches/$matchId/scorecard'),
+                  onOpenTournament:
+                      (tournamentId) =>
+                          context.push('/tournaments/$tournamentId'),
+                  onCreateTeam: () => context.push('/teams/create'),
+                  onSeeAll:
+                      (query, category) => context.push(
+                        '/explore/all/${category.wireName}?q=${Uri.encodeQueryComponent(query)}',
+                      ),
+                ),
               ),
             ),
-          ),
-        ),
         routes: [
           GoRoute(
             path: 'all/:category',
@@ -252,10 +255,11 @@ GoRouter appRouter(Ref ref) {
                 category: category,
                 onOpenTeam: (teamId) => context.push('/teams/$teamId'),
                 onOpenProfile: (u) => context.push('/u/$u'),
-                onOpenMatch: (matchId) =>
-                    context.push('/matches/$matchId/scorecard'),
-                onOpenTournament: (tournamentId) =>
-                    context.push('/tournaments/$tournamentId'),
+                onOpenMatch:
+                    (matchId) => context.push('/matches/$matchId/scorecard'),
+                onOpenTournament:
+                    (tournamentId) =>
+                        context.push('/tournaments/$tournamentId'),
               );
             },
           ),
@@ -268,23 +272,26 @@ GoRouter appRouter(Ref ref) {
           GoRoute(
             path: 'teams',
             parentNavigatorKey: _rootNavigatorKey,
-            builder: (context, _) => Scaffold(
-              backgroundColor: CkColors.paper,
-              body: SafeArea(
-                bottom: false,
-                child: Column(
-                  children: [
-                    CkPushNav(
-                      title: 'Find a Team',
-                      onBack: () => context.canPop()
-                          ? context.pop()
-                          : context.go('/explore'),
+            builder:
+                (context, _) => Scaffold(
+                  backgroundColor: CkColors.paper,
+                  body: SafeArea(
+                    bottom: false,
+                    child: Column(
+                      children: [
+                        CkPushNav(
+                          title: 'Find a Team',
+                          onBack:
+                              () =>
+                                  context.canPop()
+                                      ? context.pop()
+                                      : context.go('/explore'),
+                        ),
+                        const Expanded(child: TeamSearchScreen()),
+                      ],
                     ),
-                    const Expanded(child: TeamSearchScreen()),
-                  ],
+                  ),
                 ),
-              ),
-            ),
           ),
         ],
       ),
@@ -312,14 +319,8 @@ GoRouter appRouter(Ref ref) {
         builder: (_, __) => const ProfileEditScreen(),
       ),
       // Menu destinations under `/my/...`
-      GoRoute(
-        path: '/my/matches',
-        builder: (_, __) => const MyMatchesScreen(),
-      ),
-      GoRoute(
-        path: '/my/teams',
-        builder: (_, __) => const TeamsListScreen(),
-      ),
+      GoRoute(path: '/my/matches', builder: (_, __) => const MyMatchesScreen()),
+      GoRoute(path: '/my/teams', builder: (_, __) => const TeamsListScreen()),
       // Match Challenges queue (Challenges.dc.html). A pushed page: it is a
       // list you work down, not a sheet you return from.
       GoRoute(
@@ -334,112 +335,115 @@ GoRouter appRouter(Ref ref) {
         path: '/my/tournaments',
         builder: (_, __) => const MyTournamentsScreen(),
       ),
-      GoRoute(
-        path: '/tournaments',
-        redirect: (_, __) => '/my/tournaments',
-      ),
+      GoRoute(path: '/tournaments', redirect: (_, __) => '/my/tournaments'),
       GoRoute(
         path: '/tournaments/create',
         builder: (_, __) => const TournamentCreateWizardScreen(),
       ),
       GoRoute(
         path: '/tournaments/:tournamentId',
-        builder: (_, state) => TournamentDetailScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => TournamentDetailScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       GoRoute(
         path: '/tournaments/:tournamentId/manage',
-        builder: (_, state) => OrganizerConsoleScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => OrganizerConsoleScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       GoRoute(
         path: '/tournaments/:tournamentId/console',
-        builder: (_, state) => OrganizerConsoleScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => OrganizerConsoleScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       // Artboard 22 — the post-publish screen. pushReplacement'd from the
       // wizard, so Back does not re-enter step 6.
       GoRoute(
         path: '/tournaments/:tournamentId/published',
-        builder: (_, state) => TournamentPublishedScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => TournamentPublishedScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       // The three destinations behind the console ⋮ menu (artboards 27d–f).
       GoRoute(
         path: '/tournaments/:tournamentId/settings',
-        builder: (_, state) => TournamentSettingsScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => TournamentSettingsScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       GoRoute(
         path: '/tournaments/:tournamentId/announce',
-        builder: (_, state) => TournamentAnnounceScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => TournamentAnnounceScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       GoRoute(
         path: '/tournaments/:tournamentId/people',
-        builder: (_, state) => TournamentPeopleScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => TournamentPeopleScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       // Artboard 24c — the payment reconciliation ledger.
       GoRoute(
         path: '/tournaments/:tournamentId/fees',
-        builder: (_, state) => TournamentFeeLedgerScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => TournamentFeeLedgerScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       // Artboard 27j — assign umpires & scorers for one fixture.
       GoRoute(
         path: '/tournaments/:tournamentId/live/:matchId/officials',
-        builder: (_, state) => TournamentOfficialsScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-          matchId: state.pathParameters['matchId']!,
-        ),
+        builder:
+            (_, state) => TournamentOfficialsScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+              matchId: state.pathParameters['matchId']!,
+            ),
       ),
       // Artboard 24f — requests as a pushed page.
       GoRoute(
         path: '/tournaments/:tournamentId/requests',
-        builder: (_, state) => TournamentRequestsScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => TournamentRequestsScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       GoRoute(
         path: '/tournaments/:tournamentId/register',
-        builder: (_, state) => TeamRegistrationSheet(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => TeamRegistrationSheet(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       // Artboard 33 — status tracker + outcomes.
       GoRoute(
         path: '/tournaments/:tournamentId/register/status',
-        builder: (_, state) => TournamentRegistrationStatusScreen(
-          tournamentId: state.pathParameters['tournamentId']!,
-        ),
+        builder:
+            (_, state) => TournamentRegistrationStatusScreen(
+              tournamentId: state.pathParameters['tournamentId']!,
+            ),
       ),
       // Account settings and saved content.
       GoRoute(
         path: '/saved',
         builder: (_, __) => const ComingSoonScreen(tab: 'Saved'),
       ),
-      GoRoute(
-        path: '/settings',
-        builder: (_, __) => const SettingsScreen(),
-      ),
+      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
       // Legacy redirects for Pavilion and old paths
       GoRoute(
         path: '/pavilion',
         redirect: (_, __) => '/my/matches',
         routes: [
-          GoRoute(
-            path: 'my-matches',
-            redirect: (_, __) => '/my/matches',
-          ),
+          GoRoute(path: 'my-matches', redirect: (_, __) => '/my/matches'),
           GoRoute(
             path: 'match/:id',
             redirect: (_, state) => '/matches/${state.pathParameters['id']}',
@@ -447,34 +451,34 @@ GoRouter appRouter(Ref ref) {
         ],
       ),
       // Teams redirects & full-screen routes
-      GoRoute(
-        path: '/teams',
-        redirect: (_, __) => '/my/teams',
-      ),
+      GoRoute(path: '/teams', redirect: (_, __) => '/my/teams'),
       GoRoute(
         path: '/teams/create',
         builder: (_, __) => const TeamCreateScreen(),
       ),
       GoRoute(
         path: '/teams/:teamId',
-        builder: (_, state) =>
-            TeamPageScreen(teamId: state.pathParameters['teamId']!),
+        builder:
+            (_, state) =>
+                TeamPageScreen(teamId: state.pathParameters['teamId']!),
       ),
       GoRoute(
         path: '/teams/:teamId/manage',
-        builder: (_, state) => TeamManageScreen(
-          teamId: state.pathParameters['teamId']!,
-          justCreated: state.uri.queryParameters['justCreated'] == 'true',
-          // The team page's ⋯ menu sends "Edit team" / "Team settings" and
-          // "Invite players" to different tabs of the same console.
-          initialTab: state.uri.queryParameters['tab'],
-        ),
+        builder:
+            (_, state) => TeamManageScreen(
+              teamId: state.pathParameters['teamId']!,
+              justCreated: state.uri.queryParameters['justCreated'] == 'true',
+              // The team page's ⋯ menu sends "Edit team" / "Team settings" and
+              // "Invite players" to different tabs of the same console.
+              initialTab: state.uri.queryParameters['tab'],
+            ),
       ),
       GoRoute(
         path: '/teams/:teamId/add-unclaimed',
-        builder: (_, state) => AddUnclaimedPlayerScreen(
-          teamId: state.pathParameters['teamId']!,
-        ),
+        builder:
+            (_, state) => AddUnclaimedPlayerScreen(
+              teamId: state.pathParameters['teamId']!,
+            ),
       ),
       // Literal /matches/<word> routes MUST be declared before
       // '/matches/:matchId'. go_router matches in declaration order, so with
@@ -484,67 +488,73 @@ GoRouter appRouter(Ref ref) {
         path: '/matches/send-challenge',
         // ?mode=open comes from the pool surfaces, where the open-vs-direct
         // fork is already answered and should not be asked again.
-        builder: (_, state) => ChallengeSendScreen(
-          openOnly: state.uri.queryParameters['mode'] == 'open',
-        ),
+        builder:
+            (_, state) => ChallengeSendScreen(
+              openOnly: state.uri.queryParameters['mode'] == 'open',
+            ),
       ),
       // Legacy locations, kept so older links / pushes still land.
-      GoRoute(
-        path: '/matches/pool',
-        redirect: (_, __) => '/pool',
-      ),
+      GoRoute(path: '/matches/pool', redirect: (_, __) => '/pool'),
       GoRoute(
         path: '/matches/my-broadcasts',
         redirect: (_, __) => '/my/pool-requests',
       ),
       GoRoute(
         path: '/matches/:matchId',
-        builder: (_, state) =>
-            MatchDetailScreen(matchId: state.pathParameters['matchId']!),
+        builder:
+            (_, state) =>
+                MatchDetailScreen(matchId: state.pathParameters['matchId']!),
       ),
       GoRoute(
         path: '/matches/:matchId/start',
-        builder: (_, state) =>
-            MatchStartScreen(matchId: state.pathParameters['matchId']!),
+        builder:
+            (_, state) =>
+                MatchStartScreen(matchId: state.pathParameters['matchId']!),
       ),
       GoRoute(
         path: '/matches/:matchId/score',
-        builder: (_, state) => ScoringScreen(
-          matchId: state.pathParameters['matchId']!,
-          inningsNumber:
-              int.tryParse(state.uri.queryParameters['innings'] ?? '') ?? 1,
-        ),
+        builder:
+            (_, state) => ScoringScreen(
+              matchId: state.pathParameters['matchId']!,
+              inningsNumber:
+                  int.tryParse(state.uri.queryParameters['innings'] ?? '') ?? 1,
+            ),
       ),
       GoRoute(
         path: '/matches/:matchId/scoring',
-        builder: (_, state) => ScoringScreen(
-          matchId: state.pathParameters['matchId']!,
-          inningsNumber:
-              int.tryParse(state.uri.queryParameters['innings'] ?? '') ?? 1,
-        ),
+        builder:
+            (_, state) => ScoringScreen(
+              matchId: state.pathParameters['matchId']!,
+              inningsNumber:
+                  int.tryParse(state.uri.queryParameters['innings'] ?? '') ?? 1,
+            ),
       ),
       GoRoute(
         path: '/matches/:matchId/innings-break',
-        builder: (_, state) =>
-            InningsBreakScreen(matchId: state.pathParameters['matchId']!),
+        builder:
+            (_, state) =>
+                InningsBreakScreen(matchId: state.pathParameters['matchId']!),
       ),
       // The completed-match record. Distinct from /scorecard, which serves
       // matches still in progress: this one derives everything from the final
       // ledger and renders a printed record when no ball was ever bowled.
       GoRoute(
         path: '/matches/:matchId/summary',
-        builder: (_, state) =>
-            CompletedMatchScreen(matchId: state.pathParameters['matchId']!),
+        builder:
+            (_, state) =>
+                CompletedMatchScreen(matchId: state.pathParameters['matchId']!),
       ),
       GoRoute(
         path: '/matches/:matchId/scorecard',
-        builder: (_, state) =>
-            ScorecardScreen(matchId: state.pathParameters['matchId']!),
+        builder:
+            (_, state) =>
+                ScorecardScreen(matchId: state.pathParameters['matchId']!),
       ),
       GoRoute(
         path: '/matches/:matchId/result',
-        builder: (_, state) =>
-            ResultScreen(matchId: state.pathParameters['matchId']!),
+        builder:
+            (_, state) =>
+                ResultScreen(matchId: state.pathParameters['matchId']!),
       ),
       GoRoute(
         path: '/challenge',
@@ -552,28 +562,32 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/teams/:teamId/challenge',
-        builder: (_, state) => ChallengeSendScreen(
-          fromTeamId: state.pathParameters['teamId']!,
-        ),
+        builder:
+            (_, state) => ChallengeSendScreen(
+              fromTeamId: state.pathParameters['teamId']!,
+            ),
       ),
       GoRoute(
         path: '/challenges/:requestId',
-        builder: (_, state) => ChallengeDetailScreen(
-          requestId: state.pathParameters['requestId']!,
-        ),
+        builder:
+            (_, state) => ChallengeDetailScreen(
+              requestId: state.pathParameters['requestId']!,
+            ),
       ),
       GoRoute(
         path: '/challenges/:requestId/applicants/:applicationId',
-        builder: (_, state) => ApplicantDetailScreen(
-          requestId: state.pathParameters['requestId']!,
-          applicationId: state.pathParameters['applicationId']!,
-        ),
+        builder:
+            (_, state) => ApplicantDetailScreen(
+              requestId: state.pathParameters['requestId']!,
+              applicationId: state.pathParameters['applicationId']!,
+            ),
       ),
       GoRoute(
         path: '/challenges/:requestId/sent',
-        builder: (_, state) => ChallengeSentScreen(
-          requestId: state.pathParameters['requestId']!,
-        ),
+        builder:
+            (_, state) => ChallengeSentScreen(
+              requestId: state.pathParameters['requestId']!,
+            ),
       ),
       // Counter flow temporarily disabled — restore route + import above to re-enable.
       // GoRoute(
@@ -596,18 +610,17 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/messages/:chatId',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (_, state) => MessageThreadScreen(
-          chatId: state.pathParameters['chatId']!,
-        ),
+        builder:
+            (_, state) =>
+                MessageThreadScreen(chatId: state.pathParameters['chatId']!),
       ),
       // Chat details screen (team info / DM profile / roster / settings)
       GoRoute(
         path: '/messages/:chatId/details',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (_, state) => ChatDetailsScreen(
-          chatId: state.pathParameters['chatId']!,
-          chat: state.extra as Chat?,
-        ),
+        builder:
+            (_, state) =>
+                ChatDetailsScreen(chatId: state.pathParameters['chatId']!),
       ),
       // Public profile by @username — the landing for a shared
       // `joinmatchday.com/u/<username>` link (universal/app link) and for
@@ -615,8 +628,10 @@ GoRouter appRouter(Ref ref) {
       // auth redirect like every other route.
       GoRoute(
         path: '/u/:username',
-        builder: (_, state) =>
-            PublicProfileScreen(username: state.pathParameters['username']!),
+        builder:
+            (_, state) => PublicProfileScreen(
+              username: state.pathParameters['username']!,
+            ),
       ),
       // Shared-link prefixes. team_share.dart documents the scheme as
       // "/u/ user, /t/ team, /c/ competition"; tournaments had taken /t/ as
@@ -632,8 +647,9 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/c/:tournamentId',
-        redirect: (_, state) =>
-            '/tournaments/${state.pathParameters['tournamentId']}',
+        redirect:
+            (_, state) =>
+                '/tournaments/${state.pathParameters['tournamentId']}',
       ),
       GoRoute(
         path: '/composer',
@@ -643,9 +659,10 @@ GoRouter appRouter(Ref ref) {
           final teamName = state.uri.queryParameters['teamName'];
           final teamMono = state.uri.queryParameters['teamMono'];
           return ComposerScreen(
-            initialAuthorContext: teamId != null
-                ? PostAuthorContext.teamManager
-                : PostAuthorContext.personal,
+            initialAuthorContext:
+                teamId != null
+                    ? PostAuthorContext.teamManager
+                    : PostAuthorContext.personal,
             initialEntityId: teamId,
             initialEntityName: teamName,
             initialEntityMono: teamMono,
@@ -659,9 +676,10 @@ GoRouter appRouter(Ref ref) {
 /// The header bell (every primary tab) opens the Notifications inbox over the
 /// whole shell, including the bottom nav (root navigator).
 void _openBell(BuildContext context) {
-  Navigator.of(context, rootNavigator: true).push(
-    MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
-  );
+  Navigator.of(
+    context,
+    rootNavigator: true,
+  ).push(MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()));
 }
 
 /// Poke the router whenever auth OR onboarding status changes, so the redirect

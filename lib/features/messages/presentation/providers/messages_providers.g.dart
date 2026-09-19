@@ -55,7 +55,7 @@ final class ChatLocalFirstEngineProvider
 }
 
 String _$chatLocalFirstEngineHash() =>
-    r'd040f25540590bb2befcd5bd5afd00c29e6a6cab';
+    r'eff85e04cdcfe0a5b202875489a7c6133d43741a';
 
 @ProviderFor(chatRepository)
 final chatRepositoryProvider = ChatRepositoryProvider._();
@@ -98,103 +98,12 @@ final class ChatRepositoryProvider
 
 String _$chatRepositoryHash() => r'67535e8f0ac9b7967dccecb24772d24cfbfc0061';
 
-@ProviderFor(messagesRepository)
-final messagesRepositoryProvider = MessagesRepositoryProvider._();
-
-final class MessagesRepositoryProvider
-    extends
-        $FunctionalProvider<
-          MessagesRepository,
-          MessagesRepository,
-          MessagesRepository
-        >
-    with $Provider<MessagesRepository> {
-  MessagesRepositoryProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'messagesRepositoryProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$messagesRepositoryHash();
-
-  @$internal
-  @override
-  $ProviderElement<MessagesRepository> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  MessagesRepository create(Ref ref) {
-    return messagesRepository(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(MessagesRepository value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<MessagesRepository>(value),
-    );
-  }
-}
-
-String _$messagesRepositoryHash() =>
-    r'57497331be3fb027df3c09ea9d4d89637661b539';
-
-/// The chat inbox as a fan-out stream: one upstream subscription, many UI consumers.
-
-@ProviderFor(myChats)
-final myChatsProvider = MyChatsProvider._();
-
-/// The chat inbox as a fan-out stream: one upstream subscription, many UI consumers.
-
-final class MyChatsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<Chat>>,
-          List<Chat>,
-          Stream<List<Chat>>
-        >
-    with $FutureModifier<List<Chat>>, $StreamProvider<List<Chat>> {
-  /// The chat inbox as a fan-out stream: one upstream subscription, many UI consumers.
-  MyChatsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'myChatsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$myChatsHash();
-
-  @$internal
-  @override
-  $StreamProviderElement<List<Chat>> $createElement($ProviderPointer pointer) =>
-      $StreamProviderElement(pointer);
-
-  @override
-  Stream<List<Chat>> create(Ref ref) {
-    return myChats(ref);
-  }
-}
-
-String _$myChatsHash() => r'e173b3d2d7b28a3b2122c3fadde510dc4c930996';
-
-/// Universal channel inbox stream returning new [ChatChannel] entities.
+/// Single universal inbox provider. The legacy myChatsProvider is removed.
 
 @ProviderFor(myChatChannels)
 final myChatChannelsProvider = MyChatChannelsProvider._();
 
-/// Universal channel inbox stream returning new [ChatChannel] entities.
+/// Single universal inbox provider. The legacy myChatsProvider is removed.
 
 final class MyChatChannelsProvider
     extends
@@ -206,7 +115,7 @@ final class MyChatChannelsProvider
     with
         $FutureModifier<List<ChatChannel>>,
         $StreamProvider<List<ChatChannel>> {
-  /// Universal channel inbox stream returning new [ChatChannel] entities.
+  /// Single universal inbox provider. The legacy myChatsProvider is removed.
   MyChatChannelsProvider._()
     : super(
         from: null,
@@ -233,19 +142,14 @@ final class MyChatChannelsProvider
   }
 }
 
-String _$myChatChannelsHash() => r'2bb95007648159fd1705e096e95e551912524a72';
-
-/// Derived total unread messages count across all active conversations.
+String _$myChatChannelsHash() => r'59d3f0bef95396062ab807b19189749260950bc5';
 
 @ProviderFor(unreadMessagesCount)
 final unreadMessagesCountProvider = UnreadMessagesCountProvider._();
 
-/// Derived total unread messages count across all active conversations.
-
 final class UnreadMessagesCountProvider
     extends $FunctionalProvider<int, int, int>
     with $Provider<int> {
-  /// Derived total unread messages count across all active conversations.
   UnreadMessagesCountProvider._()
     : super(
         from: null,
@@ -280,54 +184,57 @@ final class UnreadMessagesCountProvider
 }
 
 String _$unreadMessagesCountHash() =>
-    r'45ae1d166f4d05d9d1d6fc958e86f804d4f4ac7a';
+    r'cea979985828b67fa00907751d55af4056f319fa';
 
-/// Streams real-time typing indicators for a specific chat thread.
+@ProviderFor(chatParticipants)
+final chatParticipantsProvider = ChatParticipantsFamily._();
 
-@ProviderFor(chatTyping)
-final chatTypingProvider = ChatTypingFamily._();
-
-/// Streams real-time typing indicators for a specific chat thread.
-
-final class ChatTypingProvider
-    extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
-    with $FutureModifier<bool>, $StreamProvider<bool> {
-  /// Streams real-time typing indicators for a specific chat thread.
-  ChatTypingProvider._({
-    required ChatTypingFamily super.from,
+final class ChatParticipantsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<ChatParticipant>>,
+          List<ChatParticipant>,
+          Stream<List<ChatParticipant>>
+        >
+    with
+        $FutureModifier<List<ChatParticipant>>,
+        $StreamProvider<List<ChatParticipant>> {
+  ChatParticipantsProvider._({
+    required ChatParticipantsFamily super.from,
     required String super.argument,
   }) : super(
          retry: null,
-         name: r'chatTypingProvider',
+         name: r'chatParticipantsProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$chatTypingHash();
+  String debugGetCreateSourceHash() => _$chatParticipantsHash();
 
   @override
   String toString() {
-    return r'chatTypingProvider'
+    return r'chatParticipantsProvider'
         ''
         '($argument)';
   }
 
   @$internal
   @override
-  $StreamProviderElement<bool> $createElement($ProviderPointer pointer) =>
-      $StreamProviderElement(pointer);
+  $StreamProviderElement<List<ChatParticipant>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
 
   @override
-  Stream<bool> create(Ref ref) {
+  Stream<List<ChatParticipant>> create(Ref ref) {
     final argument = this.argument as String;
-    return chatTyping(ref, argument);
+    return chatParticipants(ref, argument);
   }
 
   @override
   bool operator ==(Object other) {
-    return other is ChatTypingProvider && other.argument == argument;
+    return other is ChatParticipantsProvider && other.argument == argument;
   }
 
   @override
@@ -336,36 +243,247 @@ final class ChatTypingProvider
   }
 }
 
-String _$chatTypingHash() => r'c46b92c47c838a0726651b5c96283ead05ec913d';
+String _$chatParticipantsHash() => r'b7f40753090591262ca6940b50930254fca3de03';
 
-/// Streams real-time typing indicators for a specific chat thread.
-
-final class ChatTypingFamily extends $Family
-    with $FunctionalFamilyOverride<Stream<bool>, String> {
-  ChatTypingFamily._()
+final class ChatParticipantsFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<ChatParticipant>>, String> {
+  ChatParticipantsFamily._()
     : super(
         retry: null,
-        name: r'chatTypingProvider',
+        name: r'chatParticipantsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  /// Streams real-time typing indicators for a specific chat thread.
-
-  ChatTypingProvider call(String chatId) =>
-      ChatTypingProvider._(argument: chatId, from: this);
+  ChatParticipantsProvider call(String chatId) =>
+      ChatParticipantsProvider._(argument: chatId, from: this);
 
   @override
-  String toString() => r'chatTypingProvider';
+  String toString() => r'chatParticipantsProvider';
 }
 
-/// Streams the set of user IDs currently present (online) in [chatId].
+@ProviderFor(chatSyncState)
+final chatSyncStateProvider = ChatSyncStateFamily._();
+
+final class ChatSyncStateProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<ChatSyncState>,
+          ChatSyncState,
+          Stream<ChatSyncState>
+        >
+    with $FutureModifier<ChatSyncState>, $StreamProvider<ChatSyncState> {
+  ChatSyncStateProvider._({
+    required ChatSyncStateFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'chatSyncStateProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatSyncStateHash();
+
+  @override
+  String toString() {
+    return r'chatSyncStateProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<ChatSyncState> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<ChatSyncState> create(Ref ref) {
+    final argument = this.argument as String;
+    return chatSyncState(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChatSyncStateProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$chatSyncStateHash() => r'ab0e6fce5728ed2e75641bbf7c8db5f68c36ebeb';
+
+final class ChatSyncStateFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<ChatSyncState>, String> {
+  ChatSyncStateFamily._()
+    : super(
+        retry: null,
+        name: r'chatSyncStateProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  ChatSyncStateProvider call(String chatId) =>
+      ChatSyncStateProvider._(argument: chatId, from: this);
+
+  @override
+  String toString() => r'chatSyncStateProvider';
+}
+
+@ProviderFor(chatMediaUrl)
+final chatMediaUrlProvider = ChatMediaUrlFamily._();
+
+final class ChatMediaUrlProvider
+    extends $FunctionalProvider<AsyncValue<String>, String, FutureOr<String>>
+    with $FutureModifier<String>, $FutureProvider<String> {
+  ChatMediaUrlProvider._({
+    required ChatMediaUrlFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'chatMediaUrlProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatMediaUrlHash();
+
+  @override
+  String toString() {
+    return r'chatMediaUrlProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<String> create(Ref ref) {
+    final argument = this.argument as String;
+    return chatMediaUrl(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChatMediaUrlProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$chatMediaUrlHash() => r'f7ff446d6b3a1b55f9ccd70825be34bcdf2c2c46';
+
+final class ChatMediaUrlFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<String>, String> {
+  ChatMediaUrlFamily._()
+    : super(
+        retry: null,
+        name: r'chatMediaUrlProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  ChatMediaUrlProvider call(String storagePath) =>
+      ChatMediaUrlProvider._(argument: storagePath, from: this);
+
+  @override
+  String toString() => r'chatMediaUrlProvider';
+}
+
+@ProviderFor(chatTypingUsers)
+final chatTypingUsersProvider = ChatTypingUsersFamily._();
+
+final class ChatTypingUsersProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Set<String>>,
+          Set<String>,
+          Stream<Set<String>>
+        >
+    with $FutureModifier<Set<String>>, $StreamProvider<Set<String>> {
+  ChatTypingUsersProvider._({
+    required ChatTypingUsersFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'chatTypingUsersProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatTypingUsersHash();
+
+  @override
+  String toString() {
+    return r'chatTypingUsersProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<Set<String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<Set<String>> create(Ref ref) {
+    final argument = this.argument as String;
+    return chatTypingUsers(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChatTypingUsersProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$chatTypingUsersHash() => r'ae4ae73424f50f0537dbbc590455d27d7dbe9807';
+
+final class ChatTypingUsersFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<Set<String>>, String> {
+  ChatTypingUsersFamily._()
+    : super(
+        retry: null,
+        name: r'chatTypingUsersProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  ChatTypingUsersProvider call(String chatId) =>
+      ChatTypingUsersProvider._(argument: chatId, from: this);
+
+  @override
+  String toString() => r'chatTypingUsersProvider';
+}
 
 @ProviderFor(chatPresence)
 final chatPresenceProvider = ChatPresenceFamily._();
-
-/// Streams the set of user IDs currently present (online) in [chatId].
 
 final class ChatPresenceProvider
     extends
@@ -375,7 +493,6 @@ final class ChatPresenceProvider
           Stream<Set<String>>
         >
     with $FutureModifier<Set<String>>, $StreamProvider<Set<String>> {
-  /// Streams the set of user IDs currently present (online) in [chatId].
   ChatPresenceProvider._({
     required ChatPresenceFamily super.from,
     required String super.argument,
@@ -420,9 +537,7 @@ final class ChatPresenceProvider
   }
 }
 
-String _$chatPresenceHash() => r'4c4cdf815b126c737a208e4f31db1b9d40dea168';
-
-/// Streams the set of user IDs currently present (online) in [chatId].
+String _$chatPresenceHash() => r'1071f5ef0119cfa8b6a91497aa337748cd60f3f3';
 
 final class ChatPresenceFamily extends $Family
     with $FunctionalFamilyOverride<Stream<Set<String>>, String> {
@@ -435,8 +550,6 @@ final class ChatPresenceFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Streams the set of user IDs currently present (online) in [chatId].
-
   ChatPresenceProvider call(String chatId) =>
       ChatPresenceProvider._(argument: chatId, from: this);
 
@@ -444,17 +557,12 @@ final class ChatPresenceFamily extends $Family
   String toString() => r'chatPresenceProvider';
 }
 
-/// Streams whether a specific user is currently online in [chatId].
-
 @ProviderFor(isUserOnlineInChat)
 final isUserOnlineInChatProvider = IsUserOnlineInChatFamily._();
-
-/// Streams whether a specific user is currently online in [chatId].
 
 final class IsUserOnlineInChatProvider
     extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
     with $FutureModifier<bool>, $StreamProvider<bool> {
-  /// Streams whether a specific user is currently online in [chatId].
   IsUserOnlineInChatProvider._({
     required IsUserOnlineInChatFamily super.from,
     required ({String chatId, String userId}) super.argument,
@@ -503,9 +611,7 @@ final class IsUserOnlineInChatProvider
 }
 
 String _$isUserOnlineInChatHash() =>
-    r'4513031f5bb05d20630401ca24435056e7988003';
-
-/// Streams whether a specific user is currently online in [chatId].
+    r'65a3700cb11deb7a24cd58cfdddf1a9107714c61';
 
 final class IsUserOnlineInChatFamily extends $Family
     with
@@ -521,8 +627,6 @@ final class IsUserOnlineInChatFamily extends $Family
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
-
-  /// Streams whether a specific user is currently online in [chatId].
 
   IsUserOnlineInChatProvider call({
     required String chatId,

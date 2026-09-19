@@ -1,47 +1,48 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/chat_channel_dto.dart';
 import '../models/chat_message_dto.dart';
+import '../models/chat_participant_dto.dart';
 
 /// Remote data source communicating with Supabase Postgres RPCs and Storage.
-/// Throws raw SDK exceptions per Clean Architecture boundary discipline.
+/// Throws raw SDK exceptions; repositories map them to domain Failures.
 class ChatRemoteDataSource {
   ChatRemoteDataSource(this._supabase);
 
   final SupabaseClient _supabase;
   static const _uuid = Uuid();
 
-  /// Lists all accessible chat channels for the current user via `list_my_chats`.
   Future<List<ChatChannelDto>> listMyChats() async {
     final res = await _supabase.rpc<dynamic>('list_my_chats');
-    if (res is List) {
-      return res
-          .map((row) =>
-              ChatChannelDto.fromJson(Map<String, dynamic>.from(row as Map)))
-          .toList();
-    }
-    return const [];
+    if (res is! List) return const [];
+
+    return res
+        .map(
+          (row) => ChatChannelDto.fromJson(
+            Map<String, dynamic>.from(row as Map),
+          ),
+        )
+        .toList();
   }
 
-  /// Gets or creates a canonical 1:1 direct channel with [targetUserId].
-  Future<String> getOrCreateDirectChannel(String targetUserId) async {
-    final res = await _supabase.rpc<String>(
+  Future<String> getOrCreateDirectChannel(String targetUserId) {
+    return _supabase.rpc<String>(
       'get_or_create_direct_channel',
       params: {'p_target_user_id': targetUserId},
     );
-    return res;
   }
 
-  /// Creates a multi-user group channel.
   Future<String> createGroupChannel({
     required String title,
     required List<String> memberUserIds,
     String? description,
     String? avatarUrl,
-  }) async {
-    final res = await _supabase.rpc<String>(
+  }) {
+    return _supabase.rpc<String>(
       'create_group_channel',
       params: {
         'p_title': title,
@@ -50,10 +51,92 @@ class ChatRemoteDataSource {
         'p_avatar_url': avatarUrl,
       },
     );
-    return res;
   }
 
-  /// Sends a message into a channel using the authoritative `send_channel_message` RPC.
+  /// Hydrates the participant projection in two bounded queries.
+  ///
+  /// There is no per-message profile lookup and no LocalChatParticipants
+  /// table. The result is written into LocalChannelMembers.
+  Future<List<ChatParticipantDto>> fetchChannelParticipants(
+    String channelId,
+  ) async {
+    final memberRows = await _supabase
+        .from('channel_members')
+        .select(
+          'channel_id,user_id,role,status,'
+          'last_read_message_seq,last_read_at,'
+          'last_delivered_message_seq,last_delivered_at',
+        )
+        .eq('channel_id', channelId)
+        .inFilter('status', const ['active', 'pending']);
+
+    final members = List<Map<String, dynamic>>.from(memberRows);
+    final userIds = members
+        .map((row) => row['user_id'] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList();
+
+    if (userIds.isEmpty) return const [];
+
+    final profileRows = await _supabase
+        .from('profiles')
+        .select('user_id,username,display_name,profile_photo_url')
+        .inFilter('user_id', userIds);
+
+    final profiles = <String, Map<String, dynamic>>{
+      for (final row in List<Map<String, dynamic>>.from(profileRows))
+        if (row['user_id'] is String) row['user_id'] as String: row,
+    };
+
+    final now = DateTime.now().toUtc();
+    final out = <ChatParticipantDto>[];
+
+    for (final member in members) {
+      final userId = member['user_id'] as String?;
+      if (userId == null) continue;
+
+      final profile = profiles[userId];
+      final displayName = _participantDisplayName(profile);
+
+      out.add(
+        ChatParticipantDto(
+          channelId: channelId,
+          userId: userId,
+          displayName: displayName,
+          username: profile?['username'] as String?,
+          avatarUrl: profile?['profile_photo_url'] as String?,
+          channelRole: member['role'] as String? ?? 'member',
+          membershipStatus: member['status'] as String? ?? 'active',
+          lastReadMessageSeq:
+              (member['last_read_message_seq'] as num?)?.toInt(),
+          lastReadAt: _tryDate(member['last_read_at']),
+          lastDeliveredMessageSeq:
+              (member['last_delivered_message_seq'] as num?)?.toInt(),
+          lastDeliveredAt: _tryDate(member['last_delivered_at']),
+          updatedAt: now,
+        ),
+      );
+    }
+
+    return out;
+  }
+
+  String _participantDisplayName(Map<String, dynamic>? profile) {
+    final name = (profile?['display_name'] as String?)?.trim();
+    if (name != null && name.isNotEmpty) return name;
+
+    final username = (profile?['username'] as String?)?.trim();
+    if (username != null && username.isNotEmpty) return '@$username';
+
+    return 'Deleted user';
+  }
+
+  DateTime? _tryDate(dynamic raw) {
+    if (raw is! String || raw.isEmpty) return null;
+    return DateTime.tryParse(raw);
+  }
+
   Future<ChatMessageDto> sendChannelMessage({
     required String messageId,
     required String channelId,
@@ -74,11 +157,11 @@ class ChatRemoteDataSource {
       },
     );
 
-    final map = Map<String, dynamic>.from(res as Map);
-    return ChatMessageDto.fromJson(map);
+    return ChatMessageDto.fromJson(
+      Map<String, dynamic>.from(res as Map),
+    );
   }
 
-  /// Edits an existing message with optimistic concurrency control.
   Future<ChatMessageDto> editChannelMessage({
     required String messageId,
     required int expectedVersion,
@@ -95,11 +178,11 @@ class ChatRemoteDataSource {
       },
     );
 
-    final map = Map<String, dynamic>.from(res as Map);
-    return ChatMessageDto.fromJson(map);
+    return ChatMessageDto.fromJson(
+      Map<String, dynamic>.from(res as Map),
+    );
   }
 
-  /// Soft-deletes a message via `delete_channel_message` RPC.
   Future<void> deleteChannelMessage(String messageId) async {
     await _supabase.rpc<dynamic>(
       'delete_channel_message',
@@ -107,7 +190,6 @@ class ChatRemoteDataSource {
     );
   }
 
-  /// Sets or clears a reaction on a message via `set_message_reaction` RPC.
   Future<void> setMessageReaction({
     required String messageId,
     required String reaction,
@@ -123,7 +205,6 @@ class ChatRemoteDataSource {
     );
   }
 
-  /// Monotonically advances the read horizon via `mark_channel_read` RPC.
   Future<void> markChannelRead({
     required String channelId,
     required int throughSeq,
@@ -137,7 +218,6 @@ class ChatRemoteDataSource {
     );
   }
 
-  /// Monotonically advances the delivery horizon via `mark_channel_delivered` RPC.
   Future<void> markChannelDelivered({
     required String channelId,
     required int throughSeq,
@@ -151,7 +231,6 @@ class ChatRemoteDataSource {
     );
   }
 
-  /// Accepts an incoming direct message invite/request.
   Future<void> acceptChannelInvite(String channelId) async {
     await _supabase.rpc<dynamic>(
       'accept_channel_invite',
@@ -159,7 +238,6 @@ class ChatRemoteDataSource {
     );
   }
 
-  /// Declines an incoming direct message invite/request.
   Future<void> declineChannelInvite(String channelId) async {
     await _supabase.rpc<dynamic>(
       'decline_channel_invite',
@@ -167,7 +245,6 @@ class ChatRemoteDataSource {
     );
   }
 
-  /// Fetches a bounded recent window of messages for initial channel bootstrap (Spec §5).
   Future<List<ChatMessageDto>> fetchRecentMessages(
     String channelId, {
     int limit = 50,
@@ -175,18 +252,16 @@ class ChatRemoteDataSource {
     final res = await _supabase
         .from('messages')
         .select(
-          '*, sender:profiles!messages_sender_id_fkey(display_name), attachments:message_attachments(*), reactions:message_reactions(*)',
+          '*,sender:profiles!messages_sender_id_fkey(display_name),'
+          'attachments:message_attachments(*),reactions:message_reactions(*)',
         )
         .eq('channel_id', channelId)
         .order('message_seq', ascending: false)
         .limit(limit);
 
-    final list = _parseMessageDtos(res as List);
-    // Reverse to chronological order (asc)
-    return list.reversed.toList();
+    return _parseMessageDtos(res as List).reversed.toList();
   }
 
-  /// Fetches delta messages where `message_seq > afterSeq` with an explicit page limit (Spec §6).
   Future<List<ChatMessageDto>> fetchDeltaMessages(
     String channelId,
     int afterSeq, {
@@ -195,7 +270,8 @@ class ChatRemoteDataSource {
     final res = await _supabase
         .from('messages')
         .select(
-          '*, sender:profiles!messages_sender_id_fkey(display_name), attachments:message_attachments(*), reactions:message_reactions(*)',
+          '*,sender:profiles!messages_sender_id_fkey(display_name),'
+          'attachments:message_attachments(*),reactions:message_reactions(*)',
         )
         .eq('channel_id', channelId)
         .gt('message_seq', afterSeq)
@@ -205,7 +281,6 @@ class ChatRemoteDataSource {
     return _parseMessageDtos(res as List);
   }
 
-  /// Fetches an older page of message history before [beforeSeq].
   Future<List<ChatMessageDto>> fetchOlderMessages(
     String channelId,
     int beforeSeq, {
@@ -214,19 +289,17 @@ class ChatRemoteDataSource {
     final res = await _supabase
         .from('messages')
         .select(
-          '*, sender:profiles!messages_sender_id_fkey(display_name), attachments:message_attachments(*), reactions:message_reactions(*)',
+          '*,sender:profiles!messages_sender_id_fkey(display_name),'
+          'attachments:message_attachments(*),reactions:message_reactions(*)',
         )
         .eq('channel_id', channelId)
         .lt('message_seq', beforeSeq)
         .order('message_seq', ascending: false)
         .limit(limit);
 
-    final list = _parseMessageDtos(res as List);
-    // Reverse to chronological order (asc)
-    return list.reversed.toList();
+    return _parseMessageDtos(res as List).reversed.toList();
   }
 
-  /// Uploads media attachment bytes to Supabase Storage private bucket and returns the storage path (Spec §26).
   Future<String> uploadMediaAttachment({
     required List<int> bytes,
     required String channelId,
@@ -248,23 +321,23 @@ class ChatRemoteDataSource {
     return path;
   }
 
-  /// Generates a temporary signed URL for authorized access to private chat media (Spec §26).
-  Future<String> getMediaSignedUrl(String storagePath, {int expiresInSeconds = 3600}) {
+  Future<String> getMediaSignedUrl(
+    String storagePath, {
+    int expiresInSeconds = 3600,
+  }) {
     return _supabase.storage
         .from('chat-media')
         .createSignedUrl(storagePath, expiresInSeconds);
   }
 
-  /// Deletes an uploaded attachment object from private chat-media storage on terminal send failure (Spec §26).
   Future<void> deleteStorageAttachment(String storagePath) async {
     try {
       await _supabase.storage.from('chat-media').remove([storagePath]);
     } catch (e) {
-      debugPrint('[ChatRemoteDataSource] Error cleaning up storage object: $e');
+      debugPrint('[ChatRemoteDataSource] Storage cleanup failed: $e');
     }
   }
 
-  /// Fetches durable changes from `chat_changes` ledger occurring after [afterChangeSeq] (Spec §12).
   Future<List<Map<String, dynamic>>> fetchChannelChanges(
     String channelId, {
     int? afterChangeSeq,
@@ -286,15 +359,14 @@ class ChatRemoteDataSource {
   List<ChatMessageDto> _parseMessageDtos(List<dynamic> rows) {
     final currentUserId = _supabase.auth.currentUser?.id;
 
-    return rows.map((r) {
-      final map = Map<String, dynamic>.from(r as Map);
-      // Flatten joined sender display_name
-      final senderObj = map['sender'];
-      if (senderObj is Map && senderObj['display_name'] != null) {
-        map['sender_display_name'] = senderObj['display_name'];
+    return rows.map((row) {
+      final map = Map<String, dynamic>.from(row as Map);
+      final sender = map['sender'];
+      if (sender is Map && sender['display_name'] != null) {
+        map['sender_display_name'] = sender['display_name'];
       }
-      map['from_me'] = currentUserId != null && map['sender_id'] == currentUserId;
-
+      map['from_me'] =
+          currentUserId != null && map['sender_id'] == currentUserId;
       return ChatMessageDto.fromJson(map);
     }).toList();
   }

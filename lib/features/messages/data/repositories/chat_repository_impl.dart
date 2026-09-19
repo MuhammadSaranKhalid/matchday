@@ -11,7 +11,10 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/chat_channel.dart';
+import '../../domain/entities/chat_draft.dart';
 import '../../domain/entities/chat_message.dart';
+import '../../domain/entities/chat_participant.dart';
+import '../../domain/entities/chat_sync_state.dart';
 import '../../domain/entities/message_attachment.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../domain/value_objects/message_body.dart';
@@ -22,8 +25,11 @@ import '../sync/outbox_processor.dart';
 import '../sync/receipt_coordinator.dart';
 import '../sync/realtime_ingestor.dart';
 
-/// Production implementation of ChatRepository.
-/// Follows Clean Architecture, local-first outbox pattern, and reactive Drift streams.
+/// Production local-first implementation of [ChatRepository].
+///
+/// Presentation reads ONLY Drift streams. Supabase is the authoritative remote
+/// write/reconciliation source and the Outbox is the only path for durable
+/// offline mutations.
 class ChatRepositoryImpl implements ChatRepository {
   ChatRepositoryImpl({
     required ChatLocalDataSource localDataSource,
@@ -56,11 +62,7 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Stream<List<ChatChannel>> watchInbox() {
     final userId = _currentUserId;
-    if (userId == null) {
-      return Stream.value(const []);
-    }
-
-    // Return reactive Drift stream (single read path per Spec §9)
+    if (userId == null) return Stream.value(const []);
     return _local.watchInbox(userId);
   }
 
@@ -70,11 +72,12 @@ class ChatRepositoryImpl implements ChatRepository {
     if (userId == null) {
       return left(const AuthFailure('User not authenticated'));
     }
+
     try {
       await _syncCoordinator.syncInbox(userId);
       return right(unit);
     } catch (e) {
-      return left(ServerFailure(e.toString()));
+      return left(ServerFailure('Failed to refresh chats: $e'));
     }
   }
 
@@ -84,12 +87,17 @@ class ChatRepositoryImpl implements ChatRepository {
     int? beforeMessageSeq,
   }) {
     final userId = _currentUserId;
-    if (userId == null) {
-      return Stream.value(const []);
-    }
+    if (userId == null) return Stream.value(const <ChatMessage>[]);
 
-    // Trigger open-channel sequence asynchronously
-    unawaited(_syncCoordinator.openChannel(channelId, userId));
+    // Drift remains the immediate UI source. The coordinator owns the
+    // realtime/Presence policy and opens the transport exactly once for the
+    // lifetime of the thread provider.
+    unawaited(
+      _syncCoordinator.openChannel(
+        channelId,
+        userId,
+      ),
+    );
 
     return _local.watchMessages(
       channelId,
@@ -97,6 +105,14 @@ class ChatRepositoryImpl implements ChatRepository {
       beforeMessageSeq: beforeMessageSeq,
     );
   }
+
+  @override
+  Stream<List<ChatParticipant>> watchParticipants(String channelId) =>
+      _local.watchParticipants(channelId);
+
+  @override
+  Stream<ChatSyncState> watchSyncState(String channelId) =>
+      _local.watchChannelSyncState(channelId);
 
   @override
   Future<Either<Failure, ChatMessage>> sendMessage(
@@ -113,8 +129,7 @@ class ChatRepositoryImpl implements ChatRepository {
       final messageId = _uuid.v4();
       final now = DateTime.now().toUtc();
 
-      // Optimistic message row
-      final messageComp = LocalMessagesCompanion.insert(
+      final message = LocalMessagesCompanion.insert(
         messageId: messageId,
         channelId: channelId,
         senderId: Value(userId),
@@ -127,9 +142,9 @@ class ChatRepositoryImpl implements ChatRepository {
         syncStatus: const Value('pending'),
       );
 
-      // Outbox operation row
-      final opComp = OutboxOperationsCompanion.insert(
+      final operation = OutboxOperationsCompanion.insert(
         operationId: _uuid.v4(),
+        ownerUserId: Value(userId),
         channelId: channelId,
         entityId: Value(messageId),
         operationType: 'send_message',
@@ -144,29 +159,26 @@ class ChatRepositoryImpl implements ChatRepository {
         updatedAt: now,
       );
 
-      // Atomic Drift commit
       await _local.enqueueOutgoingMessage(
-        message: messageComp,
-        operation: opComp,
+        message: message,
+        operation: operation,
       );
-
-      // Notify background worker
       _outbox.notify();
 
-      final optimisticEntity = ChatMessage(
-        id: messageId,
-        channelId: channelId,
-        senderId: userId,
-        messageType: 'text',
-        body: body.value,
-        replyToId: replyToId,
-        createdAt: now,
-        fromMe: true,
-        syncStatus: 'pending',
-        deliveryStatus: MessageDeliveryStatus.pending,
+      return right(
+        ChatMessage(
+          id: messageId,
+          channelId: channelId,
+          senderId: userId,
+          messageType: 'text',
+          body: body.value,
+          replyToId: replyToId,
+          createdAt: now,
+          fromMe: true,
+          syncStatus: 'pending',
+          deliveryStatus: MessageDeliveryStatus.pending,
+        ),
       );
-
-      return right(optimisticEntity);
     } catch (e) {
       return left(CacheFailure('Failed to enqueue message: $e'));
     }
@@ -189,20 +201,23 @@ class ChatRepositoryImpl implements ChatRepository {
       final messageId = _uuid.v4();
       final attachmentId = _uuid.v4();
       final now = DateTime.now().toUtc();
-      final mimeType = extension.toLowerCase() == 'png' ? 'image/png' : 'image/jpeg';
+      final normalizedExt = extension.replaceFirst('.', '').toLowerCase();
+      final mimeType = normalizedExt == 'png' ? 'image/png' : 'image/jpeg';
 
-      // 1. Cache image locally in durable app support directory (Spec §25)
-      final appSupportDir = await getApplicationSupportDirectory();
-      final outboxDir = io.Directory('${appSupportDir.path}/chat_outbox/$userId/$channelId');
+      // A durable application-support file keeps an offline image available
+      // even when the OS clears the image picker's temporary file.
+      final supportDir = await getApplicationSupportDirectory();
+      final outboxDir = io.Directory(
+        '${supportDir.path}/chat_outbox/$userId/$channelId',
+      );
       if (!await outboxDir.exists()) {
         await outboxDir.create(recursive: true);
       }
-      final localPath = '${outboxDir.path}/$attachmentId.$extension';
-      final localFile = io.File(localPath);
-      await localFile.writeAsBytes(imageBytes);
 
-      // 2. Commit to Drift + Outbox
-      final messageComp = LocalMessagesCompanion.insert(
+      final localPath = '${outboxDir.path}/$attachmentId.$normalizedExt';
+      await io.File(localPath).writeAsBytes(imageBytes);
+
+      final message = LocalMessagesCompanion.insert(
         messageId: messageId,
         channelId: channelId,
         senderId: Value(userId),
@@ -216,7 +231,7 @@ class ChatRepositoryImpl implements ChatRepository {
         syncStatus: const Value('pending'),
       );
 
-      final attComp = LocalMessageAttachmentsCompanion.insert(
+      final attachment = LocalMessageAttachmentsCompanion.insert(
         attachmentId: attachmentId,
         messageId: messageId,
         localPath: Value(localPath),
@@ -225,8 +240,9 @@ class ChatRepositoryImpl implements ChatRepository {
         uploadStatus: const Value('pending'),
       );
 
-      final opComp = OutboxOperationsCompanion.insert(
+      final operation = OutboxOperationsCompanion.insert(
         operationId: _uuid.v4(),
+        ownerUserId: Value(userId),
         channelId: channelId,
         entityId: Value(messageId),
         operationType: 'send_message',
@@ -237,7 +253,7 @@ class ChatRepositoryImpl implements ChatRepository {
           'message_type': 'image',
           'attachment_id': attachmentId,
           'local_path': localPath,
-          'extension': extension,
+          'extension': normalizedExt,
           'mime_type': mimeType,
           'reply_to_message_id': replyToId,
         }),
@@ -246,38 +262,37 @@ class ChatRepositoryImpl implements ChatRepository {
       );
 
       await _local.enqueueOutgoingMessage(
-        message: messageComp,
-        operation: opComp,
-        attachments: [attComp],
+        message: message,
+        operation: operation,
+        attachments: [attachment],
       );
-
       _outbox.notify();
 
-      final optimisticEntity = ChatMessage(
-        id: messageId,
-        channelId: channelId,
-        senderId: userId,
-        messageType: 'image',
-        body: caption ?? '',
-        payload: {'local_path': localPath},
-        replyToId: replyToId,
-        createdAt: now,
-        fromMe: true,
-        syncStatus: 'pending',
-        deliveryStatus: MessageDeliveryStatus.pending,
-        attachments: [
-          MessageAttachment(
-            id: attachmentId,
-            messageId: messageId,
-            localPath: localPath,
-            mimeType: mimeType,
-            sizeBytes: imageBytes.length,
-            uploadStatus: 'pending',
-          ),
-        ],
+      return right(
+        ChatMessage(
+          id: messageId,
+          channelId: channelId,
+          senderId: userId,
+          messageType: 'image',
+          body: caption ?? '',
+          payload: {'local_path': localPath},
+          replyToId: replyToId,
+          createdAt: now,
+          fromMe: true,
+          syncStatus: 'pending',
+          deliveryStatus: MessageDeliveryStatus.pending,
+          attachments: [
+            MessageAttachment(
+              id: attachmentId,
+              messageId: messageId,
+              localPath: localPath,
+              mimeType: mimeType,
+              sizeBytes: imageBytes.length,
+              uploadStatus: 'pending',
+            ),
+          ],
+        ),
       );
-
-      return right(optimisticEntity);
     } catch (e) {
       return left(CacheFailure('Failed to enqueue image message: $e'));
     }
@@ -300,75 +315,142 @@ class ChatRepositoryImpl implements ChatRepository {
         return left(const NotFoundFailure('Message not found locally'));
       }
 
-      final channelId = existing.channelId;
+      if (existing.senderId != userId) {
+        return left(const AuthFailure('You can only edit your own message'));
+      }
+      if (existing.deletedAt != null) {
+        return left(const ValidationFailure('Deleted messages cannot be edited'));
+      }
+      if (existing.messageSeq == null) {
+        return left(
+          const ValidationFailure(
+            'Wait for this message to send before editing it',
+          ),
+        );
+      }
+
       final now = DateTime.now().toUtc();
-      final opComp = OutboxOperationsCompanion.insert(
+      final operation = OutboxOperationsCompanion.insert(
         operationId: _uuid.v4(),
-        channelId: channelId,
+        ownerUserId: Value(userId),
+        channelId: existing.channelId,
         entityId: Value(messageId),
         operationType: 'edit_message',
         payloadJson: jsonEncode({
           'message_id': messageId,
-          'channel_id': channelId,
+          'channel_id': existing.channelId,
           'expected_version': expectedVersion,
           'body': newBody,
+          // Inverse state lets the Outbox restore the optimistic UI when the
+          // mutation is permanently rejected by the server.
+          'previous_body': existing.body,
+          'previous_edited_at': existing.editedAt?.toIso8601String(),
+          'previous_updated_at': existing.updatedAt?.toIso8601String(),
         }),
         createdAt: now,
         updatedAt: now,
       );
 
-      final updatedRow = await _local.optimisticEditMessage(
+      final updated = await _local.optimisticEditMessage(
         messageId: messageId,
         newBody: newBody,
-        operation: opComp,
+        operation: operation,
       );
+      if (updated == null) {
+        return left(const NotFoundFailure('Message not found locally'));
+      }
 
       _outbox.notify();
 
-      if (updatedRow == null) {
-        return left(const NotFoundFailure('Failed to update local message'));
-      }
-
-      final entity = ChatMessage(
-        id: updatedRow.messageId,
-        channelId: updatedRow.channelId,
-        senderId: updatedRow.senderId ?? userId,
-        senderDisplayName: updatedRow.senderDisplayName,
-        messageType: updatedRow.messageType,
-        body: updatedRow.body,
-        replyToId: updatedRow.replyToMessageId,
-        createdAt: updatedRow.createdAt ?? updatedRow.localCreatedAt,
-        editedAt: updatedRow.editedAt,
-        fromMe: updatedRow.senderId == userId,
-        syncStatus: updatedRow.syncStatus,
-        deliveryStatus: MessageDeliveryStatus.pending,
+      return right(
+        ChatMessage(
+          id: updated.messageId,
+          messageSeq: updated.messageSeq,
+          channelId: updated.channelId,
+          senderId: updated.senderId,
+          senderDisplayName: updated.senderDisplayName,
+          messageType: updated.messageType,
+          body: updated.body,
+          replyToId: updated.replyToMessageId,
+          version: updated.version,
+          createdAt: updated.createdAt ?? updated.localCreatedAt,
+          editedAt: updated.editedAt,
+          fromMe: updated.senderId == userId,
+          syncStatus: updated.syncStatus,
+          deliveryStatus: MessageDeliveryStatus.sent,
+        ),
       );
-
-      return right(entity);
     } catch (e) {
       return left(CacheFailure('Failed to edit message: $e'));
     }
   }
 
   @override
-  Future<Either<Failure, Unit>> deleteMessage(String channelId, String messageId) async {
-    try {
-      final now = DateTime.now().toUtc();
-      await _local.softDeleteMessageLocally(messageId);
+  Future<Either<Failure, Unit>> deleteMessage(
+    String channelId,
+    String messageId,
+  ) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return left(const AuthFailure('User not authenticated'));
+    }
 
-      final opComp = OutboxOperationsCompanion.insert(
+    try {
+      final existing = await _local.getMessage(messageId);
+      if (existing == null) {
+        return left(const NotFoundFailure('Message not found locally'));
+      }
+
+      if (existing.senderId != userId) {
+        return left(const AuthFailure('You can only delete your own message'));
+      }
+
+      // No server sequence means the optimistic send has never been accepted.
+      // This is a cancellation, not a chat tombstone.
+      if (existing.messageSeq == null && existing.syncStatus != 'sending') {
+        final localFiles = await _local.cancelPendingOutgoingMessage(
+          messageId: messageId,
+          currentUserId: userId,
+        );
+
+        for (final path in localFiles) {
+          try {
+            final file = io.File(path);
+            if (await file.exists()) await file.delete();
+          } catch (_) {
+            // A leftover cache file is non-critical; DB/UI cancellation already
+            // succeeded and must not be reported as a failed user action.
+          }
+        }
+        return right(unit);
+      }
+
+      final now = DateTime.now().toUtc();
+      final operation = OutboxOperationsCompanion.insert(
         operationId: _uuid.v4(),
+        ownerUserId: Value(userId),
         channelId: channelId,
         entityId: Value(messageId),
         operationType: 'delete_message',
-        payloadJson: jsonEncode({'message_id': messageId}),
+        payloadJson: jsonEncode({
+          'message_id': messageId,
+          'previous_body': existing.body,
+          'previous_deleted_at': existing.deletedAt?.toIso8601String(),
+          'previous_updated_at': existing.updatedAt?.toIso8601String(),
+        }),
         createdAt: now,
         updatedAt: now,
       );
 
-      await _local.enqueueOperation(opComp);
-      _outbox.notify();
+      final updated = await _local.optimisticDeleteMessage(
+        messageId: messageId,
+        operation: operation,
+      );
+      if (updated == null) {
+        return left(const NotFoundFailure('Message not found locally'));
+      }
 
+      _outbox.notify();
       return right(unit);
     } catch (e) {
       return left(CacheFailure('Failed to delete message: $e'));
@@ -378,6 +460,12 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<Either<Failure, Unit>> retryMessage(String messageId) async {
     try {
+      final existing = await _local.getMessage(messageId);
+      if (existing == null) {
+        return left(const NotFoundFailure('Message not found locally'));
+      }
+      if (existing.messageSeq != null) return right(unit);
+
       await _local.retryMessage(messageId);
       _outbox.notify();
       return right(unit);
@@ -387,22 +475,16 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> markRead(String channelId, [int? throughMessageSeq]) async {
+  Future<Either<Failure, Unit>> markRead(
+    String channelId, [
+    int? throughMessageSeq,
+  ]) async {
     final userId = _currentUserId;
     if (userId == null) return right(unit);
 
     try {
-      final seq = (throughMessageSeq != null &&
-              throughMessageSeq > 0 &&
-              throughMessageSeq != 999999999)
-          ? throughMessageSeq
-          : await _local.getLatestMessageSeq(channelId);
-
-      // Guard: If channel has no messages, never store or enqueue 0.
-      if (seq == null || seq <= 0) {
-        return right(unit);
-      }
-
+      final seq = throughMessageSeq ?? await _local.getLatestMessageSeq(channelId);
+      if (seq == null || seq <= 0) return right(unit);
       await _receiptCoordinator.markRead(channelId, userId, seq);
       return right(unit);
     } catch (e) {
@@ -411,13 +493,19 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> markDelivered(String channelId, int throughMessageSeq) async {
+  Future<Either<Failure, Unit>> markDelivered(
+    String channelId,
+    int throughMessageSeq,
+  ) async {
     final userId = _currentUserId;
-    if (userId == null) return right(unit);
-    if (throughMessageSeq <= 0) return right(unit);
+    if (userId == null || throughMessageSeq <= 0) return right(unit);
 
     try {
-      await _receiptCoordinator.markDelivered(channelId, userId, throughMessageSeq);
+      await _receiptCoordinator.markDelivered(
+        channelId,
+        userId,
+        throughMessageSeq,
+      );
       return right(unit);
     } catch (e) {
       return left(CacheFailure('Failed to mark delivered: $e'));
@@ -435,28 +523,60 @@ class ChatRepositoryImpl implements ChatRepository {
     String reaction,
     bool selected,
   ) async {
-    try {
-      final msg = await _local.getMessage(messageId);
-      final channelId = msg?.channelId ?? '';
+    final userId = _currentUserId;
+    if (userId == null) {
+      return left(const AuthFailure('User not authenticated'));
+    }
 
-      final opComp = OutboxOperationsCompanion.insert(
+    try {
+      final message = await _local.getMessage(messageId);
+      if (message == null) {
+        return left(const NotFoundFailure('Message not found locally'));
+      }
+      if (message.messageSeq == null) {
+        return left(
+          const ValidationFailure(
+            'Wait for this message to send before reacting',
+          ),
+        );
+      }
+
+      final previous = await _local.getReaction(
+        messageId: messageId,
+        userId: userId,
+        reaction: reaction,
+      );
+      final previouslySelected = previous != null && previous.removedAt == null;
+      final now = DateTime.now().toUtc();
+
+      await _local.upsertReaction(
+        messageId: messageId,
+        userId: userId,
+        reaction: reaction,
+        createdAt: previous?.createdAt ?? now,
+        removedAt: selected ? null : now,
+      );
+
+      final operation = OutboxOperationsCompanion.insert(
         operationId: _uuid.v4(),
-        channelId: channelId,
+        ownerUserId: Value(userId),
+        channelId: message.channelId,
         entityId: Value(messageId),
         operationType: 'set_reaction',
-        coalesceKey: Value('reaction:$messageId:$reaction'),
+        coalesceKey: Value('reaction:$messageId:$userId:$reaction'),
         payloadJson: jsonEncode({
           'message_id': messageId,
           'reaction': reaction,
           'selected': selected,
+          'user_id': userId,
+          'previous_selected': previouslySelected,
         }),
-        createdAt: DateTime.now().toUtc(),
-        updatedAt: DateTime.now().toUtc(),
+        createdAt: now,
+        updatedAt: now,
       );
 
-      await _local.enqueueOperation(opComp);
+      await _local.enqueueOperation(operation);
       _outbox.notify();
-
       return right(unit);
     } catch (e) {
       return left(CacheFailure('Failed to set reaction: $e'));
@@ -465,12 +585,14 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<Either<Failure, String>> getOrCreateDmChat(String targetUserId) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return left(const AuthFailure('User not authenticated'));
+    }
+
     try {
       final channelId = await _remote.getOrCreateDirectChannel(targetUserId);
-      final userId = _currentUserId;
-      if (userId != null) {
-        await _syncCoordinator.syncInbox(userId);
-      }
+      await _syncCoordinator.syncInbox(userId);
       return right(channelId);
     } on PostgrestException catch (e) {
       return left(ServerFailure(e.message));
@@ -480,37 +602,68 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> acceptDirectRequest(String channelId) async {
+  Future<Either<Failure, String>> createGroupChat({
+    required String title,
+    required List<String> memberUserIds,
+    String? description,
+    String? avatarUrl,
+  }) async {
     final userId = _currentUserId;
     if (userId == null) {
       return left(const AuthFailure('User not authenticated'));
     }
 
     try {
-      final now = DateTime.now().toUtc();
-      await _local.updateMemberStatus(channelId, userId, 'active');
-
-      final opComp = OutboxOperationsCompanion.insert(
-        operationId: _uuid.v4(),
-        channelId: channelId,
-        entityId: Value(channelId),
-        operationType: 'accept_invite',
-        payloadJson: jsonEncode({'channel_id': channelId}),
-        createdAt: now,
-        updatedAt: now,
+      final channelId = await _remote.createGroupChannel(
+        title: title,
+        memberUserIds: memberUserIds,
+        description: description,
+        avatarUrl: avatarUrl,
       );
-
-      await _local.enqueueOperation(opComp);
-      _outbox.notify();
-
-      return right(unit);
+      await _syncCoordinator.syncInbox(userId);
+      return right(channelId);
+    } on PostgrestException catch (e) {
+      return left(ServerFailure(e.message));
     } catch (e) {
-      return left(CacheFailure('Failed to accept chat: $e'));
+      return left(ServerFailure('Failed to create group: $e'));
     }
   }
 
   @override
+  Future<Either<Failure, Unit>> acceptDirectRequest(String channelId) async {
+    final result = await _changeRequestStatus(
+      channelId: channelId,
+      localStatus: 'active',
+      operationType: 'accept_invite',
+    );
+
+    final userId = _currentUserId;
+    if (result.isRight() && userId != null) {
+      // The user has explicitly accepted the request. If this thread is
+      // already open, enter Presence on its existing presence-capable Ably
+      // attachment. Do not rebuild/re-subscribe the message thread.
+      unawaited(
+        _syncCoordinator.enablePresenceForOpenChannel(channelId),
+      );
+    }
+
+    return result;
+  }
+
+  @override
   Future<Either<Failure, Unit>> declineDirectRequest(String channelId) async {
+    return _changeRequestStatus(
+      channelId: channelId,
+      localStatus: 'declined',
+      operationType: 'decline_invite',
+    );
+  }
+
+  Future<Either<Failure, Unit>> _changeRequestStatus({
+    required String channelId,
+    required String localStatus,
+    required String operationType,
+  }) async {
     final userId = _currentUserId;
     if (userId == null) {
       return left(const AuthFailure('User not authenticated'));
@@ -518,24 +671,27 @@ class ChatRepositoryImpl implements ChatRepository {
 
     try {
       final now = DateTime.now().toUtc();
-      await _local.updateMemberStatus(channelId, userId, 'declined');
-
-      final opComp = OutboxOperationsCompanion.insert(
+      final operation = OutboxOperationsCompanion.insert(
         operationId: _uuid.v4(),
+        ownerUserId: Value(userId),
         channelId: channelId,
         entityId: Value(channelId),
-        operationType: 'decline_invite',
+        operationType: operationType,
         payloadJson: jsonEncode({'channel_id': channelId}),
         createdAt: now,
         updatedAt: now,
       );
 
-      await _local.enqueueOperation(opComp);
+      await _local.optimisticMemberStatusChange(
+        channelId: channelId,
+        userId: userId,
+        status: localStatus,
+        operation: operation,
+      );
       _outbox.notify();
-
       return right(unit);
     } catch (e) {
-      return left(CacheFailure('Failed to decline chat: $e'));
+      return left(CacheFailure('Failed to update chat request: $e'));
     }
   }
 
@@ -545,25 +701,28 @@ class ChatRepositoryImpl implements ChatRepository {
     if (userId == null) return right(0);
 
     try {
-      final count = await _syncCoordinator.loadOlderMessages(channelId, userId);
-      return right(count);
+      return right(
+        await _syncCoordinator.loadOlderMessages(channelId, userId),
+      );
     } catch (e) {
       return left(ServerFailure('Failed to load older messages: $e'));
     }
   }
 
   @override
-  Future<String?> readDraft(String channelId) => _local.readDraft(channelId);
+  Future<ChatDraft?> readDraftState(String channelId) =>
+      _local.readDraftState(channelId);
 
   @override
-  Future<void> saveDraft(String channelId, String body) =>
-      _local.saveDraft(channelId, body);
+  Future<void> saveDraftState(String channelId, ChatDraft draft) =>
+      _local.saveDraftState(channelId, draft);
 
   @override
   Future<void> deleteDraft(String channelId) => _local.deleteDraft(channelId);
 
   @override
-  Stream<bool> watchTyping(String channelId) => _ingestor.watchTyping(channelId);
+  Stream<Set<String>> watchTypingUsers(String channelId) =>
+      _ingestor.watchTypingUsers(channelId);
 
   @override
   Future<void> setTyping(String channelId, bool isTyping) async {
@@ -576,5 +735,25 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Stream<Set<String>> watchPresence(String channelId) =>
       _ingestor.watchPresence(channelId);
-}
 
+  @override
+  Future<Either<Failure, String>> resolveMediaUrl(String storagePath) async {
+    if (storagePath.startsWith('http://') ||
+        storagePath.startsWith('https://')) {
+      return right(storagePath);
+    }
+
+    try {
+      return right(
+        await _remote.getMediaSignedUrl(
+          storagePath,
+          expiresInSeconds: 3600,
+        ),
+      );
+    } on StorageException catch (e) {
+      return left(ServerFailure(e.message));
+    } catch (e) {
+      return left(ServerFailure('Could not load chat media: $e'));
+    }
+  }
+}

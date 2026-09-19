@@ -10,211 +10,297 @@ import '../../../../core/database/app_database.dart';
 import '../datasources/chat_local_data_source.dart';
 import '../datasources/chat_remote_data_source.dart';
 
-/// FIFO queue processor draining offline outbox operations reliably per Spec §7.2.
+/// FIFO processor for durable offline chat mutations.
 class OutboxProcessor {
-  OutboxProcessor(this._local, this._remote);
+  OutboxProcessor(
+    this._local,
+    this._remote, {
+    required String? Function() currentUserId,
+  }) : _currentUserId = currentUserId;
 
   final ChatLocalDataSource _local;
   final ChatRemoteDataSource _remote;
+  final String? Function() _currentUserId;
 
   bool _isProcessing = false;
+  bool _drainAgainRequested = false;
   Timer? _retryTimer;
   static const int _maxRetries = 5;
 
-  /// Signals the processor that new outbox operations are available.
   void notify() {
+    if (_isProcessing) {
+      // The active drain already owns a snapshot. Remember that another pass
+      // is required instead of silently dropping this wake-up.
+      _drainAgainRequested = true;
+      return;
+    }
     _scheduleDrain();
   }
 
   void _scheduleDrain() {
-    if (_isProcessing) return;
+    if (_isProcessing) {
+      _drainAgainRequested = true;
+      return;
+    }
     scheduleMicrotask(drain);
   }
 
-  /// Drains pending operations across all channel lanes.
   Future<void> drain() async {
-    if (_isProcessing) return;
+    if (_isProcessing) {
+      _drainAgainRequested = true;
+      return;
+    }
+
     _isProcessing = true;
-
     try {
-      final pendingOps = await _local.getPendingOperations();
-      if (pendingOps.isEmpty) return;
+      final ownerUserId = _currentUserId();
+      if (ownerUserId == null) return;
 
-      // Group operations by channelId for strict FIFO per-channel execution
-      final channelLanes = <String, List<OutboxOperationRow>>{};
-      for (final op in pendingOps) {
-        channelLanes.putIfAbsent(op.channelId, () => []).add(op);
+      final ready = await _local.getPendingOperations(
+        ownerUserId: ownerUserId,
+      );
+      if (ready.isEmpty) return;
+
+      final lanes = <String, List<OutboxOperationRow>>{};
+      for (final operation in ready) {
+        lanes.putIfAbsent(operation.channelId, () => []).add(operation);
       }
 
-      // Execute channels with max 4 concurrent lanes, operations within each channel sequentially
       const maxConcurrentLanes = 4;
-      final entries = channelLanes.entries.toList();
-      var nextIdx = 0;
-      Future<void> runWorker() async {
-        while (true) {
-          if (nextIdx >= entries.length) break;
-          final entry = entries[nextIdx++];
-          await _processChannelLane(entry.key, entry.value);
+      final entries = lanes.entries.toList();
+      var cursor = 0;
+
+      Future<void> worker() async {
+        while (cursor < entries.length) {
+          final entry = entries[cursor++];
+          await _processLane(entry.value);
         }
       }
 
-      final workers = List.generate(
-        min(maxConcurrentLanes, entries.length),
-        (_) => runWorker(),
+      await Future.wait(
+        List.generate(
+          min(maxConcurrentLanes, entries.length),
+          (_) => worker(),
+        ),
       );
-      await Future.wait(workers);
     } catch (e, st) {
-      debugPrint('[OutboxProcessor] Error draining outbox: $e\n$st');
+      debugPrint('[OutboxProcessor] drain failed: $e\n$st');
     } finally {
       _isProcessing = false;
-      _scheduleNextRetry();
+
+      if (_drainAgainRequested) {
+        _drainAgainRequested = false;
+        scheduleMicrotask(drain);
+      } else {
+        await _scheduleNextRetry();
+      }
     }
   }
 
-  Future<void> _processChannelLane(
-    String channelId,
-    List<OutboxOperationRow> operations,
-  ) async {
-    for (final op in operations) {
-      await _local.updateOutboxOperation(op.operationId, status: 'processing');
+  Future<void> _processLane(List<OutboxOperationRow> snapshots) async {
+    for (final snapshot in snapshots) {
+      // A user can cancel an unsent message after getPendingOperations() took
+      // its snapshot. Re-read before executing so cancelled work stays gone.
+      final operation = await _local.getOutboxOperation(snapshot.operationId);
+      if (operation == null) continue;
+
+      // Never execute another account's durable command. Re-check the active
+      // auth identity for every operation because the user can switch accounts
+      // after the drain snapshot was taken.
+      final activeUserId = _currentUserId();
+      if (activeUserId == null || operation.ownerUserId != activeUserId) {
+        break;
+      }
+
+      await _local.updateOutboxOperation(
+        operation.operationId,
+        status: 'processing',
+      );
+
+      if (operation.operationType == 'send_message' &&
+          operation.entityId != null) {
+        await _local.updateMessageSyncStatus(
+          operation.entityId!,
+          syncStatus: 'sending',
+        );
+      }
 
       try {
-        await _executeOperation(op);
-        // Successful execution: delete operation
-        await _local.deleteOutboxOperation(op.operationId);
+        await _executeOperation(operation);
+        await _local.deleteOutboxOperation(operation.operationId);
       } catch (e) {
-        final isOffline = _isNetworkOrOfflineError(e);
-        final isTerminal = _isTerminalError(e);
+        final offline = _isNetworkOrOfflineError(e);
+        final terminal = _isTerminalError(e);
+        final nextAttempt = operation.attemptCount + 1;
 
-        if (!isOffline && (isTerminal || op.attemptCount + 1 >= _maxRetries)) {
-          final nextAttempt = op.attemptCount + 1;
-          debugPrint('[OutboxProcessor] Terminal error for op ${op.operationId}: $e');
+        if (!offline && (terminal || nextAttempt >= _maxRetries)) {
           await _local.updateOutboxOperation(
-            op.operationId,
+            operation.operationId,
             status: 'failed',
             attemptCount: nextAttempt,
             lastErrorCode: _extractErrorCode(e),
             lastErrorMessage: e.toString(),
           );
 
-          if (op.operationType == 'send_message' && op.entityId != null) {
+          if (operation.operationType == 'edit_message' ||
+              operation.operationType == 'delete_message' ||
+              operation.operationType == 'set_reaction') {
+            await _rollbackOptimisticMutation(operation);
+            // These mutations can be issued again as fresh commands. Once the
+            // optimistic UI has been rolled back, retaining a permanently
+            // failed row only pollutes the queue. Failed SEND rows are kept
+            // because the user can explicitly Retry them.
+            await _local.deleteOutboxOperation(operation.operationId);
+          }
+
+          if (operation.operationType == 'send_message' &&
+              operation.entityId != null) {
             await _local.updateMessageSyncStatus(
-              op.entityId!,
+              operation.entityId!,
               syncStatus: 'failed',
               sendErrorCode: _extractErrorCode(e),
               sendErrorMessage: e.toString(),
             );
 
-            // Clean up storage object on terminal failure to prevent orphaned media (Spec §8.4)
+            // The message stays visible for Retry/Remove, but a remotely
+            // uploaded object from a permanently failed send is an orphan.
             try {
-              final attachments = await _local.getAttachmentsForMessage(op.entityId!);
-              for (final att in attachments) {
-                if (att.storagePath != null && att.storagePath!.isNotEmpty) {
-                  await _remote.deleteStorageAttachment(att.storagePath!);
+              final attachments = await _local.getAttachmentsForMessage(
+                operation.entityId!,
+              );
+              for (final attachment in attachments) {
+                final path = attachment.storagePath;
+                if (path != null && path.isNotEmpty) {
+                  await _remote.deleteStorageAttachment(path);
                 }
               }
-            } catch (cleanupErr) {
-              debugPrint('[OutboxProcessor] Non-critical error cleaning storage attachment: $cleanupErr');
+            } catch (cleanupError) {
+              debugPrint(
+                '[OutboxProcessor] storage cleanup failed: $cleanupError',
+              );
             }
           }
-        } else if (isOffline) {
-          debugPrint(
-            '[OutboxProcessor] Op ${op.operationId} network/offline error. Preserving attempt count (${op.attemptCount}). Retrying when online.',
-          );
+        } else if (offline) {
+          await _resetSendToPending(operation, e, code: 'NETWORK_OFFLINE');
           await _local.updateOutboxOperation(
-            op.operationId,
+            operation.operationId,
             status: 'retry_wait',
-            attemptCount: op.attemptCount,
-            nextAttemptAt: DateTime.now().toUtc().add(const Duration(seconds: 15)),
+            attemptCount: operation.attemptCount,
+            nextAttemptAt:
+                DateTime.now().toUtc().add(const Duration(seconds: 15)),
             lastErrorCode: 'NETWORK_OFFLINE',
             lastErrorMessage: e.toString(),
           );
         } else {
-          // Retryable error: apply exponential backoff with jitter or honor slow-mode cooldown
-          final nextAttempt = op.attemptCount + 1;
-          final cooldownSeconds = _extractSlowModeWaitSeconds(e);
-          final int backoffSeconds;
-          if (cooldownSeconds != null && cooldownSeconds > 0) {
-            backoffSeconds = cooldownSeconds + 1;
-          } else {
-            final jitter = 0.8 + (Random().nextDouble() * 0.4);
-            backoffSeconds = max(1, (pow(2, nextAttempt) * jitter).round());
-          }
-          final nextAttemptAt = DateTime.now().toUtc().add(Duration(seconds: backoffSeconds));
+          final slowModeSeconds = _extractSlowModeWaitSeconds(e);
+          final backoffSeconds = slowModeSeconds != null && slowModeSeconds > 0
+              ? slowModeSeconds + 1
+              : max(
+                  1,
+                  (pow(2, nextAttempt) *
+                          (0.8 + Random().nextDouble() * 0.4))
+                      .round(),
+                );
 
-          debugPrint(
-            '[OutboxProcessor] Op ${op.operationId} failed, retrying in $backoffSeconds s. Error: $e',
+          await _resetSendToPending(
+            operation,
+            e,
+            code: _extractErrorCode(e),
           );
-
           await _local.updateOutboxOperation(
-            op.operationId,
+            operation.operationId,
             status: 'retry_wait',
             attemptCount: nextAttempt,
-            nextAttemptAt: nextAttemptAt,
+            nextAttemptAt: DateTime.now()
+                .toUtc()
+                .add(Duration(seconds: backoffSeconds)),
             lastErrorCode: _extractErrorCode(e),
             lastErrorMessage: e.toString(),
           );
         }
 
-        // Break channel lane on error to preserve FIFO ordering
+        // Preserve strict FIFO within this channel. Later operations may
+        // depend on the failed operation having completed first.
         break;
       }
     }
   }
 
-  Future<void> _executeOperation(OutboxOperationRow op) async {
-    final payload = jsonDecode(op.payloadJson) as Map<String, dynamic>;
+  Future<void> _resetSendToPending(
+    OutboxOperationRow operation,
+    Object error, {
+    String? code,
+  }) async {
+    if (operation.operationType != 'send_message' ||
+        operation.entityId == null) {
+      return;
+    }
 
-    switch (op.operationType) {
+    await _local.updateMessageSyncStatus(
+      operation.entityId!,
+      syncStatus: 'pending',
+      sendErrorCode: code,
+      sendErrorMessage: error.toString(),
+    );
+  }
+
+  Future<void> _executeOperation(OutboxOperationRow operation) async {
+    final payload = jsonDecode(operation.payloadJson) as Map<String, dynamic>;
+
+    switch (operation.operationType) {
       case 'send_message':
-        final messageId = op.entityId ?? payload['message_id'] as String;
-        final channelId = op.channelId;
-        final messageType = payload['message_type'] as String? ?? 'text';
+        final messageId =
+            operation.entityId ?? payload['message_id'] as String;
+        final channelId = operation.channelId;
+        final type = payload['message_type'] as String? ?? 'text';
         final body = payload['body'] as String?;
-        final replyToId = payload['reply_to_message_id'] as String?;
-        var msgPayload = payload['payload'] as Map<String, dynamic>?;
+        final replyTo = payload['reply_to_message_id'] as String?;
+        var messagePayload = payload['payload'] is Map
+            ? Map<String, dynamic>.from(payload['payload'] as Map)
+            : <String, dynamic>{};
 
-        // Offline Attachment handling (Spec §8.4)
-        if (messageType == 'image') {
+        if (type == 'image') {
           final localPath = payload['local_path'] as String?;
           final attachmentId = payload['attachment_id'] as String?;
           final extension = payload['extension'] as String? ?? 'jpg';
           final mimeType = payload['mime_type'] as String? ?? 'image/jpeg';
           final fileName = payload['file_name'] as String?;
-          final width = payload['width'] as int?;
-          final height = payload['height'] as int?;
+          final width = (payload['width'] as num?)?.toInt();
+          final height = (payload['height'] as num?)?.toInt();
 
-          String? storageUrl = msgPayload?['media_url'] as String?;
+          String? storagePath = messagePayload['media_url'] as String?;
           int? sizeBytes;
 
-          if (storageUrl == null && localPath != null && attachmentId != null) {
+          if (storagePath == null && localPath != null && attachmentId != null) {
             final file = io.File(localPath);
-            if (await file.exists()) {
-              final bytes = await file.readAsBytes();
-              sizeBytes = bytes.length;
-              storageUrl = await _remote.uploadMediaAttachment(
-                bytes: bytes,
-                channelId: channelId,
-                messageId: messageId,
-                attachmentId: attachmentId,
-                extension: extension,
-                mimeType: mimeType,
-              );
-              await _local.updateAttachmentStoragePath(
-                attachmentId,
-                storagePath: storageUrl,
-                uploadStatus: 'uploaded',
-              );
+            if (!await file.exists()) {
+              throw StateError('Pending chat attachment file is missing');
             }
+
+            final bytes = await file.readAsBytes();
+            sizeBytes = bytes.length;
+            storagePath = await _remote.uploadMediaAttachment(
+              bytes: bytes,
+              channelId: channelId,
+              messageId: messageId,
+              attachmentId: attachmentId,
+              extension: extension,
+              mimeType: mimeType,
+            );
+            await _local.updateAttachmentStoragePath(
+              attachmentId,
+              storagePath: storagePath,
+              uploadStatus: 'uploaded',
+            );
           }
 
-          if (storageUrl != null) {
-            msgPayload = {
-              ...?msgPayload,
-              'media_url': storageUrl,
+          if (storagePath != null) {
+            messagePayload = {
+              ...messagePayload,
+              'media_url': storagePath,
               'attachment': {
                 if (attachmentId != null) 'attachment_id': attachmentId,
-                'storage_path': storageUrl,
+                'storage_path': storagePath,
                 'mime_type': mimeType,
                 if (fileName != null) 'file_name': fileName,
                 if (sizeBytes != null) 'size_bytes': sizeBytes,
@@ -225,217 +311,251 @@ class OutboxProcessor {
           }
         }
 
-        final confirmedDto = await _remote.sendChannelMessage(
+        final confirmed = await _remote.sendChannelMessage(
           messageId: messageId,
           channelId: channelId,
-          messageType: messageType,
+          messageType: type,
           body: body,
-          replyToMessageId: replyToId,
-          payload: msgPayload,
+          replyToMessageId: replyTo,
+          payload: messagePayload,
         );
 
-        // Clean up outbox file after confirmed upload and send (Spec §25)
-        if (messageType == 'image') {
+        if (type == 'image') {
           final localPath = payload['local_path'] as String?;
+          final attachmentId = payload['attachment_id'] as String?;
           if (localPath != null && localPath.contains('chat_outbox')) {
             try {
               final file = io.File(localPath);
-              if (await file.exists()) {
-                await file.delete();
+              if (await file.exists()) await file.delete();
+              if (attachmentId != null) {
+                await _local.clearAttachmentLocalPath(attachmentId);
               }
             } catch (e) {
-              debugPrint('[OutboxProcessor] Non-critical error cleaning outbox file: $e');
+              debugPrint('[OutboxProcessor] local file cleanup failed: $e');
             }
           }
         }
 
-        // Update local message with confirmed server sequence
         await _local.updateMessageSyncStatus(
           messageId,
           syncStatus: 'sent',
-          messageSeq: confirmedDto.messageSeq,
-          version: confirmedDto.version,
+          messageSeq: confirmed.messageSeq,
+          version: confirmed.version,
         );
 
-        // Advance sender's own read and delivered horizons locally
-        if (confirmedDto.messageSeq != null && confirmedDto.senderId != null) {
+        if (confirmed.messageSeq != null && confirmed.senderId != null) {
           await _local.updateMemberHorizons(
             channelId,
-            confirmedDto.senderId!,
-            readSeq: confirmedDto.messageSeq,
-            deliveredSeq: confirmedDto.messageSeq,
+            confirmed.senderId!,
+            readSeq: confirmed.messageSeq,
+            deliveredSeq: confirmed.messageSeq,
           );
         }
         break;
 
       case 'edit_message':
-        final messageId = op.entityId ?? payload['message_id'] as String;
-        final expectedVersion = payload['expected_version'] as int? ?? 1;
-        final newBody = payload['body'] as String;
-        final msgPayload = payload['payload'] as Map<String, dynamic>?;
-
-        final updatedDto = await _remote.editChannelMessage(
+        final messageId =
+            operation.entityId ?? payload['message_id'] as String;
+        final updated = await _remote.editChannelMessage(
           messageId: messageId,
-          expectedVersion: expectedVersion,
-          newBody: newBody,
-          payload: msgPayload,
+          expectedVersion: payload['expected_version'] as int? ?? 1,
+          newBody: payload['body'] as String,
+          payload: payload['payload'] is Map
+              ? Map<String, dynamic>.from(payload['payload'] as Map)
+              : null,
         );
-
         await _local.updateMessageSyncStatus(
           messageId,
           syncStatus: 'sent',
-          version: updatedDto.version,
+          version: updated.version,
         );
         break;
 
       case 'delete_message':
-        final messageId = op.entityId ?? payload['message_id'] as String;
+        final messageId =
+            operation.entityId ?? payload['message_id'] as String;
         await _remote.deleteChannelMessage(messageId);
         await _local.softDeleteMessageLocally(messageId);
         break;
 
       case 'mark_read':
-        final throughSeq = payload['through_seq'] as int;
         await _remote.markChannelRead(
-          channelId: op.channelId,
-          throughSeq: throughSeq,
+          channelId: operation.channelId,
+          throughSeq: (payload['through_seq'] as num).toInt(),
         );
         break;
 
       case 'mark_delivered':
-        final throughSeq = payload['through_seq'] as int;
         await _remote.markChannelDelivered(
-          channelId: op.channelId,
-          throughSeq: throughSeq,
+          channelId: operation.channelId,
+          throughSeq: (payload['through_seq'] as num).toInt(),
         );
         break;
 
       case 'set_reaction':
-        final messageId = op.entityId ?? payload['message_id'] as String;
-        final reaction = payload['reaction'] as String;
-        final selected = payload['selected'] as bool;
         await _remote.setMessageReaction(
-          messageId: messageId,
-          reaction: reaction,
-          selected: selected,
+          messageId: operation.entityId ?? payload['message_id'] as String,
+          reaction: payload['reaction'] as String,
+          selected: payload['selected'] as bool,
         );
         break;
 
       case 'accept_invite':
-        await _remote.acceptChannelInvite(op.channelId);
+        await _remote.acceptChannelInvite(operation.channelId);
         break;
 
       case 'decline_invite':
-        await _remote.declineChannelInvite(op.channelId);
+        await _remote.declineChannelInvite(operation.channelId);
         break;
 
       default:
-        debugPrint('[OutboxProcessor] Unknown operation type: ${op.operationType}');
+        // Returning normally would make the caller delete unknown work as if
+        // it had succeeded. Unknown durable commands must fail loudly.
+        throw StateError(
+          'Unknown chat outbox operation: ${operation.operationType}',
+        );
     }
   }
 
-  bool _isNetworkOrOfflineError(dynamic e) {
-    if (e is io.SocketException ||
-        e is io.HttpException ||
-        e is TimeoutException) {
-      return true;
+  Future<void> _rollbackOptimisticMutation(
+    OutboxOperationRow operation,
+  ) async {
+    final payload = jsonDecode(operation.payloadJson) as Map<String, dynamic>;
+
+    DateTime? parseDate(Object? raw) {
+      if (raw is! String || raw.isEmpty) return null;
+      return DateTime.tryParse(raw);
     }
-    final str = e.toString().toLowerCase();
-    if (str.contains('socketexception') ||
-        str.contains('failed host lookup') ||
-        str.contains('network is unreachable') ||
-        str.contains('network error') ||
-        str.contains('connection refused') ||
-        str.contains('connection timed out') ||
-        str.contains('connection reset') ||
-        str.contains('connection closed') ||
-        str.contains('clientexception') ||
-        str.contains('handshakeexception') ||
-        str.contains('tls exception') ||
-        str.contains('os error') ||
-        str.contains('software caused connection abort')) {
-      return true;
+
+    switch (operation.operationType) {
+      case 'edit_message':
+        final messageId = operation.entityId ?? payload['message_id'] as String?;
+        if (messageId == null) return;
+        await _local.rollbackOptimisticEdit(
+          messageId: messageId,
+          previousBody: payload['previous_body'] as String?,
+          previousEditedAt: parseDate(payload['previous_edited_at']),
+          previousUpdatedAt: parseDate(payload['previous_updated_at']),
+        );
+        break;
+
+      case 'delete_message':
+        final messageId = operation.entityId ?? payload['message_id'] as String?;
+        if (messageId == null) return;
+        await _local.rollbackOptimisticDelete(
+          messageId: messageId,
+          previousBody: payload['previous_body'] as String?,
+          previousDeletedAt: parseDate(payload['previous_deleted_at']),
+          previousUpdatedAt: parseDate(payload['previous_updated_at']),
+        );
+        break;
+
+      case 'set_reaction':
+        final messageId = operation.entityId ?? payload['message_id'] as String?;
+        final userId = payload['user_id'] as String?;
+        final reaction = payload['reaction'] as String?;
+        if (messageId == null || userId == null || reaction == null) return;
+
+        await _local.upsertReaction(
+          messageId: messageId,
+          userId: userId,
+          reaction: reaction,
+          createdAt: DateTime.now().toUtc(),
+          removedAt: payload['previous_selected'] == true
+              ? null
+              : DateTime.now().toUtc(),
+        );
+        break;
     }
-    if (e is PostgrestException) {
-      if (e.code == null &&
-          (e.message.isEmpty ||
-              str.contains('network') ||
-              str.contains('socket') ||
-              str.contains('failed host lookup'))) {
-        return true;
-      }
-    }
-    return false;
   }
 
-  bool _isTerminalError(dynamic e) {
+  bool _isNetworkOrOfflineError(Object e) {
+    if (e is io.SocketException || e is io.HttpException || e is TimeoutException) {
+      return true;
+    }
+
+    final text = e.toString().toLowerCase();
+    return text.contains('socketexception') ||
+        text.contains('failed host lookup') ||
+        text.contains('network is unreachable') ||
+        text.contains('network error') ||
+        text.contains('connection refused') ||
+        text.contains('connection timed out') ||
+        text.contains('connection reset') ||
+        text.contains('connection closed') ||
+        text.contains('clientexception') ||
+        text.contains('handshakeexception') ||
+        text.contains('tls exception') ||
+        text.contains('software caused connection abort');
+  }
+
+  bool _isTerminalError(Object e) {
+    if (e is StateError) return true;
     if (e is PostgrestException) {
-      final msg = e.message;
-      // Slow mode cooldown is transient; retry after delay
-      if (msg.contains('CHAT_SLOW_MODE')) {
-        return false;
-      }
-      // 42501: permission denied, 23514: check violation (e.g. participant limit), 22023: invalid param
+      if (e.message.contains('CHAT_SLOW_MODE')) return false;
       if (e.code == '42501' || e.code == '23514' || e.code == '22023') {
         return true;
       }
-      // Explicit application domain errors that cannot succeed on retry
       if (e.code == 'P0001') {
-        if (msg.contains('CHAT_NOT_MEMBER') ||
-            msg.contains('CHAT_PERMISSION_DENIED') ||
-            msg.contains('CHAT_FROZEN') ||
-            msg.contains('CHAT_INVITE_NOT_PENDING') ||
-            msg.contains('CHAT_MESSAGE_NOT_FOUND') ||
-            msg.contains('CHAT_CONCURRENT_MODIFICATION')) {
-          return true;
-        }
+        return e.message.contains('CHAT_NOT_MEMBER') ||
+            e.message.contains('CHAT_PERMISSION_DENIED') ||
+            e.message.contains('CHAT_FROZEN') ||
+            e.message.contains('CHAT_INVITE_NOT_PENDING') ||
+            e.message.contains('CHAT_MESSAGE_NOT_FOUND') ||
+            e.message.contains('CHAT_CONCURRENT_MODIFICATION');
       }
     }
     return false;
   }
 
-  int? _extractSlowModeWaitSeconds(dynamic e) {
-    if (e is PostgrestException) {
-      if (e.details != null) {
-        if (e.details is Map) {
-          final val = (e.details as Map)['retry_after_seconds'];
-          if (val is int) return val;
-          if (val is String) return int.tryParse(val);
-        } else if (e.details is String) {
-          try {
-            final decoded = jsonDecode(e.details as String);
-            if (decoded is Map && decoded['retry_after_seconds'] != null) {
-              final val = decoded['retry_after_seconds'];
-              if (val is int) return val;
-              if (val is String) return int.tryParse(val);
-            }
-          } catch (_) {}
-        }
-      }
-      // Fallback regex on message: "Please wait (\d+) seconds"
-      final match = RegExp(r'(\d+)\s*seconds').firstMatch(e.message);
-      if (match != null) {
-        return int.tryParse(match.group(1)!);
-      }
+  int? _extractSlowModeWaitSeconds(Object e) {
+    if (e is! PostgrestException) return null;
+
+    if (e.details is Map) {
+      final value = (e.details as Map)['retry_after_seconds'];
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value);
     }
-    return null;
+
+    if (e.details is String) {
+      try {
+        final decoded = jsonDecode(e.details as String);
+        if (decoded is Map) {
+          final value = decoded['retry_after_seconds'];
+          if (value is int) return value;
+          if (value is String) return int.tryParse(value);
+        }
+      } catch (_) {}
+    }
+
+    final match = RegExp(r'(\d+)\s*seconds').firstMatch(e.message);
+    return match == null ? null : int.tryParse(match.group(1)!);
   }
 
-  String? _extractErrorCode(dynamic e) {
+  String? _extractErrorCode(Object e) {
     if (e is PostgrestException) {
-      if (e.message.isNotEmpty && e.message.startsWith('CHAT_')) {
-        return e.message.split(' ').first;
-      }
+      if (e.message.startsWith('CHAT_')) return e.message.split(' ').first;
       return e.code;
     }
+    if (e is StateError) return 'LOCAL_OUTBOX_ERROR';
     return null;
   }
 
-  void _scheduleNextRetry() {
+  Future<void> _scheduleNextRetry() async {
     _retryTimer?.cancel();
-    _retryTimer = Timer(const Duration(seconds: 15), () {
-      _scheduleDrain();
-    });
+    _retryTimer = null;
+
+    final ownerUserId = _currentUserId();
+    if (ownerUserId == null) return;
+
+    final retryAt = await _local.getNextOutboxRetryAt(ownerUserId);
+    if (retryAt == null) return;
+
+    final rawDelay = retryAt.difference(DateTime.now().toUtc());
+    _retryTimer = Timer(
+      rawDelay.isNegative ? Duration.zero : rawDelay,
+      _scheduleDrain,
+    );
   }
 
   void dispose() {

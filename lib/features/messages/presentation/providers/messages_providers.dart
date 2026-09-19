@@ -3,18 +3,18 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/connectivity/connectivity_provider.dart';
+import '../../../../core/error/failures.dart';
 import '../../../../core/realtime/ably_provider.dart';
 import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../safety/presentation/providers/safety_providers.dart';
 import '../../data/datasources/messages_datasource_providers.dart';
 import '../../data/repositories/chat_repository_impl.dart';
-import '../../data/repositories/messages_repository_impl.dart';
 import '../../data/sync/chat_local_first_engine.dart';
-import '../../domain/entities/chat.dart';
 import '../../domain/entities/chat_channel.dart';
+import '../../domain/entities/chat_participant.dart';
+import '../../domain/entities/chat_sync_state.dart';
 import '../../domain/repositories/chat_repository.dart';
-import '../../domain/repositories/messages_repository.dart';
 
 part 'messages_providers.g.dart';
 
@@ -31,11 +31,10 @@ ChatLocalFirstEngine chatLocalFirstEngine(Ref ref) {
 
   ref.onDispose(engine.dispose);
 
-  // Connectivity listener
   ref.listen<AsyncValue<bool>>(
     isOnlineProvider,
-    (prev, next) {
-      final wasOnline = prev?.value ?? true;
+    (previous, next) {
+      final wasOnline = previous?.value ?? true;
       final isOnline = next.value ?? true;
       if (!wasOnline && isOnline) {
         unawaited(engine.reconcile('connectivity_restored'));
@@ -43,13 +42,6 @@ ChatLocalFirstEngine chatLocalFirstEngine(Ref ref) {
     },
   );
 
-  // Auth session boundaries — one fireImmediately listener handles cold
-  // start, user switch, and sign-out without the double-start risk.
-  //
-  // We listen to currentUserIdProvider (not authStateProvider) so that a
-  // transient token-refresh *error* from the stream does NOT trigger
-  // endSession: currentUser remains non-null during network glitches, so
-  // the UID stays unchanged and the session is preserved.
   ref.listen<String?>(
     currentUserIdProvider,
     (previous, next) {
@@ -77,61 +69,69 @@ ChatRepository chatRepository(Ref ref) => ChatRepositoryImpl(
       supabase: ref.watch(supabaseClientProvider),
     );
 
-@Riverpod(keepAlive: true)
-MessagesRepository messagesRepository(Ref ref) => MessagesRepositoryImpl(
-      ref.watch(chatRepositoryProvider),
-    );
-
-/// The chat inbox as a fan-out stream: one upstream subscription, many UI consumers.
-@riverpod
-Stream<List<Chat>> myChats(Ref ref) {
-  final blocked = ref.watch(blockedAccountsProvider).value ?? [];
-  return ref
-      .watch(messagesRepositoryProvider)
-      .watchMyChats()
-      .map((chats) => chats.where((c) => !blocked.any((u) => u.id == c.dmOtherUserId)).toList());
-}
-
-/// Universal channel inbox stream returning new [ChatChannel] entities.
+/// Single universal inbox provider. The legacy myChatsProvider is removed.
 @riverpod
 Stream<List<ChatChannel>> myChatChannels(Ref ref) {
-  final blocked = ref.watch(blockedAccountsProvider).value ?? [];
-  return ref
-      .watch(chatRepositoryProvider)
-      .watchInbox()
-      .map((channels) => channels.where((c) => !blocked.any((u) => u.id == c.dmOtherUserId)).toList());
+  // Make the user boundary an explicit reactive dependency. The repository
+  // reads the current Supabase user synchronously when the stream is built;
+  // watching this provider guarantees the stream is rebuilt on account switch
+  // even if unrelated providers do not change.
+  final currentUserId = ref.watch(currentUserIdProvider);
+  if (currentUserId == null) return Stream.value(const <ChatChannel>[]);
+
+  final blocked = ref.watch(blockedAccountsProvider).value ?? const [];
+  return ref.watch(chatRepositoryProvider).watchInbox().map(
+        (channels) => channels
+            .where(
+              (channel) => !blocked.any(
+                (user) => user.id == channel.dmOtherUserId,
+              ),
+            )
+            .toList(),
+      );
 }
 
-/// Derived total unread messages count across all active conversations.
 @Riverpod(keepAlive: true)
 int unreadMessagesCount(Ref ref) {
-  final list = ref.watch(myChatsProvider).value ?? const [];
-  return list.fold<int>(0, (acc, c) => acc + c.unreadCount);
+  final channels = ref.watch(myChatChannelsProvider).value ?? const [];
+  return channels.fold<int>(0, (sum, channel) => sum + channel.unreadCount);
 }
 
-/// Streams real-time typing indicators for a specific chat thread.
 @riverpod
-Stream<bool> chatTyping(Ref ref, String chatId) {
-  return ref.watch(chatRepositoryProvider).watchTyping(chatId);
-}
+Stream<List<ChatParticipant>> chatParticipants(Ref ref, String chatId) =>
+    ref.watch(chatRepositoryProvider).watchParticipants(chatId);
 
-/// Streams the set of user IDs currently present (online) in [chatId].
 @riverpod
-Stream<Set<String>> chatPresence(Ref ref, String chatId) {
-  return ref.watch(chatRepositoryProvider).watchPresence(chatId);
+Stream<ChatSyncState> chatSyncState(Ref ref, String chatId) =>
+    ref.watch(chatRepositoryProvider).watchSyncState(chatId);
+
+@riverpod
+Future<String> chatMediaUrl(Ref ref, String storagePath) async {
+  final result = await ref
+      .watch(chatRepositoryProvider)
+      .resolveMediaUrl(storagePath);
+  return result.fold(
+    (failure) => throw FailureWrapper(failure),
+    (url) => url,
+  );
 }
 
-/// Streams whether a specific user is currently online in [chatId].
+@riverpod
+Stream<Set<String>> chatTypingUsers(Ref ref, String chatId) =>
+    ref.watch(chatRepositoryProvider).watchTypingUsers(chatId);
+
+@riverpod
+Stream<Set<String>> chatPresence(Ref ref, String chatId) =>
+    ref.watch(chatRepositoryProvider).watchPresence(chatId);
+
 @riverpod
 Stream<bool> isUserOnlineInChat(
   Ref ref, {
   required String chatId,
   required String userId,
-}) {
-  return ref
-      .watch(chatRepositoryProvider)
-      .watchPresence(chatId)
-      .map((set) => set.contains(userId))
-      .distinct();
-}
-
+}) =>
+    ref
+        .watch(chatRepositoryProvider)
+        .watchPresence(chatId)
+        .map((users) => users.contains(userId))
+        .distinct();

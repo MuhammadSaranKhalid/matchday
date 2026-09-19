@@ -4,9 +4,6 @@ import 'package:drift/drift.dart';
 /// team-create, match-setup). Lets a user resume a half-filled flow after
 /// killing the app. Keyed by a caller-defined string (e.g.
 /// `onboarding:<userId>`); [payload] is the wizard's JSON-encoded draft.
-///
-/// Wizard drafts are transient presentation state, not domain data — they
-/// carry no `user_id`/`updated_at` LWW columns and are cleared on sign-out.
 @DataClassName('WizardDraftRow')
 class WizardDrafts extends Table {
   TextColumn get key => text()();
@@ -17,10 +14,10 @@ class WizardDrafts extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-// ─── Local-First Chat Architecture Tables (Spec §7) ────────────────────────
+// ─── Local-First Chat Architecture Tables ──────────────────────────────────
 
-/// Mirrors target chat_channels. Stores channel metadata for instant inbox
-/// rendering and offline discovery.
+/// Mirrors target chat_channels and stores inbox metadata for instant offline
+/// rendering.
 @DataClassName('LocalChannelRow')
 class LocalChannels extends Table {
   TextColumn get channelId => text()();
@@ -49,7 +46,7 @@ class LocalChannels extends Table {
   DateTimeColumn get serverUpdatedAt => dateTime()();
   DateTimeColumn get localUpdatedAt => dateTime()();
 
-  // DM Counterparty metadata & relationship state (Spec §7)
+  // Denormalized DM counterpart projection used only for inbox rendering.
   TextColumn get dmOtherUserId => text().nullable()();
   TextColumn get dmOtherUserName => text().nullable()();
   TextColumn get dmOtherUserUsername => text().nullable()();
@@ -62,24 +59,40 @@ class LocalChannels extends Table {
   Set<Column> get primaryKey => {channelId};
 }
 
-/// Mirrors target channel_members. Crucial for unread calculation, read/delivery
-/// horizons, and channel permissions.
+/// One local projection row per `(channelId, userId)`.
+///
+/// IMPORTANT: this table intentionally owns BOTH membership state and the
+/// small public identity snapshot needed by chat presentation. There is no
+/// separate LocalChatParticipants table.
+///
+/// Why: membership, receipt horizons and participant identity all describe
+/// the same channel-user relationship. Splitting those fields across two
+/// Drift tables creates duplicate keys, extra joins and consistency problems.
 @DataClassName('LocalChannelMemberRow')
 class LocalChannelMembers extends Table {
   TextColumn get channelId => text()();
   TextColumn get userId => text()();
+
+  // Membership / authority.
   TextColumn get role => text().withDefault(const Constant('member'))();
   TextColumn get status => text().withDefault(const Constant('active'))();
-
   DateTimeColumn get joinedAt => dateTime().nullable()();
   DateTimeColumn get leftAt => dateTime().nullable()();
 
+  // Public presentation identity snapshot.
+  // These fields are not authority. They are only cached UI metadata from
+  // `profiles` and can be refreshed independently.
+  TextColumn get displayName => text().nullable()();
+  TextColumn get username => text().nullable()();
+  TextColumn get avatarUrl => text().nullable()();
+
+  // Delivery/read horizons.
   IntColumn get lastDeliveredMessageSeq => integer().nullable()();
   DateTimeColumn get lastDeliveredAt => dateTime().nullable()();
-
   IntColumn get lastReadMessageSeq => integer().nullable()();
   DateTimeColumn get lastReadAt => dateTime().nullable()();
 
+  // Per-member inbox settings.
   DateTimeColumn get notificationsMutedUntil => dateTime().nullable()();
   DateTimeColumn get archivedAt => dateTime().nullable()();
   DateTimeColumn get pinnedAt => dateTime().nullable()();
@@ -90,14 +103,19 @@ class LocalChannelMembers extends Table {
   Set<Column> get primaryKey => {channelId, userId};
 }
 
-/// Local message store for both confirmed server messages and pending outbox sends.
+/// Local message store for both confirmed server messages and pending outbox
+/// sends.
 @DataClassName('LocalMessageRow')
 class LocalMessages extends Table {
   TextColumn get messageId => text()();
   IntColumn get messageSeq => integer().nullable()();
   TextColumn get channelId => text()();
   TextColumn get senderId => text().nullable()();
+
+  /// Historical/fallback sender-name snapshot. Active presentation should
+  /// resolve identity from LocalChannelMembers when possible.
   TextColumn get senderDisplayName => text().nullable()();
+
   TextColumn get messageType => text().withDefault(const Constant('text'))();
   TextColumn get body => text().nullable()();
   TextColumn get payloadJson => text().withDefault(const Constant('{}'))();
@@ -111,7 +129,7 @@ class LocalMessages extends Table {
   DateTimeColumn get deletedAt => dateTime().nullable()();
 
   DateTimeColumn get localCreatedAt => dateTime()();
-  TextColumn get syncStatus => text().withDefault(const Constant('pending'))(); // pending | sending | sent | failed
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
   TextColumn get sendErrorCode => text().nullable()();
   TextColumn get sendErrorMessage => text().nullable()();
 
@@ -119,7 +137,6 @@ class LocalMessages extends Table {
   Set<Column> get primaryKey => {messageId};
 }
 
-/// Local attachments metadata (upload status, local file path, and storage path).
 @DataClassName('LocalMessageAttachmentRow')
 class LocalMessageAttachments extends Table {
   TextColumn get attachmentId => text()();
@@ -133,7 +150,7 @@ class LocalMessageAttachments extends Table {
   IntColumn get durationMs => integer().nullable()();
   TextColumn get localPath => text().nullable()();
   TextColumn get thumbnailLocalPath => text().nullable()();
-  TextColumn get uploadStatus => text().withDefault(const Constant('pending'))(); // pending | uploading | uploaded | failed
+  TextColumn get uploadStatus => text().withDefault(const Constant('pending'))();
   RealColumn get uploadProgress => real().nullable()();
   TextColumn get uploadError => text().nullable()();
 
@@ -141,7 +158,6 @@ class LocalMessageAttachments extends Table {
   Set<Column> get primaryKey => {attachmentId};
 }
 
-/// Cached message emoji reactions.
 @DataClassName('LocalMessageReactionRow')
 class LocalMessageReactions extends Table {
   TextColumn get messageId => text()();
@@ -155,7 +171,6 @@ class LocalMessageReactions extends Table {
   Set<Column> get primaryKey => {messageId, userId, reaction};
 }
 
-/// Cached member posting restrictions and timeouts.
 @DataClassName('LocalMemberRestrictionRow')
 class LocalMemberRestrictions extends Table {
   TextColumn get restrictionId => text()();
@@ -169,15 +184,17 @@ class LocalMemberRestrictions extends Table {
   Set<Column> get primaryKey => {restrictionId};
 }
 
-/// Mandatory transactional outbox for reliable offline-first writes.
 @DataClassName('OutboxOperationRow')
 class OutboxOperations extends Table {
   TextColumn get operationId => text()();
+  // Account boundary for durable commands. Null only for pre-v4 dev rows,
+  // which the processor deliberately ignores.
+  TextColumn get ownerUserId => text().nullable()();
   TextColumn get channelId => text()();
   TextColumn get entityId => text().nullable()();
-  TextColumn get operationType => text()(); // send_message, edit_message, mark_read, mark_delivered, set_reaction, etc.
+  TextColumn get operationType => text()();
   TextColumn get payloadJson => text()();
-  TextColumn get status => text().withDefault(const Constant('pending'))(); // pending | processing | retry_wait | failed
+  TextColumn get status => text().withDefault(const Constant('pending'))();
   TextColumn get coalesceKey => text().nullable()();
   TextColumn get dependsOnOperationId => text().nullable()();
   IntColumn get attemptCount => integer().withDefault(const Constant(0))();
@@ -191,7 +208,6 @@ class OutboxOperations extends Table {
   Set<Column> get primaryKey => {operationId};
 }
 
-/// Channel synchronization cursor and gap tracking.
 @DataClassName('ChannelSyncStateRow')
 class ChannelSyncStates extends Table {
   TextColumn get channelId => text()();
@@ -208,7 +224,6 @@ class ChannelSyncStates extends Table {
   Set<Column> get primaryKey => {channelId};
 }
 
-/// One composer draft per channel.
 @DataClassName('ChannelDraftRow')
 class ChannelDrafts extends Table {
   TextColumn get channelId => text()();
@@ -220,9 +235,8 @@ class ChannelDrafts extends Table {
   Set<Column> get primaryKey => {channelId};
 }
 
-// ─── Scoring write-ahead log (offline scoring; design doc §10) ──────────────
+// ─── Scoring write-ahead log ────────────────────────────────────────────────
 
-/// Append-only scoring write-ahead log.
 @DataClassName('ScoringOpRow')
 class ScoringOps extends Table {
   TextColumn get opId => text()();
@@ -241,7 +255,6 @@ class ScoringOps extends Table {
   Set<Column> get primaryKey => {opId};
 }
 
-/// Innings state at the last synced op.
 @DataClassName('ScoringSnapshotRow')
 class ScoringSnapshots extends Table {
   TextColumn get matchId => text()();
@@ -256,7 +269,6 @@ class ScoringSnapshots extends Table {
 
 // ─── Offline Match Hydration Cache ──────────────────────────────────────────
 
-/// Caches match metadata (format, teams, toss, status) locally for offline cold-start.
 @DataClassName('CachedMatchRow')
 class CachedMatches extends Table {
   TextColumn get matchId => text()();
@@ -267,7 +279,6 @@ class CachedMatches extends Table {
   Set<Column> get primaryKey => {matchId};
 }
 
-/// Caches the playing XI (match_players) locally for offline cold-start.
 @DataClassName('CachedMatchPlayersRow')
 class CachedMatchPlayers extends Table {
   TextColumn get matchId => text()();
@@ -278,7 +289,6 @@ class CachedMatchPlayers extends Table {
   Set<Column> get primaryKey => {matchId};
 }
 
-/// Caches running match innings state locally for offline cold-start.
 @DataClassName('CachedInningsStateRow')
 class CachedInningsStates extends Table {
   TextColumn get matchId => text()();

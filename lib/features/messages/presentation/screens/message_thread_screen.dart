@@ -71,7 +71,6 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
     _chatRepository = ref.read(chatRepositoryProvider);
     _pushMessagingService = ref.read(pushMessagingServiceProvider);
     WidgetsBinding.instance.addObserver(this);
-    _pushMessagingService.setActiveChat(widget.chatId);
     _scrollController.addListener(_onScroll);
     _textController.addListener(_onComposerChanged);
     unawaited(_restoreDraft());
@@ -80,23 +79,43 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
+    // ModalRoute.of(context) establishes a dependency on the route's state.
+    // Flutter notifies this State when isCurrent changes. That gives the push
+    // layer the distinction we actually care about:
+    //
+    //   mounted thread != visible thread
+    //
+    // A details page, another route, dialog or root-level overlay can cover
+    // this widget without disposing it. In that case notifications for this
+    // chat must NOT be suppressed.
     _route = ModalRoute.of(context);
+    _syncActiveChatVisibility();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _lifecycle = state;
+    _syncActiveChatVisibility();
+
     if (state == AppLifecycleState.resumed) {
-      _pushMessagingService.setActiveChat(widget.chatId);
       _checkAndMarkVisibleRead();
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      _pushMessagingService.setActiveChat(null);
     }
   }
 
-  ChatChannel? _channelFrom(List<ChatChannel>? channels) =>
-      channels?.where((channel) => channel.id == widget.chatId).firstOrNull;
+  void _syncActiveChatVisibility() {
+    final isActuallyVisible =
+        _lifecycle == AppLifecycleState.resumed &&
+        (_route?.isCurrent ?? false);
+
+    _pushMessagingService.setActiveChat(
+      isActuallyVisible ? widget.chatId : null,
+    );
+  }
+
+  ChatChannel? _channelFrom(List<ChatChannel>? channels) => channels
+      ?.where((channel) => channel.id == widget.chatId)
+      .firstOrNull;
 
   Future<void> _restoreDraft() async {
     final draft = await _chatRepository.readDraftState(widget.chatId);
@@ -119,7 +138,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
 
     if (hasText && !_typingPublished) {
       _typingPublished = true;
-      unawaited(_chatRepository.setTyping(widget.chatId, true));
+      unawaited(
+        _chatRepository.setTyping(widget.chatId, true),
+      );
     }
 
     _typingDebounce?.cancel();
@@ -136,7 +157,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
     _typingPublished = false;
 
     if (publish) {
-      unawaited(_chatRepository.setTyping(widget.chatId, false));
+      unawaited(
+        _chatRepository.setTyping(widget.chatId, false),
+      );
     }
   }
 
@@ -182,16 +205,15 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
     if (_isLoadingOlder || !_hasMoreOlder) return;
     setState(() => _isLoadingOlder = true);
 
-    final result =
-        await ref
-            .read(messageThreadProvider(widget.chatId).notifier)
-            .loadOlder();
+    final result = await ref
+        .read(messageThreadProvider(widget.chatId).notifier)
+        .loadOlder();
 
     if (!mounted) return;
     result.fold(
-      (failure) => ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message))),
+      (failure) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      ),
       (count) {
         if (count < 50) _hasMoreOlder = false;
       },
@@ -204,8 +226,7 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
     if (_lifecycle != AppLifecycleState.resumed) return;
     if (_route == null || !_route!.isCurrent || _isScrolledUp) return;
 
-    final messages =
-        current ?? ref.read(messageThreadProvider(widget.chatId)).value;
+    final messages = current ?? ref.read(messageThreadProvider(widget.chatId)).value;
     if (messages == null || messages.isEmpty) return;
 
     int? highest;
@@ -276,10 +297,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
       _composerError = null;
     });
 
-    final extension =
-        picked.name.contains('.')
-            ? picked.name.split('.').last.toLowerCase()
-            : 'jpg';
+    final extension = picked.name.contains('.')
+        ? picked.name.split('.').last.toLowerCase()
+        : 'jpg';
     final bytes = await picked.readAsBytes();
     if (!mounted) return;
 
@@ -288,10 +308,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
         .sendImage(
           imageBytes: bytes,
           extension: extension,
-          caption:
-              _textController.text.trim().isEmpty
-                  ? null
-                  : _textController.text.trim(),
+          caption: _textController.text.trim().isEmpty
+              ? null
+              : _textController.text.trim(),
           replyToId: _replyingTo?.id,
         );
 
@@ -332,9 +351,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
         .deleteMessage(message.id);
     if (!mounted) return;
     result.fold(
-      (failure) => ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message))),
+      (failure) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      ),
       (_) => setState(() => _selectedMessage = null),
     );
   }
@@ -345,9 +364,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
         .retryMessage(message.id);
     if (!mounted) return;
     result.fold(
-      (failure) => ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message))),
+      (failure) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      ),
       (_) {},
     );
   }
@@ -356,26 +375,25 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
     final controller = TextEditingController(text: message.body ?? '');
     final value = await showDialog<String>(
       context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: const Text('Edit message'),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              maxLines: 5,
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, controller.text),
-                child: const Text('Save'),
-              ),
-            ],
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit message'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 5,
+          textCapitalization: TextCapitalization.sentences,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
     controller.dispose();
 
@@ -386,9 +404,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
         .editMessage(message, value);
     if (!mounted) return;
     result.fold(
-      (failure) => ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message))),
+      (failure) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      ),
       (_) => setState(() => _selectedMessage = null),
     );
   }
@@ -403,19 +421,22 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
           reaction.reaction == emoji &&
           !reaction.isRemoved,
     );
-    await _chatRepository.setReaction(message.id, emoji, !selected);
+    await _chatRepository.setReaction(
+      message.id,
+      emoji,
+      !selected,
+    );
   }
 
   Future<void> _acceptRequest() async {
-    final result =
-        await ref
-            .read(messageThreadProvider(widget.chatId).notifier)
-            .acceptRequest();
+    final result = await ref
+        .read(messageThreadProvider(widget.chatId).notifier)
+        .acceptRequest();
     if (!mounted) return;
     result.fold(
-      (failure) => ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message))),
+      (failure) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      ),
       (_) {
         // LocalChannelMembers is already updated optimistically and the
         // repository upgrades Presence on the existing Ably attachment.
@@ -426,15 +447,14 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
   }
 
   Future<void> _declineRequest() async {
-    final result =
-        await ref
-            .read(messageThreadProvider(widget.chatId).notifier)
-            .declineRequest();
+    final result = await ref
+        .read(messageThreadProvider(widget.chatId).notifier)
+        .declineRequest();
     if (!mounted) return;
     result.fold(
-      (failure) => ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message))),
+      (failure) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      ),
       (_) => context.pop(),
     );
   }
@@ -466,10 +486,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
         if (current == null) return;
 
         if (_replyingTo == null && _draftReplyToId != null) {
-          final target =
-              current
-                  .where((message) => message.id == _draftReplyToId)
-                  .firstOrNull;
+          final target = current
+              .where((message) => message.id == _draftReplyToId)
+              .firstOrNull;
           if (target != null) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;
@@ -483,10 +502,7 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
 
         final old = previous?.value ?? const <ChatMessage>[];
         if (old.isNotEmpty) {
-          final count = countNewIncomingMessages(
-            previous: old,
-            current: current,
-          );
+          final count = countNewIncomingMessages(previous: old, current: current);
           if (count > 0) {
             if (_isScrolledUp) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -521,8 +537,7 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
               chatId: widget.chatId,
               typingLabel: typingLabel,
               onBack: () => context.pop(),
-              onDetails:
-                  () => context.push('/messages/${widget.chatId}/details'),
+              onDetails: () => context.push('/messages/${widget.chatId}/details'),
             ),
             if (incomingRequest)
               _RequestBanner(
@@ -550,8 +565,7 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
                       _Timeline(
                         messages: messages,
                         initialLastReadSeq: _initialLastReadSeq,
-                        isMultiParticipant:
-                            channel?.isMultiParticipant ?? false,
+                        isMultiParticipant: channel?.isMultiParticipant ?? false,
                         selectedMessage: _selectedMessage,
                         scrollController: _scrollController,
                         loadingOlder: _isLoadingOlder,
@@ -564,13 +578,10 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
                           _scheduleDraftSave();
                           _composerFocus.requestFocus();
                         },
-                        onSelect:
-                            (message) => setState(() {
-                              _selectedMessage =
-                                  _selectedMessage?.id == message.id
-                                      ? null
-                                      : message;
-                            }),
+                        onSelect: (message) => setState(() {
+                          _selectedMessage =
+                              _selectedMessage?.id == message.id ? null : message;
+                        }),
                         onDelete: _delete,
                         onRetry: _retry,
                         onReaction: _toggleReaction,
@@ -584,34 +595,29 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
                               setState(() => _newMessagesWhileScrolledUp = 0);
                               _scrollToBottom();
                             },
-                            icon: const Icon(
-                              Icons.arrow_downward_rounded,
-                              size: 16,
-                            ),
+                            icon: const Icon(Icons.arrow_downward_rounded, size: 16),
                             label: Text('$_newMessagesWhileScrolledUp new'),
                           ),
                         ),
                     ],
                   );
                 },
-                loading:
-                    () => const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: ChatTheme.matchDayCoral,
-                      ),
+                loading: () => const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: ChatTheme.matchDayCoral,
+                  ),
+                ),
+                error: (error, _) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'Could not load this chat.\n$error',
+                      textAlign: TextAlign.center,
+                      style: ChatTheme.bodyMd(color: ChatTheme.mutedStone),
                     ),
-                error:
-                    (error, _) => Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          'Could not load this chat.\n$error',
-                          textAlign: TextAlign.center,
-                          style: ChatTheme.bodyMd(color: ChatTheme.mutedStone),
-                        ),
-                      ),
-                    ),
+                  ),
+                ),
               ),
             ),
             if (_selectedMessage != null)
@@ -627,16 +633,14 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
                   _scheduleDraftSave();
                   _composerFocus.requestFocus();
                 },
-                onEdit:
-                    _selectedMessage!.fromMe &&
-                            !_selectedMessage!.isDeleted &&
-                            !_selectedMessage!.isImage
-                        ? () => _edit(_selectedMessage!)
-                        : null,
-                onDelete:
-                    _selectedMessage!.fromMe
-                        ? () => _delete(_selectedMessage!)
-                        : null,
+                onEdit: _selectedMessage!.fromMe &&
+                        !_selectedMessage!.isDeleted &&
+                        !_selectedMessage!.isImage
+                    ? () => _edit(_selectedMessage!)
+                    : null,
+                onDelete: _selectedMessage!.fromMe
+                    ? () => _delete(_selectedMessage!)
+                    : null,
               )
             else
               ChatComposer(
@@ -645,14 +649,13 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
                 replyingTo: _replyingTo,
                 enabled: !incomingRequest && !outgoingRequest,
                 sending: _sending,
-                placeholder:
-                    outgoingRequest
-                        ? 'Waiting for them to accept…'
-                        : incomingRequest
+                placeholder: outgoingRequest
+                    ? 'Waiting for them to accept…'
+                    : incomingRequest
                         ? 'Accept the request to reply'
                         : channel?.isMultiParticipant == true
-                        ? 'Message group...'
-                        : 'Message ${channel?.displayName ?? 'user'}...',
+                            ? 'Message group...'
+                            : 'Message ${channel?.displayName ?? 'user'}...',
                 errorText: _composerError,
                 onSend: _sendText,
                 onImagePressed: _sendImage,
@@ -676,8 +679,9 @@ class _MessageThreadScreenState extends ConsumerState<MessageThreadScreen>
   ) {
     if (typingUsers.isEmpty) return null;
     final byId = {for (final person in participants) person.userId: person};
-    final names =
-        typingUsers.map((id) => byId[id]?.displayName ?? 'Someone').toList();
+    final names = typingUsers
+        .map((id) => byId[id]?.displayName ?? 'Someone')
+        .toList();
     if (names.length == 1) return '${names.first} is typing…';
     if (names.length == 2) return '${names[0]} and ${names[1]} are typing…';
     return '${names.length} people are typing…';
@@ -729,8 +733,7 @@ class _ThreadHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     var online = false;
     if (channel?.isDm == true && channel?.dmOtherUserId != null) {
-      online =
-          ref
+      online = ref
               .watch(
                 isUserOnlineInChatProvider(
                   chatId: chatId,
@@ -749,10 +752,7 @@ class _ThreadHeader extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          IconButton(
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back_rounded),
-          ),
+          IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back_rounded)),
           ChatAvatar(
             label: channel?.displayName ?? 'Chat',
             imageUrl: channel?.displayAvatarUrl,
@@ -784,13 +784,16 @@ class _ThreadHeader extends ConsumerWidget {
                     style: ChatTheme.metadata(),
                   )
                 else
-                  Text(switch (channel?.contextType) {
-                    ChatChannelContext.team => 'Team chat',
-                    ChatChannelContext.match => 'Match room',
-                    ChatChannelContext.tournament => 'Tournament chat',
-                    ChatChannelContext.club => 'Club chat',
-                    _ => 'Group chat',
-                  }, style: ChatTheme.metadata()),
+                  Text(
+                    switch (channel?.contextType) {
+                      ChatChannelContext.team => 'Team chat',
+                      ChatChannelContext.match => 'Match room',
+                      ChatChannelContext.tournament => 'Tournament chat',
+                      ChatChannelContext.club => 'Club chat',
+                      _ => 'Group chat',
+                    },
+                    style: ChatTheme.metadata(),
+                  ),
               ],
             ),
           ),
@@ -843,8 +846,7 @@ class _Timeline extends StatelessWidget {
       final message = messages[i];
       final previous = i == 0 ? null : messages[i - 1];
 
-      if (i == 0 ||
-          isDifferentCalendarDay(previous!.createdAt, message.createdAt)) {
+      if (i == 0 || isDifferentCalendarDay(previous!.createdAt, message.createdAt)) {
         widgets.add(_DayDivider(date: message.createdAt));
       }
       if (i == unreadIndex) widgets.add(const _UnreadDivider());
@@ -903,15 +905,16 @@ class _DayDivider extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final day = DateTime(local.year, local.month, local.day);
-    final label =
-        day == today
-            ? 'Today'
-            : day == today.subtract(const Duration(days: 1))
+    final label = day == today
+        ? 'Today'
+        : day == today.subtract(const Duration(days: 1))
             ? 'Yesterday'
             : DateFormat('MMM d, y').format(local);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Center(child: Text(label, style: ChatTheme.timestamp())),
+      child: Center(
+        child: Text(label, style: ChatTheme.timestamp()),
+      ),
     );
   }
 }
@@ -921,25 +924,25 @@ class _UnreadDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.symmetric(vertical: 10),
-    child: Row(
-      children: [
-        Expanded(child: Divider(color: ChatTheme.matchDayCoral)),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            'NEW MESSAGES',
-            style: TextStyle(
-              color: ChatTheme.matchDayCoral,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Expanded(child: Divider(color: ChatTheme.matchDayCoral)),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                'NEW MESSAGES',
+                style: TextStyle(
+                  color: ChatTheme.matchDayCoral,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
+            Expanded(child: Divider(color: ChatTheme.matchDayCoral)),
+          ],
         ),
-        Expanded(child: Divider(color: ChatTheme.matchDayCoral)),
-      ],
-    ),
-  );
+      );
 }
 
 class _RequestBanner extends StatelessWidget {
@@ -949,22 +952,22 @@ class _RequestBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-    color: ChatTheme.warningSandBg,
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(
-            'Message request. Reading this preview does not send a normal read receipt.',
-            style: ChatTheme.bodySm(color: ChatTheme.warningSandText),
-          ),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        color: ChatTheme.warningSandBg,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Message request. Reading this preview does not send a normal read receipt.',
+                style: ChatTheme.bodySm(color: ChatTheme.warningSandText),
+              ),
+            ),
+            TextButton(onPressed: onDecline, child: const Text('Decline')),
+            const SizedBox(width: 4),
+            FilledButton(onPressed: onAccept, child: const Text('Accept')),
+          ],
         ),
-        TextButton(onPressed: onDecline, child: const Text('Decline')),
-        const SizedBox(width: 4),
-        FilledButton(onPressed: onAccept, child: const Text('Accept')),
-      ],
-    ),
-  );
+      );
 }
 
 class _SelectionBar extends StatelessWidget {
@@ -984,41 +987,41 @@ class _SelectionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SafeArea(
-    top: false,
-    child: Container(
-      height: 60,
-      decoration: const BoxDecoration(
-        color: ChatTheme.pureSurface,
-        border: Border(top: BorderSide(color: ChatTheme.hairlineSand)),
-      ),
-      child: Row(
-        children: [
-          IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded)),
-          const Spacer(),
-          IconButton(
-            onPressed: onReply,
-            tooltip: 'Reply',
-            icon: const Icon(Icons.reply_rounded),
+        top: false,
+        child: Container(
+          height: 60,
+          decoration: const BoxDecoration(
+            color: ChatTheme.pureSurface,
+            border: Border(top: BorderSide(color: ChatTheme.hairlineSand)),
           ),
-          if (onEdit != null)
-            IconButton(
-              onPressed: onEdit,
-              tooltip: 'Edit',
-              icon: const Icon(Icons.edit_outlined),
-            ),
-          if (onDelete != null)
-            IconButton(
-              onPressed: onDelete,
-              tooltip: 'Delete',
-              icon: const Icon(
-                Icons.delete_outline_rounded,
-                color: ChatTheme.destructiveCoralText,
+          child: Row(
+            children: [
+              IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded)),
+              const Spacer(),
+              IconButton(
+                onPressed: onReply,
+                tooltip: 'Reply',
+                icon: const Icon(Icons.reply_rounded),
               ),
-            ),
-        ],
-      ),
-    ),
-  );
+              if (onEdit != null)
+                IconButton(
+                  onPressed: onEdit,
+                  tooltip: 'Edit',
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+              if (onDelete != null)
+                IconButton(
+                  onPressed: onDelete,
+                  tooltip: 'Delete',
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: ChatTheme.destructiveCoralText,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
 }
 
 class _EmptyThread extends StatelessWidget {
@@ -1026,13 +1029,13 @@ class _EmptyThread extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Text(
-        'No messages yet.\nStart the conversation.',
-        textAlign: TextAlign.center,
-        style: ChatTheme.bodyMd(color: ChatTheme.mutedStone),
-      ),
-    ),
-  );
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            'No messages yet.\nStart the conversation.',
+            textAlign: TextAlign.center,
+            style: ChatTheme.bodyMd(color: ChatTheme.mutedStone),
+          ),
+        ),
+      );
 }

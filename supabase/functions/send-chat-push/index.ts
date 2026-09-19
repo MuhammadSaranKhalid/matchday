@@ -29,49 +29,89 @@ Deno.serve(async (req) => {
   const projectId = Deno.env.get("FCM_PROJECT_ID");
 
   if (!supabaseUrl || !serviceRoleKey || !projectId) {
-    console.error("Missing required environment variables for send-chat-push");
-    return new Response("internal configuration error", { status: 500 });
+    console.error(
+      "Missing required environment variables for send-chat-push",
+    );
+    return new Response(
+      "internal configuration error",
+      { status: 500 },
+    );
   }
 
-  const db = createClient(supabaseUrl, serviceRoleKey, {
-    global: {
-      fetch: (input, init) =>
-        fetch(input, { ...init, signal: AbortSignal.timeout(10000) }),
+  const db = createClient(
+    supabaseUrl,
+    serviceRoleKey,
+    {
+      global: {
+        fetch: (input, init) =>
+          fetch(input, {
+            ...init,
+            signal: AbortSignal.timeout(10000),
+          }),
+      },
     },
-  });
+  );
 
   try {
     const accessToken = await getAccessToken();
 
-    // Prepare authoritative jobs server-side in Postgres
-    const { data, error } = await db.rpc("prepare_chat_push_jobs", {
-      p_message_id: messageId,
-    });
+    const { data, error } = await db.rpc(
+      "prepare_chat_push_jobs",
+      {
+        p_message_id: messageId,
+      },
+    );
 
     if (error) {
-      console.error("Error in prepare_chat_push_jobs:", error);
-      return new Response("database error", { status: 500 });
+      console.error(
+        "Error in prepare_chat_push_jobs:",
+        error,
+      );
+      return new Response(
+        "database error",
+        { status: 500 },
+      );
     }
 
     const jobs = (data ?? []) as ChatPushJob[];
+
     if (jobs.length === 0) {
-      return Response.json({ dispatched: 0, status: "no_eligible_recipients" });
+      return Response.json({
+        dispatched: 0,
+        status: "no_eligible_recipients",
+      });
     }
 
     const outcomes = await Promise.allSettled(
-      jobs.map((job) => processChatPushJob(db, job, projectId, accessToken)),
+      jobs.map((job) =>
+        processChatPushJob(
+          db,
+          job,
+          projectId,
+          accessToken,
+        )
+      ),
     );
 
     const sent = outcomes.filter(
-      (r) => r.status === "fulfilled" && r.value.status === "sent",
+      (result) =>
+        result.status === "fulfilled" &&
+        result.value.status === "sent",
     ).length;
+
     const failed = outcomes.filter(
-      (r) =>
-        r.status === "rejected" ||
-        (r.status === "fulfilled" && r.value.status === "failed"),
+      (result) =>
+        result.status === "rejected" ||
+        (
+          result.status === "fulfilled" &&
+          result.value.status === "failed"
+        ),
     ).length;
+
     const invalidToken = outcomes.filter(
-      (r) => r.status === "fulfilled" && r.value.status === "invalid_token",
+      (result) =>
+        result.status === "fulfilled" &&
+        result.value.status === "invalid_token",
     ).length;
 
     return Response.json({
@@ -81,7 +121,13 @@ Deno.serve(async (req) => {
       invalid_token: invalidToken,
     });
   } catch (err) {
-    console.error("send-chat-push execution failed:", err);
-    return new Response("worker unavailable", { status: 503 });
+    console.error(
+      "send-chat-push execution failed:",
+      err,
+    );
+    return new Response(
+      "worker unavailable",
+      { status: 503 },
+    );
   }
 });

@@ -9,14 +9,50 @@ part of 'message_thread_controller.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Thread controller over the universal ChatRepository.
+///
+/// IMPORTANT LIFECYCLE RULE:
+/// This provider intentionally does NOT watch the inbox/channel projection.
+/// The previous implementation watched [myChatChannelsProvider] to decide
+/// whether Presence should be enabled. Every local inbox mutation (read
+/// horizon, participant hydration, unread count, request status, etc.) then
+/// recomputed this provider. Riverpod disposed the old build, which called
+/// closeChannel(), so the Ably channel repeatedly detached and re-attached.
+///
+/// Presence policy now belongs below the UI in ChatSyncCoordinator. The thread
+/// owns one message stream for the lifetime of the route, and closing the route
+/// is the only normal reason to close the realtime channel.
 
 @ProviderFor(MessageThread)
 final messageThreadProvider = MessageThreadFamily._();
 
 /// Thread controller over the universal ChatRepository.
+///
+/// IMPORTANT LIFECYCLE RULE:
+/// This provider intentionally does NOT watch the inbox/channel projection.
+/// The previous implementation watched [myChatChannelsProvider] to decide
+/// whether Presence should be enabled. Every local inbox mutation (read
+/// horizon, participant hydration, unread count, request status, etc.) then
+/// recomputed this provider. Riverpod disposed the old build, which called
+/// closeChannel(), so the Ably channel repeatedly detached and re-attached.
+///
+/// Presence policy now belongs below the UI in ChatSyncCoordinator. The thread
+/// owns one message stream for the lifetime of the route, and closing the route
+/// is the only normal reason to close the realtime channel.
 final class MessageThreadProvider
     extends $StreamNotifierProvider<MessageThread, List<ChatMessage>> {
   /// Thread controller over the universal ChatRepository.
+  ///
+  /// IMPORTANT LIFECYCLE RULE:
+  /// This provider intentionally does NOT watch the inbox/channel projection.
+  /// The previous implementation watched [myChatChannelsProvider] to decide
+  /// whether Presence should be enabled. Every local inbox mutation (read
+  /// horizon, participant hydration, unread count, request status, etc.) then
+  /// recomputed this provider. Riverpod disposed the old build, which called
+  /// closeChannel(), so the Ably channel repeatedly detached and re-attached.
+  ///
+  /// Presence policy now belongs below the UI in ChatSyncCoordinator. The thread
+  /// owns one message stream for the lifetime of the route, and closing the route
+  /// is the only normal reason to close the realtime channel.
   MessageThreadProvider._({
     required MessageThreadFamily super.from,
     required String super.argument,
@@ -53,9 +89,21 @@ final class MessageThreadProvider
   }
 }
 
-String _$messageThreadHash() => r'e3e36b1cbee045151d82ec2b2123b23b791193ed';
+String _$messageThreadHash() => r'394184c779532139a9e26c0bd887cbc1a8a3eb6f';
 
 /// Thread controller over the universal ChatRepository.
+///
+/// IMPORTANT LIFECYCLE RULE:
+/// This provider intentionally does NOT watch the inbox/channel projection.
+/// The previous implementation watched [myChatChannelsProvider] to decide
+/// whether Presence should be enabled. Every local inbox mutation (read
+/// horizon, participant hydration, unread count, request status, etc.) then
+/// recomputed this provider. Riverpod disposed the old build, which called
+/// closeChannel(), so the Ably channel repeatedly detached and re-attached.
+///
+/// Presence policy now belongs below the UI in ChatSyncCoordinator. The thread
+/// owns one message stream for the lifetime of the route, and closing the route
+/// is the only normal reason to close the realtime channel.
 
 final class MessageThreadFamily extends $Family
     with
@@ -76,6 +124,18 @@ final class MessageThreadFamily extends $Family
       );
 
   /// Thread controller over the universal ChatRepository.
+  ///
+  /// IMPORTANT LIFECYCLE RULE:
+  /// This provider intentionally does NOT watch the inbox/channel projection.
+  /// The previous implementation watched [myChatChannelsProvider] to decide
+  /// whether Presence should be enabled. Every local inbox mutation (read
+  /// horizon, participant hydration, unread count, request status, etc.) then
+  /// recomputed this provider. Riverpod disposed the old build, which called
+  /// closeChannel(), so the Ably channel repeatedly detached and re-attached.
+  ///
+  /// Presence policy now belongs below the UI in ChatSyncCoordinator. The thread
+  /// owns one message stream for the lifetime of the route, and closing the route
+  /// is the only normal reason to close the realtime channel.
 
   MessageThreadProvider call(String chatId) =>
       MessageThreadProvider._(argument: chatId, from: this);
@@ -85,6 +145,18 @@ final class MessageThreadFamily extends $Family
 }
 
 /// Thread controller over the universal ChatRepository.
+///
+/// IMPORTANT LIFECYCLE RULE:
+/// This provider intentionally does NOT watch the inbox/channel projection.
+/// The previous implementation watched [myChatChannelsProvider] to decide
+/// whether Presence should be enabled. Every local inbox mutation (read
+/// horizon, participant hydration, unread count, request status, etc.) then
+/// recomputed this provider. Riverpod disposed the old build, which called
+/// closeChannel(), so the Ably channel repeatedly detached and re-attached.
+///
+/// Presence policy now belongs below the UI in ChatSyncCoordinator. The thread
+/// owns one message stream for the lifetime of the route, and closing the route
+/// is the only normal reason to close the realtime channel.
 
 abstract class _$MessageThread extends $StreamNotifier<List<ChatMessage>> {
   late final _$args = ref.$arg as String;

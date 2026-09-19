@@ -8,36 +8,27 @@ part of 'teams_list_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Builds the "My teams" screen's [MyTeamsView] directly from three sources —
-/// the user's teams (local stream), their active matches (online), and the
-/// cached teams used to resolve opponent crests — plus the signed-in user id
-/// to bucket teams by relationship. The screen stays a pure renderer
-/// (CLAUDE.md §5.3 / §6.6); there is no intermediate view shape or adapter.
+/// Loads the signed-in user's current team memberships.
 ///
-/// The filter is local UI state held here (not in the widget): [setFilter]
-/// re-derives the view from the cached base data without re-fetching.
+/// My Teams is intentionally one-shot rather than realtime. The controller
+/// reloads when it is first built and when the screen explicitly refreshes
+/// after returning from a team flow or via pull-to-refresh.
 
 @ProviderFor(TeamsListController)
 final teamsListControllerProvider = TeamsListControllerProvider._();
 
-/// Builds the "My teams" screen's [MyTeamsView] directly from three sources —
-/// the user's teams (local stream), their active matches (online), and the
-/// cached teams used to resolve opponent crests — plus the signed-in user id
-/// to bucket teams by relationship. The screen stays a pure renderer
-/// (CLAUDE.md §5.3 / §6.6); there is no intermediate view shape or adapter.
+/// Loads the signed-in user's current team memberships.
 ///
-/// The filter is local UI state held here (not in the widget): [setFilter]
-/// re-derives the view from the cached base data without re-fetching.
+/// My Teams is intentionally one-shot rather than realtime. The controller
+/// reloads when it is first built and when the screen explicitly refreshes
+/// after returning from a team flow or via pull-to-refresh.
 final class TeamsListControllerProvider
-    extends $AsyncNotifierProvider<TeamsListController, MyTeamsView> {
-  /// Builds the "My teams" screen's [MyTeamsView] directly from three sources —
-  /// the user's teams (local stream), their active matches (online), and the
-  /// cached teams used to resolve opponent crests — plus the signed-in user id
-  /// to bucket teams by relationship. The screen stays a pure renderer
-  /// (CLAUDE.md §5.3 / §6.6); there is no intermediate view shape or adapter.
+    extends $AsyncNotifierProvider<TeamsListController, TeamsListState> {
+  /// Loads the signed-in user's current team memberships.
   ///
-  /// The filter is local UI state held here (not in the widget): [setFilter]
-  /// re-derives the view from the cached base data without re-fetching.
+  /// My Teams is intentionally one-shot rather than realtime. The controller
+  /// reloads when it is first built and when the screen explicitly refreshes
+  /// after returning from a team flow or via pull-to-refresh.
   TeamsListControllerProvider._()
     : super(
         from: null,
@@ -58,28 +49,25 @@ final class TeamsListControllerProvider
 }
 
 String _$teamsListControllerHash() =>
-    r'6c9b17623f5b11c7e487ad1843817e4fa803aba5';
+    r'799b553a596def5d7a0ed1fcc792d52884046b56';
 
-/// Builds the "My teams" screen's [MyTeamsView] directly from three sources —
-/// the user's teams (local stream), their active matches (online), and the
-/// cached teams used to resolve opponent crests — plus the signed-in user id
-/// to bucket teams by relationship. The screen stays a pure renderer
-/// (CLAUDE.md §5.3 / §6.6); there is no intermediate view shape or adapter.
+/// Loads the signed-in user's current team memberships.
 ///
-/// The filter is local UI state held here (not in the widget): [setFilter]
-/// re-derives the view from the cached base data without re-fetching.
+/// My Teams is intentionally one-shot rather than realtime. The controller
+/// reloads when it is first built and when the screen explicitly refreshes
+/// after returning from a team flow or via pull-to-refresh.
 
-abstract class _$TeamsListController extends $AsyncNotifier<MyTeamsView> {
-  FutureOr<MyTeamsView> build();
+abstract class _$TeamsListController extends $AsyncNotifier<TeamsListState> {
+  FutureOr<TeamsListState> build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<MyTeamsView>, MyTeamsView>;
+    final ref = this.ref as $Ref<AsyncValue<TeamsListState>, TeamsListState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AsyncValue<MyTeamsView>, MyTeamsView>,
-              AsyncValue<MyTeamsView>,
+              AnyNotifier<AsyncValue<TeamsListState>, TeamsListState>,
+              AsyncValue<TeamsListState>,
               Object?,
               Object?
             >;

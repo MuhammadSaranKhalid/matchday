@@ -8,45 +8,54 @@ part of 'push_registrar.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Drives the FCM token lifecycle + notification-tap deep links for the
-/// signed-in user. Activated once (app.dart watches it); keepAlive for the
-/// session.
+/// Application-scoped FCM token lifecycle + notification navigation.
 ///
-/// - On sign-in (or app start while already signed in): request permission →
-///   fetch the FCM token → register it via the notifications repository.
-/// - On token rotation: re-register.
-/// - On a notification tap: deep-link via the router.
-/// - On sign-out: [unregister] is invoked from the auth controller *before* the
-///   session ends, because the RLS delete on `device_tokens` needs
-///   `auth.uid()`.
+/// Activated once from app.dart and kept alive for the session.
+///
+/// Responsibilities:
+/// - initialize foreground notification presentation
+/// - register the signed-in user's FCM token
+/// - re-register token rotations
+/// - route foreground/background/cold-start notification taps
+/// - revoke the device token before sign-out
+///
+/// This controller intentionally does NOT decide whether a particular chat
+/// notification should be suppressed. That visibility policy belongs to
+/// PushMessagingService + MessageThreadScreen.
 
 @ProviderFor(PushRegistrar)
 final pushRegistrarProvider = PushRegistrarProvider._();
 
-/// Drives the FCM token lifecycle + notification-tap deep links for the
-/// signed-in user. Activated once (app.dart watches it); keepAlive for the
-/// session.
+/// Application-scoped FCM token lifecycle + notification navigation.
 ///
-/// - On sign-in (or app start while already signed in): request permission →
-///   fetch the FCM token → register it via the notifications repository.
-/// - On token rotation: re-register.
-/// - On a notification tap: deep-link via the router.
-/// - On sign-out: [unregister] is invoked from the auth controller *before* the
-///   session ends, because the RLS delete on `device_tokens` needs
-///   `auth.uid()`.
+/// Activated once from app.dart and kept alive for the session.
+///
+/// Responsibilities:
+/// - initialize foreground notification presentation
+/// - register the signed-in user's FCM token
+/// - re-register token rotations
+/// - route foreground/background/cold-start notification taps
+/// - revoke the device token before sign-out
+///
+/// This controller intentionally does NOT decide whether a particular chat
+/// notification should be suppressed. That visibility policy belongs to
+/// PushMessagingService + MessageThreadScreen.
 final class PushRegistrarProvider
     extends $NotifierProvider<PushRegistrar, void> {
-  /// Drives the FCM token lifecycle + notification-tap deep links for the
-  /// signed-in user. Activated once (app.dart watches it); keepAlive for the
-  /// session.
+  /// Application-scoped FCM token lifecycle + notification navigation.
   ///
-  /// - On sign-in (or app start while already signed in): request permission →
-  ///   fetch the FCM token → register it via the notifications repository.
-  /// - On token rotation: re-register.
-  /// - On a notification tap: deep-link via the router.
-  /// - On sign-out: [unregister] is invoked from the auth controller *before* the
-  ///   session ends, because the RLS delete on `device_tokens` needs
-  ///   `auth.uid()`.
+  /// Activated once from app.dart and kept alive for the session.
+  ///
+  /// Responsibilities:
+  /// - initialize foreground notification presentation
+  /// - register the signed-in user's FCM token
+  /// - re-register token rotations
+  /// - route foreground/background/cold-start notification taps
+  /// - revoke the device token before sign-out
+  ///
+  /// This controller intentionally does NOT decide whether a particular chat
+  /// notification should be suppressed. That visibility policy belongs to
+  /// PushMessagingService + MessageThreadScreen.
   PushRegistrarProvider._()
     : super(
         from: null,
@@ -74,19 +83,22 @@ final class PushRegistrarProvider
   }
 }
 
-String _$pushRegistrarHash() => r'9f4ce05a8827b325486b74a019c9301e811949ff';
+String _$pushRegistrarHash() => r'8303f495d8c4800bdcd0760a60f9a4e845b8dc4c';
 
-/// Drives the FCM token lifecycle + notification-tap deep links for the
-/// signed-in user. Activated once (app.dart watches it); keepAlive for the
-/// session.
+/// Application-scoped FCM token lifecycle + notification navigation.
 ///
-/// - On sign-in (or app start while already signed in): request permission →
-///   fetch the FCM token → register it via the notifications repository.
-/// - On token rotation: re-register.
-/// - On a notification tap: deep-link via the router.
-/// - On sign-out: [unregister] is invoked from the auth controller *before* the
-///   session ends, because the RLS delete on `device_tokens` needs
-///   `auth.uid()`.
+/// Activated once from app.dart and kept alive for the session.
+///
+/// Responsibilities:
+/// - initialize foreground notification presentation
+/// - register the signed-in user's FCM token
+/// - re-register token rotations
+/// - route foreground/background/cold-start notification taps
+/// - revoke the device token before sign-out
+///
+/// This controller intentionally does NOT decide whether a particular chat
+/// notification should be suppressed. That visibility policy belongs to
+/// PushMessagingService + MessageThreadScreen.
 
 abstract class _$PushRegistrar extends $Notifier<void> {
   void build();

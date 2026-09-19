@@ -8,12 +8,12 @@ part of 'push_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// App-lifetime FCM wrapper. keepAlive — one instance for the whole session.
+/// Single app-lifetime FCM/local-notification service.
 
 @ProviderFor(pushMessagingService)
 final pushMessagingServiceProvider = PushMessagingServiceProvider._();
 
-/// App-lifetime FCM wrapper. keepAlive — one instance for the whole session.
+/// Single app-lifetime FCM/local-notification service.
 
 final class PushMessagingServiceProvider
     extends
@@ -23,7 +23,7 @@ final class PushMessagingServiceProvider
           PushMessagingService
         >
     with $Provider<PushMessagingService> {
-  /// App-lifetime FCM wrapper. keepAlive — one instance for the whole session.
+  /// Single app-lifetime FCM/local-notification service.
   PushMessagingServiceProvider._()
     : super(
         from: null,
@@ -59,4 +59,4 @@ final class PushMessagingServiceProvider
 }
 
 String _$pushMessagingServiceHash() =>
-    r'769f511042d52ffede874d24b89996564c898aa7';
+    r'1904ba2b814da4a662bc0c51dee5286e1067814c';

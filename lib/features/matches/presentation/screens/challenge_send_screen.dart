@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../teams/domain/entities/team.dart';
+import '../../../teams/domain/entities/team_relationship.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/match.dart';
 import '../providers/matches_providers.dart';
 import '../widgets/challenge/step_format.dart';
@@ -470,14 +472,6 @@ String _dayLabel(DateTime d) {
 
 // ─── Header / Footer ──────────────────────────────────────────────────────
 
-/// Per-row role on the team-pick step. Pulled from the user's relationship
-/// to the team (owner/manager/captain via team_members). v1 simplification:
-/// users only see teams they own/manage (via `myTeamsProvider`'s filter), so
-/// every visible row is treated as CAPTAIN. Vice-captain + manager-disabled
-/// rendering paths are kept so we can wire them in when the team-members
-/// role surfaces.
-enum _MyTeamRole { captain, viceCaptain, manager }
-
 class _TeamStep extends ConsumerWidget {
   const _TeamStep({
     required this.selected,
@@ -491,7 +485,7 @@ class _TeamStep extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mineAsync = ref.watch(myTeamsProvider);
+    final mineAsync = ref.watch(currentUserTeamMembershipsProvider);
     return mineAsync.when(
       loading: () =>
           const Center(child: CircularProgressIndicator(color: CkColors.ink)),
@@ -501,19 +495,22 @@ class _TeamStep extends ConsumerWidget {
           child: Text(e.toString(), textAlign: TextAlign.center),
         ),
       ),
-      data: (mine) {
+      data: (memberships) {
+        final mine = memberships
+            .where((membership) => membership.relationship.canSendChallenge)
+            .toList(growable: false);
         if (mine.isEmpty) {
           return const Padding(
             padding: EdgeInsets.fromLTRB(18, 32, 18, 18),
             child: Text(
-              'You need to manage a team to issue a challenge. Create or '
-              'join one first.',
+              'You need to own or manage a team to issue a challenge. Create '
+              'one or ask an owner to appoint you as manager.',
               textAlign: TextAlign.center,
             ),
           );
         }
         if (mine.length == 1) {
-          onSingle(mine.single);
+          onSingle(mine.single.team);
           return const Center(
             child: CircularProgressIndicator(color: CkColors.ink),
           );
@@ -524,7 +521,7 @@ class _TeamStep extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(top: 2, bottom: 6),
               child: Text(
-                'You captain ${_countLabel(mine.length)}. Issue the challenge '
+                'You manage ${_countLabel(mine.length)}. Issue the challenge '
                 "as one of them — your XI options come from this squad later.",
                 style: CkType.body(
                   fontSize: 13,
@@ -535,22 +532,22 @@ class _TeamStep extends ConsumerWidget {
             ),
             const _SectionLabel('Eligible to challenge as'),
             const SizedBox(height: 8),
-            for (final t in mine)
+            for (final membership in mine)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _MyTeamRow(
-                  team: t,
-                  role: _MyTeamRole.captain,
+                  team: membership.team,
+                  role: membership.relationship,
                   disabledNote: null,
-                  selected: selected?.id == t.id,
-                  onTap: () => onPick(t),
+                  selected: selected?.id == membership.team.id,
+                  onTap: () => onPick(membership.team),
                 ),
               ),
             const SizedBox(height: 6),
             const _InfoCard(
               text:
-                  "Manager-only teams can’t initiate challenges. Get the "
-                  'captain to send it, or ask them to promote you.',
+                  "Captain-only membership can’t initiate challenges. The team "
+                  'owner or a manager can send one.',
             ),
           ],
         );
@@ -577,7 +574,7 @@ class _MyTeamRow extends StatelessWidget {
   });
 
   final Team team;
-  final _MyTeamRole role;
+  final TeamRelationship role;
   final bool selected;
   final VoidCallback onTap;
 
@@ -699,15 +696,19 @@ class _MyTeamRow extends StatelessWidget {
 
 class _RolePill extends StatelessWidget {
   const _RolePill({required this.role});
-  final _MyTeamRole role;
+  final TeamRelationship role;
 
   @override
   Widget build(BuildContext context) {
     final (label, bg, fg) = switch (role) {
-      _MyTeamRole.captain => ('CAPTAIN', CkColors.red, CkColors.paper),
-      _MyTeamRole.viceCaptain =>
-        ('VICE-CAPTAIN', CkColors.cream, CkColors.ink2),
-      _MyTeamRole.manager => ('MANAGER', CkColors.paper2, CkColors.ink2),
+      TeamRelationship.owner => ('OWNER', CkColors.red, CkColors.paper),
+      TeamRelationship.manager =>
+        ('MANAGER', CkColors.paper2, CkColors.ink2),
+      TeamRelationship.captain =>
+        ('CAPTAIN', CkColors.cream, CkColors.ink2),
+      TeamRelationship.player =>
+        ('PLAYER', CkColors.paper2, CkColors.ink2),
+      TeamRelationship.none => ('MEMBER', CkColors.paper2, CkColors.ink2),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -785,7 +786,8 @@ class _OpponentPicker extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final all = ref.watch(allTeamsProvider).value ?? const <Team>[];
+    final all =
+        ref.watch(discoverableTeamsProvider(query)).value ?? const <Team>[];
     final q = query.trim().toLowerCase();
     final visible = all
         .where((t) => t.id != fromTeamId)

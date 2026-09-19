@@ -42,9 +42,6 @@ abstract class TeamMemberDto with _$TeamMemberDto {
       _$TeamMemberDtoFromJson(json);
 
   TeamMember toEntity({Set<String>? roles}) {
-    // XOR check on the DB side guarantees exactly one is set, but be
-    // defensive at the boundary (renaming a column or a partial select
-    // shouldn't crash the app).
     final isClaimed = userId != null;
     final pid = userId ?? unclaimedId ?? '';
     return TeamMember(

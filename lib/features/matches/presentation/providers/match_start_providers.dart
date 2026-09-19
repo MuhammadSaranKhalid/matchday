@@ -2,7 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../teams/domain/entities/roster_member.dart';
-import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/match_player.dart';
 import '../state/match_start_state.dart';
 import '../state/match_start_views.dart';

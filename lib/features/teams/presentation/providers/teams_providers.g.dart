@@ -51,103 +51,17 @@ final class TeamsRepositoryProvider
 
 String _$teamsRepositoryHash() => r'ab9db3bdded7261464d685b4fe83a5b845fdb68e';
 
-/// Teams owned/managed by the signed-in user. Empty when signed out.
-
-@ProviderFor(myTeams)
-final myTeamsProvider = MyTeamsProvider._();
-
-/// Teams owned/managed by the signed-in user. Empty when signed out.
-
-final class MyTeamsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<Team>>,
-          List<Team>,
-          Stream<List<Team>>
-        >
-    with $FutureModifier<List<Team>>, $StreamProvider<List<Team>> {
-  /// Teams owned/managed by the signed-in user. Empty when signed out.
-  MyTeamsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'myTeamsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$myTeamsHash();
-
-  @$internal
-  @override
-  $StreamProviderElement<List<Team>> $createElement($ProviderPointer pointer) =>
-      $StreamProviderElement(pointer);
-
-  @override
-  Stream<List<Team>> create(Ref ref) {
-    return myTeams(ref);
-  }
-}
-
-String _$myTeamsHash() => r'51fb83f482e069c179b1f9d6825e8e1fd5de2f11';
-
-/// All teams visible to the signed-in user (used by match setup's opponent picker).
-
-@ProviderFor(allTeams)
-final allTeamsProvider = AllTeamsProvider._();
-
-/// All teams visible to the signed-in user (used by match setup's opponent picker).
-
-final class AllTeamsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<Team>>,
-          List<Team>,
-          Stream<List<Team>>
-        >
-    with $FutureModifier<List<Team>>, $StreamProvider<List<Team>> {
-  /// All teams visible to the signed-in user (used by match setup's opponent picker).
-  AllTeamsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'allTeamsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$allTeamsHash();
-
-  @$internal
-  @override
-  $StreamProviderElement<List<Team>> $createElement($ProviderPointer pointer) =>
-      $StreamProviderElement(pointer);
-
-  @override
-  Stream<List<Team>> create(Ref ref) {
-    return allTeams(ref);
-  }
-}
-
-String _$allTeamsHash() => r'a6c39fd0272afa8b23bedc2e4bad849f752bba52';
-
-/// A single team (hub view). Null if not found / not accessible.
+/// Scoped one-shot team profile read.
 
 @ProviderFor(team)
 final teamProvider = TeamFamily._();
 
-/// A single team (hub view). Null if not found / not accessible.
+/// Scoped one-shot team profile read.
 
 final class TeamProvider
-    extends $FunctionalProvider<AsyncValue<Team?>, Team?, Stream<Team?>>
-    with $FutureModifier<Team?>, $StreamProvider<Team?> {
-  /// A single team (hub view). Null if not found / not accessible.
+    extends $FunctionalProvider<AsyncValue<Team?>, Team?, FutureOr<Team?>>
+    with $FutureModifier<Team?>, $FutureProvider<Team?> {
+  /// Scoped one-shot team profile read.
   TeamProvider._({
     required TeamFamily super.from,
     required String super.argument,
@@ -171,11 +85,11 @@ final class TeamProvider
 
   @$internal
   @override
-  $StreamProviderElement<Team?> $createElement($ProviderPointer pointer) =>
-      $StreamProviderElement(pointer);
+  $FutureProviderElement<Team?> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
 
   @override
-  Stream<Team?> create(Ref ref) {
+  FutureOr<Team?> create(Ref ref) {
     final argument = this.argument as String;
     return team(ref, argument);
   }
@@ -191,12 +105,12 @@ final class TeamProvider
   }
 }
 
-String _$teamHash() => r'c34145eadbada5954c0db00d1f32259f6d60e1b8';
+String _$teamHash() => r'9f2caeaaf0c3b438c2c0b479e7b651e186521ae6';
 
-/// A single team (hub view). Null if not found / not accessible.
+/// Scoped one-shot team profile read.
 
 final class TeamFamily extends $Family
-    with $FunctionalFamilyOverride<Stream<Team?>, String> {
+    with $FunctionalFamilyOverride<FutureOr<Team?>, String> {
   TeamFamily._()
     : super(
         retry: null,
@@ -206,7 +120,7 @@ final class TeamFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// A single team (hub view). Null if not found / not accessible.
+  /// Scoped one-shot team profile read.
 
   TeamProvider call(String teamId) =>
       TeamProvider._(argument: teamId, from: this);
@@ -215,60 +129,60 @@ final class TeamFamily extends $Family
   String toString() => r'teamProvider';
 }
 
-/// A team's roster (members + display names).
+/// One-shot public/discoverable team list for selectors such as direct
+/// challenges. This replaces the old permanent `allTeams` stream.
 
-@ProviderFor(roster)
-final rosterProvider = RosterFamily._();
+@ProviderFor(discoverableTeams)
+final discoverableTeamsProvider = DiscoverableTeamsFamily._();
 
-/// A team's roster (members + display names).
+/// One-shot public/discoverable team list for selectors such as direct
+/// challenges. This replaces the old permanent `allTeams` stream.
 
-final class RosterProvider
+final class DiscoverableTeamsProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<RosterMember>>,
-          List<RosterMember>,
-          Stream<List<RosterMember>>
+          AsyncValue<List<Team>>,
+          List<Team>,
+          FutureOr<List<Team>>
         >
-    with
-        $FutureModifier<List<RosterMember>>,
-        $StreamProvider<List<RosterMember>> {
-  /// A team's roster (members + display names).
-  RosterProvider._({
-    required RosterFamily super.from,
+    with $FutureModifier<List<Team>>, $FutureProvider<List<Team>> {
+  /// One-shot public/discoverable team list for selectors such as direct
+  /// challenges. This replaces the old permanent `allTeams` stream.
+  DiscoverableTeamsProvider._({
+    required DiscoverableTeamsFamily super.from,
     required String super.argument,
   }) : super(
          retry: null,
-         name: r'rosterProvider',
+         name: r'discoverableTeamsProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$rosterHash();
+  String debugGetCreateSourceHash() => _$discoverableTeamsHash();
 
   @override
   String toString() {
-    return r'rosterProvider'
+    return r'discoverableTeamsProvider'
         ''
         '($argument)';
   }
 
   @$internal
   @override
-  $StreamProviderElement<List<RosterMember>> $createElement(
-    $ProviderPointer pointer,
-  ) => $StreamProviderElement(pointer);
+  $FutureProviderElement<List<Team>> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
 
   @override
-  Stream<List<RosterMember>> create(Ref ref) {
+  FutureOr<List<Team>> create(Ref ref) {
     final argument = this.argument as String;
-    return roster(ref, argument);
+    return discoverableTeams(ref, argument);
   }
 
   @override
   bool operator ==(Object other) {
-    return other is RosterProvider && other.argument == argument;
+    return other is DiscoverableTeamsProvider && other.argument == argument;
   }
 
   @override
@@ -277,512 +191,28 @@ final class RosterProvider
   }
 }
 
-String _$rosterHash() => r'528a5b6d97df316d19a2293425b9975a84833839';
+String _$discoverableTeamsHash() => r'6373626798b0733969f7c4fea2ff5860334276cc';
 
-/// A team's roster (members + display names).
+/// One-shot public/discoverable team list for selectors such as direct
+/// challenges. This replaces the old permanent `allTeams` stream.
 
-final class RosterFamily extends $Family
-    with $FunctionalFamilyOverride<Stream<List<RosterMember>>, String> {
-  RosterFamily._()
+final class DiscoverableTeamsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<Team>>, String> {
+  DiscoverableTeamsFamily._()
     : super(
         retry: null,
-        name: r'rosterProvider',
+        name: r'discoverableTeamsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  /// A team's roster (members + display names).
+  /// One-shot public/discoverable team list for selectors such as direct
+  /// challenges. This replaces the old permanent `allTeams` stream.
 
-  RosterProvider call(String teamId) =>
-      RosterProvider._(argument: teamId, from: this);
-
-  @override
-  String toString() => r'rosterProvider';
-}
-
-/// The signed-in user's rung on each of their teams, keyed by team id.
-/// Ask this rather than comparing against `Team.ownerId` — see
-/// docs/team-roles-design.md.
-
-@ProviderFor(myTeamRoles)
-final myTeamRolesProvider = MyTeamRolesProvider._();
-
-/// The signed-in user's rung on each of their teams, keyed by team id.
-/// Ask this rather than comparing against `Team.ownerId` — see
-/// docs/team-roles-design.md.
-
-final class MyTeamRolesProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<Map<String, MemberRole>>,
-          Map<String, MemberRole>,
-          Stream<Map<String, MemberRole>>
-        >
-    with
-        $FutureModifier<Map<String, MemberRole>>,
-        $StreamProvider<Map<String, MemberRole>> {
-  /// The signed-in user's rung on each of their teams, keyed by team id.
-  /// Ask this rather than comparing against `Team.ownerId` — see
-  /// docs/team-roles-design.md.
-  MyTeamRolesProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'myTeamRolesProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+  DiscoverableTeamsProvider call(String query) =>
+      DiscoverableTeamsProvider._(argument: query, from: this);
 
   @override
-  String debugGetCreateSourceHash() => _$myTeamRolesHash();
-
-  @$internal
-  @override
-  $StreamProviderElement<Map<String, MemberRole>> $createElement(
-    $ProviderPointer pointer,
-  ) => $StreamProviderElement(pointer);
-
-  @override
-  Stream<Map<String, MemberRole>> create(Ref ref) {
-    return myTeamRoles(ref);
-  }
-}
-
-String _$myTeamRolesHash() => r'66d4c63afa0a1b1757dbcfe48784167034c00d57';
-
-/// Real-time stream of all teams affiliated with a user (captained and played for).
-
-@ProviderFor(userAffiliatedTeams)
-final userAffiliatedTeamsProvider = UserAffiliatedTeamsFamily._();
-
-/// Real-time stream of all teams affiliated with a user (captained and played for).
-
-final class UserAffiliatedTeamsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<UserTeamAffiliation>>,
-          List<UserTeamAffiliation>,
-          Stream<List<UserTeamAffiliation>>
-        >
-    with
-        $FutureModifier<List<UserTeamAffiliation>>,
-        $StreamProvider<List<UserTeamAffiliation>> {
-  /// Real-time stream of all teams affiliated with a user (captained and played for).
-  UserAffiliatedTeamsProvider._({
-    required UserAffiliatedTeamsFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'userAffiliatedTeamsProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$userAffiliatedTeamsHash();
-
-  @override
-  String toString() {
-    return r'userAffiliatedTeamsProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $StreamProviderElement<List<UserTeamAffiliation>> $createElement(
-    $ProviderPointer pointer,
-  ) => $StreamProviderElement(pointer);
-
-  @override
-  Stream<List<UserTeamAffiliation>> create(Ref ref) {
-    final argument = this.argument as String;
-    return userAffiliatedTeams(ref, argument);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is UserAffiliatedTeamsProvider && other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$userAffiliatedTeamsHash() =>
-    r'ba776b41c24523fd8d6a2e88773d717e1959006a';
-
-/// Real-time stream of all teams affiliated with a user (captained and played for).
-
-final class UserAffiliatedTeamsFamily extends $Family
-    with $FunctionalFamilyOverride<Stream<List<UserTeamAffiliation>>, String> {
-  UserAffiliatedTeamsFamily._()
-    : super(
-        retry: null,
-        name: r'userAffiliatedTeamsProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  /// Real-time stream of all teams affiliated with a user (captained and played for).
-
-  UserAffiliatedTeamsProvider call(String userId) =>
-      UserAffiliatedTeamsProvider._(argument: userId, from: this);
-
-  @override
-  String toString() => r'userAffiliatedTeamsProvider';
-}
-
-/// Team invites sent to players for a team.
-
-@ProviderFor(teamPendingInvites)
-final teamPendingInvitesProvider = TeamPendingInvitesFamily._();
-
-/// Team invites sent to players for a team.
-
-final class TeamPendingInvitesProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<TeamInvite>>,
-          List<TeamInvite>,
-          FutureOr<List<TeamInvite>>
-        >
-    with $FutureModifier<List<TeamInvite>>, $FutureProvider<List<TeamInvite>> {
-  /// Team invites sent to players for a team.
-  TeamPendingInvitesProvider._({
-    required TeamPendingInvitesFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'teamPendingInvitesProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$teamPendingInvitesHash();
-
-  @override
-  String toString() {
-    return r'teamPendingInvitesProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $FutureProviderElement<List<TeamInvite>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<TeamInvite>> create(Ref ref) {
-    final argument = this.argument as String;
-    return teamPendingInvites(ref, argument);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is TeamPendingInvitesProvider && other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$teamPendingInvitesHash() =>
-    r'0d210f18d2e280d4d58412bac233f4ac777fa59c';
-
-/// Team invites sent to players for a team.
-
-final class TeamPendingInvitesFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<TeamInvite>>, String> {
-  TeamPendingInvitesFamily._()
-    : super(
-        retry: null,
-        name: r'teamPendingInvitesProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  /// Team invites sent to players for a team.
-
-  TeamPendingInvitesProvider call(String teamId) =>
-      TeamPendingInvitesProvider._(argument: teamId, from: this);
-
-  @override
-  String toString() => r'teamPendingInvitesProvider';
-}
-
-/// Claim requests from users claiming unclaimed roster spots for a team.
-
-@ProviderFor(teamPendingClaimRequests)
-final teamPendingClaimRequestsProvider = TeamPendingClaimRequestsFamily._();
-
-/// Claim requests from users claiming unclaimed roster spots for a team.
-
-final class TeamPendingClaimRequestsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<TeamClaimRequest>>,
-          List<TeamClaimRequest>,
-          FutureOr<List<TeamClaimRequest>>
-        >
-    with
-        $FutureModifier<List<TeamClaimRequest>>,
-        $FutureProvider<List<TeamClaimRequest>> {
-  /// Claim requests from users claiming unclaimed roster spots for a team.
-  TeamPendingClaimRequestsProvider._({
-    required TeamPendingClaimRequestsFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'teamPendingClaimRequestsProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$teamPendingClaimRequestsHash();
-
-  @override
-  String toString() {
-    return r'teamPendingClaimRequestsProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $FutureProviderElement<List<TeamClaimRequest>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<TeamClaimRequest>> create(Ref ref) {
-    final argument = this.argument as String;
-    return teamPendingClaimRequests(ref, argument);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is TeamPendingClaimRequestsProvider &&
-        other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$teamPendingClaimRequestsHash() =>
-    r'2bffd0037d62e27a9ed259c2bdce6387aecdae86';
-
-/// Claim requests from users claiming unclaimed roster spots for a team.
-
-final class TeamPendingClaimRequestsFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<TeamClaimRequest>>, String> {
-  TeamPendingClaimRequestsFamily._()
-    : super(
-        retry: null,
-        name: r'teamPendingClaimRequestsProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  /// Claim requests from users claiming unclaimed roster spots for a team.
-
-  TeamPendingClaimRequestsProvider call(String teamId) =>
-      TeamPendingClaimRequestsProvider._(argument: teamId, from: this);
-
-  @override
-  String toString() => r'teamPendingClaimRequestsProvider';
-}
-
-/// Join requests from players asking to join a team.
-
-@ProviderFor(teamPendingJoinRequests)
-final teamPendingJoinRequestsProvider = TeamPendingJoinRequestsFamily._();
-
-/// Join requests from players asking to join a team.
-
-final class TeamPendingJoinRequestsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<TeamJoinRequest>>,
-          List<TeamJoinRequest>,
-          FutureOr<List<TeamJoinRequest>>
-        >
-    with
-        $FutureModifier<List<TeamJoinRequest>>,
-        $FutureProvider<List<TeamJoinRequest>> {
-  /// Join requests from players asking to join a team.
-  TeamPendingJoinRequestsProvider._({
-    required TeamPendingJoinRequestsFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'teamPendingJoinRequestsProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$teamPendingJoinRequestsHash();
-
-  @override
-  String toString() {
-    return r'teamPendingJoinRequestsProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $FutureProviderElement<List<TeamJoinRequest>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<TeamJoinRequest>> create(Ref ref) {
-    final argument = this.argument as String;
-    return teamPendingJoinRequests(ref, argument);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is TeamPendingJoinRequestsProvider &&
-        other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$teamPendingJoinRequestsHash() =>
-    r'f918fef9b5128e2169220aae42c31144d5f5fc51';
-
-/// Join requests from players asking to join a team.
-
-final class TeamPendingJoinRequestsFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<TeamJoinRequest>>, String> {
-  TeamPendingJoinRequestsFamily._()
-    : super(
-        retry: null,
-        name: r'teamPendingJoinRequestsProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  /// Join requests from players asking to join a team.
-
-  TeamPendingJoinRequestsProvider call(String teamId) =>
-      TeamPendingJoinRequestsProvider._(argument: teamId, from: this);
-
-  @override
-  String toString() => r'teamPendingJoinRequestsProvider';
-}
-
-/// Pending invite for the current signed-in user to join [teamId].
-
-@ProviderFor(myPendingInviteForTeam)
-final myPendingInviteForTeamProvider = MyPendingInviteForTeamFamily._();
-
-/// Pending invite for the current signed-in user to join [teamId].
-
-final class MyPendingInviteForTeamProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<TeamInvite?>,
-          TeamInvite?,
-          FutureOr<TeamInvite?>
-        >
-    with $FutureModifier<TeamInvite?>, $FutureProvider<TeamInvite?> {
-  /// Pending invite for the current signed-in user to join [teamId].
-  MyPendingInviteForTeamProvider._({
-    required MyPendingInviteForTeamFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'myPendingInviteForTeamProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$myPendingInviteForTeamHash();
-
-  @override
-  String toString() {
-    return r'myPendingInviteForTeamProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $FutureProviderElement<TeamInvite?> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<TeamInvite?> create(Ref ref) {
-    final argument = this.argument as String;
-    return myPendingInviteForTeam(ref, argument);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is MyPendingInviteForTeamProvider &&
-        other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$myPendingInviteForTeamHash() =>
-    r'c22aab51c2636138f36036fe3f26e5abe64c7752';
-
-/// Pending invite for the current signed-in user to join [teamId].
-
-final class MyPendingInviteForTeamFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<TeamInvite?>, String> {
-  MyPendingInviteForTeamFamily._()
-    : super(
-        retry: null,
-        name: r'myPendingInviteForTeamProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  /// Pending invite for the current signed-in user to join [teamId].
-
-  MyPendingInviteForTeamProvider call(String teamId) =>
-      MyPendingInviteForTeamProvider._(argument: teamId, from: this);
-
-  @override
-  String toString() => r'myPendingInviteForTeamProvider';
+  String toString() => r'discoverableTeamsProvider';
 }

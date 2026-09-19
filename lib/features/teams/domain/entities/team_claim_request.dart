@@ -1,4 +1,3 @@
-/// Represents a request from a user to claim an unclaimed roster spot.
 class TeamClaimRequest {
   const TeamClaimRequest({
     required this.requestId,

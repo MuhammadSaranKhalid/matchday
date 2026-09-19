@@ -1,7 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 
-/// A team name: 3–50 characters after trimming (mirrors the DB check).
 class TeamName {
   const TeamName._(this.value);
   final String value;

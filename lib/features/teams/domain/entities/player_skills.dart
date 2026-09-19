@@ -1,9 +1,3 @@
-/// Optional playing-skill metadata for a player on the roster.
-///
-/// All three enums are surfaced in the squad list and live as JSON inside
-/// `unclaimed_players.player_profile`. Captains set them when adding an
-/// unclaimed player, the values are presentational only (no business rules
-/// gated on them yet).
 enum PlayingRole {
   batter('batter', 'Batter'),
   bowler('bowler', 'Bowler'),
@@ -12,7 +6,6 @@ enum PlayingRole {
 
   const PlayingRole(this.wire, this.label);
   final String wire;
-  
   final String label;
 
   static PlayingRole? fromWire(String? wire) {

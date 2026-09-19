@@ -10,7 +10,6 @@ import '../../../../posts/presentation/widgets/post_card.dart';
 import '../../../../posts/presentation/widgets/post_card_skeleton.dart';
 import '../../../domain/entities/team.dart';
 
-/// Team Announcements and published posts management tab.
 class TeamAnnouncementsManageTab extends ConsumerWidget {
   const TeamAnnouncementsManageTab({super.key, required this.team});
   final Team team;
@@ -21,11 +20,11 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
 
     return RefreshIndicator(
       color: CkColors.ink,
-      onRefresh: () async => ref.refresh(teamPostsProvider(team.id.value).future),
+      onRefresh: () async =>
+          ref.refresh(teamPostsProvider(team.id.value).future),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
         children: [
-          // Announcement Creation Card
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -86,7 +85,8 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
                         queryParameters: {
                           'teamId': team.id.value,
                           'teamName': team.name,
-                          if (team.logoMonogram != null && team.logoMonogram!.isNotEmpty)
+                          if (team.logoMonogram != null &&
+                              team.logoMonogram!.isNotEmpty)
                             'teamMono': team.logoMonogram!,
                         },
                       );
@@ -125,7 +125,8 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
           const SizedBox(height: 10),
           switch (postsAsync) {
             AsyncData(:final value) when value.isEmpty => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
                 alignment: Alignment.center,
                 child: Column(
                   children: [
@@ -146,7 +147,8 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
                     Text(
                       'Posts you publish as ${team.name} will appear here and on the team\'s public page.',
                       textAlign: TextAlign.center,
-                      style: CkType.body(fontSize: 12, color: CkColors.muted),
+                      style:
+                          CkType.body(fontSize: 12, color: CkColors.muted),
                     ),
                   ],
                 ),
@@ -159,11 +161,13 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
                       onComment: () => showCommentsSheet(
                         context,
                         postId: post.id.value,
-                        postAuthorHandle: post.authorUsername != null &&
-                                post.authorUsername!.isNotEmpty
-                            ? '@${post.authorUsername}'
-                            : post.authorName,
-                        onOpenProfile: (String u) => context.push('/u/$u'),
+                        postAuthorHandle:
+                            post.authorUsername != null &&
+                                    post.authorUsername!.isNotEmpty
+                                ? '@${post.authorUsername}'
+                                : post.authorName,
+                        onOpenProfile: (String u) =>
+                            context.push('/u/$u'),
                       ),
                       onLike: () => ref
                           .read(postsRepositoryProvider)
@@ -190,7 +194,8 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
                 child: Center(
                   child: Text(
                     'Could not load posts.',
-                    style: TextStyle(fontSize: 13, color: CkColors.muted),
+                    style:
+                        TextStyle(fontSize: 13, color: CkColors.muted),
                   ),
                 ),
               ),

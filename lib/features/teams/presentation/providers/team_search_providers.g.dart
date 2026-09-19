@@ -8,26 +8,9 @@ part of 'team_search_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Top cities by team count for the search filter chips. Cached per
-/// [countryCode] (null = caller's profile country, defaulted server-side).
-///
-/// Facets change slowly (a new team materialising in a new village isn't
-/// continuous traffic), so this stays autodispose — the provider rebuilds
-/// when the Search tab is opened again, and a pull-to-refresh triggers
-/// `ref.invalidate`. We deliberately do NOT subscribe to a realtime stream
-/// here; facet drift is fine.
 
 @ProviderFor(placeFacets)
 final placeFacetsProvider = PlaceFacetsFamily._();
-
-/// Top cities by team count for the search filter chips. Cached per
-/// [countryCode] (null = caller's profile country, defaulted server-side).
-///
-/// Facets change slowly (a new team materialising in a new village isn't
-/// continuous traffic), so this stays autodispose — the provider rebuilds
-/// when the Search tab is opened again, and a pull-to-refresh triggers
-/// `ref.invalidate`. We deliberately do NOT subscribe to a realtime stream
-/// here; facet drift is fine.
 
 final class PlaceFacetsProvider
     extends
@@ -37,14 +20,6 @@ final class PlaceFacetsProvider
           FutureOr<List<PlaceFacet>>
         >
     with $FutureModifier<List<PlaceFacet>>, $FutureProvider<List<PlaceFacet>> {
-  /// Top cities by team count for the search filter chips. Cached per
-  /// [countryCode] (null = caller's profile country, defaulted server-side).
-  ///
-  /// Facets change slowly (a new team materialising in a new village isn't
-  /// continuous traffic), so this stays autodispose — the provider rebuilds
-  /// when the Search tab is opened again, and a pull-to-refresh triggers
-  /// `ref.invalidate`. We deliberately do NOT subscribe to a realtime stream
-  /// here; facet drift is fine.
   PlaceFacetsProvider._({
     required PlaceFacetsFamily super.from,
     required String? super.argument,
@@ -91,15 +66,6 @@ final class PlaceFacetsProvider
 
 String _$placeFacetsHash() => r'fae229894213c804e371734f84089a25be4990d9';
 
-/// Top cities by team count for the search filter chips. Cached per
-/// [countryCode] (null = caller's profile country, defaulted server-side).
-///
-/// Facets change slowly (a new team materialising in a new village isn't
-/// continuous traffic), so this stays autodispose — the provider rebuilds
-/// when the Search tab is opened again, and a pull-to-refresh triggers
-/// `ref.invalidate`. We deliberately do NOT subscribe to a realtime stream
-/// here; facet drift is fine.
-
 final class PlaceFacetsFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<List<PlaceFacet>>, String?> {
   PlaceFacetsFamily._()
@@ -110,15 +76,6 @@ final class PlaceFacetsFamily extends $Family
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
-
-  /// Top cities by team count for the search filter chips. Cached per
-  /// [countryCode] (null = caller's profile country, defaulted server-side).
-  ///
-  /// Facets change slowly (a new team materialising in a new village isn't
-  /// continuous traffic), so this stays autodispose — the provider rebuilds
-  /// when the Search tab is opened again, and a pull-to-refresh triggers
-  /// `ref.invalidate`. We deliberately do NOT subscribe to a realtime stream
-  /// here; facet drift is fine.
 
   PlaceFacetsProvider call(String? countryCode) =>
       PlaceFacetsProvider._(argument: countryCode, from: this);

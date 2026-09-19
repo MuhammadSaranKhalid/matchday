@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/supabase/supabase_client_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../teams/domain/entities/roster_member.dart';
+import '../../../teams/domain/entities/team_membership.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_player.dart';
 import '../providers/matches_providers.dart';
@@ -93,10 +95,16 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
     // to bat is exactly who sets up the next innings. `isManagedBy` (removed
     // 2026-09-10) could not see them, so a captain-only user hit a dead
     // button at the innings break.
-    final myRoles = ref.watch(myTeamRolesProvider).value ?? const {};
+    final memberships =
+        ref.watch(currentUserTeamMembershipsProvider).value ??
+            const <TeamMembership>[];
     final canSetup = battingTeam != null &&
         currentUserId != null &&
-        (myRoles[battingTeamId.value]?.hasMatchAuthority ?? false);
+        memberships.any(
+          (membership) =>
+              membership.team.id == battingTeamId &&
+              membership.relationship.hasMatchAuthority,
+        );
 
     final ready = _strikerId != null &&
         _nonStrikerId != null &&

@@ -8,27 +8,12 @@ part of 'teams_list_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Loads the signed-in user's current team memberships.
-///
-/// My Teams is intentionally one-shot rather than realtime. The controller
-/// reloads when it is first built and when the screen explicitly refreshes
-/// after returning from a team flow or via pull-to-refresh.
 
 @ProviderFor(TeamsListController)
 final teamsListControllerProvider = TeamsListControllerProvider._();
 
-/// Loads the signed-in user's current team memberships.
-///
-/// My Teams is intentionally one-shot rather than realtime. The controller
-/// reloads when it is first built and when the screen explicitly refreshes
-/// after returning from a team flow or via pull-to-refresh.
 final class TeamsListControllerProvider
     extends $AsyncNotifierProvider<TeamsListController, TeamsListState> {
-  /// Loads the signed-in user's current team memberships.
-  ///
-  /// My Teams is intentionally one-shot rather than realtime. The controller
-  /// reloads when it is first built and when the screen explicitly refreshes
-  /// after returning from a team flow or via pull-to-refresh.
   TeamsListControllerProvider._()
     : super(
         from: null,
@@ -50,12 +35,6 @@ final class TeamsListControllerProvider
 
 String _$teamsListControllerHash() =>
     r'799b553a596def5d7a0ed1fcc792d52884046b56';
-
-/// Loads the signed-in user's current team memberships.
-///
-/// My Teams is intentionally one-shot rather than realtime. The controller
-/// reloads when it is first built and when the screen explicitly refreshes
-/// after returning from a team flow or via pull-to-refresh.
 
 abstract class _$TeamsListController extends $AsyncNotifier<TeamsListState> {
   FutureOr<TeamsListState> build();

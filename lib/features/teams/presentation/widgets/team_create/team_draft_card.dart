@@ -2,11 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 
-/// Visual card for a locally saved create-team draft.
-///
-/// Navigation and persistence are deliberately supplied by the parent. This
-/// widget renders UI and emits user intent; it does not own Riverpod, routing,
-/// or the draft store.
 class TeamDraftCard extends StatelessWidget {
   const TeamDraftCard({
     super.key,
@@ -61,23 +56,22 @@ class TeamDraftCard extends StatelessWidget {
             onPressed: () async {
               final discard = await showDialog<bool>(
                 context: context,
-                builder:
-                    (dialogContext) => AlertDialog(
-                      title: const Text('Discard this draft?'),
-                      content: const Text(
-                        'The details saved for this team will be removed from this device.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext, false),
-                          child: const Text('Keep draft'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext, true),
-                          child: const Text('Discard'),
-                        ),
-                      ],
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Discard this draft?'),
+                  content: const Text(
+                    'The details saved for this team will be removed from this device.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('Keep draft'),
                     ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      child: const Text('Discard'),
+                    ),
+                  ],
+                ),
               );
 
               if (discard != true || !context.mounted) {

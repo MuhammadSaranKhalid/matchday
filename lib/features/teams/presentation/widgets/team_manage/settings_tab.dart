@@ -7,15 +7,24 @@ import '../team_crest.dart';
 
 /// Team Settings and details tab.
 class SettingsTab extends StatelessWidget {
-  const SettingsTab({super.key, required this.team});
+  const SettingsTab({
+    super.key,
+    required this.team,
+    this.onChanged,
+  });
   final Team team;
+  final Future<void> Function()? onChanged;
 
   @override
   Widget build(BuildContext context) {
+    Future<void> edit() async {
+      final changed = await showEditTeamSheet(context, team);
+      if (changed == true) await onChanged?.call();
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Primary Edit Action Card
         Container(
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(16),
@@ -33,7 +42,7 @@ class SettingsTab extends StatelessWidget {
                     name: team.name,
                     primaryColor: team.primaryColor,
                     logoUrl: team.logoUrl,
-          crestKind: team.crestKind,
+                    crestKind: team.crestKind,
                     monogram: team.logoMonogram,
                     size: 44,
                   ),
@@ -69,7 +78,7 @@ class SettingsTab extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => showEditTeamSheet(context, team),
+                  onPressed: edit,
                   icon: const Icon(Icons.edit_outlined, size: 16),
                   label: const Text('Edit Team Details'),
                   style: ElevatedButton.styleFrom(
@@ -90,7 +99,6 @@ class SettingsTab extends StatelessWidget {
             ],
           ),
         ),
-
         const Text(
           'TEAM CONFIGURATION',
           style: TextStyle(
@@ -102,7 +110,6 @@ class SettingsTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-
         _settingTile(
           context: context,
           title: 'Team Logo & Brand Colors',
@@ -112,14 +119,14 @@ class SettingsTab extends StatelessWidget {
                   ? 'Monogram (${team.logoMonogram})'
                   : 'Preset Colors'),
           icon: Icons.palette_outlined,
-          onTap: () => showEditTeamSheet(context, team),
+          onTap: edit,
         ),
         _settingTile(
           context: context,
           title: 'Team Name',
           value: team.name,
           icon: Icons.shield_outlined,
-          onTap: () => showEditTeamSheet(context, team),
+          onTap: edit,
         ),
         _settingTile(
           context: context,
@@ -129,22 +136,27 @@ class SettingsTab extends StatelessWidget {
                   ? team.description!
                   : 'Not set'),
           icon: Icons.notes_rounded,
-          onTap: () => showEditTeamSheet(context, team),
+          onTap: edit,
         ),
         _settingTile(
           context: context,
           title: 'Location & Home Ground',
-          value: '${team.city ?? "No city"} · ${team.homeGround ?? "No ground specified"}',
+          value:
+              '${team.city ?? "No city"} · ${team.homeGround ?? "No ground specified"}',
           icon: Icons.location_on_outlined,
-          onTap: () => showEditTeamSheet(context, team),
+          onTap: edit,
         ),
         _settingTile(
           context: context,
           title: 'Squad Capacity',
-          value: '25 Players Max',
+          value: '${team.maxSquadSize} Players Max',
           icon: Icons.groups_outlined,
           onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Squad capacity is fixed at 25 players.')),
+            SnackBar(
+              content: Text(
+                'Squad capacity is fixed at ${team.maxSquadSize} players.',
+              ),
+            ),
           ),
         ),
         _settingTile(
@@ -154,7 +166,7 @@ class SettingsTab extends StatelessWidget {
               ? 'Private Team (Invite-only)'
               : 'Public Team (Discoverable)',
           icon: Icons.lock_outline_rounded,
-          onTap: () => showEditTeamSheet(context, team),
+          onTap: edit,
         ),
       ],
     );
@@ -186,18 +198,28 @@ class SettingsTab extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: CkType.body(fontSize: 11, color: CkColors.muted)),
+                  Text(
+                    title,
+                    style: CkType.body(fontSize: 11, color: CkColors.muted),
+                  ),
                   const SizedBox(height: 1),
                   Text(
                     value,
-                    style: CkType.display(fontSize: 13.5, fontWeight: FontWeight.w700),
+                    style: CkType.display(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 18, color: CkColors.muted),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: CkColors.muted,
+            ),
           ],
         ),
       ),

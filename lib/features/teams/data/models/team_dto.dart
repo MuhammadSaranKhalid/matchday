@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+
 import '../../domain/entities/team.dart';
 
 part 'team_dto.freezed.dart';
@@ -9,7 +10,7 @@ part 'team_dto.g.dart';
 abstract class TeamDto with _$TeamDto {
   const factory TeamDto({
     @JsonKey(name: 'team_id') required String teamId,
-    @JsonKey(name: 'created_by') required String createdBy,
+    @JsonKey(name: 'created_by') String? createdBy,
     @JsonKey(name: 'team_name') required String teamName,
     @JsonKey(name: 'team_type') required String teamType,
     String? description,
@@ -23,6 +24,7 @@ abstract class TeamDto with _$TeamDto {
     @JsonKey(name: 'logo_monogram') String? logoMonogram,
     @JsonKey(name: 'is_verified') @Default(false) bool isVerified,
     @Default('active') String status,
+    @JsonKey(name: 'max_squad_size') @Default(25) int maxSquadSize,
     @JsonKey(name: 'created_at') required String createdAt,
     @JsonKey(name: 'updated_at') required String updatedAt,
   }) = _TeamDto;
@@ -34,7 +36,7 @@ abstract class TeamDto with _$TeamDto {
 
   Team toEntity() => Team(
         id: TeamId(teamId),
-        createdBy: createdBy,
+        createdBy: createdBy ?? '',
         name: teamName,
         type: TeamType.fromWire(teamType),
         privacy: TeamPrivacy.fromWire(privacy),
@@ -50,6 +52,7 @@ abstract class TeamDto with _$TeamDto {
         crestKind: CrestKind.fromWire(teamColors?['crest_kind'] as String?),
         isVerified: isVerified,
         status: TeamStatus.fromWire(status),
+        maxSquadSize: maxSquadSize,
         createdAt: DateTime.parse(createdAt),
         updatedAt: DateTime.parse(updatedAt),
       );

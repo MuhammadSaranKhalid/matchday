@@ -1,6 +1,5 @@
 import 'team_member.dart';
 
-/// Represents a player's request to join a team's squad.
 class TeamJoinRequest {
   const TeamJoinRequest({
     required this.requestId,

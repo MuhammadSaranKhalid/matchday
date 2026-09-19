@@ -1,8 +1,13 @@
+import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../../../core/error/failures.dart';
 
 import '../../domain/entities/team_member.dart';
 import '../../domain/value_objects/jersey_number.dart';
-import '../providers/teams_providers.dart';
+import '../providers/team_membership_providers.dart';
+import 'team_page_controller.dart';
+import 'teams_list_controller.dart';
 
 part 'team_manage_controller.g.dart';
 
@@ -11,186 +16,160 @@ class TeamManageController extends _$TeamManageController {
   @override
   AsyncValue<void> build() => const AsyncValue.data(null);
 
-  /// Sets or clears a squad member's jersey number.
   Future<String?> setJerseyNumber({
     required MembershipId memberId,
     required String teamId,
     required int? jersey,
   }) async {
-    JerseyNumber? jerseyVo;
+    JerseyNumber? value;
     if (jersey != null) {
-      final res = JerseyNumber.create(jersey);
-      if (res.isLeft()) {
-        return res.getLeft().toNullable()!.message;
+      final validated = JerseyNumber.create(jersey);
+      if (validated.isLeft()) {
+        return validated.getLeft().toNullable()!.message;
       }
-      jerseyVo = res.getRight().toNullable();
+      value = validated.getRight().toNullable();
     }
-
-    state = const AsyncValue.loading();
-    final repo = ref.read(teamsRepositoryProvider);
-    final result = await repo.setJerseyNumber(memberId, jerseyVo);
-
-    return result.fold(
-      (failure) {
-        state = AsyncValue.error(failure, StackTrace.current);
-        return failure.message;
-      },
-      (_) {
-        state = const AsyncValue.data(null);
-        ref.invalidate(rosterProvider(teamId));
-        ref.invalidate(teamProvider(teamId));
-        return null;
-      },
+    return _run(
+      teamId,
+      () => ref
+          .read(teamMembershipRepositoryProvider)
+          .setJerseyNumber(memberId, value),
+      refreshRoster: true,
     );
   }
 
-  /// Updates a squad member's role (Captain, Vice-Captain, Wicket-Keeper, Player).
-  Future<String?> setMemberRole({
+  Future<String?> assignCaptain({
     required MembershipId memberId,
     required String teamId,
-    required MemberRole role,
-  }) async {
-    state = const AsyncValue.loading();
-    final repo = ref.read(teamsRepositoryProvider);
-    final result = await repo.setMemberRole(memberId, role);
+  }) =>
+      _run(
+        teamId,
+        () => ref.read(teamMembershipRepositoryProvider).assignCaptain(memberId),
+        refreshRoster: true,
+      );
 
-    return result.fold(
-      (failure) {
-        state = AsyncValue.error(failure, StackTrace.current);
-        return failure.message;
-      },
-      (_) {
-        state = const AsyncValue.data(null);
-        ref.invalidate(rosterProvider(teamId));
-        ref.invalidate(teamProvider(teamId));
-        return null;
-      },
-    );
-  }
+  Future<String?> revokeCaptain({
+    required MembershipId memberId,
+    required String teamId,
+  }) =>
+      _run(
+        teamId,
+        () => ref.read(teamMembershipRepositoryProvider).revokeCaptain(memberId),
+        refreshRoster: true,
+      );
 
-  /// Removes a player from the active team squad.
+  Future<String?> promoteToManager({
+    required MembershipId memberId,
+    required String teamId,
+  }) =>
+      _run(
+        teamId,
+        () => ref
+            .read(teamMembershipRepositoryProvider)
+            .promoteToManager(memberId),
+        refreshRoster: true,
+        refreshMembership: true,
+      );
+
+  Future<String?> demoteToPlayer({
+    required MembershipId memberId,
+    required String teamId,
+  }) =>
+      _run(
+        teamId,
+        () => ref
+            .read(teamMembershipRepositoryProvider)
+            .demoteToPlayer(memberId),
+        refreshRoster: true,
+        refreshMembership: true,
+      );
+
   Future<String?> removeMember({
     required MembershipId memberId,
     required String teamId,
-  }) async {
-    state = const AsyncValue.loading();
-    final repo = ref.read(teamsRepositoryProvider);
-    final result = await repo.removeMember(memberId);
+  }) =>
+      _run(
+        teamId,
+        () => ref.read(teamMembershipRepositoryProvider).removeMember(memberId),
+        refreshRoster: true,
+        refreshMembership: true,
+        refreshMyTeams: true,
+      );
 
-    return result.fold(
-      (failure) {
-        state = AsyncValue.error(failure, StackTrace.current);
-        return failure.message;
-      },
-      (_) {
-        state = const AsyncValue.data(null);
-        ref.invalidate(rosterProvider(teamId));
-        ref.invalidate(teamProvider(teamId));
-        return null;
-      },
-    );
-  }
-
-  /// Accepts a player's join request.
   Future<String?> acceptJoinRequest({
     required String requestId,
     required String teamId,
-  }) async {
-    state = const AsyncValue.loading();
-    final repo = ref.read(teamsRepositoryProvider);
-    final result = await repo.acceptJoinRequest(requestId);
+  }) =>
+      _run(
+        teamId,
+        () => ref
+            .read(teamMembershipRepositoryProvider)
+            .acceptJoinRequest(requestId),
+        refreshRoster: true,
+        refreshJoinRequests: true,
+      );
 
-    return result.fold(
-      (failure) {
-        state = AsyncValue.error(failure, StackTrace.current);
-        return failure.message;
-      },
-      (_) {
-        state = const AsyncValue.data(null);
-        ref.invalidate(teamPendingJoinRequestsProvider(teamId));
-        ref.invalidate(rosterProvider(teamId));
-        ref.invalidate(teamProvider(teamId));
-        return null;
-      },
-    );
-  }
-
-  /// Declines a player's join request.
   Future<String?> declineJoinRequest({
     required String requestId,
     required String teamId,
-  }) async {
-    state = const AsyncValue.loading();
-    final repo = ref.read(teamsRepositoryProvider);
-    final result = await repo.declineJoinRequest(requestId);
+  }) =>
+      _run(
+        teamId,
+        () => ref
+            .read(teamMembershipRepositoryProvider)
+            .declineJoinRequest(requestId),
+        refreshJoinRequests: true,
+      );
 
-    return result.fold(
-      (failure) {
-        state = AsyncValue.error(failure, StackTrace.current);
-        return failure.message;
-      },
-      (_) {
-        state = const AsyncValue.data(null);
-        ref.invalidate(teamPendingJoinRequestsProvider(teamId));
-        return null;
-      },
-    );
-  }
-
-  /// Approves a roster spot claim request.
   Future<String?> acceptClaimRequest({
     required String requestId,
     required String teamId,
-  }) async {
-    state = const AsyncValue.loading();
-    final repo = ref.read(teamsRepositoryProvider);
-    final result = await repo.acceptClaimRequest(requestId);
+  }) =>
+      _run(
+        teamId,
+        () => ref
+            .read(teamMembershipRepositoryProvider)
+            .approveClaimRequest(requestId),
+        refreshRoster: true,
+        refreshClaimRequests: true,
+      );
 
-    return result.fold(
-      (failure) {
-        state = AsyncValue.error(failure, StackTrace.current);
-        return failure.message;
-      },
-      (_) {
-        state = const AsyncValue.data(null);
-        ref.invalidate(teamPendingClaimRequestsProvider(teamId));
-        ref.invalidate(rosterProvider(teamId));
-        ref.invalidate(teamProvider(teamId));
-        return null;
-      },
-    );
-  }
-
-  /// Declines a roster spot claim request.
   Future<String?> declineClaimRequest({
     required String requestId,
     required String teamId,
-  }) async {
-    state = const AsyncValue.loading();
-    final repo = ref.read(teamsRepositoryProvider);
-    final result = await repo.declineClaimRequest(requestId);
+  }) =>
+      _run(
+        teamId,
+        () => ref
+            .read(teamMembershipRepositoryProvider)
+            .rejectClaimRequest(requestId),
+        refreshClaimRequests: true,
+      );
 
-    return result.fold(
-      (failure) {
-        state = AsyncValue.error(failure, StackTrace.current);
-        return failure.message;
-      },
-      (_) {
-        state = const AsyncValue.data(null);
-        ref.invalidate(teamPendingClaimRequestsProvider(teamId));
-        return null;
-      },
-    );
-  }
-
-  /// Cancels an in-flight team invite.
   Future<String?> cancelTeamInvite({
     required String inviteId,
     required String teamId,
+  }) =>
+      _run(
+        teamId,
+        () => ref
+            .read(teamMembershipRepositoryProvider)
+            .cancelTeamInvite(inviteId),
+        refreshInvites: true,
+      );
+
+  Future<String?> _run(
+    String teamId,
+    Future<Either<Failure, Unit>> Function() operation, {
+    bool refreshRoster = false,
+    bool refreshMembership = false,
+    bool refreshJoinRequests = false,
+    bool refreshClaimRequests = false,
+    bool refreshInvites = false,
+    bool refreshMyTeams = false,
   }) async {
     state = const AsyncValue.loading();
-    final repo = ref.read(teamsRepositoryProvider);
-    final result = await repo.cancelTeamInvite(inviteId);
+    final result = await operation();
 
     return result.fold(
       (failure) {
@@ -199,7 +178,21 @@ class TeamManageController extends _$TeamManageController {
       },
       (_) {
         state = const AsyncValue.data(null);
-        ref.invalidate(teamPendingInvitesProvider(teamId));
+        if (refreshRoster) ref.invalidate(rosterProvider(teamId));
+        if (refreshMembership) {
+          ref.invalidate(currentTeamMembershipProvider(teamId));
+        }
+        if (refreshJoinRequests) {
+          ref.invalidate(teamPendingJoinRequestsProvider(teamId));
+        }
+        if (refreshClaimRequests) {
+          ref.invalidate(teamPendingClaimRequestsProvider(teamId));
+        }
+        if (refreshInvites) {
+          ref.invalidate(teamPendingInvitesProvider(teamId));
+        }
+        ref.invalidate(teamPageControllerProvider(teamId));
+        if (refreshMyTeams) ref.invalidate(teamsListControllerProvider);
         return null;
       },
     );

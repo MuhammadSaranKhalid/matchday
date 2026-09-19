@@ -4,11 +4,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/error/failures.dart';
+import '../../../location/domain/entities/geo_place.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/value_objects/team_name.dart';
-import '../../../location/domain/entities/geo_place.dart';
 import '../providers/teams_providers.dart';
 import '../state/team_create_state.dart';
+import 'teams_list_controller.dart';
 
 part 'team_create_controller.g.dart';
 
@@ -17,8 +18,7 @@ String? _blankToNull(String? v) {
   return (t == null || t.isEmpty) ? null : t;
 }
 
-/// Drives the three-step team-create wizard. AsyncNotifier so [build] can restore a
-/// persisted draft before the form seeds (mirrors OnboardingController).
+/// Drives the five-step team-create wizard.
 @riverpod
 class TeamCreateController extends _$TeamCreateController {
   static const draftKey = 'team_create';
@@ -38,8 +38,6 @@ class TeamCreateController extends _$TeamCreateController {
     if (persist && next.createdTeamId == null) _persist(next);
   }
 
-  // ─── Field setters ────────────────────────────────────────────────────────
-
   void setName(String v) => _mutate((s) => s.copyWith(name: v));
   void setType(TeamType t) => _mutate((s) => s.copyWith(type: t));
   void setPrivacy(TeamPrivacy p) => _mutate((s) => s.copyWith(privacy: p));
@@ -47,13 +45,8 @@ class TeamCreateController extends _$TeamCreateController {
   void setFoundedYear(String v) => _mutate((s) => s.copyWith(foundedYear: v));
   void setCity(String v) => setResolvedPlace(GeoPlace.manual(v));
 
-  /// Called by the place picker when the creator resolves (or clears) a
-  /// place. A [GeoPlace] with no coordinates (kept-as-typed) still lands, so
-  /// the label is preserved while lat/lng stay null.
   void setResolvedPlace(GeoPlace? place) => _mutate(
         (s) => s.copyWith(
-          // `city` holds the LOCALITY, not the full formatted address — the
-          // §8.0 capture contract. `label` keeps the human display string.
           city: place?.city ?? place?.label ?? '',
           locationLabel: place?.label,
           district: place?.district,
@@ -65,55 +58,61 @@ class TeamCreateController extends _$TeamCreateController {
           countryCode: place?.countryCode,
         ),
       );
+
   void setArea(String v) => _mutate((s) => s.copyWith(area: v));
   void setHomeGround(String v) => _mutate((s) => s.copyWith(homeGround: v));
   void setColors(String primary, String secondary) =>
-      _mutate((s) => s.copyWith(primaryColor: primary, secondaryColor: secondary));
+      _mutate((s) => s.copyWith(
+            primaryColor: primary,
+            secondaryColor: secondary,
+          ));
   void setPrimaryColor(String hex) =>
       _mutate((s) => s.copyWith(primaryColor: hex));
   void setSecondaryColor(String hex) =>
       _mutate((s) => s.copyWith(secondaryColor: hex));
   void setMonogram(String value) =>
       _mutate((s) => s.copyWith(monogramOverride: value));
-  void setCrestKind(CrestKind kind) => _mutate((s) => s.copyWith(
-        crestKind: kind,
-        // Picking a generated style clears any uploaded logo.
-        logoUrl: kind == CrestKind.upload ? s.logoUrl : null,
-        logoName: kind == CrestKind.upload ? s.logoName : null,
-        logoSize: kind == CrestKind.upload ? s.logoSize : null,
-      ));
+  void setCrestKind(CrestKind kind) => _mutate(
+        (s) => s.copyWith(
+          crestKind: kind,
+          logoUrl: kind == CrestKind.upload ? s.logoUrl : null,
+          logoName: kind == CrestKind.upload ? s.logoName : null,
+          logoSize: kind == CrestKind.upload ? s.logoSize : null,
+        ),
+      );
   void setLogo({required String url, required String name, required int size}) =>
-      _mutate((s) => s.copyWith(
-            crestKind: CrestKind.upload,
-            logoUrl: url,
-            logoName: name,
-            logoSize: size,
-          ));
-  void removeLogo() => _mutate((s) => s.copyWith(
-        crestKind: CrestKind.monogram,
-        logoUrl: null,
-        logoName: null,
-        logoSize: null,
-      ));
+      _mutate(
+        (s) => s.copyWith(
+          crestKind: CrestKind.upload,
+          logoUrl: url,
+          logoName: name,
+          logoSize: size,
+        ),
+      );
+  void removeLogo() => _mutate(
+        (s) => s.copyWith(
+          crestKind: CrestKind.monogram,
+          logoUrl: null,
+          logoName: null,
+          logoSize: null,
+        ),
+      );
 
   void _mutate(TeamCreateState Function(TeamCreateState) f) {
     final s = _s;
-    if (s == null) return;
-    if (s.submitting || s.createdTeamId != null) return;
+    if (s == null || s.submitting || s.createdTeamId != null) return;
     _set(f(s).copyWith(submitError: null));
   }
 
-  // ─── Navigation ───────────────────────────────────────────────────────────
-
   void next() {
     final s = _s;
-    if (s == null) return;
-    if (s.submitting) return;
+    if (s == null || s.submitting) return;
     if (s.step == TeamCreateStep.basics && !s.canContinueBasics) return;
     if (s.step == TeamCreateStep.home && !s.canContinueHome) return;
-    final order = TeamCreateStep.values;
     final i = s.step.index;
-    if (i < order.length - 1) _set(s.copyWith(step: order[i + 1]));
+    if (i < TeamCreateStep.values.length - 1) {
+      _set(s.copyWith(step: TeamCreateStep.values[i + 1]));
+    }
   }
 
   void back() {
@@ -123,20 +122,32 @@ class TeamCreateController extends _$TeamCreateController {
     if (i > 0) _set(s.copyWith(step: TeamCreateStep.values[i - 1]));
   }
 
-  void goToStep(TeamCreateStep step) => _mutate((s) => s.copyWith(step: step));
+  void goToStep(TeamCreateStep step) =>
+      _mutate((s) => s.copyWith(step: step));
 
   Future<void> saveDraft() => _pendingSave;
-
-  // ─── Submit ───────────────────────────────────────────────────────────────
 
   Future<void> submit() async {
     final s = _s;
     if (s == null || s.submitting || s.createdTeamId != null) return;
     if (!s.canSubmit) {
-      _set(s.copyWith(submitError: 'Add a team name and location, and check your founding year.'));
+      _set(
+        s.copyWith(
+          submitError:
+              'Add a team name and location, and check your founding year.',
+        ),
+      );
       return;
     }
-    _set(s.copyWith(submitting: true, submitError: null, logoUploadError: null), persist: false);
+
+    _set(
+      s.copyWith(
+        submitting: true,
+        submitError: null,
+        logoUploadError: null,
+      ),
+      persist: false,
+    );
 
     final nameRes = TeamName.create(s.name);
     if (nameRes.isLeft()) {
@@ -154,9 +165,6 @@ class TeamCreateController extends _$TeamCreateController {
           name: nameRes.getRight().toNullable()!,
           type: s.type,
           privacy: s.privacy,
-          // The locality alone, NOT the old "Area, City" composite — a
-          // combined string fragments the facet list and is what §8.0 calls
-          // the capture bug. The area survives as part of `label`.
           city: _blankToNull(s.city),
           homeGround: _blankToNull(s.homeGround),
           label: _blankToNull(s.locationLabel ?? s.combinedCity),
@@ -177,14 +185,16 @@ class TeamCreateController extends _$TeamCreateController {
 
     final current = _s;
     if (current == null) return;
+
     await result.fold(
       (failure) async => _set(
-        current.copyWith(submitting: false, submitError: _friendlyError(failure)),
+        current.copyWith(
+          submitting: false,
+          submitError: _friendlyError(failure),
+        ),
         persist: false,
       ),
       (team) async {
-        // Creation has succeeded. A logo failure must never send the user
-        // back to Create team (which would risk a duplicate team).
         String? uploadError;
         if (current.crestKind == CrestKind.upload &&
             (current.logoUrl?.isNotEmpty ?? false)) {
@@ -193,27 +203,36 @@ class TeamCreateController extends _$TeamCreateController {
             final bytes = await file.readAsBytes();
             final extension = file.path.split('.').last;
             final upload = await ref.read(teamsRepositoryProvider).uploadTeamLogo(
-              teamId: team.id, bytes: bytes, extension: extension,
-            );
-            if (upload.isLeft()) uploadError = 'Your team is ready, but the logo could not be uploaded. Add it from team settings.';
+                  teamId: team.id,
+                  bytes: bytes,
+                  extension: extension,
+                );
+            if (upload.isLeft()) {
+              uploadError =
+                  'Your team is ready, but the logo could not be uploaded. Add it from team settings.';
+            }
           } catch (_) {
-            uploadError = 'Your team is ready, but the logo file is unavailable. Add it from team settings.';
+            uploadError =
+                'Your team is ready, but the logo file is unavailable. Add it from team settings.';
           }
         }
+
         await _pendingSave;
         await ref.read(wizardDraftStoreProvider).clear(draftKey);
         if (!ref.mounted) return;
-        ref.invalidate(myTeamsProvider);
-        ref.invalidate(allTeamsProvider);
-        _set(current.copyWith(
-          submitting: false, createdTeamId: team.id.value,
-          logoUploadError: uploadError,
-        ), persist: false);
+
+        ref.invalidate(teamsListControllerProvider);
+        _set(
+          current.copyWith(
+            submitting: false,
+            createdTeamId: team.id.value,
+            logoUploadError: uploadError,
+          ),
+          persist: false,
+        );
       },
     );
   }
-
-  // ─── Draft (de)serialization ────────────────────────────────────────────
 
   void _persist(TeamCreateState s) {
     final store = ref.read(wizardDraftStoreProvider);
@@ -246,8 +265,6 @@ class TeamCreateController extends _$TeamCreateController {
     _pendingSave = _pendingSave.then((_) => store.save(draftKey, payload));
   }
 
-  /// Resets the wizard so a freshly successful submit can be followed by
-  /// "Create another team" from the Done screen.
   Future<void> reset() async {
     state = const AsyncData(TeamCreateState());
     final store = ref.read(wizardDraftStoreProvider);
@@ -256,12 +273,16 @@ class TeamCreateController extends _$TeamCreateController {
   }
 
   static String _friendlyError(Failure failure) {
-    if (failure is AuthFailure) return 'Sign in again to create your team. Your draft is saved on this device.';
+    if (failure is AuthFailure) {
+      return 'Sign in again to create your team. Your draft is saved on this device.';
+    }
     final message = failure.message.toLowerCase();
     if (message.contains('permission') || message.contains('row-level')) {
       return 'Team creation is unavailable for your account right now. Your draft is saved; please try again later.';
     }
-    if (failure is NetworkFailure || message.contains('socket') || message.contains('connection')) {
+    if (failure is NetworkFailure ||
+        message.contains('socket') ||
+        message.contains('connection')) {
       return 'Check your connection and try again. Your draft is saved on this device.';
     }
     return 'We couldn’t create your team. Your draft is saved. Please try again.';

@@ -5,25 +5,21 @@ import '../../state/team_create_state.dart';
 import '../../utils/team_display.dart';
 import '../team_crest.dart';
 
-/// 12-swatch curated palette — port of `palette` in design/screens/TeamCreate.jsx.
-/// Mix of dark saturated + accent + neutrals chosen to look right next to
-/// cream paper.
 const List<String> kTeamCreatePalette = [
-  '#1E5A2C', // dark green
-  '#8C2218', // deep red
-  '#1F2D4F', // dark blue
-  '#3F3527', // brown
-  '#7B4413', // burnt orange
-  '#5E2A6B', // purple
-  '#1F6E6F', // teal
-  '#A22B1E', // brick red
-  '#161107', // ink
-  '#E24A3F', // bright red
-  '#E6AC3D', // amber
-  '#F8EAC6', // cream
+  '#1E5A2C',
+  '#8C2218',
+  '#1F2D4F',
+  '#3F3527',
+  '#7B4413',
+  '#5E2A6B',
+  '#1F6E6F',
+  '#A22B1E',
+  '#161107',
+  '#E24A3F',
+  '#E6AC3D',
+  '#F8EAC6',
 ];
 
-/// Mono-style section label — uppercase JetBrains Mono with letter-spacing.
 class TcLabel extends StatelessWidget {
   const TcLabel(this.text, {super.key});
   final String text;
@@ -45,10 +41,6 @@ class TcLabel extends StatelessWidget {
   }
 }
 
-/// Themed text input — paper background, hairline border, rounded.
-/// Owns its own [TextEditingController] so the caret doesn't reset every
-/// rebuild; only syncs from the external [value] when it diverges from
-/// what the user is currently typing.
 class TcInput extends StatefulWidget {
   const TcInput({
     super.key,
@@ -91,10 +83,6 @@ class _TcInputState extends State<TcInput> {
   @override
   void didUpdateWidget(TcInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Only push the external value back into the field when it changes from
-    // outside our own onChanged (e.g. draft restore, or a sibling step
-    // editing the same shared property). Without this guard, every onChanged
-    // round-trip would reset the caret to the end and break fast typing.
     if (widget.value != _controller.text) {
       _controller.value = TextEditingValue(
         text: widget.value,
@@ -156,8 +144,6 @@ class _TcInputState extends State<TcInput> {
   }
 }
 
-/// Tappable selection tile with title + subtitle. Used by Team-type and
-/// crest-kind grids.
 class TcSelectTile extends StatelessWidget {
   const TcSelectTile({
     super.key,
@@ -173,9 +159,6 @@ class TcSelectTile extends StatelessWidget {
   final String? subtitle;
   final bool selected;
   final VoidCallback onTap;
-
-  /// Fades the tile to ~50% opacity (used when an upload makes the
-  /// generated styles a fallback).
   final bool dim;
   final Widget? leading;
 
@@ -229,8 +212,6 @@ class TcSelectTile extends StatelessWidget {
   }
 }
 
-/// 6×2 swatch grid — port of `ColorGrid` in the JSX. Selected swatch carries
-/// a tick (white on dark, ink on cream).
 class TcColorGrid extends StatelessWidget {
   const TcColorGrid({
     super.key,
@@ -280,8 +261,6 @@ class TcColorGrid extends StatelessWidget {
   }
 }
 
-/// Pick the right foreground color for a given background — black for light
-/// backgrounds, paper for dark.
 Color _onColor(Color bg) {
   final luminance = bg.computeLuminance();
   return luminance > 0.179 ? CkColors.ink : CkColors.paper;
@@ -289,8 +268,6 @@ Color _onColor(Color bg) {
 
 Color onColor(Color bg) => _onColor(bg);
 
-/// Renders the team crest at the requested size, picking the right shape
-/// (monogram glyph, initial, shield, or uploaded image).
 class TcCrestPreview extends StatelessWidget {
   const TcCrestPreview({
     super.key,
@@ -311,8 +288,11 @@ class TcCrestPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TeamCrest(
-    name: monogram, monogram: monogram, primaryColor: primaryHex,
-    crestKind: crestKind, size: size,
+    name: monogram,
+    monogram: monogram,
+    primaryColor: primaryHex,
+    crestKind: crestKind,
+    size: size,
     localLogoPath: crestKind == CrestKind.upload ? logoPath : null,
   );
 }

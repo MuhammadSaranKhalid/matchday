@@ -1,6 +1,5 @@
 import 'team_member.dart';
 
-/// Represents a pending or resolved team invitation sent to a player.
 class TeamInvite {
   const TeamInvite({
     required this.inviteId,

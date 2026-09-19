@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../data/datasources/matches_datasource_providers.dart';
 import '../../data/repositories/match_pool_repository_impl.dart';
 import '../../domain/entities/match.dart';
@@ -49,7 +50,9 @@ String _formatMatchTime(DateTime dt) {
 @riverpod
 Future<List<OpenMatchPoolItem>> openMatchPool(Ref ref) async {
   final repo = ref.watch(matchPoolRepositoryProvider);
-  final myTeams = (await ref.watch(myTeamsProvider.future));
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final myTeams = [for (final membership in memberships) membership.team];
   final myTeamIds = myTeams.map((t) => t.id.value).toSet();
 
   final result = await repo.getOpenPoolChallenges();
@@ -87,7 +90,9 @@ Future<List<OpenMatchPoolItem>> openMatchPool(Ref ref) async {
 @riverpod
 Future<List<OpenMatchPoolItem>> myPoolRequests(Ref ref) async {
   final repo = ref.watch(matchPoolRepositoryProvider);
-  final myTeams = (await ref.watch(myTeamsProvider.future));
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final myTeams = [for (final membership in memberships) membership.team];
   final myTeamIds = myTeams.map((t) => t.id).toSet();
 
   final result = await repo.getMyPoolBroadcasts(myTeamIds: myTeamIds);
@@ -154,7 +159,9 @@ class MyChallengesView {
 @riverpod
 Future<MyChallengesView> myChallenges(Ref ref) async {
   final repo = ref.watch(matchPoolRepositoryProvider);
-  final myTeams = await ref.watch(myTeamsProvider.future);
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final myTeams = [for (final membership in memberships) membership.team];
   final myTeamIds = myTeams.map((t) => t.id).toSet();
   if (myTeamIds.isEmpty) {
     return const MyChallengesView(live: [], past: []);
@@ -286,9 +293,8 @@ Future<List<OpenMatchPoolItem>> filteredOpenMatchPool(Ref ref) async {
 Future<bool> viewerManagesTeam(Ref ref) async {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return false;
-  // 2026-09-10: was `teams.any((t) => t.isManagedBy(userId))`, which read the
-  // dead `teams.managers` array. Same rule ("only team managers can post
-  // challenges or apply to play"), asked of the role ladder.
-  final roles = await ref.watch(myTeamRolesProvider.future);
-  return roles.values.any((r) => r.isStaff);
+  // Challenge authority comes from the canonical membership relationship.
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
+  return memberships.any((m) => m.relationship.canSendChallenge);
 }

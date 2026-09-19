@@ -14,20 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TeamSearchState {
 
- String get query;/// Active search centre. Non-null when "near me" is on OR a facet chip
-/// is picked. Drives proximity ranking / hard radius cutoff.
- double? get centerLat; double? get centerLng;/// Set when a facet chip is the centre source. Lets the UI render the
-/// chip as selected and distinguish "near me" from "facet" affordances.
- String? get selectedFacetCity;/// Current near-me hard-radius cap in km. The sparse-area "expand" CTA
-/// doubles this; only relevant in near-me-browse mode (no [query]).
- double get radiusKm;/// Last successfully loaded results. Stays populated under [loading] so
-/// the list does not blank on every keystroke.
- List<TeamSearchResult> get results;/// A search is in flight. Render as a refresh spinner over the existing
-/// list when [results] is non-empty; as a skeleton when empty.
- bool get loading;/// The most recent failure. Cleared at the start of every search; set
-/// only when the round-trip returned [Left]. Survives subsequent
-/// successful searches only via [copyWith] explicit re-set.
- Failure? get error;
+ String get query; double? get centerLat; double? get centerLng; String? get selectedFacetCity; double get radiusKm; List<TeamSearchResult> get results; bool get loading; Failure? get error;
 /// Create a copy of TeamSearchState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -230,33 +217,18 @@ class _TeamSearchState extends TeamSearchState {
   
 
 @override@JsonKey() final  String query;
-/// Active search centre. Non-null when "near me" is on OR a facet chip
-/// is picked. Drives proximity ranking / hard radius cutoff.
 @override final  double? centerLat;
 @override final  double? centerLng;
-/// Set when a facet chip is the centre source. Lets the UI render the
-/// chip as selected and distinguish "near me" from "facet" affordances.
 @override final  String? selectedFacetCity;
-/// Current near-me hard-radius cap in km. The sparse-area "expand" CTA
-/// doubles this; only relevant in near-me-browse mode (no [query]).
 @override@JsonKey() final  double radiusKm;
-/// Last successfully loaded results. Stays populated under [loading] so
-/// the list does not blank on every keystroke.
  final  List<TeamSearchResult> _results;
-/// Last successfully loaded results. Stays populated under [loading] so
-/// the list does not blank on every keystroke.
 @override@JsonKey() List<TeamSearchResult> get results {
   if (_results is EqualUnmodifiableListView) return _results;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_results);
 }
 
-/// A search is in flight. Render as a refresh spinner over the existing
-/// list when [results] is non-empty; as a skeleton when empty.
 @override@JsonKey() final  bool loading;
-/// The most recent failure. Cleared at the start of every search; set
-/// only when the round-trip returned [Left]. Survives subsequent
-/// successful searches only via [copyWith] explicit re-set.
 @override final  Failure? error;
 
 /// Create a copy of TeamSearchState

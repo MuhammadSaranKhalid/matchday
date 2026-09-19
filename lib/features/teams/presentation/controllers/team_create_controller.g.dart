@@ -8,18 +8,15 @@ part of 'team_create_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Drives the three-step team-create wizard. AsyncNotifier so [build] can restore a
-/// persisted draft before the form seeds (mirrors OnboardingController).
+/// Drives the five-step team-create wizard.
 
 @ProviderFor(TeamCreateController)
 final teamCreateControllerProvider = TeamCreateControllerProvider._();
 
-/// Drives the three-step team-create wizard. AsyncNotifier so [build] can restore a
-/// persisted draft before the form seeds (mirrors OnboardingController).
+/// Drives the five-step team-create wizard.
 final class TeamCreateControllerProvider
     extends $AsyncNotifierProvider<TeamCreateController, TeamCreateState> {
-  /// Drives the three-step team-create wizard. AsyncNotifier so [build] can restore a
-  /// persisted draft before the form seeds (mirrors OnboardingController).
+  /// Drives the five-step team-create wizard.
   TeamCreateControllerProvider._()
     : super(
         from: null,
@@ -40,10 +37,9 @@ final class TeamCreateControllerProvider
 }
 
 String _$teamCreateControllerHash() =>
-    r'efc700ed7ed54bdf678139fdebda9b4c25dfa2f0';
+    r'65c88b8c91daa05bdf71ede300501c7241318b1a';
 
-/// Drives the three-step team-create wizard. AsyncNotifier so [build] can restore a
-/// persisted draft before the form seeds (mirrors OnboardingController).
+/// Drives the five-step team-create wizard.
 
 abstract class _$TeamCreateController extends $AsyncNotifier<TeamCreateState> {
   FutureOr<TeamCreateState> build();

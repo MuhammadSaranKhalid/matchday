@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../../core/widgets/ck_button.dart';
 
-/// Bottom sheet for entering or clearing a player's jersey number.
 class JerseySheet extends StatefulWidget {
   const JerseySheet({super.key, this.initial});
   final int? initial;

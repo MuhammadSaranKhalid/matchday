@@ -4,8 +4,9 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../../teams/domain/entities/team.dart';
-import '../../../teams/domain/entities/team_member.dart';
+import '../../../teams/domain/entities/team_relationship.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../../tournaments/presentation/providers/tournaments_providers.dart';
 import '../../domain/entities/innings_summary.dart';
 import '../../domain/entities/match.dart';
@@ -41,13 +42,12 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   final allRequests =
       reqResult.fold<List<MatchRequest>>((_) => const [], (list) => list);
 
-  // `myTeamsProvider` is a Stream. Reading `.value` before its first event
-  // yields an empty list, and myTeamIds feeds BOTH the request filters and the
-  // captain/manager role detection below — so on the first frame every row lost
-  // its role line and the request lists came back empty. Await the first event
-  // instead; the provider is still watched, so later emissions recompute this.
-  final teams = await ref.watch(myTeamsProvider.future);
-  final myTeamIds = {for (final t in teams) t.id.value};
+  // Current memberships are fetched once and carry both the team and the
+  // canonical multi-role-aware relationship used below.
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final teams = [for (final membership in memberships) membership.team];
+  final myTeamIds = {for (final membership in memberships) membership.team.id.value};
 
   final outbound = allRequests
       .where((r) =>
@@ -71,7 +71,10 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   }
 
   final teamsById = <String, Team>{for (final t in teams) t.id.value: t};
-  final myRoles = await ref.watch(myTeamRolesProvider.future);
+  final myRoles = <String, TeamRelationship>{
+    for (final membership in memberships)
+      membership.team.id.value: membership.relationship,
+  };
 
   // Fan-out: any team referenced by a match OR requests that isn't already loaded.
   final missingTeamIds = <String>{};
@@ -170,7 +173,7 @@ MyMatchConfirmed _confirmedFor(
   Match m,
   Map<String, Team> teamsById, {
   required String currentUserId,
-  required Map<String, MemberRole> myRoles,
+  required Map<String, TeamRelationship> myRoles,
   Map<String, String> tournamentNames = const {},
 }) {
   final home = teamsById[m.teamAId.value];
@@ -269,7 +272,7 @@ MyMatchPast _pastFor(
   Map<String, String> tournamentNames = const {},
   required List<InningsSummary> innings,
   required String currentUserId,
-  required Map<String, MemberRole> myRoles,
+  required Map<String, TeamRelationship> myRoles,
 }) {
   final home = teamsById[m.teamAId.value];
   final away = teamsById[m.teamBId.value];

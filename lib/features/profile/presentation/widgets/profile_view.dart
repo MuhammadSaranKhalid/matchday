@@ -17,8 +17,9 @@ import '../../../posts/presentation/providers/posts_providers.dart';
 import '../../../posts/presentation/screens/composer_screen.dart';
 import '../../../posts/presentation/screens/photo_viewer_screen.dart';
 import '../../../posts/presentation/widgets/post_card.dart';
-import '../../../teams/domain/entities/user_team_affiliation.dart';
-import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/domain/entities/team_membership.dart';
+import '../../../teams/domain/entities/team_member.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/player_profile.dart';
 import '../../../safety/presentation/widgets/safety_menu.dart';
 import '../../domain/entities/profile.dart';
@@ -1030,7 +1031,7 @@ class _PlaysForSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final affiliationsAsync = ref.watch(userAffiliatedTeamsProvider(userId));
+    final affiliationsAsync = ref.watch(userTeamMembershipsProvider(userId));
 
     return affiliationsAsync.when(
       data: (affiliations) {
@@ -1077,7 +1078,7 @@ class _ChipStrip extends StatelessWidget {
   });
 
   final String label;
-  final List<UserTeamAffiliation> teams;
+  final List<TeamMembership> teams;
   final bool main;
 
   Color _parsePrimaryColor(String? hex) {
@@ -1113,12 +1114,15 @@ class _ChipStrip extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 18),
           child: Row(
-            children: teams.map((t) {
-              final crestBg = _parsePrimaryColor(t.primaryColor);
+            children: teams.map((membership) {
+              final team = membership.team;
+              final mono = team.logoMonogram ??
+                  (team.name.isEmpty ? 'T' : team.name[0].toUpperCase());
+              final crestBg = _parsePrimaryColor(team.primaryColor);
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
-                  onTap: () => context.push('/teams/${t.teamId}'),
+                  onTap: () => context.push('/teams/${team.id.value}'),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -1132,7 +1136,6 @@ class _ChipStrip extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Crest / Monogram / Logo
                         Container(
                           width: 18,
                           height: 18,
@@ -1141,15 +1144,15 @@ class _ChipStrip extends StatelessWidget {
                             color: crestBg,
                             shape: BoxShape.circle,
                           ),
-                          child: t.logoUrl != null && t.logoUrl!.isNotEmpty
+                          child: team.logoUrl != null && team.logoUrl!.isNotEmpty
                               ? ClipOval(
                                   child: CachedNetworkImage(
-                                    imageUrl: t.logoUrl!,
+                                    imageUrl: team.logoUrl!,
                                     width: 18,
                                     height: 18,
                                     fit: BoxFit.cover,
                                     errorWidget: (_, __, ___) => Text(
-                                      t.logoMonogram,
+                                      mono,
                                       style: const TextStyle(
                                         fontSize: 8,
                                         fontWeight: FontWeight.w700,
@@ -1159,7 +1162,7 @@ class _ChipStrip extends StatelessWidget {
                                   ),
                                 )
                               : Text(
-                                  t.logoMonogram,
+                                  mono,
                                   style: const TextStyle(
                                     fontSize: 8,
                                     fontWeight: FontWeight.w700,
@@ -1169,17 +1172,17 @@ class _ChipStrip extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          t.teamName,
+                          team.name,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: main ? CkColors.paper : CkColors.ink,
                           ),
                         ),
-                        if (!main && t.role != 'PLAYER') ...[
+                        if (!main && membership.member.topRole != MemberRole.player) ...[
                           const SizedBox(width: 4),
                           Text(
-                            '(${t.role})',
+                            '(${membership.member.topRole.label})',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w500,

@@ -4,7 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/domain/entities/team_membership.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_leader.dart';
 import '../../domain/entities/tournament_live_match.dart';
@@ -57,9 +58,16 @@ class _RegistrationOverview extends ConsumerWidget {
         ref.watch(tournamentRegistrationsProvider(tournament.id)).value ??
             const <TournamentRegistration>[];
     final approved = regs.where((r) => r.isApproved).toList();
-    final myTeams = ref.watch(myTeamsProvider).value ?? const [];
+    final memberships = ref.watch(currentUserTeamMembershipsProvider).value ??
+        const <TeamMembership>[];
     final myReg = regs
-        .where((r) => myTeams.any((t) => t.id.value == r.teamId))
+        .where(
+          (r) => memberships.any(
+            (m) =>
+                m.relationship.canRegisterForTournament &&
+                m.team.id.value == r.teamId,
+          ),
+        )
         .firstOrNull;
 
     return ListView(

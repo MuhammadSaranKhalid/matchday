@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/ball.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_innings.dart';
@@ -81,8 +82,9 @@ Future<CompletedMatchView> completedMatch(Ref ref, String matchId) async {
     }),
   );
 
-  final myTeams = await ref.watch(myTeamsProvider.future);
-  final myTeamIds = myTeams.map((t) => t.id.value).toSet();
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final myTeamIds = memberships.map((m) => m.team.id.value).toSet();
 
   return _assemble(
     match: match,

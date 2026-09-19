@@ -42,7 +42,7 @@ final class TeamManageControllerProvider
 }
 
 String _$teamManageControllerHash() =>
-    r'dad14c947d24f7a7ff3efb45a724350d29ee90ef';
+    r'1e34bd5f26d875b893cbaeb100f13a94e8b69bb3';
 
 abstract class _$TeamManageController extends $Notifier<AsyncValue<void>> {
   AsyncValue<void> build();

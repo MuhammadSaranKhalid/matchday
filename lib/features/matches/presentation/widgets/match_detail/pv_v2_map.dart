@@ -1,5 +1,6 @@
 import '../../../../profile/domain/entities/player_profile.dart';
 import '../../../../teams/domain/entities/team.dart';
+import '../../../../teams/domain/entities/team_membership.dart';
 import '../../../../teams/domain/entities/team_relationship.dart';
 import '../../../../teams/presentation/utils/team_display.dart';
 import '../../../domain/entities/match_role.dart';
@@ -81,24 +82,27 @@ List<PvMatch> pvMatchesFromView(MyMatchesView v, {required PvCrest meFallback}) 
 
 // ── Teams ───────────────────────────────────────────────────────────────────
 
-/// Map the user's teams (owner/manager teams — the only ones `watchMyTeams`
-/// returns) into team cards. Role comes from the canonical
-/// [TeamRelationship]; subtitle is the real type + city.
-List<PvTeam> pvTeamsFromTeams(List<Team> teams, {required String? userId}) {
+/// Map the user's current memberships into the compact team cards.
+/// Authority comes from [TeamMembership.relationship], never from fields on
+/// the team profile itself.
+List<PvTeam> pvTeamsFromMemberships(List<TeamMembership> memberships) {
   return [
-    for (final t in teams)
+    for (final membership in memberships)
       PvTeam(
-        id: t.id.value,
-        crest: crestFromTeam(t),
-        role: switch (t.relationshipFor(userId: userId)) {
+        id: membership.team.id.value,
+        crest: crestFromTeam(membership.team),
+        role: switch (membership.relationship) {
           TeamRelationship.owner => 'owner',
-          TeamRelationship.manager => 'captain', // closest leadership pill
+          TeamRelationship.manager => 'manager',
           TeamRelationship.captain => 'captain',
-          _ => 'player',
+          TeamRelationship.player => 'player',
+          TeamRelationship.none => 'player',
         },
         subtitle: [
-          _teamTypeLabel(t.type),
-          if (t.city != null && t.city!.isNotEmpty) t.city!,
+          _teamTypeLabel(membership.team.type),
+          if (membership.team.city != null &&
+              membership.team.city!.isNotEmpty)
+            membership.team.city!,
         ].join(' · '),
       ),
   ];

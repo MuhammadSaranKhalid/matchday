@@ -1,7 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../core/supabase/supabase_client_provider.dart';
-import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../widgets/match_detail/pv_v2_data.dart';
 import '../widgets/match_detail/pv_v2_map.dart';
 import 'matches_providers.dart';
@@ -24,10 +23,10 @@ Future<PvMatch?> matchDetail(
   });
 
   final view = await ref.watch(myMatchesViewProvider.future);
-  final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
-  final teams = await ref.watch(myTeamsProvider.future);
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
 
-  final pvTeams = pvTeamsFromTeams(teams, userId: userId);
+  final pvTeams = pvTeamsFromMemberships(memberships);
   final meFallback = pvTeams.isNotEmpty ? pvTeams.first.crest : kPvUnknownCrest;
 
   for (final m in pvMatchesFromView(view, meFallback: meFallback)) {

@@ -3,10 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../../core/widgets/v2/ck_shimmer.dart';
 
-/// Shape-matched loading state for the team list.
-///
-/// The navigation bar stays real and interactive. Only the rows that depend on
-/// the membership query shimmer.
 class TeamsListShimmerSkeleton extends StatelessWidget {
   const TeamsListShimmerSkeleton({super.key});
 
@@ -75,10 +71,7 @@ class _TeamRowSkeleton extends StatelessWidget {
     return Opacity(
       opacity: opacity,
       child: Container(
-        margin: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 4,
-        ),
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         decoration: BoxDecoration(
           color: CkColors.paper2,
           borderRadius: BorderRadius.circular(12),

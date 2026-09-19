@@ -385,11 +385,9 @@ class _MatchRequestRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allTeams = ref.watch(allTeamsProvider).value ?? const <Team>[];
-    final fromTeam = allTeams.cast<Team?>().firstWhere(
-      (t) => t!.id.value == _fromTeamId,
-      orElse: () => null,
-    );
+    final fromTeam = _fromTeamId.isEmpty
+        ? null
+        : ref.watch(teamProvider(_fromTeamId)).value;
 
     final unread = !n.isRead;
     return InkWell(

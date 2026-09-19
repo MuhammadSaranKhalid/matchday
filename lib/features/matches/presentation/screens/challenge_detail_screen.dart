@@ -6,7 +6,9 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../teams/domain/entities/team.dart';
+import '../../../teams/domain/entities/team_membership.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_pool_application.dart';
 import '../../domain/entities/match_request.dart';
@@ -59,8 +61,14 @@ class _ChallengeDetailScreenState
         ? null
         : ref.watch(teamProvider(req.toTeamId!.value)).value;
 
-    final myTeams = ref.watch(myTeamsProvider).value ?? const <Team>[];
-    final viewerIsSender = myTeams.any((t) => t.id == req.fromTeamId);
+    final memberships =
+        ref.watch(currentUserTeamMembershipsProvider).value ??
+            const <TeamMembership>[];
+    final actingTeams = [
+      for (final membership in memberships)
+        if (membership.relationship.canSendChallenge) membership.team,
+    ];
+    final viewerIsSender = actingTeams.any((t) => t.id == req.fromTeamId);
     final isOpenPool = req.toTeamId == null;
 
     final actionable = req.isPending;
@@ -89,7 +97,7 @@ class _ChallengeDetailScreenState
       );
     }
 
-    final myAppliedTeamIds = myTeams.map((t) => t.id).toSet();
+    final myAppliedTeamIds = actingTeams.map((t) => t.id).toSet();
     final hasAlreadyApplied = applications.any(
       (app) =>
           myAppliedTeamIds.contains(app.applicantTeamId) &&
@@ -190,9 +198,15 @@ class _ChallengeDetailScreenState
   }
 
   Future<void> _onApplyToPool(MatchRequest req) async {
-    final myTeams = ref.read(myTeamsProvider).value ?? const <Team>[];
-    final eligibleTeams =
-        myTeams.where((t) => t.id != req.fromTeamId).toList();
+    final memberships =
+        ref.read(currentUserTeamMembershipsProvider).value ??
+            const <TeamMembership>[];
+    final eligibleTeams = [
+      for (final membership in memberships)
+        if (membership.relationship.canSendChallenge &&
+            membership.team.id != req.fromTeamId)
+          membership.team,
+    ];
     if (eligibleTeams.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You need to create or manage a team to apply.')),

@@ -4,6 +4,7 @@ import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../../follows/presentation/providers/follows_providers.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../../tournaments/domain/entities/tournament.dart';
 import '../../../tournaments/presentation/providers/tournaments_providers.dart';
 import '../../domain/entities/innings_summary.dart';
@@ -187,7 +188,9 @@ Future<List<Match>> _narrowToForYou(Ref ref, List<Match> matches) async {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return const [];
 
-  final myTeams = await ref.watch(myTeamsProvider.future);
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final myTeams = [for (final membership in memberships) membership.team];
   final followed = <String>{
     ...myTeams.map((t) => t.id.value),
     ...(await ref.watch(followedTeamIdsProvider.future)),
@@ -216,7 +219,9 @@ Future<MatchesBoardView> _group(
   }
 
   final userId = ref.watch(currentUserIdProvider);
-  final myTeams = await ref.watch(myTeamsProvider.future);
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final myTeams = [for (final membership in memberships) membership.team];
   final myTeamIds = userId == null
       ? <String>{}
       : myTeams.map((t) => t.id.value).toSet();

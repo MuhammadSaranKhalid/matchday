@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_registration.dart';
 import '../controllers/tournaments_controller.dart';
@@ -149,7 +149,7 @@ class _TournamentRegistrationStatusScreenState
         ref.watch(tournamentDetailProvider(widget.tournamentId));
     final registrationsAsync =
         ref.watch(tournamentRegistrationsProvider(widget.tournamentId));
-    final myTeamsAsync = ref.watch(myTeamsProvider);
+    final membershipsAsync = ref.watch(currentUserTeamMembershipsProvider);
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -178,7 +178,11 @@ class _TournamentRegistrationStatusScreenState
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('$e')),
             data: (allRegs) {
-              final myTeamIds = myTeamsAsync.value?.map((t) => t.id.value).toSet() ?? {};
+              final myTeamIds = membershipsAsync.value
+                      ?.where((m) => m.relationship.canRegisterForTournament)
+                      .map((m) => m.team.id.value)
+                      .toSet() ??
+                  <String>{};
               
               // Find the relevant registration
               final reg = widget.registrationId != null

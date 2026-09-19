@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../domain/entities/team_relationship.dart';
+import '../providers/team_membership_providers.dart';
 import '../providers/teams_providers.dart';
 import '../widgets/team_crest.dart';
 import '../widgets/team_manage/announcements_manage_tab.dart';
@@ -11,6 +13,9 @@ import '../widgets/team_manage/roster_tab.dart';
 import '../widgets/team_manage/settings_tab.dart';
 
 /// Complete Manager console: Posts, Roster, Requests, and Settings.
+///
+/// The visual structure intentionally stays the same as the established
+/// Matchday Manage screen. Only authority/data wiring is scoped to this team.
 class TeamManageScreen extends ConsumerStatefulWidget {
   const TeamManageScreen({
     super.key,
@@ -50,15 +55,31 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
   @override
   Widget build(BuildContext context) {
     final teamAsync = ref.watch(teamProvider(widget.teamId));
+    final membershipAsync =
+        ref.watch(currentTeamMembershipProvider(widget.teamId));
 
-    // Authorization. Until 2026-09-10 this screen had NO check at all and the
-    // route was unguarded, so any signed-in user could open the full manager
-    // console; they found out it wasn't theirs when each write came back as a
-    // raw Postgres RLS error. RLS is still the real boundary — this just tells
-    // the truth before they start typing.
-    final myRoles = ref.watch(myTeamRolesProvider);
-    final myRole = myRoles.value?[widget.teamId];
-    if (myRoles.hasValue && !(myRole?.isStaff ?? false)) {
+    if (membershipAsync.hasError) {
+      return Scaffold(
+        backgroundColor: CkColors.paper,
+        body: const SafeArea(
+          child: Center(child: Text('Could not verify team access')),
+        ),
+      );
+    }
+    if (!membershipAsync.hasValue) {
+      return const Scaffold(
+        backgroundColor: CkColors.paper,
+        body: SafeArea(
+          child: Center(
+            child: CircularProgressIndicator(color: CkColors.ink),
+          ),
+        ),
+      );
+    }
+
+    final viewer =
+        membershipAsync.value?.relationship ?? TeamRelationship.none;
+    if (!viewer.isStaff) {
       return _NotYourTeam(teamId: widget.teamId);
     }
 
@@ -91,6 +112,7 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
                         primaryColor: value.primaryColor,
                         logoUrl: value.logoUrl,
                         monogram: value.logoMonogram,
+                        crestKind: value.crestKind,
                         size: 36,
                       ),
                       const SizedBox(width: 10),
@@ -106,7 +128,8 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
                               ),
                             ),
                             GestureDetector(
-                              onTap: () => context.push('/teams/${value.id.value}'),
+                              onTap: () =>
+                                  context.push('/teams/${value.id.value}'),
                               child: Text(
                                 'Public team page →',
                                 style: CkType.body(
@@ -136,14 +159,14 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
                 Expanded(
                   child: switch (_activeTab) {
                     0 => TeamAnnouncementsManageTab(team: value),
-                    1 => RosterTab(team: value),
+                    1 => RosterTab(team: value, viewer: viewer),
                     2 => RequestsTab(team: value),
                     _ => SettingsTab(team: value),
                   },
                 ),
               ],
             ),
-          AsyncData() => const Center(child: Text('Team not found')),
+          AsyncData(value: null) => const Center(child: Text('Team not found')),
           AsyncError() => const Center(child: Text('Could not load team')),
           _ => const Center(
               child: CircularProgressIndicator(color: CkColors.ink),
@@ -254,12 +277,6 @@ class _JustCreatedBanner extends StatelessWidget {
       );
 }
 
-/// Shown when someone opens `/teams/:id/manage` for a team they don't run.
-///
-/// Deliberately plain and non-accusatory: the common way to land here is a
-/// stale deep link or a shared URL, not an attack. The design review
-/// (docs/design-reviews/teams-2026-09-09) asked for permission failures in
-/// plain language rather than a raw error snackbar — this is that.
 class _NotYourTeam extends StatelessWidget {
   const _NotYourTeam({required this.teamId});
   final String teamId;

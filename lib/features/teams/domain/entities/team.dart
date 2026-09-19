@@ -1,10 +1,7 @@
 /// A team. Colours are stored as hex strings for the crest avatar.
 ///
-/// There is no `managers` list any more (2026-09-10). Team authority lives on
-/// the roster as `TeamMember.role` — see [MemberRole] and
-/// docs/team-roles-design.md. [createdBy] is HISTORY — who made this team —
-/// and is never an authorization answer. "Who runs it?" is the `owner` role on
-/// the roster; ask the permission set, or [TeamRelationship].
+/// Authority never comes from [createdBy]. It lives on active membership role
+/// rows (`team_member_roles`). [createdBy] is immutable history only.
 class Team {
   const Team({
     required this.id,
@@ -26,9 +23,13 @@ class Team {
     this.crestKind = CrestKind.monogram,
     this.isVerified = false,
     this.status = TeamStatus.active,
+    this.maxSquadSize = 25,
   });
 
   final TeamId id;
+
+  /// Historical creator. Empty only for an anonymised older team whose
+  /// creator account was deleted (`created_by` is ON DELETE SET NULL).
   final String createdBy;
   final String name;
   final TeamType type;
@@ -41,30 +42,17 @@ class Team {
   final int? foundedYear;
   final String? primaryColor;
   final String? secondaryColor;
-
-  /// Short marketing line shown on the team page and scorecards.
   final String? tagline;
-
-  /// Public URL of the team's uploaded logo. Null = render the monogram
-  /// crest on [primaryColor].
   final String? logoUrl;
-
-  /// 1–3 letter override for the crest monogram. Null = derive from [name]
-  /// at render time.
   final String? logoMonogram;
-
-  /// Generated logo style, stored in team_colors.crest_kind.
   final CrestKind crestKind;
-
-  /// Mirrors `teams.is_verified`. Renders the tick beside the team name on
-  /// the Pool board and anywhere else a crest carries its name.
   final bool isVerified;
-
-  /// Mirrors `teams.status`. An archived team's page is a read-only record:
-  /// nobody can post, join or follow it, and only the owner can restore it.
   final TeamStatus status;
+  final int maxSquadSize;
 
   bool get isArchived => status == TeamStatus.archived;
+  bool get isActive => status == TeamStatus.active;
+  bool get isReadOnly => !isActive;
 
   @override
   bool operator ==(Object other) =>
@@ -87,15 +75,32 @@ class Team {
           other.crestKind == crestKind &&
           other.isVerified == isVerified &&
           other.status == status &&
+          other.maxSquadSize == maxSquadSize &&
           other.createdAt == createdAt &&
-          other.updatedAt == updatedAt &&
-          other.createdBy == createdBy;
+          other.updatedAt == updatedAt;
 
   @override
   int get hashCode => Object.hash(
-        id, createdBy, name, type, privacy, description, homeGround, city,
-        foundedYear, primaryColor, secondaryColor, tagline, logoUrl,
-        logoMonogram, crestKind, isVerified, status, createdAt, updatedAt,
+        id,
+        createdBy,
+        name,
+        type,
+        privacy,
+        description,
+        homeGround,
+        city,
+        foundedYear,
+        primaryColor,
+        secondaryColor,
+        tagline,
+        logoUrl,
+        logoMonogram,
+        crestKind,
+        isVerified,
+        status,
+        maxSquadSize,
+        createdAt,
+        updatedAt,
       );
 }
 
@@ -148,9 +153,11 @@ enum TeamPrivacy {
       values.where((p) => p.wire == wire).firstOrNull ?? TeamPrivacy.public;
 }
 
-/// Stable wire values shared by editing, persistence, and rendering.
 enum CrestKind {
-  monogram, initials, shield, upload;
+  monogram,
+  initials,
+  shield,
+  upload;
 
   static CrestKind fromWire(String? value) =>
       values.where((kind) => kind.name == value).firstOrNull ?? monogram;

@@ -11,7 +11,7 @@ import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
 import '../../domain/value_objects/jersey_number.dart';
 import '../../domain/value_objects/player_display_name.dart';
-import '../providers/teams_providers.dart';
+import '../providers/team_membership_providers.dart';
 
 /// Modern dual-mode sheet for adding a player to a team:
 /// 1. Search registered Matchday players by username/name.
@@ -37,14 +37,12 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  // Search tab state
   final _searchController = TextEditingController();
   Timer? _debounceTimer;
   List<Map<String, dynamic>> _searchResults = [];
   bool _isSearching = false;
   String? _searchError;
 
-  // Offline player tab state
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _jerseyController = TextEditingController();
@@ -85,7 +83,7 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
         _isSearching = true;
         _searchError = null;
       });
-      final res = await ref.read(teamsRepositoryProvider).searchUsers(query);
+      final res = await ref.read(teamMembershipRepositoryProvider).searchUsers(query);
       if (!mounted) return;
       res.fold(
         (failure) => setState(() {
@@ -102,7 +100,9 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
 
   Future<void> _showSendInviteSheet(Map<String, dynamic> user) async {
     final uid = user['user_id'] as String;
-    final name = user['display_name'] as String? ?? user['username'] as String? ?? 'Player';
+    final name = user['display_name'] as String? ??
+        user['username'] as String? ??
+        'Player';
     final username = user['username'] as String?;
     final avatar = user['profile_photo_url'] as String?;
 
@@ -118,8 +118,6 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
         avatarUrl: avatar,
         onSent: () {
           ref.invalidate(teamPendingInvitesProvider(widget.team.id.value));
-          ref.invalidate(rosterProvider(widget.team.id.value));
-          ref.invalidate(teamProvider(widget.team.id.value));
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -170,7 +168,7 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
     setState(() => _isSubmittingOffline = true);
 
     final phone = _phoneController.text.trim();
-    final res = await ref.read(teamsRepositoryProvider).addUnclaimedPlayer(
+    final res = await ref.read(teamMembershipRepositoryProvider).addUnclaimedPlayer(
           teamId: widget.team.id,
           displayName: nameRes.getRight().toNullable()!,
           phoneNumber: phone.isNotEmpty ? phone : null,
@@ -194,7 +192,6 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
       },
       (_) {
         ref.invalidate(rosterProvider(widget.team.id.value));
-        ref.invalidate(teamProvider(widget.team.id.value));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$name added to the squad!'),
@@ -223,7 +220,6 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
             Container(
               width: 36,
               height: 4,
@@ -233,8 +229,6 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-
-            // Header & Tabs
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
               child: Row(
@@ -242,13 +236,16 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                   Text('Add to Squad', style: CkType.display(fontSize: 19)),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close, color: CkColors.muted, size: 20),
+                    icon: const Icon(
+                      Icons.close,
+                      color: CkColors.muted,
+                      size: 20,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
             ),
-
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
@@ -264,7 +261,10 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                 indicatorSize: TabBarIndicatorSize.tab,
                 labelColor: CkColors.paper,
                 unselectedLabelColor: CkColors.muted,
-                labelStyle: CkType.display(fontSize: 13, fontWeight: FontWeight.w700),
+                labelStyle: CkType.display(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
                 unselectedLabelStyle: CkType.display(fontSize: 13),
                 dividerColor: Colors.transparent,
                 tabs: const [
@@ -273,10 +273,7 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                 ],
               ),
             ),
-
             const SizedBox(height: 10),
-
-            // Tab View Body
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -292,9 +289,6 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Tab 1: Search Registered Users
-  // ---------------------------------------------------------------------------
   Widget _buildSearchTab() {
     return Column(
       children: [
@@ -306,7 +300,11 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
             style: CkType.body(fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Search by @username or name...',
-              prefixIcon: const Icon(Icons.search, size: 18, color: CkColors.muted),
+              prefixIcon: const Icon(
+                Icons.search,
+                size: 18,
+                color: CkColors.muted,
+              ),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear, size: 16),
@@ -318,7 +316,8 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                   : null,
               filled: true,
               fillColor: CkColors.paper2,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
@@ -333,7 +332,10 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                 )
               : _searchError != null
                   ? Center(
-                      child: Text(_searchError!, style: const TextStyle(color: CkColors.red)),
+                      child: Text(
+                        _searchError!,
+                        style: const TextStyle(color: CkColors.red),
+                      ),
                     )
                   : _searchController.text.isEmpty
                       ? Center(
@@ -342,18 +344,27 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.person_search_outlined,
-                                    size: 44, color: CkColors.soft),
+                                const Icon(
+                                  Icons.person_search_outlined,
+                                  size: 44,
+                                  color: CkColors.soft,
+                                ),
                                 const SizedBox(height: 10),
                                 Text(
                                   'Find Matchday players',
-                                  style: CkType.display(fontSize: 15, fontWeight: FontWeight.w600),
+                                  style: CkType.display(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'Type a username or full name to add registered cricketers to your roster.',
                                   textAlign: TextAlign.center,
-                                  style: CkType.body(fontSize: 12, color: CkColors.muted),
+                                  style: CkType.body(
+                                    fontSize: 12,
+                                    color: CkColors.muted,
+                                  ),
                                 ),
                               ],
                             ),
@@ -363,14 +374,22 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                           ? Center(
                               child: Text(
                                 'No users found for "${_searchController.text}"',
-                                style: CkType.body(fontSize: 13, color: CkColors.muted),
+                                style: CkType.body(
+                                  fontSize: 13,
+                                  color: CkColors.muted,
+                                ),
                               ),
                             )
                           : ListView.separated(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
                               itemCount: _searchResults.length,
-                              separatorBuilder: (_, __) =>
-                                  const Divider(height: 1, color: CkColors.hairline),
+                              separatorBuilder: (_, __) => const Divider(
+                                height: 1,
+                                color: CkColors.hairline,
+                              ),
                               itemBuilder: (_, idx) {
                                 final u = _searchResults[idx];
                                 final name = u['display_name'] as String? ??
@@ -381,50 +400,72 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                                 String? role;
                                 if (playerProfiles is Map<String, dynamic>) {
                                   role = playerProfiles['player_role'] as String?;
-                                } else if (playerProfiles is List && playerProfiles.isNotEmpty) {
-                                  role = (playerProfiles.first as Map<String, dynamic>)['player_role'] as String?;
+                                } else if (playerProfiles is List &&
+                                    playerProfiles.isNotEmpty) {
+                                  role = (playerProfiles.first
+                                          as Map<String, dynamic>)[
+                                      'player_role'] as String?;
                                 }
-                                final avatar = u['profile_photo_url'] as String?;
+                                final avatar =
+                                    u['profile_photo_url'] as String?;
 
                                 return ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(vertical: 4),
                                   leading: CircleAvatar(
                                     radius: 20,
                                     backgroundColor: CkColors.paper2,
-                                    backgroundImage: avatar != null && avatar.isNotEmpty
-                                        ? NetworkImage(avatar)
-                                        : null,
+                                    backgroundImage:
+                                        avatar != null && avatar.isNotEmpty
+                                            ? NetworkImage(avatar)
+                                            : null,
                                     child: avatar == null || avatar.isEmpty
                                         ? Text(
-                                            name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                            name.isNotEmpty
+                                                ? name[0].toUpperCase()
+                                                : '?',
                                             style: CkType.display(
-                                                fontSize: 14, fontWeight: FontWeight.w700),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           )
                                         : null,
                                   ),
                                   title: Text(
                                     name,
-                                    style: CkType.display(fontSize: 14, fontWeight: FontWeight.w600),
+                                    style: CkType.display(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   subtitle: Row(
                                     children: [
                                       if (uname != null && uname.isNotEmpty)
-                                        Text('@$uname',
-                                            style: CkType.body(
-                                                fontSize: 12, color: CkColors.muted)),
+                                        Text(
+                                          '@$uname',
+                                          style: CkType.body(
+                                            fontSize: 12,
+                                            color: CkColors.muted,
+                                          ),
+                                        ),
                                       if (role != null && role.isNotEmpty) ...[
                                         const SizedBox(width: 6),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 5, vertical: 1.5),
+                                            horizontal: 5,
+                                            vertical: 1.5,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: CkColors.paper2,
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                           ),
                                           child: Text(
                                             role.replaceAll('_', ' '),
                                             style: CkType.mono(
-                                                fontSize: 9.5, color: CkColors.ink),
+                                              fontSize: 9.5,
+                                              color: CkColors.ink,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -437,16 +478,23 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                                       foregroundColor: CkColors.paper,
                                       elevation: 0,
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 14, vertical: 6),
+                                        horizontal: 14,
+                                        vertical: 6,
+                                      ),
                                       minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                     ),
-                                    child: const Text('Invite',
-                                        style: TextStyle(
-                                            fontSize: 12, fontWeight: FontWeight.w700)),
+                                    child: const Text(
+                                      'Invite',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                                   ),
                                 );
                               },
@@ -456,14 +504,10 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Tab 2: Offline Teammate Form
-  // ---------------------------------------------------------------------------
   Widget _buildOfflineTab() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
       children: [
-        // Name Field
         Text('PLAYER NAME *', style: _labelStyle),
         const SizedBox(height: 6),
         TextField(
@@ -472,8 +516,6 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
           decoration: _inputDecoration('e.g. Babar Azam'),
         ),
         const SizedBox(height: 14),
-
-        // Phone & Jersey Row
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -514,8 +556,6 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
           ],
         ),
         const SizedBox(height: 14),
-
-        // Playing Role
         Text('PLAYING ROLE', style: _labelStyle),
         const SizedBox(height: 6),
         Wrap(
@@ -524,19 +564,24 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
           children: PlayingRole.values.map((role) {
             final isSelected = _selectedPlayingRole == role;
             return ChoiceChip(
-              label: Text(role.label,
-                  style: CkType.body(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? CkColors.paper : CkColors.ink,
-                  )),
+              label: Text(
+                role.label,
+                style: CkType.body(
+                  fontSize: 12,
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? CkColors.paper : CkColors.ink,
+                ),
+              ),
               selected: isSelected,
               selectedColor: CkColors.ink,
               backgroundColor: CkColors.paper2,
               side: BorderSide(
                 color: isSelected ? CkColors.ink : CkColors.hairline,
               ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               onSelected: (selected) {
                 setState(() {
                   _selectedPlayingRole = selected ? role : null;
@@ -546,8 +591,6 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
           }).toList(),
         ),
         const SizedBox(height: 14),
-
-        // Batting Style
         Text('BATTING STYLE', style: _labelStyle),
         const SizedBox(height: 6),
         Wrap(
@@ -556,19 +599,24 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
           children: BattingStyle.values.map((style) {
             final isSelected = _selectedBattingStyle == style;
             return ChoiceChip(
-              label: Text(style.label,
-                  style: CkType.body(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? CkColors.paper : CkColors.ink,
-                  )),
+              label: Text(
+                style.label,
+                style: CkType.body(
+                  fontSize: 12,
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? CkColors.paper : CkColors.ink,
+                ),
+              ),
               selected: isSelected,
               selectedColor: CkColors.ink,
               backgroundColor: CkColors.paper2,
               side: BorderSide(
                 color: isSelected ? CkColors.ink : CkColors.hairline,
               ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               onSelected: (selected) {
                 setState(() {
                   _selectedBattingStyle = selected ? style : null;
@@ -578,8 +626,6 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
           }).toList(),
         ),
         const SizedBox(height: 14),
-
-        // Bowling Style
         Text('BOWLING STYLE', style: _labelStyle),
         const SizedBox(height: 6),
         Wrap(
@@ -588,19 +634,24 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
           children: BowlingStyle.values.map((style) {
             final isSelected = _selectedBowlingStyle == style;
             return ChoiceChip(
-              label: Text(style.label,
-                  style: CkType.body(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? CkColors.paper : CkColors.ink,
-                  )),
+              label: Text(
+                style.label,
+                style: CkType.body(
+                  fontSize: 12,
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? CkColors.paper : CkColors.ink,
+                ),
+              ),
               selected: isSelected,
               selectedColor: CkColors.ink,
               backgroundColor: CkColors.paper2,
               side: BorderSide(
                 color: isSelected ? CkColors.ink : CkColors.hairline,
               ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               onSelected: (selected) {
                 setState(() {
                   _selectedBowlingStyle = selected ? style : null;
@@ -610,17 +661,24 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
           }).toList(),
         ),
         const SizedBox(height: 20),
-
-        // Submit Button
         CkButton(
-          label: _isSubmittingOffline ? 'Adding Teammate...' : 'Add Teammate to Squad',
+          label: _isSubmittingOffline
+              ? 'Adding Teammate...'
+              : 'Add Teammate to Squad',
           icon: _isSubmittingOffline
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: CkColors.paper),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: CkColors.paper,
+                  ),
                 )
-              : const Icon(Icons.person_add_alt_1_rounded, size: 18, color: CkColors.paper),
+              : const Icon(
+                  Icons.person_add_alt_1_rounded,
+                  size: 18,
+                  color: CkColors.paper,
+                ),
           onPressed: _isSubmittingOffline ? null : _submitOfflinePlayer,
         ),
       ],
@@ -639,7 +697,8 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
         hintStyle: CkType.body(fontSize: 13, color: CkColors.muted),
         filled: true,
         fillColor: CkColors.paper2,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: CkColors.hairline),
@@ -654,8 +713,6 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
         ),
       );
 }
-
-// ─── Modal Sheet to Customize & Send Team Invite ──────────────────────────────
 
 class _InviteDetailsModal extends ConsumerStatefulWidget {
   const _InviteDetailsModal({
@@ -675,7 +732,8 @@ class _InviteDetailsModal extends ConsumerStatefulWidget {
   final VoidCallback onSent;
 
   @override
-  ConsumerState<_InviteDetailsModal> createState() => _InviteDetailsModalState();
+  ConsumerState<_InviteDetailsModal> createState() =>
+      _InviteDetailsModalState();
 }
 
 class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
@@ -700,8 +758,8 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
     }
     final note = _noteController.text.trim();
 
-    final res = await ref.read(teamsRepositoryProvider).sendTeamInvite(
-          teamId: widget.team.id.value,
+    final res = await ref.read(teamMembershipRepositoryProvider).sendTeamInvite(
+          teamId: widget.team.id,
           inviteeId: widget.userId,
           role: _selectedRole,
           jerseyNumber: jerseyNumber,
@@ -761,14 +819,16 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
                   Text('Send Team Invite', style: CkType.display(fontSize: 18)),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close, color: CkColors.muted, size: 20),
+                    icon: const Icon(
+                      Icons.close,
+                      color: CkColors.muted,
+                      size: 20,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-
-              // Invitee Row
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -779,7 +839,9 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
                 child: Row(
                   children: [
                     Avatar(
-                      mono: widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?',
+                      mono: widget.name.isNotEmpty
+                          ? widget.name[0].toUpperCase()
+                          : '?',
                       imageUrl: widget.avatarUrl,
                       size: 40,
                     ),
@@ -790,12 +852,18 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
                         children: [
                           Text(
                             widget.name,
-                            style: CkType.display(fontSize: 15, fontWeight: FontWeight.w700),
+                            style: CkType.display(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                           if (widget.username != null)
                             Text(
                               '@${widget.username}',
-                              style: CkType.body(fontSize: 12, color: CkColors.muted),
+                              style: CkType.body(
+                                fontSize: 12,
+                                color: CkColors.muted,
+                              ),
                             ),
                         ],
                       ),
@@ -804,8 +872,6 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Role Selection
               Text(
                 'INVITED ROLE',
                 style: CkType.mono(
@@ -820,17 +886,11 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  // Only these two: `team_invites.role` is capped at 'captain'
-                  // by a CHECK constraint, because member_role is an authority
-                  // ladder now — staff are appointed after joining, never by
-                  // invitation.
                   _roleChip('Squad Player', MemberRole.player),
                   _roleChip('Captain', MemberRole.captain),
                 ],
               ),
               const SizedBox(height: 16),
-
-              // Jersey Number
               Text(
                 'JERSEY NUMBER (OPTIONAL)',
                 style: CkType.mono(
@@ -851,7 +911,10 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
                   hintStyle: CkType.body(fontSize: 13, color: CkColors.muted),
                   filled: true,
                   fillColor: CkColors.paper2,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: CkColors.hairline),
@@ -859,8 +922,6 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Invitation Note / Message
               Text(
                 'ATTACH NOTE / MESSAGE (OPTIONAL)',
                 style: CkType.mono(
@@ -889,17 +950,23 @@ class _InviteDetailsModalState extends ConsumerState<_InviteDetailsModal> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Submit Button
               CkButton(
-                label: _isSending ? 'Sending Invitation...' : 'Send Invitation',
+                label:
+                    _isSending ? 'Sending Invitation...' : 'Send Invitation',
                 icon: _isSending
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: CkColors.paper),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: CkColors.paper,
+                        ),
                       )
-                    : const Icon(Icons.send_rounded, size: 18, color: CkColors.paper),
+                    : const Icon(
+                        Icons.send_rounded,
+                        size: 18,
+                        color: CkColors.paper,
+                      ),
                 onPressed: _isSending ? null : _sendInvite,
               ),
             ],

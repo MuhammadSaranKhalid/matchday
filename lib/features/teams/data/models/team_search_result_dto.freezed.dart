@@ -15,8 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TeamSearchResultDto {
 
-@JsonKey(name: 'team_id') String get teamId;@JsonKey(name: 'team_name') String get teamName;@JsonKey(name: 'logo_url') String? get logoUrl;@JsonKey(name: 'logo_monogram') String? get logoMonogram;@JsonKey(name: 'team_colors') Map<String, dynamic>? get teamColors; Map<String, dynamic>? get location;@JsonKey(name: 'is_verified') bool get isVerified;@JsonKey(name: 'distance_km') double? get distanceKm;// Returned by `search-all` only; `search-teams` does not select them.
-@JsonKey(name: 'founded_year') int? get foundedYear;@JsonKey(name: 'team_type') String? get teamType; double get score;
+@JsonKey(name: 'team_id') String get teamId;@JsonKey(name: 'team_name') String get teamName;@JsonKey(name: 'logo_url') String? get logoUrl;@JsonKey(name: 'logo_monogram') String? get logoMonogram;@JsonKey(name: 'team_colors') Map<String, dynamic>? get teamColors; Map<String, dynamic>? get location;@JsonKey(name: 'is_verified') bool get isVerified;@JsonKey(name: 'distance_km') double? get distanceKm;@JsonKey(name: 'founded_year') int? get foundedYear;@JsonKey(name: 'team_type') String? get teamType; double get score;
 /// Create a copy of TeamSearchResultDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -247,7 +246,6 @@ class _TeamSearchResultDto extends TeamSearchResultDto {
 
 @override@JsonKey(name: 'is_verified') final  bool isVerified;
 @override@JsonKey(name: 'distance_km') final  double? distanceKm;
-// Returned by `search-all` only; `search-teams` does not select them.
 @override@JsonKey(name: 'founded_year') final  int? foundedYear;
 @override@JsonKey(name: 'team_type') final  String? teamType;
 @override@JsonKey() final  double score;

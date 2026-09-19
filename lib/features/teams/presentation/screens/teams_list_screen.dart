@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_push_nav.dart';
-import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_membership.dart';
 import '../controllers/team_create_controller.dart';

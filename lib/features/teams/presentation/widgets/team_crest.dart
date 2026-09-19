@@ -137,19 +137,37 @@ class TeamCrest extends StatelessWidget {
     final hasLogo = hasLocalLogo || (url != null && url.isNotEmpty);
     if (!hasLogo && crestKind == CrestKind.shield) {
       final primary = parseHexColor(primaryColor, fallback: CkColors.ink);
-      final foreground = primary.computeLuminance() > 0.179 ? CkColors.ink : CkColors.paper;
+      final foreground = primary.computeLuminance() > 0.179
+          ? CkColors.ink
+          : CkColors.paper;
       return Container(
-        width: size, height: size,
-        decoration: BoxDecoration(color: primary,
-          borderRadius: BorderRadius.circular(size * .22)),
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: primary,
+          borderRadius: BorderRadius.circular(size * .22),
+        ),
         child: CustomPaint(
           painter: _ShieldPainter(foreground),
-          child: Center(child: FittedBox(child: Padding(
-            padding: EdgeInsets.all(size * .15),
-            child: Text(teamCrestMonogram(name, override: monogram, maxLetters: 3),
-              style: CkType.display(fontSize: size * .38,
-                fontWeight: FontWeight.w800, color: foreground)),
-          ))),
+          child: Center(
+            child: FittedBox(
+              child: Padding(
+                padding: EdgeInsets.all(size * .15),
+                child: Text(
+                  teamCrestMonogram(
+                    name,
+                    override: monogram,
+                    maxLetters: 3,
+                  ),
+                  style: CkType.display(
+                    fontSize: size * .38,
+                    fontWeight: FontWeight.w800,
+                    color: foreground,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -169,9 +187,14 @@ class TeamCrest extends StatelessWidget {
       padding: cover ? EdgeInsets.zero : EdgeInsets.all(_inset),
       child: ClipOval(
         child: hasLocalLogo
-            ? Image.file(File(localLogoPath!), fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => _monogram())
-            : hasLogo ? _logo(context, url!, cover: cover) : _monogram(),
+            ? Image.file(
+                File(localLogoPath!),
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => _monogram(),
+              )
+            : hasLogo
+                ? _logo(context, url!, cover: cover)
+                : _monogram(),
       ),
     );
   }
@@ -225,14 +248,23 @@ class _ShieldPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final s = size.width;
     final path = Path()
-      ..moveTo(s * .5, s * .08)..lineTo(s * .92, s * .20)
+      ..moveTo(s * .5, s * .08)
+      ..lineTo(s * .92, s * .20)
       ..lineTo(s * .88, s * .60)
       ..quadraticBezierTo(s * .88, s * .84, s * .5, s * .96)
       ..quadraticBezierTo(s * .12, s * .84, s * .12, s * .60)
-      ..lineTo(s * .08, s * .20)..close();
-    canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.stroke
-      ..strokeWidth = s * .018..strokeJoin = StrokeJoin.round);
+      ..lineTo(s * .08, s * .20)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = s * .018
+        ..strokeJoin = StrokeJoin.round,
+    );
   }
+
   @override
   bool shouldRepaint(_ShieldPainter oldDelegate) => color != oldDelegate.color;
 }

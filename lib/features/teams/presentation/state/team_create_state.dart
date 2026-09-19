@@ -6,11 +6,8 @@ export '../../domain/entities/team.dart' show CrestKind;
 
 part 'team_create_state.freezed.dart';
 
-/// The 5 steps of the team-create wizard.
 enum TeamCreateStep { basics, identity, home, crest, review }
 
-/// In-progress team-create form state. Freezed data class (same rationale as
-/// OnboardingState — concurrent fields + copyWith).
 @freezed
 abstract class TeamCreateState with _$TeamCreateState {
   const factory TeamCreateState({
@@ -22,9 +19,6 @@ abstract class TeamCreateState with _$TeamCreateState {
     String? foundedYear,
     @Default('') String city,
     @Default('') String area,
-    // Structured geo resolved by the place picker. Populated when the creator
-    // picks a prediction; all null when they keep typed text, in which case
-    // the team is name-findable but not proximity-findable.
     String? locationLabel,
     String? district,
     String? province,
@@ -50,25 +44,21 @@ abstract class TeamCreateState with _$TeamCreateState {
   const TeamCreateState._();
 
   bool get canContinueBasics => TeamName.create(name).isRight();
+
   String? get foundedYearError {
     final text = foundedYear?.trim() ?? '';
     if (text.isEmpty) return null;
     final year = int.tryParse(text);
     return year == null || year < 1800 || year > DateTime.now().year
-        ? 'Enter a year between 1800 and ${DateTime.now().year}.' : null;
+        ? 'Enter a year between 1800 and ${DateTime.now().year}.'
+        : null;
   }
+
   bool get canSubmit => canContinueBasics && canContinueHome;
   bool get hasDraft => name.trim().isNotEmpty || city.trim().isNotEmpty;
-
   bool get canContinueHome => city.trim().isNotEmpty;
-
-  /// True once the team carries a real coordinate — the thing that makes it
-  /// discoverable by distance.
   bool get hasCoordinates => latitude != null && longitude != null;
 
-  /// 1–3 character crest monogram. User override wins (honoured as typed,
-  /// up to the input field's maxLength); otherwise auto-derived from the
-  /// first letters of the first two words of [name].
   String get monogram {
     final override = monogramOverride?.trim();
     if (override != null && override.isNotEmpty) {
@@ -83,7 +73,6 @@ abstract class TeamCreateState with _$TeamCreateState {
     return (words.first[0] + words.elementAt(1)[0]).toUpperCase();
   }
 
-  /// Combined "Area, City" for storage in the single `city` field.
   String get combinedCity {
     final a = area.trim();
     final c = city.trim();

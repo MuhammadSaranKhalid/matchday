@@ -7,7 +7,7 @@ import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_text_field.dart';
 import '../../../teams/domain/entities/roster_member.dart';
 import '../../../teams/domain/entities/team.dart';
-import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_registration.dart';
 import '../controllers/tournaments_controller.dart';
@@ -265,15 +265,14 @@ class _TeamRegistrationSheetState extends ConsumerState<TeamRegistrationSheet> {
   Widget build(BuildContext context) {
     final tournamentAsync =
         ref.watch(tournamentDetailProvider(widget.tournamentId));
-    // Only teams the viewer actually runs. `myTeamsProvider` includes teams
-    // they merely play for, while `tournament_teams_insert_manager` demands
-    // is_team_manager — so before this filter (2026-09-10) a squad player
-    // could pick their team in the wizard and get a raw RLS denial at submit.
-    final myRoles = ref.watch(myTeamRolesProvider).value ?? const {};
-    final myTeamsAsync = ref.watch(myTeamsProvider).whenData(
-          (teams) => teams
-              .where((t) => myRoles[t.id.value]?.isStaff ?? false)
-              .toList(),
+    // Tournament registration is a staff capability. Memberships carry the
+    // canonical relationship, so player/captain-only memberships never enter
+    // the selectable team list.
+    final myTeamsAsync = ref.watch(currentUserTeamMembershipsProvider).whenData(
+          (memberships) => memberships
+              .where((m) => m.relationship.canRegisterForTournament)
+              .map((m) => m.team)
+              .toList(growable: false),
         );
     final registrationsAsync =
         ref.watch(tournamentRegistrationsProvider(widget.tournamentId));

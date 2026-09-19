@@ -1,51 +1,47 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../domain/entities/team.dart';
 import '../controllers/team_create_controller.dart';
 import '../state/team_create_state.dart';
 import '../utils/team_display.dart';
+import '../widgets/team_create/ownership_sheet.dart';
 import '../widgets/team_create/tc_atoms.dart';
 
-/// "Create a team" — a 5-step wizard (Basics → Identity → Home → Crest →
-/// Review), followed by a celebration screen on successful submit. Faithful
-/// Flutter port of the matchday design (Team Creation Flow.html).
+/// Existing Matchday five-step team-creation visual flow.
 ///
-/// The Save & Exit and Ownership briefing overlays are bottom sheets
-/// surfaced from this screen.
+/// The controller/data implementation underneath it is the cleaned one-shot
+/// architecture; this screen deliberately keeps the established wizard
+/// structure, surfaces and typography.
 class TeamCreateScreen extends ConsumerWidget {
   const TeamCreateScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.listen(teamCreateControllerProvider, (prev, next) {
-      final err = next.value?.submitError;
-      if (err != null && prev?.value?.submitError != err) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(err)));
+    ref.listen(teamCreateControllerProvider, (previous, next) {
+      final error = next.value?.submitError;
+      if (error != null && previous?.value?.submitError != error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
       }
     });
 
     final async = ref.watch(teamCreateControllerProvider);
-
     return Scaffold(
       backgroundColor: CkColors.paper,
       body: switch (async) {
-        AsyncData(:final value) when value.createdTeamId != null => SafeArea(
-          child: _DoneView(state: value),
-        ),
+        AsyncData(:final value) when value.createdTeamId != null =>
+          SafeArea(child: _DoneView(state: value)),
         AsyncData(:final value) => SafeArea(child: _Wizard(state: value)),
         _ => const Center(
-          child: CircularProgressIndicator(color: CkColors.ink),
-        ),
+            child: CircularProgressIndicator(color: CkColors.ink),
+          ),
       },
     );
   }
@@ -58,233 +54,186 @@ class _Wizard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(teamCreateControllerProvider.notifier);
-    final stepIndex = state.step.index;
-    final isLast = state.step == TeamCreateStep.review;
+    final index = state.step.index;
 
     return Column(
       children: [
         _TopBar(
-          onBack: () => stepIndex == 0 ? context.pop() : controller.back(),
-          onSaveExit: () => _openSaveExit(context, controller, state),
-          step: stepIndex + 1,
+          step: index + 1,
           totalSteps: TeamCreateStep.values.length,
-        ),
-        _Progress(
-          step: stepIndex + 1,
-          totalSteps: TeamCreateStep.values.length,
-        ),
-        Expanded(
-          child: _StepBody(
-            state: state,
-            controller: controller,
-            onOwnershipTap: () => _showOwnershipSheet(context),
+          onBack: () {
+            if (index == 0) {
+              context.pop();
+            } else {
+              controller.back();
+            }
+          },
+          onSaveExit: () => _showSaveExit(
+            context,
+            step: index + 1,
+            total: TeamCreateStep.values.length,
+            onDiscard: () async {
+              await controller.reset();
+              if (context.mounted) context.pop();
+            },
           ),
         ),
-        _Footer(
-          stepIndex: stepIndex,
-          isLast: isLast,
-          state: state,
-          controller: controller,
-          onSubmit: () => controller.submit(),
+        _Progress(step: index + 1),
+        Expanded(
+          child: switch (state.step) {
+            TeamCreateStep.basics => _Basics(
+                state: state,
+                controller: controller,
+              ),
+            TeamCreateStep.identity => _Identity(
+                state: state,
+                controller: controller,
+              ),
+            TeamCreateStep.home => _Home(
+                state: state,
+                controller: controller,
+              ),
+            TeamCreateStep.crest => _Crest(
+                state: state,
+                controller: controller,
+              ),
+            TeamCreateStep.review => _Review(
+                state: state,
+                onEdit: controller.goToStep,
+                onOwnership: () => showTeamOwnershipSheet(context),
+              ),
+          },
         ),
+        _Footer(state: state, controller: controller),
       ],
-    );
-  }
-
-  Future<void> _openSaveExit(
-    BuildContext context,
-    TeamCreateController controller,
-    TeamCreateState s,
-  ) {
-    return _showSaveExitSheet(
-      context,
-      step: s.step.index + 1,
-      totalSteps: TeamCreateStep.values.length,
-      onSaveAndExit: () {
-        // Draft is auto-persisted on every field change — just exit.
-        if (context.mounted) context.pop();
-      },
-      onDiscard: () {
-        controller.reset();
-        if (context.mounted) context.pop();
-      },
     );
   }
 }
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
-    required this.onBack,
-    required this.onSaveExit,
     required this.step,
     required this.totalSteps,
+    required this.onBack,
+    required this.onSaveExit,
   });
 
-  final VoidCallback onBack;
-  final VoidCallback onSaveExit;
   final int step;
   final int totalSteps;
+  final VoidCallback onBack;
+  final VoidCallback onSaveExit;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 14, 4),
-      child: Row(
-        children: [
-          InkWell(
-            onTap: onBack,
-            borderRadius: BorderRadius.circular(999),
-            child: const Padding(
-              padding: EdgeInsets.all(8),
-              child: Icon(Icons.chevron_left, size: 22, color: CkColors.ink),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(8, 10, 14, 4),
+        child: Row(
+          children: [
+            InkWell(
+              onTap: onBack,
+              borderRadius: BorderRadius.circular(999),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.chevron_left, size: 22, color: CkColors.ink),
+              ),
             ),
-          ),
-          Expanded(
-            child: Center(
-              child: Text(
-                'NEW TEAM · $step/$totalSteps',
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.12,
-                  color: CkColors.muted,
+            Expanded(
+              child: Center(
+                child: Text(
+                  'NEW TEAM · $step/$totalSteps',
+                  style: CkType.mono(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: .12,
+                    color: CkColors.muted,
+                  ),
                 ),
               ),
             ),
-          ),
-          InkWell(
-            onTap: onSaveExit,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              child: Text(
-                'SAVE & EXIT',
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.08,
-                  color: CkColors.muted,
+            InkWell(
+              onTap: onSaveExit,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                child: Text(
+                  'SAVE & EXIT',
+                  style: CkType.mono(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: .08,
+                    color: CkColors.muted,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+      );
 }
 
 class _Progress extends StatelessWidget {
-  const _Progress({required this.step, required this.totalSteps});
+  const _Progress({required this.step});
   final int step;
-  final int totalSteps;
+
+  static const labels = ['BASICS', 'IDENTITY', 'HOME', 'CREST', 'REVIEW'];
 
   @override
-  Widget build(BuildContext context) {
-    final stepLabels = ['BASICS', 'IDENTITY', 'HOME', 'CREST', 'REVIEW'];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 6, 18, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              for (var i = 0; i < totalSteps; i++) ...[
-                if (i > 0) const SizedBox(width: 4),
-                Expanded(
-                  child: Container(
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: i < step ? CkColors.ink : CkColors.paper2,
-                      borderRadius: BorderRadius.circular(999),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 6, 18, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                for (var i = 0; i < labels.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 4),
+                  Expanded(
+                    child: Container(
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: i < step ? CkColors.ink : CkColors.paper2,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'STEP $step · ${stepLabels[step - 1]}',
-            style: CkType.mono(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.10,
-              color: CkColors.muted,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepBody extends StatelessWidget {
-  const _StepBody({
-    required this.state,
-    required this.controller,
-    required this.onOwnershipTap,
-  });
-
-  final TeamCreateState state;
-  final TeamCreateController controller;
-  final VoidCallback onOwnershipTap;
-
-  @override
-  Widget build(BuildContext context) {
-    switch (state.step) {
-      case TeamCreateStep.basics:
-        return _StepBasics(state: state, controller: controller);
-      case TeamCreateStep.identity:
-        return _StepIdentity(state: state, controller: controller);
-      case TeamCreateStep.home:
-        return _StepHome(state: state, controller: controller);
-      case TeamCreateStep.crest:
-        return _StepCrest(state: state, controller: controller);
-      case TeamCreateStep.review:
-        return _StepReview(
-          state: state,
-          onJump: (step) => controller.goToStep(step),
-          onOwnershipTap: onOwnershipTap,
-        );
-    }
-  }
+            const SizedBox(height: 8),
+            Text(
+              'STEP $step · ${labels[step - 1]}',
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: .10,
+                color: CkColors.muted,
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _Footer extends StatelessWidget {
-  const _Footer({
-    required this.stepIndex,
-    required this.isLast,
-    required this.state,
-    required this.controller,
-    required this.onSubmit,
-  });
+  const _Footer({required this.state, required this.controller});
 
-  final int stepIndex;
-  final bool isLast;
   final TeamCreateState state;
   final TeamCreateController controller;
-  final VoidCallback onSubmit;
 
-  bool get _canContinue {
-    switch (state.step) {
-      case TeamCreateStep.basics:
-        return state.canContinueBasics;
-      case TeamCreateStep.home:
-        return state.canContinueHome;
-      default:
-        return true;
-    }
-  }
-
-  String get _label {
-    if (isLast) return state.submitting ? 'Creating…' : 'Create team';
-    if (state.step == TeamCreateStep.crest) return 'Review';
-    return 'Continue';
-  }
+  bool get canContinue => switch (state.step) {
+        TeamCreateStep.basics => state.canContinueBasics,
+        TeamCreateStep.home => state.canContinueHome,
+        _ => true,
+      };
 
   @override
   Widget build(BuildContext context) {
-    final disabled = !_canContinue || state.submitting;
+    final isLast = state.step == TeamCreateStep.review;
+    final disabled = state.submitting || !canContinue;
+    final label = isLast
+        ? (state.submitting ? 'Creating…' : 'Create team')
+        : state.step == TeamCreateStep.crest
+            ? 'Review'
+            : 'Continue';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
       decoration: const BoxDecoration(
@@ -293,27 +242,21 @@ class _Footer extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (stepIndex > 0) ...[
+          if (state.step.index > 0) ...[
             InkWell(
-              onTap: controller.back,
+              onTap: state.submitting ? null : controller.back,
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 14,
-                ),
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: CkColors.paper,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: CkColors.hairline),
                 ),
                 child: Text(
                   'Back',
-                  style: CkType.body(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: CkColors.ink,
-                  ),
+                  style: CkType.body(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -321,20 +264,24 @@ class _Footer extends StatelessWidget {
           ],
           Expanded(
             child: InkWell(
-              onTap: disabled ? null : (isLast ? onSubmit : controller.next),
+              onTap: disabled
+                  ? null
+                  : isLast
+                      ? controller.submit
+                      : controller.next,
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 height: 48,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: CkColors.ink.withValues(alpha: disabled ? 0.35 : 1),
+                  color: CkColors.ink.withValues(alpha: disabled ? .35 : 1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      _label,
+                      label,
                       style: CkType.body(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -358,698 +305,448 @@ class _Footer extends StatelessWidget {
   }
 }
 
-class _DoneView extends ConsumerWidget {
-  const _DoneView({required this.state});
-  final TeamCreateState state;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    void onOpenTeam() =>
-        context.pushReplacement('/teams/${state.createdTeamId}');
-
-    return Container(
-      color: CkColors.paper,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Top bar: Minimal close action
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 12, top: 8),
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    size: 22,
-                    color: CkColors.ink,
-                  ),
-                  tooltip: 'Close',
-                  onPressed: onOpenTeam,
-                ),
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                children: [
-                  Center(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Crest container with crisp, natural shadow
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
-                                offset: const Offset(0, 10),
-                                blurRadius: 28,
-                              ),
-                            ],
-                          ),
-                          child: TcCrestPreview(
-                            crestKind: state.crestKind,
-                            primaryHex: state.primaryColor,
-                            monogram: state.monogram,
-                            logoPath: state.logoUrl,
-                            size: 130,
-                          ),
-                        ),
-                        // Verified badge on crest
-                        Positioned(
-                          right: 4,
-                          bottom: 4,
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: CkColors.green,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: CkColors.paper,
-                                width: 3,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
-                                  offset: const Offset(0, 2),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.check_rounded,
-                              size: 18,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    '${state.name.trim().isEmpty ? 'Your team' : state.name} is live.',
-                    textAlign: TextAlign.center,
-                    style: CkType.display(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.025,
-                      height: 1.15,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "You're all set as the team owner.",
-                    textAlign: TextAlign.center,
-                    style: CkType.body(
-                      fontSize: 15,
-                      color: CkColors.muted,
-                      height: 1.4,
-                    ),
-                  ),
-                  if (state.tagline.trim().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: CkColors.paper2,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '“${state.tagline.trim()}”',
-                          textAlign: TextAlign.center,
-                          style: CkType.body(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: CkColors.ink2,
-                          ).copyWith(fontStyle: FontStyle.italic),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 28),
-                  _Receipt(state: state),
-                ],
-              ),
-            ),
-            // Bottom action area
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-              decoration: const BoxDecoration(
-                color: CkColors.paper,
-                border: Border(
-                  top: BorderSide(color: CkColors.hairline),
-                ),
-              ),
-              child: SafeArea(
-                top: false,
-                child: InkWell(
-                  onTap: onOpenTeam,
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: CkColors.ink,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Open team page',
-                          style: CkType.body(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: CkColors.paper,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.arrow_forward_rounded,
-                          size: 18,
-                          color: CkColors.paper,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Step 01 — Basics: name, team type tiles, founded year, privacy.
-// Faithful port of `TCStepBasics` in design/screens/TeamCreate.jsx.
-// ─────────────────────────────────────────────────────────────────────────
-
-class _StepBasics extends StatelessWidget {
-  const _StepBasics({required this.state, required this.controller});
+class _Basics extends StatelessWidget {
+  const _Basics({required this.state, required this.controller});
   final TeamCreateState state;
   final TeamCreateController controller;
 
   @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 18),
-            child: Text(
-              'Name your team.',
-              style: CkType.display(
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.025,
-                height: 1.1,
-              ),
-            ),
-          ),
+          const _StepTitle('Name your team.'),
           const TcLabel('Team name'),
           TcInput(
             value: state.name,
             onChanged: controller.setName,
             maxLength: 50,
+            autofocus: state.name.isEmpty,
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '3–50 characters · we\'ll use first letters as a crest',
-                    style: CkType.body(fontSize: 11, color: CkColors.muted),
-                  ),
-                ),
-                Text(
-                  '${state.name.length}/50',
-                  style: CkType.mono(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.02,
-                    color: CkColors.muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const TcLabel('Team type'),
-          _TypeGrid(value: state.type, onChanged: controller.setType),
-          const SizedBox(height: 16),
-          _TaglineSection(state: state, controller: controller),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const TcLabel('Founded'),
-                    TcInput(
-                      value: state.foundedYear ?? '',
-                      onChanged: controller.setFoundedYear,
-                      placeholder: '2019',
-                      keyboardType: TextInputType.number,
-                    ),
-                  ],
+                child: Text(
+                  '3–50 characters · first letters become the default crest',
+                  style: CkType.body(fontSize: 11, color: CkColors.muted),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const TcLabel('Privacy'),
-                    _PrivacyToggle(
-                      value: state.privacy,
-                      onChanged: controller.setPrivacy,
-                    ),
-                  ],
-                ),
+              Text(
+                '${state.name.length}/50',
+                style: CkType.mono(fontSize: 10, color: CkColors.muted),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          _PrivacyExplainer(privacy: state.privacy),
-        ],
-      ),
-    );
-  }
-}
-
-class _TaglineSection extends StatelessWidget {
-  const _TaglineSection({required this.state, required this.controller});
-  final TeamCreateState state;
-  final TeamCreateController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+          const SizedBox(height: 22),
+          const TcLabel('Team type'),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            childAspectRatio: 2.25,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
             children: [
-              Text(
-                'TAGLINE',
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.10,
-                  color: CkColors.muted,
+              for (final type in TeamType.values)
+                TcSelectTile(
+                  title: _typeLabel(type),
+                  selected: state.type == type,
+                  onTap: () => controller.setType(type),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '· optional',
-                style: CkType.body(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: CkColors.soft,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${state.tagline.length}/60',
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0,
-                  color: CkColors.muted,
-                ),
-              ),
             ],
           ),
-        ),
-        TcInput(
-          value: state.tagline,
-          onChanged: controller.setTagline,
-          maxLength: 60,
-          placeholder: 'e.g. Roar with the Lions.',
-          textStyle: CkType.display(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            letterSpacing: -0.01,
-          ).copyWith(
-            fontStyle:
-                state.tagline.isEmpty ? FontStyle.italic : FontStyle.normal,
+          const SizedBox(height: 22),
+          const TcLabel('Founded year'),
+          TcInput(
+            value: state.foundedYear ?? '',
+            onChanged: controller.setFoundedYear,
+            placeholder: 'Optional · e.g. 2022',
+            keyboardType: TextInputType.number,
+            maxLength: 4,
+            hasError: state.foundedYearError != null,
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            'A short motto. Shows on your team page and scorecards.',
-            style: CkType.body(fontSize: 11, color: CkColors.muted),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TypeGrid extends StatelessWidget {
-  const _TypeGrid({required this.value, required this.onChanged});
-  final TeamType value;
-  final ValueChanged<TeamType> onChanged;
-
-  static const _options = <(TeamType, String, String)>[
-    (TeamType.club, 'Club', 'Persistent club with branding'),
-    (TeamType.village, 'Village', 'Mohalla / community team'),
-    (TeamType.casual, 'Casual', 'One-off for a tournament'),
-    (TeamType.corporate, 'Corporate', 'Office / department'),
-    (TeamType.school, 'School', 'School team'),
-    (TeamType.university, 'University', 'Uni team'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 3,
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      childAspectRatio: 1.05,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      children: [
-        for (final opt in _options)
-          _TypeTile(
-            label: opt.$2,
-            subtitle: opt.$3,
-            selected: value == opt.$1,
-            onTap: () => onChanged(opt.$1),
-          ),
-      ],
-    );
-  }
-}
-
-class _TypeTile extends StatelessWidget {
-  const _TypeTile({
-    required this.label,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-  });
-  final String label;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
-        decoration: BoxDecoration(
-          color: selected ? CkColors.paper : CkColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? CkColors.ink : CkColors.hairline,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
+          if (state.foundedYearError != null) ...[
+            const SizedBox(height: 5),
             Text(
-              label,
-              style: CkType.display(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.01,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              subtitle,
-              style: CkType.body(
-                fontSize: 10,
-                color: CkColors.muted,
-                height: 1.3,
-              ),
+              state.foundedYearError!,
+              style: CkType.body(fontSize: 11, color: CkColors.red),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PrivacyToggle extends StatelessWidget {
-  const _PrivacyToggle({required this.value, required this.onChanged});
-  final TeamPrivacy value;
-  final ValueChanged<TeamPrivacy> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (final p in TeamPrivacy.values) ...[
-          if (p != TeamPrivacy.values.first) const SizedBox(width: 6),
-          Expanded(
-            child: _PrivacyBtn(privacy: p, value: value, onChanged: onChanged),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _PrivacyBtn extends StatelessWidget {
-  const _PrivacyBtn({
-    required this.privacy,
-    required this.value,
-    required this.onChanged,
-  });
-  final TeamPrivacy privacy;
-  final TeamPrivacy value;
-  final ValueChanged<TeamPrivacy> onChanged;
-
-  String get _label => privacy == TeamPrivacy.public ? 'Public' : 'Private';
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = value == privacy;
-    return InkWell(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onChanged(privacy);
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 49,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? CkColors.paper : CkColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? CkColors.ink : CkColors.hairline,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Text(
-          _label,
-          style: CkType.body(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: CkColors.ink,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrivacyExplainer extends StatelessWidget {
-  const _PrivacyExplainer({required this.privacy});
-  final TeamPrivacy privacy;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: CkColors.paper2,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 1),
-            child: Icon(Icons.info_outline, size: 16, color: CkColors.ink2),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: CkType.body(
-                  fontSize: 11,
-                  color: CkColors.ink2,
-                  height: 1.4,
+          const SizedBox(height: 22),
+          const TcLabel('Visibility'),
+          Row(
+            children: [
+              Expanded(
+                child: TcSelectTile(
+                  title: 'Public',
+                  subtitle: 'Discoverable',
+                  selected: state.privacy == TeamPrivacy.public,
+                  leading: const Icon(Icons.public_rounded, size: 20),
+                  onTap: () => controller.setPrivacy(TeamPrivacy.public),
                 ),
-                children: [
-                  TextSpan(
-                    text: 'Private',
-                    style: CkType.body(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: CkColors.ink,
-                    ),
-                  ),
-                  const TextSpan(
-                    text:
-                        ' teams hide their roster from non-members and are invite-only. You can change this later.',
-                  ),
-                ],
               ),
-            ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TcSelectTile(
+                  title: 'Private',
+                  subtitle: 'Invite-only',
+                  selected: state.privacy == TeamPrivacy.private,
+                  leading: const Icon(Icons.lock_outline_rounded, size: 20),
+                  onTap: () => controller.setPrivacy(TeamPrivacy.private),
+                ),
+              ),
+            ],
           ),
         ],
-      ),
-    );
-  }
+      );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Step 02 — Identity: live preview + primary + secondary swatches + monogram.
-// ─────────────────────────────────────────────────────────────────────────
-
-class _StepIdentity extends StatelessWidget {
-  const _StepIdentity({required this.state, required this.controller});
+class _Identity extends StatelessWidget {
+  const _Identity({required this.state, required this.controller});
   final TeamCreateState state;
   final TeamCreateController controller;
 
   @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 18),
-            child: Text(
-              'Your colors.',
-              style: CkType.display(
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.025,
-                height: 1.1,
-              ),
-            ),
+          const _StepTitle('Give it a voice.'),
+          const TcLabel('Tagline'),
+          TcInput(
+            value: state.tagline,
+            onChanged: controller.setTagline,
+            placeholder: 'Optional · e.g. One team, one dream',
+            maxLength: 80,
           ),
-          _LivePreview(state: state),
           const SizedBox(height: 22),
-          const TcLabel('Primary'),
+          const TcLabel('Primary colour'),
           TcColorGrid(
             palette: kTeamCreatePalette,
             value: state.primaryColor,
             onChanged: controller.setPrimaryColor,
           ),
-          const SizedBox(height: 18),
-          const TcLabel('Secondary / accent'),
+          const SizedBox(height: 22),
+          const TcLabel('Secondary colour'),
           TcColorGrid(
             palette: kTeamCreatePalette,
             value: state.secondaryColor,
             onChanged: controller.setSecondaryColor,
           ),
-          const SizedBox(height: 14),
-          const TcLabel('Monogram'),
-          TcInput(
-            value: state.monogram,
-            onChanged: controller.setMonogram,
-            maxLength: 3,
-            textAlign: TextAlign.center,
-            maxWidth: 120,
-            textStyle: CkType.display(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.02,
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: CkColors.hairline),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: parseHexColor(state.primaryColor),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    state.monogram,
+                    style: CkType.display(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: onColor(parseHexColor(state.primaryColor)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        state.name.trim().isEmpty ? 'Your team' : state.name,
+                        style: CkType.display(fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                      if (state.tagline.trim().isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          '“${state.tagline.trim()}”',
+                          style: CkType.body(fontSize: 12, color: CkColors.muted)
+                              .copyWith(fontStyle: FontStyle.italic),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
-      ),
-    );
-  }
+      );
 }
 
-class _LivePreview extends StatelessWidget {
-  const _LivePreview({required this.state});
+class _Home extends StatelessWidget {
+  const _Home({required this.state, required this.controller});
   final TeamCreateState state;
+  final TeamCreateController controller;
 
   @override
-  Widget build(BuildContext context) {
-    final primary = parseHexColor(state.primaryColor, fallback: CkColors.ink);
-    final secondary = parseHexColor(
-      state.secondaryColor,
-      fallback: CkColors.paper,
-    );
-    final fg = onColor(primary);
-
-    return Container(
-      height: 168,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: primary,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
         children: [
-          // Faint pitch motif bottom-right.
-          Positioned(
-            right: -40,
-            bottom: -44,
-            child: Opacity(
-              opacity: 0.18,
-              child: CustomPaint(
-                size: const Size(200, 200),
-                painter: _PitchMotif(stroke: fg),
-              ),
+          const _StepTitle('Where do you play?'),
+          const TcLabel('City / locality'),
+          TcInput(
+            value: state.city,
+            onChanged: controller.setCity,
+            placeholder: 'e.g. Lahore',
+            hasError: !state.canContinueHome && state.city.isNotEmpty,
+          ),
+          const SizedBox(height: 16),
+          const TcLabel('Area'),
+          TcInput(
+            value: state.area,
+            onChanged: controller.setArea,
+            placeholder: 'Optional · e.g. Johar Town',
+          ),
+          const SizedBox(height: 16),
+          const TcLabel('Home ground'),
+          TcInput(
+            value: state.homeGround,
+            onChanged: controller.setHomeGround,
+            placeholder: 'Optional',
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.place_outlined, size: 19, color: CkColors.muted),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Location helps nearby cricketers discover public teams. '
+                    'Private teams remain invite-only.',
+                    style: CkType.body(fontSize: 12, height: 1.4, color: CkColors.muted),
+                  ),
+                ),
+              ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      );
+}
+
+class _Crest extends StatelessWidget {
+  const _Crest({required this.state, required this.controller});
+  final TeamCreateState state;
+  final TeamCreateController controller;
+
+  Future<void> _pickLogo(BuildContext context) async {
+    final file = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 90,
+    );
+    if (file == null) return;
+    final size = await File(file.path).length();
+    if (!context.mounted) return;
+    if (size > 2 * 1024 * 1024) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Logo must be 2 MB or smaller.')),
+      );
+      return;
+    }
+    controller.setLogo(url: file.path, name: file.name, size: size);
+  }
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+        children: [
+          const _StepTitle('Choose your crest.'),
+          Center(
+            child: TcCrestPreview(
+              crestKind: state.crestKind,
+              primaryHex: state.primaryColor,
+              monogram: state.monogram,
+              logoPath: state.logoUrl,
+              size: 132,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const TcLabel('Style'),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            childAspectRatio: 2.2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
             children: [
-              Row(
+              for (final kind in CrestKind.values)
+                TcSelectTile(
+                  title: _crestLabel(kind),
+                  selected: state.crestKind == kind,
+                  onTap: () {
+                    if (kind == CrestKind.upload) {
+                      _pickLogo(context);
+                    } else {
+                      controller.setCrestKind(kind);
+                    }
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          if (state.crestKind != CrestKind.upload) ...[
+            const TcLabel('Monogram'),
+            TcInput(
+              value: state.monogramOverride ?? '',
+              onChanged: controller.setMonogram,
+              placeholder: state.monogram,
+              maxLength: 3,
+              textAlign: TextAlign.center,
+              textStyle: CkType.display(fontSize: 22, fontWeight: FontWeight.w800),
+            ),
+          ] else if (state.logoUrl != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: CkColors.paper2,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.image_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      state.logoName ?? 'Selected logo',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _pickLogo(context),
+                    child: const Text('Change'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      );
+}
+
+class _Review extends StatelessWidget {
+  const _Review({
+    required this.state,
+    required this.onEdit,
+    required this.onOwnership,
+  });
+  final TeamCreateState state;
+  final ValueChanged<TeamCreateStep> onEdit;
+  final VoidCallback onOwnership;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+        children: [
+          const _StepTitle('Ready to take the field?'),
+          Center(
+            child: TcCrestPreview(
+              crestKind: state.crestKind,
+              primaryHex: state.primaryColor,
+              monogram: state.monogram,
+              logoPath: state.logoUrl,
+              size: 104,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            state.name.trim(),
+            textAlign: TextAlign.center,
+            style: CkType.display(fontSize: 24, fontWeight: FontWeight.w700),
+          ),
+          if (state.tagline.trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              '“${state.tagline.trim()}”',
+              textAlign: TextAlign.center,
+              style: CkType.body(fontSize: 13, color: CkColors.muted)
+                  .copyWith(fontStyle: FontStyle.italic),
+            ),
+          ],
+          const SizedBox(height: 24),
+          Container(
+            decoration: BoxDecoration(
+              color: CkColors.paper2,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: CkColors.hairline),
+            ),
+            child: Column(
+              children: [
+                _ReviewRow(
+                  label: 'BASICS',
+                  value: '${_typeLabel(state.type)} · ${state.privacy.wire}',
+                  first: true,
+                  onTap: () => onEdit(TeamCreateStep.basics),
+                ),
+                _ReviewRow(
+                  label: 'IDENTITY',
+                  value: 'Team colours · ${state.tagline.trim().isEmpty ? 'No tagline' : state.tagline.trim()}',
+                  onTap: () => onEdit(TeamCreateStep.identity),
+                ),
+                _ReviewRow(
+                  label: 'HOME',
+                  value: [
+                    state.combinedCity,
+                    if (state.homeGround.trim().isNotEmpty) state.homeGround.trim(),
+                  ].where((e) => e.isNotEmpty).join(' · '),
+                  onTap: () => onEdit(TeamCreateStep.home),
+                ),
+                _ReviewRow(
+                  label: 'CREST',
+                  value: _crestLabel(state.crestKind),
+                  onTap: () => onEdit(TeamCreateStep.crest),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          InkWell(
+            onTap: onOwnership,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: CkColors.paper2,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: secondary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    width: 36,
+                    height: 36,
                     alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: CkColors.ink,
+                      shape: BoxShape.circle,
+                    ),
                     child: Text(
-                      state.monogram,
+                      'YO',
                       style: CkType.display(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.02,
-                        color: onColor(secondary),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: CkColors.paper,
                       ),
                     ),
                   ),
@@ -1059,1632 +756,328 @@ class _LivePreview extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          state.name.trim().isEmpty
-                              ? 'Your team name'
-                              : state.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: CkType.display(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.02,
-                            color: fg,
-                          ),
+                          "You'll be the team owner",
+                          style: CkType.body(fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${state.type.label.toUpperCase()}'
-                          '${state.city.trim().isEmpty ? '' : ' · ${state.city.toUpperCase()}'}',
-                          style: CkType.mono(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.06,
-                            color: fg.withValues(alpha: 0.7),
-                          ),
+                          'You can add managers and transfer ownership later.',
+                          style: CkType.body(fontSize: 11, color: CkColors.muted),
                         ),
                       ],
                     ),
                   ),
+                  const Icon(Icons.info_outline, size: 16, color: CkColors.muted),
                 ],
               ),
-              if (state.tagline.trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 240),
-                    child: Text(
-                      '“${state.tagline}”',
-                      style: CkType.display(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: -0.01,
-                        height: 1.3,
-                        color: fg.withValues(alpha: 0.85),
-                      ).copyWith(fontStyle: FontStyle.italic),
-                    ),
-                  ),
-                ),
-              const Spacer(),
-              Text(
-                'PREVIEW · KIT',
-                style: CkType.mono(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.06,
-                  color: fg.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
+            ),
           ),
+          if (state.submitError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              state.submitError!,
+              style: CkType.body(fontSize: 12, color: CkColors.red),
+            ),
+          ],
         ],
-      ),
-    );
-  }
+      );
 }
 
-class _PitchMotif extends CustomPainter {
-  _PitchMotif({required this.stroke});
-  final Color stroke;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = stroke
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1;
-    final c = Offset(size.width / 2, size.height / 2);
-    canvas.drawOval(Rect.fromCenter(center: c, width: 190, height: 120), paint);
-    canvas.drawOval(Rect.fromCenter(center: c, width: 110, height: 68), paint);
-    canvas.drawRect(Rect.fromCenter(center: c, width: 32, height: 120), paint);
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
-}
-
-extension on TeamType {
-  String get label {
-    switch (this) {
-      case TeamType.club:
-        return 'Club';
-      case TeamType.village:
-        return 'Village';
-      case TeamType.casual:
-        return 'Casual';
-      case TeamType.corporate:
-        return 'Corporate';
-      case TeamType.school:
-        return 'School';
-      case TeamType.university:
-        return 'University';
-    }
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Step 03 — Home: city + area + ground + stripe-pattern map placeholder.
-// ─────────────────────────────────────────────────────────────────────────
-
-class _StepHome extends StatelessWidget {
-  const _StepHome({required this.state, required this.controller});
-  final TeamCreateState state;
-  final TeamCreateController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 6),
-            child: Text(
-              'Where do you play?',
-              style: CkType.display(
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.025,
-                height: 1.1,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 22),
-            child: Text(
-              'Shown on your team page and disambiguates teams with '
-              'similar names.',
-              style: CkType.body(
-                fontSize: 13,
-                color: CkColors.muted,
-                height: 1.4,
-              ),
-            ),
-          ),
-          // Free text, like the two fields below it. The team carries no
-          // coordinates out of this wizard, so it is findable by name and
-          // city string, not by distance.
-          const TcLabel('City or village'),
-          TcInput(
-            value: state.city,
-            onChanged: controller.setCity,
-            placeholder: 'Lahore, Hair, Chak 47…',
-          ),
-          const SizedBox(height: 14),
-          const TcLabel('Area / mohalla / locality'),
-          TcInput(
-            value: state.area,
-            onChanged: controller.setArea,
-            placeholder: 'Model Town',
-          ),
-          const SizedBox(height: 14),
-          const TcLabel('Home ground (optional)'),
-          TcInput(
-            value: state.homeGround,
-            onChanged: controller.setHomeGround,
-            placeholder: 'Gaddafi B Ground',
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 22),
-            child: Text(
-              'Free text — no need to be a registered venue.',
-              style: CkType.body(fontSize: 11, color: CkColors.muted),
-            ),
-          ),
-          _MapPlaceholder(state: state),
-        ],
-      ),
-    );
-  }
-}
-
-class _MapPlaceholder extends StatelessWidget {
-  const _MapPlaceholder({required this.state});
-  final TeamCreateState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasLocation =
-        state.area.trim().isNotEmpty || state.city.trim().isNotEmpty;
-    final lineCity =
-        hasLocation
-            ? [
-              state.area.trim(),
-              state.city.trim(),
-            ].where((s) => s.isNotEmpty).join(', ')
-            : '—';
-    return Container(
-      height: 132,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Stack(
-        children: [
-          CustomPaint(
-            painter: _StripePainter(),
-            size: const Size(double.infinity, double.infinity),
-          ),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.place, size: 22, color: CkColors.red),
-                const SizedBox(height: 6),
-                Text(
-                  lineCity,
-                  style: CkType.display(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.02,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'MAP PREVIEW',
-                  style: CkType.mono(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.06,
-                    color: CkColors.muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StripePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = CkColors.paper2;
-    const stripe = 8.0;
-    const period = 16.0;
-    // Draw 135deg stripes.
-    final diag = size.width + size.height;
-    for (var d = -size.height; d < diag; d += period) {
-      final path =
-          Path()
-            ..moveTo(d, 0)
-            ..lineTo(d + size.height, size.height)
-            ..lineTo(d + size.height - stripe, size.height)
-            ..lineTo(d - stripe, 0)
-            ..close();
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Step 04 — Crest: upload OR three generated styles.
-// ─────────────────────────────────────────────────────────────────────────
-
-class _StepCrest extends StatelessWidget {
-  const _StepCrest({required this.state, required this.controller});
-  final TeamCreateState state;
-  final TeamCreateController controller;
-
-  bool get _hasLogo =>
-      state.crestKind == CrestKind.upload &&
-      (state.logoUrl?.isNotEmpty ?? false);
-
-  Future<void> _pickLogo(BuildContext context) async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 512,
-      maxHeight: 512,
-    );
-    if (file == null) return;
-    final size = await File(file.path).length();
-    if (size > 2 * 1024 * 1024) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Max 2 MB. Crop or compress and try again.'),
-          ),
-        );
-      }
-      return;
-    }
-    controller.setLogo(url: file.path, name: file.name, size: size);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 6),
-            child: Text(
-              'Set a crest.',
-              style: CkType.display(
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.025,
-                height: 1.1,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 18),
-            child: Text(
-              "Upload your club's logo if you have one, or pick a generated "
-              'style.',
-              style: CkType.body(
-                fontSize: 13,
-                color: CkColors.muted,
-                height: 1.4,
-              ),
-            ),
-          ),
-
-          // Big preview centred.
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 22),
-              child: TcCrestPreview(
-                crestKind: state.crestKind,
-                primaryHex: state.primaryColor,
-                monogram: state.monogram,
-                logoPath: state.logoUrl,
-              ),
-            ),
-          ),
-
-          const TcLabel('Your logo'),
-          _hasLogo
-              ? _UploadedRow(
-                state: state,
-                onReplace: () => _pickLogo(context),
-                onRemove: controller.removeLogo,
-              )
-              : _UploadPrompt(onTap: () => _pickLogo(context)),
-          const SizedBox(height: 18),
-          _Divider(hasLogo: _hasLogo),
-          const SizedBox(height: 12),
-          _GeneratedStyles(state: state, controller: controller, dim: _hasLogo),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: CkColors.paper2,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              _hasLogo
-                  ? "Your uploaded logo will appear on scorecards, team pages "
-                      "and the bracket. We'll auto-tint it to your team colors "
-                      'where contrast is needed.'
-                  : 'Crest auto-syncs with your team colors. You can replace '
-                      'it with an upload anytime.',
-              style: CkType.body(
-                fontSize: 11,
-                color: CkColors.ink2,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _UploadPrompt extends StatelessWidget {
-  const _UploadPrompt({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: _DottedBorderBox(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: CkColors.paper,
-                  borderRadius: BorderRadius.circular(9),
-                  border: Border.all(color: CkColors.hairline),
-                ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.file_upload_outlined,
-                  size: 18,
-                  color: CkColors.ink,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Upload a logo',
-                      style: CkType.display(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.01,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'PNG, JPG or SVG · max 2 MB · transparent background '
-                      'recommended',
-                      style: CkType.body(
-                        fontSize: 11,
-                        color: CkColors.muted,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _UploadedRow extends StatelessWidget {
-  const _UploadedRow({
-    required this.state,
-    required this.onReplace,
-    required this.onRemove,
-  });
-  final TeamCreateState state;
-  final VoidCallback onReplace;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: CkColors.paper2,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: CkColors.hairline),
-            ),
-            clipBehavior: Clip.antiAlias,
-            padding: const EdgeInsets.all(4),
-            child:
-                state.logoUrl == null
-                    ? const SizedBox.shrink()
-                    : Image.file(File(state.logoUrl!), fit: BoxFit.contain),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        state.logoName ?? 'team-logo.png',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: CkType.body(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: CkColors.greenSoft,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'UPLOADED',
-                        style: CkType.mono(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.08,
-                          color: CkInk.green,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${state.logoSize == null ? '—' : '${(state.logoSize! / 1024).round()} KB'} '
-                  '· auto-cropped square',
-                  style: CkType.mono(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.04,
-                    color: CkColors.muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          _GhostBtn(label: 'Replace', onTap: onReplace),
-          const SizedBox(width: 6),
-          InkWell(
-            onTap: onRemove,
-            borderRadius: BorderRadius.circular(7),
-            child: Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: CkColors.paper,
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: CkColors.hairline),
-              ),
-              child: const Icon(Icons.close, size: 13, color: CkColors.muted),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GhostBtn extends StatelessWidget {
-  const _GhostBtn({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(7),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.circular(7),
-          border: Border.all(color: CkColors.hairline),
-        ),
-        child: Text(
-          label,
-          style: CkType.body(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: CkColors.ink,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Divider extends StatelessWidget {
-  const _Divider({required this.hasLogo});
-  final bool hasLogo;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Container(height: 1, color: CkColors.hairline)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(
-            hasLogo ? 'OR GENERATE ONE' : 'OR USE A GENERATED CREST',
-            style: CkType.mono(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.10,
-              color: CkColors.muted,
-            ),
-          ),
-        ),
-        Expanded(child: Container(height: 1, color: CkColors.hairline)),
-      ],
-    );
-  }
-}
-
-class _GeneratedStyles extends StatelessWidget {
-  const _GeneratedStyles({
-    required this.state,
-    required this.controller,
-    required this.dim,
-  });
-  final TeamCreateState state;
-  final TeamCreateController controller;
-  final bool dim;
-
-  static const _kinds = [
-    (CrestKind.monogram, 'Monogram'),
-    (CrestKind.initials, 'Initials'),
-    (CrestKind.shield, 'Shield'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 3,
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      childAspectRatio: 1.1,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      children: [
-        for (final entry in _kinds)
-          TcSelectTile(
-            title: entry.$2,
-            selected: !dim && state.crestKind == entry.$1,
-            dim: dim,
-            onTap: () => controller.setCrestKind(entry.$1),
-            leading: TcCrestPreview(
-              crestKind: entry.$1,
-              primaryHex: state.primaryColor,
-              monogram: state.monogram,
-              size: 26,
-              radius: 7,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// Dashed-border rectangle for the upload prompt.
-class _DottedBorderBox extends StatelessWidget {
-  const _DottedBorderBox({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _DashedRectPainter(),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          decoration: const BoxDecoration(color: CkColors.paper2),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-class _DashedRectPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = CkColors.soft
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5;
-    final rrect = RRect.fromRectAndRadius(
-      Offset.zero & size,
-      const Radius.circular(12),
-    );
-    final path = Path()..addRRect(rrect);
-    for (final m in path.computeMetrics()) {
-      var d = 0.0;
-      while (d < m.length) {
-        canvas.drawPath(m.extractPath(d, (d + 5).clamp(0, m.length)), paint);
-        d += 9;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Step 05 — Review: hero card + summary rows that jump back to their step,
-// owner block, terms blurb.
-// ─────────────────────────────────────────────────────────────────────────
-
-class _StepReview extends StatelessWidget {
-  const _StepReview({
-    required this.state,
-    required this.onJump,
-    required this.onOwnershipTap,
-  });
-
-  final TeamCreateState state;
-  final ValueChanged<TeamCreateStep> onJump;
-
-  /// Tapping the owner block opens the ownership briefing overlay.
-  final VoidCallback onOwnershipTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 4),
-            child: Text(
-              'Looks good?',
-              style: CkType.display(
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.025,
-                height: 1.1,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 22),
-            child: Text(
-              'Tap any row to jump back and edit.',
-              style: CkType.body(
-                fontSize: 13,
-                color: CkColors.muted,
-                height: 1.4,
-              ),
-            ),
-          ),
-          _HeroCard(state: state),
-          const SizedBox(height: 14),
-          _SummaryList(state: state, onJump: onJump),
-          const SizedBox(height: 16),
-          _OwnerBlock(onTap: onOwnershipTap),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              "By creating this team you agree to Matchday's community "
-              "guidelines. You'll be able to add players from the team page "
-              'next.',
-              style: CkType.body(
-                fontSize: 11,
-                color: CkColors.muted,
-                height: 1.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({required this.state});
-  final TeamCreateState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = parseHexColor(state.primaryColor, fallback: CkColors.ink);
-    final secondary = parseHexColor(
-      state.secondaryColor,
-      fallback: CkColors.paper,
-    );
-    final fg = onColor(primary);
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: primary,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: secondary,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              state.monogram,
-              style: CkType.display(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.03,
-                color: onColor(secondary),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  state.name.trim().isEmpty ? 'Your team name' : state.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: CkType.display(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.025,
-                    height: 1.05,
-                    color: fg,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _eyebrow(state),
-                  style: CkType.mono(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.06,
-                    color: fg.withValues(alpha: 0.8),
-                  ),
-                ),
-                if (state.tagline.trim().isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 260),
-                    child: Text(
-                      '“${state.tagline}”',
-                      style: CkType.display(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: -0.01,
-                        height: 1.35,
-                        color: fg.withValues(alpha: 0.9),
-                      ).copyWith(fontStyle: FontStyle.italic),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _eyebrow(TeamCreateState s) {
-    final parts = <String>[s.type.wire.toUpperCase()];
-    final loc =
-        [
-          s.area,
-          s.city,
-        ].where((p) => p.trim().isNotEmpty).join(', ').toUpperCase();
-    if (loc.isNotEmpty) parts.add(loc);
-    if ((s.foundedYear ?? '').trim().isNotEmpty) {
-      parts.add('EST. ${s.foundedYear}');
-    }
-    return parts.join(' · ');
-  }
-}
-
-class _SummaryList extends StatelessWidget {
-  const _SummaryList({required this.state, required this.onJump});
-  final TeamCreateState state;
-  final ValueChanged<TeamCreateStep> onJump;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: CkColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Column(
-        children: [
-          _SummaryRow(
-            label: 'BASICS',
-            value: Text(
-              [
-                state.name.trim().isEmpty ? 'Unnamed' : state.name,
-                state.type.wire,
-                state.privacy.wire,
-                'est. ${(state.foundedYear ?? '').trim().isEmpty ? '—' : state.foundedYear}',
-              ].join(' · '),
-              style: CkType.body(fontSize: 13.5, fontWeight: FontWeight.w500),
-            ),
-            onTap: () => onJump(TeamCreateStep.basics),
-            isFirst: true,
-          ),
-          if (state.tagline.trim().isNotEmpty)
-            _SummaryRow(
-              label: 'TAGLINE',
-              value: Text(
-                '“${state.tagline}”',
-                style: CkType.display(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: -0.01,
-                ).copyWith(fontStyle: FontStyle.italic),
-              ),
-              onTap: () => onJump(TeamCreateStep.basics),
-            ),
-          _SummaryRow(
-            label: 'IDENTITY',
-            value: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _Swatch(hex: state.primaryColor),
-                const SizedBox(width: 6),
-                _Swatch(hex: state.secondaryColor),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    'Monogram "${state.monogram}"',
-                    overflow: TextOverflow.ellipsis,
-                    style: CkType.body(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            onTap: () => onJump(TeamCreateStep.identity),
-          ),
-          _SummaryRow(
-            label: 'HOME',
-            value: Text(
-              [
-                [
-                  state.area,
-                  state.city,
-                ].where((p) => p.trim().isNotEmpty).join(', '),
-                if (state.homeGround.trim().isNotEmpty) state.homeGround,
-              ].where((s) => s.isNotEmpty).join(' · '),
-              style: CkType.body(fontSize: 13.5, fontWeight: FontWeight.w500),
-            ),
-            onTap: () => onJump(TeamCreateStep.home),
-          ),
-          _SummaryRow(
-            label: 'CREST',
-            value: Text(
-              state.crestKind == CrestKind.upload && state.logoUrl != null
-                  ? 'Logo uploaded · ${state.logoName ?? 'logo'}'
-                  : '${_kindLabel(state.crestKind)} style · auto-synced colors',
-              style: CkType.body(fontSize: 13.5, fontWeight: FontWeight.w500),
-            ),
-            onTap: () => onJump(TeamCreateStep.crest),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _kindLabel(CrestKind k) {
-    switch (k) {
-      case CrestKind.monogram:
-        return 'Monogram';
-      case CrestKind.initials:
-        return 'Initials';
-      case CrestKind.shield:
-        return 'Shield';
-      case CrestKind.upload:
-        return 'Upload';
-    }
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({
+class _ReviewRow extends StatelessWidget {
+  const _ReviewRow({
     required this.label,
     required this.value,
     required this.onTap,
-    this.isFirst = false,
+    this.first = false,
   });
   final String label;
-  final Widget value;
+  final String value;
   final VoidCallback onTap;
-  final bool isFirst;
+  final bool first;
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          border:
-              isFirst
-                  ? null
-                  : const Border(top: BorderSide(color: CkColors.hairline)),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 78,
-              child: Text(
-                label,
-                style: CkType.mono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.10,
-                  color: CkColors.muted,
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            border: first ? null : const Border(top: BorderSide(color: CkColors.hairline)),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 78,
+                child: Text(
+                  label,
+                  style: CkType.mono(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: .10,
+                    color: CkColors.muted,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: value),
-            const SizedBox(width: 8),
-            const Icon(Icons.east, size: 14, color: CkColors.muted),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Swatch extends StatelessWidget {
-  const _Swatch({required this.hex});
-  final String hex;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 16,
-      height: 16,
-      decoration: BoxDecoration(
-        color: parseHexColor(hex, fallback: CkColors.ink),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: CkColors.hairline),
-      ),
-    );
-  }
-}
-
-class _OwnerBlock extends StatelessWidget {
-  const _OwnerBlock({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: CkColors.paper2,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: CkColors.ink,
-                shape: BoxShape.circle,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: CkType.body(fontSize: 13.5, fontWeight: FontWeight.w500),
+                ),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                'YO',
+              const SizedBox(width: 8),
+              const Icon(Icons.east, size: 14, color: CkColors.muted),
+            ],
+          ),
+        ),
+      );
+}
+
+class _DoneView extends StatelessWidget {
+  const _DoneView({required this.state});
+  final TeamCreateState state;
+
+  @override
+  Widget build(BuildContext context) {
+    void openTeam() => context.pushReplacement('/teams/${state.createdTeamId}');
+
+    return Column(
+      children: [
+        Align(
+          alignment: Alignment.topRight,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 12, top: 8),
+            child: IconButton(
+              onPressed: openTeam,
+              icon: const Icon(Icons.close_rounded, color: CkColors.ink),
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+            children: [
+              Center(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    TcCrestPreview(
+                      crestKind: state.crestKind,
+                      primaryHex: state.primaryColor,
+                      monogram: state.monogram,
+                      logoPath: state.logoUrl,
+                      size: 130,
+                    ),
+                    Positioned(
+                      right: 2,
+                      bottom: 2,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: CkColors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: CkColors.paper, width: 3),
+                        ),
+                        child: const Icon(Icons.check_rounded, size: 18, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                '${state.name.trim().isEmpty ? 'Your team' : state.name} is live.',
+                textAlign: TextAlign.center,
                 style: CkType.display(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.03,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -.025,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "You're all set as the team owner.",
+                textAlign: TextAlign.center,
+                style: CkType.body(fontSize: 15, color: CkColors.muted),
+              ),
+              if (state.logoUploadError != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  state.logoUploadError!,
+                  textAlign: TextAlign.center,
+                  style: CkType.body(fontSize: 12, color: CkColors.red),
+                ),
+              ],
+              const SizedBox(height: 28),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: CkColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: CkColors.line),
+                ),
+                child: Column(
+                  children: [
+                    _ReceiptRow('Type & visibility', '${_typeLabel(state.type)} · ${state.privacy.wire}'),
+                    if (state.combinedCity.isNotEmpty)
+                      _ReceiptRow('Location', state.combinedCity),
+                    _ReceiptRow('Crest', _crestLabel(state.crestKind)),
+                    const _ReceiptRow('Your role', 'Team Owner', last: true),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: CkColors.hairline)),
+          ),
+          child: InkWell(
+            onTap: openTeam,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              height: 52,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: CkColors.ink,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                'Open team page  →',
+                style: CkType.body(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                   color: CkColors.paper,
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "You'll be the team owner",
-                    style: CkType.body(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'You can add co-managers and transfer ownership later.',
-                    style: CkType.body(fontSize: 11, color: CkColors.muted),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(Icons.info_outline, size: 16, color: CkColors.muted),
-          ],
+          ),
         ),
-      ),
+      ],
     );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Done screen sub-widgets — confetti hero crest, receipt, next-steps stack.
-// ─────────────────────────────────────────────────────────────────────────
-
-class _Receipt extends StatelessWidget {
-  const _Receipt({required this.state});
-  final TeamCreateState state;
-
-  static String _capitalize(String s) {
-    if (s.isEmpty) return s;
-    return s[0].toUpperCase() + s.substring(1).toLowerCase();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final locationParts = [
-      state.area,
-      state.city,
-    ].where((p) => p.trim().isNotEmpty).toList();
-    final locationText = locationParts.isNotEmpty
-        ? locationParts.join(', ')
-        : (state.locationLabel?.trim().isNotEmpty == true
-            ? state.locationLabel!.trim()
-            : '');
-
-    final typeFormatted = _capitalize(state.type.wire);
-    final privacyFormatted = _capitalize(state.privacy.wire);
-    final crestFormatted = state.crestKind == CrestKind.upload
-        ? 'Custom crest'
-        : '${_kindLabel(state.crestKind)} style';
-
-    return Container(
-      decoration: BoxDecoration(
-        color: CkColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: CkColors.line),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            offset: const Offset(0, 4),
-            blurRadius: 16,
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-      child: Column(
-        children: [
-          _ReceiptRow(
-            icon: Icons.shield_outlined,
-            label: 'Type & Visibility',
-            detail: '$typeFormatted · $privacyFormatted',
-            isFirst: true,
-          ),
-          if (locationText.isNotEmpty)
-            _ReceiptRow(
-              icon: Icons.place_outlined,
-              label: 'Location',
-              detail: locationText,
-            ),
-          _ReceiptRow(
-            icon: Icons.palette_outlined,
-            label: 'Crest',
-            detail: crestFormatted,
-          ),
-          const _ReceiptRow(
-            icon: Icons.verified_user_outlined,
-            label: 'Your role',
-            detail: 'Team Owner',
-            isLast: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _kindLabel(CrestKind k) {
-    switch (k) {
-      case CrestKind.monogram:
-        return 'Monogram';
-      case CrestKind.initials:
-        return 'Initials';
-      case CrestKind.shield:
-        return 'Shield';
-      case CrestKind.upload:
-        return 'Upload';
-    }
   }
 }
 
 class _ReceiptRow extends StatelessWidget {
-  const _ReceiptRow({
-    required this.icon,
-    required this.label,
-    required this.detail,
-    this.isFirst = false,
-    this.isLast = false,
-  });
-
-  final IconData icon;
+  const _ReceiptRow(this.label, this.value, {this.last = false});
   final String label;
-  final String detail;
-  final bool isFirst;
-  final bool isLast;
+  final String value;
+  final bool last;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : const Border(bottom: BorderSide(color: CkColors.hairline)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 18,
-            color: CkColors.muted,
-          ),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: CkType.body(
-              fontSize: 14,
-              color: CkColors.ink2,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            detail,
-            style: CkType.body(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: CkColors.ink,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          border: last ? null : const Border(bottom: BorderSide(color: CkColors.hairline)),
+        ),
+        child: Row(
+          children: [
+            Expanded(child: Text(label, style: CkType.body(fontSize: 13, color: CkColors.ink2))),
+            Text(value, style: CkType.body(fontSize: 13, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Bottom-sheet overlays (Save & Exit, Ownership briefing).
-// ─────────────────────────────────────────────────────────────────────────
+class _StepTitle extends StatelessWidget {
+  const _StepTitle(this.text);
+  final String text;
 
-/// Save & exit bottom sheet (Guard B from the design source).
-/// Three actions: save draft + exit, keep going, discard.
-Future<void> _showSaveExitSheet(
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 18),
+        child: Text(
+          text,
+          style: CkType.display(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -.025,
+            height: 1.1,
+          ),
+        ),
+      );
+}
+
+Future<void> _showSaveExit(
   BuildContext context, {
   required int step,
-  required int totalSteps,
-  required VoidCallback onSaveAndExit,
-  required VoidCallback onDiscard,
-}) {
-  return showModalBottomSheet<void>(
+  required int total,
+  required Future<void> Function() onDiscard,
+}) async {
+  final action = await showModalBottomSheet<String>(
     context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder:
-        (_) => _SheetShell(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _Grab(),
-                const SizedBox(height: 12),
-                Text(
-                  'Save your draft?',
-                  style: CkType.display(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.025,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "You're on step $step of $totalSteps. We'll keep your draft "
-                  'under Pavilion → Drafts so you can pick up where you left off.',
-                  style: CkType.body(
-                    fontSize: 13,
-                    color: CkColors.muted,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                _SheetBtn(
-                  label: 'Save draft & exit',
-                  primary: true,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    onSaveAndExit();
-                  },
-                ),
-                const SizedBox(height: 8),
-                _SheetBtn(
-                  label: 'Keep going',
-                  onTap: () => Navigator.of(context).pop(),
-                ),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    onDiscard();
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Center(
-                      child: Text(
-                        'Discard changes',
-                        style: CkType.body(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: CkColors.red,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+    backgroundColor: CkColors.paper,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: CkColors.line, borderRadius: BorderRadius.circular(4)),
+              ),
             ),
-          ),
+            const SizedBox(height: 14),
+            Text(
+              'Save your draft?',
+              style: CkType.display(fontSize: 22, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              "You're on step $step of $total. Your draft is saved automatically on this device.",
+              style: CkType.body(fontSize: 13, color: CkColors.muted, height: 1.45),
+            ),
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: () => Navigator.pop(sheetContext, 'exit'),
+              child: const Text('Save draft & exit'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(sheetContext, 'continue'),
+              child: const Text('Keep going'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(sheetContext, 'discard'),
+              child: const Text('Discard changes', style: TextStyle(color: CkColors.red)),
+            ),
+          ],
         ),
+      ),
+    ),
   );
-}
 
-/// Ownership briefing bottom sheet (Guard C).
-/// Tabular capability list — what owners can do that members/managers can't.
-Future<void> _showOwnershipSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder:
-        (_) => _SheetShell(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _Grab(),
-                const SizedBox(height: 12),
-                Text(
-                  "What it means to own a team",
-                  style: CkType.display(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.025,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'A quick rundown of what you can do — and what you share with '
-                  'co-managers and players.',
-                  style: CkType.body(
-                    fontSize: 13,
-                    color: CkColors.muted,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const _CapabilityHeader(),
-                const _CapRow(
-                  label: 'Edit team profile',
-                  owner: true,
-                  manager: true,
-                  player: false,
-                ),
-                const _CapRow(
-                  label: 'Add & remove players',
-                  owner: true,
-                  manager: true,
-                  player: false,
-                ),
-                const _CapRow(
-                  label: 'Score matches',
-                  owner: true,
-                  manager: true,
-                  player: false,
-                ),
-                const _CapRow(
-                  label: 'Approve join requests',
-                  owner: true,
-                  manager: true,
-                  player: false,
-                ),
-                const _CapRow(
-                  label: 'Transfer ownership',
-                  owner: true,
-                  manager: false,
-                  player: false,
-                  irreversible: true,
-                ),
-                const _CapRow(
-                  label: 'Delete the team',
-                  owner: true,
-                  manager: false,
-                  player: false,
-                  irreversible: true,
-                ),
-                const SizedBox(height: 18),
-                _SheetBtn(
-                  label: 'Got it',
-                  primary: true,
-                  onTap: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-        ),
-  );
-}
-
-class _CapabilityHeader extends StatelessWidget {
-  const _CapabilityHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(child: SizedBox.shrink()),
-          _HeaderCell('OWNER'),
-          _HeaderCell('MANAGER'),
-          _HeaderCell('PLAYER'),
-        ],
-      ),
-    );
+  if (!context.mounted) return;
+  if (action == 'exit') {
+    context.pop();
+  } else if (action == 'discard') {
+    await onDiscard();
   }
 }
 
-class _HeaderCell extends StatelessWidget {
-  const _HeaderCell(this.label);
-  final String label;
+String _typeLabel(TeamType type) => switch (type) {
+      TeamType.club => 'Club',
+      TeamType.village => 'Village',
+      TeamType.casual => 'Casual',
+      TeamType.corporate => 'Corporate',
+      TeamType.school => 'School',
+      TeamType.university => 'University',
+    };
 
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 54,
-      child: Center(
-        child: Text(
-          label,
-          style: CkType.mono(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.10,
-            color: CkColors.muted,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CapRow extends StatelessWidget {
-  const _CapRow({
-    required this.label,
-    required this.owner,
-    required this.manager,
-    required this.player,
-    this.irreversible = false,
-  });
-  final String label;
-  final bool owner;
-  final bool manager;
-  final bool player;
-  final bool irreversible;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: CkType.body(fontSize: 13, fontWeight: FontWeight.w500),
-                ),
-                if (irreversible) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Irreversible',
-                    style: CkType.mono(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.08,
-                      color: CkColors.red,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          _CapCell(value: owner),
-          _CapCell(value: manager),
-          _CapCell(value: player),
-        ],
-      ),
-    );
-  }
-}
-
-class _CapCell extends StatelessWidget {
-  const _CapCell({required this.value});
-  final bool value;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 54,
-      child: Center(
-        child: Icon(
-          value ? Icons.check_rounded : Icons.remove,
-          size: 16,
-          color: value ? CkColors.green : CkColors.muted,
-        ),
-      ),
-    );
-  }
-}
-
-class _SheetShell extends StatelessWidget {
-  const _SheetShell({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      child: SafeArea(top: false, child: child),
-    );
-  }
-}
-
-class _Grab extends StatelessWidget {
-  const _Grab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 40,
-        height: 4,
-        decoration: BoxDecoration(
-          color: CkColors.line,
-          borderRadius: BorderRadius.circular(4),
-        ),
-      ),
-    );
-  }
-}
-
-class _SheetBtn extends StatelessWidget {
-  const _SheetBtn({
-    required this.label,
-    this.primary = false,
-    required this.onTap,
-  });
-  final String label;
-  final bool primary;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 48,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: primary ? CkColors.ink : CkColors.paper,
-          borderRadius: BorderRadius.circular(12),
-          border: primary ? null : Border.all(color: CkColors.hairline),
-        ),
-        child: Text(
-          label,
-          style: CkType.body(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: primary ? CkColors.paper : CkColors.ink,
-          ),
-        ),
-      ),
-    );
-  }
-}
+String _crestLabel(CrestKind kind) => switch (kind) {
+      CrestKind.monogram => 'Monogram',
+      CrestKind.initials => 'Initials',
+      CrestKind.shield => 'Shield',
+      CrestKind.upload => 'Upload logo',
+    };

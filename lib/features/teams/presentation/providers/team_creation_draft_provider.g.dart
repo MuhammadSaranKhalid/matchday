@@ -8,16 +8,9 @@ part of 'team_creation_draft_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Locally persisted create-team draft.
-///
-/// This provider belongs in presentation/providers, not inside a widget.
 
 @ProviderFor(teamCreationDraft)
 final teamCreationDraftProvider = TeamCreationDraftProvider._();
-
-/// Locally persisted create-team draft.
-///
-/// This provider belongs in presentation/providers, not inside a widget.
 
 final class TeamCreationDraftProvider
     extends
@@ -29,9 +22,6 @@ final class TeamCreationDraftProvider
     with
         $FutureModifier<Map<String, dynamic>?>,
         $StreamProvider<Map<String, dynamic>?> {
-  /// Locally persisted create-team draft.
-  ///
-  /// This provider belongs in presentation/providers, not inside a widget.
   TeamCreationDraftProvider._()
     : super(
         from: null,

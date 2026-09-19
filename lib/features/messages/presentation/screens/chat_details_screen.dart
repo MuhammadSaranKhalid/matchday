@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../safety/presentation/widgets/safety_menu.dart';
 import '../../../teams/domain/entities/roster_member.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/chat_channel.dart';
 import '../../domain/entities/chat_participant.dart';
 import '../providers/messages_providers.dart';

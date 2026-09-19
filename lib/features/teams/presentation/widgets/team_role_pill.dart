@@ -1,14 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../domain/entities/team_member.dart';
 
-/// Renders the roles that matter on a team-membership row.
-///
-/// PLAYER is intentionally implicit inside the "Teams you play for" section.
-/// CAPTAIN can coexist with OWNER or MANAGER, so both pills are shown when
-/// both roles are present.
 class TeamRolePills extends StatelessWidget {
   const TeamRolePills({
     super.key,
@@ -85,12 +79,7 @@ class _TeamRolePill extends StatelessWidget {
         color: spec.background,
         borderRadius: BorderRadius.circular(4),
         border:
-            spec.border == null
-                ? null
-                : Border.all(
-                    color: spec.border!,
-                    width: 1,
-                  ),
+            spec.border == null ? null : Border.all(color: spec.border!, width: 1),
       ),
       child: Text(
         spec.label,

@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../teams/domain/entities/team.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_request.dart';
 import '../state/challenges_view.dart';
@@ -19,10 +20,10 @@ part 'challenges_providers.g.dart';
 /// no row needs to shout."
 @riverpod
 Future<ChallengesView> challengesView(Ref ref) async {
-  // `myTeamsProvider` is a Stream; await the first event rather than reading
-  // `.value`, which would be empty on the first frame and silently produce an
-  // empty queue.
-  final teams = await ref.watch(myTeamsProvider.future);
+  // Memberships are a one-shot scoped read; no permanent team stream is kept.
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final teams = [for (final membership in memberships) membership.team];
   if (teams.isEmpty) return const ChallengesView.empty();
 
   final result = await ref.watch(matchesRepositoryProvider).listMyMatchChallenges();

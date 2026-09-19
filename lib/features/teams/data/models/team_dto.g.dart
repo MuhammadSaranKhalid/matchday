@@ -8,7 +8,7 @@ part of 'team_dto.dart';
 
 _TeamDto _$TeamDtoFromJson(Map<String, dynamic> json) => _TeamDto(
   teamId: json['team_id'] as String,
-  createdBy: json['created_by'] as String,
+  createdBy: json['created_by'] as String?,
   teamName: json['team_name'] as String,
   teamType: json['team_type'] as String,
   description: json['description'] as String?,
@@ -22,6 +22,7 @@ _TeamDto _$TeamDtoFromJson(Map<String, dynamic> json) => _TeamDto(
   logoMonogram: json['logo_monogram'] as String?,
   isVerified: json['is_verified'] as bool? ?? false,
   status: json['status'] as String? ?? 'active',
+  maxSquadSize: (json['max_squad_size'] as num?)?.toInt() ?? 25,
   createdAt: json['created_at'] as String,
   updatedAt: json['updated_at'] as String,
 );
@@ -42,6 +43,7 @@ Map<String, dynamic> _$TeamDtoToJson(_TeamDto instance) => <String, dynamic>{
   'logo_monogram': instance.logoMonogram,
   'is_verified': instance.isVerified,
   'status': instance.status,
+  'max_squad_size': instance.maxSquadSize,
   'created_at': instance.createdAt,
   'updated_at': instance.updatedAt,
 };

@@ -6,9 +6,11 @@ import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/value_objects/team_name.dart';
+import '../controllers/team_page_controller.dart';
+import '../controllers/teams_list_controller.dart';
 import '../providers/teams_providers.dart';
 
-/// Shows the bottom sheet to edit team details (and upload logo).
+/// Shows the existing Matchday bottom sheet to edit team details and logo.
 Future<bool?> showEditTeamSheet(BuildContext context, Team team) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -45,14 +47,14 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
   String? _error;
 
   static const _presetColors = [
-    '#2E7D32', // Forest Green
-    '#1565C0', // Navy Blue
-    '#C62828', // Crimson Red
-    '#6A1B9A', // Royal Purple
-    '#E65100', // Deep Orange
-    '#00838F', // Teal
-    '#29251E', // Pitch Black
-    '#4E342E', // Brown
+    '#2E7D32',
+    '#1565C0',
+    '#C62828',
+    '#6A1B9A',
+    '#E65100',
+    '#00838F',
+    '#29251E',
+    '#4E342E',
   ];
 
   @override
@@ -81,6 +83,12 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
     _homeGroundController.dispose();
     _monogramController.dispose();
     super.dispose();
+  }
+
+  void _invalidateTeamSurfaces() {
+    ref.invalidate(teamProvider(widget.team.id.value));
+    ref.invalidate(teamPageControllerProvider(widget.team.id.value));
+    ref.invalidate(teamsListControllerProvider);
   }
 
   Future<void> _pickAndUploadLogo() async {
@@ -115,28 +123,20 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
         SnackBar(content: Text('Failed to upload logo: ${f.message}')),
       ),
       (url) {
-        setState(() {
-          _currentLogoUrl = url;
-        });
-        ref.invalidate(teamProvider(widget.team.id.value));
-        ref.invalidate(myTeamsProvider);
-        ref.invalidate(allTeamsProvider);
+        setState(() => _currentLogoUrl = url);
+        _invalidateTeamSurfaces();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Team logo updated!')),
         );
       },
     );
-    if (mounted) {
-      setState(() => _isUploadingLogo = false);
-    }
+    if (mounted) setState(() => _isUploadingLogo = false);
   }
 
   Future<void> _handleSave() async {
     final nameRes = TeamName.create(_nameController.text.trim());
     if (nameRes.isLeft()) {
-      setState(() {
-        _error = nameRes.getLeft().toNullable()!.message;
-      });
+      setState(() => _error = nameRes.getLeft().toNullable()!.message);
       return;
     }
 
@@ -145,42 +145,36 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
       _error = null;
     });
 
-    final repo = ref.read(teamsRepositoryProvider);
-    final result = await repo.updateTeam(
-      teamId: widget.team.id,
-      name: nameRes.getRight().toNullable()!,
-      privacy: _privacy,
-      tagline: _taglineController.text.trim().isEmpty
-          ? null
-          : _taglineController.text.trim(),
-      description: _descriptionController.text.trim().isEmpty
-          ? null
-          : _descriptionController.text.trim(),
-      city: _cityController.text.trim().isEmpty
-          ? null
-          : _cityController.text.trim(),
-      homeGround: _homeGroundController.text.trim().isEmpty
-          ? null
-          : _homeGroundController.text.trim(),
-      logoMonogram: _monogramController.text.trim().isEmpty
-          ? null
-          : _monogramController.text.trim().toUpperCase(),
-      primaryColor: _primaryColor,
-    );
+    final result = await ref.read(teamsRepositoryProvider).updateTeam(
+          teamId: widget.team.id,
+          name: nameRes.getRight().toNullable()!,
+          privacy: _privacy,
+          tagline: _taglineController.text.trim().isEmpty
+              ? null
+              : _taglineController.text.trim(),
+          description: _descriptionController.text.trim().isEmpty
+              ? null
+              : _descriptionController.text.trim(),
+          city: _cityController.text.trim().isEmpty
+              ? null
+              : _cityController.text.trim(),
+          homeGround: _homeGroundController.text.trim().isEmpty
+              ? null
+              : _homeGroundController.text.trim(),
+          logoMonogram: _monogramController.text.trim().isEmpty
+              ? null
+              : _monogramController.text.trim().toUpperCase(),
+          primaryColor: _primaryColor,
+        );
 
     if (!mounted) return;
-
     result.fold(
-      (failure) {
-        setState(() {
-          _isSaving = false;
-          _error = failure.message;
-        });
-      },
-      (updatedTeam) {
-        ref.invalidate(teamProvider(widget.team.id.value));
-        ref.invalidate(myTeamsProvider);
-        ref.invalidate(allTeamsProvider);
+      (failure) => setState(() {
+        _isSaving = false;
+        _error = failure.message;
+      }),
+      (_) {
+        _invalidateTeamSurfaces();
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Team details updated successfully!')),
@@ -191,9 +185,7 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
 
   Color _parseHex(String hex) {
     final clean = hex.replaceAll('#', '');
-    if (clean.length == 6) {
-      return Color(int.parse('FF$clean', radix: 16));
-    }
+    if (clean.length == 6) return Color(int.parse('FF$clean', radix: 16));
     return CkColors.ink;
   }
 
@@ -211,7 +203,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Grab handle
               Center(
                 child: Container(
                   width: 36,
@@ -223,8 +214,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Title
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -243,8 +232,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                 ],
               ),
               const SizedBox(height: 14),
-
-              // Logo Uploader Avatar
               Center(
                 child: GestureDetector(
                   onTap: _isUploadingLogo ? null : _pickAndUploadLogo,
@@ -256,38 +243,33 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                         decoration: BoxDecoration(
                           color: _parseHex(_primaryColor),
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: CkColors.hairline,
-                            width: 2,
-                          ),
-                          image:
-                              (_currentLogoUrl != null &&
-                                      _currentLogoUrl!.isNotEmpty)
-                                  ? DecorationImage(
-                                    image: NetworkImage(_currentLogoUrl!),
-                                    fit: BoxFit.cover,
-                                  )
-                                  : null,
+                          border: Border.all(color: CkColors.hairline, width: 2),
+                          image: (_currentLogoUrl != null &&
+                                  _currentLogoUrl!.isNotEmpty)
+                              ? DecorationImage(
+                                  image: NetworkImage(_currentLogoUrl!),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
                         ),
                         alignment: Alignment.center,
-                        child:
-                            (_currentLogoUrl == null ||
-                                    _currentLogoUrl!.isEmpty)
-                                ? Text(
-                                  _monogramController.text.isNotEmpty
-                                      ? _monogramController.text
-                                      : widget.team.name.isNotEmpty
-                                      ? widget.team.name
-                                          .substring(0, 1)
-                                          .toUpperCase()
-                                      : 'T',
-                                  style: CkType.display(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
-                                )
-                                : null,
+                        child: (_currentLogoUrl == null ||
+                                _currentLogoUrl!.isEmpty)
+                            ? Text(
+                                _monogramController.text.isNotEmpty
+                                    ? _monogramController.text
+                                    : widget.team.name.isNotEmpty
+                                        ? widget.team.name
+                                            .substring(0, 1)
+                                            .toUpperCase()
+                                        : 'T',
+                                style: CkType.display(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : null,
                       ),
                       Positioned(
                         bottom: -2,
@@ -297,26 +279,22 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                           decoration: BoxDecoration(
                             color: CkColors.ink,
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: CkColors.surface,
-                              width: 2,
-                            ),
+                            border: Border.all(color: CkColors.surface, width: 2),
                           ),
-                          child:
-                              _isUploadingLogo
-                                  ? const SizedBox(
-                                    width: 12,
-                                    height: 12,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                  : const Icon(
-                                    Icons.camera_alt_rounded,
-                                    size: 13,
+                          child: _isUploadingLogo
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                     color: Colors.white,
                                   ),
+                                )
+                              : const Icon(
+                                  Icons.camera_alt_rounded,
+                                  size: 13,
+                                  color: Colors.white,
+                                ),
                         ),
                       ),
                     ],
@@ -338,7 +316,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                 ),
               ),
               const SizedBox(height: 18),
-
               if (_error != null) ...[
                 Container(
                   width: double.infinity,
@@ -357,8 +334,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                 ),
                 const SizedBox(height: 16),
               ],
-
-              // Team Name
               const _FieldLabel(label: 'TEAM NAME *'),
               TextField(
                 controller: _nameController,
@@ -366,8 +341,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                 decoration: _inputDec(hint: 'e.g. Lahore Lions'),
               ),
               const SizedBox(height: 16),
-
-              // Tagline & Monogram
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -387,7 +360,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    flex: 1,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -400,9 +372,7 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                           ),
-                          decoration: _inputDec(
-                            hint: 'LL',
-                          ).copyWith(counterText: ''),
+                          decoration: _inputDec(hint: 'LL').copyWith(counterText: ''),
                         ),
                       ],
                     ),
@@ -410,8 +380,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                 ],
               ),
               const SizedBox(height: 16),
-
-              // Description
               const _FieldLabel(label: 'ABOUT / BIO'),
               TextField(
                 controller: _descriptionController,
@@ -422,8 +390,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // City & Home Ground
               Row(
                 children: [
                   Expanded(
@@ -456,8 +422,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                 ],
               ),
               const SizedBox(height: 18),
-
-              // Brand Color Palette
               const _FieldLabel(label: 'PRIMARY BRAND COLOR'),
               const SizedBox(height: 6),
               Wrap(
@@ -474,28 +438,24 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                           color: _parseHex(hex),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color:
-                                _primaryColor == hex
-                                    ? CkColors.ink
-                                    : Colors.transparent,
+                            color: _primaryColor == hex
+                                ? CkColors.ink
+                                : Colors.transparent,
                             width: 2.5,
                           ),
                         ),
-                        child:
-                            _primaryColor == hex
-                                ? const Icon(
-                                  Icons.check,
-                                  color: Colors.white,
-                                  size: 18,
-                                )
-                                : null,
+                        child: _primaryColor == hex
+                            ? const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 18,
+                              )
+                            : null,
                       ),
                     ),
                 ],
               ),
               const SizedBox(height: 20),
-
-              // Privacy Toggle
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -553,8 +513,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Save Button
               SizedBox(
                 width: double.infinity,
                 child: CkButton(

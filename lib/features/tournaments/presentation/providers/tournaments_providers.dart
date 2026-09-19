@@ -4,7 +4,7 @@ import '../../../../core/supabase/supabase_auth_state_provider.dart';
 import '../../../matches/domain/entities/match.dart';
 import '../../data/datasources/tournaments_datasource_providers.dart';
 import '../../data/repositories/tournaments_repository_impl.dart';
-import '../../../teams/presentation/providers/teams_providers.dart';
+import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../domain/entities/ground.dart';
 import '../../domain/entities/match_official.dart';
 import '../../domain/entities/my_tournament_entry.dart';
@@ -135,8 +135,12 @@ Future<List<TournamentLiveMatch>> tournamentLiveBoard(
 /// which is the sanctioned cross-feature seam.
 @riverpod
 Future<List<MyTournamentEntry>> myPlayingTournaments(Ref ref) async {
-  final teams = await ref.watch(myTeamsProvider.future);
-  final ids = teams.map((t) => t.id.value).toList();
+  final memberships =
+      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final ids = memberships
+      .where((m) => m.relationship.canRegisterForTournament)
+      .map((m) => m.team.id.value)
+      .toList(growable: false);
   if (ids.isEmpty) return const [];
 
   final repo = ref.watch(tournamentsRepositoryProvider);

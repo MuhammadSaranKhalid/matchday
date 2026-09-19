@@ -11,9 +11,8 @@ import '../../../domain/entities/team_invite.dart';
 import '../../../domain/entities/team_join_request.dart';
 import '../../../domain/entities/team_member.dart';
 import '../../controllers/team_manage_controller.dart';
-import '../../providers/teams_providers.dart';
+import '../../providers/team_membership_providers.dart';
 
-/// Requests and invitations tab for handling player join requests, claim requests, and sent invites.
 class RequestsTab extends ConsumerWidget {
   const RequestsTab({super.key, required this.team});
   final Team team;
@@ -24,9 +23,9 @@ class RequestsTab extends ConsumerWidget {
     final claimsAsync = ref.watch(teamPendingClaimRequestsProvider(team.id.value));
     final invitesAsync = ref.watch(teamPendingInvitesProvider(team.id.value));
 
-    final hasJoin = (joinReqsAsync.value?.isNotEmpty ?? false);
-    final hasClaims = (claimsAsync.value?.isNotEmpty ?? false);
-    final hasInvites = (invitesAsync.value?.isNotEmpty ?? false);
+    final hasJoin = joinReqsAsync.value?.isNotEmpty ?? false;
+    final hasClaims = claimsAsync.value?.isNotEmpty ?? false;
+    final hasInvites = invitesAsync.value?.isNotEmpty ?? false;
     final isAllLoaded = joinReqsAsync.hasValue && claimsAsync.hasValue && invitesAsync.hasValue;
     final isEmpty = isAllLoaded && !hasJoin && !hasClaims && !hasInvites;
 
@@ -40,7 +39,6 @@ class RequestsTab extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Invite share card
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -95,87 +93,50 @@ class RequestsTab extends ConsumerWidget {
                     ),
                     child: Text(
                       'Copy Link',
-                      style: CkType.body(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: CkColors.paper,
-                      ),
+                      style: CkType.body(fontSize: 12, fontWeight: FontWeight.w700, color: CkColors.paper),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 24),
-
-          // ─── Section 1: Player Join Requests ───
           if (hasJoin) ...[
             Text(
               'PLAYER JOIN REQUESTS (${joinReqsAsync.value!.length})',
-              style: CkType.mono(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.06,
-                color: CkColors.muted,
-              ),
+              style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.06, color: CkColors.muted),
             ),
             const SizedBox(height: 10),
             for (final req in joinReqsAsync.value!) ...[
-              PlayerJoinRequestCard(
-                request: req,
-                teamId: team.id.value,
-              ),
+              PlayerJoinRequestCard(request: req, teamId: team.id.value),
               const SizedBox(height: 12),
             ],
             const SizedBox(height: 16),
           ],
-
-          // ─── Section 2: Roster Claim Requests ───
           if (hasClaims) ...[
             Text(
               'ROSTER CLAIM REQUESTS (${claimsAsync.value!.length})',
-              style: CkType.mono(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.06,
-                color: CkColors.muted,
-              ),
+              style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.06, color: CkColors.muted),
             ),
             const SizedBox(height: 10),
             for (final req in claimsAsync.value!) ...[
-              ClaimRequestCard(
-                request: req,
-                teamId: team.id.value,
-              ),
+              ClaimRequestCard(request: req, teamId: team.id.value),
               const SizedBox(height: 12),
             ],
             const SizedBox(height: 16),
           ],
-
-          // ─── Section 3: Sent Team Invitations ───
           if (hasInvites) ...[
             Text(
               'SENT INVITATIONS (${invitesAsync.value!.length})',
-              style: CkType.mono(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.06,
-                color: CkColors.muted,
-              ),
+              style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.06, color: CkColors.muted),
             ),
             const SizedBox(height: 10),
             for (final inv in invitesAsync.value!) ...[
-              SentInviteCard(
-                invite: inv,
-                teamId: team.id.value,
-              ),
+              SentInviteCard(invite: inv, teamId: team.id.value),
               const SizedBox(height: 12),
             ],
             const SizedBox(height: 16),
           ],
-
-          // ─── Empty state if all are empty ───
           if (isEmpty)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
@@ -189,10 +150,7 @@ class RequestsTab extends ConsumerWidget {
                 children: [
                   const Icon(Icons.inbox_outlined, size: 36, color: CkColors.muted),
                   const SizedBox(height: 8),
-                  Text(
-                    'No pending requests',
-                    style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
+                  Text('No pending requests', style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   Text(
                     'When players ask to join your squad, claim historical scorecards, or when you invite players, their status will appear here.',
@@ -215,140 +173,51 @@ class PlayerJoinRequestCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reqId = request.requestId;
     final playerName = request.applicantName ?? 'Player';
     final playerHandle = request.applicantUsername;
     final photoUrl = request.applicantPhotoUrl;
     final message = request.message;
     final ctrl = ref.read(teamManageControllerProvider.notifier);
-
-    // Invites and join requests are capped at 'captain' by a CHECK constraint
-    // on both tables — staff are appointed after joining, never by invitation.
     final roleLabel = switch (request.role) {
       MemberRole.captain => 'Captain',
       MemberRole.player => 'Squad Player',
       MemberRole.manager || MemberRole.owner => 'Staff',
     };
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: CkColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: () {
-              if (playerHandle != null && playerHandle.isNotEmpty) {
-                context.push('/u/$playerHandle');
-              }
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Row(
-              children: [
-                Avatar(
-                  mono: playerName.isNotEmpty ? playerName[0].toUpperCase() : '?',
-                  imageUrl: photoUrl,
-                  size: 40,
+    return _RequestCardShell(
+      header: InkWell(
+        onTap: () {
+          if (playerHandle != null && playerHandle.isNotEmpty) context.push('/u/$playerHandle');
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Row(
+          children: [
+            Avatar(mono: playerName.isNotEmpty ? playerName[0].toUpperCase() : '?', imageUrl: photoUrl, size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(playerName, style: CkType.display(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                Text(
+                  '${playerHandle != null ? '@$playerHandle · ' : ''}Applying as $roleLabel',
+                  style: CkType.body(fontSize: 11.5, color: CkColors.muted),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        playerName,
-                        style: CkType.display(fontSize: 14.5, fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        '${playerHandle != null ? '@$playerHandle · ' : ''}Applying as $roleLabel',
-                        style: CkType.body(fontSize: 11.5, color: CkColors.muted),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded, size: 20, color: CkColors.muted),
-              ],
+              ]),
             ),
-          ),
-          if (message != null && message.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: CkColors.paper2,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '"$message"',
-                style: CkType.body(fontSize: 12, color: CkColors.ink).copyWith(fontStyle: FontStyle.italic),
-              ),
-            ),
+            const Icon(Icons.chevron_right_rounded, size: 20, color: CkColors.muted),
           ],
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              InkWell(
-                onTap: () async {
-                  final error = await ctrl.declineJoinRequest(
-                    requestId: reqId,
-                    teamId: teamId,
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(error ?? 'Join request declined')),
-                    );
-                  }
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: CkColors.paper,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: CkColors.hairline),
-                  ),
-                  child: Text(
-                    'Decline',
-                    style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600, color: CkColors.red),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () async {
-                  final error = await ctrl.acceptJoinRequest(
-                    requestId: reqId,
-                    teamId: teamId,
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(error ?? 'Accepted! $playerName added to squad roster.')),
-                    );
-                  }
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: CkColors.ink,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Accept Request',
-                    style: CkType.body(fontSize: 12, fontWeight: FontWeight.w700, color: CkColors.paper),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
+      message: message,
+      secondaryLabel: 'Decline',
+      primaryLabel: 'Accept Request',
+      onSecondary: () async {
+        final error = await ctrl.declineJoinRequest(requestId: request.requestId, teamId: teamId);
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? 'Join request declined')));
+      },
+      onPrimary: () async {
+        final error = await ctrl.acceptJoinRequest(requestId: request.requestId, teamId: teamId);
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? 'Accepted! $playerName added to squad roster.')));
+      },
     );
   }
 }
@@ -360,133 +229,44 @@ class ClaimRequestCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reqId = request.requestId;
     final requesterName = request.requesterName ?? 'Player';
     final requesterHandle = request.requesterUsername;
     final photoUrl = request.requesterPhotoUrl;
     final unclaimedName = request.unclaimedPlayerName ?? 'Roster spot';
-    final message = request.message;
     final ctrl = ref.read(teamManageControllerProvider.notifier);
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: CkColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: () {
-              if (requesterHandle != null && requesterHandle.isNotEmpty) {
-                context.push('/u/$requesterHandle');
-              }
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Row(
-              children: [
-                Avatar(
-                  mono: requesterName.isNotEmpty ? requesterName[0].toUpperCase() : '?',
-                  imageUrl: photoUrl,
-                  size: 40,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        requesterName,
-                        style: CkType.display(fontSize: 14.5, fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        '${requesterHandle != null ? '@$requesterHandle · ' : ''}wants to claim: $unclaimedName',
-                        style: CkType.body(fontSize: 11.5, color: CkColors.muted),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded, size: 20, color: CkColors.muted),
-              ],
-            ),
+    return _RequestCardShell(
+      header: InkWell(
+        onTap: () {
+          if (requesterHandle != null && requesterHandle.isNotEmpty) context.push('/u/$requesterHandle');
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Row(children: [
+          Avatar(mono: requesterName.isNotEmpty ? requesterName[0].toUpperCase() : '?', imageUrl: photoUrl, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(requesterName, style: CkType.display(fontSize: 14.5, fontWeight: FontWeight.w700)),
+              Text(
+                '${requesterHandle != null ? '@$requesterHandle · ' : ''}wants to claim: $unclaimedName',
+                style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+              ),
+            ]),
           ),
-          if (message != null && message.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: CkColors.paper2,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '"$message"',
-                style: CkType.body(fontSize: 12, color: CkColors.ink).copyWith(fontStyle: FontStyle.italic),
-              ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              InkWell(
-                onTap: () async {
-                  final error = await ctrl.declineClaimRequest(
-                    requestId: reqId,
-                    teamId: teamId,
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(error ?? 'Claim request rejected')),
-                    );
-                  }
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: CkColors.paper,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: CkColors.hairline),
-                  ),
-                  child: Text(
-                    'Reject',
-                    style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600, color: CkColors.red),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () async {
-                  final error = await ctrl.acceptClaimRequest(
-                    requestId: reqId,
-                    teamId: teamId,
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(error ?? 'Claim approved! $requesterName added to roster.')),
-                    );
-                  }
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: CkColors.ink,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Approve Claim',
-                    style: CkType.body(fontSize: 12, fontWeight: FontWeight.w700, color: CkColors.paper),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+          const Icon(Icons.chevron_right_rounded, size: 20, color: CkColors.muted),
+        ]),
       ),
+      message: request.message,
+      secondaryLabel: 'Reject',
+      primaryLabel: 'Approve Claim',
+      onSecondary: () async {
+        final error = await ctrl.declineClaimRequest(requestId: request.requestId, teamId: teamId);
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? 'Claim request rejected')));
+      },
+      onPrimary: () async {
+        final error = await ctrl.acceptClaimRequest(requestId: request.requestId, teamId: teamId);
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? 'Claim approved! $requesterName added to roster.')));
+      },
     );
   }
 }
@@ -498,14 +278,11 @@ class SentInviteCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inviteId = invite.inviteId;
     final inviteeName = invite.inviteeName ?? 'Player';
     final inviteeHandle = invite.inviteeUsername;
     final photoUrl = invite.inviteePhotoUrl;
     final jersey = invite.jerseyNumber;
-    final message = invite.message;
     final ctrl = ref.read(teamManageControllerProvider.notifier);
-
     final roleLabel = switch (invite.role) {
       MemberRole.captain => 'Captain',
       MemberRole.player => 'Squad Player',
@@ -519,92 +296,103 @@ class SentInviteCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: CkColors.hairline),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: () {
-              if (inviteeHandle != null && inviteeHandle.isNotEmpty) {
-                context.push('/u/$inviteeHandle');
-              }
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Row(
-              children: [
-                Avatar(
-                  mono: inviteeName.isNotEmpty ? inviteeName[0].toUpperCase() : '?',
-                  imageUrl: photoUrl,
-                  size: 40,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        InkWell(
+          onTap: () {
+            if (inviteeHandle != null && inviteeHandle.isNotEmpty) context.push('/u/$inviteeHandle');
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Row(children: [
+            Avatar(mono: inviteeName.isNotEmpty ? inviteeName[0].toUpperCase() : '?', imageUrl: photoUrl, size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(inviteeName, style: CkType.display(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                Text(
+                  '${inviteeHandle != null ? '@$inviteeHandle · ' : ''}Invited as $roleLabel${jersey != null ? ' (#$jersey)' : ''}',
+                  style: CkType.body(fontSize: 11.5, color: CkColors.muted),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        inviteeName,
-                        style: CkType.display(fontSize: 14.5, fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        '${inviteeHandle != null ? '@$inviteeHandle · ' : ''}Invited as $roleLabel${jersey != null ? ' (#$jersey)' : ''}',
-                        style: CkType.body(fontSize: 11.5, color: CkColors.muted),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: CkColors.amber.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    'Pending',
-                    style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, color: CkColors.amber),
-                  ),
-                ),
-              ],
+              ]),
             ),
-          ),
-          if (message != null && message.isNotEmpty) ...[
-            const SizedBox(height: 10),
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: CkColors.paper2,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '"$message"',
-                style: CkType.body(fontSize: 12, color: CkColors.ink).copyWith(fontStyle: FontStyle.italic),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: CkColors.amber.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
+              child: Text('Pending', style: CkType.mono(fontSize: 10, fontWeight: FontWeight.w700, color: CkColors.amber)),
             ),
-          ],
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () async {
-                final error = await ctrl.cancelTeamInvite(
-                  inviteId: inviteId,
-                  teamId: teamId,
-                );
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(error ?? 'Invitation cancelled')),
-                  );
-                }
-              },
-              icon: const Icon(Icons.close_rounded, size: 14, color: CkColors.red),
-              label: Text(
-                'Cancel Invite',
-                style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600, color: CkColors.red),
-              ),
-            ),
-          ),
+          ]),
+        ),
+        if (invite.message != null && invite.message!.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _MessageBox(invite.message!),
         ],
-      ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () async {
+              final error = await ctrl.cancelTeamInvite(inviteId: invite.inviteId, teamId: teamId);
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? 'Invitation cancelled')));
+            },
+            icon: const Icon(Icons.close_rounded, size: 14, color: CkColors.red),
+            label: Text('Cancel Invite', style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600, color: CkColors.red)),
+          ),
+        ),
+      ]),
     );
   }
+}
+
+class _RequestCardShell extends StatelessWidget {
+  const _RequestCardShell({required this.header, this.message, required this.secondaryLabel, required this.primaryLabel, required this.onSecondary, required this.onPrimary});
+  final Widget header;
+  final String? message;
+  final String secondaryLabel, primaryLabel;
+  final Future<void> Function() onSecondary, onPrimary;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(color: CkColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: CkColors.hairline)),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      header,
+      if (message != null && message!.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        _MessageBox(message!),
+      ],
+      const SizedBox(height: 14),
+      Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+        InkWell(
+          onTap: () async => onSecondary(),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(color: CkColors.paper, borderRadius: BorderRadius.circular(8), border: Border.all(color: CkColors.hairline)),
+            child: Text(secondaryLabel, style: CkType.body(fontSize: 12, fontWeight: FontWeight.w600, color: CkColors.red)),
+          ),
+        ),
+        const SizedBox(width: 8),
+        InkWell(
+          onTap: () async => onPrimary(),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(color: CkColors.ink, borderRadius: BorderRadius.circular(8)),
+            child: Text(primaryLabel, style: CkType.body(fontSize: 12, fontWeight: FontWeight.w700, color: CkColors.paper)),
+          ),
+        ),
+      ]),
+    ]),
+  );
+}
+
+class _MessageBox extends StatelessWidget {
+  const _MessageBox(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(color: CkColors.paper2, borderRadius: BorderRadius.circular(8)),
+    child: Text('"$text"', style: CkType.body(fontSize: 12, color: CkColors.ink).copyWith(fontStyle: FontStyle.italic)),
+  );
 }

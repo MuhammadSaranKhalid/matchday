@@ -1,13 +1,5 @@
 import '../../domain/entities/team_membership.dart';
 
-/// Minimal state for the My Teams screen.
-///
-/// The page owns only two concepts:
-///   - teams the user can administer
-///   - teams the user participates in without administrative authority
-///
-/// Matches, invites, discovery, follows, archived buckets and filters are not
-/// part of this screen state.
 class TeamsListState {
   const TeamsListState({
     required this.managed,

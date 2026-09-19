@@ -6,10 +6,6 @@ import '../../domain/entities/team_search_result.dart';
 part 'team_search_result_dto.freezed.dart';
 part 'team_search_result_dto.g.dart';
 
-/// One row from the `search-teams` edge function. The function returns flat
-/// team columns (not a nested team) so this DTO is a different wire shape
-/// from [TeamDto] — same `teams` table, narrower selection, plus
-/// distance/score.
 @freezed
 abstract class TeamSearchResultDto with _$TeamSearchResultDto {
   const factory TeamSearchResultDto({
@@ -21,7 +17,6 @@ abstract class TeamSearchResultDto with _$TeamSearchResultDto {
     Map<String, dynamic>? location,
     @JsonKey(name: 'is_verified') @Default(false) bool isVerified,
     @JsonKey(name: 'distance_km') double? distanceKm,
-    // Returned by `search-all` only; `search-teams` does not select them.
     @JsonKey(name: 'founded_year') int? foundedYear,
     @JsonKey(name: 'team_type') String? teamType,
     @Default(0.0) double score,

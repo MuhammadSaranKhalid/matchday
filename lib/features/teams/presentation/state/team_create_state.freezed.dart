@@ -14,10 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TeamCreateState {
 
- TeamCreateStep get step; String get name; TeamType get type; TeamPrivacy get privacy; String get tagline; String? get foundedYear; String get city; String get area;// Structured geo resolved by the place picker. Populated when the creator
-// picks a prediction; all null when they keep typed text, in which case
-// the team is name-findable but not proximity-findable.
- String? get locationLabel; String? get district; String? get province; String? get postcode; String? get placeId; double? get latitude; double? get longitude; String? get countryCode; String get homeGround; String get primaryColor; String get secondaryColor; CrestKind get crestKind; String? get monogramOverride; String? get logoUrl; String? get logoName; int? get logoSize; bool get submitting; String? get submitError; String? get logoUploadError; String? get createdTeamId;
+ TeamCreateStep get step; String get name; TeamType get type; TeamPrivacy get privacy; String get tagline; String? get foundedYear; String get city; String get area; String? get locationLabel; String? get district; String? get province; String? get postcode; String? get placeId; double? get latitude; double? get longitude; String? get countryCode; String get homeGround; String get primaryColor; String get secondaryColor; CrestKind get crestKind; String? get monogramOverride; String? get logoUrl; String? get logoName; int? get logoSize; bool get submitting; String? get submitError; String? get logoUploadError; String? get createdTeamId;
 /// Create a copy of TeamCreateState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -247,9 +244,6 @@ class _TeamCreateState extends TeamCreateState {
 @override final  String? foundedYear;
 @override@JsonKey() final  String city;
 @override@JsonKey() final  String area;
-// Structured geo resolved by the place picker. Populated when the creator
-// picks a prediction; all null when they keep typed text, in which case
-// the team is name-findable but not proximity-findable.
 @override final  String? locationLabel;
 @override final  String? district;
 @override final  String? province;

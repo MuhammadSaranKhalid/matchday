@@ -8,32 +8,17 @@ part of 'add_unclaimed_player_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Drives the 2-step add-as-unclaimed wizard.
-///
-/// Pure form state — duplicate-name and jersey-clash detection live in the
-/// screen (which has live access to the roster stream). The controller's job
-/// is field state + step navigation + submit.
 
 @ProviderFor(AddUnclaimedPlayerController)
 final addUnclaimedPlayerControllerProvider =
     AddUnclaimedPlayerControllerFamily._();
 
-/// Drives the 2-step add-as-unclaimed wizard.
-///
-/// Pure form state — duplicate-name and jersey-clash detection live in the
-/// screen (which has live access to the roster stream). The controller's job
-/// is field state + step navigation + submit.
 final class AddUnclaimedPlayerControllerProvider
     extends
         $NotifierProvider<
           AddUnclaimedPlayerController,
           AddUnclaimedPlayerState
         > {
-  /// Drives the 2-step add-as-unclaimed wizard.
-  ///
-  /// Pure form state — duplicate-name and jersey-clash detection live in the
-  /// screen (which has live access to the roster stream). The controller's job
-  /// is field state + step navigation + submit.
   AddUnclaimedPlayerControllerProvider._({
     required AddUnclaimedPlayerControllerFamily super.from,
     required String super.argument,
@@ -80,13 +65,7 @@ final class AddUnclaimedPlayerControllerProvider
 }
 
 String _$addUnclaimedPlayerControllerHash() =>
-    r'12b972ef2e2cdf529701c7b7a50aa695352d8024';
-
-/// Drives the 2-step add-as-unclaimed wizard.
-///
-/// Pure form state — duplicate-name and jersey-clash detection live in the
-/// screen (which has live access to the roster stream). The controller's job
-/// is field state + step navigation + submit.
+    r'e23a90648acd8a0b95791f7f4fc68faca123393d';
 
 final class AddUnclaimedPlayerControllerFamily extends $Family
     with
@@ -106,24 +85,12 @@ final class AddUnclaimedPlayerControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Drives the 2-step add-as-unclaimed wizard.
-  ///
-  /// Pure form state — duplicate-name and jersey-clash detection live in the
-  /// screen (which has live access to the roster stream). The controller's job
-  /// is field state + step navigation + submit.
-
   AddUnclaimedPlayerControllerProvider call(String teamId) =>
       AddUnclaimedPlayerControllerProvider._(argument: teamId, from: this);
 
   @override
   String toString() => r'addUnclaimedPlayerControllerProvider';
 }
-
-/// Drives the 2-step add-as-unclaimed wizard.
-///
-/// Pure form state — duplicate-name and jersey-clash detection live in the
-/// screen (which has live access to the roster stream). The controller's job
-/// is field state + step navigation + submit.
 
 abstract class _$AddUnclaimedPlayerController
     extends $Notifier<AddUnclaimedPlayerState> {

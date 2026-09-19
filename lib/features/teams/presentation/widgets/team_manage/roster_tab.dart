@@ -9,36 +9,67 @@ import '../../../../../core/widgets/v2/v2_kit.dart';
 import '../../../domain/entities/roster_member.dart';
 import '../../../domain/entities/team.dart';
 import '../../../domain/entities/team_member.dart';
+import '../../../domain/entities/team_relationship.dart';
 import '../../controllers/team_manage_controller.dart';
-import '../../providers/teams_providers.dart';
+import '../../providers/team_membership_providers.dart';
 import '../add_player_sheet.dart';
 import 'jersey_sheet.dart';
 import 'member_actions_sheet.dart';
 
-/// Roster management tab showing current squad members and actions.
+/// Roster management tab. Visual layout is unchanged from the existing app;
+/// data is supplied by the scoped one-shot roster read owned by Manage.
 class RosterTab extends ConsumerWidget {
-  const RosterTab({super.key, required this.team});
+  const RosterTab({
+    super.key,
+    required this.team,
+    required this.viewer,
+  });
+
   final Team team;
+  final TeamRelationship viewer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rosterAsync = ref.watch(rosterProvider(team.id.value));
+
+    Future<void> refresh() async {
+      ref.invalidate(rosterProvider(team.id.value));
+      await ref.read(rosterProvider(team.id.value).future);
+    }
+
+    Future<void> addPlayer() async {
+      await AddPlayerSheet.show(context, team);
+      if (!context.mounted) return;
+      await refresh();
+    }
 
     return switch (rosterAsync) {
       AsyncData(:final value) => Column(
           children: [
             Expanded(
               child: value.isEmpty
-                  ? EmptyRoster(onAdd: () => AddPlayerSheet.show(context, team))
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: value.length,
-                      separatorBuilder: (_, __) =>
-                          const Divider(height: 1, color: CkColors.hairline),
-                      itemBuilder: (_, i) => ManagedRow(
-                        entry: value[i],
-                        team: team,
-                        onManage: () => _handleMemberAction(context, ref, value[i]),
+                  ? EmptyRoster(onAdd: addPlayer)
+                  : RefreshIndicator(
+                      color: CkColors.ink,
+                      onRefresh: refresh,
+                      child: ListView.separated(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: value.length,
+                        separatorBuilder: (_, __) => const Divider(
+                          height: 1,
+                          color: CkColors.hairline,
+                        ),
+                        itemBuilder: (_, i) => ManagedRow(
+                          entry: value[i],
+                          team: team,
+                          onManage: () => _handleMemberAction(
+                            context,
+                            ref,
+                            value[i],
+                            refresh,
+                          ),
+                        ),
                       ),
                     ),
             ),
@@ -52,13 +83,15 @@ class RosterTab extends ConsumerWidget {
                     size: 18,
                     color: CkColors.paper,
                   ),
-                  onPressed: () => AddPlayerSheet.show(context, team),
+                  onPressed: addPlayer,
                 ),
               ),
           ],
         ),
       AsyncError() => const Center(child: Text('Could not load roster')),
-      _ => const Center(child: CircularProgressIndicator(color: CkColors.ink)),
+      _ => const Center(
+          child: CircularProgressIndicator(color: CkColors.ink),
+        ),
     };
   }
 
@@ -66,74 +99,110 @@ class RosterTab extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     RosterMember entry,
+    Future<void> Function() onRefresh,
   ) async {
-    final action = await MemberActionsSheet.show(context, entry);
+    final action = await MemberActionsSheet.show(
+      context,
+      entry,
+      viewer: viewer,
+    );
     if (action == null || !context.mounted) return;
-    final m = entry.member;
-    final ctrl = ref.read(teamManageControllerProvider.notifier);
+
+    final member = entry.member;
+    final controller = ref.read(teamManageControllerProvider.notifier);
+    String? error;
 
     switch (action) {
       case MemberActionType.jersey:
-        final picked = await JerseySheet.show(context, initial: m.jerseyNumber);
+        final picked = await JerseySheet.show(
+          context,
+          initial: member.jerseyNumber,
+        );
         if (picked == null || !context.mounted) return;
-        final error = await ctrl.setJerseyNumber(
-          memberId: m.id,
-          teamId: m.teamId.value,
+        error = await controller.setJerseyNumber(
+          memberId: member.id,
+          teamId: team.id.value,
           jersey: picked.value,
         );
-        if (error != null && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
-        }
 
-      case MemberActionType.captain:
-      case MemberActionType.manager:
-      case MemberActionType.player:
-        final error = await ctrl.setMemberRole(
-          memberId: m.id,
-          teamId: m.teamId.value,
-          role: action.role!,
+      case MemberActionType.assignCaptain:
+        error = await controller.assignCaptain(
+          memberId: member.id,
+          teamId: team.id.value,
         );
-        if (error != null && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
-        }
+
+      case MemberActionType.revokeCaptain:
+        error = await controller.revokeCaptain(
+          memberId: member.id,
+          teamId: team.id.value,
+        );
+
+      case MemberActionType.promoteManager:
+        error = await controller.promoteToManager(
+          memberId: member.id,
+          teamId: team.id.value,
+        );
+
+      case MemberActionType.demoteManager:
+        error = await controller.demoteToPlayer(
+          memberId: member.id,
+          teamId: team.id.value,
+        );
 
       case MemberActionType.remove:
         final confirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: Text(
               'Remove from squad?',
-              style: CkType.display(fontSize: 17, fontWeight: FontWeight.w700),
+              style: CkType.display(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             content: Text(
-              'Remove ${entry.displayName} from the active team roster? Historical match scorecards will remain intact.',
+              'Remove ${entry.displayName} from the active team roster? '
+              'Historical match scorecards will remain intact.',
               style: CkType.body(fontSize: 13, color: CkColors.muted),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Cancel', style: TextStyle(color: CkColors.ink)),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: CkColors.ink),
+                ),
               ),
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
                 child: const Text(
                   'Remove',
-                  style: TextStyle(color: CkColors.red, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: CkColors.red,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
         );
         if (confirm != true || !context.mounted) return;
-        final error = await ctrl.removeMember(
-          memberId: m.id,
-          teamId: m.teamId.value,
+        error = await controller.removeMember(
+          memberId: member.id,
+          teamId: team.id.value,
         );
-        if (error != null && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
-        }
     }
+
+    if (error != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+    if (context.mounted) await onRefresh();
   }
 }
 
@@ -150,8 +219,8 @@ class ManagedRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final m = entry.member;
-    final isUnclaimed = m.playerType == PlayerType.unclaimed;
+    final member = entry.member;
+    final isUnclaimed = member.playerType == PlayerType.unclaimed;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -160,7 +229,9 @@ class ManagedRow extends StatelessWidget {
           Expanded(
             child: InkWell(
               onTap: () {
-                if (!isUnclaimed && entry.username != null && entry.username!.isNotEmpty) {
+                if (!isUnclaimed &&
+                    entry.username != null &&
+                    entry.username!.isNotEmpty) {
                   context.push('/u/${entry.username}');
                 } else if (isUnclaimed) {
                   showOfflinePlayerSheet(context, team, entry, onManage);
@@ -172,7 +243,9 @@ class ManagedRow extends StatelessWidget {
                 child: Row(
                   children: [
                     Avatar(
-                      mono: entry.displayName.isNotEmpty ? entry.displayName[0].toUpperCase() : '?',
+                      mono: entry.displayName.isNotEmpty
+                          ? entry.displayName[0].toUpperCase()
+                          : '?',
                       imageUrl: !isUnclaimed ? entry.profilePhotoUrl : null,
                       size: 38,
                     ),
@@ -193,37 +266,56 @@ class ManagedRow extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              if (m.topRole != MemberRole.player) ...[
+                              if (member.hasRole(MemberRole.owner) ||
+                                  member.hasRole(MemberRole.manager)) ...[
                                 const SizedBox(width: 6),
-                                _roleChip(m.topRole),
+                                _roleChip(
+                                  member.hasRole(MemberRole.owner)
+                                      ? MemberRole.owner
+                                      : MemberRole.manager,
+                                ),
                               ],
-                              if (m.jerseyNumber != null) ...[
+                              if (member.hasRole(MemberRole.captain)) ...[
                                 const SizedBox(width: 6),
-                                _jerseyBadge(m.jerseyNumber!),
+                                _roleChip(MemberRole.captain),
+                              ],
+                              if (member.jerseyNumber != null) ...[
+                                const SizedBox(width: 6),
+                                _jerseyBadge(member.jerseyNumber!),
                               ],
                             ],
                           ),
                           const SizedBox(height: 2),
                           Row(
                             children: [
-                              if (isUnclaimed) ...[
+                              if (isUnclaimed)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 1,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: CkColors.paper2,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
                                     'Offline Player',
-                                    style: CkType.mono(fontSize: 9, color: CkColors.muted),
+                                    style: CkType.mono(
+                                      fontSize: 9,
+                                      color: CkColors.muted,
+                                    ),
+                                  ),
+                                )
+                              else
+                                Text(
+                                  entry.username != null
+                                      ? '@${entry.username}'
+                                      : 'Verified Member',
+                                  style: CkType.body(
+                                    fontSize: 11,
+                                    color: const Color(0xFF1E5A2C),
                                   ),
                                 ),
-                              ] else ...[
-                                Text(
-                                  entry.username != null ? '@${entry.username}' : 'Verified Member',
-                                  style: CkType.body(fontSize: 11, color: const Color(0xFF1E5A2C)),
-                                ),
-                              ],
                             ],
                           ),
                         ],
@@ -244,24 +336,22 @@ class ManagedRow extends StatelessWidget {
     );
   }
 
-  Widget _jerseyBadge(int number) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: CkColors.paper2,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Text(
-        '#$number',
-        style: CkType.mono(
-          fontSize: 9.5,
-          fontWeight: FontWeight.w700,
-          color: CkColors.ink,
+  Widget _jerseyBadge(int number) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: CkColors.paper2,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: CkColors.hairline),
         ),
-      ),
-    );
-  }
+        child: Text(
+          '#$number',
+          style: CkType.mono(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w700,
+            color: CkColors.ink,
+          ),
+        ),
+      );
 
   Widget _roleChip(MemberRole role) {
     final label = switch (role) {
@@ -278,7 +368,11 @@ class ManagedRow extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: CkType.mono(fontSize: 9, fontWeight: FontWeight.w700, color: const Color(0xFF6B5414)),
+        style: CkType.mono(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: const Color(0xFF6B5414),
+        ),
       ),
     );
   }
@@ -326,8 +420,13 @@ void showOfflinePlayerSheet(
                     border: Border.all(color: CkColors.hairline),
                   ),
                   child: Text(
-                    entry.displayName.isNotEmpty ? entry.displayName[0].toUpperCase() : '?',
-                    style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
+                    entry.displayName.isNotEmpty
+                        ? entry.displayName[0].toUpperCase()
+                        : '?',
+                    style: CkType.display(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -337,11 +436,17 @@ void showOfflinePlayerSheet(
                     children: [
                       Text(
                         entry.displayName,
-                        style: CkType.display(fontSize: 16, fontWeight: FontWeight.w700),
+                        style: CkType.display(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       Text(
                         'Offline Squad Placeholder',
-                        style: CkType.body(fontSize: 12, color: CkColors.muted),
+                        style: CkType.body(
+                          fontSize: 12,
+                          color: CkColors.muted,
+                        ),
                       ),
                     ],
                   ),
@@ -358,11 +463,19 @@ void showOfflinePlayerSheet(
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.phone_outlined, size: 16, color: CkColors.muted),
+                    const Icon(
+                      Icons.phone_outlined,
+                      size: 16,
+                      color: CkColors.muted,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       entry.phoneNumber!,
-                      style: CkType.mono(fontSize: 13, fontWeight: FontWeight.w600, color: CkColors.ink),
+                      style: CkType.mono(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: CkColors.ink,
+                      ),
                     ),
                   ],
                 ),
@@ -377,12 +490,21 @@ void showOfflinePlayerSheet(
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded, size: 18, color: CkColors.muted),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: CkColors.muted,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'This player does not have a linked Matchday account yet. You can share the claim link so they can register and claim their stats.',
-                      style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+                      'This player does not have a linked Matchday account yet. '
+                      'You can share the claim link so they can register and '
+                      'claim their stats.',
+                      style: CkType.body(
+                        fontSize: 11.5,
+                        color: CkColors.muted,
+                      ),
                     ),
                   ),
                 ],
@@ -394,12 +516,17 @@ void showOfflinePlayerSheet(
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(
-                        text: 'https://matchday.app/teams/${team.id.value}/claim',
-                      ));
+                      Clipboard.setData(
+                        ClipboardData(
+                          text:
+                              'https://matchday.app/teams/${team.id.value}/claim',
+                        ),
+                      );
                       Navigator.of(ctx).pop();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Claim link copied to clipboard!')),
+                        const SnackBar(
+                          content: Text('Claim link copied to clipboard!'),
+                        ),
                       );
                     },
                     icon: const Icon(Icons.link_rounded, size: 16),
@@ -408,7 +535,9 @@ void showOfflinePlayerSheet(
                       foregroundColor: CkColors.ink,
                       side: const BorderSide(color: CkColors.hairline),
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
@@ -425,7 +554,9 @@ void showOfflinePlayerSheet(
                       backgroundColor: CkColors.ink,
                       foregroundColor: CkColors.paper,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
@@ -467,7 +598,11 @@ class EmptyRoster extends StatelessWidget {
             CkButton(
               label: 'Add player',
               expand: false,
-              icon: const Icon(Icons.add_rounded, size: 20, color: CkColors.paper),
+              icon: const Icon(
+                Icons.add_rounded,
+                size: 20,
+                color: CkColors.paper,
+              ),
               onPressed: onAdd,
             ),
           ],

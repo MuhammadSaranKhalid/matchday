@@ -7,17 +7,11 @@ import '../../../domain/entities/team_member.dart';
 
 enum MemberActionType {
   jersey,
-  captain,
-  manager,
-  player,
-  remove;
-
-  MemberRole? get role => switch (this) {
-        MemberActionType.manager => MemberRole.manager,
-        MemberActionType.captain => MemberRole.captain,
-        MemberActionType.player => MemberRole.player,
-        _ => null,
-      };
+  assignCaptain,
+  revokeCaptain,
+  promoteManager,
+  demoteManager,
+  remove,
 }
 
 /// Action sheet for promoting, demoting, setting jersey, or removing a player.
@@ -25,18 +19,17 @@ class MemberActionsSheet extends StatelessWidget {
   const MemberActionsSheet({
     super.key,
     required this.entry,
-    this.viewer = TeamRelationship.owner,
+    required this.viewer,
   });
   final RosterMember entry;
 
-  /// The signed-in user's rung. Gates the staff actions so the sheet never
-  /// offers something the server will refuse with a 42501.
+  /// The signed-in user's rung. Required: authority is never guessed.
   final TeamRelationship viewer;
 
   static Future<MemberActionType?> show(
     BuildContext context,
     RosterMember entry, {
-    TeamRelationship viewer = TeamRelationship.owner,
+    required TeamRelationship viewer,
   }) {
     return showModalBottomSheet<MemberActionType>(
       context: context,
@@ -70,11 +63,16 @@ class MemberActionsSheet extends StatelessWidget {
         );
 
     final m = entry.member;
+    final isOwner = m.hasRole(MemberRole.owner);
+    final isManager = m.hasRole(MemberRole.manager);
+    final isCaptain = m.hasRole(MemberRole.captain);
+    final canActOnAuthority = viewer == TeamRelationship.owner ||
+        (viewer == TeamRelationship.manager && !isOwner && !isManager);
+
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
           Container(
             width: 36,
             height: 4,
@@ -114,12 +112,7 @@ class MemberActionsSheet extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        switch (m.topRole) {
-                          MemberRole.owner => 'Owner',
-                          MemberRole.manager => 'Manager',
-                          MemberRole.captain => 'Captain',
-                          MemberRole.player => 'Squad Player',
-                        },
+                        m.roles.map((r) => r.toUpperCase()).join(' · '),
                         style: CkType.body(
                           fontSize: 12,
                           color: CkColors.muted,
@@ -132,35 +125,40 @@ class MemberActionsSheet extends StatelessWidget {
             ),
           ),
           const Divider(height: 1, color: CkColors.hairline),
-          item(Icons.tag_rounded, 'Set jersey number', MemberActionType.jersey),
-          if (m.topRole != MemberRole.captain)
+          if (!isOwner || viewer == TeamRelationship.owner)
+            item(Icons.tag_rounded, 'Set jersey number', MemberActionType.jersey),
+          if (canActOnAuthority && !isCaptain)
             item(
               Icons.star_rounded,
               'Promote to Captain',
-              MemberActionType.captain,
+              MemberActionType.assignCaptain,
               color: const Color(0xFFB45309),
             ),
-          // Appointing staff is the owner's call alone; the server rejects a
-          // manager who tries (set_team_member_role, "never grant a rung at or
-          // above your own"), so only offer it when it can succeed.
-          if (viewer.canAppointStaff && m.topRole != MemberRole.manager)
+          if (viewer.canAppointStaff && !isOwner && !isManager)
             item(
               Icons.shield_outlined,
               'Make Manager',
-              MemberActionType.manager,
+              MemberActionType.promoteManager,
             ),
-          if (m.topRole != MemberRole.player)
+          if (canActOnAuthority && isCaptain)
+            item(
+              Icons.star_outline_rounded,
+              'Remove Captaincy',
+              MemberActionType.revokeCaptain,
+            ),
+          if (viewer == TeamRelationship.owner && isManager)
             item(
               Icons.person_outline_rounded,
-              'Set as regular player',
-              MemberActionType.player,
+              'Remove Manager role',
+              MemberActionType.demoteManager,
             ),
-          item(
-            Icons.delete_outline_rounded,
-            'Remove from squad',
-            MemberActionType.remove,
-            color: CkColors.red,
-          ),
+          if (canActOnAuthority && !isOwner)
+            item(
+              Icons.delete_outline_rounded,
+              'Remove from squad',
+              MemberActionType.remove,
+              color: CkColors.red,
+            ),
           const SizedBox(height: 8),
         ],
       ),

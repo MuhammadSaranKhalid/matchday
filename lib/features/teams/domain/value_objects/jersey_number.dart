@@ -1,8 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 
-/// A jersey number: 0–999. Uniqueness within a team is enforced by the DB
-/// (partial unique index) and surfaced as a Failure, not by this value object.
 class JerseyNumber {
   const JerseyNumber._(this.value);
   final int value;

@@ -2,22 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/supabase/supabase_client_provider.dart';
+import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
-import '../../../matches/presentation/providers/matches_providers.dart';
-import '../../domain/entities/team.dart';
-import '../providers/teams_providers.dart';
-import '../utils/team_page_adapter.dart';
-import '../widgets/team_page/tp_page_body.dart';
+import '../controllers/team_page_controller.dart';
+import '../widgets/team_page/team_page_body.dart';
 
-/// Team page screen at `/teams/:teamId` — Clean Architecture entry point.
-/// Watches riverpod providers, handles loading and not-found states, adapts
-/// domain entities via [buildTeamPageViewFromReal], and renders [TeamPageBody].
+/// Public team page at `/teams/:teamId`.
+///
+/// The existing Matchday visual language is preserved, but the page consumes
+/// the real domain state directly. There is no duplicate viewer enum, fixture
+/// model or adapter layer between [TeamPageController] and the UI.
 class TeamPageScreen extends ConsumerWidget {
   const TeamPageScreen({super.key, required this.teamId});
   final String teamId;
 
-  void _handleBack(BuildContext context) {
+  void _back(BuildContext context) {
     if (context.canPop()) {
       context.pop();
     } else {
@@ -27,107 +26,75 @@ class TeamPageScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final teamAsync = ref.watch(teamProvider(teamId));
-    final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
-
+    final async = ref.watch(teamPageControllerProvider(teamId));
     return Scaffold(
       backgroundColor: CkColors.paper,
-      body: switch (teamAsync) {
-        AsyncData(value: final team?) => SafeArea(
-          top: false,
-          child: _LoadedBody(
-            teamId: teamId,
-            team: team,
-            userId: userId,
-            onBack: () => _handleBack(context),
+      body: switch (async) {
+        AsyncData(value: final page?) => SafeArea(
+            top: false,
+            child: TeamPageBody(
+              teamId: teamId,
+              page: page,
+              onBack: () => _back(context),
+            ),
           ),
-        ),
-        AsyncData(value: null) => _NotFound(onBack: () => _handleBack(context)),
-        AsyncError() => _NotFound(onBack: () => _handleBack(context)),
+        AsyncData(value: null) => _Message(
+            title: 'Team not found',
+            body: 'This team is unavailable or you do not have access to it.',
+            onBack: () => _back(context),
+          ),
+        AsyncError(:final error) => _Message(
+            title: 'Could not load team',
+            body: failureMessageOf(error),
+            onBack: () => _back(context),
+            onRetry: () => ref.invalidate(teamPageControllerProvider(teamId)),
+          ),
         _ => const Center(
-          child: CircularProgressIndicator(color: CkColors.ink),
-        ),
+            child: CircularProgressIndicator(color: CkColors.ink),
+          ),
       },
     );
   }
 }
 
-/// Isolates roster and match stream subscriptions so they do not rebuild the
-/// outer scaffold on every stream tick.
-class _LoadedBody extends ConsumerWidget {
-  const _LoadedBody({
-    required this.teamId,
-    required this.team,
-    required this.userId,
+class _Message extends StatelessWidget {
+  const _Message({
+    required this.title,
+    required this.body,
     required this.onBack,
+    this.onRetry,
   });
-
-  final String teamId;
-  final Team team;
-  final String? userId;
+  final String title;
+  final String body;
   final VoidCallback onBack;
+  final VoidCallback? onRetry;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final rosterAsync = ref.watch(rosterProvider(teamId));
-    final matchesAsync = ref.watch(myMatchesProvider);
-    final allMatches = matchesAsync.value ?? const [];
-    final matchesForTeam =
-        allMatches
-            .where(
-              (m) => m.teamAId.value == teamId || m.teamBId.value == teamId,
-            )
-            .toList();
-    final pendingInvite =
-        ref.watch(myPendingInviteForTeamProvider(teamId)).value;
-
-    return TeamPageBody(
-      teamId: teamId,
-      view: buildTeamPageViewFromReal(
-        team: team,
-        roster: rosterAsync.value ?? const [],
-        matches: matchesForTeam,
-        viewerUserId: userId,
-      ),
-      pendingInvite: pendingInvite,
-      onBack: onBack,
-    );
-  }
-}
-
-class _NotFound extends StatelessWidget {
-  const _NotFound({required this.onBack});
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Team not found',
-              style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: onBack,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  'Go back',
-                  style: CkType.body(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: CkColors.ink,
-                  ),
+  Widget build(BuildContext context) => SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  body,
+                  textAlign: TextAlign.center,
+                  style: CkType.body(fontSize: 13, color: CkColors.muted),
+                ),
+                const SizedBox(height: 12),
+                if (onRetry != null)
+                  TextButton(onPressed: onRetry, child: const Text('Try again')),
+                TextButton(onPressed: onBack, child: const Text('Go back')),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }

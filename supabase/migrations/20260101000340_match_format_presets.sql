@@ -9,13 +9,10 @@
 -- The superseded preset_id/rules_config shape and late conditional rebuild
 -- were consolidated into this declaration.
 
-drop view if exists public.format_presets cascade;
-
-drop table if exists public.match_format_presets cascade;
-
 create table public.match_format_presets (
   id                   text primary key,
   label                text not null,
+  sport_id             text not null default 'cricket' references public.sports(sport_id),
   sort_order           integer not null default 0,
   config               jsonb not null,
   is_active            boolean not null default true,
@@ -47,6 +44,42 @@ create policy "match_format_presets_read_all"
 grant select on public.match_format_presets to anon, authenticated;
 grant select on public.format_presets       to anon, authenticated;
 
+
+-- -----------------------------------------------------------------------------
+-- Match format presets
+-- -----------------------------------------------------------------------------
+
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.match_format_presets'::regclass
+      and conname = 'match_format_presets_sport_id_fkey'
+  ) then
+    alter table public.match_format_presets
+      add constraint match_format_presets_sport_id_fkey
+      foreign key (sport_id)
+      references public.sports(sport_id)
+      on update restrict
+      on delete restrict;
+  end if;
+end
+$$;
+
+create index if not exists match_format_presets_sport_id
+  on public.match_format_presets (sport_id);
+
+comment on column public.match_format_presets.sport_id is
+  'Sport whose match rules this preset represents.';
+
+create trigger match_format_presets_sport_immutable
+  before update of sport_id
+  on public.match_format_presets
+  for each row
+  execute function public.prevent_sport_reassignment();
+
 -- -----------------------------------------------------------------------------
 -- The system catalog.
 -- -----------------------------------------------------------------------------
@@ -72,10 +105,10 @@ on conflict (id) do update set
   default_scoring_mode = excluded.default_scoring_mode;
 
 -- The picker reads active presets in display order.
-create index if not exists idx_match_format_presets_active_order
-  on public.match_format_presets (sort_order)
+create index idx_match_format_presets_active_order
+  on public.match_format_presets (sport_id, sort_order)
   where is_active;
 
 -- Index the profile FK for account deletion and joins (Supabase advisor 0001).
-create index if not exists idx_match_format_presets_created_by
+create index idx_match_format_presets_created_by
   on public.match_format_presets (created_by);

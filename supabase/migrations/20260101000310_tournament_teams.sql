@@ -89,6 +89,67 @@ create index tournament_teams_tournament on public.tournament_teams (tournament_
 create index tournament_teams_team       on public.tournament_teams (team_id);
 create index tournament_teams_status     on public.tournament_teams (tournament_id, status);
 
+
+-- =============================================================================
+-- 6. Tournament registration integrity
+-- =============================================================================
+--
+-- tournament_teams does NOT need another sport_id column.
+--
+-- Its sport is already determined by:
+--
+--   tournament_id -> tournaments.sport_id
+--   team_id       -> teams.sport_id
+--
+-- We only need to guarantee that those two values agree.
+-- =============================================================================
+
+create or replace function public.enforce_tournament_team_sport()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_tournament_sport text;
+  v_team_sport       text;
+begin
+  select t.sport_id
+    into v_tournament_sport
+    from public.tournaments t
+   where t.tournament_id = new.tournament_id;
+
+  select tm.sport_id
+    into v_team_sport
+    from public.teams tm
+   where tm.team_id = new.team_id;
+
+  -- Invalid IDs are handled by the foreign keys themselves.
+  if v_tournament_sport is not null
+     and v_team_sport is not null
+     and v_tournament_sport is distinct from v_team_sport then
+
+    raise exception
+      'Team sport (%) does not match tournament sport (%)',
+      v_team_sport,
+      v_tournament_sport
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all
+  on function public.enforce_tournament_team_sport()
+  from public, anon, authenticated;
+
+create trigger tournament_teams_enforce_sport
+  before insert or update of tournament_id, team_id
+  on public.tournament_teams
+  for each row
+  execute function public.enforce_tournament_team_sport();
+
+
 -- squad is a uuid[] that gets probed by id ("is this player registered?").
 -- Without a GIN index every such check is a sequential scan of the array.
 create index if not exists tournament_teams_squad_gin

@@ -133,61 +133,61 @@ create policy "grounds_delete_creator"
   to authenticated
   using ((select auth.uid()) = created_by);
 
--- -----------------------------------------------------------------------------
--- 4. matches.ground_id — additive, nullable.
--- -----------------------------------------------------------------------------
--- matches.ground_id and its index are declared in 20260101000400_matches.sql.
--- This file was renumbered from 20260831000000 to 20260101000330 on 2026-09-06
--- so that it runs BEFORE matches, which lets that FK be an inline column
--- reference instead of a late ALTER. grounds depends only on profiles (0100)
--- and tournaments (0300), so nothing else moves.
+-- -- -----------------------------------------------------------------------------
+-- -- 4. matches.ground_id — additive, nullable.
+-- -- -----------------------------------------------------------------------------
+-- -- matches.ground_id and its index are declared in 20260101000400_matches.sql.
+-- -- This file was renumbered from 20260831000000 to 20260101000330 on 2026-09-06
+-- -- so that it runs BEFORE matches, which lets that FK be an inline column
+-- -- reference instead of a late ALTER. grounds depends only on profiles (0100)
+-- -- and tournaments (0300), so nothing else moves.
 
--- (matches.ground_coordinates carried a 'DEPRECATED — never written' comment
---  here. It was dropped at the source on 2026-09-06; coordinates live on
---  grounds.location_point and only there.)
+-- -- (matches.ground_coordinates carried a 'DEPRECATED — never written' comment
+-- --  here. It was dropped at the source on 2026-09-06; coordinates live on
+-- --  grounds.location_point and only there.)
 
--- -----------------------------------------------------------------------------
--- 5. Backfill.
--- -----------------------------------------------------------------------------
--- Create a ground per distinct name already listed on a tournament, attributed
--- to that tournament's creator. `venues` holds [{name, city}]; the create
--- wizard also wrote the surface/floodlight line into `city`, so it is read as
--- a note rather than guessed at.
-with listed as (
-  select distinct
-    btrim(v->>'name')                       as name,
-    nullif(btrim(v->>'city'), '')           as detail,
-    t.created_by,
-    t.location->>'city'                     as tournament_city
-  from public.tournaments t
-  cross join lateral jsonb_array_elements(
-    case when jsonb_typeof(t.venues) = 'array' then t.venues else '[]'::jsonb end
-  ) as v
-  where btrim(coalesce(v->>'name', '')) <> ''
-),
-deduped as (
-  -- One row per (normalised name, city) so two cups naming the same ground
-  -- share it rather than each getting their own.
-  select distinct on (lower(public.f_unaccent(name)), coalesce(tournament_city, ''))
-    name, detail, created_by, tournament_city
-  from listed
-  order by lower(public.f_unaccent(name)), coalesce(tournament_city, ''), name
-)
-insert into public.grounds (name, location, notes, created_by)
-select
-  d.name,
-  case
-    when d.tournament_city is null then '{}'::jsonb
-    else jsonb_build_object('city', d.tournament_city)
-  end,
-  d.detail,
-  d.created_by
-from deduped d
-where not exists (
-  select 1 from public.grounds g
-   where lower(public.f_unaccent(g.name)) = lower(public.f_unaccent(d.name))
-     and coalesce(g.location->>'city', '') = coalesce(d.tournament_city, '')
-);
+-- -- -----------------------------------------------------------------------------
+-- -- 5. Backfill.
+-- -- -----------------------------------------------------------------------------
+-- -- Create a ground per distinct name already listed on a tournament, attributed
+-- -- to that tournament's creator. `venues` holds [{name, city}]; the create
+-- -- wizard also wrote the surface/floodlight line into `city`, so it is read as
+-- -- a note rather than guessed at.
+-- with listed as (
+--   select distinct
+--     btrim(v->>'name')                       as name,
+--     nullif(btrim(v->>'city'), '')           as detail,
+--     t.created_by,
+--     t.location->>'city'                     as tournament_city
+--   from public.tournaments t
+--   cross join lateral jsonb_array_elements(
+--     case when jsonb_typeof(t.venues) = 'array' then t.venues else '[]'::jsonb end
+--   ) as v
+--   where btrim(coalesce(v->>'name', '')) <> ''
+-- ),
+-- deduped as (
+--   -- One row per (normalised name, city) so two cups naming the same ground
+--   -- share it rather than each getting their own.
+--   select distinct on (lower(public.f_unaccent(name)), coalesce(tournament_city, ''))
+--     name, detail, created_by, tournament_city
+--   from listed
+--   order by lower(public.f_unaccent(name)), coalesce(tournament_city, ''), name
+-- )
+-- insert into public.grounds (name, location, notes, created_by)
+-- select
+--   d.name,
+--   case
+--     when d.tournament_city is null then '{}'::jsonb
+--     else jsonb_build_object('city', d.tournament_city)
+--   end,
+--   d.detail,
+--   d.created_by
+-- from deduped d
+-- where not exists (
+--   select 1 from public.grounds g
+--    where lower(public.f_unaccent(g.name)) = lower(public.f_unaccent(d.name))
+--      and coalesce(g.location->>'city', '') = coalesce(d.tournament_city, '')
+-- );
 
 -- -----------------------------------------------------------------------------
 -- 6. Ground search for the picker (the "did you mean …" step).

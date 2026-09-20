@@ -105,7 +105,7 @@ create table public.match_challenges (
 
   -- The match row that materialised from this request (accept path only).
   match_id              uuid references public.matches(match_id) on delete set null,
-
+  sport_id              text not null default 'cricket' references public.sports(sport_id),
   -- 6-digit code for the in-person flow + 24h expiry. The send RPC retries
   -- collisions against the partial unique index below.
   share_code            text,
@@ -172,6 +172,106 @@ create unique index match_challenges_active_code
 create trigger match_challenges_set_updated_at
   before update on public.match_challenges
   for each row execute function public.set_updated_at();
+
+
+-- =============================================================================
+-- 8. Challenge sport integrity
+-- =============================================================================
+
+create or replace function public.enforce_match_challenge_sport()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_from_sport text;
+  v_to_sport   text;
+begin
+
+  select t.sport_id
+    into v_from_sport
+    from public.teams t
+   where t.team_id = new.from_team_id;
+
+
+  if new.to_team_id is not null then
+    select t.sport_id
+      into v_to_sport
+      from public.teams t
+     where t.team_id = new.to_team_id;
+  end if;
+
+
+  if v_from_sport is not null
+     and v_to_sport is not null
+     and v_from_sport is distinct from v_to_sport then
+
+    raise exception
+      'Challenge teams must belong to the same sport'
+      using errcode = '23514';
+  end if;
+
+
+  -- The sending team defines the challenge sport.
+  new.sport_id :=
+    coalesce(
+      v_from_sport,
+      new.sport_id,
+      'cricket'
+    );
+
+  return new;
+end;
+$$;
+
+revoke all
+  on function public.enforce_match_challenge_sport()
+  from public, anon, authenticated;
+
+create trigger match_challenges_enforce_sport
+  before insert
+      or update of from_team_id, to_team_id, sport_id
+  on public.match_challenges
+  for each row
+  execute function public.enforce_match_challenge_sport();
+
+
+
+
+
+-- -----------------------------------------------------------------------------
+-- Match challenges
+--
+-- A challenge has a sport before it becomes a match. This is particularly
+-- important for the public/open challenge pool.
+-- -----------------------------------------------------------------------------
+
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.match_challenges'::regclass
+      and conname = 'match_challenges_sport_id_fkey'
+  ) then
+    alter table public.match_challenges
+      add constraint match_challenges_sport_id_fkey
+      foreign key (sport_id)
+      references public.sports(sport_id)
+      on update restrict
+      on delete restrict;
+  end if;
+end
+$$;
+
+create index if not exists match_challenges_sport_id
+  on public.match_challenges (sport_id);
+
+comment on column public.match_challenges.sport_id is
+  'Sport of the challenge. Derived from from_team_id and validated against '
+  'to_team_id when present.';
+
 
 -- =============================================================================
 -- Helpers

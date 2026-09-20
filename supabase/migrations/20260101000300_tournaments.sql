@@ -46,6 +46,7 @@ create table public.tournaments (
   tournament_type        public.tournament_type not null,
   banner_image_url       text,
   logo_url               text,
+  sport_id               text not null default 'cricket' references public.sports(sport_id),
   description            text check (description is null or length(description) <= 1000),
 
   format                 jsonb not null default '{}'::jsonb,
@@ -55,20 +56,6 @@ create table public.tournaments (
   end_date               date,
   registration_deadline  date,
 
-  location               jsonb not null default '{}'::jsonb,
-  location_point         geography(point, 4326) generated always as (
-                            case
-                              when location ? 'lat' and location ? 'lng' then
-                                st_setsrid(
-                                  st_makepoint(
-                                    (location->>'lng')::double precision,
-                                    (location->>'lat')::double precision
-                                  ),
-                                  4326
-                                )::geography
-                              else null
-                            end
-                          ) stored,
   -- Free-form list of grounds being used: [{"name":"...", "city":"..."}, ...].
   venues                 jsonb not null default '[]'::jsonb,
   prize_details          text check (prize_details is null or length(prize_details) <= 500),
@@ -116,13 +103,44 @@ create index tournaments_creator        on public.tournaments (created_by);
 create index tournaments_organizers_gin on public.tournaments using gin (organizers);
 create index tournaments_status         on public.tournaments (status);
 create index tournaments_start_date     on public.tournaments (start_date);
-create index tournaments_city           on public.tournaments ((location->>'city'));
-create index tournaments_location_point on public.tournaments using gist (location_point);
-create index tournaments_name_trgm      on public.tournaments using gin (tournament_name gin_trgm_ops);
+create index tournaments_sport_id       on public.tournaments (sport_id);
 
 create trigger tournaments_set_updated_at
   before update on public.tournaments
-  for each row execute function public.set_updated_at();
+  for each row 
+  execute function public.set_updated_at();
+
+
+create trigger tournaments_sport_immutable
+  before update of sport_id
+  on public.tournaments
+  for each row
+  execute function public.prevent_sport_reassignment();
+
+-- -----------------------------------------------------------------------------
+-- Tournaments
+-- -----------------------------------------------------------------------------
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.tournaments'::regclass
+      and conname = 'tournaments_sport_id_fkey'
+  ) then
+    alter table public.tournaments
+      add constraint tournaments_sport_id_fkey
+      foreign key (sport_id)
+      references public.sports(sport_id)
+      on update restrict
+      on delete restrict;
+  end if;
+end
+$$;
+
+
+
 
 -- -----------------------------------------------------------------------------
 -- is_tournament_organizer — universal RLS predicate. Same pattern as

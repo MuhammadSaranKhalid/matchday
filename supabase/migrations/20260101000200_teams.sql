@@ -61,28 +61,15 @@ create table public.teams (
   -- Optional short marketing line shown on team cards.
   tagline             text check (tagline is null or length(tagline) <= 60),
   logo_url            text,
+
+  sport_id            text not null default 'cricket' references public.sports(sport_id),
+
   -- 1–3 letter override for the placeholder logo when no logo_url is set.
   logo_monogram       text check (logo_monogram is null
                                   or length(logo_monogram) between 1 and 3),
   team_colors         jsonb,                              -- {primary, secondary} hex
   description         text check (description is null or length(description) <= 500),
   home_ground         text,
-
-  -- Same shape as profiles.location.
-  location            jsonb not null default '{}'::jsonb,
-  location_point      geography(point, 4326) generated always as (
-                         case
-                           when location ? 'lat' and location ? 'lng' then
-                             st_setsrid(
-                               st_makepoint(
-                                 (location->>'lng')::double precision,
-                                 (location->>'lat')::double precision
-                               ),
-                               4326
-                             )::geography
-                           else null
-                         end
-                       ) stored,
 
   founded_year        integer
                        check (founded_year is null
@@ -122,16 +109,23 @@ create table public.teams (
 -- Indexes
 -- -----------------------------------------------------------------------------
 create index teams_created_by     on public.teams (created_by);
+create index teams_sport_id       on public.teams (sport_id);
 -- teams_managers_gin dropped 2026-09-10 with the `managers uuid[]` column.
 -- The equivalent lookup ("which teams do I run?") is now
 -- team_members_team_role in 0210.
-create index teams_city           on public.teams ((location->>'city'));
-create index teams_location_point on public.teams using gist (location_point);
+-- create index teams_city           on public.teams ((location->>'city'));
+-- create index teams_location_point on public.teams using gist (location_point);
 create index teams_name_trgm      on public.teams using gin (team_name gin_trgm_ops);
 
 create trigger teams_set_updated_at
   before update on public.teams
   for each row execute function public.set_updated_at();
+
+create trigger teams_sport_immutable
+  before update of sport_id
+  on public.teams
+  for each row
+  execute function public.prevent_sport_reassignment();
 
 -- -----------------------------------------------------------------------------
 -- is_team_manager / is_team_captain are declared in 0210_team_members.sql.
@@ -157,6 +151,7 @@ create policy "teams_insert_self_owner"
   on public.teams for insert
   to authenticated
   with check ((select auth.uid()) = created_by);
+
 
 -- teams_delete_owner moved to 0210: it now asks for the `team.disband`
 -- permission rather than comparing against a column.

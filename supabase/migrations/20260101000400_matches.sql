@@ -3,9 +3,6 @@
 -- =============================================================================
 -- Match fixtures, rules, scheduling, teams and result snapshots.
 -- Spec: docs/matches-schema-architecture.md
-
-drop table if exists public.matches cascade;
-
 -- -----------------------------------------------------------------------------
 -- The canonical match-format shape
 -- -----------------------------------------------------------------------------
@@ -86,6 +83,7 @@ create table public.matches (
   venue                  text,
   ground_id              uuid references public.grounds(ground_id)
                            on delete set null,
+  sport_id               text not null default 'cricket' references public.sports(sport_id),
   scheduled_start_time   timestamptz not null default now(),
   actual_start_time      timestamptz,
   completed_at           timestamptz,
@@ -151,19 +149,175 @@ create policy "matches_read_all" on public.matches for select
   using (true);
 
 -- Performance Indexes
-create index if not exists idx_matches_status_time on public.matches(status, scheduled_start_time desc);
+create index idx_matches_status_time on public.matches(status, scheduled_start_time desc);
+create index idx_matches_tournament on public.matches(tournament_id) where tournament_id is not null;
+create index idx_matches_team_a on public.matches(team_a_id) where team_a_id is not null;
+create index idx_matches_team_b on public.matches(team_b_id) where team_b_id is not null;
+create index matches_sport_id on public.matches (sport_id);
 
-create index if not exists idx_matches_tournament on public.matches(tournament_id) where tournament_id is not null;
+-- -----------------------------------------------------------------------------
+-- Matches
+-- -----------------------------------------------------------------------------
 
-create index if not exists idx_matches_team_a on public.matches(team_a_id) where team_a_id is not null;
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.matches'::regclass
+      and conname = 'matches_sport_id_fkey'
+  ) then
+    alter table public.matches
+      add constraint matches_sport_id_fkey
+      foreign key (sport_id)
+      references public.sports(sport_id)
+      on update restrict
+      on delete restrict;
+  end if;
+end
+$$;
 
-create index if not exists idx_matches_team_b on public.matches(team_b_id) where team_b_id is not null;
+
+
+comment on column public.matches.sport_id is
+  'Stable sport identity of this match. For tournament/team matches the '
+  'database derives and validates it from the related entities.';
+
+
+
+
 
 -- The scheduler's lookup: "what else is on this ground around this time".
 comment on column public.matches.venue is
   'Free-text ground name, NULL when unknown. Retained for casual matches with '
   'no registered ground. Tournament fixtures should set ground_id and mirror '
   'the name here for display.';
+
+
+-- =============================================================================
+-- 7. Match sport integrity
+-- =============================================================================
+--
+-- The match sport is authoritative on the match row, but when relations are
+-- present the database derives it from:
+--
+--   tournament
+--   team A
+--   team B
+--
+-- All supplied relations must agree.
+--
+-- This also supports unresolved tournament fixtures where team A/B may still
+-- be NULL.
+-- =============================================================================
+
+
+create or replace function public.enforce_match_sport()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_tournament_sport text;
+  v_team_a_sport     text;
+  v_team_b_sport     text;
+  v_effective_sport  text;
+begin
+
+  if new.tournament_id is not null then
+    select t.sport_id
+      into v_tournament_sport
+      from public.tournaments t
+     where t.tournament_id = new.tournament_id;
+  end if;
+
+
+  if new.team_a_id is not null then
+    select t.sport_id
+      into v_team_a_sport
+      from public.teams t
+     where t.team_id = new.team_a_id;
+  end if;
+
+
+  if new.team_b_id is not null then
+    select t.sport_id
+      into v_team_b_sport
+      from public.teams t
+     where t.team_id = new.team_b_id;
+  end if;
+
+
+  -- First ensure the related entities themselves agree.
+
+  if v_team_a_sport is not null
+     and v_team_b_sport is not null
+     and v_team_a_sport is distinct from v_team_b_sport then
+
+    raise exception
+      'Both match teams must belong to the same sport'
+      using errcode = '23514';
+  end if;
+
+
+  if v_tournament_sport is not null
+     and v_team_a_sport is not null
+     and v_tournament_sport is distinct from v_team_a_sport then
+
+    raise exception
+      'Team A sport (%) does not match tournament sport (%)',
+      v_team_a_sport,
+      v_tournament_sport
+      using errcode = '23514';
+  end if;
+
+
+  if v_tournament_sport is not null
+     and v_team_b_sport is not null
+     and v_tournament_sport is distinct from v_team_b_sport then
+
+    raise exception
+      'Team B sport (%) does not match tournament sport (%)',
+      v_team_b_sport,
+      v_tournament_sport
+      using errcode = '23514';
+  end if;
+
+
+  -- Relationships are more authoritative than caller-supplied/default
+  -- sport_id.
+  --
+  -- This is important when a future Football match is inserted by older
+  -- code that still receives the temporary DEFAULT 'cricket'.
+
+  v_effective_sport :=
+    coalesce(
+      v_tournament_sport,
+      v_team_a_sport,
+      v_team_b_sport,
+      new.sport_id,
+      'cricket'
+    );
+
+
+  new.sport_id := v_effective_sport;
+
+  return new;
+end;
+$$;
+
+revoke all
+  on function public.enforce_match_sport()
+  from public, anon, authenticated;
+
+create trigger matches_enforce_sport
+  before insert
+      or update of tournament_id, team_a_id, team_b_id, sport_id
+  on public.matches
+  for each row
+  execute function public.enforce_match_sport();
+
+
 
 create index if not exists matches_ground_time
   on public.matches (ground_id, scheduled_start_time)

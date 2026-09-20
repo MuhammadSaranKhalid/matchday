@@ -239,64 +239,64 @@ $$;
 revoke all on function public.tournament_bowling_leaderboard(uuid, integer) from public;
 grant execute on function public.tournament_bowling_leaderboard(uuid, integer) to authenticated;
 
--- -----------------------------------------------------------------------------
--- 4. Organiser credibility (artboard 09).
--- -----------------------------------------------------------------------------
--- The Overview tab for a cup taking registrations is built around the three
--- things a manager actually decides on: *is this organiser trustworthy*, is
--- there room, and is it worth the fee. The first of those had no data behind
--- it — a name was all the client could show. This answers it with the only
--- evidence that means anything: how many cups this person has actually run,
--- and since when.
-create or replace function public.tournament_organizer_profile(
-  p_tournament_id uuid
-)
-returns table (
-  user_id       uuid,
-  display_name  text,
-  username      text,
-  avatar_url    text,
-  city          text,
-  cups_run      integer,
-  first_cup_year integer,
-  completed_cups integer
-)
-language sql
-security definer
-stable
-set search_path = public, pg_temp
-as $$
-  with organiser as (
-    -- tournaments.location is jsonb, same shape as profiles.location; there
-    -- is no flat `city` column (see the tournaments_city index).
-    select t.created_by as uid, t.location->>'city' as city
-      from public.tournaments t
-     where t.tournament_id = p_tournament_id
-  ),
-  history as (
-    select
-      count(*)::integer                                as cups_run,
-      min(extract(year from t2.created_at))::integer   as first_year,
-      count(*) filter (where t2.status = 'completed')::integer as completed
-    from public.tournaments t2, organiser o
-    where t2.created_by = o.uid
-      -- A draft nobody ever published is not a cup they ran.
-      and t2.status <> 'draft'
-  )
-  select
-    pr.user_id,
-    pr.display_name,
-    pr.username,
-    pr.profile_photo_url,
-    -- profiles.location is jsonb; the city lives under its 'city' key.
-    coalesce(o.city, pr.location->>'city'),
-    h.cups_run,
-    h.first_year,
-    h.completed
-  from organiser o
-  join public.profiles pr on pr.user_id = o.uid
-  cross join history h;
-$$;
+-- -- -----------------------------------------------------------------------------
+-- -- 4. Organiser credibility (artboard 09).
+-- -- -----------------------------------------------------------------------------
+-- -- The Overview tab for a cup taking registrations is built around the three
+-- -- things a manager actually decides on: *is this organiser trustworthy*, is
+-- -- there room, and is it worth the fee. The first of those had no data behind
+-- -- it — a name was all the client could show. This answers it with the only
+-- -- evidence that means anything: how many cups this person has actually run,
+-- -- and since when.
+-- create or replace function public.tournament_organizer_profile(
+--   p_tournament_id uuid
+-- )
+-- returns table (
+--   user_id       uuid,
+--   display_name  text,
+--   username      text,
+--   avatar_url    text,
+--   city          text,
+--   cups_run      integer,
+--   first_cup_year integer,
+--   completed_cups integer
+-- )
+-- language sql
+-- security definer
+-- stable
+-- set search_path = public, pg_temp
+-- as $$
+--   with organiser as (
+--     -- tournaments.location is jsonb, same shape as profiles.location; there
+--     -- is no flat `city` column (see the tournaments_city index).
+--     select t.created_by as uid, t.location->>'city' as city
+--       from public.tournaments t
+--      where t.tournament_id = p_tournament_id
+--   ),
+--   history as (
+--     select
+--       count(*)::integer                                as cups_run,
+--       min(extract(year from t2.created_at))::integer   as first_year,
+--       count(*) filter (where t2.status = 'completed')::integer as completed
+--     from public.tournaments t2, organiser o
+--     where t2.created_by = o.uid
+--       -- A draft nobody ever published is not a cup they ran.
+--       and t2.status <> 'draft'
+--   )
+--   select
+--     pr.user_id,
+--     pr.display_name,
+--     pr.username,
+--     pr.profile_photo_url,
+--     -- profiles.location is jsonb; the city lives under its 'city' key.
+--     coalesce(o.city, pr.location->>'city'),
+--     h.cups_run,
+--     h.first_year,
+--     h.completed
+--   from organiser o
+--   join public.profiles pr on pr.user_id = o.uid
+--   cross join history h;
+-- $$;
 
-revoke all on function public.tournament_organizer_profile(uuid) from public;
-grant execute on function public.tournament_organizer_profile(uuid) to authenticated;
+-- revoke all on function public.tournament_organizer_profile(uuid) from public;
+-- grant execute on function public.tournament_organizer_profile(uuid) to authenticated;

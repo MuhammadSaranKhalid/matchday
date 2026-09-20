@@ -47,21 +47,21 @@ create index teams_search_trgm
   on public.teams using gin (search_name gin_trgm_ops)
   where status = 'active' and privacy = 'public';
 
--- 4. Backfill coordinates from each team owner's profile.
--- Run inside a transaction (each migration is wrapped). Idempotent thanks to
--- the `not (location ? 'lat')` guard — repeated runs are a no-op once a team
--- has been seeded once.
-update public.teams t
-set location = coalesce(t.location, '{}'::jsonb)
-  || jsonb_strip_nulls(
-       jsonb_build_object(
-         'lat',          p.location->'lat',
-         'lng',          p.location->'lng',
-         'place_id',     p.location->'place_id',
-         'country_code', p.location->'country_code'
-       )
-     )
-from public.profiles p
-where t.created_by = p.user_id
-  and not (coalesce(t.location, '{}'::jsonb) ? 'lat')
-  and (p.location ? 'lat');
+-- -- 4. Backfill coordinates from each team owner's profile.
+-- -- Run inside a transaction (each migration is wrapped). Idempotent thanks to
+-- -- the `not (location ? 'lat')` guard — repeated runs are a no-op once a team
+-- -- has been seeded once.
+-- update public.teams t
+-- set location = coalesce(t.location, '{}'::jsonb)
+--   || jsonb_strip_nulls(
+--        jsonb_build_object(
+--          'lat',          p.location->'lat',
+--          'lng',          p.location->'lng',
+--          'place_id',     p.location->'place_id',
+--          'country_code', p.location->'country_code'
+--        )
+--      )
+-- from public.profiles p
+-- where t.created_by = p.user_id
+--   and not (coalesce(t.location, '{}'::jsonb) ? 'lat')
+--   and (p.location ? 'lat');

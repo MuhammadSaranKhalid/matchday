@@ -44,18 +44,18 @@ create policy "tournament_grounds_write_organizer"
   using (public.is_tournament_organizer(tournament_id))
   with check (public.is_tournament_organizer(tournament_id));
 
--- Link each tournament to the grounds it listed, preserving array order.
-insert into public.tournament_grounds (tournament_id, ground_id, sort_order)
-select
-  t.tournament_id,
-  g.ground_id,
-  (v.ord - 1)::int
-from public.tournaments t
-cross join lateral jsonb_array_elements(
-  case when jsonb_typeof(t.venues) = 'array' then t.venues else '[]'::jsonb end
-) with ordinality as v(elem, ord)
-join public.grounds g
-  on lower(public.f_unaccent(g.name)) = lower(public.f_unaccent(btrim(v.elem->>'name')))
- and coalesce(g.location->>'city', '') = coalesce(t.location->>'city', '')
-where btrim(coalesce(v.elem->>'name', '')) <> ''
-on conflict (tournament_id, ground_id) do nothing;
+-- -- Link each tournament to the grounds it listed, preserving array order.
+-- insert into public.tournament_grounds (tournament_id, ground_id, sort_order)
+-- select
+--   t.tournament_id,
+--   g.ground_id,
+--   (v.ord - 1)::int
+-- from public.tournaments t
+-- cross join lateral jsonb_array_elements(
+--   case when jsonb_typeof(t.venues) = 'array' then t.venues else '[]'::jsonb end
+-- ) with ordinality as v(elem, ord)
+-- join public.grounds g
+--   on lower(public.f_unaccent(g.name)) = lower(public.f_unaccent(btrim(v.elem->>'name')))
+--  and coalesce(g.location->>'city', '') = coalesce(t.location->>'city', '')
+-- where btrim(coalesce(v.elem->>'name', '')) <> ''
+-- on conflict (tournament_id, ground_id) do nothing;

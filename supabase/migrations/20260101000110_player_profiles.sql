@@ -1,21 +1,11 @@
 -- =============================================================================
--- 0110 · player_profiles
+-- 0110 · cricket_player_profiles
 -- =============================================================================
--- Spec §1.4. Optional 1:1 extension of profiles for users who play. A
--- profile exists for every signed-in user, but a player_profile only exists
--- if the user has filled in cricket-specific details during onboarding's
--- "are you a player?" branch.
+-- Cricket-specific player attributes. Optional 1:1 extension of player_sports
+-- for users who have activated a Cricket player identity.
 --
--- Flow:
---   - Onboarding asks: "Do you play cricket?"
---   - If yes → INSERT into player_profiles (or UPSERT) with batting_style,
---     bowling_style, player_role, preferred_ball_types, years_playing.
---   - If no  → no row written. The Pavilion / leaderboards skip them.
---
--- Stats migrations (claim flow §2.5/§2.6) reference these fields when an
--- unclaimed player's stats merge into a real user's account: if the user's
--- player_profile is empty, the unclaimed_players.player_profile JSON is
--- copied over by the cascade trigger.
+-- A row here requires the corresponding (user_id, 'cricket') row in
+-- player_sports. The composite FK enforces this at the database level.
 -- =============================================================================
 
 -- Enums moved to 20260101000000_shared_helpers.sql (the enum catalogue),
@@ -28,7 +18,7 @@ create table public.cricket_player_profiles (
   user_id               uuid primary key
                           references public.profiles(user_id) on delete cascade,
   sport_id              text not null default 'cricket'
-                          references public.sports(sport_id) on update restrict on delete restrict,
+                          check (sport_id = 'cricket'),
   batting_style         public.batting_style,
   bowling_style         public.bowling_style,
   player_role           public.player_role,
@@ -43,39 +33,10 @@ create trigger cricket_player_profiles_set_updated_at
   before update on public.cricket_player_profiles
   for each row execute function public.set_updated_at();
 
--- Clean object names left behind by PostgreSQL's table rename.
-
-alter table public.cricket_player_profiles
-  rename constraint player_profiles_pkey
-  to cricket_player_profiles_pkey;
-
-alter table public.cricket_player_profiles
-  rename constraint player_profiles_years_playing_check
-  to cricket_player_profiles_years_playing_check;
-
-alter trigger player_profiles_set_updated_at
-  on public.cricket_player_profiles
-  rename to cricket_player_profiles_set_updated_at;
-
 
 -- =============================================================================
--- 5. Bind the Cricket profile to player_sports
+-- Bind the Cricket profile to player_sports
 -- =============================================================================
-
-alter table public.cricket_player_profiles
-  add column sport_id text not null default 'cricket';
-
-
--- This table can NEVER accidentally contain Football/etc. data.
-
-alter table public.cricket_player_profiles
-  add constraint cricket_player_profiles_sport_check
-  check (sport_id = 'cricket');
-
-
--- The old table referenced profiles directly.
---
--- It should now belong to the shared player_sports identity instead:
 --
 -- profiles
 --    ↓
@@ -99,18 +60,11 @@ comment on column public.cricket_player_profiles.sport_id is
 
 
 -- =============================================================================
--- 6. Rebuild Cricket profile RLS with explicit names
+-- RLS
 -- =============================================================================
 
 alter table public.cricket_player_profiles
   enable row level security;
-
-
-drop policy if exists "player_profiles_read_public"
-  on public.cricket_player_profiles;
-
-drop policy if exists "player_profiles_write_self"
-  on public.cricket_player_profiles;
 
 
 create policy "cricket_player_profiles_read_public"
@@ -167,4 +121,3 @@ grant insert, update, delete
 grant all
   on table public.cricket_player_profiles
   to service_role;
-

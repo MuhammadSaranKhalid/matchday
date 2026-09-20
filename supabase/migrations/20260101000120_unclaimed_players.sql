@@ -27,14 +27,11 @@
 
 create table public.unclaimed_players (
   unclaimed_id         uuid primary key default gen_random_uuid(),
+  sport_id             text not null
+                         references public.sports(sport_id) on update restrict on delete restrict,
   display_name         text not null check (length(display_name) between 1 and 80),
   phone_number         text,
   email                text,
-
-  -- Inline player profile (same shape as player_profiles fields). Stored as
-  -- jsonb so unclaimed players appear in stats with their batting/bowling
-  -- style without needing a real player_profiles row.
-  player_profile       jsonb not null default '{}'::jsonb,
 
   -- Manager who created this placeholder, NULL once they delete their account
   -- (or for the synthetic placeholder delete_user creates for a departing
@@ -62,6 +59,10 @@ create table public.unclaimed_players (
                          lower(public.f_unaccent(coalesce(display_name, '')))
                        ) stored,
 
+  -- Composite FK target for sport-specific extensions.
+  constraint unclaimed_players_id_sport_unique
+    unique (unclaimed_id, sport_id),
+
   -- Either both claim columns are null, or both are non-null.
   constraint claim_consistency check (
     (claimed_by_user_id is null and claimed_at is null)
@@ -69,6 +70,7 @@ create table public.unclaimed_players (
   )
 );
 
+create index unclaimed_players_sport_id   on public.unclaimed_players (sport_id);
 create index unclaimed_players_phone     on public.unclaimed_players (phone_number)
   where phone_number is not null;
 create index unclaimed_players_email     on public.unclaimed_players (email)
@@ -76,6 +78,17 @@ create index unclaimed_players_email     on public.unclaimed_players (email)
 create index unclaimed_players_added_by  on public.unclaimed_players (added_by);
 create index unclaimed_players_claimed   on public.unclaimed_players (claimed_by_user_id)
   where claimed_by_user_id is not null;
+
+comment on column public.unclaimed_players.sport_id is
+  'Single sport represented by this unclaimed placeholder. '
+  'Normally derived from the team that created the placeholder.';
+
+-- An existing placeholder never changes sports.
+create trigger unclaimed_players_sport_immutable
+  before update of sport_id
+  on public.unclaimed_players
+  for each row
+  execute function public.prevent_sport_reassignment();
 
 -- Hard guard against double-claim races: two parallel approve_claim_request()
 -- calls on the same unclaimed_id can both pass the FOR UPDATE inside the RPC
@@ -89,6 +102,48 @@ create unique index unclaimed_players_one_claim
 create trigger unclaimed_players_set_updated_at
   before update on public.unclaimed_players
   for each row execute function public.set_updated_at();
+
+-- =============================================================================
+-- Cricket-specific unclaimed profile
+-- =============================================================================
+
+create table public.cricket_unclaimed_player_profiles (
+  unclaimed_id         uuid primary key,
+
+  sport_id             text not null default 'cricket'
+                         check (sport_id = 'cricket'),
+
+  batting_style        public.batting_style,
+  bowling_style        public.bowling_style,
+  player_role          public.player_role,
+
+  preferred_ball_types public.ball_type[]
+                         not null default '{}',
+
+  years_playing        integer
+                         check (
+                           years_playing is null
+                           or years_playing between 0 and 80
+                         ),
+
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+
+  constraint cricket_unclaimed_player_profile_identity_fkey
+    foreign key (unclaimed_id, sport_id)
+    references public.unclaimed_players(unclaimed_id, sport_id)
+    on update restrict
+    on delete cascade
+);
+
+create trigger cricket_unclaimed_player_profiles_set_updated_at
+  before update on public.cricket_unclaimed_player_profiles
+  for each row
+  execute function public.set_updated_at();
+
+comment on table public.cricket_unclaimed_player_profiles is
+  'Cricket-specific attributes for an unclaimed Cricket player. '
+  'The shared unclaimed identity remains in unclaimed_players.';
 
 -- -----------------------------------------------------------------------------
 -- Auto-stamp claimed_at on the first transition of claimed_by_user_id from
@@ -171,10 +226,14 @@ create policy "unclaimed_players_read_public"
   to anon, authenticated
   using (true);
 
-create policy "unclaimed_players_insert_authed"
+-- Shared placeholder creation is RPC-owned.
+-- sport_id must be derived from the team, not trusted from the client.
+create policy "unclaimed_players_no_direct_insert"
   on public.unclaimed_players for insert
   to authenticated
-  with check ((select auth.uid()) = added_by);
+  with check (false);
+
+revoke insert on public.unclaimed_players from authenticated;
 
 create policy "unclaimed_players_update_owner"
   on public.unclaimed_players for update
@@ -186,6 +245,22 @@ create policy "unclaimed_players_delete_owner"
   on public.unclaimed_players for delete
   to authenticated
   using ((select auth.uid()) = added_by);
+
+-- -----------------------------------------------------------------------------
+-- Cricket unclaimed-profile security
+-- -----------------------------------------------------------------------------
+alter table public.cricket_unclaimed_player_profiles enable row level security;
+
+create policy "cricket_unclaimed_profiles_read_public"
+  on public.cricket_unclaimed_player_profiles
+  for select
+  to anon, authenticated
+  using (true);
+
+-- Creation / mutation happens through domain RPCs only.
+revoke all on public.cricket_unclaimed_player_profiles from anon, authenticated;
+grant select on public.cricket_unclaimed_player_profiles to anon, authenticated;
+grant all on public.cricket_unclaimed_player_profiles to service_role;
 
 -- -----------------------------------------------------------------------------
 -- PII: phone_number and email are NOT readable through the API.
@@ -214,7 +289,7 @@ create policy "unclaimed_players_delete_owner"
 revoke select on public.unclaimed_players from anon, authenticated;
 
 grant select (
-  unclaimed_id, display_name, added_by, player_profile,
+  unclaimed_id, sport_id, display_name, added_by,
   claimed_by_user_id, claimed_at, created_at, updated_at, search_name
 ) on public.unclaimed_players to anon, authenticated;
 

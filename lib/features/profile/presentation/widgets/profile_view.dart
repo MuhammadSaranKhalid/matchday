@@ -885,7 +885,7 @@ class _MessageButtonState extends ConsumerState<_MessageButton> {
         );
       },
       (chatId) {
-        context.push('/messages/${chatId}');
+        context.push('/messages/$chatId');
       },
     );
   }

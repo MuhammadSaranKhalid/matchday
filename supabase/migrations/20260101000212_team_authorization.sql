@@ -970,20 +970,180 @@ grant execute on function public.unclaimed_player_contact_for_manager(uuid)
 
 
 -- =============================================================================
--- add_unclaimed_team_member() — the one way to put a placeholder on a roster
+-- add_unclaimed_cricket_team_member() — Canonical Cricket creation RPC
 -- =============================================================================
--- Creating an unclaimed player and rostering them is ONE user action, and it
--- must be one transaction: the two inserts straddle two tables, and a jersey
--- clash on the second would otherwise leave an orphaned placeholder behind.
+
+create or replace function public.add_unclaimed_cricket_team_member(
+  p_team_id uuid,
+  p_display_name text,
+  p_phone_number text default null,
+  p_jersey_number integer default null,
+  p_player_role public.player_role default null,
+  p_batting_style public.batting_style default null,
+  p_bowling_style public.bowling_style default null,
+  p_preferred_ball_types public.ball_type[]
+    default '{}'::public.ball_type[],
+  p_years_playing integer default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_sport text;
+  v_unclaimed_id uuid;
+  v_membership_id uuid;
+begin
+  if v_uid is null then
+    raise exception 'Not authenticated'
+      using errcode = '28000';
+  end if;
+
+  select t.sport_id
+  into v_sport
+  from public.teams t
+  where t.team_id = p_team_id;
+
+  if v_sport is null then
+    raise exception 'Team not found'
+      using errcode = 'P0002';
+  end if;
+
+  if v_sport <> 'cricket' then
+    raise exception
+      'Cricket player details can only be added to a Cricket team'
+      using errcode = '23514';
+  end if;
+
+  if not public.can(
+    'team',
+    p_team_id,
+    'team.roster.write'
+  ) then
+    raise exception
+      'Only team staff can add players'
+      using errcode = '42501';
+  end if;
+
+  if p_years_playing is not null
+     and p_years_playing not between 0 and 80 then
+    raise exception
+      'years_playing must be between 0 and 80'
+      using errcode = '22023';
+  end if;
+
+  -- Sport is derived from the team.
+  insert into public.unclaimed_players (
+    sport_id,
+    display_name,
+    phone_number,
+    added_by
+  )
+  values (
+    v_sport,
+    trim(p_display_name),
+    nullif(trim(p_phone_number), ''),
+    v_uid
+  )
+  returning unclaimed_id
+  into v_unclaimed_id;
+
+  -- The sport-specific extension is optional.
+  if p_player_role is not null
+     or p_batting_style is not null
+     or p_bowling_style is not null
+     or coalesce(
+       cardinality(p_preferred_ball_types),
+       0
+     ) > 0
+     or p_years_playing is not null then
+
+    insert into public.cricket_unclaimed_player_profiles (
+      unclaimed_id,
+      sport_id,
+      player_role,
+      batting_style,
+      bowling_style,
+      preferred_ball_types,
+      years_playing
+    )
+    values (
+      v_unclaimed_id,
+      'cricket',
+      p_player_role,
+      p_batting_style,
+      p_bowling_style,
+      coalesce(
+        p_preferred_ball_types,
+        '{}'::public.ball_type[]
+      ),
+      p_years_playing
+    );
+  end if;
+
+  insert into public.team_members (
+    team_id,
+    unclaimed_id,
+    jersey_number,
+    added_by
+  )
+  values (
+    p_team_id,
+    v_unclaimed_id,
+    p_jersey_number,
+    v_uid
+  )
+  returning membership_id
+  into v_membership_id;
+
+  return v_membership_id;
+end;
+$$;
+
+revoke all
+  on function public.add_unclaimed_cricket_team_member(
+    uuid,
+    text,
+    text,
+    integer,
+    public.player_role,
+    public.batting_style,
+    public.bowling_style,
+    public.ball_type[],
+    integer
+  )
+  from public;
+
+grant execute
+  on function public.add_unclaimed_cricket_team_member(
+    uuid,
+    text,
+    text,
+    integer,
+    public.player_role,
+    public.batting_style,
+    public.bowling_style,
+    public.ball_type[],
+    integer
+  )
+  to authenticated;
+
+-- =============================================================================
+-- Compatibility shim for currently installed app versions
+-- =============================================================================
 --
--- SECURITY DEFINER since 2026-09-11 (was INVOKER): team_members INSERT is now
--- RPC-only, so this has to be able to write it. The explicit permission check
--- below is therefore load-bearing, not just a nicer error.
+-- Keep the old RPC temporarily.
+-- It no longer stores JSON; it translates old values into the canonical
+-- Cricket vocabulary and calls the typed RPC.
+-- =============================================================================
+
 create or replace function public.add_unclaimed_team_member(
-  p_team_id        uuid,
-  p_display_name   text,
-  p_phone_number   text default null,
-  p_jersey_number  integer default null,
+  p_team_id uuid,
+  p_display_name text,
+  p_phone_number text default null,
+  p_jersey_number integer default null,
   p_player_profile jsonb default '{}'::jsonb
 )
 returns uuid
@@ -992,39 +1152,112 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_unclaimed_id  uuid;
-  v_membership_id uuid;
+  v_role public.player_role;
+  v_batting public.batting_style;
+  v_bowling public.bowling_style;
 begin
-  if auth.uid() is null
-     or not public.can('team', p_team_id, 'team.roster.write') then
-    raise exception 'Only team staff can add players' using errcode = '42501';
-  end if;
+  v_role :=
+    case coalesce(
+      p_player_profile ->> 'player_role',
+      p_player_profile ->> 'playing_role'
+    )
+      when 'batter'
+        then 'batter'::public.player_role
+      when 'bowler'
+        then 'bowler'::public.player_role
+      when 'all_rounder'
+        then 'all_rounder'::public.player_role
+      when 'wicket_keeper'
+        then 'wicket_keeper'::public.player_role
+      else null
+    end;
 
-  insert into public.unclaimed_players
-    (display_name, phone_number, player_profile, added_by)
-  values
-    (p_display_name,
-     nullif(trim(p_phone_number), ''),
-     coalesce(p_player_profile, '{}'::jsonb),
-     (select auth.uid()))
-  returning unclaimed_id into v_unclaimed_id;
+  v_batting :=
+    case p_player_profile ->> 'batting_style'
+      when 'rhb'
+        then 'right_hand'::public.batting_style
+      when 'right_hand'
+        then 'right_hand'::public.batting_style
+      when 'lhb'
+        then 'left_hand'::public.batting_style
+      when 'left_hand'
+        then 'left_hand'::public.batting_style
+      else null
+    end;
 
-  -- A duplicate jersey raises here, and the placeholder above goes with it.
-  insert into public.team_members
-    (team_id, unclaimed_id, jersey_number, added_by)
-  values
-    (p_team_id, v_unclaimed_id, p_jersey_number, (select auth.uid()))
-  returning membership_id into v_membership_id;
-  -- No set_config: the default is 'player', which is the only role flagged
-  -- allows_unclaimed — and the only one guard_role_needs_account would permit.
+  v_bowling :=
+    case p_player_profile ->> 'bowling_style'
+      when 'rfm'
+        then 'right_arm_fast'::public.bowling_style
+      when 'rmf'
+        then 'right_arm_medium'::public.bowling_style
+      when 'lfm'
+        then 'left_arm_fast'::public.bowling_style
+      when 'os'
+        then 'right_arm_spin'::public.bowling_style
+      when 'lbg'
+        then 'right_arm_spin'::public.bowling_style
+      when 'sla'
+        then 'left_arm_spin'::public.bowling_style
+      when 'slc'
+        then 'left_arm_spin'::public.bowling_style
 
-  return v_membership_id;
+      when 'right_arm_fast'
+        then 'right_arm_fast'::public.bowling_style
+      when 'right_arm_medium'
+        then 'right_arm_medium'::public.bowling_style
+      when 'right_arm_spin'
+        then 'right_arm_spin'::public.bowling_style
+      when 'left_arm_fast'
+        then 'left_arm_fast'::public.bowling_style
+      when 'left_arm_spin'
+        then 'left_arm_spin'::public.bowling_style
+      when 'doesnt_bowl'
+        then 'doesnt_bowl'::public.bowling_style
+
+      else null
+    end;
+
+  return public.add_unclaimed_cricket_team_member(
+    p_team_id              => p_team_id,
+    p_display_name         => p_display_name,
+    p_phone_number         => p_phone_number,
+    p_jersey_number        => p_jersey_number,
+    p_player_role          => v_role,
+    p_batting_style        => v_batting,
+    p_bowling_style        => v_bowling,
+    p_preferred_ball_types => '{}'::public.ball_type[],
+    p_years_playing        => null
+  );
 end;
 $$;
 
-revoke all on function
-  public.add_unclaimed_team_member(uuid, text, text, integer, jsonb)
+revoke all
+  on function public.add_unclaimed_team_member(
+    uuid,
+    text,
+    text,
+    integer,
+    jsonb
+  )
   from public;
-grant execute on function
-  public.add_unclaimed_team_member(uuid, text, text, integer, jsonb)
+
+grant execute
+  on function public.add_unclaimed_team_member(
+    uuid,
+    text,
+    text,
+    integer,
+    jsonb
+  )
   to authenticated;
+
+comment on function public.add_unclaimed_team_member(
+  uuid,
+  text,
+  text,
+  integer,
+  jsonb
+) is
+  'Deprecated compatibility RPC. New clients use '
+  'add_unclaimed_cricket_team_member().';

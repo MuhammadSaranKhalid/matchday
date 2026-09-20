@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
-import '../../domain/entities/player_skills.dart';
+import '../../../sports/cricket/domain/entities/cricket_player_profile.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
 import '../../domain/value_objects/jersey_number.dart';
@@ -46,7 +46,7 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _jerseyController = TextEditingController();
-  PlayingRole? _selectedPlayingRole;
+  PlayerRole? _selectedPlayingRole;
   BattingStyle? _selectedBattingStyle;
   BowlingStyle? _selectedBowlingStyle;
   bool _isSubmittingOffline = false;
@@ -168,12 +168,12 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
     setState(() => _isSubmittingOffline = true);
 
     final phone = _phoneController.text.trim();
-    final res = await ref.read(teamMembershipRepositoryProvider).addUnclaimedPlayer(
+    final res = await ref.read(teamMembershipRepositoryProvider).addUnclaimedCricketPlayer(
           teamId: widget.team.id,
           displayName: nameRes.getRight().toNullable()!,
           phoneNumber: phone.isNotEmpty ? phone : null,
           jerseyNumber: jersey,
-          playingRole: _selectedPlayingRole,
+          playerRole: _selectedPlayingRole,
           battingStyle: _selectedBattingStyle,
           bowlingStyle: _selectedBowlingStyle,
         );
@@ -561,11 +561,17 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: PlayingRole.values.map((role) {
+          children: PlayerRole.values.map((role) {
             final isSelected = _selectedPlayingRole == role;
+            final label = switch (role) {
+              PlayerRole.batter => 'Batter',
+              PlayerRole.bowler => 'Bowler',
+              PlayerRole.allRounder => 'All-rounder',
+              PlayerRole.wicketKeeper => 'Wicket-keeper',
+            };
             return ChoiceChip(
               label: Text(
-                role.label,
+                label,
                 style: CkType.body(
                   fontSize: 12,
                   fontWeight:
@@ -598,9 +604,13 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
           runSpacing: 8,
           children: BattingStyle.values.map((style) {
             final isSelected = _selectedBattingStyle == style;
+            final label = switch (style) {
+              BattingStyle.rightHand => 'Right-hand',
+              BattingStyle.leftHand => 'Left-hand',
+            };
             return ChoiceChip(
               label: Text(
-                style.label,
+                label,
                 style: CkType.body(
                   fontSize: 12,
                   fontWeight:
@@ -633,9 +643,17 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
           runSpacing: 8,
           children: BowlingStyle.values.map((style) {
             final isSelected = _selectedBowlingStyle == style;
+            final label = switch (style) {
+              BowlingStyle.rightArmFast => 'Right-arm fast',
+              BowlingStyle.rightArmMedium => 'Right-arm medium',
+              BowlingStyle.rightArmSpin => 'Right-arm spin',
+              BowlingStyle.leftArmFast => 'Left-arm fast',
+              BowlingStyle.leftArmSpin => 'Left-arm spin',
+              BowlingStyle.doesntBowl => "Doesn't bowl",
+            };
             return ChoiceChip(
               label: Text(
-                style.label,
+                label,
                 style: CkType.body(
                   fontSize: 12,
                   fontWeight:

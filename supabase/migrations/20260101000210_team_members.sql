@@ -105,5 +105,58 @@ create trigger team_members_set_updated_at
 
 alter table public.team_members enable row level security;
 
+-- -----------------------------------------------------------------------------
+-- Sport integrity: an unclaimed player's sport must match the team's sport.
+-- -----------------------------------------------------------------------------
+create or replace function public.enforce_unclaimed_team_sport()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_team_sport text;
+  v_player_sport text;
+begin
+  if new.unclaimed_id is null then
+    return new;
+  end if;
+
+  select t.sport_id
+  into v_team_sport
+  from public.teams t
+  where t.team_id = new.team_id;
+
+  select up.sport_id
+  into v_player_sport
+  from public.unclaimed_players up
+  where up.unclaimed_id = new.unclaimed_id;
+
+  if v_team_sport is not null
+     and v_player_sport is not null
+     and v_team_sport is distinct from v_player_sport then
+
+    raise exception
+      'Unclaimed player sport (%) does not match team sport (%)',
+      v_player_sport,
+      v_team_sport
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all
+  on function public.enforce_unclaimed_team_sport()
+  from public, anon, authenticated;
+
+create trigger team_members_enforce_unclaimed_sport
+  before insert
+      or update of team_id, unclaimed_id
+  on public.team_members
+  for each row
+  execute function public.enforce_unclaimed_team_sport();
+
 -- Role assignment and policies depend on team_member_roles and can();
 -- they are installed in 20260101000212_team_authorization.sql.
+

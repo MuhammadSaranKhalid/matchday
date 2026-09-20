@@ -47,3 +47,57 @@ create index if not exists idx_match_players_user on public.match_players(user_i
 create index if not exists idx_match_players_unclaimed on public.match_players(unclaimed_id) where unclaimed_id is not null;
 
 create index if not exists idx_match_players_match on public.match_players(match_id);
+
+-- =============================================================================
+-- match_players sport integrity
+-- =============================================================================
+
+create or replace function public.enforce_unclaimed_match_sport()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_match_sport text;
+  v_player_sport text;
+begin
+  if new.unclaimed_id is null then
+    return new;
+  end if;
+
+  select m.sport_id
+  into v_match_sport
+  from public.matches m
+  where m.match_id = new.match_id;
+
+  select up.sport_id
+  into v_player_sport
+  from public.unclaimed_players up
+  where up.unclaimed_id = new.unclaimed_id;
+
+  if v_match_sport is not null
+     and v_player_sport is not null
+     and v_match_sport is distinct from v_player_sport then
+
+    raise exception
+      'Unclaimed player sport (%) does not match match sport (%)',
+      v_player_sport,
+      v_match_sport
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all
+  on function public.enforce_unclaimed_match_sport()
+  from public, anon, authenticated;
+
+create trigger match_players_enforce_unclaimed_sport
+  before insert
+      or update of match_id, unclaimed_id
+  on public.match_players
+  for each row
+  execute function public.enforce_unclaimed_match_sport();
+

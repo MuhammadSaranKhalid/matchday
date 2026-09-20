@@ -65,7 +65,7 @@ final class AddUnclaimedPlayerControllerProvider
 }
 
 String _$addUnclaimedPlayerControllerHash() =>
-    r'e23a90648acd8a0b95791f7f4fc68faca123393d';
+    r'79f594e0193f249b1cd65c6421b0539a17ace98c';
 
 final class AddUnclaimedPlayerControllerFamily extends $Family
     with

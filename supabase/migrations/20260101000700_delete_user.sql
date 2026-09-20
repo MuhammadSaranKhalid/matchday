@@ -67,6 +67,379 @@
 -- `authenticated` role.
 -- =============================================================================
 
+-- =============================================================================
+-- Claim finalization
+-- =============================================================================
+--
+-- Triggered exactly once:
+--
+-- claimed_by_user_id: null -> user_id
+--
+-- It:
+--   * activates player_sports
+--   * merges Cricket profile details
+--   * rewrites team memberships
+--   * rewrites match lineup identity
+--   * preserves match_player_id references where possible
+--
+-- Registered/self-owned Cricket values WIN over manager-entered values.
+-- =============================================================================
+
+create or replace function public.finalize_unclaimed_claim()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_tm record;
+  v_existing_membership uuid;
+
+  v_mp record;
+  v_existing_match_player uuid;
+  v_existing_team_side text;
+begin
+  if old.claimed_by_user_id is not null
+     or new.claimed_by_user_id is null then
+    return new;
+  end if;
+
+  if not exists (
+    select 1
+    from public.profiles p
+    where p.user_id = new.claimed_by_user_id
+  ) then
+    raise exception 'Claim target profile does not exist'
+      using errcode = 'P0002';
+  end if;
+
+  -- ---------------------------------------------------------------------------
+  -- Shared registered-player sport identity.
+  -- ---------------------------------------------------------------------------
+
+  insert into public.player_sports (
+    user_id,
+    sport_id
+  )
+  values (
+    new.claimed_by_user_id,
+    new.sport_id
+  )
+  on conflict (user_id, sport_id)
+  do nothing;
+
+  -- ---------------------------------------------------------------------------
+  -- Cricket profile merge.
+  --
+  -- Existing registered values take precedence.
+  -- Manager-entered unclaimed values only fill missing information.
+  -- ---------------------------------------------------------------------------
+
+  if new.sport_id = 'cricket' then
+
+    insert into public.cricket_player_profiles as cp (
+      user_id,
+      sport_id,
+      batting_style,
+      bowling_style,
+      player_role,
+      preferred_ball_types,
+      years_playing
+    )
+    select
+      new.claimed_by_user_id,
+      'cricket',
+      cup.batting_style,
+      cup.bowling_style,
+      cup.player_role,
+      cup.preferred_ball_types,
+      cup.years_playing
+    from public.cricket_unclaimed_player_profiles cup
+    where cup.unclaimed_id = new.unclaimed_id
+
+    on conflict (user_id)
+    do update set
+      batting_style =
+        coalesce(
+          cp.batting_style,
+          excluded.batting_style
+        ),
+
+      bowling_style =
+        coalesce(
+          cp.bowling_style,
+          excluded.bowling_style
+        ),
+
+      player_role =
+        coalesce(
+          cp.player_role,
+          excluded.player_role
+        ),
+
+      preferred_ball_types =
+        case
+          when cardinality(
+            cp.preferred_ball_types
+          ) = 0
+          then excluded.preferred_ball_types
+          else cp.preferred_ball_types
+        end,
+
+      years_playing =
+        coalesce(
+          cp.years_playing,
+          excluded.years_playing
+        );
+  end if;
+
+  -- ---------------------------------------------------------------------------
+  -- Team membership identity rewrite.
+  -- ---------------------------------------------------------------------------
+
+  for v_tm in
+    select
+      tm.membership_id,
+      tm.team_id,
+      tm.jersey_number,
+      tm.in_squad
+    from public.team_members tm
+    where tm.unclaimed_id = new.unclaimed_id
+    for update
+  loop
+
+    v_existing_membership := null;
+
+    select tm.membership_id
+    into v_existing_membership
+    from public.team_members tm
+    where tm.team_id = v_tm.team_id
+      and tm.user_id = new.claimed_by_user_id
+      and tm.status = 'active'
+    order by tm.joined_at
+    limit 1
+    for update;
+
+    if v_existing_membership is null then
+
+      update public.team_members
+      set
+        user_id = new.claimed_by_user_id,
+        unclaimed_id = null,
+
+        -- Managers cannot decide a signed-in user's primary team.
+        is_primary = false
+      where membership_id = v_tm.membership_id;
+
+    else
+
+      -- Remove the placeholder first so its jersey no longer participates
+      -- in the active-team unique constraint.
+      delete from public.team_members
+      where membership_id = v_tm.membership_id;
+
+      update public.team_members
+      set
+        in_squad =
+          in_squad or v_tm.in_squad,
+
+        jersey_number =
+          coalesce(
+            jersey_number,
+            v_tm.jersey_number
+          )
+      where membership_id =
+        v_existing_membership;
+
+    end if;
+
+  end loop;
+
+  -- ---------------------------------------------------------------------------
+  -- Match lineup identity rewrite.
+  -- ---------------------------------------------------------------------------
+
+  for v_mp in
+    select
+      mp.match_player_id,
+      mp.match_id,
+      mp.team_side,
+      mp.display_name,
+      mp.jersey_number,
+      mp.role,
+      mp.is_in_playing_xi,
+      mp.batting_order
+    from public.match_players mp
+    where mp.unclaimed_id = new.unclaimed_id
+    for update
+  loop
+
+    v_existing_match_player := null;
+    v_existing_team_side := null;
+
+    select
+      mp.match_player_id,
+      mp.team_side
+    into
+      v_existing_match_player,
+      v_existing_team_side
+    from public.match_players mp
+    where mp.match_id = v_mp.match_id
+      and mp.user_id = new.claimed_by_user_id
+    limit 1
+    for update;
+
+    if v_existing_match_player is null then
+
+      -- Keep the existing match_player_id so delivery/wicket FKs remain valid.
+
+      update public.match_players
+      set
+        user_id = new.claimed_by_user_id,
+        unclaimed_id = null
+      where match_player_id =
+        v_mp.match_player_id;
+
+    else
+
+      -- Same real person appearing on both sides is not something we should
+      -- silently merge.
+      if v_existing_team_side is distinct from v_mp.team_side then
+        raise exception
+          'Claim would place the same user on both sides of match %',
+          v_mp.match_id
+          using errcode = '23514';
+      end if;
+
+      -- Repoint every FK to the already-existing registered lineup row.
+
+      update public.matches
+      set player_of_the_match_id =
+        v_existing_match_player
+      where player_of_the_match_id =
+        v_mp.match_player_id;
+
+      update public.match_innings_state
+      set striker_id = v_existing_match_player
+      where striker_id = v_mp.match_player_id;
+
+      update public.match_innings_state
+      set non_striker_id = v_existing_match_player
+      where non_striker_id = v_mp.match_player_id;
+
+      update public.match_innings_state
+      set bowler_id = v_existing_match_player
+      where bowler_id = v_mp.match_player_id;
+
+      update public.match_deliveries
+      set striker_id = v_existing_match_player
+      where striker_id = v_mp.match_player_id;
+
+      update public.match_deliveries
+      set non_striker_id = v_existing_match_player
+      where non_striker_id = v_mp.match_player_id;
+
+      update public.match_deliveries
+      set bowler_id = v_existing_match_player
+      where bowler_id = v_mp.match_player_id;
+
+      update public.match_deliveries
+      set fielder_id = v_existing_match_player
+      where fielder_id = v_mp.match_player_id;
+
+      update public.match_wickets
+      set player_out_id = v_existing_match_player
+      where player_out_id = v_mp.match_player_id;
+
+      update public.match_wickets
+      set credited_bowler_id = v_existing_match_player
+      where credited_bowler_id = v_mp.match_player_id;
+
+      update public.match_wickets
+      set primary_fielder_id = v_existing_match_player
+      where primary_fielder_id = v_mp.match_player_id;
+
+      update public.match_wickets
+      set assisted_fielder_id = v_existing_match_player
+      where assisted_fielder_id = v_mp.match_player_id;
+
+      update public.match_teams
+      set captain_player_id = v_existing_match_player
+      where captain_player_id = v_mp.match_player_id;
+
+      update public.match_teams
+      set keeper_player_id = v_existing_match_player
+      where keeper_player_id = v_mp.match_player_id;
+
+      -- Merge lineup metadata.
+
+      update public.match_players
+      set
+        jersey_number =
+          coalesce(
+            jersey_number,
+            v_mp.jersey_number
+          ),
+
+        role =
+          case
+            when role = 'player'
+            then v_mp.role
+            else role
+          end,
+
+        is_in_playing_xi =
+          is_in_playing_xi
+          or v_mp.is_in_playing_xi,
+
+        batting_order =
+          coalesce(
+            batting_order,
+            v_mp.batting_order
+          )
+      where match_player_id =
+        v_existing_match_player;
+
+      delete from public.match_players
+      where match_player_id =
+        v_mp.match_player_id;
+
+    end if;
+
+  end loop;
+
+  -- Reserved hook for any future derived/career stats.
+
+  perform public.migrate_player_stats(
+    new.unclaimed_id,
+    new.claimed_by_user_id
+  );
+
+  return new;
+end;
+$$;
+
+revoke all
+  on function public.finalize_unclaimed_claim()
+  from public, anon, authenticated;
+
+drop trigger if exists unclaimed_players_finalize_claim
+  on public.unclaimed_players;
+
+create trigger unclaimed_players_finalize_claim
+  after update of claimed_by_user_id
+  on public.unclaimed_players
+  for each row
+  when (
+    old.claimed_by_user_id is null
+    and new.claimed_by_user_id is not null
+  )
+  execute function public.finalize_unclaimed_claim();
+
+
+-- =============================================================================
+-- 0700 · delete_user — self-service account deletion
+-- =============================================================================
 create or replace function public.delete_user()
 returns void
 language plpgsql
@@ -74,92 +447,154 @@ security definer
 set search_path = public, auth, pg_temp
 as $$
 declare
-  v_uid           uuid := auth.uid();
-  v_unclaimed_id  uuid;
-  v_display_name  text;
+  v_uid uuid := auth.uid();
+  v_unclaimed_id uuid;
+  v_sport text;
 begin
   if v_uid is null then
-    raise exception 'Not authenticated' using errcode = '28000';
+    raise exception 'Not authenticated'
+      using errcode = '28000';
   end if;
 
   -- ---------------------------------------------------------------------------
-  -- Match-history promotion (match_players.user_id).
-  -- ---------------------------------------------------------------------------
-  -- If the user has EVER appeared in a match lineup, create one
-  -- unclaimed_players placeholder carrying their display name, then
-  -- rewrite all their match_players rows to point at it.
+  -- Preserve historical match lineups.
   --
-  -- Collision guard: if rewriting would put the placeholder on the same
-  -- (match, team_side) as an existing row for the same person (cannot
-  -- happen via app flows but possible via manual data tooling), the
-  -- partial unique on match_players_unique_unclaimed would reject the
-  -- update. The NOT EXISTS subquery skips those rows so the bulk
-  -- update completes; orphans are left as-is for operator review.
-  if exists (select 1 from public.match_players where user_id = v_uid) then
-    select 'Deleted player'
-      into v_display_name
-      from public.profiles
-     where user_id = v_uid;
+  -- A deleted user may have played several sports, so create one anonymous
+  -- placeholder for each sport represented in their match history.
+  -- ---------------------------------------------------------------------------
 
-    -- added_by is left NULL: no manager created this placeholder, and pointing
-    -- it at v_uid would either cascade it away or trip a not-null violation
-    -- when auth.users is deleted below.
-    insert into public.unclaimed_players (display_name, added_by)
-    values (v_display_name, null)
-    returning unclaimed_id into v_unclaimed_id;
+  for v_sport in
+    select distinct m.sport_id
+    from public.match_players mp
+    join public.matches m
+      on m.match_id = mp.match_id
+    where mp.user_id = v_uid
+  loop
 
-    update public.match_players mp1
-       set display_name = 'Deleted player',
-           jersey_number = null,
-           user_id      = null,
-           unclaimed_id = v_unclaimed_id
-     where user_id = v_uid
-       and not exists (
-         select 1 from public.match_players mp2
-          where mp2.match_id     = mp1.match_id
-            and mp2.team_side    = mp1.team_side
-            and mp2.unclaimed_id = v_unclaimed_id
-       );
+    insert into public.unclaimed_players (
+      sport_id,
+      display_name,
+      added_by
+    )
+    values (
+      v_sport,
+      'Deleted player',
+      null
+    )
+    returning unclaimed_id
+    into v_unclaimed_id;
+
+    update public.match_players mp
+    set
+      display_name = 'Deleted player',
+      jersey_number = null,
+      user_id = null,
+      unclaimed_id = v_unclaimed_id
+    from public.matches m
+    where mp.match_id = m.match_id
+      and mp.user_id = v_uid
+      and m.sport_id = v_sport;
+
+  end loop;
+
+  -- ---------------------------------------------------------------------------
+  -- Historical authored rows.
+  -- ---------------------------------------------------------------------------
+
+  update public.matches
+  set created_by = null
+  where created_by = v_uid;
+
+  update public.match_deliveries
+  set recorded_by = null
+  where recorded_by = v_uid;
+
+  update public.team_members
+  set added_by = null
+  where added_by = v_uid;
+
+  update public.unclaimed_players
+  set added_by = null
+  where added_by = v_uid;
+
+  -- ---------------------------------------------------------------------------
+  -- Remove sport-specific manager-entered profile data belonging to
+  -- placeholders previously claimed by this account.
+  -- ---------------------------------------------------------------------------
+
+  delete from public.cricket_unclaimed_player_profiles cup
+  using public.unclaimed_players up
+  where cup.unclaimed_id = up.unclaimed_id
+    and up.claimed_by_user_id = v_uid;
+
+  -- Claimed placeholders survive for historical/audit purposes but no longer
+  -- identify the deleted user.
+
+  update public.unclaimed_players
+  set
+    display_name = 'Deleted player',
+    phone_number = null,
+    email = null,
+    claimed_by_user_id = null,
+    claimed_at = null
+  where claimed_by_user_id = v_uid;
+
+  update public.messages
+  set
+    body = 'This message was deleted',
+    payload = '{}'::jsonb,
+    deleted_at = now()
+  where sender_id = v_uid;
+
+  -- Storage objects must still be removed through the authenticated deletion
+  -- worker before deleting auth.users.
+
+  if exists (
+    select 1
+    from storage.objects o
+    where
+      o.owner_id = v_uid::text
+
+      or (
+        o.bucket_id = 'avatars'
+        and split_part(
+          o.name,
+          '/',
+          1
+        ) = v_uid::text
+      )
+
+      or (
+        o.bucket_id = 'post-media'
+        and exists (
+          select 1
+          from public.posts p
+          where p.author_id = v_uid
+            and p.post_id::text =
+              split_part(
+                o.name,
+                '/',
+                1
+              )
+        )
+      )
+  ) then
+    raise exception
+      'Remove uploaded files before completing account deletion';
   end if;
 
-  -- ---------------------------------------------------------------------------
-  -- Authored-row anonymisation. Belt-and-braces — the FKs already do this
-  -- on cascade, but explicit makes the RPC predictable if the FK actions
-  -- ever change.
-  -- ---------------------------------------------------------------------------
-  update public.matches           set created_by  = null where created_by  = v_uid;
-  update public.match_deliveries  set recorded_by = null where recorded_by = v_uid;
-
-  -- Audit breadcrumbs that must not block the delete. Both FKs are ON DELETE
-  -- SET NULL so this is belt-and-braces, but explicit keeps the RPC readable.
-  update public.team_members      set added_by    = null where added_by    = v_uid;
-  update public.unclaimed_players set added_by    = null where added_by    = v_uid;
-
-  -- ---------------------------------------------------------------------------
-  -- Final cascade. Everything else hung off auth.users / profiles cleans
-  -- up via its own ON DELETE CASCADE.
-  -- ---------------------------------------------------------------------------
-  -- A profile's claimed placeholders must not retain identity/contact data.
-  update public.unclaimed_players set display_name = 'Deleted player',
-    phone_number = null, email = null, player_profile = '{}'::jsonb,
-    claimed_by_user_id = null, claimed_at = null where claimed_by_user_id = v_uid;
-  update public.messages set body = 'This message was deleted', payload = '{}'::jsonb,
-    deleted_at = now() where sender_id = v_uid;
-
-  -- The authenticated Edge Function removes bytes through the Storage API first.
-  -- Deleting storage.objects rows directly would leak the underlying objects.
-  if exists (select 1 from storage.objects o where o.owner_id = v_uid::text
-    or (o.bucket_id = 'avatars' and split_part(o.name, '/', 1) = v_uid::text)
-    or (o.bucket_id = 'post-media' and exists (select 1 from public.posts p
-      where p.author_id = v_uid and p.post_id::text = split_part(o.name, '/', 1)))) then
-    raise exception 'Remove uploaded files before completing account deletion';
-  end if;
-  delete from auth.users where id = v_uid;
+  delete from auth.users
+  where id = v_uid;
 end;
 $$;
 
-revoke all on function public.delete_user() from public;
-grant execute on function public.delete_user() to authenticated;
+revoke all
+  on function public.delete_user()
+  from public;
+
+grant execute
+  on function public.delete_user()
+  to authenticated;
 
 
 -- =============================================================================

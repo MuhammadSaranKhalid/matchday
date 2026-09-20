@@ -386,19 +386,27 @@ class TeamMembershipRemoteDataSource {
     }
   }
 
-  Future<void> addUnclaimedPlayer({
+  Future<void> addUnclaimedCricketPlayer({
     required String teamId,
     required String displayName,
     String? phoneNumber,
     int? jerseyNumber,
-    Map<String, dynamic> playerProfile = const {},
+    String? playerRole,
+    String? battingStyle,
+    String? bowlingStyle,
+    List<String> preferredBallTypes = const [],
+    int? yearsPlaying,
   }) =>
-      _rpc('add_unclaimed_team_member', {
+      _rpc('add_unclaimed_cricket_team_member', {
         'p_team_id': teamId,
         'p_display_name': displayName,
         'p_phone_number': phoneNumber,
         'p_jersey_number': jerseyNumber,
-        'p_player_profile': playerProfile,
+        'p_player_role': playerRole,
+        'p_batting_style': battingStyle,
+        'p_bowling_style': bowlingStyle,
+        'p_preferred_ball_types': preferredBallTypes,
+        'p_years_playing': yearsPlaying,
       });
 
   Future<void> sendTeamInvite({

@@ -94,7 +94,7 @@ class _DirectInfo extends StatelessWidget {
           const SizedBox(height: 28),
           _InfoCard(
             children: [
-              _InfoRow(
+              const _InfoRow(
                 icon: Icons.person_outline_rounded,
                 label: 'Conversation',
                 value: 'Direct message',

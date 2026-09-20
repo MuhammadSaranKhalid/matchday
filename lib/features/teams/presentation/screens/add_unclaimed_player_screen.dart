@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
-import '../../domain/entities/player_skills.dart';
+import '../../../sports/cricket/domain/entities/cricket_player_profile.dart';
 import '../controllers/add_unclaimed_player_controller.dart';
 import '../state/add_unclaimed_player_state.dart';
 
@@ -51,7 +51,7 @@ class AddUnclaimedPlayerScreen extends ConsumerWidget {
                       : _DetailsStep(
                           state: state,
                           onJersey: controller.setJersey,
-                          onRole: controller.setPlayingRole,
+                          onRole: controller.setPlayerRole,
                           onBatting: controller.setBattingStyle,
                           onBowling: controller.setBowlingStyle,
                         ),
@@ -208,9 +208,30 @@ class _DetailsStep extends StatelessWidget {
   });
   final AddUnclaimedPlayerState state;
   final ValueChanged<String> onJersey;
-  final ValueChanged<PlayingRole?> onRole;
+  final ValueChanged<PlayerRole?> onRole;
   final ValueChanged<BattingStyle?> onBatting;
   final ValueChanged<BowlingStyle?> onBowling;
+
+  static String _roleLabel(PlayerRole r) => switch (r) {
+        PlayerRole.batter => 'Batter',
+        PlayerRole.bowler => 'Bowler',
+        PlayerRole.allRounder => 'All-rounder',
+        PlayerRole.wicketKeeper => 'Wicket-keeper',
+      };
+
+  static String _battingLabel(BattingStyle b) => switch (b) {
+        BattingStyle.rightHand => 'Right-hand',
+        BattingStyle.leftHand => 'Left-hand',
+      };
+
+  static String _bowlingLabel(BowlingStyle b) => switch (b) {
+        BowlingStyle.rightArmFast => 'Right-arm fast',
+        BowlingStyle.rightArmMedium => 'Right-arm medium',
+        BowlingStyle.rightArmSpin => 'Right-arm spin',
+        BowlingStyle.leftArmFast => 'Left-arm fast',
+        BowlingStyle.leftArmSpin => 'Left-arm spin',
+        BowlingStyle.doesntBowl => "Doesn't bowl",
+      };
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -249,10 +270,10 @@ class _DetailsStep extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           _label('PLAYING ROLE'),
-          _OptionWrap<PlayingRole>(
-            values: PlayingRole.values,
-            selected: state.playingRole,
-            label: (value) => value.label,
+          _OptionWrap<PlayerRole>(
+            values: PlayerRole.values,
+            selected: state.playerRole,
+            label: _roleLabel,
             onTap: onRole,
           ),
           const SizedBox(height: 20),
@@ -260,7 +281,7 @@ class _DetailsStep extends StatelessWidget {
           _OptionWrap<BattingStyle>(
             values: BattingStyle.values,
             selected: state.battingStyle,
-            label: (value) => value.label,
+            label: _battingLabel,
             onTap: onBatting,
           ),
           const SizedBox(height: 20),
@@ -268,7 +289,7 @@ class _DetailsStep extends StatelessWidget {
           _OptionWrap<BowlingStyle>(
             values: BowlingStyle.values,
             selected: state.bowlingStyle,
-            label: (value) => value.label,
+            label: _bowlingLabel,
             onTap: onBowling,
           ),
           if (state.submitError != null) ...[

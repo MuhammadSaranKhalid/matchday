@@ -145,7 +145,7 @@ function searchPlayers(sql: any, q: string, limit: number) {
                                             as follower_count,
         coalesce(word_similarity(${q}, p.search_name), 0)::float8 as score
       from public.profiles p
-      left join public.player_profiles pp on pp.user_id = p.user_id
+      left join public.cricket_player_profiles pp on pp.user_id = p.user_id
       where p.account_status = 'active'
         and coalesce((p.discoverability->>'appear_in_search')::boolean, true)
         and (p.search_name like ${q} || '%' or ${q} <% p.search_name)
@@ -159,9 +159,9 @@ function searchPlayers(sql: any, q: string, limit: number) {
         null::text                          as username,
         null::text                          as photo_url,
         null::text                          as city,
-        u.player_profile->>'player_role'    as player_role,
-        u.player_profile->>'batting_style'  as batting_style,
-        u.player_profile->>'bowling_style'  as bowling_style,
+        cup.player_role::text               as player_role,
+        cup.batting_style::text             as batting_style,
+        cup.bowling_style::text             as bowling_style,
         false                               as is_verified,
         true                                as is_unclaimed,
         (select t.team_name
@@ -175,6 +175,7 @@ function searchPlayers(sql: any, q: string, limit: number) {
         -- a signed-up player is the more useful result for the same string.
         (coalesce(word_similarity(${q}, u.search_name), 0) * 0.9)::float8 as score
       from public.unclaimed_players u
+      left join public.cricket_unclaimed_player_profiles cup on cup.unclaimed_id = u.unclaimed_id
       where u.claimed_by_user_id is null
         and (u.search_name like ${q} || '%' or ${q} <% u.search_name)
     )
@@ -311,7 +312,7 @@ async function browse(sql: any, actor: string) {
                                as follower_count,
         0::float8              as score
       from public.profiles p
-      left join public.player_profiles pp on pp.user_id = p.user_id
+      left join public.cricket_player_profiles pp on pp.user_id = p.user_id
       where p.account_status = 'active'
         and coalesce((p.discoverability->>'appear_in_search')::boolean, true)
         and p.username is not null

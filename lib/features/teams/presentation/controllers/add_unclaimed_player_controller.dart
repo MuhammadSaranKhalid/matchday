@@ -1,7 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
-import '../../domain/entities/player_skills.dart';
+import '../../../sports/cricket/domain/entities/cricket_player_profile.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/value_objects/jersey_number.dart';
 import '../../domain/value_objects/player_display_name.dart';
@@ -19,8 +19,8 @@ class AddUnclaimedPlayerController extends _$AddUnclaimedPlayerController {
   void setName(String v) => state = state.copyWith(name: v, submitError: null);
   void setJersey(String v) =>
       state = state.copyWith(jersey: v, submitError: null);
-  void setPlayingRole(PlayingRole? r) =>
-      state = state.copyWith(playingRole: r, submitError: null);
+  void setPlayerRole(PlayerRole? r) =>
+      state = state.copyWith(playerRole: r, submitError: null);
   void setBattingStyle(BattingStyle? b) =>
       state = state.copyWith(battingStyle: b, submitError: null);
   void setBowlingStyle(BowlingStyle? b) =>
@@ -64,13 +64,15 @@ class AddUnclaimedPlayerController extends _$AddUnclaimedPlayerController {
       jersey = jerseyRes.getRight().toNullable();
     }
 
-    final result = await ref.read(teamMembershipRepositoryProvider).addUnclaimedPlayer(
+    final result = await ref.read(teamMembershipRepositoryProvider).addUnclaimedCricketPlayer(
           teamId: TeamId(teamId),
           displayName: nameRes.getRight().toNullable()!,
           jerseyNumber: jersey,
-          playingRole: state.playingRole,
+          playerRole: state.playerRole,
           battingStyle: state.battingStyle,
           bowlingStyle: state.bowlingStyle,
+          preferredBallTypes: state.preferredBallTypes,
+          yearsPlaying: state.yearsPlaying,
         );
 
     state = result.fold(

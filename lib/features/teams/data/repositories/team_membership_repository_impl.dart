@@ -2,7 +2,7 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
-import '../../domain/entities/player_skills.dart';
+import '../../../sports/cricket/domain/entities/cricket_player_profile.dart';
 import '../../domain/entities/roster_member.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_claim_request.dart';
@@ -257,25 +257,28 @@ class TeamMembershipRepositoryImpl implements TeamMembershipRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> addUnclaimedPlayer({
+  Future<Either<Failure, Unit>> addUnclaimedCricketPlayer({
     required TeamId teamId,
     required PlayerDisplayName displayName,
     String? phoneNumber,
     JerseyNumber? jerseyNumber,
-    PlayingRole? playingRole,
+    PlayerRole? playerRole,
     BattingStyle? battingStyle,
     BowlingStyle? bowlingStyle,
+    List<BallType> preferredBallTypes = const [],
+    int? yearsPlaying,
   }) =>
-      _run(() => _remote.addUnclaimedPlayer(
+      _run(() => _remote.addUnclaimedCricketPlayer(
             teamId: teamId.value,
             displayName: displayName.value,
             phoneNumber: phoneNumber?.trim(),
             jerseyNumber: jerseyNumber?.value,
-            playerProfile: {
-              if (playingRole != null) 'playing_role': playingRole.wire,
-              if (battingStyle != null) 'batting_style': battingStyle.wire,
-              if (bowlingStyle != null) 'bowling_style': bowlingStyle.wire,
-            },
+            playerRole: playerRole?.wire,
+            battingStyle: battingStyle?.wire,
+            bowlingStyle: bowlingStyle?.wire,
+            preferredBallTypes:
+                preferredBallTypes.map((e) => e.wire).toList(),
+            yearsPlaying: yearsPlaying,
           ));
 
   @override

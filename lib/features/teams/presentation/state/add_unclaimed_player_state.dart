@@ -1,6 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import '../../domain/entities/player_skills.dart';
+import '../../../sports/cricket/domain/entities/cricket_player_profile.dart';
 
 part 'add_unclaimed_player_state.freezed.dart';
 
@@ -12,9 +12,11 @@ abstract class AddUnclaimedPlayerState with _$AddUnclaimedPlayerState {
     @Default(AddUnclaimedPlayerStep.name) AddUnclaimedPlayerStep step,
     @Default('') String name,
     @Default('') String jersey,
-    PlayingRole? playingRole,
+    PlayerRole? playerRole,
     BattingStyle? battingStyle,
     BowlingStyle? bowlingStyle,
+    @Default([]) List<BallType> preferredBallTypes,
+    int? yearsPlaying,
     @Default(false) bool submitting,
     String? submitError,
   }) = _AddUnclaimedPlayerState;
@@ -23,9 +25,11 @@ abstract class AddUnclaimedPlayerState with _$AddUnclaimedPlayerState {
 
   bool get hasDetails =>
       jersey.trim().isNotEmpty ||
-      playingRole != null ||
+      playerRole != null ||
       battingStyle != null ||
-      bowlingStyle != null;
+      bowlingStyle != null ||
+      preferredBallTypes.isNotEmpty ||
+      yearsPlaying != null;
 
   int? get jerseyNumber {
     final trimmed = jersey.trim();

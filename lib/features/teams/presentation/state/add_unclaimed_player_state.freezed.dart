@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$AddUnclaimedPlayerState {
 
- AddUnclaimedPlayerStep get step; String get name; String get jersey; PlayingRole? get playingRole; BattingStyle? get battingStyle; BowlingStyle? get bowlingStyle; bool get submitting; String? get submitError;
+ AddUnclaimedPlayerStep get step; String get name; String get jersey; PlayerRole? get playerRole; BattingStyle? get battingStyle; BowlingStyle? get bowlingStyle; List<BallType> get preferredBallTypes; int? get yearsPlaying; bool get submitting; String? get submitError;
 /// Create a copy of AddUnclaimedPlayerState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +25,16 @@ $AddUnclaimedPlayerStateCopyWith<AddUnclaimedPlayerState> get copyWith => _$AddU
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AddUnclaimedPlayerState&&(identical(other.step, step) || other.step == step)&&(identical(other.name, name) || other.name == name)&&(identical(other.jersey, jersey) || other.jersey == jersey)&&(identical(other.playingRole, playingRole) || other.playingRole == playingRole)&&(identical(other.battingStyle, battingStyle) || other.battingStyle == battingStyle)&&(identical(other.bowlingStyle, bowlingStyle) || other.bowlingStyle == bowlingStyle)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.submitError, submitError) || other.submitError == submitError));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AddUnclaimedPlayerState&&(identical(other.step, step) || other.step == step)&&(identical(other.name, name) || other.name == name)&&(identical(other.jersey, jersey) || other.jersey == jersey)&&(identical(other.playerRole, playerRole) || other.playerRole == playerRole)&&(identical(other.battingStyle, battingStyle) || other.battingStyle == battingStyle)&&(identical(other.bowlingStyle, bowlingStyle) || other.bowlingStyle == bowlingStyle)&&const DeepCollectionEquality().equals(other.preferredBallTypes, preferredBallTypes)&&(identical(other.yearsPlaying, yearsPlaying) || other.yearsPlaying == yearsPlaying)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.submitError, submitError) || other.submitError == submitError));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,step,name,jersey,playingRole,battingStyle,bowlingStyle,submitting,submitError);
+int get hashCode => Object.hash(runtimeType,step,name,jersey,playerRole,battingStyle,bowlingStyle,const DeepCollectionEquality().hash(preferredBallTypes),yearsPlaying,submitting,submitError);
 
 @override
 String toString() {
-  return 'AddUnclaimedPlayerState(step: $step, name: $name, jersey: $jersey, playingRole: $playingRole, battingStyle: $battingStyle, bowlingStyle: $bowlingStyle, submitting: $submitting, submitError: $submitError)';
+  return 'AddUnclaimedPlayerState(step: $step, name: $name, jersey: $jersey, playerRole: $playerRole, battingStyle: $battingStyle, bowlingStyle: $bowlingStyle, preferredBallTypes: $preferredBallTypes, yearsPlaying: $yearsPlaying, submitting: $submitting, submitError: $submitError)';
 }
 
 
@@ -45,7 +45,7 @@ abstract mixin class $AddUnclaimedPlayerStateCopyWith<$Res>  {
   factory $AddUnclaimedPlayerStateCopyWith(AddUnclaimedPlayerState value, $Res Function(AddUnclaimedPlayerState) _then) = _$AddUnclaimedPlayerStateCopyWithImpl;
 @useResult
 $Res call({
- AddUnclaimedPlayerStep step, String name, String jersey, PlayingRole? playingRole, BattingStyle? battingStyle, BowlingStyle? bowlingStyle, bool submitting, String? submitError
+ AddUnclaimedPlayerStep step, String name, String jersey, PlayerRole? playerRole, BattingStyle? battingStyle, BowlingStyle? bowlingStyle, List<BallType> preferredBallTypes, int? yearsPlaying, bool submitting, String? submitError
 });
 
 
@@ -62,15 +62,17 @@ class _$AddUnclaimedPlayerStateCopyWithImpl<$Res>
 
 /// Create a copy of AddUnclaimedPlayerState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? step = null,Object? name = null,Object? jersey = null,Object? playingRole = freezed,Object? battingStyle = freezed,Object? bowlingStyle = freezed,Object? submitting = null,Object? submitError = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? step = null,Object? name = null,Object? jersey = null,Object? playerRole = freezed,Object? battingStyle = freezed,Object? bowlingStyle = freezed,Object? preferredBallTypes = null,Object? yearsPlaying = freezed,Object? submitting = null,Object? submitError = freezed,}) {
   return _then(_self.copyWith(
 step: null == step ? _self.step : step // ignore: cast_nullable_to_non_nullable
 as AddUnclaimedPlayerStep,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,jersey: null == jersey ? _self.jersey : jersey // ignore: cast_nullable_to_non_nullable
-as String,playingRole: freezed == playingRole ? _self.playingRole : playingRole // ignore: cast_nullable_to_non_nullable
-as PlayingRole?,battingStyle: freezed == battingStyle ? _self.battingStyle : battingStyle // ignore: cast_nullable_to_non_nullable
+as String,playerRole: freezed == playerRole ? _self.playerRole : playerRole // ignore: cast_nullable_to_non_nullable
+as PlayerRole?,battingStyle: freezed == battingStyle ? _self.battingStyle : battingStyle // ignore: cast_nullable_to_non_nullable
 as BattingStyle?,bowlingStyle: freezed == bowlingStyle ? _self.bowlingStyle : bowlingStyle // ignore: cast_nullable_to_non_nullable
-as BowlingStyle?,submitting: null == submitting ? _self.submitting : submitting // ignore: cast_nullable_to_non_nullable
+as BowlingStyle?,preferredBallTypes: null == preferredBallTypes ? _self.preferredBallTypes : preferredBallTypes // ignore: cast_nullable_to_non_nullable
+as List<BallType>,yearsPlaying: freezed == yearsPlaying ? _self.yearsPlaying : yearsPlaying // ignore: cast_nullable_to_non_nullable
+as int?,submitting: null == submitting ? _self.submitting : submitting // ignore: cast_nullable_to_non_nullable
 as bool,submitError: freezed == submitError ? _self.submitError : submitError // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
@@ -157,10 +159,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( AddUnclaimedPlayerStep step,  String name,  String jersey,  PlayingRole? playingRole,  BattingStyle? battingStyle,  BowlingStyle? bowlingStyle,  bool submitting,  String? submitError)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( AddUnclaimedPlayerStep step,  String name,  String jersey,  PlayerRole? playerRole,  BattingStyle? battingStyle,  BowlingStyle? bowlingStyle,  List<BallType> preferredBallTypes,  int? yearsPlaying,  bool submitting,  String? submitError)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _AddUnclaimedPlayerState() when $default != null:
-return $default(_that.step,_that.name,_that.jersey,_that.playingRole,_that.battingStyle,_that.bowlingStyle,_that.submitting,_that.submitError);case _:
+return $default(_that.step,_that.name,_that.jersey,_that.playerRole,_that.battingStyle,_that.bowlingStyle,_that.preferredBallTypes,_that.yearsPlaying,_that.submitting,_that.submitError);case _:
   return orElse();
 
 }
@@ -178,10 +180,10 @@ return $default(_that.step,_that.name,_that.jersey,_that.playingRole,_that.batti
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( AddUnclaimedPlayerStep step,  String name,  String jersey,  PlayingRole? playingRole,  BattingStyle? battingStyle,  BowlingStyle? bowlingStyle,  bool submitting,  String? submitError)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( AddUnclaimedPlayerStep step,  String name,  String jersey,  PlayerRole? playerRole,  BattingStyle? battingStyle,  BowlingStyle? bowlingStyle,  List<BallType> preferredBallTypes,  int? yearsPlaying,  bool submitting,  String? submitError)  $default,) {final _that = this;
 switch (_that) {
 case _AddUnclaimedPlayerState():
-return $default(_that.step,_that.name,_that.jersey,_that.playingRole,_that.battingStyle,_that.bowlingStyle,_that.submitting,_that.submitError);case _:
+return $default(_that.step,_that.name,_that.jersey,_that.playerRole,_that.battingStyle,_that.bowlingStyle,_that.preferredBallTypes,_that.yearsPlaying,_that.submitting,_that.submitError);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -198,10 +200,10 @@ return $default(_that.step,_that.name,_that.jersey,_that.playingRole,_that.batti
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( AddUnclaimedPlayerStep step,  String name,  String jersey,  PlayingRole? playingRole,  BattingStyle? battingStyle,  BowlingStyle? bowlingStyle,  bool submitting,  String? submitError)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( AddUnclaimedPlayerStep step,  String name,  String jersey,  PlayerRole? playerRole,  BattingStyle? battingStyle,  BowlingStyle? bowlingStyle,  List<BallType> preferredBallTypes,  int? yearsPlaying,  bool submitting,  String? submitError)?  $default,) {final _that = this;
 switch (_that) {
 case _AddUnclaimedPlayerState() when $default != null:
-return $default(_that.step,_that.name,_that.jersey,_that.playingRole,_that.battingStyle,_that.bowlingStyle,_that.submitting,_that.submitError);case _:
+return $default(_that.step,_that.name,_that.jersey,_that.playerRole,_that.battingStyle,_that.bowlingStyle,_that.preferredBallTypes,_that.yearsPlaying,_that.submitting,_that.submitError);case _:
   return null;
 
 }
@@ -213,15 +215,23 @@ return $default(_that.step,_that.name,_that.jersey,_that.playingRole,_that.batti
 
 
 class _AddUnclaimedPlayerState extends AddUnclaimedPlayerState {
-  const _AddUnclaimedPlayerState({this.step = AddUnclaimedPlayerStep.name, this.name = '', this.jersey = '', this.playingRole, this.battingStyle, this.bowlingStyle, this.submitting = false, this.submitError}): super._();
+  const _AddUnclaimedPlayerState({this.step = AddUnclaimedPlayerStep.name, this.name = '', this.jersey = '', this.playerRole, this.battingStyle, this.bowlingStyle, final  List<BallType> preferredBallTypes = const [], this.yearsPlaying, this.submitting = false, this.submitError}): _preferredBallTypes = preferredBallTypes,super._();
   
 
 @override@JsonKey() final  AddUnclaimedPlayerStep step;
 @override@JsonKey() final  String name;
 @override@JsonKey() final  String jersey;
-@override final  PlayingRole? playingRole;
+@override final  PlayerRole? playerRole;
 @override final  BattingStyle? battingStyle;
 @override final  BowlingStyle? bowlingStyle;
+ final  List<BallType> _preferredBallTypes;
+@override@JsonKey() List<BallType> get preferredBallTypes {
+  if (_preferredBallTypes is EqualUnmodifiableListView) return _preferredBallTypes;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_preferredBallTypes);
+}
+
+@override final  int? yearsPlaying;
 @override@JsonKey() final  bool submitting;
 @override final  String? submitError;
 
@@ -235,16 +245,16 @@ _$AddUnclaimedPlayerStateCopyWith<_AddUnclaimedPlayerState> get copyWith => __$A
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AddUnclaimedPlayerState&&(identical(other.step, step) || other.step == step)&&(identical(other.name, name) || other.name == name)&&(identical(other.jersey, jersey) || other.jersey == jersey)&&(identical(other.playingRole, playingRole) || other.playingRole == playingRole)&&(identical(other.battingStyle, battingStyle) || other.battingStyle == battingStyle)&&(identical(other.bowlingStyle, bowlingStyle) || other.bowlingStyle == bowlingStyle)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.submitError, submitError) || other.submitError == submitError));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AddUnclaimedPlayerState&&(identical(other.step, step) || other.step == step)&&(identical(other.name, name) || other.name == name)&&(identical(other.jersey, jersey) || other.jersey == jersey)&&(identical(other.playerRole, playerRole) || other.playerRole == playerRole)&&(identical(other.battingStyle, battingStyle) || other.battingStyle == battingStyle)&&(identical(other.bowlingStyle, bowlingStyle) || other.bowlingStyle == bowlingStyle)&&const DeepCollectionEquality().equals(other._preferredBallTypes, _preferredBallTypes)&&(identical(other.yearsPlaying, yearsPlaying) || other.yearsPlaying == yearsPlaying)&&(identical(other.submitting, submitting) || other.submitting == submitting)&&(identical(other.submitError, submitError) || other.submitError == submitError));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,step,name,jersey,playingRole,battingStyle,bowlingStyle,submitting,submitError);
+int get hashCode => Object.hash(runtimeType,step,name,jersey,playerRole,battingStyle,bowlingStyle,const DeepCollectionEquality().hash(_preferredBallTypes),yearsPlaying,submitting,submitError);
 
 @override
 String toString() {
-  return 'AddUnclaimedPlayerState(step: $step, name: $name, jersey: $jersey, playingRole: $playingRole, battingStyle: $battingStyle, bowlingStyle: $bowlingStyle, submitting: $submitting, submitError: $submitError)';
+  return 'AddUnclaimedPlayerState(step: $step, name: $name, jersey: $jersey, playerRole: $playerRole, battingStyle: $battingStyle, bowlingStyle: $bowlingStyle, preferredBallTypes: $preferredBallTypes, yearsPlaying: $yearsPlaying, submitting: $submitting, submitError: $submitError)';
 }
 
 
@@ -255,7 +265,7 @@ abstract mixin class _$AddUnclaimedPlayerStateCopyWith<$Res> implements $AddUncl
   factory _$AddUnclaimedPlayerStateCopyWith(_AddUnclaimedPlayerState value, $Res Function(_AddUnclaimedPlayerState) _then) = __$AddUnclaimedPlayerStateCopyWithImpl;
 @override @useResult
 $Res call({
- AddUnclaimedPlayerStep step, String name, String jersey, PlayingRole? playingRole, BattingStyle? battingStyle, BowlingStyle? bowlingStyle, bool submitting, String? submitError
+ AddUnclaimedPlayerStep step, String name, String jersey, PlayerRole? playerRole, BattingStyle? battingStyle, BowlingStyle? bowlingStyle, List<BallType> preferredBallTypes, int? yearsPlaying, bool submitting, String? submitError
 });
 
 
@@ -272,15 +282,17 @@ class __$AddUnclaimedPlayerStateCopyWithImpl<$Res>
 
 /// Create a copy of AddUnclaimedPlayerState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? step = null,Object? name = null,Object? jersey = null,Object? playingRole = freezed,Object? battingStyle = freezed,Object? bowlingStyle = freezed,Object? submitting = null,Object? submitError = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? step = null,Object? name = null,Object? jersey = null,Object? playerRole = freezed,Object? battingStyle = freezed,Object? bowlingStyle = freezed,Object? preferredBallTypes = null,Object? yearsPlaying = freezed,Object? submitting = null,Object? submitError = freezed,}) {
   return _then(_AddUnclaimedPlayerState(
 step: null == step ? _self.step : step // ignore: cast_nullable_to_non_nullable
 as AddUnclaimedPlayerStep,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,jersey: null == jersey ? _self.jersey : jersey // ignore: cast_nullable_to_non_nullable
-as String,playingRole: freezed == playingRole ? _self.playingRole : playingRole // ignore: cast_nullable_to_non_nullable
-as PlayingRole?,battingStyle: freezed == battingStyle ? _self.battingStyle : battingStyle // ignore: cast_nullable_to_non_nullable
+as String,playerRole: freezed == playerRole ? _self.playerRole : playerRole // ignore: cast_nullable_to_non_nullable
+as PlayerRole?,battingStyle: freezed == battingStyle ? _self.battingStyle : battingStyle // ignore: cast_nullable_to_non_nullable
 as BattingStyle?,bowlingStyle: freezed == bowlingStyle ? _self.bowlingStyle : bowlingStyle // ignore: cast_nullable_to_non_nullable
-as BowlingStyle?,submitting: null == submitting ? _self.submitting : submitting // ignore: cast_nullable_to_non_nullable
+as BowlingStyle?,preferredBallTypes: null == preferredBallTypes ? _self._preferredBallTypes : preferredBallTypes // ignore: cast_nullable_to_non_nullable
+as List<BallType>,yearsPlaying: freezed == yearsPlaying ? _self.yearsPlaying : yearsPlaying // ignore: cast_nullable_to_non_nullable
+as int?,submitting: null == submitting ? _self.submitting : submitting // ignore: cast_nullable_to_non_nullable
 as bool,submitError: freezed == submitError ? _self.submitError : submitError // ignore: cast_nullable_to_non_nullable
 as String?,
   ));

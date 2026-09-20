@@ -177,7 +177,7 @@ class RealtimeIngestor {
       // Your ably-auth token already limits chat:<id> to subscribe/publish/
       // presence, so this cannot grant capabilities the token does not have.
       await channel.setOptions(
-        ably.RealtimeChannelOptions(
+        const ably.RealtimeChannelOptions(
           modes: ably.ChannelMode.values,
         ),
       );

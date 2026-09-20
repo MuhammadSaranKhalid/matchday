@@ -59,9 +59,9 @@ class _TeamManageScreenState extends ConsumerState<TeamManageScreen> {
         ref.watch(currentTeamMembershipProvider(widget.teamId));
 
     if (membershipAsync.hasError) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: CkColors.paper,
-        body: const SafeArea(
+        body: SafeArea(
           child: Center(child: Text('Could not verify team access')),
         ),
       );

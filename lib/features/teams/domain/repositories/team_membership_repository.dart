@@ -1,7 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failures.dart';
-import '../entities/player_skills.dart';
+import '../../../sports/cricket/domain/entities/cricket_player_profile.dart';
 import '../entities/roster_member.dart';
 import '../entities/team.dart';
 import '../entities/team_claim_request.dart';
@@ -44,14 +44,16 @@ abstract class TeamMembershipRepository {
 
   Future<Either<Failure, List<Map<String, dynamic>>>> searchUsers(String query);
 
-  Future<Either<Failure, Unit>> addUnclaimedPlayer({
+  Future<Either<Failure, Unit>> addUnclaimedCricketPlayer({
     required TeamId teamId,
     required PlayerDisplayName displayName,
     String? phoneNumber,
     JerseyNumber? jerseyNumber,
-    PlayingRole? playingRole,
+    PlayerRole? playerRole,
     BattingStyle? battingStyle,
     BowlingStyle? bowlingStyle,
+    List<BallType> preferredBallTypes = const [],
+    int? yearsPlaying,
   });
 
   Future<Either<Failure, Unit>> sendTeamInvite({

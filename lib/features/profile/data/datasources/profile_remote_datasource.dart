@@ -4,16 +4,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/profile_dto.dart';
 
-/// Speaks Supabase for the `profiles` + `player_profiles` tables. Returns DTOs,
-/// throws raw exceptions. The profiles row already exists (created by the
+/// Speaks Supabase for the `profiles` table. Returns DTOs, throws raw
+/// exceptions. The profiles row already exists (created by the
 /// `handle_new_auth_user` trigger), so onboarding UPDATEs it — never INSERTs.
-/// Cricketing attributes live in `player_profiles` and are upserted separately.
+///
+/// Cricket-specific attributes live in `cricket_player_profiles` and are
+/// fetched independently by [CricketPlayerProfileRemoteDataSource].
 class ProfileRemoteDataSource {
   ProfileRemoteDataSource(this._supabase);
   final SupabaseClient _supabase;
 
   static const _profiles = 'profiles';
-  static const _playerProfiles = 'player_profiles';
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
@@ -26,21 +27,15 @@ class ProfileRemoteDataSource {
   Future<ProfileDto?> fetchMyProfile() async {
     try {
       final uid = _requireUid();
+
       final row = await _supabase
           .from(_profiles)
           .select()
           .eq('user_id', uid)
           .maybeSingle();
+
       if (row == null) return null;
 
-      // player_profiles is a separate 1:1 table; fold it into the profile map
-      // under the key ProfileDto expects so a single fromJson assembles both.
-      final player = await _supabase
-          .from(_playerProfiles)
-          .select()
-          .eq('user_id', uid)
-          .maybeSingle();
-      row['player_profile'] = player;
       return ProfileDto.fromJson(row);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -50,8 +45,6 @@ class ProfileRemoteDataSource {
   /// Fetch any user's public profile by [username] (the `profiles` table is
   /// publicly readable for active accounts — see the `profiles_read_public`
   /// RLS policy). Returns null when no active profile holds that username.
-  /// Folds the 1:1 `player_profiles` row in under the key [ProfileDto] expects,
-  /// mirroring [fetchMyProfile].
   Future<ProfileDto?> fetchProfileByUsername(String username) async {
     try {
       final row = await _supabase
@@ -59,14 +52,9 @@ class ProfileRemoteDataSource {
           .select()
           .eq('username', username)
           .maybeSingle();
+
       if (row == null) return null;
 
-      final player = await _supabase
-          .from(_playerProfiles)
-          .select()
-          .eq('user_id', row['user_id'] as Object)
-          .maybeSingle();
-      row['player_profile'] = player;
       return ProfileDto.fromJson(row);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -92,8 +80,7 @@ class ProfileRemoteDataSource {
   }
 
   /// Persists onboarding: updates the profiles row (stamping `onboarded_at`)
-  /// and, when the user supplied cricketing attributes, upserts player_profiles.
-  /// Returns the freshly assembled profile.
+  /// and returns the freshly assembled profile.
   Future<ProfileDto> completeOnboarding({
     required String username,
     required String displayName,

@@ -721,7 +721,7 @@ final class MyPlayingTournamentsProvider
 }
 
 String _$myPlayingTournamentsHash() =>
-    r'68495ed248b72a65073d3fbbf835d83f7025c6a0';
+    r'82016014e3f0dc76ace03eb4cf75d23852cb6df5';
 
 /// Ground picker results. Autodispose and keyed by the query so typing does
 /// not accumulate subscriptions.

@@ -65,4 +65,4 @@ final class ChallengesViewProvider
   }
 }
 
-String _$challengesViewHash() => r'49e945b48829a575e77087bc94f251c40b332a16';
+String _$challengesViewHash() => r'cf2f74582b9c9299cb9424ea65c87842804ac67f';

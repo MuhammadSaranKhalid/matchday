@@ -101,7 +101,7 @@ final class OpenMatchPoolProvider
   }
 }
 
-String _$openMatchPoolHash() => r'79d2c4c0f7f819e5e4d122d81d901c4a14a39caa';
+String _$openMatchPoolHash() => r'cfd31a7ba3b920ffdad7e1a24777662347ad5de7';
 
 /// Active match pool challenges hosted by user's own teams.
 
@@ -147,7 +147,7 @@ final class MyPoolRequestsProvider
   }
 }
 
-String _$myPoolRequestsHash() => r'f0538e27ab27012bce929d689c50ccde819f7afe';
+String _$myPoolRequestsHash() => r'6a7ec40ca21c1cfb81838b73c1f87acb1b391b85';
 
 @ProviderFor(myChallenges)
 final myChallengesProvider = MyChallengesProvider._();
@@ -186,7 +186,7 @@ final class MyChallengesProvider
   }
 }
 
-String _$myChallengesHash() => r'5742f843a5de1a25c683d44be6d01e9822ec5683';
+String _$myChallengesHash() => r'4faed2e4a6b790b2343545e6bc0ed47357e9ce71';
 
 /// Applications for a specific match pool challenge.
 
@@ -434,4 +434,4 @@ final class ViewerManagesTeamProvider
   }
 }
 
-String _$viewerManagesTeamHash() => r'011f8e317d1feca15bf070c17d63e5cb19623a5d';
+String _$viewerManagesTeamHash() => r'00c7cc05b17c38e080b2ebb0e10e4509762a5082';

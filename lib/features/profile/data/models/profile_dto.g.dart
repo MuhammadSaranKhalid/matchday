@@ -15,12 +15,6 @@ _ProfileDto _$ProfileDtoFromJson(Map<String, dynamic> json) => _ProfileDto(
   coverPhotoUrl: json['cover_photo_url'] as String?,
   location: json['location'] as Map<String, dynamic>?,
   onboardedAt: json['onboarded_at'] as String?,
-  playerProfile:
-      json['player_profile'] == null
-          ? null
-          : PlayerProfileDto.fromJson(
-            json['player_profile'] as Map<String, dynamic>,
-          ),
 );
 
 Map<String, dynamic> _$ProfileDtoToJson(_ProfileDto instance) =>
@@ -33,5 +27,4 @@ Map<String, dynamic> _$ProfileDtoToJson(_ProfileDto instance) =>
       'cover_photo_url': instance.coverPhotoUrl,
       'location': instance.location,
       'onboarded_at': instance.onboardedAt,
-      'player_profile': instance.playerProfile,
     };

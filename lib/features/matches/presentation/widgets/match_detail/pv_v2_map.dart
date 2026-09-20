@@ -1,4 +1,4 @@
-import '../../../../profile/domain/entities/player_profile.dart';
+import '../../../../sports/cricket/domain/entities/cricket_player_profile.dart';
 import '../../../../teams/domain/entities/team.dart';
 import '../../../../teams/domain/entities/team_membership.dart';
 import '../../../../teams/domain/entities/team_relationship.dart';

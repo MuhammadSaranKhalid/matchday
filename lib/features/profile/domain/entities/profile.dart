@@ -1,5 +1,3 @@
-import 'player_profile.dart';
-
 /// A user's public profile. Keyed by [ProfileUserId] — a wrapper over the auth
 /// user id, defined locally so the onboarding domain stays decoupled from the
 /// auth feature's own `UserId`.
@@ -8,6 +6,10 @@ import 'player_profile.dart';
 /// [onboardedAt] (created by the `handle_new_auth_user` Supabase trigger).
 /// Onboarding fills it in and stamps `onboarded_at`; [isComplete] (which reads
 /// that stamp) is the signal the router's onboarding gate reads.
+///
+/// Sport-specific player attributes (e.g. batting/bowling style) are NOT stored
+/// here. They live in their respective sport modules:
+///   - Cricket → `features/sports/cricket/domain/entities/cricket_player_profile.dart`
 class Profile {
   const Profile({
     required this.userId,
@@ -22,7 +24,6 @@ class Profile {
     this.coverUrl,
     this.bio,
     this.onboardedAt,
-    this.playerProfile,
   });
 
   final ProfileUserId userId;
@@ -58,8 +59,6 @@ class Profile {
   /// When onboarding was completed (`profiles.onboarded_at`). Null until then.
   final DateTime? onboardedAt;
 
-  final PlayerProfile? playerProfile;
-
   /// Whether this profile has resolved coordinates (eligible for proximity).
   bool get hasCoordinates => latitude != null && longitude != null;
 
@@ -78,7 +77,6 @@ class Profile {
     String? coverUrl,
     String? bio,
     DateTime? onboardedAt,
-    PlayerProfile? playerProfile,
   }) =>
       Profile(
         userId: userId,
@@ -93,7 +91,6 @@ class Profile {
         coverUrl: coverUrl ?? this.coverUrl,
         bio: bio ?? this.bio,
         onboardedAt: onboardedAt ?? this.onboardedAt,
-        playerProfile: playerProfile ?? this.playerProfile,
       );
 
   @override
@@ -111,8 +108,7 @@ class Profile {
           other.avatarUrl == avatarUrl &&
           other.coverUrl == coverUrl &&
           other.bio == bio &&
-          other.onboardedAt == onboardedAt &&
-          other.playerProfile == playerProfile;
+          other.onboardedAt == onboardedAt;
 
   @override
   int get hashCode => Object.hash(
@@ -128,7 +124,6 @@ class Profile {
         coverUrl,
         bio,
         onboardedAt,
-        playerProfile,
       );
 }
 

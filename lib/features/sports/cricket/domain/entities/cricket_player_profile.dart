@@ -1,13 +1,16 @@
-/// A player's self-described cricketing style, captured (optionally) during
-/// onboarding so teams can scout them. Persisted in the dedicated
-/// `player_profiles` table (one row per user, keyed by user_id) — NOT inline on
-/// the profiles row.
+/// Cricket-specific player identity: a user's self-described cricketing
+/// attributes, captured optionally during onboarding so teams can scout them.
+///
+/// Persisted in [cricket_player_profiles] (keyed by [CricketPlayerUserId]).
+/// A row requires the corresponding (user_id, 'cricket') identity in
+/// [player_sports] — the row's existence is independent of whether any
+/// attributes have been filled in.
 ///
 /// Pure Dart: each enum carries only its stable [wire] value (matching the
-/// Postgres enum labels), used by the DTO at the data boundary. Human-readable
-/// labels live in the presentation layer.
-class PlayerProfile {
-  const PlayerProfile({
+/// Postgres enum labels). Human-readable labels live in the presentation layer.
+class CricketPlayerProfile {
+  const CricketPlayerProfile({
+    required this.userId,
     this.role,
     this.battingStyle,
     this.bowlingStyle,
@@ -15,11 +18,13 @@ class PlayerProfile {
     this.yearsPlaying,
   });
 
+  final CricketPlayerUserId userId;
+
   final PlayerRole? role;
   final BattingStyle? battingStyle;
   final BowlingStyle? bowlingStyle;
 
-  /// Ball materials the player is comfortable with (`player_profiles
+  /// Ball materials the player is comfortable with (`cricket_player_profiles
   /// .preferred_ball_types`, a Postgres `ball_type[]`). May be empty.
   final List<BallType> preferredBallTypes;
 
@@ -34,25 +39,11 @@ class PlayerProfile {
       preferredBallTypes.isNotEmpty ||
       yearsPlaying != null;
 
-  PlayerProfile copyWith({
-    PlayerRole? role,
-    BattingStyle? battingStyle,
-    BowlingStyle? bowlingStyle,
-    List<BallType>? preferredBallTypes,
-    int? yearsPlaying,
-  }) =>
-      PlayerProfile(
-        role: role ?? this.role,
-        battingStyle: battingStyle ?? this.battingStyle,
-        bowlingStyle: bowlingStyle ?? this.bowlingStyle,
-        preferredBallTypes: preferredBallTypes ?? this.preferredBallTypes,
-        yearsPlaying: yearsPlaying ?? this.yearsPlaying,
-      );
-
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PlayerProfile &&
+      other is CricketPlayerProfile &&
+          other.userId == userId &&
           other.role == role &&
           other.battingStyle == battingStyle &&
           other.bowlingStyle == bowlingStyle &&
@@ -61,6 +52,7 @@ class PlayerProfile {
 
   @override
   int get hashCode => Object.hash(
+        userId,
         role,
         battingStyle,
         bowlingStyle,
@@ -76,6 +68,28 @@ class PlayerProfile {
     return true;
   }
 }
+
+/// Typed wrapper around the `cricket_player_profiles.user_id` primary key.
+/// Ensures the cricket identity is never confused with a raw auth uid string.
+class CricketPlayerUserId {
+  const CricketPlayerUserId(this.value);
+
+  final String value;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CricketPlayerUserId && other.value == value;
+
+  @override
+  int get hashCode => value.hashCode;
+
+  @override
+  String toString() => value;
+}
+
+// =============================================================================
+// Cricket enums — Postgres enum vocabulary, moved from profile feature.
+// =============================================================================
 
 /// Maps to the `player_role` Postgres enum.
 enum PlayerRole {

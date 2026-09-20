@@ -20,8 +20,9 @@ import '../../../posts/presentation/widgets/post_card.dart';
 import '../../../teams/domain/entities/team_membership.dart';
 import '../../../teams/domain/entities/team_member.dart';
 import '../../../teams/presentation/providers/team_membership_providers.dart';
-import '../../domain/entities/player_profile.dart';
 import '../../../safety/presentation/widgets/safety_menu.dart';
+import '../../../sports/cricket/domain/entities/cricket_player_profile.dart';
+import '../../../sports/cricket/presentation/providers/cricket_player_profile_providers.dart';
 import '../../domain/entities/profile.dart';
 
 // ── Profile Main Views ────────────────────────────────────────────────────────
@@ -36,6 +37,11 @@ class ProfileView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final postsAsync = ref.watch(authorPostsProvider(profile.userId.value));
+
+    final cricketProfileAsync = ref.watch(
+      cricketPlayerProfileProvider(profile.userId.value),
+    );
+    final cricketProfile = cricketProfileAsync.value;
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -114,11 +120,11 @@ class ProfileView extends ConsumerWidget {
                               ),
 
                               // Role & styles (Cricket Identity)
-                              if (_hasRoleContent)
+                              if (_hasRoleContent(cricketProfile))
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: _RoleStyleLine(
-                                    playerProfile: profile.playerProfile,
+                                    playerProfile: cricketProfile,
                                   ),
                                 ),
 
@@ -482,12 +488,12 @@ class ProfileView extends ConsumerWidget {
     return letters.substring(0, letters.length >= 2 ? 2 : 1).toUpperCase();
   }
 
-  bool get _hasRoleContent {
-    final pp = profile.playerProfile;
+  bool _hasRoleContent(CricketPlayerProfile? pp) {
     if (pp == null) return false;
     return pp.role != null ||
         pp.battingStyle != null ||
-        (pp.bowlingStyle != null && pp.bowlingStyle != BowlingStyle.doesntBowl);
+        (pp.bowlingStyle != null &&
+            pp.bowlingStyle != BowlingStyle.doesntBowl);
   }
 
   Widget _avatar(BuildContext context) {
@@ -723,7 +729,7 @@ class ProfileNotFoundView extends StatelessWidget {
 
 class _RoleStyleLine extends StatelessWidget {
   const _RoleStyleLine({required this.playerProfile});
-  final PlayerProfile? playerProfile;
+  final CricketPlayerProfile? playerProfile;
 
   @override
   Widget build(BuildContext context) {

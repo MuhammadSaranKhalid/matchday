@@ -237,6 +237,10 @@ begin
   )
   returning match_id into v_match_id;
 
+  -- Cricket extension row.
+  insert into public.cricket_matches (match_id, format_code, rules_snapshot)
+  values (v_match_id, v_format->>'format_preset', v_format);
+
   -- Populate Team A match_players
   insert into public.match_players (
     match_id, team_side, profile_id, unclaimed_id, is_captain, is_keeper

@@ -251,91 +251,9 @@ create index cricket_match_players_match
   on public.cricket_match_players (match_id);
 
 
--- Existing writers still write role/is_in_playing_xi/batting_order on
--- match_players. Mirror those fields until Phase 2 moves the writers.
+-- Transitional mirror trigger removed (development: writers populate
+-- cricket_match_players directly in each RPC).
 
-create or replace function public.sync_legacy_match_player_to_cricket_extension()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-begin
-  if not exists (
-    select 1
-    from public.matches m
-    where m.match_id = new.match_id
-      and m.sport_id = 'cricket'
-  ) then
-    return new;
-  end if;
-
-  -- The match INSERT trigger creates cricket_matches before match_players are
-  -- materialised. This guard makes the dependency explicit.
-  if not exists (
-    select 1
-    from public.cricket_matches cm
-    where cm.match_id = new.match_id
-  ) then
-    raise exception
-      'Cricket match extension is missing for match %',
-      new.match_id
-      using errcode = '23503';
-  end if;
-
-  insert into public.cricket_match_players (
-    match_player_id,
-    match_id,
-    is_playing_xi,
-    batting_order,
-    is_captain,
-    is_vice_captain,
-    is_wicket_keeper,
-    is_substitute
-  )
-  values (
-    new.match_player_id,
-    new.match_id,
-    new.is_in_playing_xi,
-    new.batting_order,
-    new.role = 'captain',
-    new.role = 'vice_captain',
-    new.role = 'wicket_keeper',
-    new.role = 'substitute'
-  )
-  on conflict (match_player_id)
-  do update set
-    match_id          = excluded.match_id,
-    is_playing_xi     = excluded.is_playing_xi,
-    batting_order     = excluded.batting_order,
-    is_captain        = excluded.is_captain,
-    is_vice_captain   = excluded.is_vice_captain,
-    is_wicket_keeper  = excluded.is_wicket_keeper,
-    is_substitute     = excluded.is_substitute,
-    updated_at        = now();
-
-  return new;
-end;
-$$;
-
-revoke all
-  on function public.sync_legacy_match_player_to_cricket_extension()
-  from public, anon, authenticated;
-
-
-drop trigger if exists match_players_sync_cricket_extension
-  on public.match_players;
-
-create trigger match_players_sync_cricket_extension
-  after insert
-      or update of
-        match_id,
-        role,
-        is_in_playing_xi,
-        batting_order
-  on public.match_players
-  for each row
-  execute function public.sync_legacy_match_player_to_cricket_extension();
 
 
 -- =============================================================================
@@ -343,15 +261,14 @@ create trigger match_players_sync_cricket_extension
 -- =============================================================================
 
 comment on column public.match_players.role is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored into independent flags on '
-  'cricket_match_players.';
+  'DEPRECATED CRICKET FIELD. Canonical flags live in cricket_match_players '
+  '(is_captain, is_wicket_keeper, is_substitute).';
 
 comment on column public.match_players.is_in_playing_xi is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to '
+  'DEPRECATED CRICKET FIELD. Canonical value lives in '
   'cricket_match_players.is_playing_xi.';
 
 comment on column public.match_players.batting_order is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to '
+  'DEPRECATED CRICKET FIELD. Canonical value lives in '
   'cricket_match_players.batting_order.';
-
 

@@ -20,6 +20,7 @@ export class HttpSignal extends Error {
 export interface RecordDeliveryResult {
   ball: unknown;
   innings: unknown;
+  match: unknown;
   transition: {
     kind: "none" | "innings_break" | "completed";
     result?: unknown;
@@ -32,10 +33,8 @@ export class ScoringService {
     const sql = db();
 
     return await sql.begin(async (tx) => {
-      // 1. Transaction-local Auth context
       await setTransactionJwtClaims(tx, actorId);
 
-      // 2. Writer authorization: Batting side scores their own innings (D12)
       const isAllowed = await matchRepository.checkWriterEntitlement(
         tx,
         input.matchId,
@@ -45,7 +44,6 @@ export class ScoringService {
         throw new HttpSignal(403, "FORBIDDEN", "Only the batting side can score this innings");
       }
 
-      // 3. Innings lock
       const lockedInnings = await matchRepository.lockInningsState(
         tx,
         input.matchId,
@@ -56,13 +54,15 @@ export class ScoringService {
       }
       const inningsId = lockedInnings.inningsId;
 
-      // 4. Match liveness
+      // Reads the shared shell + cricket_matches extension.
       const match = await matchRepository.getMatch(tx, input.matchId);
-      if (match && ["completed", "abandoned", "walkover"].includes(match.status as string)) {
+      if (!match) {
+        throw new HttpSignal(404, "MATCH_NOT_FOUND", "Cricket match not found");
+      }
+      if (["completed", "abandoned", "walkover"].includes(match.status as string)) {
         throw new HttpSignal(409, "MATCH_FINALIZED", "Match is already finished");
       }
 
-      // 5. Duplicate check & Insertion
       const nextSeq = await matchRepository.getNextDeliverySeq(tx, inningsId);
       let ball = await matchRepository.insertDelivery(tx, input, inningsId, nextSeq, actorId);
       let alreadyStored = false;
@@ -76,19 +76,16 @@ export class ScoringService {
         );
       }
 
-      // 6. Fall of wicket recording
       if (!alreadyStored && input.isWicket && input.wicketType) {
         await matchRepository.insertWicket(tx, ball.delivery_id, inningsId, input);
       }
 
-      // 7. Ledger re-summing (D13: Totals derived, never accumulated)
       const updatedState = await matchRepository.resumInningsState(tx, inningsId, input);
 
-      // 8. Innings & Match Transition
       let transition: RecordDeliveryResult["transition"] = { kind: "none" };
 
       if (input.inningsEnded && !alreadyStored) {
-        const fmt = (match?.format ?? {}) as Record<string, unknown>;
+        const fmt = (match.format ?? {}) as Record<string, unknown>;
         const inningsPerSide = Math.max(num(fmt.innings_per_side, 1), 1);
         const isFinalInnings = input.inningsNumber >= inningsPerSide * 2;
 
@@ -121,9 +118,13 @@ export class ScoringService {
         }
       }
 
+      const matchSnapshot =
+        await matchRepository.getCricketMatchDetails(tx, input.matchId);
+
       return {
         ball,
         innings: updatedState,
+        match: matchSnapshot,
         transition,
         duplicate: alreadyStored,
       };
@@ -138,7 +139,6 @@ function num(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-// Map innings_state rows -> result InningsLine[]
 // deno-lint-ignore no-explicit-any
 function toInningsLines(rows: any[], m: any): InningsLine[] {
   const teamA = (m?.team_a_id ?? null) as string | null;

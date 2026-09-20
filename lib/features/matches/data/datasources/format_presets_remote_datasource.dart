@@ -19,6 +19,7 @@ class FormatPresetsRemoteDataSource {
       final rows = await _supabase
           .from(_table)
           .select()
+          .eq('sport_id', 'cricket')
           .eq('is_active', true)
           .order('sort_order');
       return rows.map(FormatPresetDto.fromJson).toList();

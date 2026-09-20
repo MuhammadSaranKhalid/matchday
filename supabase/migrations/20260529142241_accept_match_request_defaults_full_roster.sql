@@ -120,6 +120,10 @@ begin
   )
   returning match_id into v_match_id;
 
+  -- Cricket extension row.
+  insert into public.cricket_matches (match_id, format_code, rules_snapshot)
+  values (v_match_id, v_format->>'format_preset', v_format);
+
   -- ---------------------------------------------------------------------------
   -- MATERIALISE THE PLAYING XIS INTO match_players
   --

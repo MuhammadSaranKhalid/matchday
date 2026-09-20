@@ -32,7 +32,7 @@ class TournamentsRemoteDataSource {
   static const _tournamentsTable = 'tournaments';
   static const _registrationsTable = 'tournament_teams';
   static const _standingsTable = 'tournament_standings';
-  static const _matchesTable = 'matches';
+  static const _cricketMatchesView = 'cricket_match_details';
   static const _followsTable = 'follows';
   static const _groundsTable = 'grounds';
   static const _bannerBucket = 'tournament-banners';
@@ -43,6 +43,57 @@ class TournamentsRemoteDataSource {
     final uid = _supabase.auth.currentUser?.id;
     if (uid == null) throw UnauthorizedException('Must be signed in');
     return uid;
+  }
+
+  Future<Map<String, dynamic>> _matchAction(
+    String action,
+    Map<String, dynamic> params,
+  ) async {
+    try {
+      final res = await _supabase.functions.invoke(
+        'cricket-match-action',
+        body: {
+          'action': action,
+          ...params,
+        },
+      );
+
+      final data = res.data;
+      if (data is Map && data['ok'] == true) {
+        return Map<String, dynamic>.from(data);
+      }
+
+      throw ServerException(
+        data is Map
+            ? (data['error']?['message']?.toString() ??
+                'Tournament match action failed')
+            : 'Tournament match action failed',
+      );
+    } on FunctionException catch (e) {
+      String? message;
+      final details = e.details;
+
+      if (details is Map && details['error'] is Map) {
+        message = (details['error'] as Map)['message']?.toString();
+      }
+
+      if (e is FunctionsFetchException) {
+        throw NetworkException(
+          e.reasonPhrase ?? 'No connection to tournament match service',
+        );
+      }
+
+      if (e.status == 401 || e.status == 403) {
+        throw UnauthorizedException(
+          message ?? 'Not allowed to perform this action',
+        );
+      }
+
+      throw ServerException(
+        message ?? 'Tournament match action failed',
+        statusCode: e.status,
+      );
+    }
   }
 
   // ─── Tournaments ──────────────────────────────────────────────────────────
@@ -418,7 +469,7 @@ class TournamentsRemoteDataSource {
   Future<List<Match>> getTournamentFixtures(String tournamentId) async {
     try {
       final rows = await _supabase
-          .from(_matchesTable)
+          .from(_cricketMatchesView)
           .select()
           .eq('tournament_id', tournamentId)
           .order('bracket_round_number', ascending: true)
@@ -793,18 +844,11 @@ class TournamentsRemoteDataSource {
     required DateTime startTime,
     String? venue,
   }) async {
-    try {
-      await _supabase.rpc<void>(
-        'tournament_reschedule_match',
-        params: {
-          'p_match_id': matchId,
-          'p_start': startTime.toUtc().toIso8601String(),
-          'p_venue': venue,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _matchAction('tournament_reschedule_match', {
+      'p_match_id': matchId,
+      'p_start': startTime.toUtc().toIso8601String(),
+      if (venue != null) 'p_venue': venue,
+    });
   }
 
   Future<void> abandonMatch({
@@ -813,19 +857,13 @@ class TournamentsRemoteDataSource {
     DateTime? rescheduleTo,
     String? reason,
   }) async {
-    try {
-      await _supabase.rpc<void>(
-        'tournament_abandon_match',
-        params: {
-          'p_match_id': matchId,
-          'p_mode': mode,
-          'p_reschedule_to': rescheduleTo?.toUtc().toIso8601String(),
-          'p_reason': reason,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _matchAction('tournament_abandon_match', {
+      'p_match_id': matchId,
+      'p_mode': mode,
+      if (rescheduleTo != null)
+        'p_reschedule_to': rescheduleTo.toUtc().toIso8601String(),
+      if (reason != null) 'p_reason': reason,
+    });
   }
 
   Future<void> declareWalkover({
@@ -833,18 +871,11 @@ class TournamentsRemoteDataSource {
     required String winnerTeamId,
     String? reason,
   }) async {
-    try {
-      await _supabase.rpc<void>(
-        'tournament_declare_walkover',
-        params: {
-          'p_match_id': matchId,
-          'p_winner_team_id': winnerTeamId,
-          'p_reason': reason,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _matchAction('tournament_declare_walkover', {
+      'p_match_id': matchId,
+      'p_winner_team_id': winnerTeamId,
+      if (reason != null) 'p_reason': reason,
+    });
   }
 
   Future<void> overrideResult({
@@ -852,18 +883,11 @@ class TournamentsRemoteDataSource {
     required String winnerTeamId,
     required String reason,
   }) async {
-    try {
-      await _supabase.rpc<void>(
-        'tournament_override_result',
-        params: {
-          'p_match_id': matchId,
-          'p_winner_team_id': winnerTeamId,
-          'p_reason': reason,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _matchAction('tournament_override_result', {
+      'p_match_id': matchId,
+      'p_winner_team_id': winnerTeamId,
+      'p_reason': reason,
+    });
   }
 
   Future<void> setCoOrganizer({
@@ -1048,38 +1072,27 @@ class TournamentsRemoteDataSource {
     TargetMethod method = TargetMethod.runRate,
     String? reason,
   }) async {
-    try {
-      await _supabase.rpc<void>(
-        'tournament_revise_match_conditions',
-        params: {
-          'p_match_id': matchId,
-          'p_revised_overs': revisedOvers,
-          'p_bowler_quota': bowlerQuota,
-          'p_revised_target': revisedTarget,
-          'p_method': method.wire,
-          'p_reason': reason,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _matchAction(
+      'tournament_revise_match_conditions',
+      {
+        'p_match_id': matchId,
+        'p_revised_overs': revisedOvers,
+        'p_bowler_quota': bowlerQuota,
+        if (revisedTarget != null) 'p_revised_target': revisedTarget,
+        'p_method': method.wire,
+        if (reason != null) 'p_reason': reason,
+      },
+    );
   }
 
   Future<void> triggerSuperOver({
     required String matchId,
     required String batsFirstTeamId,
   }) async {
-    try {
-      await _supabase.rpc<void>(
-        'tournament_trigger_super_over',
-        params: {
-          'p_match_id': matchId,
-          'p_bats_first_id': batsFirstTeamId,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _matchAction('tournament_trigger_super_over', {
+      'p_match_id': matchId,
+      'p_bats_first_id': batsFirstTeamId,
+    });
   }
 
   // ─── Leaderboards (artboards 10, 11, 15) ────────────────────────────────────

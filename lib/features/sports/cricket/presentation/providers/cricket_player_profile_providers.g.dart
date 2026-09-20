@@ -10,7 +10,8 @@ part of 'cricket_player_profile_providers.dart';
 // ignore_for_file: type=lint, type=warning
 /// Fetches the [CricketPlayerProfile] for [userId].
 ///
-/// Returns `null` when the user has no Cricket player identity.
+/// Returns `null` when the user has no Cricket-specific profile attributes.
+/// Player identity itself is represented by `player_sports`.
 /// Throws [FailureWrapper] on network/server errors so the UI can pattern-match
 /// `AsyncError` normally.
 
@@ -19,7 +20,8 @@ final cricketPlayerProfileProvider = CricketPlayerProfileFamily._();
 
 /// Fetches the [CricketPlayerProfile] for [userId].
 ///
-/// Returns `null` when the user has no Cricket player identity.
+/// Returns `null` when the user has no Cricket-specific profile attributes.
+/// Player identity itself is represented by `player_sports`.
 /// Throws [FailureWrapper] on network/server errors so the UI can pattern-match
 /// `AsyncError` normally.
 
@@ -35,7 +37,8 @@ final class CricketPlayerProfileProvider
         $FutureProvider<CricketPlayerProfile?> {
   /// Fetches the [CricketPlayerProfile] for [userId].
   ///
-  /// Returns `null` when the user has no Cricket player identity.
+  /// Returns `null` when the user has no Cricket-specific profile attributes.
+  /// Player identity itself is represented by `player_sports`.
   /// Throws [FailureWrapper] on network/server errors so the UI can pattern-match
   /// `AsyncError` normally.
   CricketPlayerProfileProvider._({
@@ -87,7 +90,8 @@ String _$cricketPlayerProfileHash() =>
 
 /// Fetches the [CricketPlayerProfile] for [userId].
 ///
-/// Returns `null` when the user has no Cricket player identity.
+/// Returns `null` when the user has no Cricket-specific profile attributes.
+/// Player identity itself is represented by `player_sports`.
 /// Throws [FailureWrapper] on network/server errors so the UI can pattern-match
 /// `AsyncError` normally.
 
@@ -104,7 +108,8 @@ final class CricketPlayerProfileFamily extends $Family
 
   /// Fetches the [CricketPlayerProfile] for [userId].
   ///
-  /// Returns `null` when the user has no Cricket player identity.
+  /// Returns `null` when the user has no Cricket-specific profile attributes.
+  /// Player identity itself is represented by `player_sports`.
   /// Throws [FailureWrapper] on network/server errors so the UI can pattern-match
   /// `AsyncError` normally.
 

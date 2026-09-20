@@ -160,6 +160,10 @@ begin
   )
   returning match_id into v_match_id;
 
+  -- Cricket extension row (sport is always cricket for match challenges).
+  insert into public.cricket_matches (match_id, format_code, rules_snapshot)
+  values (v_match_id, v_format->>'format_preset', v_format);
+
   -- ---------------------------------------------------------------------------
   -- MATERIALISE THE PLAYING XIS INTO match_players
   --
@@ -236,6 +240,19 @@ begin
        or tm.user_id      = any(v_to_team_xi)
        or tm.unclaimed_id = any(v_to_team_xi)
      );
+
+  -- Populate cricket_match_players for every row just inserted.
+  insert into public.cricket_match_players (
+    match_player_id, match_id,
+    is_playing_xi, batting_order,
+    is_captain, is_wicket_keeper
+  )
+  select mp.match_player_id, mp.match_id,
+         mp.is_in_playing_xi, mp.batting_order,
+         mp.role = 'captain',
+         mp.role = 'wicket_keeper'
+  from public.match_players mp
+  where mp.match_id = v_match_id;
 
   -- Race guard: the inner UPDATE re-asserts the status we read above. If
   -- another concurrent transaction (counter / cancel / decline) already
@@ -349,6 +366,10 @@ begin
   )
   returning match_id into v_match_id;
 
+  -- Cricket extension row.
+  insert into public.cricket_matches (match_id, format_code, rules_snapshot)
+  values (v_match_id, v_format->>'format_preset', v_format);
+
   -- Populate Team A match_players
   insert into public.match_players (
     match_id, team_side, user_id, unclaimed_id, display_name,
@@ -414,6 +435,19 @@ begin
        or tm.user_id      = any(v_app.applicant_xi)
        or tm.unclaimed_id = any(v_app.applicant_xi)
      );
+
+  -- Populate cricket_match_players.
+  insert into public.cricket_match_players (
+    match_player_id, match_id,
+    is_playing_xi, batting_order,
+    is_captain, is_wicket_keeper
+  )
+  select mp.match_player_id, mp.match_id,
+         mp.is_in_playing_xi, mp.batting_order,
+         mp.role = 'captain',
+         mp.role = 'wicket_keeper'
+  from public.match_players mp
+  where mp.match_id = v_match_id;
 
   -- Mark accepted application
   update public.match_pool_applications

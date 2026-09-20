@@ -27,7 +27,7 @@ class MatchesRemoteDataSource {
   final SupabaseClient _supabase;
   final AblyService _ablyService;
 
-  static const _matches = 'matches';
+  static const _matches = 'cricket_match_details';
   static const _matchPlayers = 'match_players';
 
   /// `match_players` plus the identity of whoever the row points at.
@@ -43,7 +43,12 @@ class MatchesRemoteDataSource {
   /// so the embed can still come back null for a suspended account. The DTO
   /// falls back accordingly.
   static const _matchPlayersSelect =
-      '*, profile:profiles!user_id(display_name, username, profile_photo_url), '
+      '*, '
+      'cricket:cricket_match_players!cricket_match_players_parent_player_fkey('
+      'is_playing_xi, batting_order, is_captain, is_vice_captain, '
+      'is_wicket_keeper, is_substitute'
+      '), '
+      'profile:profiles!user_id(display_name, username, profile_photo_url), '
       'unclaimed:unclaimed_players!unclaimed_id(display_name)';
   static const _matchInningsState = 'match_innings_state';
   static const _balls = 'match_deliveries';
@@ -137,7 +142,8 @@ class MatchesRemoteDataSource {
   /// union of both definitions now lives in the RPC alone.
   Future<List<MatchDto>> list() async {
     try {
-      final rows = await _supabase.rpc<List<dynamic>>('list_my_matches');
+      final rows =
+          await _supabase.rpc<List<dynamic>>('list_my_cricket_matches');
       return rows
           .map((row) =>
               MatchDto.fromJson(Map<String, dynamic>.from(row as Map)))
@@ -151,18 +157,61 @@ class MatchesRemoteDataSource {
   }
 
 
-  // ─── Match Start RPCs (deployed in migration 0623) ───────────────────────
-
-  /// Runs a match-start RPC with timing and outcome on the `match.rpc`
-  /// channel. These three calls are the whole write surface of the flow, so
-  /// having every one of them timestamped is what makes a two-phone session
-  /// reconstructable after the fact.
-  Future<void> _startRpc(String name, Map<String, dynamic> params) async {
+  Future<Map<String, dynamic>> _matchAction(
+    String action,
+    Map<String, dynamic> params,
+  ) async {
     try {
-      await _supabase.rpc<void>(name, params: params);
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
+      final res = await _supabase.functions.invoke(
+        'cricket-match-action',
+        body: {
+          'action': action,
+          ...params,
+        },
+      );
+
+      final data = res.data;
+      if (data is Map && data['ok'] == true) {
+        return Map<String, dynamic>.from(data);
+      }
+
+      throw ServerException(
+        data is Map
+            ? (data['error']?['message']?.toString() ??
+                'Cricket match action failed')
+            : 'Cricket match action failed',
+      );
+    } on FunctionException catch (e) {
+      if (e is FunctionsFetchException) {
+        throw NetworkException(
+          e.reasonPhrase ?? 'No connection to match service',
+        );
+      }
+
+      String? message;
+      final details = e.details;
+      if (details is Map && details['error'] is Map) {
+        message = (details['error'] as Map)['message']?.toString();
+      }
+
+      switch (e.status) {
+        case 401:
+        case 403:
+          throw UnauthorizedException(message ?? 'Not allowed');
+        default:
+          throw ServerException(
+            message ?? 'Cricket match action failed',
+            statusCode: e.status,
+          );
+      }
     }
+  }
+
+  Future<void> _startRpc(
+    String action,
+    Map<String, dynamic> params,
+  ) async {
+    await _matchAction(action, params);
   }
 
   Future<void> recordTossWinner({
@@ -304,18 +353,14 @@ class MatchesRemoteDataSource {
     int? target,
   }) async {
     await _transport(() async {
-      try {
-        await _supabase.rpc<void>('start_innings', params: {
-          'p_match_id': matchId,
-          'p_innings_number': inningsNumber,
-          'p_striker_id': strikerId,
-          'p_non_striker_id': nonStrikerId,
-          'p_bowler_id': bowlerId,
-          if (target != null) 'p_target': target,
-        });
-      } on PostgrestException catch (e) {
-        throw _rpcException(e);
-      }
+      await _matchAction('start_innings', {
+        'p_match_id': matchId,
+        'p_innings_number': inningsNumber,
+        'p_striker_id': strikerId,
+        'p_non_striker_id': nonStrikerId,
+        'p_bowler_id': bowlerId,
+        if (target != null) 'p_target': target,
+      });
     });
   }
 
@@ -334,10 +379,17 @@ class MatchesRemoteDataSource {
       final rows = await _supabase
           .from(_matchPlayers)
           .select(_matchPlayersSelect)
-          .eq('match_id', matchId)
-          .order('team_side', ascending: true)
-          .order('batting_order', ascending: true, nullsFirst: false);
-      return rows.map(MatchPlayerDto.fromJson).toList();
+          .eq('match_id', matchId);
+
+      final dtos = rows.map(MatchPlayerDto.fromJson).toList()
+        ..sort((a, b) {
+          final side = a.teamSide.compareTo(b.teamSide);
+          if (side != 0) return side;
+          return (a.battingOrder ?? 999)
+              .compareTo(b.battingOrder ?? 999);
+        });
+
+      return dtos;
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -474,19 +526,31 @@ class MatchesRemoteDataSource {
     required int inningsNumber,
   }) =>
       _transport(() async {
-        try {
-          final result = await _supabase.rpc<dynamic>(
-            'undo_last_ball',
-            params: {
-              'p_match_id': matchId,
-              'p_innings_number': inningsNumber,
-            },
-          );
-          return result == true;
-        } on PostgrestException catch (e) {
-          throw _rpcException(e);
-        }
+        final data = await _matchAction('undo_last_ball', {
+          'p_match_id': matchId,
+          'p_innings_number': inningsNumber,
+        });
+        return data['result'] == true;
       });
+
+  Future<MatchDto> completeCricketMatch({
+    required String matchId,
+    required String description,
+  }) async {
+    final data = await _matchAction('complete_cricket_match', {
+      'p_match_id': matchId,
+      'p_description': description,
+    });
+
+    final match = data['match'];
+    if (match is! Map) {
+      throw ServerException('Match completion returned no snapshot');
+    }
+
+    return MatchDto.fromJson(
+      Map<String, dynamic>.from(match),
+    );
+  }
 
   /// Initial-hydration GET for balls in (match, innings) — feeds the
   /// broadcast stream's first emission.
@@ -544,10 +608,34 @@ class MatchesRemoteDataSource {
       }
     });
 
+    final subResync =
+        channel.subscribe(name: 'balls_resync').listen((ably.Message msg) async {
+      final data = msg.data;
+      if (data is! Map) return;
+
+      final n = (data['innings_number'] as num?)?.toInt();
+      if (n != inningsNumber) return;
+
+      try {
+        current = await listBalls(
+          matchId: matchId,
+          inningsNumber: inningsNumber,
+        );
+        if (!controller.isClosed) {
+          controller.add(List.unmodifiable(current));
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(ServerException(e.toString()));
+        }
+      }
+    });
+
     yield* controller.stream.asBroadcastStream(
       onCancel: (sub) async {
         await subRecorded.cancel();
         await subDeleted.cancel();
+        await subResync.cancel();
         await _ablyService.releaseChannel(channelName);
         await controller.close();
       },

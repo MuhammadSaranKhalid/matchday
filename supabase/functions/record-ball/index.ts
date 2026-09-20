@@ -1,10 +1,12 @@
 // record-ball — HTTP API Endpoint for recording a cricket delivery.
 //
-// Clean Layered Architecture:
-//   1. Request parsing & CORS preflight handling
-//   2. Supabase Auth verification via @supabase/server
-//   3. Schema validation & Type coercion
-//   4. Atomic Transaction execution via ScoringService
+// Phase 2 realtime contract:
+//   ball_recorded          -> raw delivery row
+//   innings_state_updated  -> raw innings-state row
+//   match_state_updated    -> raw cricket_match_details row
+//
+// Flutter consumes those exact DTO shapes. Do not wrap them in
+// {ball:...}/{innings:...} on the Ably event itself.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsPreflight, json } from "../_shared/http.ts";
@@ -13,10 +15,8 @@ import { parseAndValidateRecordBall } from "./schemas/record_ball_schema.ts";
 import { HttpSignal, scoringService } from "./services/scoring_service.ts";
 
 Deno.serve(async (req) => {
-  // 1. CORS Preflight
   if (req.method === "OPTIONS") return corsPreflight();
 
-  // 2. Authentication via @supabase/server
   const auth = await authenticateRequest(req);
   if (auth.error || !auth.actorId) {
     return json(auth.error?.status ?? 401, {
@@ -27,9 +27,7 @@ Deno.serve(async (req) => {
       },
     });
   }
-  const actor = auth.actorId;
 
-  // 3. Body Parsing
   let rawBody: Record<string, unknown>;
   try {
     rawBody = await req.json();
@@ -40,7 +38,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // 4. Schema Validation
   const idempotencyHeader = req.headers.get("Idempotency-Key");
   const validation = parseAndValidateRecordBall(rawBody, idempotencyHeader);
   if (validation.error) {
@@ -50,30 +47,36 @@ Deno.serve(async (req) => {
     });
   }
 
-  // 5. Service Execution
   try {
-    const out = await scoringService.recordDelivery(actor, validation.data!);
+    const out = await scoringService.recordDelivery(
+      auth.actorId,
+      validation.data!,
+    );
 
-    // Broadcast to Ably channels for live spectators (non-blocking)
     const ablyKey = Deno.env.get("ABLY_API_KEY");
     if (ablyKey && !out.duplicate) {
       try {
-        const ably = new (await import("npm:ably@2.4.1")).default.Rest(ablyKey);
+        const Ably = (await import("npm:ably@2.4.1")).default;
+        const ably = new Ably.Rest(ablyKey);
         const matchId = validation.data!.matchId;
-        // Broadcast ball to spectator feed
-        ably.channels.get(`match:${matchId}:balls`).publish("ball_recorded", {
-          ball: out.ball,
-          innings: out.innings,
-          transition: out.transition,
-        }).catch((e: unknown) => console.error("[record-ball] Ably balls broadcast failed:", e));
 
-        // Broadcast updated state to match state feed
-        ably.channels.get(`match:${matchId}:state`).publish("match_state_updated", {
-          innings: out.innings,
-          transition: out.transition,
-        }).catch((e: unknown) => console.error("[record-ball] Ably state broadcast failed:", e));
+        await ably.channels
+          .get(`match:${matchId}:balls`)
+          .publish("ball_recorded", out.ball);
+
+        if (out.innings) {
+          await ably.channels
+            .get(`match:${matchId}:state`)
+            .publish("innings_state_updated", out.innings);
+        }
+
+        if (out.match) {
+          await ably.channels
+            .get(`match:${matchId}:state`)
+            .publish("match_state_updated", out.match);
+        }
       } catch (ablyErr) {
-        console.error("[record-ball] Could not initialize Ably broadcast:", ablyErr);
+        console.error("[record-ball] Ably broadcast failed:", ablyErr);
       }
     }
 
@@ -81,6 +84,7 @@ Deno.serve(async (req) => {
       ok: true,
       ball: out.ball,
       innings: out.innings,
+      match: out.match,
       transition: out.transition,
       duplicate: out.duplicate,
       data: out,

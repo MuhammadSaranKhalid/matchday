@@ -191,9 +191,16 @@ begin
     from slot
     where (slot.elem->>'team_a_id') is not null
       and (slot.elem->>'team_b_id') is not null
+    returning match_id
+  ),
+  ext as (
+    -- Cricket extension rows for each created fixture.
+    insert into public.cricket_matches (match_id, format_code, rules_snapshot)
+    select i.match_id, v_format->>'format_preset', v_format
+    from inserted i
     returning 1
   )
-  select count(*) into v_created from inserted;
+  select count(*) into v_created from ext;
 
   update public.tournaments
      set status = 'upcoming', updated_at = now()

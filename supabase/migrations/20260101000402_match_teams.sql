@@ -128,64 +128,10 @@ grant all
   to service_role;
 
 
-create or replace function public.sync_legacy_match_side_to_cricket_extension()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-begin
-  if not exists (
-    select 1
-    from public.matches m
-    where m.match_id = new.match_id
-      and m.sport_id = 'cricket'
-  ) then
-    return new;
-  end if;
-
-  insert into public.cricket_match_sides (
-    match_id,
-    team_side,
-    is_batting_first,
-    captain_player_id,
-    keeper_player_id
-  )
-  values (
-    new.match_id,
-    new.team_side,
-    new.is_batting_first,
-    new.captain_player_id,
-    new.keeper_player_id
-  )
-  on conflict (match_id, team_side)
-  do update set
-    is_batting_first   = excluded.is_batting_first,
-    captain_player_id  = excluded.captain_player_id,
-    keeper_player_id   = excluded.keeper_player_id,
-    updated_at         = now();
-
-  return new;
-end;
-$$;
-
-revoke all
-  on function public.sync_legacy_match_side_to_cricket_extension()
-  from public, anon, authenticated;
+-- Transitional mirror trigger removed (development: writers populate
+-- cricket_match_sides directly in each RPC).
 
 
-drop trigger if exists match_teams_sync_cricket_extension
-  on public.match_teams;
-
-create trigger match_teams_sync_cricket_extension
-  after insert
-      or update of
-        is_batting_first,
-        captain_player_id,
-        keeper_player_id
-  on public.match_teams
-  for each row
-  execute function public.sync_legacy_match_side_to_cricket_extension();
 
 
 -- =============================================================================
@@ -193,11 +139,10 @@ create trigger match_teams_sync_cricket_extension
 -- =============================================================================
 
 comment on column public.match_teams.is_batting_first is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_match_sides.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_match_sides.';
 
 comment on column public.match_teams.captain_player_id is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_match_sides.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_match_sides.';
 
 comment on column public.match_teams.keeper_player_id is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_match_sides.';
-
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_match_sides.';

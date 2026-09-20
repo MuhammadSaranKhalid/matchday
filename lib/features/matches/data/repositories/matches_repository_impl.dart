@@ -743,14 +743,16 @@ class MatchesRepositoryImpl implements MatchesRepository {
   }) async {
     final desc = description.trim();
     if (desc.isEmpty) {
-      return const Left(ValidationFailure('A result is required'));
+      return const Left(
+        ValidationFailure('A result is required'),
+      );
     }
+
     try {
-      final dto = await _remote.update(id.value, {
-        'status': 'completed',
-        'result': {'description': desc},
-        'end_time': DateTime.now().toIso8601String(),
-      });
+      final dto = await _remote.completeCricketMatch(
+        matchId: id.value,
+        description: desc,
+      );
       return Right(dto.toEntity());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));

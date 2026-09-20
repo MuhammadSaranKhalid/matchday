@@ -28,11 +28,32 @@ export class MatchRepository {
     };
   }
 
+  // Shared shell + Cricket extension. The scoring engine never reads Cricket
+  // state from public.matches after Phase 2.
   // deno-lint-ignore no-explicit-any
   async getMatch(tx: any, matchId: string) {
     const rows = await tx`
-      select status, toss_won_by, toss_decision, team_a_id, team_b_id, format
-        from matches where match_id = ${matchId}`;
+      select
+        m.status,
+        m.team_a_id,
+        m.team_b_id,
+        cm.toss_won_by,
+        cm.toss_decision,
+        cm.rules_snapshot as format
+      from matches m
+      join cricket_matches cm
+        on cm.match_id = m.match_id
+      where m.match_id = ${matchId}
+        and m.sport_id = 'cricket'`;
+    return rows[0] ?? null;
+  }
+
+  // deno-lint-ignore no-explicit-any
+  async getCricketMatchDetails(tx: any, matchId: string) {
+    const rows = await tx`
+      select *
+      from cricket_match_details
+      where match_id = ${matchId}::uuid`;
     return rows[0] ?? null;
   }
 
@@ -45,12 +66,6 @@ export class MatchRepository {
   }
 
   // deno-lint-ignore no-explicit-any
-  // One column per fact. This used to write every value twice — into
-  // delivery_type AND ball_type, runs_off_bat AND runs_scored, striker_id AND
-  // batsman_id, recorded_by AND created_by — because the table carried both
-  // spellings. total_runs is GENERATED from runs_off_bat + extra_runs, so the
-  // pairs disagreeing would have silently corrupted the innings total. The
-  // alias columns were dropped 2026-09-06.
   async insertDelivery(
     tx: any,
     input: RecordDeliveryInput,
@@ -179,6 +194,7 @@ export class MatchRepository {
        order by innings_number`;
   }
 
+  // `innings_break` remains a transitional shared status until Phase 3.
   // deno-lint-ignore no-explicit-any
   async setMatchStatusInningsBreak(tx: any, matchId: string): Promise<void> {
     await tx`
@@ -186,15 +202,30 @@ export class MatchRepository {
        where match_id = ${matchId}`;
   }
 
+  // Cricket result belongs to cricket_matches. Shared matches keeps generic
+  // lifecycle, completed_at and winner_id for tournament/bracket joins.
   // deno-lint-ignore no-explicit-any
   async setMatchCompleted(tx: any, matchId: string, result: unknown): Promise<void> {
+    const r = (result ?? {}) as Record<string, unknown>;
+    const winnerTeamId =
+      typeof r.winner_team_id === "string" ? r.winner_team_id : null;
+    const description =
+      typeof r.description === "string" ? r.description : null;
+
+    await tx`
+      update cricket_matches set
+        result = ${tx.json(result)},
+        result_summary = ${tx.json({ description })},
+        updated_at = now()
+      where match_id = ${matchId}`;
+
     await tx`
       update matches set
         status = 'completed',
-        end_time = now(),
-        updated_at = now(),
-        result = ${tx.json(result)}
-       where match_id = ${matchId}`;
+        completed_at = now(),
+        winner_id = ${winnerTeamId}::uuid,
+        updated_at = now()
+      where match_id = ${matchId}`;
   }
 }
 

@@ -5,12 +5,15 @@ import '../../domain/entities/match.dart';
 part 'match_dto.freezed.dart';
 part 'match_dto.g.dart';
 
-/// Wire-format `matches` row. `format` is jsonb; `venue` is text.
+/// Cricket-facing match aggregate.
 ///
-/// The matches row no longer carries squad arrays, the keeper FK, the
-/// live on-field trio, or the active innings number. Those moved to
-/// `match_players` (XI) and `match_innings_state` (live state) — see
-/// `MatchPlayerDto` (0405) and `MatchInningsStateDto` (0409).
+/// The shared `matches` table is sport-neutral. Cricket-only values in this
+/// DTO (`format`, toss, start phase, result, captain snapshots) are supplied by
+/// the `cricket_match_details` security-invoker view, which joins
+/// `matches` + `cricket_matches` and derives captains from
+/// `cricket_match_players`.
+///
+/// Do not point this DTO back at `matches`.
 @freezed
 abstract class MatchDto with _$MatchDto {
   const factory MatchDto({

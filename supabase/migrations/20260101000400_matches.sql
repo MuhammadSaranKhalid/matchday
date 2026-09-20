@@ -536,113 +536,8 @@ create index cricket_matches_player_of_the_match
   where player_of_the_match_id is not null;
 
 
--- =============================================================================
--- Transitional mirror from legacy matches columns -> cricket_matches
--- =============================================================================
---
--- Existing Flutter/RPC code still writes the legacy Cricket columns on
--- `matches`. During Phase 1 that is allowed. This trigger immediately mirrors
--- those values into the new canonical extension so we can verify the boundary
--- before changing all writers.
---
--- IMPORTANT: this is ONE-WAY. cricket_matches is not mirrored back to matches.
--- Phase 2 changes writers to cricket_matches; this trigger is then deleted.
--- =============================================================================
-
-create or replace function public.sync_legacy_match_to_cricket_extension()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-begin
-  if new.sport_id <> 'cricket' then
-    return new;
-  end if;
-
-  insert into public.cricket_matches (
-    match_id,
-    format_code,
-    rules_snapshot,
-    toss_won_by,
-    toss_decision,
-    toss_face,
-    toss_recorded_at,
-    phase,
-    openers_submitted_by,
-    openers_submitted_at,
-    scoring_mode,
-    revised_conditions,
-    result,
-    result_summary,
-    player_of_the_match_id
-  )
-  values (
-    new.match_id,
-    new.match_format,
-    public._normalize_match_format(new.format),
-    new.toss_won_by,
-    new.toss_decision,
-    new.toss_face,
-    new.toss_recorded_at,
-    new.start_phase,
-    new.openers_submitted_by,
-    new.openers_submitted_at,
-    new.scoring_mode,
-    new.revised_conditions,
-    new.result,
-    new.result_summary,
-    new.player_of_the_match_id
-  )
-  on conflict (match_id)
-  do update set
-    format_code              = excluded.format_code,
-    rules_snapshot           = excluded.rules_snapshot,
-    toss_won_by              = excluded.toss_won_by,
-    toss_decision            = excluded.toss_decision,
-    toss_face                = excluded.toss_face,
-    toss_recorded_at         = excluded.toss_recorded_at,
-    phase                    = excluded.phase,
-    openers_submitted_by     = excluded.openers_submitted_by,
-    openers_submitted_at     = excluded.openers_submitted_at,
-    scoring_mode             = excluded.scoring_mode,
-    revised_conditions       = excluded.revised_conditions,
-    result                   = excluded.result,
-    result_summary           = excluded.result_summary,
-    player_of_the_match_id   = excluded.player_of_the_match_id,
-    updated_at               = now();
-
-  return new;
-end;
-$$;
-
-revoke all
-  on function public.sync_legacy_match_to_cricket_extension()
-  from public, anon, authenticated;
-
-
-drop trigger if exists matches_sync_cricket_extension on public.matches;
-
-create trigger matches_sync_cricket_extension
-  after insert
-      or update of
-        match_format,
-        format,
-        toss_won_by,
-        toss_decision,
-        toss_face,
-        toss_recorded_at,
-        start_phase,
-        openers_submitted_by,
-        openers_submitted_at,
-        scoring_mode,
-        revised_conditions,
-        result,
-        result_summary,
-        player_of_the_match_id
-  on public.matches
-  for each row
-  execute function public.sync_legacy_match_to_cricket_extension();
+-- Transitional mirror trigger removed (development: writers populate
+-- cricket_matches directly in each RPC).
 
 
 -- =============================================================================
@@ -720,43 +615,41 @@ comment on view public.cricket_match_details is
 -- =============================================================================
 
 comment on column public.matches.match_format is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to '
-  'cricket_matches.format_code. Remove after Phase 2 callers move.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.format_code.';
 
 comment on column public.matches.format is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to '
-  'cricket_matches.rules_snapshot. Remove after Phase 2 callers move.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.rules_snapshot.';
 
 comment on column public.matches.toss_won_by is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_matches.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.';
 
 comment on column public.matches.toss_decision is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_matches.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.';
 
 comment on column public.matches.toss_face is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_matches.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.';
 
 comment on column public.matches.start_phase is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_matches.phase.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.phase.';
 
 comment on column public.matches.openers_submitted_by is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_matches.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.';
 
 comment on column public.matches.openers_submitted_at is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_matches.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.';
 
 comment on column public.matches.scoring_mode is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_matches.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.';
 
 comment on column public.matches.revised_conditions is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_matches.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.';
 
 comment on column public.matches.result is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Cricket result detail belongs in '
-  'cricket_matches; matches.winner_id remains shared.';
+  'DEPRECATED CRICKET FIELD. Cricket result detail belongs in '
+  'cricket_matches; matches.winner_id remains the shared winner pointer.';
 
 comment on column public.matches.result_summary is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_matches.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.';
 
 comment on column public.matches.player_of_the_match_id is
-  'DEPRECATED TRANSITIONAL CRICKET FIELD. Mirrored to cricket_matches.';
+  'DEPRECATED CRICKET FIELD. Canonical value lives in cricket_matches.';

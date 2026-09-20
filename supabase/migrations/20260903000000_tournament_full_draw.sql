@@ -220,9 +220,16 @@ begin
       'scheduled',
       v_uid
     from jsonb_array_elements(p_slots) as slot(elem)
+    returning match_id
+  ),
+  ext as (
+    -- Cricket extension rows for each created fixture.
+    insert into public.cricket_matches (match_id, format_code, rules_snapshot)
+    select i.match_id, v_format->>'format_preset', v_format
+    from inserted i
     returning 1
   )
-  select count(*) into v_created from inserted;
+  select count(*) into v_created from ext;
 
   -- The order the organiser dragged into IS the draw, so it is recorded in
   -- the same transaction. Read in four places before this, written in none.

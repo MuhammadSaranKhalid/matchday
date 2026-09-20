@@ -396,7 +396,7 @@ class _AddPlayerSheetState extends ConsumerState<AddPlayerSheet>
                                     u['username'] as String? ??
                                     'Player';
                                 final uname = u['username'] as String?;
-                                final playerProfiles = u['player_profiles'];
+                                final playerProfiles = u['cricket_player_profiles'];
                                 String? role;
                                 if (playerProfiles is Map<String, dynamic>) {
                                   role = playerProfiles['player_role'] as String?;

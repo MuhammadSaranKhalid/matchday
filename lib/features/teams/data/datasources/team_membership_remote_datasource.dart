@@ -373,7 +373,7 @@ class TeamMembershipRemoteDataSource {
           .from('profiles')
           .select(
             'user_id, username, display_name, profile_photo_url, '
-            'player_profiles(player_role)',
+            'cricket_player_profiles(player_role)',
           )
           .or('username.ilike.%$clean%,display_name.ilike.%$clean%')
           .limit(20)

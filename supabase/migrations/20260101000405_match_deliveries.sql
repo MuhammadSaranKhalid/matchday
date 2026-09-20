@@ -4,15 +4,6 @@
 -- The delivery ledger and its compatibility view.
 -- Spec: docs/matches-schema-architecture.md
 
-drop view if exists public.balls cascade;
-
-drop table if exists public.match_bowler_stats cascade;
-
--- removed 2026-09-06
-drop table if exists public.match_batsman_stats cascade;
-
-drop table if exists public.match_deliveries cascade;
-
 -- -----------------------------------------------------------------------------
 -- Deliveries & Dismissals Ledger
 -- -----------------------------------------------------------------------------

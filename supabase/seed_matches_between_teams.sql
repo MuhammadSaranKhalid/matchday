@@ -138,7 +138,7 @@ begin
   on conflict (match_player_id) do nothing;
 
   -- 1st Innings
-  insert into public.match_innings (
+  insert into public.cricket_match_innings (
     innings_id, match_id, innings_number, batting_team_side, bowling_team_side,
     overs_allocated, is_completed, start_time
   ) values (
@@ -147,7 +147,7 @@ begin
   ) on conflict (innings_id) do nothing;
 
   -- Live Innings State (164/4 at 18.4 overs)
-  insert into public.match_innings_state (
+  insert into public.cricket_match_innings_state (
     innings_id, match_id, innings_number,
     striker_id, non_striker_id, bowler_id,
     total_runs, total_wickets, legal_ball_count,
@@ -226,7 +226,7 @@ begin
   on conflict (match_player_id) do nothing;
 
   -- 1st Innings (Saran Strikers: 186/6)
-  insert into public.match_innings (
+  insert into public.cricket_match_innings (
     innings_id, match_id, innings_number, batting_team_side, bowling_team_side,
     overs_allocated, is_completed, start_time, end_time
   ) values (
@@ -235,7 +235,7 @@ begin
   ) on conflict (innings_id) do nothing;
 
   -- 1st Innings State
-  insert into public.match_innings_state (
+  insert into public.cricket_match_innings_state (
     innings_id, match_id, innings_number,
     striker_id, non_striker_id, bowler_id,
     total_runs, total_wickets, legal_ball_count,
@@ -248,7 +248,7 @@ begin
   ) on conflict (innings_id) do update set total_runs = 186, total_wickets = 6, legal_ball_count = 120;
 
   -- 2nd Innings (Muazam Mavericks: 168/8, Target: 187)
-  insert into public.match_innings (
+  insert into public.cricket_match_innings (
     innings_id, match_id, innings_number, batting_team_side, bowling_team_side,
     overs_allocated, is_completed, start_time, end_time
   ) values (
@@ -257,7 +257,7 @@ begin
   ) on conflict (innings_id) do nothing;
 
   -- 2nd Innings State
-  insert into public.match_innings_state (
+  insert into public.cricket_match_innings_state (
     innings_id, match_id, innings_number,
     striker_id, non_striker_id, bowler_id,
     total_runs, total_wickets, legal_ball_count,

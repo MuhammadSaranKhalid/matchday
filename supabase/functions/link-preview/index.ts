@@ -274,7 +274,7 @@ async function matchPreview(matchId: string): Promise<Preview | null> {
     description = String(summary);
   } else if (m.status === "live" || m.status === "innings_break") {
     const { data: st } = await sb
-      .from("match_innings_state")
+      .from("cricket_match_innings_state")
       .select("total_runs, total_wickets, legal_ball_count, innings_number")
       .eq("match_id", matchId)
       .order("innings_number", { ascending: false })

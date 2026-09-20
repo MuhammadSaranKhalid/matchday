@@ -401,7 +401,7 @@ function matchProjection(sql: any) {
     left join lateral (
       select mis.innings_number, mis.total_runs, mis.total_wickets,
              mis.legal_ball_count, mis.target
-        from public.match_innings_state mis
+        from public.cricket_match_innings_state mis
        where mis.match_id = m.match_id
        order by mis.innings_number desc
        limit 1

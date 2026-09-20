@@ -11,7 +11,7 @@
 -- This file upgrades ONE of them (the won match, ff…011) into a real ledger:
 --   · 22 match_players (11 a side), named, with a batting order
 --   · every delivery attributed to a striker, non-striker and bowler
---   · match_wickets rows so dismissals, fall of wickets and partnerships exist
+--   · cricket_match_wickets rows so dismissals, fall of wickets and partnerships exist
 --
 -- The arithmetic is deliberately plain — a fixed per-over run pattern — because
 -- the point is to exercise the DERIVATION, not to simulate a believable match.
@@ -63,7 +63,7 @@ begin
   end if;
 
   -- ── Clean up (deliveries cascade to wickets) ──────────────────────────────
-  delete from public.match_deliveries where match_id = v_match;
+  delete from public.cricket_match_deliveries where match_id = v_match;
   delete from public.match_players     where match_id = v_match;
   delete from public.unclaimed_players
    where unclaimed_id::text like 'cd000000-0000-4000-8000-%';
@@ -122,7 +122,7 @@ begin
       end if;
 
       v_delivery := gen_random_uuid();
-      insert into public.match_deliveries (
+      insert into public.cricket_match_deliveries (
         delivery_id, innings_id, match_id, innings_number, seq,
         over_number, ball_in_over, is_legal_delivery, delivery_type,
         runs_off_bat, extra_runs, is_wicket, wicket_type,
@@ -144,7 +144,7 @@ begin
 
       if i % 13 = 0 and v_wkt < 9 then
         v_wkt := v_wkt + 1;
-        insert into public.match_wickets (
+        insert into public.cricket_match_wickets (
           delivery_id, innings_id, player_out_id, dismissal_kind,
           is_bowler_credited, credited_bowler_id,
           fall_of_wicket_score, fall_of_wicket_number, fall_of_wicket_overs
@@ -175,7 +175,7 @@ begin
                  then d.runs_off_bat + d.extra_runs else 0 end)
         - sum(case when d.innings_number = 2
                    then d.runs_off_bat + d.extra_runs else 0 end) as margin
-      from public.match_deliveries d
+      from public.cricket_match_deliveries d
       where d.match_id = v_match
     ) t
    where m.match_id = v_match;
@@ -192,7 +192,7 @@ select
   count(*) filter (where d.is_wicket)               as wickets,
   count(distinct d.striker_id)                      as batters_used,
   count(distinct d.bowler_id)                       as bowlers_used
-from public.match_deliveries d
+from public.cricket_match_deliveries d
 where d.match_id = 'ff000000-0000-4000-8000-000000000011'
 group by d.innings_number
 order by d.innings_number;

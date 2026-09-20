@@ -42,7 +42,7 @@ begin
   end if;
 
   -- Start clean so the seed can be re-run.
-  delete from public.match_innings where match_id in (v_m1, v_m2, v_m3);
+  delete from public.cricket_match_innings where match_id in (v_m1, v_m2, v_m3);
   update public.matches
      set status = 'scheduled', actual_start_time = null
    where match_id in (v_m1, v_m2, v_m3);
@@ -55,25 +55,25 @@ begin
    where match_id = v_m1;
 
   -- First innings closed at 161/7 off 20.
-  insert into public.match_innings
+  insert into public.cricket_match_innings
     (match_id, innings_number, batting_team_side, bowling_team_side,
      overs_allocated, is_completed)
   values (v_m1, 1, 'team_a', 'team_b', 20.0, true)
   returning innings_id into v_innings;
-  insert into public.match_innings_state
+  insert into public.cricket_match_innings_state
     (innings_id, match_id, innings_number, total_runs, total_wickets,
      legal_ball_count)
   values (v_innings, v_m1, 1, 161, 7, 120);
 
   -- Second innings live at 142/3 off 16.2 (98 legal balls).
-  -- The target lives on match_innings_state only (match_innings.target_runs was
+  -- The target lives on cricket_match_innings_state only (cricket_match_innings.target_runs was
   -- a duplicate, dropped 2026-09-06).
-  insert into public.match_innings
+  insert into public.cricket_match_innings
     (match_id, innings_number, batting_team_side, bowling_team_side,
      overs_allocated)
   values (v_m1, 2, 'team_b', 'team_a', 20.0)
   returning innings_id into v_innings;
-  insert into public.match_innings_state
+  insert into public.cricket_match_innings_state
     (innings_id, match_id, innings_number, total_runs, total_wickets,
      legal_ball_count, target)
   values (v_innings, v_m1, 2, 142, 3, 98, 162);
@@ -85,12 +85,12 @@ begin
          scheduled_start_time = now() - interval '45 minutes'
    where match_id = v_m2;
 
-  insert into public.match_innings
+  insert into public.cricket_match_innings
     (match_id, innings_number, batting_team_side, bowling_team_side,
      overs_allocated)
   values (v_m2, 1, 'team_a', 'team_b', 20.0)
   returning innings_id into v_innings;
-  insert into public.match_innings_state
+  insert into public.cricket_match_innings_state
     (innings_id, match_id, innings_number, total_runs, total_wickets,
      legal_ball_count)
   values (v_innings, v_m2, 1, 88, 2, 58);
@@ -109,25 +109,25 @@ begin
   values (v_m1, v_organiser, 'scorer', v_organiser),
          (v_m2, v_organiser, 'scorer', v_organiser);
 
-  -- "Last ball 40s ago" reads off match_deliveries, so give the live grounds
+  -- "Last ball 40s ago" reads off cricket_match_deliveries, so give the live grounds
   -- a most-recent ball each. One legal delivery is enough for the staleness
   -- line; the scores above are the authority on the totals.
-  insert into public.match_deliveries
+  insert into public.cricket_match_deliveries
     (innings_id, match_id, innings_number, seq, over_number, ball_in_over,
      is_legal_delivery, delivery_type, runs_off_bat, recorded_at, recorded_by)
   select mi.innings_id, mi.match_id, mi.innings_number, 9999, 16, 2,
          true, 'legal', 1,
          now() - interval '40 seconds', v_organiser
-    from public.match_innings mi
+    from public.cricket_match_innings mi
    where mi.match_id = v_m1 and mi.innings_number = 2;
 
-  insert into public.match_deliveries
+  insert into public.cricket_match_deliveries
     (innings_id, match_id, innings_number, seq, over_number, ball_in_over,
      is_legal_delivery, delivery_type, runs_off_bat, recorded_at, recorded_by)
   select mi.innings_id, mi.match_id, mi.innings_number, 9999, 9, 4,
          true, 'legal', 2,
          now() - interval '12 seconds', v_organiser
-    from public.match_innings mi
+    from public.cricket_match_innings mi
    where mi.match_id = v_m2 and mi.innings_number = 1;
 
   update public.tournaments set status = 'live' where tournament_id = v_t;

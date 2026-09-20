@@ -15,7 +15,7 @@
 --   PAST  (6 rows, so the windowed "SEE ALL 6 MATCHES" footer appears)
 --     · won · lost · tied · no result · walkover · abandoned
 --
--- Past scores are aggregated from match_deliveries by the client, so real
+-- Past scores are aggregated from cricket_match_deliveries by the client, so real
 -- deliveries are generated for the four matches that were actually played.
 -- striker/bowler are left NULL deliberately — those FKs are nullable, so no
 -- lineup rows are needed just to make a scorecard total.
@@ -61,13 +61,13 @@ begin
   end if;
 
   -- ── Clean up ──────────────────────────────────────────────────────────────
-  delete from public.match_deliveries where match_id in (
+  delete from public.cricket_match_deliveries where match_id in (
     select match_id from public.matches
      where match_id::text like 'ff000000-0000-4000-8000-%');
-  delete from public.match_innings_state where match_id in (
+  delete from public.cricket_match_innings_state where match_id in (
     select match_id from public.matches
      where match_id::text like 'ff000000-0000-4000-8000-%');
-  delete from public.match_innings where match_id in (
+  delete from public.cricket_match_innings where match_id in (
     select match_id from public.matches
      where match_id::text like 'ff000000-0000-4000-8000-%');
   delete from public.matches where match_id::text like 'ff000000-0000-4000-8000-%';
@@ -180,7 +180,7 @@ begin
     -- Only the matches that were actually bowled get innings and deliveries.
     -- A walkover and an abandonment must show no score line at all.
     if r.played then
-      insert into public.match_innings (
+      insert into public.cricket_match_innings (
         innings_id, match_id, innings_number,
         batting_team_side, bowling_team_side, overs_allocated, is_completed
       ) values
@@ -192,7 +192,7 @@ begin
       -- 96 legal deliveries per innings. The run pattern is fixed so the two
       -- totals differ predictably and the winner is unambiguous; innings 2 of
       -- the tied match is nudged to level the scores.
-      insert into public.match_deliveries (
+      insert into public.cricket_match_deliveries (
         innings_id, match_id, innings_number, seq, over_number, ball_in_over,
         is_legal_delivery, delivery_type, runs_off_bat, is_wicket, wicket_type,
         idempotency_key
@@ -228,7 +228,7 @@ select
   sum(case when d.innings_number = 1 then d.runs_off_bat + d.extra_runs end) as mine,
   sum(case when d.innings_number = 2 then d.runs_off_bat + d.extra_runs end) as theirs
 from public.matches m
-left join public.match_deliveries d on d.match_id = m.match_id
+left join public.cricket_match_deliveries d on d.match_id = m.match_id
 where m.match_id::text like 'ff000000-0000-4000-8000-0000000000%'
   and m.status in ('completed','tied','no_result','walkover','abandoned')
 group by m.match_id, m.status, m.result, m.scheduled_start_time

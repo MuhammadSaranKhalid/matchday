@@ -18,7 +18,7 @@ export class MatchRepository {
   ): Promise<{ inningsId: string; version: number } | null> {
     const rows = await tx`
       select innings_id, version
-        from match_innings_state
+        from cricket_match_innings_state
        where match_id = ${matchId} and innings_number = ${inningsNumber}
        for update`;
     if (rows.length === 0) return null;
@@ -61,7 +61,7 @@ export class MatchRepository {
   async getNextDeliverySeq(tx: any, inningsId: string): Promise<number> {
     const rows = await tx`
       select coalesce(max(seq), 0) + 1 as next_seq
-        from match_deliveries where innings_id = ${inningsId}`;
+        from cricket_match_deliveries where innings_id = ${inningsId}`;
     return Number(rows[0]?.next_seq ?? 1);
   }
 
@@ -78,7 +78,7 @@ export class MatchRepository {
     const isBoundary = isFour || isSix;
 
     const inserted = await tx`
-      insert into match_deliveries (
+      insert into cricket_match_deliveries (
         innings_id, match_id, innings_number, seq,
         over_number, ball_in_over, is_legal_delivery, delivery_type,
         runs_off_bat, extra_runs, is_free_hit,
@@ -109,7 +109,7 @@ export class MatchRepository {
   // deno-lint-ignore no-explicit-any
   async findDeliveryByIdempotencyKey(tx: any, inningsId: string, idempotencyKey: string) {
     const existing = await tx`
-      select * from match_deliveries
+      select * from cricket_match_deliveries
        where innings_id = ${inningsId} and idempotency_key = ${idempotencyKey}`;
     return existing[0] ?? null;
   }
@@ -122,7 +122,7 @@ export class MatchRepository {
     input: RecordDeliveryInput,
   ): Promise<void> {
     await tx`
-      insert into match_wickets (
+      insert into cricket_match_wickets (
         delivery_id, innings_id, player_out_id, dismissal_kind,
         is_bowler_credited, credited_bowler_id, primary_fielder_id,
         fall_of_wicket_score, fall_of_wicket_number, fall_of_wicket_overs
@@ -140,7 +140,7 @@ export class MatchRepository {
           (count(*) filter (where d.is_legal_delivery))::numeric
           / greatest(${input.ballsPerOver}, 1), 1
         )
-      from match_deliveries d
+      from cricket_match_deliveries d
       where d.innings_id = ${inningsId} and d.is_undone = false
       on conflict do nothing`;
   }
@@ -152,7 +152,7 @@ export class MatchRepository {
     input: RecordDeliveryInput,
   ) {
     const updated = await tx`
-      update match_innings_state s set
+      update cricket_match_innings_state s set
         total_runs       = agg.runs,
         total_wickets    = agg.wickets,
         legal_ball_count = agg.legal,
@@ -177,7 +177,7 @@ export class MatchRepository {
           coalesce(sum(extra_runs) filter (where delivery_type = 'bye'), 0)::int as byes,
           coalesce(sum(extra_runs) filter (where delivery_type = 'leg_bye'), 0)::int as leg_byes,
           coalesce(sum(extra_runs) filter (where delivery_type = 'penalty'), 0)::int as penalties
-        from match_deliveries
+        from cricket_match_deliveries
         where innings_id = ${inningsId} and is_undone = false
       ) agg
       where s.innings_id = ${inningsId}
@@ -189,7 +189,7 @@ export class MatchRepository {
   async getInningsStates(tx: any, matchId: string) {
     return await tx`
       select innings_number, total_runs, total_wickets, legal_ball_count, is_all_out
-        from match_innings_state
+        from cricket_match_innings_state
        where match_id = ${matchId}
        order by innings_number`;
   }

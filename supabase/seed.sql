@@ -960,7 +960,7 @@ begin
     mp_bilal_live   constant uuid := '31000000-0000-0000-0000-000000000003';
     -- match_players rows for the completed match. The live-match trio above
     -- belong to m_live_id and cannot be reused as the past match's lineup:
-    -- match_deliveries' player FKs point at match_players, and match_players
+    -- cricket_match_deliveries' player FKs point at match_players, and match_players
     -- is scoped to one match_id.
     mp_saran_past   constant uuid := '31000000-0000-0000-0000-000000000011';
     mp_babar_past   constant uuid := '31000000-0000-0000-0000-000000000012';
@@ -1003,9 +1003,9 @@ begin
       (mp_bilal_live, m_live_id, 'team_b', v_bilal_uid, 'Bilal Ahmed',  null, 10, 'captain')
     on conflict (match_player_id) do nothing;
 
-    -- Live Innings. match_innings_state hangs off match_innings, so the parent
+    -- Live Innings. cricket_match_innings_state hangs off cricket_match_innings, so the parent
     -- has to exist first: its PK innings_id is NOT NULL on the state row.
-    insert into public.match_innings (
+    insert into public.cricket_match_innings (
       innings_id, match_id, innings_number,
       batting_team_side, bowling_team_side, overs_allocated
     )
@@ -1014,7 +1014,7 @@ begin
 
     -- total_extras is GENERATED from the five breakdown columns and cannot be
     -- written directly; seed the parts and let it compute (8 = 5 wides + 3 byes).
-    insert into public.match_innings_state (
+    insert into public.cricket_match_innings_state (
       innings_id, match_id, innings_number,
       striker_id, non_striker_id, bowler_id,
       legal_ball_count, total_runs, total_wickets,
@@ -1074,7 +1074,7 @@ begin
       start_phase = excluded.start_phase,
       result = excluded.result;
 
-    -- Lineup for the completed match. Needed because match_deliveries' striker /
+    -- Lineup for the completed match. Needed because cricket_match_deliveries' striker /
     -- non-striker / bowler FKs point at match_players, scoped per match.
     insert into public.match_players (
       match_player_id, match_id, team_side, user_id,
@@ -1087,7 +1087,7 @@ begin
     on conflict (match_player_id) do nothing;
 
     -- Past Match Innings 1 (Lahore Lions: 168/5) and 2 (Islamabad United: 144/9)
-    insert into public.match_innings (
+    insert into public.cricket_match_innings (
       innings_id, match_id, innings_number,
       batting_team_side, bowling_team_side, overs_allocated, is_completed
     )
@@ -1098,7 +1098,7 @@ begin
 
     -- total_extras is generated; seed its parts (12 = 8 wides + 4 byes,
     -- 6 = 4 wides + 2 leg-byes).
-    insert into public.match_innings_state (
+    insert into public.cricket_match_innings_state (
       innings_id, match_id, innings_number,
       legal_ball_count, total_runs, total_wickets,
       total_wides, total_byes, total_leg_byes,
@@ -1113,10 +1113,10 @@ begin
       total_wickets = excluded.total_wickets;
 
     -- Sample deliveries for listInningsForMatches aggregation. Written to
-    -- match_deliveries directly rather than through the `balls` view, with the
+    -- cricket_match_deliveries directly rather than through the `balls` view, with the
     -- columns the table actually has: innings_id and seq are NOT NULL, and
     -- idempotency_key no longer carries a default (the client owns it).
-    insert into public.match_deliveries (
+    insert into public.cricket_match_deliveries (
       innings_id, match_id, innings_number, seq,
       over_number, ball_in_over, is_legal_delivery, delivery_type,
       runs_off_bat, striker_id, non_striker_id, bowler_id,

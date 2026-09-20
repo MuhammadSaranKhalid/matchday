@@ -14,7 +14,7 @@ import '../models/match_innings_dto.dart';
 import '../models/match_wicket_dto.dart';
 
 /// Talks to Supabase for the match-lifecycle tables — `matches`,
-/// `match_players`, `match_innings_state`, and `match_deliveries` — plus the match-start
+/// `match_players`, `cricket_match_innings_state`, and `cricket_match_deliveries` — plus the match-start
 /// and scoring RPCs / `record-ball` edge function. Returns DTOs / RPC result
 /// types, throws raw exceptions. RLS + SECURITY DEFINER RPCs scope
 /// reads/writes.
@@ -50,10 +50,10 @@ class MatchesRemoteDataSource {
       '), '
       'profile:profiles!user_id(display_name, username, profile_photo_url), '
       'unclaimed:unclaimed_players!unclaimed_id(display_name)';
-  static const _matchInningsState = 'match_innings_state';
-  static const _balls = 'match_deliveries';
-  static const _matchInnings = 'match_innings';
-  static const _wickets = 'match_wickets';
+  static const _matchInningsState = 'cricket_match_innings_state';
+  static const _balls = 'cricket_match_deliveries';
+  static const _matchInnings = 'cricket_match_innings';
+  static const _wickets = 'cricket_match_wickets';
   static const _scorerLeases = 'match_scorer_leases';
 
   String _requireUid() {
@@ -395,7 +395,7 @@ class MatchesRemoteDataSource {
     }
   }
 
-  // ─── match_innings_state ─────────────────────────────────────────────────
+  // ─── cricket_match_innings_state ─────────────────────────────────────────────────
 
   /// One-shot fetch of the (match, innings) state row. Returns null if
   /// the innings hasn't been opened yet.
@@ -817,7 +817,7 @@ class MatchesRemoteDataSource {
 
   /// The innings rows for a match, oldest-first.
   ///
-  /// Deliveries carry an innings *number*; `match_wickets` is keyed by the
+  /// Deliveries carry an innings *number*; `cricket_match_wickets` is keyed by the
   /// innings *uuid*. This is the only way to get from one to the other.
   Future<List<MatchInningsDto>> listInnings(String matchId) async {
     try {

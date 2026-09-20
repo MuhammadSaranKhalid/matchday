@@ -155,10 +155,6 @@ class TournamentsRemoteDataSource {
         query = query.eq('status', status.wire);
       }
 
-      if (city != null && city.isNotEmpty) {
-        query = query.ilike('location->>city', '%$city%');
-      }
-
       final rows = await query.order('start_date', ascending: false).limit(30);
       return rows.map(TournamentDto.fromJson).toList();
     } on PostgrestException catch (e) {
@@ -187,12 +183,6 @@ class TournamentsRemoteDataSource {
         if (params.registrationDeadline != null)
           'registration_deadline':
               params.registrationDeadline!.toIso8601String().split('T').first,
-        if (params.city != null || params.latitude != null)
-          'location': {
-            if (params.city != null) 'city': params.city,
-            if (params.latitude != null) 'lat': params.latitude,
-            if (params.longitude != null) 'lng': params.longitude,
-          },
         if (params.prizeDetails != null) 'prize_details': params.prizeDetails,
         if (params.entryFee != null) 'entry_fee': params.entryFee,
         if (params.minTeams != null) 'min_teams': params.minTeams,

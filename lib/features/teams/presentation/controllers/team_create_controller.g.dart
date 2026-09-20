@@ -37,7 +37,7 @@ final class TeamCreateControllerProvider
 }
 
 String _$teamCreateControllerHash() =>
-    r'65c88b8c91daa05bdf71ede300501c7241318b1a';
+    r'c074ca17320e5ffeec38beef9e60d4bff23161cf';
 
 /// Drives the five-step team-create wizard.
 

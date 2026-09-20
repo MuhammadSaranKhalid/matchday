@@ -100,9 +100,9 @@ List<PvTeam> pvTeamsFromMemberships(List<TeamMembership> memberships) {
         },
         subtitle: [
           _teamTypeLabel(membership.team.type),
-          if (membership.team.city != null &&
-              membership.team.city!.isNotEmpty)
-            membership.team.city!,
+          if (membership.team.homeGround != null &&
+              membership.team.homeGround!.isNotEmpty)
+            membership.team.homeGround!,
         ].join(' · '),
       ),
   ];

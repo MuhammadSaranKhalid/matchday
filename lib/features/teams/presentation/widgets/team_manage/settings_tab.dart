@@ -140,10 +140,9 @@ class SettingsTab extends StatelessWidget {
         ),
         _settingTile(
           context: context,
-          title: 'Location & Home Ground',
-          value:
-              '${team.city ?? "No city"} · ${team.homeGround ?? "No ground specified"}',
-          icon: Icons.location_on_outlined,
+          title: 'Home Ground',
+          value: team.homeGround ?? 'No ground specified',
+          icon: Icons.stadium_outlined,
           onTap: edit,
         ),
         _settingTile(

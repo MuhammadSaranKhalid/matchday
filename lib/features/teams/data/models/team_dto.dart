@@ -5,7 +5,7 @@ import '../../domain/entities/team.dart';
 part 'team_dto.freezed.dart';
 part 'team_dto.g.dart';
 
-/// Wire-format `teams` row. `location` and `team_colors` are jsonb blobs.
+/// Wire-format `teams` row. `team_colors` is a jsonb blob.
 @freezed
 abstract class TeamDto with _$TeamDto {
   const factory TeamDto({
@@ -15,7 +15,6 @@ abstract class TeamDto with _$TeamDto {
     @JsonKey(name: 'team_type') required String teamType,
     String? description,
     @JsonKey(name: 'home_ground') String? homeGround,
-    Map<String, dynamic>? location,
     @JsonKey(name: 'founded_year') int? foundedYear,
     @JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors,
     @Default('public') String privacy,
@@ -42,7 +41,6 @@ abstract class TeamDto with _$TeamDto {
         privacy: TeamPrivacy.fromWire(privacy),
         description: description,
         homeGround: homeGround,
-        city: location?['city'] as String?,
         foundedYear: foundedYear,
         primaryColor: teamColors?['primary'] as String?,
         secondaryColor: teamColors?['secondary'] as String?,

@@ -21,7 +21,6 @@ class TournamentDto {
     this.startDate,
     this.endDate,
     this.registrationDeadline,
-    this.location = const {},
     this.prizeDetails,
     this.entryFee,
     this.minTeams,
@@ -46,7 +45,6 @@ class TournamentDto {
   final String? startDate;
   final String? endDate;
   final String? registrationDeadline;
-  final Map<String, dynamic> location;
   final String? prizeDetails;
   final num? entryFee;
   final int? minTeams;
@@ -77,7 +75,6 @@ class TournamentDto {
       startDate: json['start_date'] as String?,
       endDate: json['end_date'] as String?,
       registrationDeadline: json['registration_deadline'] as String?,
-      location: (json['location'] as Map<String, dynamic>?) ?? const {},
       prizeDetails: json['prize_details'] as String?,
       entryFee: json['entry_fee'] as num?,
       minTeams: json['min_teams'] as int?,
@@ -116,9 +113,9 @@ class TournamentDto {
       startDate: parseDate(startDate),
       endDate: parseDate(endDate),
       registrationDeadline: parseDate(registrationDeadline),
-      city: location['city'] as String?,
-      latitude: (location['lat'] as num?)?.toDouble(),
-      longitude: (location['lng'] as num?)?.toDouble(),
+      city: venueObjects.firstOrNull?.city,
+      latitude: null,
+      longitude: null,
       prizeDetails: prizeDetails,
       entryFee: entryFee?.toDouble(),
       minTeams: minTeams,

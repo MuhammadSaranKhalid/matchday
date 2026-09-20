@@ -4,7 +4,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/database/database_provider.dart';
 import '../../../../core/error/failures.dart';
-import '../../../location/domain/entities/geo_place.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/value_objects/team_name.dart';
 import '../providers/teams_providers.dart';
@@ -43,23 +42,6 @@ class TeamCreateController extends _$TeamCreateController {
   void setPrivacy(TeamPrivacy p) => _mutate((s) => s.copyWith(privacy: p));
   void setTagline(String v) => _mutate((s) => s.copyWith(tagline: v));
   void setFoundedYear(String v) => _mutate((s) => s.copyWith(foundedYear: v));
-  void setCity(String v) => setResolvedPlace(GeoPlace.manual(v));
-
-  void setResolvedPlace(GeoPlace? place) => _mutate(
-        (s) => s.copyWith(
-          city: place?.city ?? place?.label ?? '',
-          locationLabel: place?.label,
-          district: place?.district,
-          province: place?.province,
-          postcode: place?.postcode,
-          placeId: place?.placeId,
-          latitude: place?.latitude,
-          longitude: place?.longitude,
-          countryCode: place?.countryCode,
-        ),
-      );
-
-  void setArea(String v) => _mutate((s) => s.copyWith(area: v));
   void setHomeGround(String v) => _mutate((s) => s.copyWith(homeGround: v));
   void setColors(String primary, String secondary) =>
       _mutate((s) => s.copyWith(
@@ -133,8 +115,7 @@ class TeamCreateController extends _$TeamCreateController {
     if (!s.canSubmit) {
       _set(
         s.copyWith(
-          submitError:
-              'Add a team name and location, and check your founding year.',
+          submitError: 'Add a team name and check your founding year.',
         ),
       );
       return;
@@ -165,16 +146,7 @@ class TeamCreateController extends _$TeamCreateController {
           name: nameRes.getRight().toNullable()!,
           type: s.type,
           privacy: s.privacy,
-          city: _blankToNull(s.city),
           homeGround: _blankToNull(s.homeGround),
-          label: _blankToNull(s.locationLabel ?? s.combinedCity),
-          district: s.district,
-          province: s.province,
-          postcode: s.postcode,
-          placeId: s.placeId,
-          latitude: s.latitude,
-          longitude: s.longitude,
-          countryCode: s.countryCode,
           foundedYear: int.tryParse(s.foundedYear?.trim() ?? ''),
           primaryColor: s.primaryColor,
           secondaryColor: s.secondaryColor,
@@ -243,8 +215,6 @@ class TeamCreateController extends _$TeamCreateController {
       'privacy': s.privacy.wire,
       'tagline': s.tagline,
       'foundedYear': s.foundedYear,
-      'city': s.city,
-      'area': s.area,
       'homeGround': s.homeGround,
       'primaryColor': s.primaryColor,
       'secondaryColor': s.secondaryColor,
@@ -253,14 +223,6 @@ class TeamCreateController extends _$TeamCreateController {
       'logoUrl': s.logoUrl,
       'logoName': s.logoName,
       'logoSize': s.logoSize,
-      'locationLabel': s.locationLabel,
-      'district': s.district,
-      'province': s.province,
-      'postcode': s.postcode,
-      'placeId': s.placeId,
-      'latitude': s.latitude,
-      'longitude': s.longitude,
-      'countryCode': s.countryCode,
     };
     _pendingSave = _pendingSave.then((_) => store.save(draftKey, payload));
   }
@@ -298,16 +260,6 @@ class TeamCreateController extends _$TeamCreateController {
         privacy: TeamPrivacy.fromWire(m['privacy'] as String?),
         tagline: m['tagline'] as String? ?? '',
         foundedYear: m['foundedYear'] as String?,
-        city: m['city'] as String? ?? '',
-        area: m['area'] as String? ?? '',
-        locationLabel: m['locationLabel'] as String?,
-        district: m['district'] as String?,
-        province: m['province'] as String?,
-        postcode: m['postcode'] as String?,
-        placeId: m['placeId'] as String?,
-        latitude: (m['latitude'] as num?)?.toDouble(),
-        longitude: (m['longitude'] as num?)?.toDouble(),
-        countryCode: m['countryCode'] as String?,
         homeGround: m['homeGround'] as String? ?? '',
         primaryColor: m['primaryColor'] as String? ?? '#338946',
         secondaryColor: m['secondaryColor'] as String? ?? '#FDFAF4',

@@ -345,7 +345,8 @@ class _SheetHeader extends StatelessWidget {
           };
     final where = [
       team.type.wire.toUpperCase(),
-      if (team.city?.trim().isNotEmpty ?? false) team.city!.toUpperCase(),
+      if (team.homeGround?.trim().isNotEmpty ?? false)
+        team.homeGround!.toUpperCase(),
     ].join(' · ');
 
     return Row(

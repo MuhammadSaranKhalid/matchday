@@ -48,7 +48,6 @@ abstract class TeamResultDto with _$TeamResultDto {
         logoMonogram: logoMonogram,
         primaryColor: teamColors?['primary'] as String?,
         secondaryColor: teamColors?['secondary'] as String?,
-        city: location?['city'] as String?,
         isVerified: isVerified,
         distanceKm: distanceKm,
         foundedYear: foundedYear,

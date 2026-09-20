@@ -19,7 +19,7 @@ class TeamDraftCard extends StatelessWidget {
     final name = (draft['name'] as String? ?? '').trim();
     final step = switch (draft['step']) {
       'review' => 'Review · step 3 of 3',
-      'identity' || 'home' || 'crest' => 'Look & location · step 2 of 3',
+      'identity' || 'home' || 'crest' => 'Look & home ground · step 2 of 3',
       _ => 'Team details · step 1 of 3',
     };
 

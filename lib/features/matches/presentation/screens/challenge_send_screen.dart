@@ -687,9 +687,8 @@ class _MyTeamRow extends StatelessWidget {
   }
 
   String _secondaryLine(Team t) {
-    if (t.city != null && t.city!.isNotEmpty) return t.city!;
-    if (t.tagline != null && t.tagline!.isNotEmpty) return t.tagline!;
     if (t.homeGround != null && t.homeGround!.isNotEmpty) return t.homeGround!;
+    if (t.tagline != null && t.tagline!.isNotEmpty) return t.tagline!;
     return 'Tap to issue the challenge';
   }
 }
@@ -898,8 +897,8 @@ class _TeamRow extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.01,
                     )),
-                if (team.city != null)
-                  Text(team.city!,
+                if (team.homeGround != null)
+                  Text(team.homeGround!,
                       style: CkType.body(
                         fontSize: 12,
                         color: CkColors.muted,

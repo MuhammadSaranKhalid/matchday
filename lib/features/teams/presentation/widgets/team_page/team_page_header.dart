@@ -162,7 +162,8 @@ class _Identity extends StatelessWidget {
     final hasTagline = team.tagline?.trim().isNotEmpty ?? false;
     final eyebrow = [
       team.type.wire.toUpperCase(),
-      if (team.city?.trim().isNotEmpty ?? false) team.city!.toUpperCase(),
+      if (team.homeGround?.trim().isNotEmpty ?? false)
+        team.homeGround!.toUpperCase(),
     ].join(' · ');
     final nameSize = team.name.length <= 16
         ? 28.0

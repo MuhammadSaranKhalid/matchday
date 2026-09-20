@@ -393,9 +393,9 @@ class _TeamRow extends StatelessWidget {
   }
 
   String _teamMeta(Team team) {
-    final city = team.city?.trim();
-    if (city != null && city.isNotEmpty) {
-      return city;
+    final ground = team.homeGround?.trim();
+    if (ground != null && ground.isNotEmpty) {
+      return ground;
     }
 
     return switch (team.type) {

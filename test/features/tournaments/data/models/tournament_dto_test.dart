@@ -20,7 +20,6 @@ void main() {
         'rules': {'min_squad': 11},
         'start_date': '2026-09-01',
         'end_date': '2026-09-07',
-        'location': {'city': 'Lahore', 'lat': 31.5204, 'lng': 74.3587},
         'prize_details': 'PKR 100,000',
         'entry_fee': 5000,
         'min_teams': 4,

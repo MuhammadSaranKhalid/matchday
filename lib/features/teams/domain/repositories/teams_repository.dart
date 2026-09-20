@@ -23,21 +23,12 @@ abstract class TeamsRepository {
     TeamPrivacy privacy = TeamPrivacy.public,
     String? description,
     String? homeGround,
-    String? city,
     int? foundedYear,
     String? primaryColor,
     String? secondaryColor,
     String? tagline,
     String? logoMonogram,
     CrestKind crestKind = CrestKind.monogram,
-    String? label,
-    String? district,
-    String? province,
-    String? postcode,
-    String? placeId,
-    double? latitude,
-    double? longitude,
-    String? countryCode,
   });
 
   Future<Either<Failure, Team>> updateTeam({
@@ -47,16 +38,11 @@ abstract class TeamsRepository {
     TeamPrivacy? privacy,
     String? description,
     String? homeGround,
-    String? city,
     int? foundedYear,
     String? primaryColor,
     String? secondaryColor,
     String? tagline,
     String? logoMonogram,
-    String? district,
-    String? province,
-    String? postcode,
-    String? countryCode,
   });
 
   Future<Either<Failure, Team>> setTeamStatus({

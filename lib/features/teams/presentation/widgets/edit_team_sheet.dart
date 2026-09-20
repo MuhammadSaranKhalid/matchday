@@ -35,7 +35,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _taglineController;
   late final TextEditingController _descriptionController;
-  late final TextEditingController _cityController;
   late final TextEditingController _homeGroundController;
   late final TextEditingController _monogramController;
 
@@ -64,7 +63,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
     _taglineController = TextEditingController(text: widget.team.tagline ?? '');
     _descriptionController =
         TextEditingController(text: widget.team.description ?? '');
-    _cityController = TextEditingController(text: widget.team.city ?? '');
     _homeGroundController =
         TextEditingController(text: widget.team.homeGround ?? '');
     _monogramController =
@@ -79,7 +77,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
     _nameController.dispose();
     _taglineController.dispose();
     _descriptionController.dispose();
-    _cityController.dispose();
     _homeGroundController.dispose();
     _monogramController.dispose();
     super.dispose();
@@ -155,9 +152,6 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
           description: _descriptionController.text.trim().isEmpty
               ? null
               : _descriptionController.text.trim(),
-          city: _cityController.text.trim().isEmpty
-              ? null
-              : _cityController.text.trim(),
           homeGround: _homeGroundController.text.trim().isEmpty
               ? null
               : _homeGroundController.text.trim(),
@@ -390,36 +384,11 @@ class _EditTeamSheetState extends ConsumerState<EditTeamSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _FieldLabel(label: 'CITY'),
-                        TextField(
-                          controller: _cityController,
-                          style: CkType.body(fontSize: 14),
-                          decoration: _inputDec(hint: 'e.g. Lahore'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _FieldLabel(label: 'HOME GROUND'),
-                        TextField(
-                          controller: _homeGroundController,
-                          style: CkType.body(fontSize: 14),
-                          decoration: _inputDec(hint: 'e.g. Model Town Ground'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              const _FieldLabel(label: 'HOME GROUND'),
+              TextField(
+                controller: _homeGroundController,
+                style: CkType.body(fontSize: 14),
+                decoration: _inputDec(hint: 'e.g. Model Town Ground'),
               ),
               const SizedBox(height: 18),
               const _FieldLabel(label: 'PRIMARY BRAND COLOR'),

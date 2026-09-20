@@ -29,7 +29,6 @@ class TeamsRemoteDataSource {
     team_colors,
     description,
     home_ground,
-    location,
     founded_year,
     is_verified,
     privacy,
@@ -91,20 +90,6 @@ class TeamsRemoteDataSource {
               'logo_monogram': payload['logo_monogram'],
             if (payload['founded_year'] != null)
               'founded_year': payload['founded_year'],
-            'location': {
-              for (final key in [
-                'label',
-                'city',
-                'district',
-                'province',
-                'postcode',
-                'place_id',
-                'lat',
-                'lng',
-                'country_code',
-              ])
-                if (payload[key] != null) key: payload[key],
-            },
             'team_colors': {
               if (payload['primary_color'] != null)
                 'primary': payload['primary_color'],
@@ -141,31 +126,6 @@ class TeamsRemoteDataSource {
         'founded_year',
       ]) {
         if (payload.containsKey(key)) updates[key] = payload[key];
-      }
-
-      if (payload.keys.any(
-        (key) => const {
-          'city',
-          'district',
-          'province',
-          'postcode',
-          'country_code',
-        }.contains(key),
-      )) {
-        final current = await _supabase
-            .from(_teams)
-            .select('location')
-            .eq('team_id', teamId)
-            .single();
-        updates['location'] = {
-          ...?current['location'] as Map<String, dynamic>?,
-          if (payload.containsKey('city')) 'city': payload['city'],
-          if (payload.containsKey('district')) 'district': payload['district'],
-          if (payload.containsKey('province')) 'province': payload['province'],
-          if (payload.containsKey('postcode')) 'postcode': payload['postcode'],
-          if (payload.containsKey('country_code'))
-            'country_code': payload['country_code'],
-        };
       }
 
       if (payload.containsKey('primary_color') ||

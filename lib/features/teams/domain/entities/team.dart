@@ -13,7 +13,6 @@ class Team {
     required this.updatedAt,
     this.description,
     this.homeGround,
-    this.city,
     this.foundedYear,
     this.primaryColor,
     this.secondaryColor,
@@ -38,7 +37,6 @@ class Team {
   final DateTime updatedAt;
   final String? description;
   final String? homeGround;
-  final String? city;
   final int? foundedYear;
   final String? primaryColor;
   final String? secondaryColor;
@@ -65,7 +63,6 @@ class Team {
           other.privacy == privacy &&
           other.description == description &&
           other.homeGround == homeGround &&
-          other.city == city &&
           other.foundedYear == foundedYear &&
           other.primaryColor == primaryColor &&
           other.secondaryColor == secondaryColor &&
@@ -88,7 +85,6 @@ class Team {
         privacy,
         description,
         homeGround,
-        city,
         foundedYear,
         primaryColor,
         secondaryColor,

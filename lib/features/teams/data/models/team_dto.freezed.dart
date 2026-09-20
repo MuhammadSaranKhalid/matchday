@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TeamDto {
 
-@JsonKey(name: 'team_id') String get teamId;@JsonKey(name: 'created_by') String? get createdBy;@JsonKey(name: 'team_name') String get teamName;@JsonKey(name: 'team_type') String get teamType; String? get description;@JsonKey(name: 'home_ground') String? get homeGround; Map<String, dynamic>? get location;@JsonKey(name: 'founded_year') int? get foundedYear;@JsonKey(name: 'team_colors') Map<String, dynamic>? get teamColors; String get privacy; String? get tagline;@JsonKey(name: 'logo_url') String? get logoUrl;@JsonKey(name: 'logo_monogram') String? get logoMonogram;@JsonKey(name: 'is_verified') bool get isVerified; String get status;@JsonKey(name: 'max_squad_size') int get maxSquadSize;@JsonKey(name: 'created_at') String get createdAt;@JsonKey(name: 'updated_at') String get updatedAt;
+@JsonKey(name: 'team_id') String get teamId;@JsonKey(name: 'created_by') String? get createdBy;@JsonKey(name: 'team_name') String get teamName;@JsonKey(name: 'team_type') String get teamType; String? get description;@JsonKey(name: 'home_ground') String? get homeGround;@JsonKey(name: 'founded_year') int? get foundedYear;@JsonKey(name: 'team_colors') Map<String, dynamic>? get teamColors; String get privacy; String? get tagline;@JsonKey(name: 'logo_url') String? get logoUrl;@JsonKey(name: 'logo_monogram') String? get logoMonogram;@JsonKey(name: 'is_verified') bool get isVerified; String get status;@JsonKey(name: 'max_squad_size') int get maxSquadSize;@JsonKey(name: 'created_at') String get createdAt;@JsonKey(name: 'updated_at') String get updatedAt;
 /// Create a copy of TeamDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $TeamDtoCopyWith<TeamDto> get copyWith => _$TeamDtoCopyWithImpl<TeamDto>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TeamDto&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.teamType, teamType) || other.teamType == teamType)&&(identical(other.description, description) || other.description == description)&&(identical(other.homeGround, homeGround) || other.homeGround == homeGround)&&const DeepCollectionEquality().equals(other.location, location)&&(identical(other.foundedYear, foundedYear) || other.foundedYear == foundedYear)&&const DeepCollectionEquality().equals(other.teamColors, teamColors)&&(identical(other.privacy, privacy) || other.privacy == privacy)&&(identical(other.tagline, tagline) || other.tagline == tagline)&&(identical(other.logoUrl, logoUrl) || other.logoUrl == logoUrl)&&(identical(other.logoMonogram, logoMonogram) || other.logoMonogram == logoMonogram)&&(identical(other.isVerified, isVerified) || other.isVerified == isVerified)&&(identical(other.status, status) || other.status == status)&&(identical(other.maxSquadSize, maxSquadSize) || other.maxSquadSize == maxSquadSize)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TeamDto&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.teamType, teamType) || other.teamType == teamType)&&(identical(other.description, description) || other.description == description)&&(identical(other.homeGround, homeGround) || other.homeGround == homeGround)&&(identical(other.foundedYear, foundedYear) || other.foundedYear == foundedYear)&&const DeepCollectionEquality().equals(other.teamColors, teamColors)&&(identical(other.privacy, privacy) || other.privacy == privacy)&&(identical(other.tagline, tagline) || other.tagline == tagline)&&(identical(other.logoUrl, logoUrl) || other.logoUrl == logoUrl)&&(identical(other.logoMonogram, logoMonogram) || other.logoMonogram == logoMonogram)&&(identical(other.isVerified, isVerified) || other.isVerified == isVerified)&&(identical(other.status, status) || other.status == status)&&(identical(other.maxSquadSize, maxSquadSize) || other.maxSquadSize == maxSquadSize)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,teamId,createdBy,teamName,teamType,description,homeGround,const DeepCollectionEquality().hash(location),foundedYear,const DeepCollectionEquality().hash(teamColors),privacy,tagline,logoUrl,logoMonogram,isVerified,status,maxSquadSize,createdAt,updatedAt);
+int get hashCode => Object.hash(runtimeType,teamId,createdBy,teamName,teamType,description,homeGround,foundedYear,const DeepCollectionEquality().hash(teamColors),privacy,tagline,logoUrl,logoMonogram,isVerified,status,maxSquadSize,createdAt,updatedAt);
 
 @override
 String toString() {
-  return 'TeamDto(teamId: $teamId, createdBy: $createdBy, teamName: $teamName, teamType: $teamType, description: $description, homeGround: $homeGround, location: $location, foundedYear: $foundedYear, teamColors: $teamColors, privacy: $privacy, tagline: $tagline, logoUrl: $logoUrl, logoMonogram: $logoMonogram, isVerified: $isVerified, status: $status, maxSquadSize: $maxSquadSize, createdAt: $createdAt, updatedAt: $updatedAt)';
+  return 'TeamDto(teamId: $teamId, createdBy: $createdBy, teamName: $teamName, teamType: $teamType, description: $description, homeGround: $homeGround, foundedYear: $foundedYear, teamColors: $teamColors, privacy: $privacy, tagline: $tagline, logoUrl: $logoUrl, logoMonogram: $logoMonogram, isVerified: $isVerified, status: $status, maxSquadSize: $maxSquadSize, createdAt: $createdAt, updatedAt: $updatedAt)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $TeamDtoCopyWith<$Res>  {
   factory $TeamDtoCopyWith(TeamDto value, $Res Function(TeamDto) _then) = _$TeamDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'created_by') String? createdBy,@JsonKey(name: 'team_name') String teamName,@JsonKey(name: 'team_type') String teamType, String? description,@JsonKey(name: 'home_ground') String? homeGround, Map<String, dynamic>? location,@JsonKey(name: 'founded_year') int? foundedYear,@JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors, String privacy, String? tagline,@JsonKey(name: 'logo_url') String? logoUrl,@JsonKey(name: 'logo_monogram') String? logoMonogram,@JsonKey(name: 'is_verified') bool isVerified, String status,@JsonKey(name: 'max_squad_size') int maxSquadSize,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'updated_at') String updatedAt
+@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'created_by') String? createdBy,@JsonKey(name: 'team_name') String teamName,@JsonKey(name: 'team_type') String teamType, String? description,@JsonKey(name: 'home_ground') String? homeGround,@JsonKey(name: 'founded_year') int? foundedYear,@JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors, String privacy, String? tagline,@JsonKey(name: 'logo_url') String? logoUrl,@JsonKey(name: 'logo_monogram') String? logoMonogram,@JsonKey(name: 'is_verified') bool isVerified, String status,@JsonKey(name: 'max_squad_size') int maxSquadSize,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'updated_at') String updatedAt
 });
 
 
@@ -65,7 +65,7 @@ class _$TeamDtoCopyWithImpl<$Res>
 
 /// Create a copy of TeamDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? teamId = null,Object? createdBy = freezed,Object? teamName = null,Object? teamType = null,Object? description = freezed,Object? homeGround = freezed,Object? location = freezed,Object? foundedYear = freezed,Object? teamColors = freezed,Object? privacy = null,Object? tagline = freezed,Object? logoUrl = freezed,Object? logoMonogram = freezed,Object? isVerified = null,Object? status = null,Object? maxSquadSize = null,Object? createdAt = null,Object? updatedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? teamId = null,Object? createdBy = freezed,Object? teamName = null,Object? teamType = null,Object? description = freezed,Object? homeGround = freezed,Object? foundedYear = freezed,Object? teamColors = freezed,Object? privacy = null,Object? tagline = freezed,Object? logoUrl = freezed,Object? logoMonogram = freezed,Object? isVerified = null,Object? status = null,Object? maxSquadSize = null,Object? createdAt = null,Object? updatedAt = null,}) {
   return _then(_self.copyWith(
 teamId: null == teamId ? _self.teamId : teamId // ignore: cast_nullable_to_non_nullable
 as String,createdBy: freezed == createdBy ? _self.createdBy : createdBy // ignore: cast_nullable_to_non_nullable
@@ -73,8 +73,7 @@ as String?,teamName: null == teamName ? _self.teamName : teamName // ignore: cas
 as String,teamType: null == teamType ? _self.teamType : teamType // ignore: cast_nullable_to_non_nullable
 as String,description: freezed == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
 as String?,homeGround: freezed == homeGround ? _self.homeGround : homeGround // ignore: cast_nullable_to_non_nullable
-as String?,location: freezed == location ? _self.location : location // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>?,foundedYear: freezed == foundedYear ? _self.foundedYear : foundedYear // ignore: cast_nullable_to_non_nullable
+as String?,foundedYear: freezed == foundedYear ? _self.foundedYear : foundedYear // ignore: cast_nullable_to_non_nullable
 as int?,teamColors: freezed == teamColors ? _self.teamColors : teamColors // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,privacy: null == privacy ? _self.privacy : privacy // ignore: cast_nullable_to_non_nullable
 as String,tagline: freezed == tagline ? _self.tagline : tagline // ignore: cast_nullable_to_non_nullable
@@ -170,10 +169,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'created_by')  String? createdBy, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'team_type')  String teamType,  String? description, @JsonKey(name: 'home_ground')  String? homeGround,  Map<String, dynamic>? location, @JsonKey(name: 'founded_year')  int? foundedYear, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  String privacy,  String? tagline, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'is_verified')  bool isVerified,  String status, @JsonKey(name: 'max_squad_size')  int maxSquadSize, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'created_by')  String? createdBy, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'team_type')  String teamType,  String? description, @JsonKey(name: 'home_ground')  String? homeGround, @JsonKey(name: 'founded_year')  int? foundedYear, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  String privacy,  String? tagline, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'is_verified')  bool isVerified,  String status, @JsonKey(name: 'max_squad_size')  int maxSquadSize, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TeamDto() when $default != null:
-return $default(_that.teamId,_that.createdBy,_that.teamName,_that.teamType,_that.description,_that.homeGround,_that.location,_that.foundedYear,_that.teamColors,_that.privacy,_that.tagline,_that.logoUrl,_that.logoMonogram,_that.isVerified,_that.status,_that.maxSquadSize,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.teamId,_that.createdBy,_that.teamName,_that.teamType,_that.description,_that.homeGround,_that.foundedYear,_that.teamColors,_that.privacy,_that.tagline,_that.logoUrl,_that.logoMonogram,_that.isVerified,_that.status,_that.maxSquadSize,_that.createdAt,_that.updatedAt);case _:
   return orElse();
 
 }
@@ -191,10 +190,10 @@ return $default(_that.teamId,_that.createdBy,_that.teamName,_that.teamType,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'created_by')  String? createdBy, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'team_type')  String teamType,  String? description, @JsonKey(name: 'home_ground')  String? homeGround,  Map<String, dynamic>? location, @JsonKey(name: 'founded_year')  int? foundedYear, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  String privacy,  String? tagline, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'is_verified')  bool isVerified,  String status, @JsonKey(name: 'max_squad_size')  int maxSquadSize, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'created_by')  String? createdBy, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'team_type')  String teamType,  String? description, @JsonKey(name: 'home_ground')  String? homeGround, @JsonKey(name: 'founded_year')  int? foundedYear, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  String privacy,  String? tagline, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'is_verified')  bool isVerified,  String status, @JsonKey(name: 'max_squad_size')  int maxSquadSize, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _TeamDto():
-return $default(_that.teamId,_that.createdBy,_that.teamName,_that.teamType,_that.description,_that.homeGround,_that.location,_that.foundedYear,_that.teamColors,_that.privacy,_that.tagline,_that.logoUrl,_that.logoMonogram,_that.isVerified,_that.status,_that.maxSquadSize,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.teamId,_that.createdBy,_that.teamName,_that.teamType,_that.description,_that.homeGround,_that.foundedYear,_that.teamColors,_that.privacy,_that.tagline,_that.logoUrl,_that.logoMonogram,_that.isVerified,_that.status,_that.maxSquadSize,_that.createdAt,_that.updatedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -211,10 +210,10 @@ return $default(_that.teamId,_that.createdBy,_that.teamName,_that.teamType,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'created_by')  String? createdBy, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'team_type')  String teamType,  String? description, @JsonKey(name: 'home_ground')  String? homeGround,  Map<String, dynamic>? location, @JsonKey(name: 'founded_year')  int? foundedYear, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  String privacy,  String? tagline, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'is_verified')  bool isVerified,  String status, @JsonKey(name: 'max_squad_size')  int maxSquadSize, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'team_id')  String teamId, @JsonKey(name: 'created_by')  String? createdBy, @JsonKey(name: 'team_name')  String teamName, @JsonKey(name: 'team_type')  String teamType,  String? description, @JsonKey(name: 'home_ground')  String? homeGround, @JsonKey(name: 'founded_year')  int? foundedYear, @JsonKey(name: 'team_colors')  Map<String, dynamic>? teamColors,  String privacy,  String? tagline, @JsonKey(name: 'logo_url')  String? logoUrl, @JsonKey(name: 'logo_monogram')  String? logoMonogram, @JsonKey(name: 'is_verified')  bool isVerified,  String status, @JsonKey(name: 'max_squad_size')  int maxSquadSize, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'updated_at')  String updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _TeamDto() when $default != null:
-return $default(_that.teamId,_that.createdBy,_that.teamName,_that.teamType,_that.description,_that.homeGround,_that.location,_that.foundedYear,_that.teamColors,_that.privacy,_that.tagline,_that.logoUrl,_that.logoMonogram,_that.isVerified,_that.status,_that.maxSquadSize,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.teamId,_that.createdBy,_that.teamName,_that.teamType,_that.description,_that.homeGround,_that.foundedYear,_that.teamColors,_that.privacy,_that.tagline,_that.logoUrl,_that.logoMonogram,_that.isVerified,_that.status,_that.maxSquadSize,_that.createdAt,_that.updatedAt);case _:
   return null;
 
 }
@@ -226,7 +225,7 @@ return $default(_that.teamId,_that.createdBy,_that.teamName,_that.teamType,_that
 @JsonSerializable()
 
 class _TeamDto extends TeamDto {
-  const _TeamDto({@JsonKey(name: 'team_id') required this.teamId, @JsonKey(name: 'created_by') this.createdBy, @JsonKey(name: 'team_name') required this.teamName, @JsonKey(name: 'team_type') required this.teamType, this.description, @JsonKey(name: 'home_ground') this.homeGround, final  Map<String, dynamic>? location, @JsonKey(name: 'founded_year') this.foundedYear, @JsonKey(name: 'team_colors') final  Map<String, dynamic>? teamColors, this.privacy = 'public', this.tagline, @JsonKey(name: 'logo_url') this.logoUrl, @JsonKey(name: 'logo_monogram') this.logoMonogram, @JsonKey(name: 'is_verified') this.isVerified = false, this.status = 'active', @JsonKey(name: 'max_squad_size') this.maxSquadSize = 25, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'updated_at') required this.updatedAt}): _location = location,_teamColors = teamColors,super._();
+  const _TeamDto({@JsonKey(name: 'team_id') required this.teamId, @JsonKey(name: 'created_by') this.createdBy, @JsonKey(name: 'team_name') required this.teamName, @JsonKey(name: 'team_type') required this.teamType, this.description, @JsonKey(name: 'home_ground') this.homeGround, @JsonKey(name: 'founded_year') this.foundedYear, @JsonKey(name: 'team_colors') final  Map<String, dynamic>? teamColors, this.privacy = 'public', this.tagline, @JsonKey(name: 'logo_url') this.logoUrl, @JsonKey(name: 'logo_monogram') this.logoMonogram, @JsonKey(name: 'is_verified') this.isVerified = false, this.status = 'active', @JsonKey(name: 'max_squad_size') this.maxSquadSize = 25, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'updated_at') required this.updatedAt}): _teamColors = teamColors,super._();
   factory _TeamDto.fromJson(Map<String, dynamic> json) => _$TeamDtoFromJson(json);
 
 @override@JsonKey(name: 'team_id') final  String teamId;
@@ -235,15 +234,6 @@ class _TeamDto extends TeamDto {
 @override@JsonKey(name: 'team_type') final  String teamType;
 @override final  String? description;
 @override@JsonKey(name: 'home_ground') final  String? homeGround;
- final  Map<String, dynamic>? _location;
-@override Map<String, dynamic>? get location {
-  final value = _location;
-  if (value == null) return null;
-  if (_location is EqualUnmodifiableMapView) return _location;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableMapView(value);
-}
-
 @override@JsonKey(name: 'founded_year') final  int? foundedYear;
  final  Map<String, dynamic>? _teamColors;
 @override@JsonKey(name: 'team_colors') Map<String, dynamic>? get teamColors {
@@ -277,16 +267,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TeamDto&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.teamType, teamType) || other.teamType == teamType)&&(identical(other.description, description) || other.description == description)&&(identical(other.homeGround, homeGround) || other.homeGround == homeGround)&&const DeepCollectionEquality().equals(other._location, _location)&&(identical(other.foundedYear, foundedYear) || other.foundedYear == foundedYear)&&const DeepCollectionEquality().equals(other._teamColors, _teamColors)&&(identical(other.privacy, privacy) || other.privacy == privacy)&&(identical(other.tagline, tagline) || other.tagline == tagline)&&(identical(other.logoUrl, logoUrl) || other.logoUrl == logoUrl)&&(identical(other.logoMonogram, logoMonogram) || other.logoMonogram == logoMonogram)&&(identical(other.isVerified, isVerified) || other.isVerified == isVerified)&&(identical(other.status, status) || other.status == status)&&(identical(other.maxSquadSize, maxSquadSize) || other.maxSquadSize == maxSquadSize)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TeamDto&&(identical(other.teamId, teamId) || other.teamId == teamId)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.teamType, teamType) || other.teamType == teamType)&&(identical(other.description, description) || other.description == description)&&(identical(other.homeGround, homeGround) || other.homeGround == homeGround)&&(identical(other.foundedYear, foundedYear) || other.foundedYear == foundedYear)&&const DeepCollectionEquality().equals(other._teamColors, _teamColors)&&(identical(other.privacy, privacy) || other.privacy == privacy)&&(identical(other.tagline, tagline) || other.tagline == tagline)&&(identical(other.logoUrl, logoUrl) || other.logoUrl == logoUrl)&&(identical(other.logoMonogram, logoMonogram) || other.logoMonogram == logoMonogram)&&(identical(other.isVerified, isVerified) || other.isVerified == isVerified)&&(identical(other.status, status) || other.status == status)&&(identical(other.maxSquadSize, maxSquadSize) || other.maxSquadSize == maxSquadSize)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,teamId,createdBy,teamName,teamType,description,homeGround,const DeepCollectionEquality().hash(_location),foundedYear,const DeepCollectionEquality().hash(_teamColors),privacy,tagline,logoUrl,logoMonogram,isVerified,status,maxSquadSize,createdAt,updatedAt);
+int get hashCode => Object.hash(runtimeType,teamId,createdBy,teamName,teamType,description,homeGround,foundedYear,const DeepCollectionEquality().hash(_teamColors),privacy,tagline,logoUrl,logoMonogram,isVerified,status,maxSquadSize,createdAt,updatedAt);
 
 @override
 String toString() {
-  return 'TeamDto(teamId: $teamId, createdBy: $createdBy, teamName: $teamName, teamType: $teamType, description: $description, homeGround: $homeGround, location: $location, foundedYear: $foundedYear, teamColors: $teamColors, privacy: $privacy, tagline: $tagline, logoUrl: $logoUrl, logoMonogram: $logoMonogram, isVerified: $isVerified, status: $status, maxSquadSize: $maxSquadSize, createdAt: $createdAt, updatedAt: $updatedAt)';
+  return 'TeamDto(teamId: $teamId, createdBy: $createdBy, teamName: $teamName, teamType: $teamType, description: $description, homeGround: $homeGround, foundedYear: $foundedYear, teamColors: $teamColors, privacy: $privacy, tagline: $tagline, logoUrl: $logoUrl, logoMonogram: $logoMonogram, isVerified: $isVerified, status: $status, maxSquadSize: $maxSquadSize, createdAt: $createdAt, updatedAt: $updatedAt)';
 }
 
 
@@ -297,7 +287,7 @@ abstract mixin class _$TeamDtoCopyWith<$Res> implements $TeamDtoCopyWith<$Res> {
   factory _$TeamDtoCopyWith(_TeamDto value, $Res Function(_TeamDto) _then) = __$TeamDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'created_by') String? createdBy,@JsonKey(name: 'team_name') String teamName,@JsonKey(name: 'team_type') String teamType, String? description,@JsonKey(name: 'home_ground') String? homeGround, Map<String, dynamic>? location,@JsonKey(name: 'founded_year') int? foundedYear,@JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors, String privacy, String? tagline,@JsonKey(name: 'logo_url') String? logoUrl,@JsonKey(name: 'logo_monogram') String? logoMonogram,@JsonKey(name: 'is_verified') bool isVerified, String status,@JsonKey(name: 'max_squad_size') int maxSquadSize,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'updated_at') String updatedAt
+@JsonKey(name: 'team_id') String teamId,@JsonKey(name: 'created_by') String? createdBy,@JsonKey(name: 'team_name') String teamName,@JsonKey(name: 'team_type') String teamType, String? description,@JsonKey(name: 'home_ground') String? homeGround,@JsonKey(name: 'founded_year') int? foundedYear,@JsonKey(name: 'team_colors') Map<String, dynamic>? teamColors, String privacy, String? tagline,@JsonKey(name: 'logo_url') String? logoUrl,@JsonKey(name: 'logo_monogram') String? logoMonogram,@JsonKey(name: 'is_verified') bool isVerified, String status,@JsonKey(name: 'max_squad_size') int maxSquadSize,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'updated_at') String updatedAt
 });
 
 
@@ -314,7 +304,7 @@ class __$TeamDtoCopyWithImpl<$Res>
 
 /// Create a copy of TeamDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? teamId = null,Object? createdBy = freezed,Object? teamName = null,Object? teamType = null,Object? description = freezed,Object? homeGround = freezed,Object? location = freezed,Object? foundedYear = freezed,Object? teamColors = freezed,Object? privacy = null,Object? tagline = freezed,Object? logoUrl = freezed,Object? logoMonogram = freezed,Object? isVerified = null,Object? status = null,Object? maxSquadSize = null,Object? createdAt = null,Object? updatedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? teamId = null,Object? createdBy = freezed,Object? teamName = null,Object? teamType = null,Object? description = freezed,Object? homeGround = freezed,Object? foundedYear = freezed,Object? teamColors = freezed,Object? privacy = null,Object? tagline = freezed,Object? logoUrl = freezed,Object? logoMonogram = freezed,Object? isVerified = null,Object? status = null,Object? maxSquadSize = null,Object? createdAt = null,Object? updatedAt = null,}) {
   return _then(_TeamDto(
 teamId: null == teamId ? _self.teamId : teamId // ignore: cast_nullable_to_non_nullable
 as String,createdBy: freezed == createdBy ? _self.createdBy : createdBy // ignore: cast_nullable_to_non_nullable
@@ -322,8 +312,7 @@ as String?,teamName: null == teamName ? _self.teamName : teamName // ignore: cas
 as String,teamType: null == teamType ? _self.teamType : teamType // ignore: cast_nullable_to_non_nullable
 as String,description: freezed == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
 as String?,homeGround: freezed == homeGround ? _self.homeGround : homeGround // ignore: cast_nullable_to_non_nullable
-as String?,location: freezed == location ? _self._location : location // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>?,foundedYear: freezed == foundedYear ? _self.foundedYear : foundedYear // ignore: cast_nullable_to_non_nullable
+as String?,foundedYear: freezed == foundedYear ? _self.foundedYear : foundedYear // ignore: cast_nullable_to_non_nullable
 as int?,teamColors: freezed == teamColors ? _self._teamColors : teamColors // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,privacy: null == privacy ? _self.privacy : privacy // ignore: cast_nullable_to_non_nullable
 as String,tagline: freezed == tagline ? _self.tagline : tagline // ignore: cast_nullable_to_non_nullable

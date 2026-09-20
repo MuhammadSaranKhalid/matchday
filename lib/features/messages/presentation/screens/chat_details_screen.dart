@@ -167,13 +167,6 @@ class _TeamInfo extends ConsumerWidget {
                   ? team!.homeGround!
                   : 'Not provided',
             ),
-            _InfoRow(
-              icon: Icons.place_outlined,
-              label: 'Location',
-              value: team?.city?.trim().isNotEmpty == true
-                  ? team!.city!
-                  : 'Not provided',
-            ),
           ],
         ),
         const SizedBox(height: 22),

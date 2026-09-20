@@ -496,48 +496,11 @@ class _Home extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
         children: [
           const _StepTitle('Where do you play?'),
-          const TcLabel('City / locality'),
-          TcInput(
-            value: state.city,
-            onChanged: controller.setCity,
-            placeholder: 'e.g. Lahore',
-            hasError: !state.canContinueHome && state.city.isNotEmpty,
-          ),
-          const SizedBox(height: 16),
-          const TcLabel('Area'),
-          TcInput(
-            value: state.area,
-            onChanged: controller.setArea,
-            placeholder: 'Optional · e.g. Johar Town',
-          ),
-          const SizedBox(height: 16),
           const TcLabel('Home ground'),
           TcInput(
             value: state.homeGround,
             onChanged: controller.setHomeGround,
-            placeholder: 'Optional',
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: CkColors.paper2,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.place_outlined, size: 19, color: CkColors.muted),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Location helps nearby cricketers discover public teams. '
-                    'Private teams remain invite-only.',
-                    style: CkType.body(fontSize: 12, height: 1.4, color: CkColors.muted),
-                  ),
-                ),
-              ],
-            ),
+            placeholder: 'Optional · e.g. Model Town Ground',
           ),
         ],
       );
@@ -707,10 +670,9 @@ class _Review extends StatelessWidget {
                 ),
                 _ReviewRow(
                   label: 'HOME',
-                  value: [
-                    state.combinedCity,
-                    if (state.homeGround.trim().isNotEmpty) state.homeGround.trim(),
-                  ].where((e) => e.isNotEmpty).join(' · '),
+                  value: state.homeGround.trim().isNotEmpty
+                      ? state.homeGround.trim()
+                      : 'No home ground specified',
                   onTap: () => onEdit(TeamCreateStep.home),
                 ),
                 _ReviewRow(
@@ -921,8 +883,8 @@ class _DoneView extends StatelessWidget {
                 child: Column(
                   children: [
                     _ReceiptRow('Type & visibility', '${_typeLabel(state.type)} · ${state.privacy.wire}'),
-                    if (state.combinedCity.isNotEmpty)
-                      _ReceiptRow('Location', state.combinedCity),
+                    if (state.homeGround.trim().isNotEmpty)
+                      _ReceiptRow('Home ground', state.homeGround.trim()),
                     _ReceiptRow('Crest', _crestLabel(state.crestKind)),
                     const _ReceiptRow('Your role', 'Team Owner', last: true),
                   ],

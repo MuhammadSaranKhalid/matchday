@@ -11,7 +11,6 @@ class TeamSearchResult extends Equatable {
     this.logoMonogram,
     this.primaryColor,
     this.secondaryColor,
-    this.city,
     this.isVerified = false,
     this.distanceKm,
     this.foundedYear,
@@ -25,7 +24,6 @@ class TeamSearchResult extends Equatable {
   final String? logoMonogram;
   final String? primaryColor;
   final String? secondaryColor;
-  final String? city;
   final bool isVerified;
   final double? distanceKm;
   final int? foundedYear;
@@ -33,7 +31,6 @@ class TeamSearchResult extends Equatable {
 
   String get metaLine {
     final parts = <String>[
-      if (city != null && city!.isNotEmpty) city!,
       if (foundedYear != null) 'FD $foundedYear',
       if (teamType != null && teamType!.isNotEmpty)
         teamType!.replaceAll('_', '-'),
@@ -50,7 +47,6 @@ class TeamSearchResult extends Equatable {
         logoMonogram,
         primaryColor,
         secondaryColor,
-        city,
         isVerified,
         distanceKm,
         foundedYear,

@@ -50,21 +50,12 @@ class TeamsRepositoryImpl implements TeamsRepository {
     TeamPrivacy privacy = TeamPrivacy.public,
     String? description,
     String? homeGround,
-    String? city,
     int? foundedYear,
     String? primaryColor,
     String? secondaryColor,
     String? tagline,
     String? logoMonogram,
     CrestKind crestKind = CrestKind.monogram,
-    String? label,
-    String? district,
-    String? province,
-    String? postcode,
-    String? placeId,
-    double? latitude,
-    double? longitude,
-    String? countryCode,
   }) async {
     try {
       final dto = await _remote.createTeam({
@@ -72,23 +63,14 @@ class TeamsRepositoryImpl implements TeamsRepository {
         'team_name': name.value,
         'team_type': type.wire,
         'privacy': privacy.wire,
-        'description': description,
-        'home_ground': homeGround,
-        'city': city,
-        'founded_year': foundedYear,
-        'primary_color': primaryColor,
-        'secondary_color': secondaryColor,
-        'tagline': tagline,
-        'logo_monogram': logoMonogram,
+        if (description != null) 'description': description,
+        if (homeGround != null) 'home_ground': homeGround,
+        if (foundedYear != null) 'founded_year': foundedYear,
+        if (primaryColor != null) 'primary_color': primaryColor,
+        if (secondaryColor != null) 'secondary_color': secondaryColor,
+        if (tagline != null) 'tagline': tagline,
+        if (logoMonogram != null) 'logo_monogram': logoMonogram,
         'crest_kind': crestKind.name,
-        'label': label,
-        'district': district,
-        'province': province,
-        'postcode': postcode,
-        'place_id': placeId,
-        'lat': latitude,
-        'lng': longitude,
-        'country_code': countryCode,
       });
       return Right(dto.toEntity());
     } catch (e) {
@@ -104,16 +86,11 @@ class TeamsRepositoryImpl implements TeamsRepository {
     TeamPrivacy? privacy,
     String? description,
     String? homeGround,
-    String? city,
     int? foundedYear,
     String? primaryColor,
     String? secondaryColor,
     String? tagline,
     String? logoMonogram,
-    String? district,
-    String? province,
-    String? postcode,
-    String? countryCode,
   }) async {
     try {
       final payload = <String, dynamic>{};
@@ -122,16 +99,11 @@ class TeamsRepositoryImpl implements TeamsRepository {
       if (privacy != null) payload['privacy'] = privacy.wire;
       if (description != null) payload['description'] = description;
       if (homeGround != null) payload['home_ground'] = homeGround;
-      if (city != null) payload['city'] = city;
       if (foundedYear != null) payload['founded_year'] = foundedYear;
       if (primaryColor != null) payload['primary_color'] = primaryColor;
       if (secondaryColor != null) payload['secondary_color'] = secondaryColor;
       if (tagline != null) payload['tagline'] = tagline;
       if (logoMonogram != null) payload['logo_monogram'] = logoMonogram;
-      if (district != null) payload['district'] = district;
-      if (province != null) payload['province'] = province;
-      if (postcode != null) payload['postcode'] = postcode;
-      if (countryCode != null) payload['country_code'] = countryCode;
 
       final dto = await _remote.updateTeam(teamId.value, payload);
       return Right(dto.toEntity());

@@ -40,7 +40,6 @@ class TeamAboutTab extends StatelessWidget {
           rows: [
             ('Type', team.type.wire),
             if (team.foundedYear != null) ('Founded', '${team.foundedYear}'),
-            if (team.city?.isNotEmpty ?? false) ('City', team.city!),
             if (team.homeGround?.isNotEmpty ?? false) ('Home ground', team.homeGround!),
             ('Privacy', team.privacy.wire),
             ('Squad capacity', '${team.maxSquadSize}'),

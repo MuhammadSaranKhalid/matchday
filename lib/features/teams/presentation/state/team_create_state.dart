@@ -17,16 +17,6 @@ abstract class TeamCreateState with _$TeamCreateState {
     @Default(TeamPrivacy.public) TeamPrivacy privacy,
     @Default('') String tagline,
     String? foundedYear,
-    @Default('') String city,
-    @Default('') String area,
-    String? locationLabel,
-    String? district,
-    String? province,
-    String? postcode,
-    String? placeId,
-    double? latitude,
-    double? longitude,
-    String? countryCode,
     @Default('') String homeGround,
     @Default('#338946') String primaryColor,
     @Default('#FDFAF4') String secondaryColor,
@@ -54,10 +44,9 @@ abstract class TeamCreateState with _$TeamCreateState {
         : null;
   }
 
-  bool get canSubmit => canContinueBasics && canContinueHome;
-  bool get hasDraft => name.trim().isNotEmpty || city.trim().isNotEmpty;
-  bool get canContinueHome => city.trim().isNotEmpty;
-  bool get hasCoordinates => latitude != null && longitude != null;
+  bool get canSubmit => canContinueBasics;
+  bool get hasDraft => name.trim().isNotEmpty || homeGround.trim().isNotEmpty;
+  bool get canContinueHome => true;
 
   String get monogram {
     final override = monogramOverride?.trim();
@@ -71,13 +60,5 @@ abstract class TeamCreateState with _$TeamCreateState {
       return (w.length >= 2 ? w.substring(0, 2) : w).toUpperCase();
     }
     return (words.first[0] + words.elementAt(1)[0]).toUpperCase();
-  }
-
-  String get combinedCity {
-    final a = area.trim();
-    final c = city.trim();
-    if (a.isEmpty) return c;
-    if (c.isEmpty) return a;
-    return '$a, $c';
   }
 }

@@ -155,3 +155,7 @@ create index if not exists idx_match_deliveries_recorded_by
 
 -- The unique (innings_id, seq) constraint already provides the ledger-order
 -- index, including backward scans. Do not add a duplicate index on that pair.
+
+comment on table public.match_deliveries is
+  'CRICKET ENGINE TABLE (legacy generic name). Planned rename: '
+  'cricket_match_deliveries.';

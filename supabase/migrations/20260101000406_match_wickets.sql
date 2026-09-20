@@ -4,9 +4,6 @@
 -- Dismissal details attached to deliveries.
 -- Spec: docs/matches-schema-architecture.md
 
--- removed 2026-09-06
-drop table if exists public.match_wickets cascade;
-
 create table public.match_wickets (
   wicket_id              uuid primary key default gen_random_uuid(),
   delivery_id            uuid not null unique references public.match_deliveries(delivery_id) on delete cascade,
@@ -53,3 +50,7 @@ create index if not exists idx_match_wickets_player_out_id
 
 create index if not exists idx_match_wickets_primary_fielder_id
   on public.match_wickets (primary_fielder_id);
+
+comment on table public.match_wickets is
+  'CRICKET ENGINE TABLE (legacy generic name). Planned rename: '
+  'cricket_match_wickets.';

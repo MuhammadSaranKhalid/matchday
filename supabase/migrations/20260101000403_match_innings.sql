@@ -4,8 +4,6 @@
 -- Innings definitions and their allocation/completion state.
 -- Spec: docs/matches-schema-architecture.md
 
-drop table if exists public.match_innings cascade;
-
 -- -----------------------------------------------------------------------------
 -- Innings & Live Hot State
 -- -----------------------------------------------------------------------------
@@ -47,3 +45,26 @@ create policy "match_innings_read_all" on public.match_innings for select
   using (true);
 
 create index if not exists idx_innings_match on public.match_innings(match_id);
+
+
+-- =============================================================================
+-- Make the innings engine structurally Cricket-only
+-- =============================================================================
+--
+-- We intentionally keep the current public table names in Phase 1 so no
+-- scoring caller breaks. This additional FK means an innings cannot belong to
+-- Football or another sport even though the table still has a legacy generic
+-- name.
+-- =============================================================================
+
+alter table public.match_innings
+  add constraint match_innings_cricket_match_fkey
+  foreign key (match_id)
+  references public.cricket_matches(match_id)
+  on delete cascade;
+
+
+comment on table public.match_innings is
+  'CRICKET ENGINE TABLE (legacy generic name). Every row is constrained to '
+  'a cricket_matches parent. Planned rename: cricket_match_innings.';
+

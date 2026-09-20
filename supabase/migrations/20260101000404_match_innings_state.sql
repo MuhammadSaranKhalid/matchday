@@ -84,3 +84,7 @@ create index if not exists idx_match_innings_state_non_striker_id
 
 create index if not exists idx_match_innings_state_striker_id
   on public.match_innings_state (striker_id);
+
+comment on table public.match_innings_state is
+  'CRICKET ENGINE TABLE (legacy generic name). Planned rename: '
+  'cricket_match_innings_state.';

@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
           await tx`
             select public.record_toss_decision(
               ${matchId}::uuid,
-              ${body.p_decision}::public.toss_decision
+              ${body.p_decision}::public.cricket_toss_decision
             )`;
           break;
 

@@ -6,8 +6,14 @@ import '../../domain/entities/match.dart';
 part 'format_preset_dto.freezed.dart';
 part 'format_preset_dto.g.dart';
 
-/// DTO for a `format_presets` row. `config` is the open-shape format jsonb;
-/// `toEntity` parses it into a [MatchFormat] (same key set as `matches.format`).
+/// Cricket-facing DTO for one row from the shared sport-scoped preset catalog.
+///
+/// The shared `match_format_presets` table deliberately has no Cricket-typed
+/// `default_scoring_mode` column after Phase 3B. Cricket-only preset metadata
+/// lives inside the opaque `config` document.
+///
+/// [defaultScoringMode] is kept temporarily as an optional compatibility field
+/// so older cached/API payloads are harmless during rollout.
 @freezed
 abstract class FormatPresetDto with _$FormatPresetDto {
   const factory FormatPresetDto({
@@ -25,19 +31,27 @@ abstract class FormatPresetDto with _$FormatPresetDto {
   FormatPreset toEntity() => FormatPreset(
         id: id,
         label: label,
-        defaultScoringMode: ScoringMode.fromWire(defaultScoringMode),
-        // Parse the config jsonb → MatchFormat (mirrors MatchDto's format parse;
-        // every key is optional + defaulted, per the append-only config model).
+        defaultScoringMode: ScoringMode.fromWire(
+          defaultScoringMode ??
+              config['default_scoring_mode']?.toString(),
+        ),
         format: MatchFormat(
-          oversPerInnings: (config['overs_per_innings'] as num?)?.toInt() ?? 0,
-          playersPerTeam: (config['players_per_team'] as num?)?.toInt() ?? 11,
-          ballType: MatchBallType.fromWire(config['ball_type'] as String?),
+          oversPerInnings:
+              (config['overs_per_innings'] as num?)?.toInt() ?? 0,
+          playersPerTeam:
+              (config['players_per_team'] as num?)?.toInt() ?? 11,
+          ballType:
+              MatchBallType.fromWire(config['ball_type'] as String?),
           maxOversPerBowler:
               (config['max_overs_per_bowler'] as num?)?.toInt() ?? 0,
-          ballsPerOver: (config['balls_per_over'] as num?)?.toInt() ?? 6,
-          inningsPerSide: (config['innings_per_side'] as num?)?.toInt() ?? 1,
-          wicketsToAllOut: (config['wickets_to_all_out'] as num?)?.toInt(),
-          endChangeBalls: (config['end_change_balls'] as num?)?.toInt(),
+          ballsPerOver:
+              (config['balls_per_over'] as num?)?.toInt() ?? 6,
+          inningsPerSide:
+              (config['innings_per_side'] as num?)?.toInt() ?? 1,
+          wicketsToAllOut:
+              (config['wickets_to_all_out'] as num?)?.toInt(),
+          endChangeBalls:
+              (config['end_change_balls'] as num?)?.toInt(),
         ),
       );
 }

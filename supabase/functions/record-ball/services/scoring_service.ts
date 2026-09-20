@@ -59,7 +59,7 @@ export class ScoringService {
       if (!match) {
         throw new HttpSignal(404, "MATCH_NOT_FOUND", "Cricket match not found");
       }
-      if (["completed", "abandoned", "walkover"].includes(match.status as string)) {
+      if (["completed", "abandoned", "cancelled"].includes(match.status as string)) {
         throw new HttpSignal(409, "MATCH_FINALIZED", "Match is already finished");
       }
 

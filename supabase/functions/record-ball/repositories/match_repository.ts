@@ -194,16 +194,24 @@ export class MatchRepository {
        order by innings_number`;
   }
 
-  // `innings_break` remains a transitional shared status until Phase 3.
+  // Innings break is a Cricket PHASE; the generic parent stays live.
   // deno-lint-ignore no-explicit-any
   async setMatchStatusInningsBreak(tx: any, matchId: string): Promise<void> {
     await tx`
-      update matches set status = 'innings_break', updated_at = now()
-       where match_id = ${matchId}`;
+      update cricket_matches set
+        phase = 'innings_break',
+        updated_at = now()
+      where match_id = ${matchId}`;
+
+    await tx`
+      update matches set
+        status = 'live',
+        updated_at = now()
+      where match_id = ${matchId}`;
   }
 
-  // Cricket result belongs to cricket_matches. Shared matches keeps generic
-  // lifecycle, completed_at and winner_id for tournament/bracket joins.
+  // Detailed outcome belongs to cricket_matches. Shared matches stores only
+  // generic lifecycle + winner projection.
   // deno-lint-ignore no-explicit-any
   async setMatchCompleted(tx: any, matchId: string, result: unknown): Promise<void> {
     const r = (result ?? {}) as Record<string, unknown>;
@@ -214,6 +222,7 @@ export class MatchRepository {
 
     await tx`
       update cricket_matches set
+        phase = 'complete',
         result = ${tx.json(result)},
         result_summary = ${tx.json({ description })},
         updated_at = now()

@@ -143,9 +143,10 @@ begin
     continue when v_owner is null;
 
     for v_i in 1 .. array_length(v_names, 1) loop
-      insert into public.unclaimed_players (unclaimed_id, display_name, added_by)
+      insert into public.unclaimed_players (unclaimed_id, sport_id, display_name, added_by)
       values (
         md5('pool-prod:' || v_team::text || ':' || v_i)::uuid,
+        'cricket',
         v_names[v_i],
         v_owner
       )

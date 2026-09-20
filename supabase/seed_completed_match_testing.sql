@@ -73,9 +73,10 @@ begin
   -- 22 people would collide with the identities used to sign in.
   for i in 1..22 loop
     v_uid := ('cd000000-0000-4000-8000-' || lpad(i::text, 12, '0'))::uuid;
-    insert into public.unclaimed_players (unclaimed_id, display_name, added_by)
+    insert into public.unclaimed_players (unclaimed_id, sport_id, display_name, added_by)
     values (
       v_uid,
+      'cricket',
       case when i <= 11 then v_names_a[i] else v_names_b[i - 11] end,
       v_me
     );

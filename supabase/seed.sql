@@ -784,10 +784,10 @@ begin
     display_name = excluded.display_name;
 
   -- 2) Unclaimed Players on Lahore Lions Roster
-  insert into public.unclaimed_players (unclaimed_id, display_name, phone_number, added_by, created_at, updated_at)
+  insert into public.unclaimed_players (unclaimed_id, sport_id, display_name, phone_number, added_by, created_at, updated_at)
   values
-    (v_unclaimed_wahab, 'Wahab Riaz', '+923001112233', v_saran_uid, now(), now()),
-    (v_unclaimed_imad,  'Imad Wasim', '+923004445566', v_saran_uid, now(), now())
+    (v_unclaimed_wahab, 'cricket', 'Wahab Riaz', '+923001112233', v_saran_uid, now(), now()),
+    (v_unclaimed_imad,  'cricket', 'Imad Wasim', '+923004445566', v_saran_uid, now(), now())
   on conflict (unclaimed_id) do nothing;
 
   insert into public.team_members (membership_id, team_id, unclaimed_id, added_by, jersey_number, status)

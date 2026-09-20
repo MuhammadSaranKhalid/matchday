@@ -6,16 +6,14 @@ import '../../../../core/error/exceptions.dart';
 import '../models/team_dto.dart';
 import '../models/team_member_dto.dart';
 
-typedef TeamMembershipRecord = ({
-  TeamMemberDto member,
-  TeamDto team,
-});
+typedef TeamMembershipRecord = ({TeamMemberDto member, TeamDto team});
 
-typedef TeamRosterRecord = ({
-  TeamMemberDto member,
-  Map<String, dynamic>? profile,
-  Map<String, dynamic>? unclaimed,
-});
+typedef TeamRosterRecord =
+    ({
+      TeamMemberDto member,
+      Map<String, dynamic>? profile,
+      Map<String, dynamic>? unclaimed,
+    });
 
 /// One-shot Supabase source for team membership, roster and membership
 /// workflows. No Postgres Changes stream is kept open by this feature.
@@ -47,7 +45,6 @@ class TeamMembershipRemoteDataSource {
       team_colors,
       description,
       home_ground,
-      location,
       founded_year,
       is_verified,
       privacy,
@@ -85,6 +82,7 @@ class TeamMembershipRemoteDataSource {
           .eq('status', 'active')
           .order('joined_at')
           .timeout(_readTimeout);
+
       return rows.map(_membershipFromRow).toList(growable: false);
     } on TimeoutException {
       throw ServerException('Team memberships request timed out.');
@@ -93,9 +91,7 @@ class TeamMembershipRemoteDataSource {
     }
   }
 
-  Future<List<TeamMembershipRecord>> getUserMemberships(
-    String userId,
-  ) async {
+  Future<List<TeamMembershipRecord>> getUserMemberships(String userId) async {
     if (userId.trim().isEmpty) return const [];
     try {
       final rows = await _supabase
@@ -174,18 +170,21 @@ class TeamMembershipRemoteDataSource {
         final membershipId = row['membership_id'] as String?;
         final roleKey = row['role_key'] as String?;
         if (membershipId == null || roleKey == null) continue;
-        (rolesByMembership[membershipId] ??= <Map<String, dynamic>>[]).add(
-          {'role_key': roleKey},
-        );
+        (rolesByMembership[membershipId] ??= <Map<String, dynamic>>[]).add({
+          'role_key': roleKey,
+        });
       }
 
-      final members = memberRows.map((row) {
-        final json = Map<String, dynamic>.from(row);
-        final membershipId = json['membership_id'] as String;
-        json['team_member_roles'] =
-            rolesByMembership[membershipId] ?? const <Map<String, dynamic>>[];
-        return TeamMemberDto.fromJson(json);
-      }).toList(growable: false);
+      final members = memberRows
+          .map((row) {
+            final json = Map<String, dynamic>.from(row);
+            final membershipId = json['membership_id'] as String;
+            json['team_member_roles'] =
+                rolesByMembership[membershipId] ??
+                const <Map<String, dynamic>>[];
+            return TeamMemberDto.fromJson(json);
+          })
+          .toList(growable: false);
 
       final userIds = members
           .map((member) => member.userId)
@@ -229,9 +228,10 @@ class TeamMembershipRemoteDataSource {
           (
             member: member,
             profile: member.userId == null ? null : profiles[member.userId],
-            unclaimed: member.unclaimedId == null
-                ? null
-                : unclaimed[member.unclaimedId],
+            unclaimed:
+                member.unclaimedId == null
+                    ? null
+                    : unclaimed[member.unclaimedId],
           ),
       ];
     } on TimeoutException {
@@ -396,18 +396,17 @@ class TeamMembershipRemoteDataSource {
     String? bowlingStyle,
     List<String> preferredBallTypes = const [],
     int? yearsPlaying,
-  }) =>
-      _rpc('add_unclaimed_cricket_team_member', {
-        'p_team_id': teamId,
-        'p_display_name': displayName,
-        'p_phone_number': phoneNumber,
-        'p_jersey_number': jerseyNumber,
-        'p_player_role': playerRole,
-        'p_batting_style': battingStyle,
-        'p_bowling_style': bowlingStyle,
-        'p_preferred_ball_types': preferredBallTypes,
-        'p_years_playing': yearsPlaying,
-      });
+  }) => _rpc('add_unclaimed_cricket_team_member', {
+    'p_team_id': teamId,
+    'p_display_name': displayName,
+    'p_phone_number': phoneNumber,
+    'p_jersey_number': jerseyNumber,
+    'p_player_role': playerRole,
+    'p_batting_style': battingStyle,
+    'p_bowling_style': bowlingStyle,
+    'p_preferred_ball_types': preferredBallTypes,
+    'p_years_playing': yearsPlaying,
+  });
 
   Future<void> sendTeamInvite({
     required String teamId,
@@ -434,29 +433,28 @@ class TeamMembershipRemoteDataSource {
     }
   }
 
-  Future<void> setJerseyNumber(String membershipId, int? jersey) =>
-      _rpc('set_team_member_jersey', {
-        'p_membership_id': membershipId,
-        'p_jersey_number': jersey,
-      });
+  Future<void> setJerseyNumber(String membershipId, int? jersey) => _rpc(
+    'set_team_member_jersey',
+    {'p_membership_id': membershipId, 'p_jersey_number': jersey},
+  );
 
   Future<void> assignCaptain(String membershipId) =>
       _rpc('assign_team_captain', {'p_membership_id': membershipId});
 
-  Future<void> revokeCaptain(String membershipId) => _rpc(
-        'revoke_team_role',
-        {'p_membership_id': membershipId, 'p_role_key': 'captain'},
-      );
+  Future<void> revokeCaptain(String membershipId) => _rpc('revoke_team_role', {
+    'p_membership_id': membershipId,
+    'p_role_key': 'captain',
+  });
 
   Future<void> promoteToManager(String membershipId) => _rpc(
-        'set_team_member_base_role',
-        {'p_membership_id': membershipId, 'p_role_key': 'manager'},
-      );
+    'set_team_member_base_role',
+    {'p_membership_id': membershipId, 'p_role_key': 'manager'},
+  );
 
   Future<void> demoteToPlayer(String membershipId) => _rpc(
-        'set_team_member_base_role',
-        {'p_membership_id': membershipId, 'p_role_key': 'player'},
-      );
+    'set_team_member_base_role',
+    {'p_membership_id': membershipId, 'p_role_key': 'player'},
+  );
 
   Future<void> removeMember(String membershipId) =>
       _rpc('remove_team_member', {'p_membership_id': membershipId});
@@ -480,10 +478,7 @@ class TeamMembershipRemoteDataSource {
   Future<void> rejectClaimRequest(String requestId) =>
       _rpc('reject_claim_request', {'p_request_id': requestId});
 
-  Future<void> requestToJoinTeam({
-    required String teamId,
-    String? message,
-  }) =>
+  Future<void> requestToJoinTeam({required String teamId, String? message}) =>
       _rpc('request_to_join_team', {
         'p_team_id': teamId,
         'p_role': 'player',
@@ -496,8 +491,19 @@ class TeamMembershipRemoteDataSource {
       _requireUid();
       await _supabase.rpc<dynamic>(name, params: params);
     } on PostgrestException catch (e) {
-      if (e.code == '42501' || e.code == '28000') {
+      if (e.code == '28000') {
         throw UnauthorizedException(e.message);
+      }
+      if (e.code == '42501') {
+        // Distinguish intentional RPC-level authorization rejections
+        // (RAISE EXCEPTION … USING ERRCODE = '42501') from raw Postgres ACL
+        // failures ("permission denied for table …"). The former is a domain
+        // decision; the latter is an infrastructure misconfiguration that
+        // callers should not silently swallow as a user-facing auth error.
+        final msg = e.message.toLowerCase();
+        final isRawPrivilege = msg.startsWith('permission denied');
+        if (!isRawPrivilege) throw UnauthorizedException(e.message);
+        throw ServerException(e.message);
       }
       if (e.code == 'P0002') throw NotFoundException(e.message);
       if (e.code == '23505') {

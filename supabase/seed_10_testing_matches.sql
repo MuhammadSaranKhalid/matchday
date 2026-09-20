@@ -193,8 +193,8 @@ begin
     select count(*) into v_cnt from public.match_players where match_id = v_match_id and team_side = 'team_a';
     if v_cnt < 5 then
       for g in (v_cnt + 1)..7 loop
-        insert into public.unclaimed_players (display_name, added_by)
-        values (v_team_a_name || ' Player ' || g, v_saran_uid)
+        insert into public.unclaimed_players (sport_id, display_name, added_by)
+        values ('cricket', v_team_a_name || ' Player ' || g, v_saran_uid)
         returning unclaimed_id into v_new_unclaimed;
 
         insert into public.match_players (
@@ -229,8 +229,8 @@ begin
     select count(*) into v_cnt from public.match_players where match_id = v_match_id and team_side = 'team_b';
     if v_cnt < 5 then
       for g in (v_cnt + 1)..7 loop
-        insert into public.unclaimed_players (display_name, added_by)
-        values (v_team_b_name || ' Player ' || g, v_muazam_uid)
+        insert into public.unclaimed_players (sport_id, display_name, added_by)
+        values ('cricket', v_team_b_name || ' Player ' || g, v_muazam_uid)
         returning unclaimed_id into v_new_unclaimed;
 
         insert into public.match_players (

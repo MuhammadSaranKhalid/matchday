@@ -16,7 +16,11 @@ class CricketPlayerProfileRemoteDataSource {
 
   /// Fetch the cricket profile row for [userId].
   ///
-  /// Returns `null` when the user has no Cricket player identity.
+  /// Returns `null` when the user has no Cricket-specific profile attributes.
+  ///
+  /// Player identity itself is represented by `player_sports`; a user may have
+  /// `(user_id, cricket)` there without having filled batting/bowling/profile
+  /// details in `cricket_player_profiles`.
   Future<CricketPlayerProfileDto?> fetchByUserId(String userId) async {
     try {
       final row = await _supabase

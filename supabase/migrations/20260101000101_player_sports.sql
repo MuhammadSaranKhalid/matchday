@@ -1,29 +1,37 @@
 -- =============================================================================
--- Player Sports
+-- 0101 · player_sports
 -- =============================================================================
 --
--- Domain contract:
+-- Canonical registered-player identity per sport.
 --
---   profiles
---      = global Matchday identity
+-- profiles
+--    = one global Matchday account
 --
---   player_sports
---      = sports in which the user has activated a player identity
---      = NOT team membership / authorization
+-- player_sports
+--    = sports in which that account has established a player identity
 --
--- A user may therefore have:
+-- Example:
 --
---   (user, cricket)
---   (user, football)
---   (user, badminton)
+--   user A | cricket
+--   user A | football
 --
--- simultaneously.
+-- This table does NOT mean:
+--   - current team membership
+--   - team authority
+--   - following/interests
+--   - sport-specific skills
+--
+-- A player-sport identity is durable. Leaving a team does not remove it.
+--
+-- Current activation paths:
+--
+--   1. Active team_members row with in_squad = true
+--   2. Registered match_players row
+--   3. Claiming an unclaimed player
+--
+-- Future sport-specific onboarding may add another backend activation path.
 -- =============================================================================
 
-
--- =============================================================================
--- 1. Shared player_sports identity
--- =============================================================================
 
 create table public.player_sports (
   user_id uuid not null
@@ -40,38 +48,44 @@ create table public.player_sports (
   primary key (user_id, sport_id)
 );
 
+
 comment on table public.player_sports is
-  'Sports for which a Matchday user has activated a player identity. '
-  'This is not team membership, roster authority, or match participation.';
+  'Canonical registered-player identity per sport. '
+  'A row means this Matchday account has established a player identity '
+  'in that sport. Team membership and sport-specific attributes are stored '
+  'elsewhere.';
+
 
 comment on column public.player_sports.user_id is
-  'Global Matchday user identity.';
+  'Global Matchday account identity.';
+
 
 comment on column public.player_sports.sport_id is
-  'Sport for which this user has activated a player identity.';
+  'Sport in which this account has established a player identity.';
 
 
--- Useful for future:
+-- PK is (user_id, sport_id), which is ideal for:
 --
---   "show Cricket players"
---   "show Football players"
+--   "which sports does this player play?"
 --
--- PK(user_id, sport_id) is user-first, so add the inverse lookup.
+-- This inverse index supports:
+--
+--   "find Cricket players"
+--   "find Football players"
 
 create index player_sports_sport_user
   on public.player_sports (sport_id, user_id);
 
 
 -- =============================================================================
--- 2. player_sports security
+-- RLS / Data API
 -- =============================================================================
 
 alter table public.player_sports
   enable row level security;
 
 
--- Public player profiles are already part of the Matchday model, so the
--- sports a player identifies with are public as well.
+-- Player sport identity is public, just like the public player/profile model.
 
 create policy "player_sports_read_public"
   on public.player_sports
@@ -80,49 +94,35 @@ create policy "player_sports_read_public"
   using (true);
 
 
--- A user may activate an ACTIVE sport only for themselves.
-
-create policy "player_sports_insert_self"
-  on public.player_sports
-  for insert
-  to authenticated
-  with check (
-    (select auth.uid()) = user_id
-    and exists (
-      select 1
-      from public.sports s
-      where s.sport_id = player_sports.sport_id
-        and s.is_active = true
-    )
-  );
-
-
--- Removing the row means removing that optional sport-player identity.
--- Sport-specific profile rows cascade with it.
-
-create policy "player_sports_delete_self"
-  on public.player_sports
-  for delete
-  to authenticated
-  using (
-    (select auth.uid()) = user_id
-  );
-
-
--- There is nothing mutable on player_sports.
--- sport_id is identity, not an editable attribute.
+-- =============================================================================
+-- Domain ownership
+-- =============================================================================
+--
+-- player_sports is NOT directly writable through Flutter.
+--
+-- It is maintained by backend domain transitions:
+--
+--   team_members
+--   match_players
+--   unclaimed-player claiming
+--
+-- This prevents clients from:
+--
+--   * claiming to play arbitrary sports
+--   * deleting an identity while match/team history still depends on it
+--
+-- Account deletion naturally removes rows through profiles ON DELETE CASCADE.
+-- =============================================================================
 
 revoke all
   on table public.player_sports
   from anon, authenticated;
 
+
 grant select
   on table public.player_sports
   to anon, authenticated;
 
-grant insert, delete
-  on table public.player_sports
-  to authenticated;
 
 grant all
   on table public.player_sports

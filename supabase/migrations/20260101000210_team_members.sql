@@ -157,6 +157,101 @@ create trigger team_members_enforce_unclaimed_sport
   for each row
   execute function public.enforce_unclaimed_team_sport();
 
+
+-- =============================================================================
+-- Registered player-sport activation
+-- =============================================================================
+--
+-- team_members answers:
+--
+--   "Is this person connected to this team?"
+--
+-- in_squad answers:
+--
+--   "Does this person actually participate as a player?"
+--
+-- Authority is separate and lives in team_member_roles.
+--
+-- Therefore:
+--
+--   registered + active + in_squad
+--
+-- establishes a durable player_sports identity.
+--
+-- We NEVER delete player_sports when the member leaves the team.
+-- A player identity is historical/durable; membership is current-state data.
+-- =============================================================================
+
+
+create or replace function public.activate_player_sport_from_team_membership()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_sport_id text;
+begin
+  -- Unclaimed players have their own identity lifecycle.
+  if new.user_id is null then
+    return new;
+  end if;
+
+
+  -- Staff-only membership does not make someone a player.
+  if new.in_squad is not true then
+    return new;
+  end if;
+
+
+  -- Historical/inactive membership does not activate a new identity.
+  if new.status <> 'active' then
+    return new;
+  end if;
+
+
+  select t.sport_id
+  into v_sport_id
+  from public.teams t
+  where t.team_id = new.team_id;
+
+
+  if v_sport_id is null then
+    raise exception 'Team sport could not be resolved'
+      using errcode = 'P0002';
+  end if;
+
+
+  insert into public.player_sports (
+    user_id,
+    sport_id
+  )
+  values (
+    new.user_id,
+    v_sport_id
+  )
+  on conflict (user_id, sport_id)
+  do nothing;
+
+
+  return new;
+end;
+$$;
+
+
+revoke all
+  on function public.activate_player_sport_from_team_membership()
+  from public, anon, authenticated;
+
+
+create trigger team_members_activate_player_sport
+  after insert
+      or update of user_id, team_id, in_squad, status
+  on public.team_members
+  for each row
+  execute function public.activate_player_sport_from_team_membership();
+
+
 -- Role assignment and policies depend on team_member_roles and can();
 -- they are installed in 20260101000212_team_authorization.sql.
 

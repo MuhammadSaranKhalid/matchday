@@ -13,8 +13,10 @@ part 'cricket_player_profile_repository_impl.g.dart';
 /// Implements [CricketPlayerProfileRepository].
 ///
 /// Catches raw datasource exceptions and maps them to typed [Failure]s.
-/// Business rule: a missing row is not an error — it means the user has no
-/// Cricket player identity yet.
+/// Business rule: a missing row is not an error.
+///
+/// It means no Cricket-specific attributes have been supplied. The canonical
+/// Cricket player identity lives in `player_sports`, not in this table.
 class CricketPlayerProfileRepositoryImpl
     implements CricketPlayerProfileRepository {
   CricketPlayerProfileRepositoryImpl(this._remote);

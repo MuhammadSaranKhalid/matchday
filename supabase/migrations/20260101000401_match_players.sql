@@ -101,3 +101,76 @@ create trigger match_players_enforce_unclaimed_sport
   for each row
   execute function public.enforce_unclaimed_match_sport();
 
+
+-- =============================================================================
+-- Registered player-sport activation from match participation
+-- =============================================================================
+--
+-- A registered account appearing in match_players has participated in the
+-- sport represented by the match.
+--
+-- This is deliberately independent of team_members:
+--
+--   * practice matches
+--   * imported historical matches
+--   * future non-team formats
+--
+-- may establish player participation without a current team membership.
+-- =============================================================================
+
+
+create or replace function public.activate_player_sport_from_match_player()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_sport_id text;
+begin
+  if new.user_id is null then
+    return new;
+  end if;
+
+
+  select m.sport_id
+  into v_sport_id
+  from public.matches m
+  where m.match_id = new.match_id;
+
+
+  if v_sport_id is null then
+    raise exception 'Match sport could not be resolved'
+      using errcode = 'P0002';
+  end if;
+
+
+  insert into public.player_sports (
+    user_id,
+    sport_id
+  )
+  values (
+    new.user_id,
+    v_sport_id
+  )
+  on conflict (user_id, sport_id)
+  do nothing;
+
+
+  return new;
+end;
+$$;
+
+
+revoke all
+  on function public.activate_player_sport_from_match_player()
+  from public, anon, authenticated;
+
+
+create trigger match_players_activate_player_sport
+  after insert
+      or update of user_id, match_id
+  on public.match_players
+  for each row
+  execute function public.activate_player_sport_from_match_player();
+

@@ -8,7 +8,8 @@ part 'cricket_player_profile_providers.g.dart';
 
 /// Fetches the [CricketPlayerProfile] for [userId].
 ///
-/// Returns `null` when the user has no Cricket player identity.
+/// Returns `null` when the user has no Cricket-specific profile attributes.
+/// Player identity itself is represented by `player_sports`.
 /// Throws [FailureWrapper] on network/server errors so the UI can pattern-match
 /// `AsyncError` normally.
 @riverpod

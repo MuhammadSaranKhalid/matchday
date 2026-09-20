@@ -1,11 +1,27 @@
 -- =============================================================================
 -- 0110 · cricket_player_profiles
 -- =============================================================================
--- Cricket-specific player attributes. Optional 1:1 extension of player_sports
--- for users who have activated a Cricket player identity.
 --
--- A row here requires the corresponding (user_id, 'cricket') row in
--- player_sports. The composite FK enforces this at the database level.
+-- OPTIONAL Cricket-specific attributes for a registered Cricket player.
+--
+-- Identity:
+--
+--   player_sports(user_id, 'cricket')
+--
+-- Optional details:
+--
+--   cricket_player_profiles
+--
+-- Therefore this is valid:
+--
+--   player_sports
+--      U1 | cricket
+--
+--   cricket_player_profiles
+--      no row
+--
+-- It means U1 is a Cricket player but has not supplied optional Cricket
+-- attributes such as batting style or bowling style.
 -- =============================================================================
 
 -- Enums moved to 20260101000000_shared_helpers.sql (the enum catalogue),

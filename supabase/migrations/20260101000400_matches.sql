@@ -233,19 +233,9 @@ where
 
 create index if not exists idx_matches_created_by on public.matches(created_by);
 
-create index if not exists idx_matches_openers_submitted_by on public.matches(openers_submitted_by);
-
-create index if not exists idx_matches_player_of_the_match_id on public.matches(player_of_the_match_id);
-
 create index if not exists idx_matches_prev_match_a_id on public.matches(prev_match_a_id);
 
 create index if not exists idx_matches_prev_match_b_id on public.matches(prev_match_b_id);
-
-create index if not exists idx_matches_team_a_captain on public.matches(team_a_captain);
-
-create index if not exists idx_matches_team_b_captain on public.matches(team_b_captain);
-
-create index if not exists idx_matches_toss_won_by on public.matches(toss_won_by);
 
 create index if not exists idx_matches_winner_id on public.matches(winner_id);
 

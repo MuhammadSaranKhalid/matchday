@@ -525,15 +525,17 @@ set search_path = public, pg_temp
 as $$
   select distinct
     tm.user_id
-  from
-    public.matches m
-    join public.team_members tm on tm.team_id in (m.team_a_id, m.team_b_id)
-  where m.match_id = p_match_id and tm.status = 'active' and tm.user_id is not null;
+  from public.match_teams ms
+  join public.team_members tm
+    on tm.team_id = ms.team_id
+  where ms.match_id = p_match_id
+    and tm.status = 'active'
+    and tm.user_id is not null;
 $$;
 
 revoke all
-on function public.audience_match_sides(uuid)
-from public, anon, authenticated;
+  on function public.audience_match_sides(uuid)
+  from public, anon, authenticated;
 
 -- NOT HERE: audience_chat_members.
 --

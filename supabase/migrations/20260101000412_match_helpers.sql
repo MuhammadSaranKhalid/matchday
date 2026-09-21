@@ -3,23 +3,8 @@
 -- =============================================================================
 
 -- 0412 · match_helpers
--- Cross-table match lifecycle and scoring helpers; circular lineup FK.
+-- Cross-table match lifecycle and scoring helpers.
 -- Spec: docs/matches-schema-architecture.md
--- Table declarations and their RLS/indexes live in their named migrations.
--- The matches -> match_players FK is deferred here because match_players
--- already references matches; neither declaration can precede the other.
--- Deferred FK: the PoM is a participant in THIS match, so it points at
--- match_players (which is polymorphic over profiles/unclaimed_players) rather
--- than profiles. This circular FK is declared after both tables exist.
-
--- -----------------------------------------------------------------------------
--- Tables and constraints
--- -----------------------------------------------------------------------------
-
-alter table public.matches
-add constraint matches_player_of_the_match_fkey
-  foreign key (player_of_the_match_id) references public.match_players (match_player_id)
-    on delete set null;
 
 -- -----------------------------------------------------------------------------
 -- Functions
@@ -27,14 +12,6 @@ add constraint matches_player_of_the_match_fkey
 
 -- Match authorization predicates
 -- Helper Predicates
---
--- `_can_score_match(match_id)` was DELETED 2026-09-10. It answered the weaker
--- "may you score this match" (either side, plus the creator), had no callers
--- left, and was still granted — so the schema carried two live definitions of
--- "can score", the dead one being the more permissive. `_can_score_innings`
--- below is the only answer. Do not reintroduce a match-level variant: the
--- innings-level distinction IS the single-writer property the local-first
--- scoring design rests on (CLAUDE.md exemption 2).
 create or replace function public._is_match_captain(
   p_match_id uuid
 )
@@ -71,16 +48,11 @@ as $$
     );
 $$;
 
--- Who may score which innings  (design doc D12)
+-- Who may score which innings (design doc D12)
 -- The BATTING side scores its own innings; control passes at the innings break.
 -- Odd innings belong to whoever batted first (derived from the toss), even
 -- innings to the other side. Tournament organisers and the creator of a
 -- practice match may score either side.
---
--- record-ball calls this as its writer check. It takes the innings number
--- precisely so it can answer "may you score THIS innings" rather than the
--- weaker "may you score this match" — that distinction is the whole of the
--- single-writer property the local-first design rests on.
 create or replace function public._can_score_innings(
   p_match_id uuid,
   p_innings_number integer default 1
@@ -91,71 +63,95 @@ security definer
 stable
 set search_path = public, pg_temp
 as $$
-  with
-    m as (
-      -- Join cricket_matches to get toss state; toss_won_by / toss_decision
-      -- live on the cricket extension, not the sport-neutral matches table.
-      select
-        mt.*,
-        cm.toss_won_by,
-        cm.toss_decision
-      from public.matches mt
-      left join public.cricket_matches cm on cm.match_id = mt.match_id
-      where mt.match_id = p_match_id
-    ),
-    sides as (
-      select
-        m.*,
-        -- toss_won_by is 'team_a' | 'team_b' text in cricket_matches.
-        -- Derive bats_first as the corresponding team uuid.
-        case
-          when m.toss_won_by is null
-          or m.toss_decision is null then m.team_a_id
-          when m.toss_decision = 'bat' and m.toss_won_by = 'team_a' then m.team_a_id
-          when m.toss_decision = 'bat' and m.toss_won_by = 'team_b' then m.team_b_id
-          when m.toss_won_by = 'team_a' then m.team_b_id
-          else m.team_a_id
-        end as bats_first
-      from m
-    ),
-    batting as (
-      select
-        sides.*,
-        case
-          when p_innings_number % 2 = 1 then sides.bats_first
-          when sides.bats_first = sides.team_a_id then sides.team_b_id
-          else sides.team_a_id
-        end as batting_team_id
-      from sides
-    )
-  select
-    exists (
-      select
-        1
-      from batting b
-      where
-        -- Practice matches have no opposition to hand over to.
-        (b.match_type = 'practice' and b.created_by = auth.uid())
-        -- The captain of the batting side (derived from cricket_match_players;
-        -- team_a_captain / team_b_captain no longer exist as stored columns).
-        or exists (
-          select 1
-          from
-            public.match_players mp
-            join public.cricket_match_players cmp
-              on cmp.match_player_id = mp.match_player_id and cmp.match_id = mp.match_id
-          where
-            mp.match_id = b.match_id
-            and mp.user_id = auth.uid()
-            and mp.team_side = case
-              when b.batting_team_id = b.team_a_id then 'team_a'
-              else 'team_b'
-            end
-            and cmp.is_captain = true
+  with match_context as (
+    select
+      m.match_id,
+      m.match_type,
+      m.created_by,
+      cm.toss_won_by,
+      cm.toss_decision
+    from public.matches m
+    join public.cricket_matches cm
+      on cm.match_id = m.match_id
+    where m.match_id = p_match_id
+  ),
+  batting_side as (
+    select
+      mc.*,
+      case
+        when p_innings_number % 2 = 1 then
+          case
+            when mc.toss_won_by is null
+              or mc.toss_decision is null
+              then 'team_a'
+            when mc.toss_decision = 'bat'
+              then mc.toss_won_by
+            when mc.toss_won_by = 'team_a'
+              then 'team_b'
+            else 'team_a'
+          end
+        else
+          case
+            when (
+              case
+                when mc.toss_won_by is null
+                  or mc.toss_decision is null
+                  then 'team_a'
+                when mc.toss_decision = 'bat'
+                  then mc.toss_won_by
+                when mc.toss_won_by = 'team_a'
+                  then 'team_b'
+                else 'team_a'
+              end
+            ) = 'team_a'
+              then 'team_b'
+            else 'team_a'
+          end
+      end as batting_side
+    from match_context mc
+  ),
+  batting as (
+    select
+      b.*,
+      mt.team_id as batting_team_id
+    from batting_side b
+    join public.match_teams mt
+      on mt.match_id = b.match_id
+     and mt.team_side = b.batting_side
+  )
+  select exists (
+    select 1
+    from batting b
+    where
+      (
+        b.match_type = 'practice'
+        and b.created_by = auth.uid()
+      )
+      or exists (
+        select 1
+        from public.match_players mp
+        join public.cricket_match_players cmp
+          on cmp.match_player_id = mp.match_player_id
+         and cmp.match_id = mp.match_id
+        where mp.match_id = b.match_id
+          and mp.user_id = auth.uid()
+          and mp.team_side = b.batting_side
+          and cmp.is_captain = true
+      )
+      or (
+        b.batting_team_id is not null
+        and public.can(
+          'team',
+          b.batting_team_id,
+          'match.score'
         )
-        -- The batting side, via the authorization engine (2026-09-11).
-        or public.can('team', b.batting_team_id, 'match.score')
-    );
+      )
+      or public.can(
+        'match',
+        b.match_id,
+        'match.score'
+      )
+  );
 $$;
 
 revoke all on function public._can_score_innings(uuid, integer) from public;
@@ -164,9 +160,7 @@ grant execute
 on function public._can_score_innings(uuid, integer)
 to authenticated, service_role;
 
--- can_score_innings is the client-facing gate. It MUST delegate to the same
--- predicate record-ball enforces — two definitions of "may you score" is how
--- the UI and the write path drifted apart last time.
+-- can_score_innings is the client-facing gate.
 create or replace function public.can_score_innings(
   p_match_id uuid,
   p_innings_number integer default 1
@@ -181,248 +175,368 @@ as $$
     public._can_score_innings(p_match_id, p_innings_number);
 $$;
 
--- NO SCORING TRIGGER.  (design doc D10 · CLAUDE.md exemption 2)
--- `fn_process_delivery` used to live here: it reduced each inserted delivery
--- into match_innings_state — running totals, strike rotation, over completion,
--- free-hit derivation — and upserted the materialised batting/bowling cards.
---
--- It is GONE, deliberately. The rules of cricket now live in exactly one place,
--- the Dart engine on the scoring device, because that device has to compute an
--- innings unaided while it has no signal. A second implementation here could
--- only ever agree or silently disagree, and it did the latter: it rotated
--- strike on `runs_off_bat % 2` (so runs run off a no-ball never changed ends),
--- hardcoded a six-ball over, never incremented `total_wickets`, and never
--- cleared `bowler_id` at the end of an over.
---
--- record-ball now writes match_innings_state itself: aggregate columns are
--- SUMMED from match_deliveries (D13 — derive, never accumulate, which is what
--- makes undo "delete the last row and re-total"), and the on-field trio comes
--- from the engine that computed the delivery.
---
--- 🟥 DO NOT reintroduce scoring arithmetic in SQL. If a scorecard number looks
--- wrong, the fix belongs in the Dart engine and its vectors.
---
--- That decision left match_batsman_stats and match_bowler_stats populated by
--- nothing. They were retained empty "pending a decision to drop them or back
--- them with views"; on 2026-09-06 the decision was made and they were dropped.
--- Scorecards are derived from the delivery ledger on the client
--- (see scoring_rules.dart), which is the only place the rules live.
--- Toss commands (record_toss_winner, record_toss_decision) are now executed
--- via direct SQL in cricket-match-action Edge Function.
-drop function if exists public.record_match_toss(uuid, uuid, public.toss_decision, char);
+-- Internal Side-Roster Materialization
+create or replace function public._materialize_match_team_side(
+  p_match_id uuid,
+  p_team_side text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_match public.matches%rowtype;
+  v_team_id uuid;
+  v_tournament_squad uuid[];
+begin
+  if p_team_side not in ('team_a', 'team_b') then
+    raise exception 'Invalid match side: %', p_team_side
+      using errcode = '22023';
+  end if;
 
+  select m.*
+    into v_match
+  from public.matches m
+  where m.match_id = p_match_id;
 
--- submit_match_openers, start_match_now, and start_innings RPCs
--- have been moved to TypeScript Edge Functions (cricket-match-action) executing direct SQL.
+  if not found then
+    raise exception 'Match not found'
+      using errcode = 'P0002';
+  end if;
+
+  select mt.team_id
+    into v_team_id
+  from public.match_teams mt
+  where mt.match_id = p_match_id
+    and mt.team_side = p_team_side;
+
+  -- An unresolved future bracket slot intentionally has no participants yet.
+  if v_team_id is null then
+    delete from public.match_players
+    where match_id = p_match_id
+      and team_side = p_team_side;
+    return;
+  end if;
+
+  if v_match.tournament_id is not null then
+    select tt.squad
+      into v_tournament_squad
+    from public.tournament_teams tt
+    where tt.tournament_id = v_match.tournament_id
+      and tt.team_id = v_team_id
+      and tt.status = 'approved'
+    limit 1;
+  end if;
+
+  delete from public.match_players
+  where match_id = p_match_id
+    and team_side = p_team_side;
+
+  insert into public.match_players (
+    match_player_id,
+    match_id,
+    team_side,
+    user_id,
+    unclaimed_id,
+    display_name,
+    jersey_number
+  )
+  select
+    gen_random_uuid(),
+    p_match_id,
+    p_team_side,
+    tm.user_id,
+    tm.unclaimed_id,
+    coalesce(
+      pr.display_name,
+      up.display_name,
+      'Player'
+    ),
+    tm.jersey_number
+  from public.team_members tm
+  left join public.profiles pr
+    on pr.user_id = tm.user_id
+  left join public.unclaimed_players up
+    on up.unclaimed_id = tm.unclaimed_id
+  where tm.team_id = v_team_id
+    and tm.status = 'active'
+    and tm.in_squad = true
+    and (
+      coalesce(cardinality(v_tournament_squad), 0) = 0
+      or tm.user_id = any(v_tournament_squad)
+      or tm.unclaimed_id = any(v_tournament_squad)
+    );
+
+  if v_match.sport_id = 'cricket' then
+    insert into public.cricket_match_players (
+      match_player_id,
+      match_id,
+      is_captain,
+      is_vice_captain,
+      is_wicket_keeper
+    )
+    select
+      mp.match_player_id,
+      mp.match_id,
+      coalesce(
+        mp.user_id = public._team_current_captain(v_team_id),
+        false
+      ),
+      false,
+      false
+    from public.match_players mp
+    where mp.match_id = p_match_id
+      and mp.team_side = p_team_side;
+  end if;
+end;
+$$;
+
+revoke all
+  on function public._materialize_match_team_side(uuid, text)
+  from public, anon, authenticated;
+
+-- List matches user participates in
 create or replace function public.list_my_matches()
 returns setof public.matches
 language sql
 security definer
 stable
+set search_path = public, pg_temp
 as $$
-  select
-    *
+  select m.*
   from public.matches m
   where
     m.created_by = auth.uid()
-    -- captain of either side (derived from cricket_match_players)
     or exists (
       select 1
-      from
-        public.match_players mp
-        join public.cricket_match_players cmp
-          on cmp.match_player_id = mp.match_player_id and cmp.match_id = mp.match_id
-      where
-        mp.match_id = m.match_id
+      from public.match_players mp
+      join public.cricket_match_players cmp
+        on cmp.match_player_id = mp.match_player_id
+       and cmp.match_id = mp.match_id
+      where mp.match_id = m.match_id
         and mp.user_id = auth.uid()
         and cmp.is_captain = true
     )
     or exists (
-      select
-        1
-      from public.team_members tm
-      where
-        tm.user_id = auth.uid()
-        and (tm.team_id = m.team_a_id or tm.team_id = m.team_b_id)
+      select 1
+      from public.match_teams ms
+      join public.team_members tm
+        on tm.team_id = ms.team_id
+      where ms.match_id = m.match_id
+        and tm.user_id = auth.uid()
+        and tm.status = 'active'
+    )
+    or exists (
+      select 1
+      from public.match_officials mo
+      where mo.match_id = m.match_id
+        and mo.user_id = auth.uid()
     )
   order by m.scheduled_start_time desc;
 $$;
+
+revoke all
+  on function public.list_my_matches()
+  from public, anon;
+
+grant execute
+  on function public.list_my_matches()
+  to authenticated;
 
 -- -----------------------------------------------------------------------------
 -- Views
 -- -----------------------------------------------------------------------------
 
-create view public.cricket_match_details
+create or replace view public.cricket_match_details
 with (security_invoker = true)
 as
-  select
-    m.match_id,
-    m.tournament_id,
-    m.match_type,
-    m.stage,
-    m.round,
-    m.bracket_round_number,
-    m.bracket_match_number,
-    m.prev_match_a_id,
-    m.prev_match_b_id,
-    m.group_id,
-    m.venue,
-    m.ground_id,
-    m.sport_id,
-    m.scheduled_start_time,
-    m.actual_start_time,
-    m.completed_at,
-    -- Canonical generic lifecycle for future backend/frontend consumers.
-    m.status as lifecycle_status,
-    -- Canonical Cricket phase.
-    cm.phase as cricket_phase,
-    -- Compatibility status for the existing Cricket-only Flutter app.
-    case
-      when m.status = 'scheduled'
-      and cm.toss_recorded_at is not null then 'toss'
-      when m.status = 'live'
-      and cm.phase = 'innings_break' then 'innings_break'
-      when m.status = 'live'
-      and cm.phase = 'super_over' then 'super_over'
-      when m.status = 'completed'
-      and cm.result ->> 'win_type' = 'tie' then 'tied'
-      when m.status = 'completed'
-      and cm.result ->> 'win_type' = 'walkover' then 'walkover'
-      when cm.result ->> 'win_type' = 'no_result' then 'no_result'
-      else m.status::text
-    end as status,
-    m.winner_id,
-    m.team_a_id,
-    m.team_b_id,
-    m.created_by,
-    m.created_at,
-    m.updated_at,
-    cm.format_code as match_format,
-    cm.rules_snapshot as format,
-    cm.toss_won_by,
-    cm.toss_decision,
-    cm.toss_face,
-    cm.toss_recorded_at,
-    -- Existing MatchStartPhase has only the pre-live values. Once Cricket moves
-    -- into innings-break/super-over/complete, expose `live` on the compatibility
-    -- field while `cricket_phase` carries the exact phase.
-    case cm.phase
-      when 'toss' then 'toss'
-      when 'lineup' then 'lineup'
-      when 'ready' then 'ready'
-      else 'live'
-    end as start_phase,
-    cm.openers_submitted_by,
-    cm.openers_submitted_at,
-    cm.scoring_mode,
-    cm.result,
-    cm.result_summary,
-    cm.revised_conditions,
-    cm.player_of_the_match_id,
-    (
-      select
-        mp.user_id
-      from
-        public.match_players mp
-        join public.cricket_match_players cmp
-          on cmp.match_player_id = mp.match_player_id and cmp.match_id = mp.match_id
-      where
-        mp.match_id = m.match_id
-        and mp.team_side = 'team_a'
-        and cmp.is_captain = true
-        and mp.user_id is not null
-      order by cmp.updated_at desc, mp.created_at asc
-      limit 1
-    ) as team_a_captain,
-    (
-      select
-        mp.user_id
-      from
-        public.match_players mp
-        join public.cricket_match_players cmp
-          on cmp.match_player_id = mp.match_player_id and cmp.match_id = mp.match_id
-      where
-        mp.match_id = m.match_id
-        and mp.team_side = 'team_b'
-        and cmp.is_captain = true
-        and mp.user_id is not null
-      order by cmp.updated_at desc, mp.created_at asc
-      limit 1
-    ) as team_b_captain
-  from
-    public.matches m
-    join public.cricket_matches cm on cm.match_id = m.match_id
-  where m.sport_id = 'cricket';
+select
+  m.match_id,
+  m.tournament_id,
+  m.match_type,
+  m.stage,
+  m.round,
+  m.bracket_round_number,
+  m.bracket_match_number,
+  m.prev_match_a_id,
+  m.prev_match_b_id,
+  m.group_id,
+  m.venue,
+  m.ground_id,
+  m.sport_id,
+  m.scheduled_start_time,
+  m.actual_start_time,
+  m.completed_at,
 
--- -----------------------------------------------------------------------------
--- Permissions
--- -----------------------------------------------------------------------------
+  m.status as lifecycle_status,
+  cm.phase as cricket_phase,
 
-grant select on public.cricket_match_details to anon, authenticated, service_role;
+  case
+    when m.status = 'scheduled'
+      and cm.toss_recorded_at is not null
+      then 'toss'
+    when m.status = 'live'
+      and cm.phase = 'innings_break'
+      then 'innings_break'
+    when m.status = 'live'
+      and cm.phase = 'super_over'
+      then 'super_over'
+    when m.status = 'completed'
+      and cm.result ->> 'win_type' = 'tie'
+      then 'tied'
+    when m.status = 'completed'
+      and cm.result ->> 'win_type' = 'walkover'
+      then 'walkover'
+    when cm.result ->> 'win_type' = 'no_result'
+      then 'no_result'
+    else m.status::text
+  end as status,
+
+  m.winner_side,
+  winner_slot.team_id as winner_id,
+
+  team_a.team_id as team_a_id,
+  team_b.team_id as team_b_id,
+  team_a.team_name as team_a_name,
+  team_b.team_name as team_b_name,
+
+  m.created_by,
+  m.created_at,
+  m.updated_at,
+
+  cm.format_code as match_format,
+  cm.rules_snapshot as format,
+
+  cm.toss_won_by as toss_won_by_side,
+
+  case cm.toss_won_by
+    when 'team_a' then team_a.team_id
+    when 'team_b' then team_b.team_id
+    else null
+  end as toss_won_by,
+
+  cm.toss_decision,
+  cm.toss_face,
+  cm.toss_recorded_at,
+
+  case cm.phase
+    when 'toss' then 'toss'
+    when 'lineup' then 'lineup'
+    when 'ready' then 'ready'
+    else 'live'
+  end as start_phase,
+
+  cm.openers_submitted_by,
+  cm.openers_submitted_at,
+  cm.scoring_mode,
+  case
+    when cm.result is null then null
+    else cm.result || jsonb_build_object(
+      'winner_team_id',
+      winner_slot.team_id
+    )
+  end as result,
+  cm.result_summary,
+  cm.revised_conditions,
+  cm.player_of_the_match_id,
+
+  (
+    select mp.user_id
+    from public.match_players mp
+    join public.cricket_match_players cmp
+      on cmp.match_player_id = mp.match_player_id
+     and cmp.match_id = mp.match_id
+    where mp.match_id = m.match_id
+      and mp.team_side = 'team_a'
+      and cmp.is_captain = true
+      and mp.user_id is not null
+    order by cmp.updated_at desc, mp.created_at asc
+    limit 1
+  ) as team_a_captain,
+
+  (
+    select mp.user_id
+    from public.match_players mp
+    join public.cricket_match_players cmp
+      on cmp.match_player_id = mp.match_player_id
+     and cmp.match_id = mp.match_id
+    where mp.match_id = m.match_id
+      and mp.team_side = 'team_b'
+      and cmp.is_captain = true
+      and mp.user_id is not null
+    order by cmp.updated_at desc, mp.created_at asc
+    limit 1
+  ) as team_b_captain
+
+from public.matches m
+join public.cricket_matches cm
+  on cm.match_id = m.match_id
+join public.match_teams team_a
+  on team_a.match_id = m.match_id
+ and team_a.team_side = 'team_a'
+join public.match_teams team_b
+  on team_b.match_id = m.match_id
+ and team_b.team_side = 'team_b'
+left join public.match_teams winner_slot
+  on winner_slot.match_id = m.match_id
+ and winner_slot.team_side = m.winner_side
+where m.sport_id = 'cricket';
+
+grant select
+  on public.cricket_match_details
+  to anon, authenticated, service_role;
 
 comment on view public.cricket_match_details is
-  'Canonical Cricket aggregate. lifecycle_status is the generic parent '
-  'lifecycle; cricket_phase is the exact Cricket phase; status/start_phase are '
-  'compatibility projections for the current Cricket Flutter UI.';
+  'Canonical Cricket aggregate view with match_teams projection.';
 
 -- -----------------------------------------------------------------------------
--- Functions
+-- List My Cricket Matches
 -- -----------------------------------------------------------------------------
 
-create function public.list_my_cricket_matches()
+create or replace function public.list_my_cricket_matches()
 returns setof public.cricket_match_details
 language sql
-stable
 security definer
+stable
 set search_path = public, pg_temp
 as $$
-  select
-    d.*
+  select d.*
   from public.cricket_match_details d
   where
-    d.created_by = (
-      select
-        auth.uid()
-    )
+    d.created_by = auth.uid()
     or public._is_match_captain(d.match_id)
     or exists (
-      select
-        1
-      from public.team_members tm
-      where
-        tm.team_id in (d.team_a_id, d.team_b_id)
-        and tm.user_id = (
-          select
-            auth.uid()
-        )
+      select 1
+      from public.match_teams ms
+      join public.team_members tm
+        on tm.team_id = ms.team_id
+      where ms.match_id = d.match_id
+        and tm.user_id = auth.uid()
         and tm.status = 'active'
     )
     or exists (
-      select
-        1
+      select 1
       from public.match_players mp
-      where
-        mp.match_id = d.match_id
-        and mp.user_id = (
-          select
-            auth.uid()
-        )
+      where mp.match_id = d.match_id
+        and mp.user_id = auth.uid()
     )
     or exists (
-      select
-        1
+      select 1
       from public.match_officials mo
-      where
-        mo.match_id = d.match_id
-        and mo.user_id = (
-          select
-            auth.uid()
-        )
+      where mo.match_id = d.match_id
+        and mo.user_id = auth.uid()
     )
-  order by coalesce(d.scheduled_start_time, d.created_at) desc;
+  order by coalesce(
+    d.scheduled_start_time,
+    d.created_at
+  ) desc;
 $$;
 
-revoke all on function public.list_my_cricket_matches() from public, anon;
+revoke all
+  on function public.list_my_cricket_matches()
+  from public, anon;
 
-grant execute on function public.list_my_cricket_matches() to authenticated;
-
+grant execute
+  on function public.list_my_cricket_matches()
+  to authenticated;

@@ -2,17 +2,35 @@ import type {
   CommandContext,
   CommandResult,
 } from "../types.ts";
-import { MatchRepository } from "../repositories/match_repository.ts";
-import { AuthorizationRepository } from "../repositories/authorization_repository.ts";
-import { requiredUuid } from "../domain/validation.ts";
+import {
+  MatchRepository,
+} from "../repositories/match_repository.ts";
+import {
+  MatchTeamRepository,
+} from "../repositories/match_team_repository.ts";
+import {
+  AuthorizationRepository,
+} from "../repositories/authorization_repository.ts";
+import {
+  requiredUuid,
+} from "../domain/validation.ts";
 import {
   booleanRule,
   jsonObject,
+  teamSideFor,
 } from "../domain/cricket.ts";
-import { unprocessable } from "../domain/errors.ts";
+import {
+  unprocessable,
+} from "../domain/errors.ts";
 
-const matches = new MatchRepository();
-const authz = new AuthorizationRepository();
+const matches =
+  new MatchRepository();
+
+const teams =
+  new MatchTeamRepository();
+
+const authz =
+  new AuthorizationRepository();
 
 export async function tournamentTriggerSuperOver(
   ctx: CommandContext,
@@ -23,10 +41,11 @@ export async function tournamentTriggerSuperOver(
       "p_bats_first_id",
     );
 
-  const match = await matches.lockCricketMatch(
-    ctx.tx,
-    ctx.matchId,
-  );
+  const match =
+    await matches.lockCricketMatch(
+      ctx.tx,
+      ctx.matchId,
+    );
 
   await authz.requireTournamentOrganizer(
     ctx.tx,
@@ -34,7 +53,10 @@ export async function tournamentTriggerSuperOver(
     ctx.actorId,
   );
 
-  const result = jsonObject(match.result);
+  const result =
+    jsonObject(
+      match.result,
+    );
 
   if (
     match.status !== "completed" ||
@@ -45,14 +67,11 @@ export async function tournamentTriggerSuperOver(
     );
   }
 
-  if (
-    batsFirstId !== match.teamAId &&
-    batsFirstId !== match.teamBId
-  ) {
-    unprocessable(
-      "Choose one of the two sides to bat first",
+  const batsFirstSide =
+    teamSideFor(
+      match,
+      batsFirstId,
     );
-  }
 
   if (
     !booleanRule(
@@ -66,35 +85,49 @@ export async function tournamentTriggerSuperOver(
     );
   }
 
+  if (match.winnerSide) {
+    await teams.clearAdvancedWinner(
+      ctx.tx,
+      ctx.matchId,
+    );
+  }
+
   await ctx.tx`
     update public.cricket_matches
     set
       phase = 'super_over',
       result =
-        coalesce(result, '{}'::jsonb)
+        coalesce(
+          result,
+          '{}'::jsonb
+        )
         || jsonb_build_object(
+          'winner_side',
+            null,
           'super_over',
           jsonb_build_object(
             'triggered_at',
               now(),
             'triggered_by',
               ${ctx.actorId}::uuid,
-            'bats_first_id',
-              ${batsFirstId}::uuid
+            'bats_first_side',
+              ${batsFirstSide}
           )
         ),
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   await ctx.tx`
     update public.matches
     set
       status = 'live',
-      winner_id = null,
+      winner_side = null,
       completed_at = null,
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   return {};

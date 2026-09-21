@@ -177,13 +177,19 @@ as $$
       limit 1
     ),
     -- Neutral = not attached to either side of THIS fixture.
-    not (
-      public._user_team_can(mo.user_id, m.team_a_id, 'team.roster.write')
-      or public._user_team_can(mo.user_id, m.team_b_id, 'team.roster.write')
-    )
+    not exists (
+      select 1
+      from public.match_teams ms
+      where ms.match_id = mo.match_id
+        and ms.team_id is not null
+        and public._user_team_can(
+          mo.user_id,
+          ms.team_id,
+          'team.roster.write'
+        )
+    ) as is_neutral
   from
     public.match_officials mo
-    join public.matches m on m.match_id = mo.match_id
     join public.profiles pr on pr.user_id = mo.user_id
   where mo.match_id = p_match_id
   order by
@@ -298,8 +304,6 @@ as $$
     target as (
       select
         m.match_id,
-        m.team_a_id,
-        m.team_b_id,
         m.scheduled_start_time
       from public.matches m
       where m.match_id = p_match_id
@@ -335,13 +339,16 @@ as $$
       limit 1
     ),
     not exists (
-      select
-        1
-      from target tg
-      where
-        public._user_team_can(pr.user_id, tg.team_a_id, 'team.roster.write')
-        or public._user_team_can(pr.user_id, tg.team_b_id, 'team.roster.write')
-    ),
+      select 1
+      from public.match_teams ms
+      where ms.match_id = p_match_id
+        and ms.team_id is not null
+        and public._user_team_can(
+          pr.user_id,
+          ms.team_id,
+          'team.roster.write'
+        )
+    ) as is_neutral,
     (
       select
         count(*)::integer
@@ -490,13 +497,14 @@ as $$
         mp.display_name,
         mp.user_id,
         mp.unclaimed_id,
-        mp.team_side,
-        m.team_a_id,
-        m.team_b_id
+        ms.team_id
       from
         public.cricket_match_deliveries d
         join public.matches m on m.match_id = d.match_id
         join public.match_players mp on mp.match_player_id = d.striker_id
+        join public.match_teams ms
+          on ms.match_id = mp.match_id
+         and ms.team_side = mp.team_side
       where
         m.tournament_id = p_tournament_id
         and d.is_undone = false
@@ -508,14 +516,7 @@ as $$
         dv.match_id,
         max(dv.display_name) as display_name,
         bool_or(dv.user_id is null) as is_unclaimed,
-        (
-          array_agg(
-            case dv.team_side
-              when 'team_a' then dv.team_a_id
-              else dv.team_b_id
-            end
-          )
-        )[1] as team_id,
+        (array_agg(dv.team_id))[1] as team_id,
         sum(dv.runs_off_bat)::integer as runs,
         count(*) filter (where dv.is_legal_delivery)::integer as balls,
         count(*) filter (where dv.is_four)::integer as fours,
@@ -615,13 +616,14 @@ as $$
         mp.display_name,
         mp.user_id,
         mp.unclaimed_id,
-        mp.team_side,
-        m.team_a_id,
-        m.team_b_id
+        ms.team_id
       from
         public.cricket_match_deliveries d
         join public.matches m on m.match_id = d.match_id
         join public.match_players mp on mp.match_player_id = d.bowler_id
+        join public.match_teams ms
+          on ms.match_id = mp.match_id
+         and ms.team_side = mp.team_side
       where
         m.tournament_id = p_tournament_id
         and d.is_undone = false
@@ -633,14 +635,7 @@ as $$
         dv.match_id,
         max(dv.display_name) as display_name,
         bool_or(dv.user_id is null) as is_unclaimed,
-        (
-          array_agg(
-            case dv.team_side
-              when 'team_a' then dv.team_a_id
-              else dv.team_b_id
-            end
-          )
-        )[1] as team_id,
+        (array_agg(dv.team_id))[1] as team_id,
         count(*) filter (
           where
             dv.is_wicket
@@ -852,3 +847,295 @@ begin
   end if;
 end
 $$;
+
+-- -----------------------------------------------------------------------------
+-- Fixture Generation
+-- -----------------------------------------------------------------------------
+
+create or replace function public.tournament_generate_fixtures(
+  p_tournament_id uuid,
+  p_slots jsonb,
+  p_seed_order uuid[] default '{}'::uuid[]
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_tournament public.tournaments%rowtype;
+  v_slot jsonb;
+  v_slot_id text;
+  v_match_id uuid;
+  v_team_a uuid;
+  v_team_b uuid;
+  v_prev_a text;
+  v_prev_b text;
+  v_count integer := 0;
+  v_i integer;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated'
+      using errcode = '42501';
+  end if;
+
+  if not public.is_tournament_organizer(
+    p_tournament_id
+  ) then
+    raise exception
+      'Only a tournament organizer can publish fixtures'
+      using errcode = '42501';
+  end if;
+
+  select *
+    into v_tournament
+  from public.tournaments
+  where tournament_id = p_tournament_id
+  for update;
+
+  if not found then
+    raise exception 'Tournament not found'
+      using errcode = 'P0002';
+  end if;
+
+  if jsonb_typeof(p_slots) <> 'array' then
+    raise exception 'p_slots must be a JSON array'
+      using errcode = '22023';
+  end if;
+
+  if exists (
+    select 1
+    from public.matches
+    where tournament_id = p_tournament_id
+  ) then
+    raise exception
+      'Fixtures have already been published for this tournament'
+      using errcode = '23505';
+  end if;
+
+  if array_length(p_seed_order, 1) is not null then
+    for v_i in 1..array_length(p_seed_order, 1) loop
+      update public.tournament_teams
+      set
+        seed_number = v_i,
+        updated_at = now()
+      where tournament_id = p_tournament_id
+        and team_id = p_seed_order[v_i]
+        and status = 'approved';
+    end loop;
+  end if;
+
+  create temporary table if not exists
+    pg_temp.matchday_fixture_slot_map (
+      slot_id text primary key,
+      match_id uuid not null
+    )
+  on commit drop;
+
+  truncate table pg_temp.matchday_fixture_slot_map;
+
+  -- First pass: create all match shells and side slots.
+  for v_slot in
+    select value
+    from jsonb_array_elements(p_slots)
+  loop
+    v_slot_id :=
+      nullif(v_slot ->> 'slot_id', '');
+
+    if v_slot_id is null then
+      raise exception 'Every fixture needs slot_id'
+        using errcode = '22023';
+    end if;
+
+    v_team_a :=
+      nullif(v_slot ->> 'team_a_id', '')::uuid;
+    v_team_b :=
+      nullif(v_slot ->> 'team_b_id', '')::uuid;
+
+    if v_team_a is not null
+       and not exists (
+         select 1
+         from public.tournament_teams tt
+         where tt.tournament_id = p_tournament_id
+           and tt.team_id = v_team_a
+           and tt.status = 'approved'
+       )
+    then
+      raise exception
+        'Team A % is not an approved tournament team',
+        v_team_a
+        using errcode = '23514';
+    end if;
+
+    if v_team_b is not null
+       and not exists (
+         select 1
+         from public.tournament_teams tt
+         where tt.tournament_id = p_tournament_id
+           and tt.team_id = v_team_b
+           and tt.status = 'approved'
+       )
+    then
+      raise exception
+        'Team B % is not an approved tournament team',
+        v_team_b
+        using errcode = '23514';
+    end if;
+
+    if v_team_a is not null
+       and v_team_b is not null
+       and v_team_a = v_team_b
+    then
+      raise exception 'A fixture cannot contain the same team twice'
+        using errcode = '23514';
+    end if;
+
+    insert into public.matches (
+      tournament_id,
+      match_type,
+      round,
+      bracket_round_number,
+      bracket_match_number,
+      venue,
+      sport_id,
+      scheduled_start_time,
+      status,
+      created_by
+    )
+    values (
+      p_tournament_id,
+      'tournament',
+      nullif(v_slot ->> 'round', ''),
+      nullif(
+        v_slot ->> 'bracket_round_number',
+        ''
+      )::integer,
+      nullif(
+        v_slot ->> 'bracket_match_number',
+        ''
+      )::integer,
+      nullif(v_slot ->> 'venue', ''),
+      v_tournament.sport_id,
+      coalesce(
+        nullif(
+          v_slot ->> 'scheduled_start_time',
+          ''
+        )::timestamptz,
+        now()
+      ),
+      'scheduled',
+      auth.uid()
+    )
+    returning match_id
+      into v_match_id;
+
+    update public.match_teams
+    set team_id = case team_side
+      when 'team_a' then v_team_a
+      when 'team_b' then v_team_b
+    end
+    where match_id = v_match_id;
+
+    if v_tournament.sport_id = 'cricket' then
+      insert into public.cricket_matches (
+        match_id,
+        format_code,
+        rules_snapshot
+      )
+      values (
+        v_match_id,
+        coalesce(
+          v_tournament.format ->> 'format_preset',
+          v_tournament.format ->> 'format_code',
+          't20'
+        ),
+        coalesce(
+          v_tournament.format,
+          '{}'::jsonb
+        )
+        || coalesce(
+          v_tournament.rules,
+          '{}'::jsonb
+        )
+      );
+    end if;
+
+    if v_team_a is not null then
+      perform public._materialize_match_team_side(
+        v_match_id,
+        'team_a'
+      );
+    end if;
+
+    if v_team_b is not null then
+      perform public._materialize_match_team_side(
+        v_match_id,
+        'team_b'
+      );
+    end if;
+
+    insert into pg_temp.matchday_fixture_slot_map (
+      slot_id,
+      match_id
+    )
+    values (
+      v_slot_id,
+      v_match_id
+    );
+
+    v_count := v_count + 1;
+  end loop;
+
+  -- Second pass: resolve feeder match IDs now that every slot has a match_id.
+  for v_slot in
+    select value
+    from jsonb_array_elements(p_slots)
+  loop
+    v_slot_id :=
+      nullif(v_slot ->> 'slot_id', '');
+    v_prev_a :=
+      nullif(v_slot ->> 'prev_slot_a', '');
+    v_prev_b :=
+      nullif(v_slot ->> 'prev_slot_b', '');
+
+    select sm.match_id
+      into v_match_id
+    from pg_temp.matchday_fixture_slot_map sm
+    where sm.slot_id = v_slot_id;
+
+    update public.matches
+    set
+      prev_match_a_id = (
+        select sm.match_id
+        from pg_temp.matchday_fixture_slot_map sm
+        where sm.slot_id = v_prev_a
+      ),
+      prev_match_b_id = (
+        select sm.match_id
+        from pg_temp.matchday_fixture_slot_map sm
+        where sm.slot_id = v_prev_b
+      ),
+      updated_at = now()
+    where match_id = v_match_id;
+  end loop;
+
+  return v_count;
+end;
+$$;
+
+revoke all
+  on function public.tournament_generate_fixtures(
+    uuid,
+    jsonb,
+    uuid[]
+  )
+  from public, anon;
+
+grant execute
+  on function public.tournament_generate_fixtures(
+    uuid,
+    jsonb,
+    uuid[]
+  )
+  to authenticated;
+

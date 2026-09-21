@@ -10,7 +10,8 @@ export class HistoryRepository {
       matchId: string;
       previousStatus: MatchLifecycle;
       newStatus: MatchLifecycle;
-      resultPayload: Record<string, unknown>;
+      resultPayload:
+        Record<string, unknown>;
       reason: string | null;
       actorId: string;
     },

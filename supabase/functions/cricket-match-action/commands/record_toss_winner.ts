@@ -2,48 +2,69 @@ import type {
   CommandContext,
   CommandResult,
 } from "../types.ts";
-import { MatchRepository } from "../repositories/match_repository.ts";
-import { AuthorizationRepository } from "../repositories/authorization_repository.ts";
 import {
-  requiredUuid,
+  MatchRepository,
+} from "../repositories/match_repository.ts";
+import {
+  AuthorizationRepository,
+} from "../repositories/authorization_repository.ts";
+import {
   optionalString,
+  requiredUuid,
 } from "../domain/validation.ts";
+import {
+  teamSideFor,
+} from "../domain/cricket.ts";
 import {
   forbidden,
   unprocessable,
 } from "../domain/errors.ts";
 
-const matches = new MatchRepository();
-const authz = new AuthorizationRepository();
+const matches =
+  new MatchRepository();
+
+const authz =
+  new AuthorizationRepository();
 
 export async function recordTossWinner(
   ctx: CommandContext,
 ): Promise<CommandResult> {
-  const wonBy = requiredUuid(ctx.body, "p_won_by");
-  const face = optionalString(ctx.body, "p_face");
+  // Flutter supplies the concrete team UUID. Convert it to the stable match-side
+  // identity before persisting Cricket state.
+  const wonByTeamId =
+    requiredUuid(
+      ctx.body,
+      "p_won_by",
+    );
 
-  // 1. Lock current authoritative state.
-  const match = await matches.lockCricketMatch(
-    ctx.tx,
-    ctx.matchId,
-  );
+  const face =
+    optionalString(
+      ctx.body,
+      "p_face",
+    );
 
-  // 2. Command authority: match creator records the observed toss winner.
-  if (!authz.isMatchCreator(match, ctx.actorId)) {
+  const match =
+    await matches.lockCricketMatch(
+      ctx.tx,
+      ctx.matchId,
+    );
+
+  if (
+    !authz.isMatchCreator(
+      match,
+      ctx.actorId,
+    )
+  ) {
     forbidden(
       "Only the match creator can record the toss winner",
     );
   }
 
-  // 3. Domain validation.
-  if (
-    wonBy !== match.teamAId &&
-    wonBy !== match.teamBId
-  ) {
-    unprocessable(
-      "The toss winner must be one of the two teams in this match",
+  const winningSide =
+    teamSideFor(
+      match,
+      wonByTeamId,
     );
-  }
 
   if (
     match.phase !== "toss" &&
@@ -54,12 +75,10 @@ export async function recordTossWinner(
     );
   }
 
-  // 4. Persist ONLY Cricket-owned state.
-  // The generic parent remains `scheduled`.
   await ctx.tx`
     update public.cricket_matches
     set
-      toss_won_by = ${wonBy}::uuid,
+      toss_won_by = ${winningSide},
       toss_decision = null,
       toss_face = coalesce(
         ${face},
@@ -68,7 +87,8 @@ export async function recordTossWinner(
       toss_recorded_at = now(),
       phase = 'toss',
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   return {};

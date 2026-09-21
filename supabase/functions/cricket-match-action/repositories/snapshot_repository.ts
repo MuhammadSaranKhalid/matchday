@@ -1,4 +1,6 @@
-import type { Tx } from "../types.ts";
+import type {
+  Tx,
+} from "../types.ts";
 
 export class SnapshotRepository {
   async match(
@@ -8,9 +10,11 @@ export class SnapshotRepository {
     const rows = await tx`
       select *
       from public.cricket_match_details
-      where match_id = ${matchId}::uuid
+      where match_id =
+              ${matchId}::uuid
       limit 1
     `;
+
     return rows[0] ?? null;
   }
 
@@ -22,10 +26,13 @@ export class SnapshotRepository {
     const rows = await tx`
       select *
       from public.cricket_match_innings_state
-      where match_id = ${matchId}::uuid
-        and innings_number = ${inningsNumber}
+      where match_id =
+              ${matchId}::uuid
+        and innings_number =
+              ${inningsNumber}
       limit 1
     `;
+
     return rows[0] ?? null;
   }
 }

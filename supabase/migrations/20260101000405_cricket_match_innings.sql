@@ -78,6 +78,17 @@ add constraint cricket_match_innings_cricket_match_fkey
   foreign key (match_id) references public.cricket_matches (match_id)
     on delete cascade;
 
+alter table public.cricket_match_innings
+  add constraint cricket_match_innings_batting_side_fkey
+  foreign key (match_id, batting_team_side)
+  references public.match_teams (match_id, team_side)
+  on delete restrict;
+
+alter table public.cricket_match_innings
+  add constraint cricket_match_innings_bowling_side_fkey
+  foreign key (match_id, bowling_team_side)
+  references public.match_teams (match_id, team_side)
+  on delete restrict;
+
 comment on table public.cricket_match_innings is
-  'CRICKET ENGINE TABLE (legacy generic name). Every row is constrained to '
-  'a cricket_matches parent. Planned rename: cricket_match_innings.';
+  'CRICKET ENGINE TABLE. Every row is constrained to a cricket_matches parent and valid match_teams sides.';

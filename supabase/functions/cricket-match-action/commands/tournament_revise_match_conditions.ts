@@ -2,8 +2,12 @@ import type {
   CommandContext,
   CommandResult,
 } from "../types.ts";
-import { MatchRepository } from "../repositories/match_repository.ts";
-import { AuthorizationRepository } from "../repositories/authorization_repository.ts";
+import {
+  MatchRepository,
+} from "../repositories/match_repository.ts";
+import {
+  AuthorizationRepository,
+} from "../repositories/authorization_repository.ts";
 import {
   optionalInteger,
   optionalString,
@@ -14,10 +18,15 @@ import {
   normalizeCricketRules,
   numberRule,
 } from "../domain/cricket.ts";
-import { unprocessable } from "../domain/errors.ts";
+import {
+  unprocessable,
+} from "../domain/errors.ts";
 
-const matches = new MatchRepository();
-const authz = new AuthorizationRepository();
+const matches =
+  new MatchRepository();
+
+const authz =
+  new AuthorizationRepository();
 
 export async function tournamentReviseMatchConditions(
   ctx: CommandContext,
@@ -27,29 +36,42 @@ export async function tournamentReviseMatchConditions(
       ctx.body,
       "p_revised_overs",
     );
+
   const bowlerQuota =
     requiredInteger(
       ctx.body,
       "p_bowler_quota",
     );
+
   const revisedTarget =
     optionalInteger(
       ctx.body,
       "p_revised_target",
     );
+
   const method =
     requiredEnum(
       ctx.body,
       "p_method",
-      ["run_rate", "dls", "custom", "none"] as const,
+      [
+        "run_rate",
+        "dls",
+        "custom",
+        "none",
+      ] as const,
     );
-  const reason =
-    optionalString(ctx.body, "p_reason");
 
-  const match = await matches.lockCricketMatch(
-    ctx.tx,
-    ctx.matchId,
-  );
+  const reason =
+    optionalString(
+      ctx.body,
+      "p_reason",
+    );
+
+  const match =
+    await matches.lockCricketMatch(
+      ctx.tx,
+      ctx.matchId,
+    );
 
   await authz.requireTournamentOrganizer(
     ctx.tx,
@@ -86,7 +108,10 @@ export async function tournamentReviseMatchConditions(
       20,
     );
 
-  if (revisedOvers > originalOvers) {
+  if (
+    revisedOvers >
+    originalOvers
+  ) {
     unprocessable(
       "Overs can only be reduced, not extended",
     );
@@ -99,20 +124,30 @@ export async function tournamentReviseMatchConditions(
       4,
     );
 
-  const rules = normalizeCricketRules({
-    ...match.rulesSnapshot,
-    overs_per_innings: revisedOvers,
-    max_overs_per_bowler: bowlerQuota,
-  });
+  const rules =
+    normalizeCricketRules({
+      ...match.rulesSnapshot,
+      overs_per_innings:
+        revisedOvers,
+      max_overs_per_bowler:
+        bowlerQuota,
+    });
 
   const revisedConditions = {
-    applied_at: new Date().toISOString(),
-    applied_by: ctx.actorId,
-    original_overs: originalOvers,
-    revised_overs: revisedOvers,
-    original_quota: originalQuota,
-    revised_quota: bowlerQuota,
-    revised_target: revisedTarget,
+    applied_at:
+      new Date().toISOString(),
+    applied_by:
+      ctx.actorId,
+    original_overs:
+      originalOvers,
+    revised_overs:
+      revisedOvers,
+    original_quota:
+      originalQuota,
+    revised_quota:
+      bowlerQuota,
+    revised_target:
+      revisedTarget,
     method,
     reason,
   };
@@ -123,9 +158,12 @@ export async function tournamentReviseMatchConditions(
       rules_snapshot =
         ${ctx.tx.json(rules)},
       revised_conditions =
-        ${ctx.tx.json(revisedConditions)},
+        ${ctx.tx.json(
+          revisedConditions,
+        )},
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   return {};

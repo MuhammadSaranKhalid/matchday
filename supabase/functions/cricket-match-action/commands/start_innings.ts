@@ -2,42 +2,71 @@ import type {
   CommandContext,
   CommandResult,
 } from "../types.ts";
-import { MatchRepository } from "../repositories/match_repository.ts";
-import { AuthorizationRepository } from "../repositories/authorization_repository.ts";
-import { InningsRepository } from "../repositories/innings_repository.ts";
 import {
+  MatchRepository,
+} from "../repositories/match_repository.ts";
+import {
+  AuthorizationRepository,
+} from "../repositories/authorization_repository.ts";
+import {
+  InningsRepository,
+} from "../repositories/innings_repository.ts";
+import {
+  optionalInteger,
   requiredInteger,
   requiredUuid,
-  optionalInteger,
 } from "../domain/validation.ts";
 import {
-  battingTeamForInnings,
+  battingSideForInnings,
   numberRule,
   oppositeSide,
-  teamSideFor,
 } from "../domain/cricket.ts";
 import {
   forbidden,
   unprocessable,
 } from "../domain/errors.ts";
 
-const matches = new MatchRepository();
-const authz = new AuthorizationRepository();
-const innings = new InningsRepository();
+const matches =
+  new MatchRepository();
+
+const authz =
+  new AuthorizationRepository();
+
+const innings =
+  new InningsRepository();
 
 export async function startInnings(
   ctx: CommandContext,
 ): Promise<CommandResult> {
   const inningsNumber =
-    requiredInteger(ctx.body, "p_innings_number");
+    requiredInteger(
+      ctx.body,
+      "p_innings_number",
+    );
+
   const strikerId =
-    requiredUuid(ctx.body, "p_striker_id");
+    requiredUuid(
+      ctx.body,
+      "p_striker_id",
+    );
+
   const nonStrikerId =
-    requiredUuid(ctx.body, "p_non_striker_id");
+    requiredUuid(
+      ctx.body,
+      "p_non_striker_id",
+    );
+
   const bowlerId =
-    requiredUuid(ctx.body, "p_bowler_id");
+    requiredUuid(
+      ctx.body,
+      "p_bowler_id",
+    );
+
   const target =
-    optionalInteger(ctx.body, "p_target");
+    optionalInteger(
+      ctx.body,
+      "p_target",
+    );
 
   if (inningsNumber < 1) {
     unprocessable(
@@ -51,10 +80,11 @@ export async function startInnings(
     );
   }
 
-  const match = await matches.lockCricketMatch(
-    ctx.tx,
-    ctx.matchId,
-  );
+  const match =
+    await matches.lockCricketMatch(
+      ctx.tx,
+      ctx.matchId,
+    );
 
   if (
     match.status === "completed" ||
@@ -79,16 +109,16 @@ export async function startInnings(
     );
   }
 
-  const battingTeamId =
-    battingTeamForInnings(
+  const battingSide =
+    battingSideForInnings(
       match,
       inningsNumber,
     );
 
-  const battingSide =
-    teamSideFor(match, battingTeamId);
   const bowlingSide =
-    oppositeSide(battingSide);
+    oppositeSide(
+      battingSide,
+    );
 
   if (
     !(await innings.bothBattersAreInXi(
@@ -158,7 +188,8 @@ export async function startInnings(
         else 'live'::public.cricket_match_phase
       end,
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   await ctx.tx`
@@ -166,10 +197,14 @@ export async function startInnings(
     set
       status = 'live',
       actual_start_time =
-        coalesce(actual_start_time, now()),
+        coalesce(
+          actual_start_time,
+          now()
+        ),
       completed_at = null,
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   return {

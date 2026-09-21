@@ -2,24 +2,45 @@ import type {
   CommandContext,
   CommandResult,
 } from "../types.ts";
-import { MatchRepository } from "../repositories/match_repository.ts";
-import { AuthorizationRepository } from "../repositories/authorization_repository.ts";
-import { requiredString } from "../domain/validation.ts";
-import { forbidden } from "../domain/errors.ts";
+import {
+  MatchRepository,
+} from "../repositories/match_repository.ts";
+import {
+  MatchTeamRepository,
+} from "../repositories/match_team_repository.ts";
+import {
+  AuthorizationRepository,
+} from "../repositories/authorization_repository.ts";
+import {
+  requiredString,
+} from "../domain/validation.ts";
+import {
+  forbidden,
+} from "../domain/errors.ts";
 
-const matches = new MatchRepository();
-const authz = new AuthorizationRepository();
+const matches =
+  new MatchRepository();
+
+const teams =
+  new MatchTeamRepository();
+
+const authz =
+  new AuthorizationRepository();
 
 export async function completeCricketMatch(
   ctx: CommandContext,
 ): Promise<CommandResult> {
   const description =
-    requiredString(ctx.body, "p_description");
+    requiredString(
+      ctx.body,
+      "p_description",
+    );
 
-  const match = await matches.lockCricketMatch(
-    ctx.tx,
-    ctx.matchId,
-  );
+  const match =
+    await matches.lockCricketMatch(
+      ctx.tx,
+      ctx.matchId,
+    );
 
   const isCaptain =
     await authz.isAnyMatchCaptain(
@@ -36,14 +57,24 @@ export async function completeCricketMatch(
       "match.score",
     );
 
-  if (!isCaptain && !hasMatchScoreGrant) {
+  if (
+    !isCaptain &&
+    !hasMatchScoreGrant
+  ) {
     forbidden(
       "This user is not allowed to complete the match",
     );
   }
 
+  if (match.winnerSide) {
+    await teams.clearAdvancedWinner(
+      ctx.tx,
+      ctx.matchId,
+    );
+  }
+
   const result = {
-    winner_team_id: null,
+    winner_side: null,
     win_type: "manual",
     description,
     summary: description,
@@ -53,21 +84,24 @@ export async function completeCricketMatch(
     update public.cricket_matches
     set
       phase = 'complete',
-      result = ${ctx.tx.json(result)},
+      result =
+        ${ctx.tx.json(result)},
       result_summary =
-        ${ctx.tx.json({ description })},
+        ${description},
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   await ctx.tx`
     update public.matches
     set
       status = 'completed',
-      winner_id = null,
+      winner_side = null,
       completed_at = now(),
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   return {};

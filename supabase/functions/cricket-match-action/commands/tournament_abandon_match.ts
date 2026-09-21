@@ -2,31 +2,60 @@ import type {
   CommandContext,
   CommandResult,
 } from "../types.ts";
-import { MatchRepository } from "../repositories/match_repository.ts";
-import { AuthorizationRepository } from "../repositories/authorization_repository.ts";
-import { InningsRepository } from "../repositories/innings_repository.ts";
-import { HistoryRepository } from "../repositories/history_repository.ts";
+import {
+  MatchRepository,
+} from "../repositories/match_repository.ts";
+import {
+  MatchTeamRepository,
+} from "../repositories/match_team_repository.ts";
+import {
+  AuthorizationRepository,
+} from "../repositories/authorization_repository.ts";
+import {
+  InningsRepository,
+} from "../repositories/innings_repository.ts";
+import {
+  HistoryRepository,
+} from "../repositories/history_repository.ts";
 import {
   optionalString,
   optionalTimestamp,
   requiredEnum,
 } from "../domain/validation.ts";
-import { jsonObject } from "../domain/cricket.ts";
-import { unprocessable } from "../domain/errors.ts";
+import {
+  jsonObject,
+} from "../domain/cricket.ts";
+import {
+  unprocessable,
+} from "../domain/errors.ts";
 
-const matches = new MatchRepository();
-const authz = new AuthorizationRepository();
-const innings = new InningsRepository();
-const history = new HistoryRepository();
+const matches =
+  new MatchRepository();
+
+const teams =
+  new MatchTeamRepository();
+
+const authz =
+  new AuthorizationRepository();
+
+const innings =
+  new InningsRepository();
+
+const history =
+  new HistoryRepository();
 
 export async function tournamentAbandonMatch(
   ctx: CommandContext,
 ): Promise<CommandResult> {
-  const mode = requiredEnum(
-    ctx.body,
-    "p_mode",
-    ["reschedule", "no_result"] as const,
-  );
+  const mode =
+    requiredEnum(
+      ctx.body,
+      "p_mode",
+      [
+        "reschedule",
+        "no_result",
+      ] as const,
+    );
 
   const rescheduleTo =
     optionalTimestamp(
@@ -35,12 +64,16 @@ export async function tournamentAbandonMatch(
     );
 
   const reason =
-    optionalString(ctx.body, "p_reason");
+    optionalString(
+      ctx.body,
+      "p_reason",
+    );
 
-  const match = await matches.lockCricketMatch(
-    ctx.tx,
-    ctx.matchId,
-  );
+  const match =
+    await matches.lockCricketMatch(
+      ctx.tx,
+      ctx.matchId,
+    );
 
   await authz.requireTournamentOrganizer(
     ctx.tx,
@@ -48,14 +81,19 @@ export async function tournamentAbandonMatch(
     ctx.actorId,
   );
 
-  if (mode === "reschedule" && !rescheduleTo) {
+  if (
+    mode === "reschedule" &&
+    !rescheduleTo
+  ) {
     unprocessable(
       "A new date is required to reschedule the match",
     );
   }
 
   const previousResult =
-    jsonObject(match.result);
+    jsonObject(
+      match.result,
+    );
 
   const newStatus =
     mode === "reschedule"
@@ -66,7 +104,8 @@ export async function tournamentAbandonMatch(
     ctx.tx,
     {
       matchId: ctx.matchId,
-      previousStatus: match.status,
+      previousStatus:
+        match.status,
       newStatus,
       resultPayload: {
         ...previousResult,
@@ -77,9 +116,14 @@ export async function tournamentAbandonMatch(
     },
   );
 
+  if (match.winnerSide) {
+    await teams.clearAdvancedWinner(
+      ctx.tx,
+      ctx.matchId,
+    );
+  }
+
   if (mode === "reschedule") {
-    // Deleting innings is the clean reset point. State, balls and wickets
-    // cascade from cricket_match_innings.
     await innings.deleteAllForMatch(
       ctx.tx,
       ctx.matchId,
@@ -100,7 +144,8 @@ export async function tournamentAbandonMatch(
         openers_submitted_at = null,
         player_of_the_match_id = null,
         updated_at = now()
-      where match_id = ${ctx.matchId}::uuid
+      where match_id =
+              ${ctx.matchId}::uuid
     `;
 
     await ctx.tx`
@@ -111,9 +156,10 @@ export async function tournamentAbandonMatch(
           ${rescheduleTo}::timestamptz,
         actual_start_time = null,
         completed_at = null,
-        winner_id = null,
+        winner_side = null,
         updated_at = now()
-      where match_id = ${ctx.matchId}::uuid
+      where match_id =
+              ${ctx.matchId}::uuid
     `;
 
     return {};
@@ -124,7 +170,7 @@ export async function tournamentAbandonMatch(
     "Match abandoned — no result";
 
   const result = {
-    winner_team_id: null,
+    winner_side: null,
     win_type: "no_result",
     description,
   };
@@ -133,21 +179,24 @@ export async function tournamentAbandonMatch(
     update public.cricket_matches
     set
       phase = 'complete',
-      result = ${ctx.tx.json(result)},
+      result =
+        ${ctx.tx.json(result)},
       result_summary =
-        ${ctx.tx.json({ description })},
+        ${description},
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   await ctx.tx`
     update public.matches
     set
       status = 'abandoned',
-      winner_id = null,
+      winner_side = null,
       completed_at = now(),
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   return {};

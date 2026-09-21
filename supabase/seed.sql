@@ -971,21 +971,38 @@ begin
   begin
     -- 1. LIVE MATCH
     insert into public.matches (
-      match_id, match_type, team_a_id, team_b_id,
+      match_id, match_type,
       venue, scheduled_start_time, actual_start_time,
       status, created_by, created_at, updated_at
     )
     values (
-      m_live_id, 'friendly', v_lahore_lions, v_karachi_kings,
+      m_live_id, 'friendly',
       'Gaddafi Stadium, Lahore',
       now() - interval '1 hour 15 minutes',
       now() - interval '1 hour 15 minutes',
-      'live', v_saran_uid, now() - interval '2 days', now()
+      'scheduled', v_saran_uid, now() - interval '2 days', now()
     )
     on conflict (match_id) do update set
       status = excluded.status,
       scheduled_start_time = excluded.scheduled_start_time,
       actual_start_time = excluded.actual_start_time;
+
+    -- Resolve match_teams side slots for the live match.
+    -- The trigger auto-creates (team_a, NULL) and (team_b, NULL) on insert;
+    -- we update them to set the resolved team_id and snapshot team_name.
+    update public.match_teams
+       set team_id   = v_lahore_lions,
+           team_name = (select team_name from public.teams where team_id = v_lahore_lions)
+     where match_id = m_live_id and team_side = 'team_a';
+
+    update public.match_teams
+       set team_id   = v_karachi_kings,
+           team_name = (select team_name from public.teams where team_id = v_karachi_kings)
+     where match_id = m_live_id and team_side = 'team_b';
+
+    update public.matches
+       set status = 'live'
+     where match_id = m_live_id;
 
     insert into public.cricket_matches (
       match_id, format_code, rules_snapshot, phase,
@@ -1050,12 +1067,12 @@ begin
 
     -- 2. CONFIRMED UPCOMING MATCH: Lahore Lions vs Rawalpindi Rams (Tomorrow at 4:30 PM)
     insert into public.matches (
-      match_id, match_type, team_a_id, team_b_id,
+      match_id, match_type,
       venue, scheduled_start_time,
       status, created_by, created_at, updated_at
     )
     values (
-      m_upcoming_id, 'friendly', v_lahore_lions, v_rawalpindi_rams,
+      m_upcoming_id, 'friendly',
       'Model Town Club Ground, Lahore',
       now() + interval '1 day 2 hours',
       'scheduled', v_saran_uid, now() - interval '1 day', now()
@@ -1063,6 +1080,17 @@ begin
     on conflict (match_id) do update set
       status = excluded.status,
       scheduled_start_time = excluded.scheduled_start_time;
+
+    -- Resolve match_teams side slots for the upcoming match.
+    update public.match_teams
+       set team_id   = v_lahore_lions,
+           team_name = (select team_name from public.teams where team_id = v_lahore_lions)
+     where match_id = m_upcoming_id and team_side = 'team_a';
+
+    update public.match_teams
+       set team_id   = v_rawalpindi_rams,
+           team_name = (select team_name from public.teams where team_id = v_rawalpindi_rams)
+     where match_id = m_upcoming_id and team_side = 'team_b';
 
     insert into public.cricket_matches (
       match_id, format_code, rules_snapshot, phase
@@ -1078,21 +1106,40 @@ begin
     -- 3. PAST COMPLETED MATCH: Lahore Lions vs Islamabad United (Yesterday)
     --    Lahore Lions won by 24 runs (LL: 168/5, IU: 144/9)
     insert into public.matches (
-      match_id, match_type, team_a_id, team_b_id,
+      match_id, match_type,
       venue, scheduled_start_time, actual_start_time, completed_at,
       status, created_by, created_at, updated_at
     )
     values (
-      m_past_id, 'friendly', v_lahore_lions, v_islamabad_united,
+      m_past_id, 'friendly',
       'LCCA Ground, Lahore',
       now() - interval '1 day 4 hours',
       now() - interval '1 day 4 hours',
       now() - interval '1 day 1 hour',
-      'completed',
+      'scheduled',
       v_saran_uid, now() - interval '2 days', now()
     )
     on conflict (match_id) do update set
-      status = excluded.status;
+      status = excluded.status,
+      scheduled_start_time = excluded.scheduled_start_time,
+      actual_start_time = excluded.actual_start_time,
+      completed_at = excluded.completed_at;
+
+    -- Resolve match_teams side slots for the completed match.
+    update public.match_teams
+       set team_id   = v_lahore_lions,
+           team_name = (select team_name from public.teams where team_id = v_lahore_lions)
+     where match_id = m_past_id and team_side = 'team_a';
+
+    update public.match_teams
+       set team_id   = v_islamabad_united,
+           team_name = (select team_name from public.teams where team_id = v_islamabad_united)
+     where match_id = m_past_id and team_side = 'team_b';
+
+    update public.matches
+       set status = 'completed',
+           winner_side = 'team_a'
+     where match_id = m_past_id;
 
     insert into public.cricket_matches (
       match_id, format_code, rules_snapshot, phase,

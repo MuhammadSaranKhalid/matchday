@@ -60,16 +60,10 @@ create table public.matches (
   actual_start_time      timestamptz,
   completed_at           timestamptz,
   status                 public.match_status not null default 'scheduled',
-  winner_id              uuid
-    references public.teams (team_id)
-    on delete set null,
-  player_of_the_match_id uuid,
-  team_a_id              uuid
-    references public.teams (team_id)
-    on delete set null,
-  team_b_id              uuid
-    references public.teams (team_id)
-    on delete set null,
+  winner_side            text check (
+    winner_side is null
+    or winner_side in ('team_a', 'team_b')
+  ),
   created_by             uuid
     references public.profiles (user_id)
     on delete set null,
@@ -114,13 +108,6 @@ create index idx_matches_tournament
   on public.matches (tournament_id)
   where tournament_id is not null;
 
-create index idx_matches_team_a
-  on public.matches (team_a_id)
-  where team_a_id is not null;
-
-create index idx_matches_team_b
-  on public.matches (team_b_id)
-  where team_b_id is not null;
 
 create index matches_sport_id
   on public.matches (sport_id);
@@ -180,93 +167,29 @@ set search_path = public, pg_temp
 as $$
 declare
   v_tournament_sport text;
-  v_team_a_sport text;
-  v_team_b_sport text;
-  v_effective_sport text;
 begin
   if new.tournament_id is not null then
-    select
-      t.sport_id
-    into v_tournament_sport
+    select t.sport_id
+      into v_tournament_sport
     from public.tournaments t
     where t.tournament_id = new.tournament_id;
-  end if;
-  if new.team_a_id is not null then
-    select
-      t.sport_id
-    into v_team_a_sport
-    from public.teams t
-    where t.team_id = new.team_a_id;
-  end if;
-  if new.team_b_id is not null then
-    select
-      t.sport_id
-    into v_team_b_sport
-    from public.teams t
-    where t.team_id = new.team_b_id;
-  end if;
-  -- First ensure the related entities themselves agree.
-  if
-    v_team_a_sport is not null
-    and v_team_b_sport is not null
-    and v_team_a_sport is distinct from v_team_b_sport
-  then
-    raise exception 'Both match teams must belong to the same sport'
-      using errcode = '23514';
-  end if;
-  if
-    v_tournament_sport is not null
-    and v_team_a_sport is not null
-    and v_tournament_sport is distinct from v_team_a_sport
-  then
-    raise exception 'Team A sport (%) does not match tournament sport (%)',
-      v_team_a_sport,
-      v_tournament_sport
-      using errcode = '23514';
-  end if;
-  if
-    v_tournament_sport is not null
-    and v_team_b_sport is not null
-    and v_tournament_sport is distinct from v_team_b_sport
-  then
-    raise exception 'Team B sport (%) does not match tournament sport (%)',
-      v_team_b_sport,
-      v_tournament_sport
-      using errcode = '23514';
-  end if;
-  -- Validate that caller-supplied sport_id does not conflict with related entities
-  if new.sport_id is not null then
-    if v_team_a_sport is not null and new.sport_id is distinct from v_team_a_sport then
-      raise exception 'Match sport (%) does not match Team A sport (%)',
-        new.sport_id,
-        v_team_a_sport
-        using errcode = '23514';
-    end if;
-    if v_team_b_sport is not null and new.sport_id is distinct from v_team_b_sport then
-      raise exception 'Match sport (%) does not match Team B sport (%)',
-        new.sport_id,
-        v_team_b_sport
-        using errcode = '23514';
-    end if;
-    if
-      v_tournament_sport is not null
-      and new.sport_id is distinct from v_tournament_sport
+
+    if v_tournament_sport is not null
+       and new.sport_id is not null
+       and new.sport_id is distinct from v_tournament_sport
     then
       raise exception 'Match sport (%) does not match tournament sport (%)',
         new.sport_id,
         v_tournament_sport
         using errcode = '23514';
     end if;
+
+    if v_tournament_sport is not null and new.sport_id is null then
+      new.sport_id := v_tournament_sport;
+    end if;
   end if;
-  -- Relationships are more authoritative than default sport_id.
-  v_effective_sport := coalesce(
-    v_tournament_sport,
-    v_team_a_sport,
-    v_team_b_sport,
-    new.sport_id,
-    'cricket'
-  );
-  new.sport_id := v_effective_sport;
+
+  new.sport_id := coalesce(new.sport_id, 'cricket');
   return new;
 end;
 $$;
@@ -279,7 +202,7 @@ revoke all on function public.enforce_match_sport() from public, anon, authentic
 
 create trigger matches_enforce_sport
   before insert
-  or update of tournament_id, team_a_id, team_b_id, sport_id
+  or update of tournament_id, sport_id
   on public.matches
   for each row
   execute function public.enforce_match_sport();
@@ -305,13 +228,6 @@ create index if not exists matches_ground_time
   )
   where ground_id is not null;
 
-create index if not exists idx_matches_tournament_winner
-  on public.matches (
-    tournament_id,
-    winner_id
-  )
-  where tournament_id is not null;
-
 create index if not exists idx_matches_created_by
   on public.matches (created_by);
 
@@ -324,6 +240,3 @@ create index if not exists idx_matches_prev_match_b_id
   on public.matches (
     prev_match_b_id
   );
-
-create index if not exists idx_matches_winner_id
-  on public.matches (winner_id);

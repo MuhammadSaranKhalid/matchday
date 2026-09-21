@@ -20,7 +20,9 @@ create table public.cricket_matches (
   toss_decision          public.cricket_toss_decision,
   toss_face              text check (toss_face in ('heads', 'tails')),
   toss_recorded_at       timestamptz,
-  openers_submitted_by   text check (openers_submitted_by in ('team_a', 'team_b')),
+  openers_submitted_by   uuid
+    references public.profiles (user_id)
+    on delete set null,
   openers_submitted_at   timestamptz,
   scoring_mode           public.cricket_scoring_mode not null default 'standard',
   result                 jsonb,
@@ -30,7 +32,11 @@ create table public.cricket_matches (
     references public.match_players (match_player_id)
     on delete set null,
   created_at             timestamptz not null default now(),
-  updated_at             timestamptz not null default now()
+  updated_at             timestamptz not null default now(),
+  constraint cricket_matches_toss_side_fkey
+    foreign key (match_id, toss_won_by)
+    references public.match_teams (match_id, team_side)
+    on delete restrict
 );
 
 comment on table public.cricket_matches is
@@ -44,43 +50,6 @@ create trigger cricket_matches_set_updated_at
   before update on public.cricket_matches
   for each row
   execute function public.set_updated_at();
-
--- -----------------------------------------------------------------------------
--- Functions
--- -----------------------------------------------------------------------------
-
--- Sync result to parent matches
-create or replace function public._sync_cricket_result_to_parent()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_winner_id uuid;
-begin
-  if new.result is not null then
-    v_winner_id := nullif(new.result ->> 'winner_team_id', '')::uuid;
-    update public.matches
-    set
-      winner_id = v_winner_id,
-      status = 'completed',
-      completed_at = coalesce(completed_at, now()),
-      updated_at = now()
-    where match_id = new.match_id;
-  end if;
-  return new;
-end;
-$$;
-
--- -----------------------------------------------------------------------------
--- Triggers
--- -----------------------------------------------------------------------------
-
-create trigger cricket_match_sync_parent_winner
-  after insert or update of result on public.cricket_matches
-  for each row
-  execute function public._sync_cricket_result_to_parent();
 
 -- -----------------------------------------------------------------------------
 -- Enable row-level security

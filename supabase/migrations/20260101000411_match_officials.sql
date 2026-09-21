@@ -94,36 +94,42 @@ create policy "match_officials_write_organizers"
   to authenticated
   using (
     exists (
-      select
-        1
+      select 1
       from public.matches m
-      where
-        m.match_id = match_officials.match_id
+      where m.match_id = match_officials.match_id
         and (
           case
             when m.tournament_id is not null then public.is_tournament_organizer(
               m.tournament_id
             )
-            else public.is_team_captain(m.team_a_id)
-            or public.is_team_captain(m.team_b_id)
+            else exists (
+              select 1
+              from public.match_teams mt
+              where mt.match_id = m.match_id
+                and mt.team_id is not null
+                and public.is_team_captain(mt.team_id)
+            )
           end
         )
     )
   )
   with check (
     exists (
-      select
-        1
+      select 1
       from public.matches m
-      where
-        m.match_id = match_officials.match_id
+      where m.match_id = match_officials.match_id
         and (
           case
             when m.tournament_id is not null then public.is_tournament_organizer(
               m.tournament_id
             )
-            else public.is_team_captain(m.team_a_id)
-            or public.is_team_captain(m.team_b_id)
+            else exists (
+              select 1
+              from public.match_teams mt
+              where mt.match_id = m.match_id
+                and mt.team_id is not null
+                and public.is_team_captain(mt.team_id)
+            )
           end
         )
     )
@@ -132,8 +138,7 @@ create policy "match_officials_write_organizers"
     and (
       match_officials.role = 'scorer'
       or exists (
-        select
-          1
+        select 1
         from public.matches m
         where m.match_id = match_officials.match_id and m.tournament_id is not null
       )

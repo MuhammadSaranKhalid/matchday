@@ -2,33 +2,50 @@ import type {
   CommandContext,
   CommandResult,
 } from "../types.ts";
-import { MatchRepository } from "../repositories/match_repository.ts";
-import { AuthorizationRepository } from "../repositories/authorization_repository.ts";
-import { InningsRepository } from "../repositories/innings_repository.ts";
+import {
+  MatchRepository,
+} from "../repositories/match_repository.ts";
+import {
+  AuthorizationRepository,
+} from "../repositories/authorization_repository.ts";
+import {
+  InningsRepository,
+} from "../repositories/innings_repository.ts";
 import {
   requiredUuid,
 } from "../domain/validation.ts";
 import {
-  battingTeamForInnings,
+  battingSideForInnings,
   numberRule,
   oppositeSide,
-  teamSideFor,
 } from "../domain/cricket.ts";
 import {
   unprocessable,
 } from "../domain/errors.ts";
 
-const matches = new MatchRepository();
-const authz = new AuthorizationRepository();
-const innings = new InningsRepository();
+const matches =
+  new MatchRepository();
+
+const authz =
+  new AuthorizationRepository();
+
+const innings =
+  new InningsRepository();
 
 export async function submitMatchOpeners(
   ctx: CommandContext,
 ): Promise<CommandResult> {
   const strikerId =
-    requiredUuid(ctx.body, "p_striker_id");
+    requiredUuid(
+      ctx.body,
+      "p_striker_id",
+    );
+
   const nonStrikerId =
-    requiredUuid(ctx.body, "p_non_striker_id");
+    requiredUuid(
+      ctx.body,
+      "p_non_striker_id",
+    );
 
   if (strikerId === nonStrikerId) {
     unprocessable(
@@ -36,19 +53,20 @@ export async function submitMatchOpeners(
     );
   }
 
-  const match = await matches.lockCricketMatch(
-    ctx.tx,
-    ctx.matchId,
-  );
+  const match =
+    await matches.lockCricketMatch(
+      ctx.tx,
+      ctx.matchId,
+    );
 
-  if (!match.tossWonBy || !match.tossDecision) {
+  if (
+    !match.tossWonBy ||
+    !match.tossDecision
+  ) {
     unprocessable(
       "The toss must be completed before selecting openers",
     );
   }
-
-  const battingTeamId =
-    battingTeamForInnings(match, 1);
 
   await authz.requireBattingCaptain(
     ctx.tx,
@@ -58,9 +76,15 @@ export async function submitMatchOpeners(
   );
 
   const battingSide =
-    teamSideFor(match, battingTeamId);
+    battingSideForInnings(
+      match,
+      1,
+    );
+
   const bowlingSide =
-    oppositeSide(battingSide);
+    oppositeSide(
+      battingSide,
+    );
 
   if (
     !(await innings.bothBattersAreInXi(
@@ -83,17 +107,17 @@ export async function submitMatchOpeners(
       20,
     );
 
-  // Create/update innings definition first, then its hot-state row.
-  const inningsId = await innings.upsertInnings(
-    ctx.tx,
-    {
-      matchId: ctx.matchId,
-      inningsNumber: 1,
-      battingSide,
-      bowlingSide,
-      oversAllocated,
-    },
-  );
+  const inningsId =
+    await innings.upsertInnings(
+      ctx.tx,
+      {
+        matchId: ctx.matchId,
+        inningsNumber: 1,
+        battingSide,
+        bowlingSide,
+        oversAllocated,
+      },
+    );
 
   await innings.upsertOpenersState(
     ctx.tx,
@@ -114,7 +138,8 @@ export async function submitMatchOpeners(
         ${ctx.actorId}::uuid,
       openers_submitted_at = now(),
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
   return {

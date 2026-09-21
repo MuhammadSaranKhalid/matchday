@@ -1,10 +1,14 @@
-// Shared types for the cricket-match-action command boundary.
+// Canonical cricket-match-action types.
 //
-// The Edge Function owns Cricket workflow/business behavior.
-// PostgreSQL owns durable integrity: FKs, CHECKs, UNIQUE constraints, RLS/grants,
-// immutable parent-child relationships and stable generic authorization helpers.
+// Physical storage:
+//   matches                    = generic event shell
+//   match_teams                = canonical team_a/team_b slots
+//   cricket_matches            = Cricket state
+//
+// API projections may still expose team_a_id/team_b_id, but the Edge command
+// layer always loads those UUIDs from match_teams.
 
-export type Tx = any; // postgres.js TransactionSql; kept local to avoid runtime type coupling.
+export type Tx = any;
 
 export type Action =
   | "record_toss_winner"
@@ -23,6 +27,7 @@ export type Action =
 
 export type TeamSide = "team_a" | "team_b";
 export type TossDecision = "bat" | "bowl";
+
 export type MatchLifecycle =
   | "scheduled"
   | "live"
@@ -45,20 +50,31 @@ export interface MatchBundle {
   matchType: string;
   sportId: string;
   status: MatchLifecycle;
+
+  // Derived from match_teams. These are conveniences in memory, not columns on
+  // public.matches.
   teamAId: string | null;
   teamBId: string | null;
+  teamAName: string | null;
+  teamBName: string | null;
+
   createdBy: string | null;
   venue: string | null;
   scheduledStartTime: string | null;
   actualStartTime: string | null;
   completedAt: string | null;
-  winnerId: string | null;
+
+  // Canonical generic result identity.
+  winnerSide: TeamSide | null;
 
   phase: CricketPhase;
-  tossWonBy: string | null;
+
+  // Canonical Cricket toss identity is a side, never a team UUID.
+  tossWonBy: TeamSide | null;
   tossDecision: TossDecision | null;
   tossFace: string | null;
   tossRecordedAt: string | null;
+
   rulesSnapshot: Record<string, unknown>;
   revisedConditions: Record<string, unknown> | null;
   result: Record<string, unknown> | null;
@@ -78,15 +94,8 @@ export interface CommandContext {
 }
 
 export interface CommandResult {
-  // Returned as response.data.result. Most commands do not need one.
   result?: unknown;
-
-  // When set, index.ts fetches the canonical innings snapshot inside the same
-  // transaction and publishes it after commit.
   inningsNumber?: number;
-
-  // Undo changes the delivery ledger. The client should re-hydrate balls from
-  // the database instead of trying to reverse a possibly stale local list.
   ballsResync?: boolean;
 }
 

@@ -2,18 +2,37 @@ import type {
   CommandContext,
   CommandResult,
 } from "../types.ts";
-import { MatchRepository } from "../repositories/match_repository.ts";
-import { AuthorizationRepository } from "../repositories/authorization_repository.ts";
-import { HistoryRepository } from "../repositories/history_repository.ts";
+import {
+  MatchRepository,
+} from "../repositories/match_repository.ts";
+import {
+  MatchTeamRepository,
+} from "../repositories/match_team_repository.ts";
+import {
+  AuthorizationRepository,
+} from "../repositories/authorization_repository.ts";
+import {
+  HistoryRepository,
+} from "../repositories/history_repository.ts";
 import {
   optionalString,
   requiredUuid,
 } from "../domain/validation.ts";
-import { unprocessable } from "../domain/errors.ts";
+import {
+  teamSideFor,
+} from "../domain/cricket.ts";
 
-const matches = new MatchRepository();
-const authz = new AuthorizationRepository();
-const history = new HistoryRepository();
+const matches =
+  new MatchRepository();
+
+const teams =
+  new MatchTeamRepository();
+
+const authz =
+  new AuthorizationRepository();
+
+const history =
+  new HistoryRepository();
 
 export async function tournamentDeclareWalkover(
   ctx: CommandContext,
@@ -23,13 +42,18 @@ export async function tournamentDeclareWalkover(
       ctx.body,
       "p_winner_team_id",
     );
-  const reason =
-    optionalString(ctx.body, "p_reason");
 
-  const match = await matches.lockCricketMatch(
-    ctx.tx,
-    ctx.matchId,
-  );
+  const reason =
+    optionalString(
+      ctx.body,
+      "p_reason",
+    );
+
+  const match =
+    await matches.lockCricketMatch(
+      ctx.tx,
+      ctx.matchId,
+    );
 
   await authz.requireTournamentOrganizer(
     ctx.tx,
@@ -37,23 +61,21 @@ export async function tournamentDeclareWalkover(
     ctx.actorId,
   );
 
-  if (
-    winnerTeamId !== match.teamAId &&
-    winnerTeamId !== match.teamBId
-  ) {
-    unprocessable(
-      "Winner must be one of the two teams in this fixture",
+  const winnerSide =
+    teamSideFor(
+      match,
+      winnerTeamId,
     );
-  }
 
   await history.recordResultTransition(
     ctx.tx,
     {
       matchId: ctx.matchId,
-      previousStatus: match.status,
+      previousStatus:
+        match.status,
       newStatus: "completed",
       resultPayload: {
-        winner_team_id: winnerTeamId,
+        winner_side: winnerSide,
       },
       reason,
       actorId: ctx.actorId,
@@ -61,38 +83,45 @@ export async function tournamentDeclareWalkover(
   );
 
   const result = {
-    winner_team_id: winnerTeamId,
+    winner_side: winnerSide,
     win_type: "walkover",
     win_margin: null,
-    description: "Won by walkover",
-    summary: "Won by walkover",
+    description:
+      "Won by walkover",
+    summary:
+      "Won by walkover",
   };
 
   await ctx.tx`
     update public.cricket_matches
     set
       phase = 'complete',
-      result = ${ctx.tx.json(result)},
+      result =
+        ${ctx.tx.json(result)},
       result_summary =
-        ${ctx.tx.json({
-          description: "Won by walkover",
-        })},
+        'Won by walkover',
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
 
-  // Write generic winner explicitly. Do not depend on a command RPC/trigger to
-  // project it for us.
   await ctx.tx`
     update public.matches
     set
       status = 'completed',
-      winner_id =
-        ${winnerTeamId}::uuid,
+      winner_side =
+        ${winnerSide},
       completed_at = now(),
       updated_at = now()
-    where match_id = ${ctx.matchId}::uuid
+    where match_id =
+            ${ctx.matchId}::uuid
   `;
+
+  await teams.advanceWinner(
+    ctx.tx,
+    ctx.matchId,
+    winnerSide,
+  );
 
   return {};
 }

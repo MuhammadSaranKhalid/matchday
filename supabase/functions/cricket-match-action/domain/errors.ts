@@ -1,8 +1,3 @@
-// Error vocabulary shared by every command.
-//
-// Commands throw CommandError for expected business refusals. Unexpected
-// Postgres/driver failures are normalized at the HTTP boundary in index.ts.
-
 export class CommandError extends Error {
   constructor(
     public readonly status: number,
@@ -51,36 +46,50 @@ export function normalizeUnexpectedError(error: unknown): {
     code?: string;
     message?: string;
     detail?: string;
-    constraint_name?: string;
   };
 
   const pgCode = raw?.code;
   const message =
     raw?.message ??
     raw?.detail ??
-    (error instanceof Error ? error.message : String(error));
+    (error instanceof Error
+      ? error.message
+      : String(error));
 
-  // Authorization failures thrown by a stable DB primitive.
   if (pgCode === "42501" || pgCode === "28000") {
-    return { status: 403, code: pgCode, message };
+    return {
+      status: 403,
+      code: pgCode,
+      message,
+    };
   }
 
-  // Invalid UUID/input casts.
   if (pgCode === "22P02" || pgCode === "22023") {
-    return { status: 400, code: pgCode, message };
+    return {
+      status: 400,
+      code: pgCode,
+      message,
+    };
   }
 
-  // Constraint violations are business-invalid state, not server crashes.
   if (
     pgCode === "23502" ||
     pgCode === "23503" ||
     pgCode === "23514"
   ) {
-    return { status: 422, code: pgCode, message };
+    return {
+      status: 422,
+      code: pgCode,
+      message,
+    };
   }
 
   if (pgCode === "23505") {
-    return { status: 409, code: pgCode, message };
+    return {
+      status: 409,
+      code: pgCode,
+      message,
+    };
   }
 
   return {

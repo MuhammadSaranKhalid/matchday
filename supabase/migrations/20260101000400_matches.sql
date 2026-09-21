@@ -239,18 +239,3 @@ create index if not exists idx_matches_prev_match_b_id on public.matches(prev_ma
 
 create index if not exists idx_matches_winner_id on public.matches(winner_id);
 
--- Cricket match extension
--- Transitional legacy column comments
-
-
-
-
-
-
-
-
-
-
-   'cricket_matches; matches.winner_id remains the shared winner pointer.';
-
-

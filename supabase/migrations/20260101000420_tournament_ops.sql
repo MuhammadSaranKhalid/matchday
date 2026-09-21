@@ -571,6 +571,20 @@ grant execute
 on function public.tournament_batting_leaderboard(uuid, integer)
 to authenticated;
 
+-- Dismissals credited to the bowler (excluding run-outs, retirements, etc.)
+create or replace function public._bowler_credited_wickets()
+returns text[]
+language sql
+immutable
+as $$
+  select array[
+    'bowled', 'caught', 'caught_and_bowled', 'lbw', 'stumped', 'hit_wicket'
+  ]::text[];
+$$;
+
+revoke all on function public._bowler_credited_wickets() from public, anon;
+grant execute on function public._bowler_credited_wickets() to authenticated, service_role;
+
 create or replace function public.tournament_bowling_leaderboard(
   p_tournament_id uuid,
   p_limit integer default 5

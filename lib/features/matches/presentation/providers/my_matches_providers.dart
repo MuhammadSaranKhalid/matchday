@@ -133,11 +133,40 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   // surfaced on the entity).
   past.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+  // Match Start UI authority comes from the generic RBAC system, not role
+  // names. Ask the same capability system the Edge Function enforces.
+  const setupPermission = 'cricket.match.setup';
+  final repo = ref.read(matchesRepositoryProvider);
+  final canSetupByMatchId = <String, bool>{};
+
+  await Future.wait(
+    upcoming.map((m) async {
+      final matchScoped = await repo.canMatchPermission(
+        matchId: m.id,
+        permission: setupPermission,
+      );
+      final canMatch = matchScoped.fold((_) => false, (v) => v);
+
+      final teamId = _setupAuthorityTeam(m);
+      var canTeam = false;
+      if (teamId != null) {
+        final teamScoped = await repo.canTeamPermission(
+          teamId: teamId,
+          permission: setupPermission,
+        );
+        canTeam = teamScoped.fold((_) => false, (v) => v);
+      }
+
+      canSetupByMatchId[m.id.value] = canMatch || canTeam;
+    }),
+  );
+
   final confirmedRows = [
     for (final m in upcoming)
       _confirmedFor(m, teamsById,
           currentUserId: userId,
           myRoles: myRoles,
+          canSetup: canSetupByMatchId[m.id.value] ?? false,
           tournamentNames: tournamentNames),
   ];
   final pastRows = [
@@ -169,11 +198,35 @@ int _byScheduledThenCreated(Match a, Match b) {
   return aT.compareTo(bT);
 }
 
+/// Team whose role matrix controls the current pre-live setup action.
+///
+/// Toss -> Cricket setup team.
+/// Lineup/ready -> batting team.
+/// Match-scoped official authority is checked separately.
+TeamId? _setupAuthorityTeam(Match m) {
+  if (m.startPhase == MatchStartPhase.toss) {
+    return m.setupTeamId;
+  }
+
+  if (m.startPhase == MatchStartPhase.lineup ||
+      m.startPhase == MatchStartPhase.ready) {
+    final won = m.tossWonBy;
+    final decision = m.tossDecision;
+    if (won == null || decision == null) return null;
+    if (decision == TossDecision.bat) return won;
+    if (won == m.teamAId) return m.teamBId;
+    if (won == m.teamBId) return m.teamAId;
+  }
+
+  return null;
+}
+
 MyMatchConfirmed _confirmedFor(
   Match m,
   Map<String, Team> teamsById, {
   required String currentUserId,
   required Map<String, TeamRelationship> myRoles,
+  required bool canSetup,
   Map<String, String> tournamentNames = const {},
 }) {
   final home = teamsById[m.teamAId.value];
@@ -192,35 +245,37 @@ MyMatchConfirmed _confirmedFor(
   final role = roleOnMatch(m, currentUserId, userTeamIds: userTeamIds);
   final roleLine = roleLineFor(role, m, isToday: isToday);
 
-  // Toss-time detection — design's Case 03b. The card flips to "tap to
-  // start" when the captain is approximately AT match time, not just
-  // because a row was created with a default start_phase. Triggers when:
-  //   (a) Captain has actively opened Match Start (status = toss), OR
-  //   (b) We're within 30 min before scheduled start and up to 6h after
-  //       (covering "I'm at the ground but late") on a still-pre-live row.
-  // Excludes future-scheduled matches that just happen to have start_phase
-  // defaulting to 'toss' on the row.
+  // Match Start CTA is capability-driven. A team-specific role override may
+  // allow or deny owner/manager/captain independently, and an assigned match
+  // official may act through a match-scoped grant.
   final now = DateTime.now();
   final timeBracket = start != null &&
       now.isAfter(start.subtract(const Duration(minutes: 30))) &&
       now.isBefore(start.add(const Duration(hours: 6)));
-  final isCaptain = role == MatchRoleKind.captain;
-  final tossInProgress = m.status == MatchStatus.toss && isCaptain;
-  final tossReady = tossInProgress ||
-      (isCaptain &&
+
+  final setupInProgress =
+      canSetup &&
+      (m.status == MatchStatus.toss ||
+          m.startPhase == MatchStartPhase.lineup ||
+          m.startPhase == MatchStartPhase.ready);
+
+  final tossReady = setupInProgress ||
+      (canSetup &&
           (m.status == MatchStatus.scheduled ||
               m.status == MatchStatus.rescheduled) &&
           timeBracket);
 
   final when = tossReady
-      ? 'Toss · ${_hhmm(start ?? DateTime.now())}'
+      ? 'Match setup · ${_hhmm(start ?? DateTime.now())}'
       : _formatWhen(start, m.createdAt);
-  final role0 = tossReady ? 'Captain · ready when you are' : roleLine.label;
+  final role0 = tossReady ? 'Match setup · ready when you are' : roleLine.label;
   final countdown =
       tossReady ? 'Now' : _countdown(start, status: m.status);
   final urgent = tossReady || roleLine.urgent || _isUrgent(start, status: m.status);
   final helper = tossReady
-      ? 'Both captains here. Tap to flip the coin together.'
+      ? (m.startPhase == MatchStartPhase.toss
+          ? 'The Cricket setup side records the complete toss: winner plus bat/bowl choice.'
+          : 'The batting side selects the openers and starts the match.')
       : null;
 
   return MyMatchConfirmed(
@@ -247,9 +302,9 @@ MyMatchConfirmed _confirmedFor(
     helper: helper,
     startTime: start,
     metaLine: _metaLine(m, tournamentNames),
-    // Duties route somewhere and take a trailing arrow; states do not. A
-    // captain always owes something; a scorer only owes once play is on.
-    roleIsDuty: role == MatchRoleKind.captain ||
+    // Match Start duty is capability-based. Live scoring duty keeps its
+    // existing presentation role until the scoring UI is capability-refactored.
+    roleIsDuty: tossReady ||
         (role == MatchRoleKind.scoring && m.status.isLive),
     liveState: switch (m.status) {
       MatchStatus.live => 'LIVE',

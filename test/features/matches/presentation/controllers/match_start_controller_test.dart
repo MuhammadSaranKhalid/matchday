@@ -2,9 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:matchday/core/error/failures.dart';
-import 'package:matchday/features/auth/domain/entities/user.dart';
-import 'package:matchday/features/auth/domain/value_objects/email.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/core/supabase/supabase_client_provider.dart';
 import 'package:matchday/features/matches/domain/entities/match.dart';
 import 'package:matchday/features/matches/domain/entities/match_innings_state.dart';
 import 'package:matchday/features/matches/domain/entities/match_player.dart';
@@ -14,20 +12,32 @@ import 'package:matchday/features/matches/presentation/providers/matches_provide
 import 'package:matchday/features/matches/presentation/state/match_start_state.dart';
 import 'package:matchday/features/teams/domain/entities/team.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supa;
 
 class _MockMatchesRepo extends Mock implements MatchesRepository {}
+
+class _MockSupabaseClient extends Mock implements supa.SupabaseClient {}
+
+class _MockGoTrueClient extends Mock implements supa.GoTrueClient {}
 
 const _matchId = 'm1';
 const _teamA = TeamId('a');
 const _teamB = TeamId('b');
 
-User _user(String id) => User(
-      id: UserId(id),
-      email: Email.create('$id@example.com').toNullable()!,
-      displayName: id,
+supa.User _user(String id) => supa.User(
+      id: id,
+      appMetadata: {},
+      userMetadata: {},
+      aud: 'authenticated',
+      createdAt: '',
     );
 
-Match _match({TeamId? tossWonBy, TossDecision? decision, MatchStartPhase phase = MatchStartPhase.toss}) =>
+Match _match({
+  TeamId? tossWonBy,
+  TossDecision? decision,
+  MatchStartPhase phase = MatchStartPhase.toss,
+  TeamId? setupTeamId = _teamA,
+}) =>
     Match(
       id: const MatchId(_matchId),
       teamAId: _teamA,
@@ -43,6 +53,7 @@ Match _match({TeamId? tossWonBy, TossDecision? decision, MatchStartPhase phase =
       createdAt: DateTime(2026),
       teamACaptain: 'capA',
       teamBCaptain: 'capB',
+      setupTeamId: setupTeamId,
       tossWonBy: tossWonBy,
       tossDecision: decision,
       startPhase: phase,
@@ -73,6 +84,8 @@ MatchInningsState _innings({String? striker, String? nonStriker}) =>
 
 void main() {
   late _MockMatchesRepo repo;
+  late _MockSupabaseClient supabase;
+  late _MockGoTrueClient auth;
 
   setUpAll(() {
     registerFallbackValue(const MatchId(_matchId));
@@ -80,19 +93,34 @@ void main() {
     registerFallbackValue(TossDecision.bat);
   });
 
-  setUp(() => repo = _MockMatchesRepo());
+  setUp(() {
+    repo = _MockMatchesRepo();
+    supabase = _MockSupabaseClient();
+    auth = _MockGoTrueClient();
+    when(() => supabase.auth).thenReturn(auth);
+    when(() => repo.canMatchPermission(
+          matchId: any(named: 'matchId'),
+          permission: any(named: 'permission'),
+        )).thenAnswer((_) async => const Right(false));
+  });
 
   ProviderContainer makeContainer({
     Match? match,
     String userId = 'capA',
     List<MatchPlayer>? lineup,
     MatchInningsState? innings,
+    bool canSetupTeam = true,
   }) {
+    when(() => auth.currentUser).thenReturn(_user(userId));
+    when(() => repo.canTeamPermission(
+          teamId: any(named: 'teamId'),
+          permission: any(named: 'permission'),
+        )).thenAnswer((_) async => Right(canSetupTeam));
+
     final container = ProviderContainer.test(
       overrides: [
         matchesRepositoryProvider.overrideWithValue(repo),
-        currentUserStreamProvider
-            .overrideWith((ref) => Stream.value(_user(userId))),
+        supabaseClientProvider.overrideWithValue(supabase),
         liveMatchProvider(_matchId)
             .overrideWith((ref) => Stream.value(match ?? _match())),
         matchPlayersProvider(_matchId)
@@ -113,32 +141,15 @@ void main() {
       c.read(matchStartControllerProvider(_matchId).notifier);
 
   group('viewer role', () {
-    test('before the toss, only the match creator may act', () async {
-      // _match() is created by capA.
-      final creator = await load(makeContainer(userId: 'capA'));
-      expect(creator.viewerRole, MatchStartViewerRole.captain);
-      expect(creator.isCreator, isTrue);
-      expect(creator.viewerCanAct, isTrue);
+    test('before the toss, user with setup capability may act', () async {
+      final allowed = await load(makeContainer(userId: 'capA', canSetupTeam: true));
+      expect(allowed.viewerRole, MatchStartViewerRole.captain);
+      expect(allowed.viewerCanAct, isTrue);
 
-      final other = await load(makeContainer(userId: 'capB'));
-      expect(other.viewerRole, MatchStartViewerRole.captain);
-      expect(other.captainOf, _teamB);
-      expect(other.viewerCanAct, isFalse);
-    });
-
-    test('once the winner is known, the call is their captain\'s alone',
-        () async {
-      final match = _match(tossWonBy: _teamB);
-
-      final winner = await load(makeContainer(match: match, userId: 'capB'));
-      expect(winner.tossStep, TossStep.decision);
-      expect(winner.isViewerTossWinnerCaptain, isTrue);
-      expect(winner.viewerCanAct, isTrue);
-
-      // The creator has had their turn; bat-or-bowl is not theirs.
-      final creator = await load(makeContainer(match: match, userId: 'capA'));
-      expect(creator.isCreator, isTrue);
-      expect(creator.viewerCanAct, isFalse);
+      final denied = await load(makeContainer(userId: 'capB', canSetupTeam: false));
+      expect(denied.viewerRole, MatchStartViewerRole.captain);
+      expect(denied.captainOf, _teamB);
+      expect(denied.viewerCanAct, isFalse);
     });
 
     test('after the toss, roles follow who is batting first', () async {
@@ -156,7 +167,7 @@ void main() {
     });
 
     test('a non-captain is always a spectator', () async {
-      final state = await load(makeContainer(userId: 'someone-else'));
+      final state = await load(makeContainer(userId: 'someone-else', canSetupTeam: false));
 
       expect(state.viewerRole, MatchStartViewerRole.spectator);
       expect(state.viewerCanAct, isFalse);
@@ -261,94 +272,53 @@ void main() {
   });
 
   group('writes', () {
-    test('submitTossWinner rejects an empty selection without calling the repo',
+    test('submitToss rejects an incomplete selection without calling the repo',
         () async {
       final container = makeContainer();
       await load(container);
 
-      final result = await notifier(container).submitTossWinner();
+      // Nothing picked
+      final result1 = await notifier(container).submitToss();
+      expect(result1.getLeft().toNullable(), isA<ValidationFailure>());
 
-      expect(result.getLeft().toNullable(), isA<ValidationFailure>());
-      verifyNever(() => repo.recordTossWinner(
+      // Only winner picked
+      notifier(container).pickTossWinner(_teamB);
+      final result2 = await notifier(container).submitToss();
+      expect(result2.getLeft().toNullable(), isA<ValidationFailure>());
+
+      verifyNever(() => repo.recordToss(
             id: any(named: 'id'),
             wonBy: any(named: 'wonBy'),
+            decision: any(named: 'decision'),
           ));
     });
 
-    test('submitTossWinner sends the winner alone and stops there', () async {
-      when(() => repo.recordTossWinner(
+    test('submitToss atomically records winner and decision', () async {
+      when(() => repo.recordToss(
             id: any(named: 'id'),
             wonBy: any(named: 'wonBy'),
+            decision: any(named: 'decision'),
           )).thenAnswer((_) async => const Right(unit));
 
       final container = makeContainer();
       await load(container);
 
-      notifier(container).pickTossWinner(_teamB);
-      final result = await notifier(container).submitTossWinner();
+      notifier(container)
+        ..pickTossWinner(_teamB)
+        ..pickTossDecision(TossDecision.bowl);
+
+      final result = await notifier(container).submitToss();
 
       expect(result.isRight(), isTrue);
-      verify(() => repo.recordTossWinner(
+      verify(() => repo.recordToss(
             id: const MatchId(_matchId),
             wonBy: _teamB,
-          )).called(1);
-
-      // No decision is implied by recording a winner: the flow parks on the
-      // second act until the winning captain calls it.
-      final state =
-          container.read(matchStartControllerProvider(_matchId)).value!;
-      expect(state.tossStep, TossStep.decision);
-      expect(state.match.tossDecision, isNull);
-      expect(state.phase, MatchStartPhase.toss);
-      expect(state.pendingTossWinner, isNull);
-      expect(state.isBusy, isFalse);
-    });
-
-    test('submitTossDecision rejects an empty call without calling the repo',
-        () async {
-      final container = makeContainer(
-        match: _match(tossWonBy: _teamB),
-        userId: 'capB',
-      );
-      await load(container);
-
-      final result = await notifier(container).submitTossDecision();
-
-      expect(result.getLeft().toNullable(), isA<ValidationFailure>());
-      verifyNever(() => repo.recordTossDecision(
-            id: any(named: 'id'),
-            decision: any(named: 'decision'),
-          ));
-    });
-
-    test('submitTossDecision settles which side bats', () async {
-      when(() => repo.recordTossDecision(
-            id: any(named: 'id'),
-            decision: any(named: 'decision'),
-          )).thenAnswer((_) async => const Right(unit));
-
-      final container = makeContainer(
-        match: _match(tossWonBy: _teamB),
-        userId: 'capB',
-      );
-      await load(container);
-
-      notifier(container).pickTossDecision(TossDecision.bowl);
-      final result = await notifier(container).submitTossDecision();
-
-      expect(result.isRight(), isTrue);
-      verify(() => repo.recordTossDecision(
-            id: const MatchId(_matchId),
             decision: TossDecision.bowl,
           )).called(1);
 
-      // B won and elected to bowl, so A bats first and capB — who made the
-      // call — is the bowling captain from here on.
       final state =
           container.read(matchStartControllerProvider(_matchId)).value!;
-      expect(state.phase, MatchStartPhase.lineup);
-      expect(state.battingTeamId, _teamA);
-      expect(state.viewerRole, MatchStartViewerRole.bowlingCaptain);
+      expect(state.pendingTossWinner, isNull);
       expect(state.pendingDecision, isNull);
       expect(state.isBusy, isFalse);
     });

@@ -142,7 +142,7 @@ where
     or (
       r.key = 'captain'
       and p.permission_key in (
-        'match.lineup.set',
+        'cricket.match.setup',
         'match.score',
         'match.official.assign',
         'team.contact.view'

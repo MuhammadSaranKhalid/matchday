@@ -40,12 +40,7 @@ class MatchStartHeader extends StatelessWidget {
   final MatchStartState state;
 
   String get _title => switch (state.phase) {
-        // The toss is two acts on two phones, and the headline says which one
-        // the match is waiting on.
-        MatchStartPhase.toss => switch (state.tossStep) {
-            TossStep.winner => 'The toss.',
-            TossStep.decision => 'Bat or bowl?',
-          },
+        MatchStartPhase.toss => 'The toss.',
         MatchStartPhase.lineup ||
         MatchStartPhase.ready => state.isViewerBattingCaptain
             ? 'Pick your openers.'

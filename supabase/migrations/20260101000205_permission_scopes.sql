@@ -35,6 +35,10 @@ select
 union all
 select
   'match.official.assign',
+  'match'
+union all
+select
+  'cricket.match.setup',
   'match';
 
 -- -----------------------------------------------------------------------------

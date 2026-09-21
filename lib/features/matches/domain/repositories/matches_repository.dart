@@ -50,26 +50,33 @@ abstract class MatchesRepository {
   /// hydration on subscribe.
   Stream<Match?> watchMatch(MatchId id);
 
-  /// The match creator records who won the toss — their one action in the
-  /// flow. Leaves `start_phase` on 'toss': the call itself belongs to the
-  /// winner, not to whoever held the coin.
+  /// Record the complete physical toss atomically.
   ///
-  /// Correcting a misrecord is allowed until the openers are locked, and
-  /// clears any decision already made against the previous winner.
-  Future<Either<Failure, Unit>> recordTossWinner({
+  /// The authorized Cricket setup-side member/official records both the winner and the winning
+  /// side's verbal bat/bowl choice. The server authorizes this through
+  /// `cricket.match.setup`; role names and `created_by` are not authorization.
+  Future<Either<Failure, Unit>> recordToss({
     required MatchId id,
     required TeamId wonBy,
+    required TossDecision decision,
     String? face,
   });
 
-  /// The winning side's captain chooses to bat or bowl. Advances
-  /// `start_phase: toss → lineup`, handing the flow to the batting side.
-  Future<Either<Failure, Unit>> recordTossDecision({
-    required MatchId id,
-    required TossDecision decision,
+  /// Effective generic RBAC check used only to render the correct UI.
+  /// The Edge Function independently re-checks the same permission on write.
+  Future<Either<Failure, bool>> canTeamPermission({
+    required TeamId teamId,
+    required String permission,
   });
 
-  /// Batting captain locks the opening pair. Advances
+  /// Match-scoped effective permission, used for assigned officials.
+  Future<Either<Failure, bool>> canMatchPermission({
+    required MatchId matchId,
+    required String permission,
+  });
+
+  /// A user with `cricket.match.setup` for the batting team (or a match-scoped
+  /// setup grant) locks the opening pair. Advances
   /// `start_phase: lineup → ready`. Idempotent — supports EDIT PICKS.
   Future<Either<Failure, Unit>> submitMatchOpeners({
     required MatchId id,
@@ -77,7 +84,8 @@ abstract class MatchesRepository {
     required String nonStrikerId,
   });
 
-  /// Batting captain taps Start. Promotes status → live, start_phase → live,
+  /// A user with batting-side/match `cricket.match.setup` taps Start. Promotes
+  /// status → live, start_phase → live,
   /// stamps actual_start_time, and adds the caller to `assigned_scorers`.
   Future<Either<Failure, Unit>> startMatchNow(MatchId id);
 

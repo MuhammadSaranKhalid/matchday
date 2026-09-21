@@ -129,12 +129,12 @@ values
     120
   ),
   (
-    'match.lineup.set',
-    'match',
-    'lineup',
-    'Pick the XI, run the toss, start the match',
+    'cricket.match.setup',
+    'cricket_match',
+    'setup',
+    'Configure and advance pre-live Cricket Match Start (toss and openers).',
     null,
-    false,
+    true,
     130
   ),
   ('match.score', 'match', 'score', 'Score an innings', null, true, 140),

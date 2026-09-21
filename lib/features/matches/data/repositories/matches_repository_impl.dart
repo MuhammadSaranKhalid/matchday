@@ -198,15 +198,17 @@ class MatchesRepositoryImpl implements MatchesRepository {
       );
 
   @override
-  Future<Either<Failure, Unit>> recordTossWinner({
+  Future<Either<Failure, Unit>> recordToss({
     required MatchId id,
     required TeamId wonBy,
+    required TossDecision decision,
     String? face,
   }) async {
     try {
-      await _remote.recordTossWinner(
+      await _remote.recordToss(
         matchId: id.value,
         wonBy: wonBy.value,
+        decision: decision.wire,
         face: face,
       );
       return const Right(unit);
@@ -220,18 +222,40 @@ class MatchesRepositoryImpl implements MatchesRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> recordTossDecision({
-    required MatchId id,
-    required TossDecision decision,
+  Future<Either<Failure, bool>> canTeamPermission({
+    required TeamId teamId,
+    required String permission,
   }) async {
     try {
-      await _remote.recordTossDecision(
-        matchId: id.value,
-        decision: decision.wire,
+      return Right(
+        await _remote.canTeamPermission(
+          teamId: teamId.value,
+          permission: permission,
+        ),
       );
-      return const Right(unit);
-    } on UnauthorizedException catch (e) {
-      return Left(AuthFailure(e.message));
+    } on UnauthorizedException {
+      return const Right(false);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> canMatchPermission({
+    required MatchId matchId,
+    required String permission,
+  }) async {
+    try {
+      return Right(
+        await _remote.canMatchPermission(
+          matchId: matchId.value,
+          permission: permission,
+        ),
+      );
+    } on UnauthorizedException {
+      return const Right(false);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

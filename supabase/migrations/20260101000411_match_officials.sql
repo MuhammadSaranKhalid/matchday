@@ -107,7 +107,7 @@ create policy "match_officials_write_organizers"
               from public.match_teams mt
               where mt.match_id = m.match_id
                 and mt.team_id is not null
-                and public.is_team_captain(mt.team_id)
+                and public.can('team', mt.team_id, 'match.official.assign')
             )
           end
         )
@@ -128,7 +128,7 @@ create policy "match_officials_write_organizers"
               from public.match_teams mt
               where mt.match_id = m.match_id
                 and mt.team_id is not null
-                and public.is_team_captain(mt.team_id)
+                and public.can('team', mt.team_id, 'match.official.assign')
             )
           end
         )

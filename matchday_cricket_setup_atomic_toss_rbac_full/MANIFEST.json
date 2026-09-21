@@ -1,0 +1,202 @@
+[
+  {
+    "path": "ARCHITECTURE.md",
+    "bytes": 4512,
+    "sha256": "038496ff666d92ce87206811345f43158101dbe4556ef89be48f8b44ceed79c5"
+  },
+  {
+    "path": "DELETE_MANIFEST.txt",
+    "bytes": 441,
+    "sha256": "2fb4a369dafc84ee84eee836e01cbce15adef219658a5838bd347c483bf38df6"
+  },
+  {
+    "path": "DEPLOYMENT.md",
+    "bytes": 2815,
+    "sha256": "d9421dffc0b538519ebe67a9a74cd1cfe4372ff5d600c2655aeb9e661f3ddafe"
+  },
+  {
+    "path": "PATCH_MAP.md",
+    "bytes": 1671,
+    "sha256": "f0daf50cb1fa1224d312decd3be49515c557a58b942fc61d9b337c7f4c97cc53"
+  },
+  {
+    "path": "README.md",
+    "bytes": 5338,
+    "sha256": "69ff9b2bf82d2ce15568e7cebe3ce8d5534a730549579ac9eaa8d176d4065ab9"
+  },
+  {
+    "path": "REMAINING_MULTISPORT_DEBT.md",
+    "bytes": 1354,
+    "sha256": "3a3dac2e1a055927aa89dbc5d2ae0852ee70af3447d234af9c358a2ac78427f8"
+  },
+  {
+    "path": "TEST_MATRIX.md",
+    "bytes": 2277,
+    "sha256": "4705554d7aaaad67f67c982f781d270f4f0a917ee60d73449591c5fb30e35bf1"
+  },
+  {
+    "path": "VERIFICATION_REPORT.md",
+    "bytes": 1055,
+    "sha256": "b9c837b8f26264973cce0e84c0f63105f64d2b9744bc339cbad915eaa280557e"
+  },
+  {
+    "path": "flutter_replacements/match_start_controller.dart",
+    "bytes": 12064,
+    "sha256": "95c9518ab70cbd0adf7aa10f9c685e20475dc1bb0e997da069eb7b189b383a90"
+  },
+  {
+    "path": "flutter_replacements/match_start_state.dart",
+    "bytes": 7419,
+    "sha256": "67f448fda55999d802ea3490b36b97ef8f314b062adb9487cf58df8f109a94ac"
+  },
+  {
+    "path": "flutter_replacements/stage_lineup.dart",
+    "bytes": 7790,
+    "sha256": "b0853f3009d51be9713c46e09f3b46ba9da8c42d8f646c4beadcc7926e0f133e"
+  },
+  {
+    "path": "flutter_replacements/stage_toss.dart",
+    "bytes": 13592,
+    "sha256": "b9e5adad068c5dbca6550c1866df41fb4292cf47261a3294f01fca8ebf531e71"
+  },
+  {
+    "path": "migration/cricket_setup_atomic_toss_rbac.sql",
+    "bytes": 49321,
+    "sha256": "25947e9d7d0607156423a03ea59dad83b93558bee7b85cc189b752f1202754a0"
+  },
+  {
+    "path": "migration/verify_cricket_setup_atomic_toss_rbac.sql",
+    "bytes": 7819,
+    "sha256": "ee5d53db2d290d2623c21f1426ba5000b219d60868e66a90a08d11a22fc5ee60"
+  },
+  {
+    "path": "repo_tools/apply_flutter_and_repository_changes.py",
+    "bytes": 24600,
+    "sha256": "67e0971e2ec2dd200fd905e06496b249323bf44a169aaf3310ed88320468fc39"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/command_router.ts",
+    "bytes": 2116,
+    "sha256": "4a96d3c7134a4750adc682bd7e38b55011be0cc28310535b63533f82d2a0dc35"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/complete_cricket_match.ts",
+    "bytes": 1793,
+    "sha256": "d7e8c02f5ef18311f28e74680781772fb9ac3a3555788b6aa6cda73bb37c6857"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/record_toss.ts",
+    "bytes": 2593,
+    "sha256": "dc2942943ab3512513c011f1d50dac0a75af63eedb4441bbbe795f455cd844df"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/start_innings.ts",
+    "bytes": 3677,
+    "sha256": "86b82f5b76555cf0b13251b666ef87cee57f697c89efe346139898b0016aeff6"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/start_match_now.ts",
+    "bytes": 1713,
+    "sha256": "3985f7a4ce3f8c67af08605b5f550973c3ed4855d1b54ae49d70a7b189fc80e2"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/submit_match_openers.ts",
+    "bytes": 2909,
+    "sha256": "86385f5e19dd434ce5d5897cfa43589567f76853094fcb925e8878464bfaabf3"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/tournament_abandon_match.ts",
+    "bytes": 3831,
+    "sha256": "8ded5b749ffb92116f81a64d0765d284f782912d20d95ef6872c165b535c3fad"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/tournament_declare_walkover.ts",
+    "bytes": 2294,
+    "sha256": "8f29ae6ad39d204a8727ab930c9aa40734ad66a2e472c01433d0ddfb3d266041"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/tournament_override_result.ts",
+    "bytes": 2926,
+    "sha256": "72c57dc07a42937e4350447919ff4f5a4b3f7715827a35452a5d29f7bb1bc705"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/tournament_reschedule_match.ts",
+    "bytes": 1312,
+    "sha256": "8853a5c92a94e46fa9513f9265fb3d3275708afa15a6a57c4efe3ea995cc1ff3"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/tournament_revise_match_conditions.ts",
+    "bytes": 2971,
+    "sha256": "d7845c46ebe243e946b3b98a0bfa26b5bb0444ae1c6a577d2e275c2c00df8ed3"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/tournament_trigger_super_over.ts",
+    "bytes": 2438,
+    "sha256": "672f3f62a803bb2c57f41eee0c033bc452f82e5f46cf6104198f806220339653"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/commands/undo_last_ball.ts",
+    "bytes": 2539,
+    "sha256": "eec97ce539a65e773b7a99bd150858f30299b8fd20971f201eb2c9359c344e88"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/domain/cricket.ts",
+    "bytes": 5079,
+    "sha256": "2d2ff26ae671dfa7cfde0ef70eb9e0cadcad11e6fc4ef08dc0a689ee3b7e2556"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/domain/errors.ts",
+    "bytes": 1896,
+    "sha256": "7e9e170275e4818e1c6e2a26c917cab9abead1de341c98a58717f6bf8dcd49d2"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/domain/validation.ts",
+    "bytes": 3496,
+    "sha256": "d1801c85ae6292e270ed2186bad41f3e0ad901d25735092508b29cc5ba347634"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/index.ts",
+    "bytes": 6132,
+    "sha256": "c88327e5aace020ab08e38aec6456cdd0babfd3338122e692d8296b46b07cd0a"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/realtime/publisher.ts",
+    "bytes": 1352,
+    "sha256": "bea9b0e85d83bdb1821542a744cb0bd6aeb1fa3827d5002f736833e22d6cc9fa"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/repositories/authorization_repository.ts",
+    "bytes": 6192,
+    "sha256": "a6e7710a479845de284bb4f7131cbe0543d9c888d040d92cb5fb5bbac04bd29f"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/repositories/history_repository.ts",
+    "bytes": 833,
+    "sha256": "c3336e483163750cff8cdd94e97f4d5e0990323bcbfa24971717eef8639cab42"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/repositories/innings_repository.ts",
+    "bytes": 8636,
+    "sha256": "f57bcaaee7ae6f3de8d7b2f8f794081645e7579b6e25977a7169e5e1286bf0c4"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/repositories/match_repository.ts",
+    "bytes": 3999,
+    "sha256": "7f22d4fe7767d6a8bddf6f1c2b5edf6119cac2ae886379aa894721735f8aa164"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/repositories/match_team_repository.ts",
+    "bytes": 6084,
+    "sha256": "436336c8132749d453e6cc2add140cf5fdade6e8aa4ee7c2a3fec13e83c597b5"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/repositories/snapshot_repository.ts",
+    "bytes": 699,
+    "sha256": "bdfa378e18d868c5ee5d752f373023f42e25df2c152f022d66acc95de70479a2"
+  },
+  {
+    "path": "supabase/functions/cricket-match-action/types.ts",
+    "bytes": 3019,
+    "sha256": "bea93f2e6d3499b94d51586f7a77a610fbf21b463c0223432776f7a7bfcf71c8"
+  }
+]

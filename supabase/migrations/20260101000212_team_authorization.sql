@@ -194,9 +194,8 @@ revoke all on function public.team_can(uuid, text) from public;
 
 grant execute on function public.team_can(uuid, text) to authenticated;
 
--- The shims. ~45 call sites still say is_team_manager / is_team_captain, and
--- they keep working unchanged — that is the whole point of staging the sweep.
--- Step 2 replaces each with the specific key that fits; Step 4 deletes these.
+-- The shims. is_team_manager remains for legacy migration compatibility;
+-- is_team_captain was removed and replaced with explicit can() checks.
 create or replace function public.is_team_manager(
   p_team_id uuid
 )
@@ -213,23 +212,6 @@ $$;
 revoke all on function public.is_team_manager(uuid) from public;
 
 grant execute on function public.is_team_manager(uuid) to authenticated;
-
-create or replace function public.is_team_captain(
-  p_team_id uuid
-)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public, pg_temp
-as $$
-  select
-    public.can('team', p_team_id, 'match.lineup.set');
-$$;
-
-revoke all on function public.is_team_captain(uuid) from public;
-
-grant execute on function public.is_team_captain(uuid) to authenticated;
 
 -- NOT a permission — plain membership. Used by the private-roster read policy.
 create or replace function public.is_team_member(

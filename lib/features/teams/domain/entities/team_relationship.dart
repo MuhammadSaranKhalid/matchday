@@ -1,10 +1,12 @@
 import 'team_member.dart';
 
-/// The signed-in user's relationship to a team.
+/// The signed-in user's display/relationship identity on a team.
 ///
-/// This is the single client-side vocabulary for team authority. Presentation
-/// may add orthogonal state such as `isFollowing` or `hasPendingInvite`, but it
-/// must not invent another role enum.
+/// IMPORTANT: role identity is not the authorization source of truth.
+/// Effective permissions come from the generic RBAC engine (`can` / `team_can`)
+/// because each team may override its role-permission matrix. Convenience
+/// booleans below are presentation/default-policy hints only and must not gate
+/// privileged writes.
 enum TeamRelationship {
   owner,
   manager,

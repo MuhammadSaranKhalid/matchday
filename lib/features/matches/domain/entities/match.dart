@@ -19,6 +19,7 @@ class Match extends Equatable {
     required this.createdAt,
     this.teamACaptain,
     this.teamBCaptain,
+    this.setupTeamId,
     this.venue,
     this.scheduledStartTime,
     this.actualStartTime,
@@ -26,6 +27,7 @@ class Match extends Equatable {
     this.tossWonBy,
     this.tossDecision,
     this.tossFace,
+    this.tossRecordedBy,
     this.startPhase = MatchStartPhase.toss,
     this.openersSubmittedBy,
     this.openersSubmittedAt,
@@ -50,12 +52,20 @@ class Match extends Equatable {
   final String createdBy;
   final DateTime createdAt;
 
-  /// Permanent captain pinned on the matches row. Drives the toss-time
-  /// auth check (`_is_match_captain`) before any match_players rows
-  /// exist. The per-match captain flag for a single fixture lives on
-  /// `MatchPlayer.isCaptain`.
+  /// Captain snapshot used for display/relationship context.
+  ///
+  /// IMPORTANT: captain identity does not authorize Match Start. Effective
+  /// authorization is resolved by the generic RBAC permission matrix.
   final String? teamACaptain;
   final String? teamBCaptain;
+
+  /// Team currently occupying `cricket_matches.setup_side`, projected through
+  /// `cricket_match_details`. This is Cricket workflow state, not a column on
+  /// the sport-neutral `matches` shell.
+  ///
+  /// It is NOT the same thing as createdBy.
+  final TeamId? setupTeamId;
+
   final Venue? venue;
   final DateTime? scheduledStartTime;
   final DateTime? actualStartTime;
@@ -82,11 +92,15 @@ class Match extends Equatable {
   /// Coin face the host phone observed. Cosmetic — used by the result banner.
   final String? tossFace;
 
+  /// User who entered the complete physical toss result.
+  final String? tossRecordedBy;
+
   /// Where the match is in the pre-live → live progression.
   final MatchStartPhase startPhase;
 
-  /// User_id of the captain who locked the openers. Drives the "Locked by
-  /// Imran" caption + the EDIT PICKS affordance (only the locker can edit).
+  /// User_id of the person who most recently locked the openers. Useful
+  /// for audit/display only; any caller with effective match setup capability
+  /// may perform the server-authorized setup operation.
   /// The actual opener match_player_ids live on `match_innings_state` —
   /// see `MatchInningsState.strikerId` / `nonStrikerId`.
   final String? openersSubmittedBy;
@@ -123,6 +137,7 @@ class Match extends Equatable {
     DateTime? createdAt,
     String? teamACaptain,
     String? teamBCaptain,
+    TeamId? setupTeamId,
     Venue? venue,
     DateTime? scheduledStartTime,
     DateTime? actualStartTime,
@@ -130,6 +145,7 @@ class Match extends Equatable {
     TeamId? tossWonBy,
     TossDecision? tossDecision,
     String? tossFace,
+    String? tossRecordedBy,
     MatchStartPhase? startPhase,
     String? openersSubmittedBy,
     DateTime? openersSubmittedAt,
@@ -145,6 +161,7 @@ class Match extends Equatable {
         createdAt: createdAt ?? this.createdAt,
         teamACaptain: teamACaptain ?? this.teamACaptain,
         teamBCaptain: teamBCaptain ?? this.teamBCaptain,
+        setupTeamId: setupTeamId ?? this.setupTeamId,
         venue: venue ?? this.venue,
         scheduledStartTime: scheduledStartTime ?? this.scheduledStartTime,
         actualStartTime: actualStartTime ?? this.actualStartTime,
@@ -152,6 +169,7 @@ class Match extends Equatable {
         tossWonBy: tossWonBy ?? this.tossWonBy,
         tossDecision: tossDecision ?? this.tossDecision,
         tossFace: tossFace ?? this.tossFace,
+        tossRecordedBy: tossRecordedBy ?? this.tossRecordedBy,
         startPhase: startPhase ?? this.startPhase,
         openersSubmittedBy: openersSubmittedBy ?? this.openersSubmittedBy,
         openersSubmittedAt: openersSubmittedAt ?? this.openersSubmittedAt,
@@ -162,6 +180,7 @@ class Match extends Equatable {
         id,
         teamAId,
         teamBId,
+        setupTeamId,
         status,
         scheduledStartTime,
         tossWonBy,

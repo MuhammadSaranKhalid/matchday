@@ -22,6 +22,7 @@ abstract class MatchDto with _$MatchDto {
     @JsonKey(name: 'team_b_id') required String teamBId,
     @JsonKey(name: 'team_a_captain') String? teamACaptain,
     @JsonKey(name: 'team_b_captain') String? teamBCaptain,
+    @JsonKey(name: 'setup_team_id') String? setupTeamId,
     required Map<String, dynamic> format,
     String? venue,
     @JsonKey(name: 'scheduled_start_time') String? scheduledStartTime,
@@ -32,6 +33,7 @@ abstract class MatchDto with _$MatchDto {
     @JsonKey(name: 'toss_won_by') String? tossWonBy,
     @JsonKey(name: 'toss_decision') String? tossDecision,
     @JsonKey(name: 'toss_face') String? tossFace,
+    @JsonKey(name: 'toss_recorded_by') String? tossRecordedBy,
     @JsonKey(name: 'start_phase') @Default('toss') String startPhase,
     @JsonKey(name: 'openers_submitted_by') String? openersSubmittedBy,
     @JsonKey(name: 'openers_submitted_at') String? openersSubmittedAt,
@@ -61,6 +63,7 @@ abstract class MatchDto with _$MatchDto {
         teamBId: TeamId(teamBId),
         teamACaptain: teamACaptain,
         teamBCaptain: teamBCaptain,
+        setupTeamId: setupTeamId == null ? null : TeamId(setupTeamId!),
         format: MatchFormat(
           oversPerInnings: (format['overs_per_innings'] as num?)?.toInt() ?? 0,
           playersPerTeam: (format['players_per_team'] as num?)?.toInt() ?? 11,
@@ -99,6 +102,7 @@ abstract class MatchDto with _$MatchDto {
         tossDecision:
             tossDecision == null ? null : TossDecision.fromWire(tossDecision),
         tossFace: tossFace,
+        tossRecordedBy: tossRecordedBy,
         startPhase: MatchStartPhase.fromWire(startPhase),
         openersSubmittedBy: openersSubmittedBy,
         openersSubmittedAt: openersSubmittedAt == null

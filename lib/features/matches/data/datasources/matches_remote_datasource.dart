@@ -214,25 +214,55 @@ class MatchesRemoteDataSource {
     await _matchAction(action, params);
   }
 
-  Future<void> recordTossWinner({
+  Future<void> recordToss({
     required String matchId,
     required String wonBy,
+    required String decision,
     String? face,
   }) =>
-      _startRpc('record_toss_winner', {
+      _startRpc('record_toss', {
         'p_match_id': matchId,
         'p_won_by': wonBy,
+        'p_decision': decision,
         if (face != null) 'p_face': face,
       });
 
-  Future<void> recordTossDecision({
+  Future<bool> canTeamPermission({
+    required String teamId,
+    required String permission,
+  }) async {
+    try {
+      final allowed = await _supabase.rpc<dynamic>(
+        'team_can',
+        params: {
+          'p_team_id': teamId,
+          'p_permission': permission,
+        },
+      );
+      return allowed == true;
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
+    }
+  }
+
+  Future<bool> canMatchPermission({
     required String matchId,
-    required String decision,
-  }) =>
-      _startRpc('record_toss_decision', {
-        'p_match_id': matchId,
-        'p_decision': decision,
-      });
+    required String permission,
+  }) async {
+    try {
+      final allowed = await _supabase.rpc<dynamic>(
+        'can',
+        params: {
+          'p_scope': 'match',
+          'p_entity_id': matchId,
+          'p_permission': permission,
+        },
+      );
+      return allowed == true;
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
+    }
+  }
 
   Future<void> submitMatchOpeners({
     required String matchId,

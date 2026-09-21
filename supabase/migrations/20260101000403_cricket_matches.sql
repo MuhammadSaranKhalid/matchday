@@ -16,6 +16,10 @@ create table public.cricket_matches (
   format_code            text not null default 't20',
   rules_snapshot         jsonb not null default '{}'::jsonb,
   phase                  public.cricket_match_phase not null default 'toss',
+  setup_side             text check (setup_side is null or setup_side in ('team_a', 'team_b')),
+  toss_recorded_by       uuid
+    references public.profiles (user_id)
+    on delete set null,
   toss_won_by            text check (toss_won_by in ('team_a', 'team_b')),
   toss_decision          public.cricket_toss_decision,
   toss_face              text check (toss_face in ('heads', 'tails')),
@@ -33,6 +37,10 @@ create table public.cricket_matches (
     on delete set null,
   created_at             timestamptz not null default now(),
   updated_at             timestamptz not null default now(),
+  constraint cricket_matches_setup_side_fkey
+    foreign key (match_id, setup_side)
+    references public.match_teams (match_id, team_side)
+    deferrable initially deferred,
   constraint cricket_matches_toss_side_fkey
     foreign key (match_id, toss_won_by)
     references public.match_teams (match_id, team_side)
@@ -42,9 +50,60 @@ create table public.cricket_matches (
 comment on table public.cricket_matches is
   'Cricket-specific extension of matches. The parent matches row identifies the sporting event; this row contains only Cricket rules and state.';
 
+comment on column public.cricket_matches.setup_side is
+  'Cricket-only side responsible for initial peer-to-peer Match Start setup. Null is valid for neutral/tournament fixtures controlled by a match-scoped Cricket setup grant.';
+
+comment on column public.cricket_matches.toss_recorded_by is
+  'Authenticated user who entered the physical toss winner and the winner''s bat/bowl choice.';
+
+-- -----------------------------------------------------------------------------
+-- Setup-side immutability
+-- -----------------------------------------------------------------------------
+
+create or replace function public.enforce_cricket_setup_side_immutability()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_status public.match_status;
+begin
+  if old.setup_side is distinct from new.setup_side then
+    if old.setup_side is not null then
+      raise exception 'Cricket setup_side is immutable once assigned'
+        using errcode = '23514';
+    end if;
+
+    select m.status
+      into v_status
+    from public.matches m
+    where m.match_id = new.match_id;
+
+    if v_status <> 'scheduled'
+       or old.phase <> 'toss'
+    then
+      raise exception
+        'Cricket setup_side may only be assigned before the toss while the match is scheduled'
+        using errcode = '23514';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all
+  on function public.enforce_cricket_setup_side_immutability()
+  from public, anon, authenticated;
+
 -- -----------------------------------------------------------------------------
 -- Triggers
 -- -----------------------------------------------------------------------------
+
+create trigger cricket_matches_setup_side_immutable
+  before update of setup_side on public.cricket_matches
+  for each row
+  execute function public.enforce_cricket_setup_side_immutability();
 
 create trigger cricket_matches_set_updated_at
   before update on public.cricket_matches

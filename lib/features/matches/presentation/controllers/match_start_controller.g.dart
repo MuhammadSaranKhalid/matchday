@@ -8,30 +8,48 @@ part of 'match_start_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Watches the match row in real time and owns every Match Start decision:
-/// who the viewer is, which openers are selected, and the three writes
-/// (toss → openers → start).
+/// Match Start controller.
 ///
-/// Widgets read [MatchStartState] and call these methods; they never merge
-/// pending-vs-locked selections or translate between id spaces themselves.
+/// Roles are display-only. Every active control is derived from the same
+/// capability system the Edge Function enforces:
+///
+///   toss:
+///     Cricket setup team cricket.match.setup
+///     OR match-scoped cricket.match.setup
+///
+///   lineup/start:
+///     batting team cricket.match.setup
+///     OR match-scoped cricket.match.setup
 
 @ProviderFor(MatchStartController)
 final matchStartControllerProvider = MatchStartControllerFamily._();
 
-/// Watches the match row in real time and owns every Match Start decision:
-/// who the viewer is, which openers are selected, and the three writes
-/// (toss → openers → start).
+/// Match Start controller.
 ///
-/// Widgets read [MatchStartState] and call these methods; they never merge
-/// pending-vs-locked selections or translate between id spaces themselves.
+/// Roles are display-only. Every active control is derived from the same
+/// capability system the Edge Function enforces:
+///
+///   toss:
+///     Cricket setup team cricket.match.setup
+///     OR match-scoped cricket.match.setup
+///
+///   lineup/start:
+///     batting team cricket.match.setup
+///     OR match-scoped cricket.match.setup
 final class MatchStartControllerProvider
     extends $AsyncNotifierProvider<MatchStartController, MatchStartState> {
-  /// Watches the match row in real time and owns every Match Start decision:
-  /// who the viewer is, which openers are selected, and the three writes
-  /// (toss → openers → start).
+  /// Match Start controller.
   ///
-  /// Widgets read [MatchStartState] and call these methods; they never merge
-  /// pending-vs-locked selections or translate between id spaces themselves.
+  /// Roles are display-only. Every active control is derived from the same
+  /// capability system the Edge Function enforces:
+  ///
+  ///   toss:
+  ///     Cricket setup team cricket.match.setup
+  ///     OR match-scoped cricket.match.setup
+  ///
+  ///   lineup/start:
+  ///     batting team cricket.match.setup
+  ///     OR match-scoped cricket.match.setup
   MatchStartControllerProvider._({
     required MatchStartControllerFamily super.from,
     required String super.argument,
@@ -69,14 +87,20 @@ final class MatchStartControllerProvider
 }
 
 String _$matchStartControllerHash() =>
-    r'a26f5d5353862ac2eca2a414ec80fa1257e48917';
+    r'c79f89c45bf9c5443509e9944bbe8057517a7593';
 
-/// Watches the match row in real time and owns every Match Start decision:
-/// who the viewer is, which openers are selected, and the three writes
-/// (toss → openers → start).
+/// Match Start controller.
 ///
-/// Widgets read [MatchStartState] and call these methods; they never merge
-/// pending-vs-locked selections or translate between id spaces themselves.
+/// Roles are display-only. Every active control is derived from the same
+/// capability system the Edge Function enforces:
+///
+///   toss:
+///     Cricket setup team cricket.match.setup
+///     OR match-scoped cricket.match.setup
+///
+///   lineup/start:
+///     batting team cricket.match.setup
+///     OR match-scoped cricket.match.setup
 
 final class MatchStartControllerFamily extends $Family
     with
@@ -96,12 +120,18 @@ final class MatchStartControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Watches the match row in real time and owns every Match Start decision:
-  /// who the viewer is, which openers are selected, and the three writes
-  /// (toss → openers → start).
+  /// Match Start controller.
   ///
-  /// Widgets read [MatchStartState] and call these methods; they never merge
-  /// pending-vs-locked selections or translate between id spaces themselves.
+  /// Roles are display-only. Every active control is derived from the same
+  /// capability system the Edge Function enforces:
+  ///
+  ///   toss:
+  ///     Cricket setup team cricket.match.setup
+  ///     OR match-scoped cricket.match.setup
+  ///
+  ///   lineup/start:
+  ///     batting team cricket.match.setup
+  ///     OR match-scoped cricket.match.setup
 
   MatchStartControllerProvider call(String matchId) =>
       MatchStartControllerProvider._(argument: matchId, from: this);
@@ -110,12 +140,18 @@ final class MatchStartControllerFamily extends $Family
   String toString() => r'matchStartControllerProvider';
 }
 
-/// Watches the match row in real time and owns every Match Start decision:
-/// who the viewer is, which openers are selected, and the three writes
-/// (toss → openers → start).
+/// Match Start controller.
 ///
-/// Widgets read [MatchStartState] and call these methods; they never merge
-/// pending-vs-locked selections or translate between id spaces themselves.
+/// Roles are display-only. Every active control is derived from the same
+/// capability system the Edge Function enforces:
+///
+///   toss:
+///     Cricket setup team cricket.match.setup
+///     OR match-scoped cricket.match.setup
+///
+///   lineup/start:
+///     batting team cricket.match.setup
+///     OR match-scoped cricket.match.setup
 
 abstract class _$MatchStartController extends $AsyncNotifier<MatchStartState> {
   late final _$args = ref.$arg as String;

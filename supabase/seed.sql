@@ -971,36 +971,52 @@ begin
   begin
     -- 1. LIVE MATCH
     insert into public.matches (
-      match_id, match_type, team_a_id, team_b_id, team_a_captain, team_b_captain,
-      format, venue, scheduled_start_time, actual_start_time,
-      toss_won_by, toss_decision, toss_face, start_phase, status, created_by, created_at, updated_at
+      match_id, match_type, team_a_id, team_b_id,
+      venue, scheduled_start_time, actual_start_time,
+      status, created_by, created_at, updated_at
     )
     values (
-      m_live_id, 'friendly', v_lahore_lions, v_karachi_kings, v_saran_uid, v_bilal_uid,
-      '{"players_per_team": 11, "overs_per_innings": 20, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 4, "ball_type": "leather"}'::jsonb,
+      m_live_id, 'friendly', v_lahore_lions, v_karachi_kings,
       'Gaddafi Stadium, Lahore',
       now() - interval '1 hour 15 minutes',
       now() - interval '1 hour 15 minutes',
-      v_lahore_lions, 'bat', 'H', 'live', 'live', v_saran_uid, now() - interval '2 days', now()
+      'live', v_saran_uid, now() - interval '2 days', now()
     )
     on conflict (match_id) do update set
       status = excluded.status,
-      start_phase = excluded.start_phase,
       scheduled_start_time = excluded.scheduled_start_time,
       actual_start_time = excluded.actual_start_time;
 
+    insert into public.cricket_matches (
+      match_id, format_code, rules_snapshot, phase,
+      toss_won_by, toss_decision, toss_face, toss_recorded_at
+    )
+    values (
+      m_live_id, 't20',
+      '{"players_per_team": 11, "overs_per_innings": 20, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 4, "ball_type": "leather"}'::jsonb,
+      'live', 'team_a', 'bat', 'heads', now() - interval '1 hour 15 minutes'
+    )
+    on conflict (match_id) do update set
+      phase = excluded.phase;
+
     -- Match Players for Live Match
-    -- Current match_players shape: user_id (not profile_id), a single `role`
-    -- enum (not is_captain/is_keeper), team_side 'team_a'/'team_b' (not 'a'/'b'),
-    -- and display_name, which is NOT NULL.
     insert into public.match_players (
       match_player_id, match_id, team_side, user_id,
-      display_name, batting_order, jersey_number, role
+      display_name, jersey_number
     )
     values
-      (mp_saran_live, m_live_id, 'team_a', v_saran_uid, 'Saran Khalid', 1, 7, 'captain'),
-      (mp_babar_live, m_live_id, 'team_a', v_babar_uid, 'Babar Azam',   2, 56, 'player'),
-      (mp_bilal_live, m_live_id, 'team_b', v_bilal_uid, 'Bilal Ahmed',  null, 10, 'captain')
+      (mp_saran_live, m_live_id, 'team_a', v_saran_uid, 'Saran Khalid', 7),
+      (mp_babar_live, m_live_id, 'team_a', v_babar_uid, 'Babar Azam',   56),
+      (mp_bilal_live, m_live_id, 'team_b', v_bilal_uid, 'Bilal Ahmed',  10)
+    on conflict (match_player_id) do nothing;
+
+    insert into public.cricket_match_players (
+      match_player_id, match_id, is_playing_xi, batting_order, is_captain
+    )
+    values
+      (mp_saran_live, m_live_id, true, 1, true),
+      (mp_babar_live, m_live_id, true, 2, false),
+      (mp_bilal_live, m_live_id, true, null, true)
     on conflict (match_player_id) do nothing;
 
     -- Live Innings. cricket_match_innings_state hangs off cricket_match_innings, so the parent
@@ -1034,56 +1050,86 @@ begin
 
     -- 2. CONFIRMED UPCOMING MATCH: Lahore Lions vs Rawalpindi Rams (Tomorrow at 4:30 PM)
     insert into public.matches (
-      match_id, match_type, team_a_id, team_b_id, team_a_captain, team_b_captain,
-      format, venue, scheduled_start_time,
-      start_phase, status, created_by, created_at, updated_at
+      match_id, match_type, team_a_id, team_b_id,
+      venue, scheduled_start_time,
+      status, created_by, created_at, updated_at
     )
     values (
-      m_upcoming_id, 'friendly', v_lahore_lions, v_rawalpindi_rams, v_saran_uid, v_hassan_uid,
-      '{"players_per_team": 11, "overs_per_innings": 20, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 4, "ball_type": "leather"}'::jsonb,
+      m_upcoming_id, 'friendly', v_lahore_lions, v_rawalpindi_rams,
       'Model Town Club Ground, Lahore',
       now() + interval '1 day 2 hours',
-      'toss', 'scheduled', v_saran_uid, now() - interval '1 day', now()
+      'scheduled', v_saran_uid, now() - interval '1 day', now()
     )
     on conflict (match_id) do update set
       status = excluded.status,
-      start_phase = excluded.start_phase,
       scheduled_start_time = excluded.scheduled_start_time;
+
+    insert into public.cricket_matches (
+      match_id, format_code, rules_snapshot, phase
+    )
+    values (
+      m_upcoming_id, 't20',
+      '{"players_per_team": 11, "overs_per_innings": 20, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 4, "ball_type": "leather"}'::jsonb,
+      'toss'
+    )
+    on conflict (match_id) do update set
+      phase = excluded.phase;
 
     -- 3. PAST COMPLETED MATCH: Lahore Lions vs Islamabad United (Yesterday)
     --    Lahore Lions won by 24 runs (LL: 168/5, IU: 144/9)
     insert into public.matches (
-      match_id, match_type, team_a_id, team_b_id, team_a_captain, team_b_captain,
-      format, venue, scheduled_start_time, actual_start_time, completed_at,
-      toss_won_by, toss_decision, toss_face, start_phase, status,
-      result, created_by, created_at, updated_at
+      match_id, match_type, team_a_id, team_b_id,
+      venue, scheduled_start_time, actual_start_time, completed_at,
+      status, created_by, created_at, updated_at
     )
     values (
-      m_past_id, 'friendly', v_lahore_lions, v_islamabad_united, v_saran_uid, v_bilal_uid,
-      '{"players_per_team": 11, "overs_per_innings": 20, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 4, "ball_type": "leather"}'::jsonb,
+      m_past_id, 'friendly', v_lahore_lions, v_islamabad_united,
       'LCCA Ground, Lahore',
       now() - interval '1 day 4 hours',
       now() - interval '1 day 4 hours',
       now() - interval '1 day 1 hour',
-      v_lahore_lions, 'bat', 'H', 'live', 'completed',
-      '{"winner_team_id": "11111111-1111-1111-1111-111111111101", "win_type": "runs", "win_margin": 24, "summary": "Lahore Lions won by 24 runs"}'::jsonb,
+      'completed',
       v_saran_uid, now() - interval '2 days', now()
     )
     on conflict (match_id) do update set
-      status = excluded.status,
-      start_phase = excluded.start_phase,
+      status = excluded.status;
+
+    insert into public.cricket_matches (
+      match_id, format_code, rules_snapshot, phase,
+      toss_won_by, toss_decision, toss_face, toss_recorded_at,
+      result, result_summary
+    )
+    values (
+      m_past_id, 't20',
+      '{"players_per_team": 11, "overs_per_innings": 20, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 4, "ball_type": "leather"}'::jsonb,
+      'complete',
+      'team_a', 'bat', 'heads', now() - interval '1 day 4 hours',
+      '{"winner_team_id": "11111111-1111-1111-1111-111111111101", "win_type": "runs", "win_margin": 24, "summary": "Lahore Lions won by 24 runs"}'::jsonb,
+      'Lahore Lions won by 24 runs'
+    )
+    on conflict (match_id) do update set
+      phase = excluded.phase,
       result = excluded.result;
 
     -- Lineup for the completed match. Needed because cricket_match_deliveries' striker /
     -- non-striker / bowler FKs point at match_players, scoped per match.
     insert into public.match_players (
       match_player_id, match_id, team_side, user_id,
-      display_name, batting_order, jersey_number, role
+      display_name, jersey_number
     )
     values
-      (mp_saran_past, m_past_id, 'team_a', v_saran_uid, 'Saran Khalid', 1, 7, 'captain'),
-      (mp_babar_past, m_past_id, 'team_a', v_babar_uid, 'Babar Azam',   2, 56, 'player'),
-      (mp_bilal_past, m_past_id, 'team_b', v_bilal_uid, 'Bilal Ahmed',  1, 10, 'captain')
+      (mp_saran_past, m_past_id, 'team_a', v_saran_uid, 'Saran Khalid', 7),
+      (mp_babar_past, m_past_id, 'team_a', v_babar_uid, 'Babar Azam',   56),
+      (mp_bilal_past, m_past_id, 'team_b', v_bilal_uid, 'Bilal Ahmed',  10)
+    on conflict (match_player_id) do nothing;
+
+    insert into public.cricket_match_players (
+      match_player_id, match_id, is_playing_xi, batting_order, is_captain
+    )
+    values
+      (mp_saran_past, m_past_id, true, 1, true),
+      (mp_babar_past, m_past_id, true, 2, false),
+      (mp_bilal_past, m_past_id, true, 1, true)
     on conflict (match_player_id) do nothing;
 
     -- Past Match Innings 1 (Lahore Lions: 168/5) and 2 (Islamabad United: 144/9)

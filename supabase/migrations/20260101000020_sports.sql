@@ -1,4 +1,6 @@
--- Migration file: 20260101000020_sports.sql
+-- =============================================================================
+-- Migration: 20260101000020_sports.sql
+-- =============================================================================
 
 -- Sports Kernel v1
 --
@@ -23,45 +25,60 @@
 -- creation flows must send sport_id explicitly.
 -- 1. Sports catalog
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table if not exists public.sports(
+create table if not exists public.sports (
   sport_id   text primary key check (sport_id ~ '^[a-z][a-z0-9_]{1,30}$'),
-  name       text not null check (length(btrim(name)) >= 2 and length(btrim(name)) <= 40),
+  name       text not null
+    check (length(btrim(name)) >= 2 and length(btrim(name)) <= 40),
   is_active  boolean not null default true,
   created_at timestamptz not null default now()
 );
 
-comment on table public.sports is 'Stable catalog of sports supported by Matchday. '
+comment on table public.sports is
+  'Stable catalog of sports supported by Matchday. '
   'Sport-specific rules and scoring models do not belong in this table.';
 
-comment on column public.sports.sport_id is 'Stable machine identifier such as cricket or football. '
+comment on column public.sports.sport_id is
+  'Stable machine identifier such as cricket or football. '
   'It is not a display label and must not be renamed after use.';
 
--- Section: Data changes
+-- -----------------------------------------------------------------------------
+-- Data changes
+-- -----------------------------------------------------------------------------
 
 -- Cricket is the only real sport for now.
-insert into public.sports(sport_id, name, is_active)
-  values ('cricket', 'Cricket', true)
-on conflict (sport_id)
-  do update set
+insert into public.sports (sport_id, name, is_active)
+values ('cricket', 'Cricket', true)
+on conflict (sport_id) do update
+  set
     name = excluded.name,
     is_active = excluded.is_active;
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- 2. Security / Data API access
 alter table public.sports enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
 drop policy if exists "sports_read_all" on public.sports;
 
-create policy "sports_read_all" on public.sports
-  for select to anon, authenticated
+create policy "sports_read_all"
+  on public.sports
+  for select
+  to anon, authenticated
   using (true);
 
--- Section: Permissions
+-- -----------------------------------------------------------------------------
+-- Permissions
+-- -----------------------------------------------------------------------------
 
 -- This table is system-owned reference data.
 --
@@ -73,7 +90,9 @@ grant select on table public.sports to anon, authenticated;
 
 grant all on table public.sports to service_role;
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- 5. Sport ownership is immutable
 --
@@ -82,20 +101,24 @@ grant all on table public.sports to service_role;
 --
 -- The same principle applies to tournaments and format presets.
 create or replace function public.prevent_sport_reassignment()
-  returns trigger
-  language plpgsql
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
   if new.sport_id is distinct from old.sport_id then
-    raise exception 'sport_id cannot be changed after creation (% -> %)', old.sport_id, new.sport_id
+    raise exception 'sport_id cannot be changed after creation (% -> %)',
+      old.sport_id,
+      new.sport_id
       using errcode = '23514';
   end if;
   return new;
 end;
 $$;
 
-revoke all on function public.prevent_sport_reassignment() from public, anon, authenticated;
+revoke all
+on function public.prevent_sport_reassignment()
+from public, anon, authenticated;
 
 -- 9. Documentation comments
 -- comment on function public.enforce_tournament_team_sport() is

@@ -1,4 +1,6 @@
--- Migration file: 20260101000500_notifications.sql
+-- =============================================================================
+-- Migration: 20260101000500_notifications.sql
+-- =============================================================================
 
 -- 0500 · notifications — the per-user inbox
 -- Design + decision log: docs/notifications-design.md
@@ -41,16 +43,23 @@
 --   Recipient-only read; recipient may flip is_read and delete their own rows.
 --   Realtime broadcast is on, so the bell badge updates live.
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.notifications(
+create table public.notifications (
   notification_id uuid primary key default gen_random_uuid(),
-  recipient_id    uuid not null references public.profiles(user_id) on delete cascade,
+  recipient_id    uuid not null
+    references public.profiles (user_id)
+    on delete cascade,
   -- The catalogue row this was produced from. ON UPDATE CASCADE so a type can
   -- be renamed in the catalogue without orphaning history; RESTRICT on delete
   -- because deleting a type that has been sent would erase the inbox. Retiring
   -- a type is `is_active = false`, not a DELETE.
-  type_key        text not null references public.notification_types(key) on update cascade on delete restrict,
+  type_key        text not null
+    references public.notification_types (key)
+    on update cascade
+    on delete restrict,
   -- Rendered at write time from the catalogue's templates. See the header.
   title           text not null,
   body            text not null,
@@ -61,12 +70,18 @@ create table public.notifications(
   tier            text not null default 'fyi' check (tier in ('now', 'week', 'fyi')),
   icon            text not null default 'bell',
   icon_path       text not null default 'v1/bell.svg',
-  tone            text not null default 'neutral' check (tone in ('neutral', 'brand', 'success', 'warning', 'achievement', 'danger')),
+  tone            text not null default 'neutral' check (
+    tone in ('neutral', 'brand', 'success', 'warning', 'achievement', 'danger')
+  ),
   -- Who did it. NULL for system-generated notices with no human actor.
-  actor_id        uuid references public.profiles(user_id) on delete set null,
+  actor_id        uuid
+    references public.profiles (user_id)
+    on delete set null,
   -- What it is ABOUT. Drives the mute join in notify(); mirrors the scope
   -- vocabulary used by can() and notification_mutes.
-  entity_scope    text check (entity_scope in ('team', 'match', 'tournament', 'post', 'chat', 'user')),
+  entity_scope    text check (
+    entity_scope in ('team', 'match', 'tournament', 'post', 'chat', 'user')
+  ),
   entity_id       uuid,
   payload         jsonb not null default '{}'::jsonb,
   -- Coalescing. Rendered from notification_types.collapse_template; NULL means
@@ -79,66 +94,109 @@ create table public.notifications(
   updated_at      timestamptz not null default now(),
   -- entity_scope and entity_id are one fact in two columns; neither is useful
   -- alone and a half-set pair would silently never match a mute.
-  constraint notifications_entity_complete check ((entity_scope is null) =(entity_id is null))
+  constraint notifications_entity_complete
+    check ((entity_scope is null) = (entity_id is null))
 );
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index notifications_recipient_created on public.notifications(recipient_id, created_at desc, notification_id desc);
+create index notifications_recipient_created
+  on public.notifications (
+    recipient_id,
+    created_at desc,
+    notification_id desc
+  );
 
 -- Partial index used by the unread badge counter (no full-table scan).
-create index notifications_recipient_unread on public.notifications(recipient_id, created_at desc)
-where
-  is_read = false;
+create index notifications_recipient_unread
+  on public.notifications (
+    recipient_id,
+    created_at desc
+  )
+  where is_read = false;
 
 -- Advisor 0001 — index every FK column. recipient_id is covered above.
-create index notifications_type_key on public.notifications(type_key);
+create index notifications_type_key
+  on public.notifications (type_key);
 
-create index notifications_actor on public.notifications(actor_id);
+create index notifications_actor
+  on public.notifications (actor_id);
 
 -- THE COLLAPSE KEY. Unique per (recipient, key) only while UNREAD: once you
 -- have read "3 people liked your post", the next like must start a fresh row
 -- rather than silently incrementing something you already dismissed.
-create unique index notifications_collapse on public.notifications(recipient_id, collapse_key)
-where
-  collapse_key is not null and is_read = false;
+create unique index notifications_collapse
+  on public.notifications (
+    recipient_id,
+    collapse_key
+  )
+  where collapse_key is not null and is_read = false;
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger notifications_set_updated_at
-  before update on public.notifications for each row
+  before update on public.notifications
+  for each row
   execute function public.set_updated_at();
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- RLS — recipient-only read / update / delete. No INSERT policy: every write
 -- must come from public.notify(), which is SECURITY DEFINER.
 alter table public.notifications enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "notifications_read_self" on public.notifications
-  for select to authenticated
-  using ((
-    select
-      auth.uid()) = recipient_id);
+create policy "notifications_read_self"
+  on public.notifications
+  for select
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = recipient_id
+  );
 
-create policy "notifications_update_self" on public.notifications
-  for update to authenticated
-  using ((
-    select
-      auth.uid()) = recipient_id)
-  with check ((
-    select
-      auth.uid()) = recipient_id);
+create policy "notifications_update_self"
+  on public.notifications
+  for update
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = recipient_id
+  )
+  with check (
+    (
+      select
+        auth.uid()
+    ) = recipient_id
+  );
 
-create policy "notifications_delete_self" on public.notifications
-  for delete to authenticated
-  using ((
-    select
-      auth.uid()) = recipient_id);
+create policy "notifications_delete_self"
+  on public.notifications
+  for delete
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = recipient_id
+  );
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- Realtime — Broadcast on every insert / read-state change.
 -- Topic: user:<recipient_id>:notifications
@@ -152,57 +210,81 @@ create policy "notifications_delete_self" on public.notifications
 -- `to_jsonb(new)` now carries the rendered title/body/route, so the realtime
 -- payload is self-describing for the same reason the row is.
 create or replace function public.broadcast_new_notification()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   perform
-    realtime.send(to_jsonb(new), 'notification', 'user:' || new.recipient_id::text || ':notifications', true);
+    realtime.send(
+      to_jsonb(new),
+      'notification',
+      'user:' || new.recipient_id::text || ':notifications',
+      true
+    );
   return null;
 end;
 $$;
 
 revoke all on function public.broadcast_new_notification() from public;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 drop trigger if exists notifications_after_insert_broadcast on public.notifications;
 
 create trigger notifications_after_insert_broadcast
-  after insert on public.notifications for each row
+  after insert on public.notifications
+  for each row
   execute function public.broadcast_new_notification();
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- A collapse UPDATE (group_count bumped) must reach the client too, otherwise
 -- "and 4 others" never updates on a screen that is already open.
 create or replace function public.broadcast_notification_updated()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   perform
-    realtime.send(to_jsonb(new), 'notification_updated', 'user:' || new.recipient_id::text || ':notifications', true);
+    realtime.send(
+      to_jsonb(new),
+      'notification_updated',
+      'user:' || new.recipient_id::text || ':notifications',
+      true
+    );
   return null;
 end;
 $$;
 
 revoke all on function public.broadcast_notification_updated() from public;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 drop trigger if exists notifications_after_update_broadcast on public.notifications;
 
 create trigger notifications_after_update_broadcast
-  after update on public.notifications for each row
-  when(old.is_read is distinct from new.is_read or old.group_count is distinct from new.group_count)
+  after update on public.notifications
+  for each row
+  when
+    (
+      old.is_read is distinct from new.is_read
+      or old.group_count is distinct from new.group_count
+    )
   execute function public.broadcast_notification_updated();
 
--- Section: Permissions
+-- -----------------------------------------------------------------------------
+-- Permissions
+-- -----------------------------------------------------------------------------
 
 -- RLS scopes rows; column grants restrict acknowledgement to the read flag.
 revoke all on public.notifications from anon, authenticated;
@@ -213,25 +295,37 @@ grant update (is_read) on public.notifications to authenticated;
 
 grant all on public.notifications to service_role;
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 create or replace function public.broadcast_notification_deleted()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   perform
-    realtime.send(jsonb_build_object('notification_id', old.notification_id), 'notification_deleted', 'user:' || old.recipient_id::text || ':notifications', true);
+    realtime.send(
+      jsonb_build_object('notification_id', old.notification_id),
+      'notification_deleted',
+      'user:' || old.recipient_id::text || ':notifications',
+      true
+    );
   return null;
 end;
 $$;
 
-revoke all on function public.broadcast_notification_deleted() from public, anon, authenticated;
+revoke all
+on function public.broadcast_notification_deleted()
+from public, anon, authenticated;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger notifications_after_delete_broadcast
-  after delete on public.notifications for each row
+  after delete on public.notifications
+  for each row
   execute function public.broadcast_notification_deleted();

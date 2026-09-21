@@ -1,4 +1,6 @@
--- Migration file: 20260101000620_notification_triggers.sql
+-- =============================================================================
+-- Migration: 20260101000620_notification_triggers.sql
+-- =============================================================================
 
 -- 0575 · notification triggers — every producer, in one file
 -- Design + decision log: docs/notifications-design.md
@@ -37,127 +39,173 @@
 -- follows → social.follow
 -- Team / tournament follows stay silent: the entity is not a person.
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 create or replace function public.notify_on_follow()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   if new.target_type <> 'user' then
     return new;
   end if;
   perform
-    public.notify(array[new.target_id], 'social.follow', jsonb_build_object('actor_id', new.follower_id), new.follower_id, 'user', new.follower_id);
+    public.notify(
+      array[new.target_id],
+      'social.follow',
+      jsonb_build_object('actor_id', new.follower_id),
+      new.follower_id,
+      'user',
+      new.follower_id
+    );
   return new;
 end;
 $$;
 
 revoke all on function public.notify_on_follow() from public;
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 drop trigger if exists follows_notify on public.follows;
 
 create trigger follows_notify
-  after insert on public.follows for each row
+  after insert on public.follows
+  for each row
   execute function public.notify_on_follow();
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- post_likes → social.post.liked   (collapses per post)
 create or replace function public.notify_on_post_like()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_author_id uuid;
 begin
   select
     author_id
-  into
-    v_author_id
-  from
-    public.posts
-  where
-    post_id = new.post_id;
+  into v_author_id
+  from public.posts
+  where post_id = new.post_id;
   if v_author_id is null then
     return new;
   end if;
   -- notify() drops the actor, so the self-like guard is no longer duplicated
   -- here; passing the actor is what makes that happen.
   perform
-    public.notify(array[v_author_id], 'social.post.liked', jsonb_build_object('post_id', new.post_id, 'actor_id', new.user_id), new.user_id, 'post', new.post_id);
+    public.notify(
+      array[v_author_id],
+      'social.post.liked',
+      jsonb_build_object('post_id', new.post_id, 'actor_id', new.user_id),
+      new.user_id,
+      'post',
+      new.post_id
+    );
   return new;
 end;
 $$;
 
 revoke all on function public.notify_on_post_like() from public;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 drop trigger if exists post_likes_notify on public.post_likes;
 
 create trigger post_likes_notify
-  after insert on public.post_likes for each row
+  after insert on public.post_likes
+  for each row
   execute function public.notify_on_post_like();
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- comments → social.post.commented | social.comment.replied | social.mention
 create or replace function public.notify_on_comment()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_recipient_id uuid;
   v_type_key text;
   v_payload jsonb;
 begin
-  v_payload := jsonb_build_object('post_id', new.post_id, 'comment_id', new.comment_id, 'parent_comment_id', new.parent_comment_id, 'actor_id', new.author_id);
+  v_payload := jsonb_build_object(
+    'post_id',
+    new.post_id,
+    'comment_id',
+    new.comment_id,
+    'parent_comment_id',
+    new.parent_comment_id,
+    'actor_id',
+    new.author_id
+  );
   if new.parent_comment_id is null then
     select
       author_id
-    into
-      v_recipient_id
-    from
-      public.posts
-    where
-      post_id = new.post_id;
+    into v_recipient_id
+    from public.posts
+    where post_id = new.post_id;
     v_type_key := 'social.post.commented';
   else
     select
       author_id
-    into
-      v_recipient_id
-    from
-      public.comments
-    where
-      comment_id = new.parent_comment_id;
+    into v_recipient_id
+    from public.comments
+    where comment_id = new.parent_comment_id;
     v_type_key := 'social.comment.replied';
   end if;
   if v_recipient_id is not null then
     perform
-      public.notify(array[v_recipient_id], v_type_key, v_payload, new.author_id, 'post', new.post_id);
+      public.notify(
+        array[v_recipient_id],
+        v_type_key,
+        v_payload,
+        new.author_id,
+        'post',
+        new.post_id
+      );
   end if;
   -- Mentions. Skip whoever we just notified above so a post author who is also
   -- mentioned gets one notification, not two. (notify() would dedup WITHIN a
   -- call, but these are two calls with two different types.)
   if coalesce(cardinality(new.mentioned_user_ids), 0) > 0 then
     perform
-      public.notify(array (
+      public.notify(
+        array(
           select
             m
           from unnest(new.mentioned_user_ids) as m
-        where
-          v_recipient_id is null
-          or m <> v_recipient_id), 'social.mention', jsonb_build_object('post_id', new.post_id, 'comment_id', new.comment_id, 'actor_id', new.author_id), new.author_id, 'post', new.post_id);
+          where v_recipient_id is null or m <> v_recipient_id
+        ),
+        'social.mention',
+        jsonb_build_object(
+          'post_id',
+          new.post_id,
+          'comment_id',
+          new.comment_id,
+          'actor_id',
+          new.author_id
+        ),
+        new.author_id,
+        'post',
+        new.post_id
+      );
   end if;
   return new;
 end;
@@ -165,41 +213,65 @@ $$;
 
 revoke all on function public.notify_on_comment() from public;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 drop trigger if exists comments_notify on public.comments;
 
 create trigger comments_notify
-  after insert on public.comments for each row
+  after insert on public.comments
+  for each row
   execute function public.notify_on_comment();
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- team_invites → team.invitation.received
 create or replace function public.notify_on_team_invite()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   perform
-    public.notify(array[new.invitee_id], 'team.invitation.received', jsonb_build_object('invite_id', new.invite_id, 'team_id', new.team_id, 'actor_id', new.invited_by), new.invited_by, 'team', new.team_id);
+    public.notify(
+      array[new.invitee_id],
+      'team.invitation.received',
+      jsonb_build_object(
+        'invite_id',
+        new.invite_id,
+        'team_id',
+        new.team_id,
+        'actor_id',
+        new.invited_by
+      ),
+      new.invited_by,
+      'team',
+      new.team_id
+    );
   return new;
 end;
 $$;
 
 revoke all on function public.notify_on_team_invite() from public;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 drop trigger if exists team_invites_notify on public.team_invites;
 
 create trigger team_invites_notify
-  after insert on public.team_invites for each row
+  after insert on public.team_invites
+  for each row
   execute function public.notify_on_team_invite();
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- match_challenges INSERT → match.challenge.received
 --
@@ -211,35 +283,59 @@ create trigger team_invites_notify
 -- point of view ("Lahore Lions challenged you"), so the opponent is whoever
 -- is not them.
 create or replace function public.notify_on_match_request_insert()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   -- Open requests have no recipient pool yet; they notify on accept instead.
   if new.status <> 'pending' or new.to_team_id is null then
     return new;
   end if;
   perform
-    public.notify(array(
+    public.notify(
+      array(
         select
-          public.team_staff_ids(new.to_team_id)), 'match.challenge.received', jsonb_build_object('request_id', new.request_id, 'from_team_id', new.from_team_id, 'to_team_id', new.to_team_id, 'opponent_team_id', new.from_team_id, 'actor_id', new.requested_by), new.requested_by, 'team', new.to_team_id);
+          public.team_staff_ids(new.to_team_id)
+      ),
+      'match.challenge.received',
+      jsonb_build_object(
+        'request_id',
+        new.request_id,
+        'from_team_id',
+        new.from_team_id,
+        'to_team_id',
+        new.to_team_id,
+        'opponent_team_id',
+        new.from_team_id,
+        'actor_id',
+        new.requested_by
+      ),
+      new.requested_by,
+      'team',
+      new.to_team_id
+    );
   return new;
 end;
 $$;
 
 revoke all on function public.notify_on_match_request_insert() from public;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 drop trigger if exists match_challenges_notify_insert on public.match_challenges;
 
 create trigger match_challenges_notify_insert
-  after insert on public.match_challenges for each row
+  after insert on public.match_challenges
+  for each row
   execute function public.notify_on_match_request_insert();
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- match_challenges UPDATE → match.challenge.<status>
 --
@@ -251,11 +347,11 @@ create trigger match_challenges_notify_insert
 -- "v_recipient <> v_actor and (old.status <> 'pending' or v_recipient <>
 -- new.requested_by)" guard was hand-rolling.
 create or replace function public.notify_on_match_request_decision()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_actor uuid;
   v_notify_team uuid;
@@ -276,45 +372,74 @@ begin
   if v_notify_team is null then
     return new;
   end if;
-  v_recipients := array (
+  v_recipients := array(
     select
-      public.team_staff_ids(v_notify_team));
+      public.team_staff_ids(v_notify_team)
+  );
   if old.status = 'pending' and new.requested_by is not null then
     v_recipients := v_recipients || new.requested_by;
   end if;
   perform
-    public.notify(v_recipients,
+    public.notify(
+      v_recipients,
       -- Five catalogue keys, not one type plus a status field in the payload.
-      'match.challenge.' || new.status::text, jsonb_build_object('request_id', new.request_id, 'from_team_id', new.from_team_id, 'to_team_id', new.to_team_id, 'opponent_team_id', v_opponent, 'match_id', new.match_id, 'actor_id', v_actor), v_actor, 'team', v_notify_team);
+      'match.challenge.' || new.status::text,
+      jsonb_build_object(
+        'request_id',
+        new.request_id,
+        'from_team_id',
+        new.from_team_id,
+        'to_team_id',
+        new.to_team_id,
+        'opponent_team_id',
+        v_opponent,
+        'match_id',
+        new.match_id,
+        'actor_id',
+        v_actor
+      ),
+      v_actor,
+      'team',
+      v_notify_team
+    );
   return new;
 end;
 $$;
 
 revoke all on function public.notify_on_match_request_decision() from public;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 drop trigger if exists match_challenges_notify_decision on public.match_challenges;
 
 create trigger match_challenges_notify_decision
-  after update of status on public.match_challenges for each row
+  after update of status on public.match_challenges
+  for each row
   execute function public.notify_on_match_request_decision();
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- posts INSERT / UPDATE → team.post.published
 -- Audience: active team members + followers of the team.
 create or replace function public.notify_on_team_post()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_recipients uuid[];
 begin
   -- Only fire when a post is active and speaking on behalf of a team
-  if new.status <> 'active' or new.author_context <> 'team_manager' or new.context_entity_id is null then
+  if
+    new.status <> 'active'
+    or new.author_context <> 'team_manager'
+    or new.context_entity_id is null
+  then
     return new;
   end if;
   -- On UPDATE, only fire if transitioning into active status from inactive/draft
@@ -323,28 +448,32 @@ begin
   end if;
   select
     coalesce(array_agg(distinct u.user_id), '{}')
-  into
-    v_recipients
-  from (
-    select
-      tm.user_id
-    from
-      public.team_members tm
-    where
-      tm.team_id = new.context_entity_id
-      and tm.status = 'active'
-      and tm.user_id is not null
-    union
-    select
-      f.follower_id as user_id
-    from
-      public.follows f
-    where
-      f.target_type = 'team'
-      and f.target_id = new.context_entity_id) u;
+  into v_recipients
+  from
+    (
+      select
+        tm.user_id
+      from public.team_members tm
+      where
+        tm.team_id = new.context_entity_id
+        and tm.status = 'active'
+        and tm.user_id is not null
+      union
+      select
+        f.follower_id as user_id
+      from public.follows f
+      where f.target_type = 'team' and f.target_id = new.context_entity_id
+    ) u;
   if cardinality(v_recipients) > 0 then
     perform
-      public.notify(v_recipients, 'team.post.published', jsonb_build_object('team_id', new.context_entity_id, 'post_id', new.post_id), new.author_id, 'team', new.context_entity_id);
+      public.notify(
+        v_recipients,
+        'team.post.published',
+        jsonb_build_object('team_id', new.context_entity_id, 'post_id', new.post_id),
+        new.author_id,
+        'team',
+        new.context_entity_id
+      );
   end if;
   return new;
 end;
@@ -352,10 +481,13 @@ $$;
 
 revoke all on function public.notify_on_team_post() from public;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 drop trigger if exists posts_notify_team_post on public.posts;
 
 create trigger posts_notify_team_post
-  after insert or update of status on public.posts for each row
+  after insert or update of status on public.posts
+  for each row
   execute function public.notify_on_team_post();

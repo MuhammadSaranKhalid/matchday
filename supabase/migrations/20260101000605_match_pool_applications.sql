@@ -1,38 +1,65 @@
--- Migration file: 20260101000605_match_pool_applications.sql
+-- =============================================================================
+-- Migration: 20260101000605_match_pool_applications.sql
+-- =============================================================================
 
 -- 0605 · match_pool_applications
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table if not exists public.match_pool_applications(
+create table if not exists public.match_pool_applications (
   application_id      uuid primary key default gen_random_uuid(),
-  request_id          uuid not null references public.match_challenges(request_id) on delete cascade,
-  applicant_team_id   uuid not null references public.teams(team_id) on delete cascade,
-  applicant_user_id   uuid not null references public.profiles(user_id) on delete cascade,
+  request_id          uuid not null
+    references public.match_challenges (request_id)
+    on delete cascade,
+  applicant_team_id   uuid not null
+    references public.teams (team_id)
+    on delete cascade,
+  applicant_user_id   uuid not null
+    references public.profiles (user_id)
+    on delete cascade,
   applicant_xi        uuid[] default '{}'::uuid[],
   applicant_keeper_id uuid,
   message             text,
-  status              text not null default 'pending' check (status in ('pending', 'accepted', 'rejected', 'withdrawn')),
+  status              text not null default 'pending' check (
+    status in ('pending', 'accepted', 'rejected', 'withdrawn')
+  ),
   decision_note       text,
   decided_at          timestamptz,
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now()
 );
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index if not exists idx_match_pool_apps_request on public.match_pool_applications(request_id);
+create index if not exists idx_match_pool_apps_request
+  on public.match_pool_applications (
+    request_id
+  );
 
-create index if not exists idx_match_pool_apps_applicant_team on public.match_pool_applications(applicant_team_id);
+create index if not exists idx_match_pool_apps_applicant_team
+  on public.match_pool_applications (
+    applicant_team_id
+  );
 
-create index if not exists idx_match_pool_apps_status on public.match_pool_applications(status);
+create index if not exists idx_match_pool_apps_status
+  on public.match_pool_applications (
+    status
+  );
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- Enable RLS
 alter table public.match_pool_applications enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
 -- Drop any existing policies
 drop policy if exists "match_pool_apps_select" on public.match_pool_applications;
@@ -40,19 +67,25 @@ drop policy if exists "match_pool_apps_select" on public.match_pool_applications
 -- Reads:
 -- 1. Poster can view all applications for their open challenges.
 -- 2. Applicant team managers can view their own applications.
-create policy "match_pool_apps_select" on public.match_pool_applications
-  for select to authenticated
-  using (public.is_team_manager(applicant_team_id)
+create policy "match_pool_apps_select"
+  on public.match_pool_applications
+  for select
+  to authenticated
+  using (
+    public.is_team_manager(applicant_team_id)
     or exists (
       select
         1
-      from
-        public.match_challenges mr
+      from public.match_challenges mr
       where
         mr.request_id = match_pool_applications.request_id
-        and public.is_team_manager(mr.from_team_id)));
+        and public.is_team_manager(mr.from_team_id)
+    )
+  );
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- RPC: apply_to_match_pool
 create or replace function public.apply_to_match_pool(
@@ -62,11 +95,11 @@ create or replace function public.apply_to_match_pool(
   p_applicant_keeper_id uuid default null,
   p_message text default null
 )
-  returns uuid
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_req public.match_challenges%rowtype;
   v_app_id uuid;
@@ -138,20 +171,24 @@ into
 end;
 $$;
 
-revoke all on function public.apply_to_match_pool(uuid, uuid, uuid[], uuid, text) from public;
+revoke all
+on function public.apply_to_match_pool(uuid, uuid, uuid[], uuid, text)
+from public;
 
-grant execute on function public.apply_to_match_pool(uuid, uuid, uuid[], uuid, text) to authenticated;
+grant execute
+on function public.apply_to_match_pool(uuid, uuid, uuid[], uuid, text)
+to authenticated;
 
 -- RPC: accept_pool_application
 create or replace function public.accept_pool_application(
   p_application_id uuid,
   p_decision_note text default null
 )
-  returns uuid
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_app public.match_pool_applications%rowtype;
   v_req public.match_challenges%rowtype;
@@ -336,11 +373,11 @@ create or replace function public.reject_pool_application(
   p_application_id uuid,
   p_reason text default null
 )
-  returns void
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_app public.match_pool_applications%rowtype;
   v_req public.match_challenges%rowtype;
@@ -390,7 +427,9 @@ revoke all on function public.reject_pool_application(uuid, text) from public;
 
 grant execute on function public.reject_pool_application(uuid, text) to authenticated;
 
--- Section: Indexes (continued)
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
 -- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
 -- Postgres does NOT index the referencing side of a foreign key for you. Every
@@ -398,4 +437,7 @@ grant execute on function public.reject_pool_application(uuid, text) to authenti
 -- (profiles on account deletion, matches/teams on cascade), and without an
 -- index each such statement seq-scans this table once per affected parent row.
 -- They are also the columns joined on when reading.
-create index if not exists idx_match_pool_applications_applicant_user_id on public.match_pool_applications(applicant_user_id);
+create index if not exists idx_match_pool_applications_applicant_user_id
+  on public.match_pool_applications (
+    applicant_user_id
+  );

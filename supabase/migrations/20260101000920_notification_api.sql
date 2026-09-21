@@ -1,4 +1,6 @@
--- Migration file: 20260101000920_notification_api.sql
+-- =============================================================================
+-- Migration: 20260101000920_notification_api.sql
+-- =============================================================================
 
 -- 0920 · notification client API
 -- Design + decision log: docs/notifications-design.md
@@ -29,40 +31,44 @@
 --
 -- The limit is clamped rather than trusted; the caller is a client.
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 create or replace function public.list_notifications(
   p_before_created timestamptz default null,
   p_before_id uuid default null,
   p_limit int default 40
 )
-  returns setof public.notifications
-  language sql
-  stable
-  security invoker
-  set search_path = public, pg_temp
-  as $$
+returns setof public.notifications
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
   select
     n.*
-  from
-    public.notifications n
+  from public.notifications n
   where
-    n.recipient_id =(
+    n.recipient_id = (
       select
-        auth.uid())
-    and(p_before_created is null
-      or(n.created_at,
-        n.notification_id) <(p_before_created,
-        p_before_id))
-  order by
-    n.created_at desc,
-    n.notification_id desc
+        auth.uid()
+    )
+    and (
+      p_before_created is null
+      or (n.created_at, n.notification_id) < (p_before_created, p_before_id)
+    )
+  order by n.created_at desc, n.notification_id desc
   limit greatest(1, least(p_limit, 100));
 $$;
 
-revoke all on function public.list_notifications(timestamptz, uuid, int) from public, anon;
+revoke all
+on function public.list_notifications(timestamptz, uuid, int)
+from public, anon;
 
-grant execute on function public.list_notifications(timestamptz, uuid, int) to authenticated;
+grant execute
+on function public.list_notifications(timestamptz, uuid, int)
+to authenticated;
 
 -- set_follow_notifications — the bell on a followed profile/team/tournament.
 --
@@ -86,52 +92,62 @@ create or replace function public.set_follow_notifications(
   p_entity_id uuid,
   p_enabled boolean
 )
-  returns void
-  language plpgsql
-  security invoker
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
 begin
-  if not exists(
-    select
-      1
-    from
-      public.follows
-    where
-      follower_id =(
-        select
-          auth.uid())
+  if
+    not exists (
+      select
+        1
+      from public.follows
+      where
+        follower_id = (
+          select
+            auth.uid()
+        )
         and target_type::text = p_scope
-        and target_id = p_entity_id) then
+        and target_id = p_entity_id
+    )
+  then
     raise exception 'Follow this entity to change notifications'
-    using errcode = 'P0002';
-end if;
+      using errcode = 'P0002';
+  end if;
   if p_enabled then
     delete from public.notification_mutes
-    where user_id =(
+    where
+      user_id = (
         select
-          auth.uid())
+          auth.uid()
+      )
       and scope = p_scope
       and entity_id = p_entity_id;
   else
-    insert into public.notification_mutes(user_id, scope, entity_id)
-      values((
+    insert into public.notification_mutes (user_id, scope, entity_id)
+    values
+      (
+        (
           select
-            auth.uid()),
-          p_scope,
-          p_entity_id)
-    on conflict(user_id,
-      scope,
-      entity_id)
-      do update set
-        muted_until = null;
+            auth.uid()
+        ),
+        p_scope,
+        p_entity_id
+      )
+    on conflict (user_id, scope, entity_id) do update
+      set muted_until = null;
   end if;
 end;
 $$;
 
-revoke all on function public.set_follow_notifications(text, uuid, boolean) from public, anon;
+revoke all
+on function public.set_follow_notifications(text, uuid, boolean)
+from public, anon;
 
-grant execute on function public.set_follow_notifications(text, uuid, boolean) to authenticated;
+grant execute
+on function public.set_follow_notifications(text, uuid, boolean)
+to authenticated;
 
 -- notification_settings — one row per category, with the CURRENT effective
 -- value of each channel.
@@ -149,39 +165,65 @@ grant execute on function public.set_follow_notifications(text, uuid, boolean) t
 -- Two separate LEFT JOINs rather than one on `channel in (...)`: a single join
 -- would multiply rows per category and break the aggregate.
 create or replace function public.notification_settings()
-  returns jsonb
-  language sql
-  stable
-  security invoker
-  set search_path = public, pg_temp
-  as $$
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
   select
-    coalesce(jsonb_agg(jsonb_build_object('category', c.key, 'name', c.name, 'description', c.description, 'inapp', coalesce(pi.enabled,(
+    coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'category',
+          c.key,
+          'name',
+          c.name,
+          'description',
+          c.description,
+          'inapp',
+          coalesce(
+            pi.enabled,
+            (
               select
-                bool_or('inapp' = any(t.default_channels))
+                bool_or('inapp' = any (t.default_channels))
               from public.notification_types t
-              where
-                t.category = c.key
-                and t.is_active), true), 'push', coalesce(pp.enabled,(
-                select
-                  bool_or('push' = any(t.default_channels))
-                from public.notification_types t
-                where
-                  t.category = c.key
-                  and t.is_active), true))
-          order by c.sort_order), '[]'::jsonb)
+              where t.category = c.key and t.is_active
+            ),
+            true
+          ),
+          'push',
+          coalesce(
+            pp.enabled,
+            (
+              select
+                bool_or('push' = any (t.default_channels))
+              from public.notification_types t
+              where t.category = c.key and t.is_active
+            ),
+            true
+          )
+        )
+        order by c.sort_order
+      ),
+      '[]'::jsonb
+    )
   from
     public.notification_categories c
-  left join public.notification_preferences pi on pi.category = c.key
-    and pi.channel = 'inapp'
-    and pi.user_id =(
-      select
-        auth.uid())
-    left join public.notification_preferences pp on pp.category = c.key
-      and pp.channel = 'push'
-      and pp.user_id =(
+    left join public.notification_preferences pi
+      on pi.category = c.key
+      and pi.channel = 'inapp'
+      and pi.user_id = (
         select
-          auth.uid());
+          auth.uid()
+      )
+    left join public.notification_preferences pp
+      on pp.category = c.key
+      and pp.channel = 'push'
+      and pp.user_id = (
+        select
+          auth.uid()
+      );
 $$;
 
 revoke all on function public.notification_settings() from public, anon;

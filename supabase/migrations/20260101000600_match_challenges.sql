@@ -1,4 +1,6 @@
--- Migration file: 20260101000600_match_challenges.sql
+-- =============================================================================
+-- Migration: 20260101000600_match_challenges.sql
+-- =============================================================================
 
 -- 0600 · match_challenges (friendly-match consent flow)
 -- RENAMED 2026-09-06: this table and every object named after it were called
@@ -48,17 +50,25 @@
 -- 2026-09-06 — one enum, one definition, declared before anything uses it.
 -- match_challenges table.
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.match_challenges(
+create table public.match_challenges (
   request_id                 uuid primary key default gen_random_uuid(),
-  from_team_id               uuid not null references public.teams(team_id) on delete cascade,
+  from_team_id               uuid not null
+    references public.teams (team_id)
+    on delete cascade,
   -- Nullable so an open challenge can be sent without picking the opponent.
   -- The accept RPC fills this in when the receiving team claims the code.
-  to_team_id                 uuid references public.teams(team_id) on delete cascade,
+  to_team_id                 uuid
+    references public.teams (team_id)
+    on delete cascade,
   -- ON DELETE SET NULL so a deleted sender's account doesn't block.
   -- The request row outlives them; the inbox renders "deleted user".
-  requested_by               uuid references public.profiles(user_id) on delete set null,
+  requested_by               uuid
+    references public.profiles (user_id)
+    on delete set null,
   -- Proposed terms (sender side).
   proposed_start_time        timestamptz,
   proposed_venue             text,
@@ -69,25 +79,38 @@ create table public.match_challenges(
   -- stored separately: it used to be an independent column that could disagree
   -- with the blob it was supposed to mirror (20260604120100 found them
   -- diverging and made it a projection; folded inline 2026-09-06).
-  players_per_side           smallint generated always as ((proposed_format ->> 'players_per_team')::smallint) stored,
+  players_per_side           smallint generated always as (
+    (proposed_format ->> 'players_per_team')::smallint
+  ) stored,
   -- Sender's pencilled XI (user_ids). Length should equal players_per_side
   -- by match-day; smaller is allowed at send-time.
   from_team_xi               uuid[] not null default '{}'::uuid[],
-  from_team_keeper_id        uuid references public.profiles(user_id) on delete set null,
+  from_team_keeper_id        uuid
+    references public.profiles (user_id)
+    on delete set null,
   -- Counter-proposal columns (receiver-side, when status flips to countered).
   countered_start_time       timestamptz,
   countered_venue            text,
   countered_format           jsonb,
-  countered_players_per_side integer check (countered_players_per_side is null or countered_players_per_side between 5 and 15),
+  countered_players_per_side integer check (
+    countered_players_per_side is null
+    or countered_players_per_side between 5 and 15
+  ),
   status                     public.match_request_status not null default 'pending',
   -- Decision metadata (set on accept / decline / cancel / counter / expire).
-  decided_by                 uuid references public.profiles(user_id) on delete set null,
+  decided_by                 uuid
+    references public.profiles (user_id)
+    on delete set null,
   decided_at                 timestamptz,
-  decision_note              text check (decision_note is null or length(decision_note) <= 500),
+  decision_note              text
+    check (decision_note is null or length(decision_note) <= 500),
   decision_reason            public.decline_reason,
   -- The match row that materialised from this request (accept path only).
-  match_id                   uuid references public.matches(match_id) on delete set null,
-  sport_id                   text not null default 'cricket' references public.sports(sport_id),
+  match_id                   uuid
+    references public.matches (match_id)
+    on delete set null,
+  sport_id                   text not null default 'cricket'
+    references public.sports (sport_id),
   -- 6-digit code for the in-person flow + 24h expiry. The send RPC retries
   -- collisions against the partial unique index below.
   share_code                 text,
@@ -108,63 +131,110 @@ create table public.match_challenges(
   -- A team can't challenge itself when both sides are filled in.
   -- Makes the players_per_side projection above sound: the key is always
   -- present and in range, so the generated column is never null or absurd.
-  constraint match_challenges_proposed_ppt_valid check (proposed_format ? 'players_per_team' and (proposed_format ->> 'players_per_team')::int between 5 and 15),
-  constraint match_challenges_distinct_teams check (from_team_id is null or to_team_id is null or from_team_id <> to_team_id),
+  constraint match_challenges_proposed_ppt_valid
+    check (
+      proposed_format ? 'players_per_team'
+      and (proposed_format ->> 'players_per_team')::int between 5 and 15
+    ),
+  constraint match_challenges_distinct_teams
+    check (from_team_id is null or to_team_id is null or from_team_id <> to_team_id),
   -- Decision/match_id consistency by status.
-  constraint match_challenges_decision_consistency check ((status = 'pending' and decided_by is null and decided_at is null and match_id is null) or (status = 'countered' and decided_by is not null and decided_at is not null and match_id is null) or (status in ('declined', 'cancelled', 'expired') and (status = 'expired' or decided_by is not null) and decided_at is not null and match_id is null) or (status = 'accepted' and decided_by is not null and decided_at is not null and match_id is not null))
+  constraint match_challenges_decision_consistency
+    check (
+      (
+        status = 'pending'
+        and decided_by is null
+        and decided_at is null
+        and match_id is null
+      )
+      or (
+        status = 'countered'
+        and decided_by is not null
+        and decided_at is not null
+        and match_id is null
+      )
+      or (
+        status in ('declined', 'cancelled', 'expired')
+        and (status = 'expired' or decided_by is not null)
+        and decided_at is not null
+        and match_id is null
+      )
+      or (
+        status = 'accepted'
+        and decided_by is not null
+        and decided_at is not null
+        and match_id is not null
+      )
+    )
 );
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index match_challenges_to_team_status on public.match_challenges(to_team_id, status, created_at desc);
+create index match_challenges_to_team_status
+  on public.match_challenges (
+    to_team_id,
+    status,
+    created_at desc
+  );
 
-create index match_challenges_from_team_status on public.match_challenges(from_team_id, status, created_at desc);
+create index match_challenges_from_team_status
+  on public.match_challenges (
+    from_team_id,
+    status,
+    created_at desc
+  );
 
-create index match_challenges_requested_by on public.match_challenges(requested_by);
+create index match_challenges_requested_by
+  on public.match_challenges (requested_by);
 
 -- Active codes are unique across pending + countered (a countered request
 -- still owns its code until the sender resolves it).
-create unique index match_challenges_active_code on public.match_challenges(share_code)
-where
-  status in ('pending', 'countered') and share_code is not null;
+create unique index match_challenges_active_code
+  on public.match_challenges (share_code)
+  where status in ('pending', 'countered') and share_code is not null;
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger match_challenges_set_updated_at
-  before update on public.match_challenges for each row
+  before update on public.match_challenges
+  for each row
   execute function public.set_updated_at();
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- 8. Challenge sport integrity
 create or replace function public.enforce_match_challenge_sport()
-  returns trigger
-  language plpgsql
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
 declare
   v_from_sport text;
   v_to_sport text;
 begin
   select
     t.sport_id
-  into
-    v_from_sport
-  from
-    public.teams t
-  where
-    t.team_id = new.from_team_id;
+  into v_from_sport
+  from public.teams t
+  where t.team_id = new.from_team_id;
   if new.to_team_id is not null then
     select
       t.sport_id
-    into
-      v_to_sport
-    from
-      public.teams t
-    where
-      t.team_id = new.to_team_id;
+    into v_to_sport
+    from public.teams t
+    where t.team_id = new.to_team_id;
   end if;
-  if v_from_sport is not null and v_to_sport is not null and v_from_sport is distinct from v_to_sport then
+  if
+    v_from_sport is not null
+    and v_to_sport is not null
+    and v_from_sport is distinct from v_to_sport
+  then
     raise exception 'Challenge teams must belong to the same sport'
       using errcode = '23514';
   end if;
@@ -174,17 +244,22 @@ begin
 end;
 $$;
 
-revoke all on function public.enforce_match_challenge_sport() from public, anon, authenticated;
+revoke all
+on function public.enforce_match_challenge_sport()
+from public, anon, authenticated;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger match_challenges_enforce_sport
-  before insert or update of from_team_id,
-  to_team_id,
-  sport_id on public.match_challenges for each row
+  before insert or update of from_team_id, to_team_id, sport_id on public.match_challenges
+  for each row
   execute function public.enforce_match_challenge_sport();
 
--- Section: Dependency-ordered operations
+-- -----------------------------------------------------------------------------
+-- Dependency-ordered operations
+-- -----------------------------------------------------------------------------
 
 -- Match challenges
 --
@@ -206,14 +281,22 @@ end if;
 end
 $$;
 
--- Section: Indexes (continued)
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index if not exists match_challenges_sport_id on public.match_challenges(sport_id);
+create index if not exists match_challenges_sport_id
+  on public.match_challenges (
+    sport_id
+  );
 
-comment on column public.match_challenges.sport_id is 'Sport of the challenge. Derived from from_team_id and validated against '
+comment on column public.match_challenges.sport_id is
+  'Sport of the challenge. Derived from from_team_id and validated against '
   'to_team_id when present.';
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- Helpers
 -- _team_current_captain — the canonical captain user_id for a team.
@@ -232,32 +315,39 @@ comment on column public.match_challenges.sport_id is 'Sport of the challenge. D
 create or replace function public._team_current_captain(
   p_team_id uuid
 )
-  returns uuid
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns uuid
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
-    coalesce((
-      select
-        tm.user_id
-      from public.team_members tm
-      join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
-      where
-        tm.team_id = p_team_id
-        and tmr.role_key = 'captain'
-        and tm.status = 'active'
-        and tm.user_id is not null),(
-      select
-        tm.user_id
-      from public.team_members tm
-      join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
-      where
-        tm.team_id = p_team_id
-        and tmr.role_key = 'owner'
-        and tm.status = 'active'
-        and tm.user_id is not null));
+    coalesce(
+      (
+        select
+          tm.user_id
+        from
+          public.team_members tm
+          join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
+        where
+          tm.team_id = p_team_id
+          and tmr.role_key = 'captain'
+          and tm.status = 'active'
+          and tm.user_id is not null
+      ),
+      (
+        select
+          tm.user_id
+        from
+          public.team_members tm
+          join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
+        where
+          tm.team_id = p_team_id
+          and tmr.role_key = 'owner'
+          and tm.status = 'active'
+          and tm.user_id is not null
+      )
+    );
 $$;
 
 revoke all on function public._team_current_captain(uuid) from public;
@@ -272,12 +362,12 @@ create or replace function public._validate_team_xi(
   p_team_id uuid,
   p_xi uuid[]
 )
-  returns void
-  language plpgsql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_invalid uuid;
 begin
@@ -286,21 +376,16 @@ begin
   end if;
   select
     uid
-  into
-    v_invalid
-  from
-    unnest(p_xi) as t(uid)
-where
-  not exists (
-    select
-      1
-    from
-      public.team_members tm
-    where
-      tm.team_id = p_team_id
-      and tm.user_id = t.uid
-      and tm.status = 'active')
-limit 1;
+  into v_invalid
+  from unnest(p_xi) as t (uid)
+  where
+    not exists (
+      select
+        1
+      from public.team_members tm
+      where tm.team_id = p_team_id and tm.user_id = t.uid and tm.status = 'active'
+    )
+  limit 1;
   if v_invalid is not null then
     raise exception 'Player % is not an active member of team %', v_invalid, p_team_id
       using errcode = '23514';
@@ -326,11 +411,11 @@ create or replace function public.send_match_request(
   p_from_team_xi uuid[] default '{}'::uuid[],
   p_from_team_keeper_id uuid default null
 )
-  returns uuid
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_request_id uuid;
   v_code text;
@@ -338,22 +423,23 @@ declare
   v_pps integer := coalesce(p_players_per_side, 11);
 begin
   if auth.uid() is null then
-    raise exception 'Not authenticated'
-      using errcode = '42501';
+    raise exception 'Not authenticated' using errcode = '42501';
   end if;
   if p_to_team_id is not null and p_from_team_id = p_to_team_id then
-    raise exception 'A team cannot challenge itself'
-      using errcode = '23514';
+    raise exception 'A team cannot challenge itself' using errcode = '23514';
   end if;
   if not public.is_team_manager(p_from_team_id) then
     raise exception 'Only managers of the requesting team can send a match request'
       using errcode = '42501';
   end if;
   if v_pps < 5 or v_pps > 15 then
-    raise exception 'players_per_side must be between 5 and 15'
-      using errcode = '22023';
+    raise exception 'players_per_side must be between 5 and 15' using errcode = '22023';
   end if;
-  if p_from_team_xi is not null and array_length(p_from_team_xi, 1) is not null and array_length(p_from_team_xi, 1) > v_pps then
+  if
+    p_from_team_xi is not null
+    and array_length(p_from_team_xi, 1) is not null
+    and array_length(p_from_team_xi, 1) > v_pps
+  then
     raise exception 'from_team_xi has more players than players_per_side'
       using errcode = '22023';
   end if;
@@ -362,13 +448,18 @@ begin
     public._validate_team_xi(p_from_team_id, p_from_team_xi);
   -- Block duplicates only when targeted — open requests can stack (manager
   -- might want multiple parallel codes if they mistype or change ground).
-  if p_to_team_id is not null and exists (
-    select
-      1
-    from
-      public.match_challenges
-    where
-      from_team_id = p_from_team_id and to_team_id = p_to_team_id and status in ('pending', 'countered')) then
+  if
+    p_to_team_id is not null
+    and exists (
+      select
+        1
+      from public.match_challenges
+      where
+        from_team_id = p_from_team_id
+        and to_team_id = p_to_team_id
+        and status in ('pending', 'countered')
+    )
+  then
     raise exception 'A pending request already exists for these teams'
       using errcode = '23505';
   end if;
@@ -376,31 +467,79 @@ begin
   loop
     v_code := lpad((floor(random() * 1000000))::int::text, 6, '0');
     begin
-      insert into public.match_challenges(from_team_id, to_team_id, requested_by, proposed_start_time, proposed_venue, proposed_format, message, players_per_side, from_team_xi, from_team_keeper_id, share_code, code_expires_at, proposal_expires_at)
-        values (p_from_team_id, p_to_team_id, auth.uid(), p_proposed_start_time, p_proposed_venue, coalesce(p_proposed_format, '{}'::jsonb), p_message, v_pps, coalesce(p_from_team_xi, '{}'::uuid[]), p_from_team_keeper_id, v_code, now() + interval '24 hours', -- share code lifetime
+      insert into public.match_challenges
+        (
+          from_team_id,
+          to_team_id,
+          requested_by,
+          proposed_start_time,
+          proposed_venue,
+          proposed_format,
+          message,
+          players_per_side,
+          from_team_xi,
+          from_team_keeper_id,
+          share_code,
+          code_expires_at,
+          proposal_expires_at
+        )
+      values
+        (
+          p_from_team_id,
+          p_to_team_id,
+          auth.uid(),
+          p_proposed_start_time,
+          p_proposed_venue,
+          coalesce(p_proposed_format, '{}'::jsonb),
+          p_message,
+          v_pps,
+          coalesce(p_from_team_xi, '{}'::uuid[]),
+          p_from_team_keeper_id,
+          v_code,
+          now() + interval '24 hours', -- share code lifetime
           now() + interval '48 hours' -- proposal lifetime
-)
-      returning
-        request_id
-      into
-        v_request_id;
+        )
+      returning request_id
+      into v_request_id;
       exit;
-    exception
-      when unique_violation then
-        v_attempts := v_attempts + 1;
-        if v_attempts >= 6 then
-          raise;
-          end if;
+    exception when unique_violation then
+      v_attempts := v_attempts + 1;
+      if v_attempts >= 6 then
+        raise;
+      end if;
     end;
   end loop;
   return v_request_id;
 end;
-
 $$;
 
-revoke all on function public.send_match_request(uuid, uuid, timestamptz, text, jsonb, text, integer, uuid[], uuid) from public;
+revoke all
+on function public.send_match_request(
+  uuid,
+  uuid,
+  timestamptz,
+  text,
+  jsonb,
+  text,
+  integer,
+  uuid[],
+  uuid
+)
+from public;
 
-grant execute on function public.send_match_request(uuid, uuid, timestamptz, text, jsonb, text, integer, uuid[], uuid) to authenticated;
+grant execute
+on function public.send_match_request(
+  uuid,
+  uuid,
+  timestamptz,
+  text,
+  jsonb,
+  text,
+  integer,
+  uuid[],
+  uuid
+)
+to authenticated;
 
 -- accept_match_request — three flows behind one signature:
 --   1. Targeted pending: caller is to_team manager; supplies their XI.
@@ -421,11 +560,11 @@ create or replace function public.accept_match_request(
   p_to_team_xi uuid[] default '{}'::uuid[],
   p_to_team_keeper_id uuid default null
 )
-  returns uuid
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_req public.match_challenges%rowtype;
   v_to_team uuid;
@@ -648,9 +787,31 @@ begin
 end;
 $$;
 
-revoke all on function public.accept_match_request(uuid, timestamptz, text, jsonb, text, uuid, uuid[], uuid) from public;
+revoke all
+on function public.accept_match_request(
+  uuid,
+  timestamptz,
+  text,
+  jsonb,
+  text,
+  uuid,
+  uuid[],
+  uuid
+)
+from public;
 
-grant execute on function public.accept_match_request(uuid, timestamptz, text, jsonb, text, uuid, uuid[], uuid) to authenticated;
+grant execute
+on function public.accept_match_request(
+  uuid,
+  timestamptz,
+  text,
+  jsonb,
+  text,
+  uuid,
+  uuid[],
+  uuid
+)
+to authenticated;
 
 -- counter_match_request — receiver proposes changes. Status: pending →
 -- countered. Requires at least one field different from the original. Only
@@ -663,11 +824,11 @@ create or replace function public.counter_match_request(
   p_countered_players_per_side integer default null,
   p_decision_note text default null
 )
-  returns void
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_req public.match_challenges%rowtype;
   v_updated integer;
@@ -737,9 +898,13 @@ begin
 end;
 $$;
 
-revoke all on function public.counter_match_request(uuid, timestamptz, text, jsonb, integer, text) from public;
+revoke all
+on function public.counter_match_request(uuid, timestamptz, text, jsonb, integer, text)
+from public;
 
-grant execute on function public.counter_match_request(uuid, timestamptz, text, jsonb, integer, text) to authenticated;
+grant execute
+on function public.counter_match_request(uuid, timestamptz, text, jsonb, integer, text)
+to authenticated;
 
 -- decline_match_request — structured reason + free-text note. Handles both
 -- pending (receiver declines) and countered (sender declines the counter).
@@ -748,11 +913,11 @@ create or replace function public.decline_match_request(
   p_decision_note text default null,
   p_decision_reason public.decline_reason default null
 )
-  returns void
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_req public.match_challenges%rowtype;
   v_updated integer;
@@ -811,20 +976,24 @@ begin
 end;
 $$;
 
-revoke all on function public.decline_match_request(uuid, text, public.decline_reason) from public;
+revoke all
+on function public.decline_match_request(uuid, text, public.decline_reason)
+from public;
 
-grant execute on function public.decline_match_request(uuid, text, public.decline_reason) to authenticated;
+grant execute
+on function public.decline_match_request(uuid, text, public.decline_reason)
+to authenticated;
 
 -- cancel_match_request — sender withdraws a pending OR countered request.
 create or replace function public.cancel_match_request(
   p_request_id uuid,
   p_decision_note text default null
 )
-  returns void
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_req public.match_challenges%rowtype;
   v_updated integer;
@@ -886,11 +1055,11 @@ grant execute on function public.cancel_match_request(uuid, text) to authenticat
 create or replace function public.find_match_request_by_code(
   p_code text
 )
-  returns setof public.match_challenges
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns setof public.match_challenges
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_row public.match_challenges%rowtype;
 begin
@@ -923,7 +1092,9 @@ revoke all on function public.find_match_request_by_code(text) from public;
 
 grant execute on function public.find_match_request_by_code(text) to authenticated;
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- NOTIFICATION TRIGGERS MOVED → 20260101000620_notification_triggers.sql
 -- notify_on_match_request_insert / _decision now call public.notify() (0570),
@@ -941,30 +1112,42 @@ grant execute on function public.find_match_request_by_code(text) to authenticat
 -- Writes: blocked direct — RPCs are the only path.
 alter table public.match_challenges enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "match_challenges_read_team_managers" on public.match_challenges
-  for select to anon, authenticated
-  using (public.is_team_manager(from_team_id)
-    or (to_team_id is not null
-    and public.is_team_manager(to_team_id))
-    or (to_team_id is null
-    and status = 'pending'));
+create policy "match_challenges_read_team_managers"
+  on public.match_challenges
+  for select
+  to anon, authenticated
+  using (
+    public.is_team_manager(from_team_id)
+    or (to_team_id is not null and public.is_team_manager(to_team_id))
+    or (to_team_id is null and status = 'pending')
+  );
 
-create policy "match_challenges_no_direct_insert" on public.match_challenges
-  for insert to authenticated
+create policy "match_challenges_no_direct_insert"
+  on public.match_challenges
+  for insert
+  to authenticated
   with check (false);
 
-create policy "match_challenges_no_direct_update" on public.match_challenges
-  for update to authenticated
+create policy "match_challenges_no_direct_update"
+  on public.match_challenges
+  for update
+  to authenticated
   using (false)
   with check (false);
 
-create policy "match_challenges_no_direct_delete" on public.match_challenges
-  for delete to authenticated
+create policy "match_challenges_no_direct_delete"
+  on public.match_challenges
+  for delete
+  to authenticated
   using (false);
 
--- Section: Indexes (continued)
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
 -- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
 -- Postgres does NOT index the referencing side of a foreign key for you. Every
@@ -972,6 +1155,12 @@ create policy "match_challenges_no_direct_delete" on public.match_challenges
 -- (profiles on account deletion, matches/teams on cascade), and without an
 -- index each such statement seq-scans this table once per affected parent row.
 -- They are also the columns joined on when reading.
-create index if not exists idx_match_challenges_decided_by on public.match_challenges(decided_by);
+create index if not exists idx_match_challenges_decided_by
+  on public.match_challenges (
+    decided_by
+  );
 
-create index if not exists idx_match_challenges_match_id on public.match_challenges(match_id);
+create index if not exists idx_match_challenges_match_id
+  on public.match_challenges (
+    match_id
+  );

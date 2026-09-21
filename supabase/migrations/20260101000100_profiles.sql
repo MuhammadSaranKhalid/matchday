@@ -1,4 +1,6 @@
--- Migration file: 20260101000100_profiles.sql
+-- =============================================================================
+-- Migration: 20260101000100_profiles.sql
+-- =============================================================================
 
 -- 0100 · profiles
 -- Spec §1, §1.3, §1.7, §1.11, §8.2.1.
@@ -54,13 +56,18 @@
 -- 2026-09-06 — one enum, one definition, declared before anything uses it.
 -- profiles table.
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.profiles(
-  user_id             uuid primary key references auth.users(id) on delete cascade,
+create table public.profiles (
+  user_id             uuid primary key
+    references auth.users (id)
+    on delete cascade,
   -- Nullable until onboarding sets it. NULLs are distinct under the unique
   -- constraint so newly-created shells don't collide with each other.
-  username            text unique check (username is null or username ~ '^[a-z0-9_]{3,20}$'),
+  username            text unique
+    check (username is null or username ~ '^[a-z0-9_]{3,20}$'),
   display_name        text not null check (length(display_name) between 1 and 80),
   profile_photo_url   text,
   -- Public URL of the profile cover image in the `avatars` bucket
@@ -72,13 +79,30 @@ create table public.profiles(
   -- Location: flexible jsonb keyed by country / province / city / area /
   -- lat / lng. lat+lng are optional but trigger the PostGIS projection.
   location            jsonb not null default '{}'::jsonb,
-  location_point      geography(point, 4326) generated always as ( case when location ? 'lat' and location ? 'lng' then
-    st_setsrid(st_makepoint((location ->> 'lng')::double precision,(location ->> 'lat')::double precision), 4326)::geography
-  else
-    null
-  end) stored,
+  location_point      geography(point, 4326) generated always as (
+    case
+      when location ? 'lat'
+      and location ? 'lng' then st_setsrid(
+        st_makepoint(
+          (location ->> 'lng')::double precision,
+          (location ->> 'lat')::double precision
+        ),
+        4326
+      )::geography
+      else null
+    end
+  ) stored,
   -- Discoverability flags (§7.9). Defaults match spec defaults.
-  discoverability     jsonb not null default jsonb_build_object('appear_in_rankings', true, 'appear_in_search', true, 'appear_in_suggestions', true, 'show_location_publicly', true),
+  discoverability     jsonb not null default jsonb_build_object(
+    'appear_in_rankings',
+    true,
+    'appear_in_search',
+    true,
+    'appear_in_suggestions',
+    true,
+    'show_location_publicly',
+    true
+  ),
   is_verified         boolean not null default false,
   account_status      public.account_status not null default 'active',
   -- Stamped on the first real username pick. Stays NULL while onboarding
@@ -97,43 +121,68 @@ create table public.profiles(
   -- Normalised display_name + username for trigram search. GENERATED — never
   -- write it. f_unaccent() is declared in 0000_shared_helpers so this column
   -- can be declared here rather than bolted on by a later ALTER.
-  search_name         text generated always as (lower(public.f_unaccent(coalesce(display_name, '') || ' ' || coalesce(username, '')))) stored
+  search_name         text generated always as (
+    lower(
+      public.f_unaccent(coalesce(display_name, '') || ' ' || coalesce(username, ''))
+    )
+  ) stored
 );
 
-comment on column public.profiles.location is 'jsonb with keys: country, province, city, area, lat, lng. lat/lng optional.';
+comment on column public.profiles.location is
+  'jsonb with keys: country, province, city, area, lat, lng. lat/lng optional.';
 
-comment on column public.profiles.username_changed_at is 'Username cannot be changed for 30 days after this timestamp (spec §1.7).';
+comment on column public.profiles.username_changed_at is
+  'Username cannot be changed for 30 days after this timestamp (spec §1.7).';
 
-comment on column public.profiles.onboarded_at is 'Stamped when the user finishes onboarding (welcome step). NULL = onboarding incomplete; router will redirect to /onboarding.';
+comment on column public.profiles.onboarded_at is
+  'Stamped when the user finishes onboarding (welcome step). NULL = onboarding incomplete; router will redirect to /onboarding.';
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index profiles_username_trgm on public.profiles using gin(username gin_trgm_ops);
+create index profiles_username_trgm
+  on public.profiles using gin (
+    username gin_trgm_ops
+  );
 
-create index profiles_location_point on public.profiles using gist(location_point);
+create index profiles_location_point
+  on public.profiles using gist (location_point);
 
-create index profiles_city on public.profiles((location ->> 'city'));
+create index profiles_city
+  on public.profiles ((location ->> 'city'));
 
-create index profiles_last_active on public.profiles(last_active_at desc);
+create index profiles_last_active
+  on public.profiles (last_active_at desc);
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger profiles_set_updated_at
-  before update on public.profiles for each row
+  before update on public.profiles
+  for each row
   execute function public.set_updated_at();
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- Username 30-day no-change enforcement. Skipped on the first real pick —
 -- when old.username is NULL (onboarding incomplete), the change is free; we
 -- still stamp username_changed_at so subsequent changes are throttled.
 create or replace function public.enforce_username_cooldown()
-  returns trigger
-  language plpgsql
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
-  if new.username is distinct from old.username and old.username is not null and old.username_changed_at is not null and old.username_changed_at > now() - interval '30 days' then
+  if
+    new.username is distinct from old.username
+    and old.username is not null
+    and old.username_changed_at is not null
+    and old.username_changed_at > now() - interval '30 days'
+  then
     raise exception 'Username can be changed only once every 30 days.'
       using errcode = 'check_violation';
   end if;
@@ -144,110 +193,190 @@ begin
 end;
 $$;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger profiles_enforce_username_cooldown
-  before update on public.profiles for each row
+  before update on public.profiles
+  for each row
   execute function public.enforce_username_cooldown();
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- Auth integration — auto-create the profile shell on signup.
 -- SECURITY DEFINER so the trigger can write to public.profiles regardless of
 -- the RLS context of the inserting service.
 create or replace function public.handle_new_auth_user()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
-  insert into public.profiles(user_id, username, display_name, profile_photo_url, location)
-    values(new.id, new.raw_user_meta_data ->> 'username',
+  insert into public.profiles
+    (user_id, username, display_name, profile_photo_url, location)
+  values
+    (
+      new.id,
+      new.raw_user_meta_data ->> 'username',
       -- Truncated to the column's 80-char check. A raise here would abort the
       -- auth.users INSERT and surface as "Database error saving new user", so
       -- the trigger must not be able to reject a name a provider hands us.
-      left(coalesce(nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''), nullif(trim(new.raw_user_meta_data ->> 'name'), ''), nullif(trim(new.raw_user_meta_data ->> 'display_name'), ''), 'New User'), 80), coalesce(nullif(trim(new.raw_user_meta_data ->> 'avatar_url'), ''), nullif(trim(new.raw_user_meta_data ->> 'picture'), '')), coalesce(new.raw_user_meta_data -> 'location', '{}'::jsonb))
-    on conflict(user_id)
-      do nothing;
+      left(
+        coalesce(
+          nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''),
+          nullif(trim(new.raw_user_meta_data ->> 'name'), ''),
+          nullif(trim(new.raw_user_meta_data ->> 'display_name'), ''),
+          'New User'
+        ),
+        80
+      ),
+      coalesce(
+        nullif(trim(new.raw_user_meta_data ->> 'avatar_url'), ''),
+        nullif(trim(new.raw_user_meta_data ->> 'picture'), '')
+      ),
+      coalesce(new.raw_user_meta_data -> 'location', '{}'::jsonb)
+    )
+  on conflict (user_id) do nothing;
   return new;
 end;
 $$;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger on_auth_user_created
-  after insert on auth.users for each row
+  after insert on auth.users
+  for each row
   execute function public.handle_new_auth_user();
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- RLS — public read of active profiles; owner-only write.
 -- INSERT is locked at the policy level: only the auth trigger writes here.
 alter table public.profiles enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "profiles_read_public" on public.profiles
-  for select to anon, authenticated
+create policy "profiles_read_public"
+  on public.profiles
+  for select
+  to anon, authenticated
   using (account_status = 'active');
 
-create policy "profiles_update_self" on public.profiles
-  for update to authenticated
-  using ((
-    select
-      auth.uid()) = user_id)
-  with check ((
-    select
-      auth.uid()) = user_id);
+create policy "profiles_update_self"
+  on public.profiles
+  for update
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = user_id
+  )
+  with check (
+    (
+      select
+        auth.uid()
+    ) = user_id
+  );
 
-create policy "profiles_delete_self" on public.profiles
-  for delete to authenticated
-  using ((
-    select
-      auth.uid()) = user_id);
+create policy "profiles_delete_self"
+  on public.profiles
+  for delete
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = user_id
+  );
 
--- Section: Integrations
+-- -----------------------------------------------------------------------------
+-- Integrations
+-- -----------------------------------------------------------------------------
 
 -- Storage bucket: avatars
 -- Public-read; uploads restricted to <auth.uid()>/<filename>.
-insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
-  values ('avatars', 'avatars', true, 5 * 1024 * 1024, -- 5 MB cap
-    array['image/jpeg', 'image/png', 'image/webp'])
-on conflict (id)
-  do nothing;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values
+  (
+    'avatars',
+    'avatars',
+    true,
+    5 * 1024 * 1024, -- 5 MB cap
+    array['image/jpeg', 'image/png', 'image/webp']
+  )
+on conflict (id) do nothing;
 
--- Section: Policies (continued)
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "avatars_read_public" on storage.objects
+create policy "avatars_read_public"
+  on storage.objects
   for select
   using (bucket_id = 'avatars');
 
-create policy "avatars_insert_own_folder" on storage.objects
-  for insert to authenticated
-  with check (bucket_id = 'avatars'
-  and (storage.foldername(name))[1] =(
-    select
-      auth.uid())::text);
-
-create policy "avatars_update_own_folder" on storage.objects
-  for update to authenticated
-  using (bucket_id = 'avatars'
-    and (storage.foldername(name))[1] =(
+create policy "avatars_insert_own_folder"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (
       select
-        auth.uid())::text)
-  with check (bucket_id = 'avatars'
-  and (storage.foldername(name))[1] =(
-    select
-      auth.uid())::text);
+        auth.uid()
+    )::text
+  );
 
-create policy "avatars_delete_own_folder" on storage.objects
-  for delete to authenticated
-  using (bucket_id = 'avatars'
-    and (storage.foldername(name))[1] =(
+create policy "avatars_update_own_folder"
+  on storage.objects
+  for update
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (
       select
-        auth.uid())::text);
+        auth.uid()
+    )::text
+  )
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (
+      select
+        auth.uid()
+    )::text
+  );
 
-create index if not exists profiles_search_trgm on public.profiles using gin(search_name gin_trgm_ops)
-where
-  account_status = 'active' and coalesce((discoverability ->> 'appear_in_search')::boolean, true);
+create policy "avatars_delete_own_folder"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (
+      select
+        auth.uid()
+    )::text
+  );
+
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
+
+create index if not exists profiles_search_trgm
+  on public.profiles using gin (
+    search_name gin_trgm_ops
+  )
+  where
+    account_status = 'active'
+    and coalesce((discoverability ->> 'appear_in_search')::boolean, true);

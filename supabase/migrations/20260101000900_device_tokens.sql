@@ -1,4 +1,6 @@
--- Migration file: 20260101000900_device_tokens.sql
+-- =============================================================================
+-- Migration: 20260101000900_device_tokens.sql
+-- =============================================================================
 
 -- 0900 · device_tokens + send-push trigger
 -- Backs FCM push delivery. The Flutter client upserts one row per signed-in
@@ -17,13 +19,18 @@
 --   a time. If user B signs in on a device where user A was previously signed
 --   in, the upsert replaces A's row.
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.device_tokens(
+create table public.device_tokens (
   token_id     uuid primary key default gen_random_uuid(),
-  user_id      uuid not null references public.profiles(user_id) on delete cascade,
+  user_id      uuid not null
+    references public.profiles (user_id)
+    on delete cascade,
   fcm_token    text not null,
-  platform     text not null constraint device_tokens_platform_check check (platform in ('ios', 'android', 'web')),
+  platform     text not null constraint device_tokens_platform_check
+    check (platform in ('ios', 'android', 'web')),
   app_version  text,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
@@ -34,52 +41,86 @@ create table public.device_tokens(
   constraint device_tokens_unique_token unique (fcm_token)
 );
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index device_tokens_user on public.device_tokens(user_id);
+create index device_tokens_user
+  on public.device_tokens (user_id);
 
-create index device_tokens_last_seen on public.device_tokens(last_seen_at);
+create index device_tokens_last_seen
+  on public.device_tokens (last_seen_at);
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger device_tokens_set_updated_at
-  before update on public.device_tokens for each row
+  before update on public.device_tokens
+  for each row
   execute function public.set_updated_at();
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- RLS — the signed-in user can only touch their own rows. The Edge Function
 -- reads via the service role (bypasses RLS) so it can find tokens for any
 -- recipient.
 alter table public.device_tokens enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "device_tokens_self_select" on public.device_tokens
-  for select to authenticated
-  using ((
-    select
-      auth.uid()) = user_id);
+create policy "device_tokens_self_select"
+  on public.device_tokens
+  for select
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = user_id
+  );
 
-create policy "device_tokens_self_insert" on public.device_tokens
-  for insert to authenticated
-  with check ((
-    select
-      auth.uid()) = user_id);
+create policy "device_tokens_self_insert"
+  on public.device_tokens
+  for insert
+  to authenticated
+  with check (
+    (
+      select
+        auth.uid()
+    ) = user_id
+  );
 
-create policy "device_tokens_self_update" on public.device_tokens
-  for update to authenticated
-  using ((
-    select
-      auth.uid()) = user_id)
-  with check ((
-    select
-      auth.uid()) = user_id);
+create policy "device_tokens_self_update"
+  on public.device_tokens
+  for update
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = user_id
+  )
+  with check (
+    (
+      select
+        auth.uid()
+    ) = user_id
+  );
 
-create policy "device_tokens_self_delete" on public.device_tokens
-  for delete to authenticated
-  using ((
-    select
-      auth.uid()) = user_id);
+create policy "device_tokens_self_delete"
+  on public.device_tokens
+  for delete
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = user_id
+  );
 
 -- Push delivery is queued in 0910; no per-row HTTP trigger.

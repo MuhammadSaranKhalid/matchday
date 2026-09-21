@@ -1,0 +1,9 @@
+{
+  "name": "matchday-migration-formatting",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "prettier": "3.9.8",
+    "prettier-plugin-sql-cst": "0.22.1"
+  }
+}

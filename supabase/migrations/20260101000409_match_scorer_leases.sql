@@ -1,10 +1,14 @@
--- Migration file: 20260101000409_match_scorer_leases.sql
+-- =============================================================================
+-- Migration: 20260101000409_match_scorer_leases.sql
+-- =============================================================================
 
 -- 0409 · match_scorer_leases
 -- The current scoring device lease for a match.
 -- Spec: docs/matches-schema-architecture.md
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
 drop table if exists public.match_scorer_leases cascade;
 
@@ -16,27 +20,42 @@ drop table if exists public.match_scorer_leases cascade;
 -- ledger (scoring_rules.dart). Dropped 2026-09-06 rather than re-backed with
 -- views, because a view would put cricket arithmetic back in SQL — which the
 -- CLAUDE.md banner forbids: the rules live in the Dart engine only.
-create table public.match_scorer_leases(
-  match_id          uuid primary key references public.matches(match_id) on delete cascade,
-  active_scorer_id  uuid not null references public.profiles(user_id) on delete cascade,
+create table public.match_scorer_leases (
+  match_id          uuid primary key
+    references public.matches (match_id)
+    on delete cascade,
+  active_scorer_id  uuid not null
+    references public.profiles (user_id)
+    on delete cascade,
   device_id         text not null,
   lease_acquired_at timestamptz not null default now(),
   lease_expires_at  timestamptz not null default (now() + interval '5 minutes'),
   heartbeat_at      timestamptz not null default now()
 );
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 alter table public.match_scorer_leases enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
 drop policy if exists "match_scorer_leases_read_all" on public.match_scorer_leases;
 
-create policy "match_scorer_leases_read_all" on public.match_scorer_leases
-  for select to anon, authenticated
+create policy "match_scorer_leases_read_all"
+  on public.match_scorer_leases
+  for select
+  to anon, authenticated
   using (true);
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index if not exists idx_match_scorer_leases_active_scorer_id on public.match_scorer_leases(active_scorer_id);
+create index if not exists idx_match_scorer_leases_active_scorer_id
+  on public.match_scorer_leases (
+    active_scorer_id
+  );

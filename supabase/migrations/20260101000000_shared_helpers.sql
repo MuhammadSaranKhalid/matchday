@@ -1,4 +1,6 @@
--- Migration file: 20260101000000_shared_helpers.sql
+-- =============================================================================
+-- Migration: 20260101000000_shared_helpers.sql
+-- =============================================================================
 
 -- 0000 · Shared helpers
 -- Foundation that every later migration assumes is already there:
@@ -59,7 +61,9 @@
 --       NOT add `alter type ... add value` to a later migration — this project
 --       is pre-production and migrations are edited at the source.
 
--- Section: Prerequisites
+-- -----------------------------------------------------------------------------
+-- Prerequisites
+-- -----------------------------------------------------------------------------
 
 create extension if not exists pgcrypto;
 
@@ -89,17 +93,21 @@ create extension if not exists pg_net with schema extensions;
 --     deliberately none here. The queues themselves are created in 0910.
 create extension if not exists pgmq;
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- f_unaccent(text) — IMMUTABLE unaccent, safe inside generated columns.
 create or replace function public.f_unaccent(
   text
 )
-  returns text
-  language sql
-  immutable parallel safe strict
-  set search_path = public, pg_temp
-  as $$
+returns text
+language sql
+immutable
+parallel safe
+strict
+set search_path = public, pg_temp
+as $$
   -- Two-arg form is IMMUTABLE (single-arg is only STABLE). Bind the
   -- dictionary explicitly so the planner can constant-fold inside the
   -- generated column / index expression.
@@ -123,17 +131,19 @@ grant execute on function public.f_unaccent(text) to authenticated, service_role
 --     before update on public.<table>
 --     for each row execute function public.set_updated_at();
 create or replace function public.set_updated_at()
-  returns trigger
-  language plpgsql
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
   new.updated_at := now();
   return new;
 end;
 $$;
 
--- Section: Dependency-ordered operations
+-- -----------------------------------------------------------------------------
+-- Dependency-ordered operations
+-- -----------------------------------------------------------------------------
 
 -- 3. Enum catalogue
 -- Grouped by the domain that owns them. `do $$ … exception when
@@ -484,7 +494,6 @@ begin
 exception
   when duplicate_object then null;
 end $$;
-
 
 do $$
 begin

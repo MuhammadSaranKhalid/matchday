@@ -1,4 +1,6 @@
--- Migration file: 20260101000201_roles.sql
+-- =============================================================================
+-- Migration: 20260101000201_roles.sql
+-- =============================================================================
 
 -- 0201 · roles — authorization role catalogue
 -- Design + decision log: docs/team-roles-design.md
@@ -17,10 +19,14 @@
 -- earlier draft had a `category` column doing constraint + display + semantics
 -- at once; splitting them is why exclusivity could become data.
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.roles(
-  scope            text not null default 'team' check (scope in ('team', 'match', 'tournament', 'club')),
+create table public.roles (
+  scope            text not null default 'team' check (
+    scope in ('team', 'match', 'tournament', 'club')
+  ),
   key              text not null check (key ~ '^[a-z][a-z_]{1,30}$'),
   name             text not null,
   rank             integer not null check (rank between 0 and 1000),
@@ -37,25 +43,35 @@ create table public.roles(
   -- and therefore index on it — a partial-index predicate must be IMMUTABLE and
   -- cannot read this table.
   unique (scope, key, is_singleton),
-  constraint unclaimed_roles_are_powerless check (not allows_unclaimed or rank = 0 or key = 'player')
+  constraint unclaimed_roles_are_powerless
+    check (not allows_unclaimed or rank = 0 or key = 'player')
 );
 
--- Section: Data changes
+-- -----------------------------------------------------------------------------
+-- Data changes
+-- -----------------------------------------------------------------------------
 
-insert into public.roles(scope, key, name, rank, is_system, is_singleton, allows_unclaimed, display_group)
+insert into public.roles
+  (scope, key, name, rank, is_system, is_singleton, allows_unclaimed, display_group)
 values
   ('team', 'owner', 'Owner', 40, true, true, false, 'Club'),
-('team', 'manager', 'Manager', 30, true, false, false, 'Club'),
-('team', 'captain', 'Captain', 20, true, true, false, 'Match day'),
-('team', 'player', 'Player', 10, true, false, true, 'Club');
+  ('team', 'manager', 'Manager', 30, true, false, false, 'Club'),
+  ('team', 'captain', 'Captain', 20, true, true, false, 'Match day'),
+  ('team', 'player', 'Player', 10, true, false, true, 'Club');
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- Catalogue data is world-readable and writable only by migrations/service_role.
 alter table public.roles enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "roles_read_all" on public.roles
-  for select to anon, authenticated
+create policy "roles_read_all"
+  on public.roles
+  for select
+  to anon, authenticated
   using (true);

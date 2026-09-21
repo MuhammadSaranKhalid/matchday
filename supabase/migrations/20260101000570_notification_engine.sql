@@ -1,4 +1,6 @@
--- Migration file: 20260101000570_notification_engine.sql
+-- =============================================================================
+-- Migration: 20260101000570_notification_engine.sql
+-- =============================================================================
 
 -- 0570 · notification engine — render_template, notify(), audience resolvers
 -- Design + decision log: docs/notifications-design.md
@@ -51,17 +53,19 @@
 -- shipping a slightly terse sentence, and the catalogue test is where that bug
 -- is supposed to be caught.
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 create or replace function public.render_template(
   p_tmpl text,
   p_vars jsonb
 )
-  returns text
-  language plpgsql
-  immutable
-  set search_path = public, pg_temp
-  as $$
+returns text
+language plpgsql
+immutable
+set search_path = public, pg_temp
+as $$
 declare
   v_out text := p_tmpl;
   v_key text;
@@ -96,7 +100,9 @@ begin
 end;
 $$;
 
-revoke all on function public.render_template(text, jsonb) from public, anon, authenticated;
+revoke all
+on function public.render_template(text, jsonb)
+from public, anon, authenticated;
 
 -- _notify_vars — resolve ids to names ONCE, then hand render_template a flat
 -- bag of scalars. Everything already in the payload passes through, so
@@ -109,57 +115,89 @@ create or replace function public._notify_vars(
   p_payload jsonb,
   p_actor_id uuid
 )
-  returns jsonb
-  language plpgsql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v jsonb := coalesce(p_payload, '{}'::jsonb);
 begin
-  v := v || jsonb_build_object('actor_name', coalesce((
-      select
-        p.display_name
-      from public.profiles p
-      where
-        p.user_id = p_actor_id), 'Someone'), 'actor_username', coalesce((
-    select
-      p.username
-    from public.profiles p
-    where
-      p.user_id = p_actor_id), ''), 'team_name', coalesce((
-  select
-    t.team_name
-  from public.teams t
-where
-  t.team_id =(v ->> 'team_id')::uuid), 'a team'), 'opponent_name', coalesce((
-  select
-    t.team_name
-  from public.teams t
-where
-  t.team_id =(v ->> 'opponent_team_id')::uuid), 'The other team'), 'tournament_name', coalesce((
-  select
-    tn.tournament_name
-  from public.tournaments tn
-where
-  tn.tournament_id =(v ->> 'tournament_id')::uuid), 'the tournament'), 'role_name', coalesce((
-  select
-    r.name
-  from public.roles r
-where
-  r.scope = 'team'
-    and r.key = v ->> 'role_key'), 'a member'));
+  v := v || jsonb_build_object(
+    'actor_name',
+    coalesce(
+      (
+        select
+          p.display_name
+        from public.profiles p
+        where p.user_id = p_actor_id
+      ),
+      'Someone'
+    ),
+    'actor_username',
+    coalesce(
+      (
+        select
+          p.username
+        from public.profiles p
+        where p.user_id = p_actor_id
+      ),
+      ''
+    ),
+    'team_name',
+    coalesce(
+      (
+        select
+          t.team_name
+        from public.teams t
+        where t.team_id = (v ->> 'team_id')::uuid
+      ),
+      'a team'
+    ),
+    'opponent_name',
+    coalesce(
+      (
+        select
+          t.team_name
+        from public.teams t
+        where t.team_id = (v ->> 'opponent_team_id')::uuid
+      ),
+      'The other team'
+    ),
+    'tournament_name',
+    coalesce(
+      (
+        select
+          tn.tournament_name
+        from public.tournaments tn
+        where tn.tournament_id = (v ->> 'tournament_id')::uuid
+      ),
+      'the tournament'
+    ),
+    'role_name',
+    coalesce(
+      (
+        select
+          r.name
+        from public.roles r
+        where r.scope = 'team' and r.key = v ->> 'role_key'
+      ),
+      'a member'
+    )
+  );
   return v;
-exception
-  -- A malformed uuid in the payload must not take down the business write.
-  when invalid_text_representation then
-    return coalesce(p_payload, '{}'::jsonb) || jsonb_build_object('actor_name', 'Someone');
+exception when invalid_text_representation then -- A malformed uuid in the payload must not take down the business write.
+  return coalesce(p_payload, '{}'::jsonb) || jsonb_build_object(
+    'actor_name',
+    'Someone'
+  );
 end;
-
 $$;
 
-revoke all on function public._notify_vars(jsonb, uuid) from public, anon, authenticated;
+revoke all
+on function public._notify_vars(jsonb, uuid)
+from public, anon, authenticated;
 
 -- Delivery is defined in 0910 after device_tokens. PL/pgSQL resolves the
 -- dependency when a producer runs, after all migrations have been applied.
@@ -192,11 +230,11 @@ create or replace function public.notify(
   p_scope text default null,
   p_entity_id uuid default null
 )
-  returns setof uuid
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns setof uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_type public.notification_types%rowtype;
   v_icon_path text;
@@ -387,7 +425,9 @@ on conflict
 end;
 $$;
 
-revoke all on function public.notify(uuid[], text, jsonb, uuid, text, uuid) from public, anon, authenticated;
+revoke all
+on function public.notify(uuid[], text, jsonb, uuid, text, uuid)
+from public, anon, authenticated;
 
 -- Convenience wrapper for the overwhelmingly common single-recipient case.
 create or replace function public.notify_one(
@@ -398,17 +438,26 @@ create or replace function public.notify_one(
   p_scope text default null,
   p_entity_id uuid default null
 )
-  returns uuid
-  language sql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns uuid
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
   select
-    public.notify(array[p_recipient], p_type_key, p_payload, p_actor_id, p_scope, p_entity_id)
+    public.notify(
+      array[p_recipient],
+      p_type_key,
+      p_payload,
+      p_actor_id,
+      p_scope,
+      p_entity_id
+    )
   limit 1;
 $$;
 
-revoke all on function public.notify_one(uuid, text, jsonb, uuid, text, uuid) from public, anon, authenticated;
+revoke all
+on function public.notify_one(uuid, text, jsonb, uuid, text, uuid)
+from public, anon, authenticated;
 
 -- Audience resolvers — "who should be told".
 --
@@ -421,23 +470,21 @@ revoke all on function public.notify_one(uuid, text, jsonb, uuid, text, uuid) fr
 create or replace function public.audience_team_members(
   p_team_id uuid
 )
-  returns setof uuid
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
     tm.user_id
-  from
-    public.team_members tm
-  where
-    tm.team_id = p_team_id
-    and tm.status = 'active'
-    and tm.user_id is not null;
+  from public.team_members tm
+  where tm.team_id = p_team_id and tm.status = 'active' and tm.user_id is not null;
 $$;
 
-revoke all on function public.audience_team_members(uuid) from public, anon, authenticated;
+revoke all
+on function public.audience_team_members(uuid)
+from public, anon, authenticated;
 
 -- Followers of any followable entity. `follows` is already polymorphic over
 -- user / team / tournament, so this needs no new machinery.
@@ -447,46 +494,46 @@ create or replace function public.audience_followers(
   p_target_type public.follow_target_type,
   p_target_id uuid
 )
-  returns setof uuid
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
     f.follower_id
-  from
-    public.follows f
+  from public.follows f
   where
     f.target_type = p_target_type
     and f.target_id = p_target_id
     and f.status = 'active';
 $$;
 
-revoke all on function public.audience_followers(public.follow_target_type, uuid) from public, anon, authenticated;
+revoke all
+on function public.audience_followers(public.follow_target_type, uuid)
+from public, anon, authenticated;
 
 -- Both sides of a match, roster-wide.
 create or replace function public.audience_match_sides(
   p_match_id uuid
 )
-  returns setof uuid
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select distinct
     tm.user_id
   from
     public.matches m
-    join public.team_members tm on tm.team_id in(m.team_a_id, m.team_b_id)
-  where
-    m.match_id = p_match_id
-    and tm.status = 'active'
-    and tm.user_id is not null;
+    join public.team_members tm on tm.team_id in (m.team_a_id, m.team_b_id)
+  where m.match_id = p_match_id and tm.status = 'active' and tm.user_id is not null;
 $$;
 
-revoke all on function public.audience_match_sides(uuid) from public, anon, authenticated;
+revoke all
+on function public.audience_match_sides(uuid)
+from public, anon, authenticated;
 
 -- NOT HERE: audience_chat_members.
 --

@@ -1,4 +1,6 @@
--- Migration file: 20260101000320_tournament_standings.sql
+-- =============================================================================
+-- Migration: 20260101000320_tournament_standings.sql
+-- =============================================================================
 
 -- 0320 · tournament_standings
 -- Spec §3.9. Per-team accumulator inside a tournament.
@@ -17,11 +19,17 @@
 --   Public (every tournament page renders the standings table). FK CASCADE
 --   on tournament + team so dropping a team auto-cleans its row.
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.tournament_standings(
-  tournament_id  uuid not null references public.tournaments(tournament_id) on delete cascade,
-  team_id        uuid not null references public.teams(team_id) on delete cascade,
+create table public.tournament_standings (
+  tournament_id  uuid not null
+    references public.tournaments (tournament_id)
+    on delete cascade,
+  team_id        uuid not null
+    references public.teams (team_id)
+    on delete cascade,
   group_id       text, -- null for non-group formats
   matches_played integer not null default 0,
   wins           integer not null default 0,
@@ -39,33 +47,49 @@ create table public.tournament_standings(
   primary key (tournament_id, team_id)
 );
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index tournament_standings_team on public.tournament_standings(team_id);
+create index tournament_standings_team
+  on public.tournament_standings (team_id);
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger tournament_standings_set_updated_at
-  before update on public.tournament_standings for each row
+  before update on public.tournament_standings
+  for each row
   execute function public.set_updated_at();
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- RLS — public read; no direct writes (recalc RPC is the only path).
 alter table public.tournament_standings enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "tournament_standings_read_public" on public.tournament_standings
-  for select to anon, authenticated
+create policy "tournament_standings_read_public"
+  on public.tournament_standings
+  for select
+  to anon, authenticated
   using (true);
 
-create policy "tournament_standings_no_direct_write" on public.tournament_standings
-  for all to authenticated
+create policy "tournament_standings_no_direct_write"
+  on public.tournament_standings
+  for all
+  to authenticated
   using (false)
   with check (false);
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- Realtime — Broadcast on standings change
 -- Spectators on a tournament screen subscribe to
@@ -73,30 +97,38 @@ create policy "tournament_standings_no_direct_write" on public.tournament_standi
 -- matches complete. Standings are recomputed by the match-result trigger
 -- (0420), so this fires once per match completion — low msg/s.
 create or replace function public.broadcast_standings_change()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   perform
-    realtime.send(to_jsonb(coalesce(new, old)), case tg_op
-      when 'DELETE' then
-        'standings_deleted'
-      else
-        'standings_updated'
-      end, 'tournament:' || coalesce(new.tournament_id, old.tournament_id)::text || ':standings', true);
+    realtime.send(
+      to_jsonb(coalesce(new, old)),
+      case tg_op
+        when 'DELETE' then 'standings_deleted'
+        else 'standings_updated'
+      end,
+      'tournament:' || coalesce(
+        new.tournament_id,
+        old.tournament_id
+      )::text || ':standings',
+      true
+    );
   return null;
 end;
 $$;
 
 revoke all on function public.broadcast_standings_change() from public;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 drop trigger if exists tournament_standings_broadcast on public.tournament_standings;
 
 create trigger tournament_standings_broadcast
-  after insert or update or delete on public.tournament_standings for each row
+  after insert or update or delete on public.tournament_standings
+  for each row
   execute function public.broadcast_standings_change();
-

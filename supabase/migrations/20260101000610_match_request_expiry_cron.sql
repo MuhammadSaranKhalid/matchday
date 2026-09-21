@@ -1,4 +1,6 @@
--- Migration file: 20260101000610_match_request_expiry_cron.sql
+-- =============================================================================
+-- Migration: 20260101000610_match_request_expiry_cron.sql
+-- =============================================================================
 
 -- 0610 · scheduled cleanup jobs (pg_cron)
 -- Two scheduled jobs that close the loop on time-based state transitions:
@@ -30,14 +32,16 @@
 -- SECURITY DEFINER so the cron runner (minimal privileges) can bypass
 -- RLS and write the update.
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 create or replace function public.expire_stale_match_requests()
-  returns integer
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_count integer;
 begin
@@ -84,11 +88,11 @@ revoke all on function public.expire_stale_match_requests() from public;
 -- when status flips to `completed`, so flipping to `abandoned` here will
 -- NOT cascade into tournament standings or bracket advancement.
 create or replace function public.abandon_stale_matches()
-  returns integer
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_count integer;
 begin
@@ -115,7 +119,9 @@ $$;
 
 revoke all on function public.abandon_stale_matches() from public;
 
--- Section: Dependency-ordered operations
+-- -----------------------------------------------------------------------------
+-- Dependency-ordered operations
+-- -----------------------------------------------------------------------------
 
 -- Schedule both cron jobs. The DO block makes the migration safely re-
 -- runnable: existing jobs of the same name get unscheduled first so the

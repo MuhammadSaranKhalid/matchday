@@ -1,4 +1,6 @@
--- Migration file: 20260101000010_default_grants.sql
+-- =============================================================================
+-- Migration: 20260101000010_default_grants.sql
+-- =============================================================================
 
 -- 0010 · Default grants on public for anon / authenticated / service_role
 -- Hosted Supabase projects ship with these grants pre-seeded on `public`. If
@@ -12,7 +14,9 @@
 -- creates a table, so every subsequent `create table public.foo` inherits
 -- privileges automatically via ALTER DEFAULT PRIVILEGES.
 
--- Section: Permissions
+-- -----------------------------------------------------------------------------
+-- Permissions
+-- -----------------------------------------------------------------------------
 
 grant usage on schema public to anon, authenticated, service_role;
 
@@ -25,23 +29,35 @@ grant usage on schema public to anon, authenticated, service_role;
 -- RLS narrows the rows. service_role gets ALL because Edge Functions /
 -- migration tooling run as it. Explicit FOR ROLE postgres pins the grantor
 -- so self-hosted setups don't inherit the wrong owner.
-alter default privileges for role postgres in schema public grant
-select
-  on tables to anon;
+alter default privileges
+for role postgres
+in schema public
+grant select on tables to anon;
 
-alter default privileges for role postgres in schema public grant
-select
-, insert, update, delete on tables to authenticated;
+alter default privileges
+for role postgres
+in schema public
+grant select, insert, update, delete on tables to authenticated;
 
-alter default privileges for role postgres in schema public grant all on tables to service_role;
+alter default privileges
+for role postgres
+in schema public
+grant all on tables to service_role;
 
-alter default privileges for role postgres in schema public grant usage on sequences to anon;
+alter default privileges
+for role postgres
+in schema public
+grant usage on sequences to anon;
 
-alter default privileges for role postgres in schema public grant usage,
-select
-  on sequences to authenticated;
+alter default privileges
+for role postgres
+in schema public
+grant usage, select on sequences to authenticated;
 
-alter default privileges for role postgres in schema public grant all on sequences to service_role;
+alter default privileges
+for role postgres
+in schema public
+grant all on sequences to service_role;
 
 -- ⚠️ The REVOKE is load-bearing and must come first. Postgres grants EXECUTE
 -- on every newly created function to PUBLIC automatically, and `anon` inherits
@@ -55,11 +71,19 @@ alter default privileges for role postgres in schema public grant all on sequenc
 -- Default privileges apply to objects created AFTER this statement, and this
 -- migration runs before every table and function, so one revoke here fixes the
 -- whole run.
-alter default privileges for role postgres in schema public revoke execute on functions from public;
+alter default privileges
+for role postgres
+in schema public
+revoke execute on functions from public;
 
-alter default privileges for role postgres in schema public grant execute on functions to authenticated, service_role;
+alter default privileges
+for role postgres
+in schema public
+grant execute on functions to authenticated, service_role;
 
--- Section: Dependency-ordered operations
+-- -----------------------------------------------------------------------------
+-- Dependency-ordered operations
+-- -----------------------------------------------------------------------------
 
 -- anon explicitly gets no function execute by default; any RPC that wants
 -- to be reachable from the signed-out spectator surface (e.g. the public

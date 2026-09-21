@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Format migrations without changing statement order or parsed SQL.
 
-Requires pgFormatter 5.11 and requirements-format.txt. See
+Requires the pinned Node dependencies and requirements-format.txt. See
 docs/database/migration-style.md for installation and usage.
 """
 
 import argparse
-import collections
 import json
 import os
 from pathlib import Path
@@ -19,7 +18,12 @@ from pglast import parser
 
 ROOT = Path(__file__).resolve().parents[2]
 COMMENT_TOKENS = {"SQL_COMMENT", "C_COMMENT"}
-GENERATED_COMMENT = re.compile(r"-- (?:Migration file:|Section:) .*")
+GENERATED_COMMENT = re.compile(r"-- (?:Migration file:|Migration:|Section:) .*")
+SECTION_NAMES = {
+    "Prerequisites", "Tables and constraints", "Enable row-level security",
+    "Indexes", "Functions", "Triggers", "Policies", "Permissions", "Views",
+    "Data changes", "Integrations", "Dependency-ordered operations", "Object documentation",
+}
 POSITION_FIELDS = {
     "location", "stmt_location", "stmt_len", "list_start", "list_end",
     "rexpr_list_start", "rexpr_list_end",
@@ -128,6 +132,7 @@ def strip_generated_comments(source):
         value = source[token.start : token.end + 1]
         if token.name == "SQL_COMMENT" and (
             GENERATED_COMMENT.fullmatch(value)
+            or value.removeprefix("-- ") in SECTION_NAMES
             or re.fullmatch(r"--\s*[-=]{3,}\s*", value)
             or re.fullmatch(
                 r"--\s*(?:\d+[.)]\s*)?(?:Indexes|Triggers|Functions|Policies|Grants|RLS)\s*",
@@ -178,8 +183,7 @@ def split_parameters(source):
 def align_table_columns(source):
     """Align types after the longest column name, including generated columns.
 
-    pgFormatter's vertical-align skips some complex CREATE TABLE definitions.
-    PostgreSQL's column/type source positions let us align those reliably too.
+    PostgreSQL's column/type source positions include complex generated columns.
     """
     encoded = source.encode()
     edits = []
@@ -211,9 +215,8 @@ def add_sections(source, filename):
     # are Python string offsets. Work in bytes when slicing whole statements.
     statements = json.loads(parser.parse_sql_json(source))["stmts"]
     encoded = source.encode()
-    output = [f"-- Migration file: {filename}"]
+    output = [f"-- {'=' * 77}\n-- Migration: {filename}\n-- {'=' * 77}"]
     previous = None
-    seen = collections.Counter()
     start = 0
     for item in statements:
         end = item.get("stmt_location", 0) + item.get("stmt_len", 0)
@@ -230,9 +233,7 @@ def add_sections(source, filename):
             chunk = chunk[first_code.start :]
         group = section(item["stmt"], previous)
         if group != previous:
-            suffix = " (continued)" if seen[group] else ""
-            output.append(f"-- Section: {group}{suffix}")
-            seen[group] += 1
+            output.append(f"-- {'-' * 77}\n-- {group}\n-- {'-' * 77}")
         output.append(chunk)
         previous = group
         start = end
@@ -243,7 +244,7 @@ def add_sections(source, filename):
 
 
 def preserve_multiline_literals(before, after, nested=False):
-    """Undo pgFormatter indentation drift within continued string literals."""
+    """Preserve multiline string contents and nested dollar-quoted SQL exactly."""
     before_tokens = [t for t in parser.scan(before) if t.name == "SCONST"]
     after_tokens = [t for t in parser.scan(after) if t.name == "SCONST"]
     if len(before_tokens) != len(after_tokens):
@@ -270,36 +271,125 @@ def preserve_multiline_literals(before, after, nested=False):
     return after
 
 
+def restore_postgres_syntax(source):
+    """Adapt two known SQL-CST 0.22.1 printing gaps; the AST gate stays mandatory."""
+    tokens = [token for token in parser.scan(source) if token.name not in COMMENT_TOKENS]
+    edits = []
+    for index, token in enumerate(tokens[:-2]):
+        # A policy expression consisting of a scalar subquery needs both the
+        # policy-expression parentheses and the scalar-subquery parentheses.
+        policy_query = token.name in {"USING", "CHECK"} and tokens[index + 1].name == "ASCII_40" and tokens[index + 2].name in {"SELECT", "WITH"}
+        # PostgreSQL puts NULLS NOT DISTINCT before a UNIQUE constraint's list.
+        unique = token.name == "UNIQUE" and tokens[index + 1].name == "ASCII_40"
+        if not (policy_query or unique):
+            continue
+        opening = tokens[index + 1]
+        depth = 1
+        cursor = index + 2
+        while depth:
+            closing = tokens[cursor]
+            depth += int(closing.name == "ASCII_40") - int(closing.name == "ASCII_41")
+            cursor += 1
+        if policy_query:
+            edits.extend([(opening.end + 1, opening.end + 1, "("), (closing.start, closing.start, ")")])
+        elif [t.name for t in tokens[cursor:cursor + 3]] == ["NULLS_P", "NOT", "DISTINCT"]:
+            clause_end = tokens[cursor + 2].end + 1
+            edits.extend([
+                (token.end + 1, opening.start, " nulls not distinct "),
+                (closing.end + 1, clause_end, ""),
+            ])
+    for start, end, replacement in sorted(edits, reverse=True):
+        source = source[:start] + replacement + source[end:]
+    return source
+
+
+def polish_layout(source):
+    """Give policies and triggers clause indentation without touching literals."""
+    encoded = source.encode()
+    edits = []
+    for item in json.loads(parser.parse_sql_json(source))["stmts"]:
+        kind = next(iter(item["stmt"]))
+        if kind not in {"CreatePolicyStmt", "CreateTrigStmt", "IndexStmt", "CreateStmt"}:
+            continue
+        start = item.get("stmt_location", 0)
+        length = item.get("stmt_len", 0)
+        end = start + length if length else len(encoded)
+        chunk = encoded[start:end].decode()
+        tokens = parser.scan(chunk)
+        first = next(t for t in tokens if t.name not in COMMENT_TOKENS)
+        if kind == "CreateStmt":
+            local_edits = []
+            for i, token in enumerate(tokens):
+                # Each foreign-key clause occupies its own readable line.
+                is_action = token.name == "ON" and tokens[i + 1].name in {"UPDATE", "DELETE_P"}
+                line_start = chunk.rfind("\n", 0, token.start) + 1
+                line_end = chunk.find("\n", token.start)
+                long_check = token.name == "CHECK" and len(chunk[line_start:line_end]) > 88
+                if token.name == "REFERENCES" or is_action or long_check:
+                    gap_start = token.start
+                    while chunk[gap_start - 1:gap_start].isspace():
+                        gap_start -= 1
+                    local_edits.append((gap_start, token.start, "\n    "))
+                if token.name == "REFERENCES":
+                    cursor = i + 1
+                    while cursor < len(tokens) and tokens[cursor].name in {"IDENT", "ASCII_46"}:
+                        cursor += 1
+                    if cursor < len(tokens) and tokens[cursor].name == "ASCII_40":
+                        opening = tokens[cursor]
+                        cursor += 1
+                        while cursor < len(tokens) and tokens[cursor].name != "ASCII_41":
+                            cursor += 1
+                        closing = tokens[cursor]
+                        inner = chunk[opening.end + 1:closing.start]
+                        inner_tokens = parser.scan(inner)
+                        if not any(t.name in COMMENT_TOKENS for t in inner_tokens):
+                            names = [inner[t.start:t.end + 1] for t in inner_tokens if t.name != "ASCII_44"]
+                            local_edits.append((opening.end + 1, closing.start, ", ".join(names)))
+            for left, right, replacement in sorted(local_edits, reverse=True):
+                chunk = chunk[:left] + replacement + chunk[right:]
+            edits.append((start, end, chunk.encode()))
+            continue
+        if kind in {"CreatePolicyStmt", "IndexStmt"}:
+            on = next(t for t in tokens if t.start > first.start and t.name == "ON")
+            gap_start = on.start
+            while chunk[gap_start - 1:gap_start].isspace():
+                gap_start -= 1
+            chunk = chunk[:gap_start] + "\n" + chunk[on.start:]
+        protected = [t for t in parser.scan(chunk) if t.name in {"SCONST", "IDENT"} and "\n" in chunk[t.start:t.end + 1]]
+        lines = []
+        offset = 0
+        first_line_end = chunk.find("\n", first.start)
+        for line in chunk.splitlines(keepends=True):
+            original_length = len(line)
+            inside_literal = any(t.start < offset <= t.end for t in protected)
+            if first_line_end >= 0 and offset > first_line_end and line.strip() and not inside_literal:
+                line = "  " + line
+            lines.append(line)
+            offset += original_length
+        edits.append((start, end, "".join(lines).encode()))
+    for start, end, replacement in reversed(edits):
+        encoded = encoded[:start] + replacement + encoded[end:]
+    return encoded.decode()
+
+
 def format_once(source, filename, executable):
     clean = strip_generated_comments(source)
-    placeholders = []
-    for token in parser.scan(clean):
-        value = clean[token.start : token.end + 1]
-        if token.name == "SCONST" and not value.startswith("$") and "\n" in value:
-            placeholders.append(re.escape(value))
-        if token.name != "SCONST" or not value.startswith("$"):
-            continue
-        delimiter = value[: value.index("$", 1) + 1]
-        body = value[len(delimiter) : -len(delimiter)]
-        for inner in parser.scan(body):
-            literal = body[inner.start : inner.end + 1]
-            if inner.name == "SCONST" and (literal.startswith("$") or "\n" in literal):
-                placeholders.append(re.escape(literal))
-    protected = ["-M", "-p", "|".join(sorted(set(placeholders), key=len, reverse=True))] if placeholders else []
-    result = subprocess.run(
-        [executable, "-X", "-s", "2", "-u", "1", "-U", "1", "-f", "0",
-         "--redundant-parenthesis", "--no-space-function", "-L", *protected, "-"],
-        input=clean, text=True, capture_output=True, check=True,
-    ).stdout
-    result = preserve_multiline_literals(clean, result)
-    result = add_sections(align_table_columns(split_parameters(result)), filename)
+    process = subprocess.run(
+        [executable, str(Path(__file__).with_name("prettier_sql.mjs"))],
+        input=clean, text=True, capture_output=True,
+    )
+    if process.returncode:
+        raise ValueError(process.stderr.strip())
+    result = restore_postgres_syntax(preserve_multiline_literals(clean, process.stdout))
+    result = polish_layout(align_table_columns(split_parameters(result)))
+    result = add_sections(result, filename)
     if sql_ast(source) != sql_ast(result):
         raise ValueError("formatter changed the SQL AST or routine-body tokens")
     return result
 
 
 def format_sql(source, filename, executable):
-    # A few pgFormatter constructs settle on their second pass. Never write
+    # Settle the formatter and project layout together. Never write
     # output that would immediately fail --check on the next invocation.
     for _ in range(4):
         formatted = format_once(source, filename, executable)
@@ -312,18 +402,15 @@ def format_sql(source, filename, executable):
 def main():
     argument_parser = argparse.ArgumentParser(description=__doc__)
     argument_parser.add_argument("--check", action="store_true", help="report drift without writing")
-    argument_parser.add_argument("--pg-format", default=os.environ.get("PG_FORMAT", "pg_format"))
+    argument_parser.add_argument("--node", default=os.environ.get("NODE", "node"))
     arguments = argument_parser.parse_args()
-    version = subprocess.check_output([arguments.pg_format, "--version"], text=True).strip()
-    if version != "pg_format version 5.11":
-        argument_parser.error(f"expected pgFormatter 5.11, got {version!r}")
     files = sorted((ROOT / "supabase/migrations").glob("*.sql"))
     pending = []
     errors = []
     for path in files:
         original = path.read_text()
         try:
-            formatted = format_sql(original, path.name, arguments.pg_format)
+            formatted = format_sql(original, path.name, arguments.node)
             if formatted != original:
                 pending.append((path, original, formatted))
         except Exception as error:

@@ -42,7 +42,7 @@ $body$;
 REVOKE ALL ON FUNCTION public.example_fn(uuid, text[]) FROM PUBLIC;
 -- Tail comment stays present.
 '''
-        executable = os.environ.get("PG_FORMAT", "pg_format")
+        executable = os.environ.get("NODE", "node")
         formatted = format_sql(source, "example.sql", executable)
         self.assertEqual(sql_ast(source), sql_ast(formatted))
         self.assertEqual(formatted, format_sql(formatted, "example.sql", executable))
@@ -50,7 +50,7 @@ REVOKE ALL ON FUNCTION public.example_fn(uuid, text[]) FROM PUBLIC;
         self.assertIn("-- Tail comment stays present.", formatted)
         self.assertIn("-- Migration file: this is a body comment", formatted)
         self.assertIn("\n  p_id uuid,\n  p_values text[]", formatted)
-        self.assertEqual(formatted.count("-- Section: Functions"), 1)
+        self.assertEqual(formatted.count("-- Functions\n"), 1)
 
     def test_table_types_align_after_longest_column_name(self):
         source = '''create table public.example (
@@ -63,14 +63,31 @@ REVOKE ALL ON FUNCTION public.example_fn(uuid, text[]) FROM PUBLIC;
         comment on table public.example is 'First part '
           'second part.';
         '''
-        formatted = format_sql(source, "example.sql", os.environ.get("PG_FORMAT", "pg_format"))
+        formatted = format_sql(source, "example.sql", os.environ.get("NODE", "node"))
         lines = formatted.splitlines()
         positions = [
             next(line for line in lines if line.lstrip().startswith(name + " ")).index(kind)
             for name, kind in (("id", "uuid"), ("display_name", "text"), ("created_at", "timestamptz"))
         ]
         self.assertEqual(positions, [15, 15, 15])
-        self.assertEqual(formatted, format_sql(formatted, "example.sql", os.environ.get("PG_FORMAT", "pg_format")))
+        self.assertEqual(formatted, format_sql(formatted, "example.sql", os.environ.get("NODE", "node")))
+
+    def test_policy_scalar_subquery_preserves_required_parentheses(self):
+        source = """create policy example on public.example for update
+          using ((select public.can_edit(id)))
+          with check ((select public.can_edit(id)));"""
+        formatted = format_sql(source, "example.sql", os.environ.get("NODE", "node"))
+        self.assertEqual(sql_ast(source), sql_ast(formatted))
+        self.assertIn('\n  on public.example\n  for update', formatted)
+
+    def test_unique_nulls_not_distinct_keeps_postgres_syntax(self):
+        source = """create table public.example (
+          id uuid, scope text,
+          unique nulls not distinct (id, scope)
+        );"""
+        formatted = format_sql(source, "example.sql", os.environ.get("NODE", "node"))
+        self.assertEqual(sql_ast(source), sql_ast(formatted))
+        self.assertIn('unique nulls not distinct (id, scope)', formatted)
 
 
 if __name__ == "__main__":

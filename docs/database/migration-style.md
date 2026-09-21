@@ -1,27 +1,50 @@
 # Migration SQL style
 
-Migrations live in `supabase/migrations/`. Use lowercase SQL keywords, two-space
-indentation, snake_case names, schema-qualified object references, one column or
-function parameter per line, and a blank line between statements. Align table
-column data types vertically: pad names with spaces to the longest column name
-in that table. Use spaces, not tabs. Keep comments
-that explain intent and dependencies. Place `comment on` statements beside the
-object they describe. Do not rename existing objects to satisfy style rules.
+This project's layout follows the current [Supabase Postgres SQL style guide](https://supabase.com/docs/guides/ai-tools/ai-prompts/code-format-sql), with vertically aligned column types as a project preference. [SQLFluff's layout guidance](https://docs.sqlfluff.com/en/stable/configuration/layout.html) informs spacing, line breaks, and indentation. Sources reviewed on 2026-09-21.
+
+SQL has multiple valid styles. These are the conventions we use consistently:
+
+- Lowercase keywords and types; preserve identifiers and literal values.
+- Two spaces per indentation level; spaces rather than tabs.
+- Align each table's data types after its longest column name.
+- Target 88 characters for executable SQL. Expand complex expressions instead of squeezing them onto one line. Long identifiers, literal strings, and explanatory comments can exceed the target.
+- Separate foreign-key clauses, trigger clauses, and policy clauses onto their own lines.
+- Put function parameters on separate lines. Keep function attributes at the same indentation as `create function`, and indent the body by its nesting depth.
+- Keep small expressions compact, including `(select auth.uid())`. Expand nested calls and larger queries according to their structure.
+- Use trailing commas, one blank line between statements, and consistent section dividers.
+- Preserve explanatory comments. Place `comment on` beside the object it documents.
 
 ```sql
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
+
 create table public.example (
   id           uuid primary key,
-  display_name text,
+  owner_id     uuid not null
+    references auth.users (id)
+    on delete cascade,
+  display_name text not null,
   created_at   timestamptz not null default now()
 );
+
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
+
+create policy "example_read_owner"
+  on public.example
+  for select
+  to authenticated
+  using ((select auth.uid()) = owner_id);
 ```
 
 ## Recommended order for new migrations
 
 1. Header: purpose and dependencies.
-2. Prerequisites: extensions, schemas, types, and helpers used by table definitions.
+2. Prerequisites: extensions, schemas, types, and helpers needed by table definitions.
 3. Table definitions/alterations and constraints.
-4. Enable row-level security on newly created tables in exposed schemas.
+4. Enable row-level security on new tables in exposed schemas.
 5. Indexes.
 6. Functions: helpers before callers, including RPCs and trigger functions.
 7. Triggers.
@@ -29,74 +52,44 @@ create table public.example (
 9. Permissions: table/sequence grants and revokes.
 10. Integrations: Realtime publications, storage, and scheduled jobs.
 
-Omit sections that are not needed. Dependencies always override this order:
+Omit unused sections. Dependencies override the visual order:
 
 - Functions used by defaults, generated columns, or constraints precede tables.
-- Trigger and policy helpers must exist before their consumers.
-- Keep function grants/revokes immediately beside the function definition,
-  especially for SECURITY DEFINER functions. Do not postpone privilege hardening
-  merely to put it under a later heading.
-- Define views after their referenced objects. Label them `Views`.
-- Label backfills and required reference-data inserts `Data changes`. Position
-  them deliberately relative to constraints and triggers; document the reason.
-- Keep conditional DO blocks and replacement operations together. The formatter
-  labels mixed blocks `Dependency-ordered operations` because their contents can
-  span multiple categories.
-- Storage bucket inserts belong under `Integrations`; security objects on storage
-  tables still belong under their corresponding security sections.
+- Trigger and policy helpers precede their consumers.
+- Keep function grants/revokes immediately beside their definition, especially for SECURITY DEFINER functions.
+- Define views after their referenced objects, under `Views`.
+- Label backfills and required reference-data inserts `Data changes`; document their placement relative to constraints and triggers.
+- Preserve conditional DO blocks and replacement operations. Mixed blocks use `Dependency-ordered operations`.
+- Storage bucket inserts use `Integrations`; storage policies use `Policies`.
 
 ## Historical migrations
 
-The formatting pass preserves filenames, SQL statement order, identifiers,
-literal values, and existing comments. It does not move RLS, grants, backfills,
-or function/trigger replacements in historical files. Existing unqualified
-references are preserved because adding a schema can change name resolution.
+Formatting preserves filenames, statement order, object names, literal values, and explanatory comments. It does not move RLS, grants, backfills, or function/trigger replacements. A section can recur when the existing execution sequence returns to it.
 
-Sections use `-- Section: <category>` consistently. A category may recur with
-`(continued)` when the existing execution sequence returns to it. These labels
-describe the SQL rather than instructing an automatic sort. Original descriptive
-subheadings and dependency explanations remain.
+Use schema-qualified names for new SQL. Historical unqualified references remain unchanged because adding a schema could change name resolution. Applied files are history: changing their formatting does not reapply them to a deployed database. Consolidation and semantic changes require separate dependency review and database replay.
 
-Applied migrations are history. Reordering, consolidating, or changing SQL is a
-separate schema change that requires dependency review and database replay.
-Formatting an applied file does not reapply it to a deployed database.
+## Format and verify
 
-## Formatter and check
-
-Use [pgFormatter 5.11](https://github.com/darold/pgFormatter/releases/tag/v5.11)
-and Python 3.9+ with the pinned PostgreSQL parser:
+Requirements: Node.js 20+, Python 3.9+, and the committed dependency lockfiles.
 
 ```sh
+npm ci --prefix scripts/database --ignore-scripts
 python3 -m venv /tmp/matchday-sql-format
 /tmp/matchday-sql-format/bin/pip install -r scripts/database/requirements-format.txt
 
-# Install pgFormatter 5.11 using its upstream instructions, then:
-export PG_FORMAT=/path/to/pgFormatter-5.11/pg_format
 /tmp/matchday-sql-format/bin/python scripts/database/format_migrations.py
 /tmp/matchday-sql-format/bin/python scripts/database/format_migrations.py --check
 /tmp/matchday-sql-format/bin/python -m unittest discover -s scripts/database -p 'test_format_migrations.py'
 flutter test test/supabase/migration_layout_test.dart
 ```
 
-The wrapper pins the formatter version and ignores personal pgFormatter config.
-It supplies lowercase keyword/type, two-space indentation, and vertical table
-column alignment settings, lays out
-function parameters, and creates section labels without sorting statements.
-Embedded dollar-quoted SQL and multiline literals are protected from reformatting.
-Formatting must converge to repeatable output before any file is written.
+The wrapper uses pinned Prettier and [prettier-plugin-sql-cst](https://github.com/nene/prettier-plugin-sql-cst), configured in `scripts/database/sql-format.json`. Prettier provides structured line wrapping, including PL/pgSQL bodies. The wrapper adds table alignment, section dividers, declaration layout, and tested compatibility handling for PostgreSQL scalar-subquery policies and `unique nulls not distinct` constraints.
 
-Before writing any file, it compares PostgreSQL parse trees for every migration.
-It also compares routine-body tokens, including literal values and quoted names.
-Only source positions, whitespace, comments, and unquoted token case are ignored.
-Any mismatch aborts the entire pass before writing. `--check` writes nothing and
-exits nonzero for drift or a semantic mismatch. It enforces formatting and section
-labels, not dependency order; dependency review remains required for SQL changes.
+The plugin's PostgreSQL/PL/pgSQL support is experimental. **Run the Python wrapper, not an unguarded Prettier write over migrations.** Before writing anything, the wrapper compares PostgreSQL parse trees and routine-body tokens against the input, including literal values and quoted identifiers. It rejects unsupported formatting, changed semantics, and output that does not converge to a stable format. It also checks for concurrent migration edits before writing.
 
-For semantic changes, additionally replay migrations on a disposable local
-database and run the applicable database tests. Parser equivalence is appropriate
-for a formatting-only pass; it does not validate runtime authorization or data.
+`--check` writes nothing and exits nonzero for formatting drift or a validation failure. It checks layout, not dependency order. For semantic changes, also replay migrations on a disposable local database and run the relevant database tests.
 
-## References
+## Dependency references
 
 - [Supabase migration workflow](https://supabase.com/docs/guides/deployment/database-migrations)
 - [PostgreSQL CREATE TRIGGER](https://www.postgresql.org/docs/current/sql-createtrigger.html)

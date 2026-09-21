@@ -1,4 +1,6 @@
--- Migration file: 20260101000200_teams.sql
+-- =============================================================================
+-- Migration: 20260101000200_teams.sql
+-- =============================================================================
 
 -- 0200 · teams
 -- Spec §2.3, §2.12. Feature 2 (Team & Player Model).
@@ -50,22 +52,31 @@
 -- 2026-09-06 — one enum, one definition, declared before anything uses it.
 -- teams table.
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.teams(
+create table public.teams (
   team_id        uuid primary key default gen_random_uuid(),
   team_name      text not null check (length(team_name) between 3 and 50),
   team_type      public.team_type not null,
   -- Optional short marketing line shown on team cards.
   tagline        text check (tagline is null or length(tagline) <= 60),
   logo_url       text,
-  sport_id       text not null default 'cricket' references public.sports(sport_id),
+  sport_id       text not null default 'cricket'
+    references public.sports (sport_id),
   -- 1–3 letter override for the placeholder logo when no logo_url is set.
-  logo_monogram  text check (logo_monogram is null or length(logo_monogram) between 1 and 3),
+  logo_monogram  text check (
+    logo_monogram is null
+    or length(logo_monogram) between 1 and 3
+  ),
   team_colors    jsonb, -- {primary, secondary} hex
   description    text check (description is null or length(description) <= 500),
   home_ground    text,
-  founded_year   integer check (founded_year is null or founded_year between 1700 and date_part('year', now())::int + 1),
+  founded_year   integer check (
+    founded_year is null
+    or founded_year between 1700 and date_part('year', now())::int + 1
+  ),
   -- WHO MADE THIS TEAM. History, not authority — see the header. It is what
   -- `teams_insert_self_owner` checks (a value must exist at INSERT time,
   -- before any membership row can), and what the chat-admin and geo-backfill
@@ -74,7 +85,9 @@ create table public.teams(
   -- Nullable + ON DELETE SET NULL so self-service account deletion (0700) does
   -- not block. Ownership succession happens on the ROLE: the longest-tenured
   -- manager is promoted, and a team with no manager left is archived.
-  created_by     uuid references public.profiles(user_id) on delete set null,
+  created_by     uuid
+    references public.profiles (user_id)
+    on delete set null,
   is_verified    boolean not null default false,
   privacy        public.team_privacy not null default 'public',
   status         public.team_status not null default 'active',
@@ -88,30 +101,41 @@ create table public.teams(
   search_name    text generated always as (lower(public.f_unaccent(team_name))) stored
 );
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index teams_created_by on public.teams(created_by);
+create index teams_created_by
+  on public.teams (created_by);
 
-create index teams_sport_id on public.teams(sport_id);
+create index teams_sport_id
+  on public.teams (sport_id);
 
 -- teams_managers_gin dropped 2026-09-10 with the `managers uuid[]` column.
 -- The equivalent lookup ("which teams do I run?") is now
 -- team_members_team_role in 0210.
 -- create index teams_city           on public.teams ((location->>'city'));
 -- create index teams_location_point on public.teams using gist (location_point);
-create index teams_name_trgm on public.teams using gin(team_name gin_trgm_ops);
+create index teams_name_trgm
+  on public.teams using gin (team_name gin_trgm_ops);
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger teams_set_updated_at
-  before update on public.teams for each row
+  before update on public.teams
+  for each row
   execute function public.set_updated_at();
 
 create trigger teams_sport_immutable
-  before update of sport_id on public.teams for each row
+  before update of sport_id on public.teams
+  for each row
   execute function public.prevent_sport_reassignment();
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- is_team_manager / is_team_captain are declared in 0210_team_members.sql.
 -- They read the role ladder on `team_members`, and being `language sql` their
@@ -123,39 +147,65 @@ create trigger teams_sport_immutable
 -- 0210, in the "policies deferred from 0200" section.
 alter table public.teams enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "teams_read_public" on public.teams
-  for select to anon, authenticated
+create policy "teams_read_public"
+  on public.teams
+  for select
+  to anon, authenticated
   using (true);
 
-create policy "teams_insert_self_owner" on public.teams
-  for insert to authenticated
-  with check ((
-    select
-      auth.uid()) = created_by);
+create policy "teams_insert_self_owner"
+  on public.teams
+  for insert
+  to authenticated
+  with check (
+    (
+      select
+        auth.uid()
+    ) = created_by
+  );
 
--- Section: Integrations
+-- -----------------------------------------------------------------------------
+-- Integrations
+-- -----------------------------------------------------------------------------
 
 -- teams_delete_owner moved to 0210: it now asks for the `team.disband`
 -- permission rather than comparing against a column.
 -- Storage bucket: team-logos
 -- Public-read; manager-only write under <team_id>/.
-insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
-  values ('team-logos', 'team-logos', true, 5 * 1024 * 1024, array['image/jpeg', 'image/png', 'image/webp'])
-on conflict (id)
-  do nothing;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values
+  (
+    'team-logos',
+    'team-logos',
+    true,
+    5 * 1024 * 1024,
+    array['image/jpeg', 'image/png', 'image/webp']
+  )
+on conflict (id) do nothing;
 
--- Section: Policies (continued)
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "team_logos_read_public" on storage.objects
+create policy "team_logos_read_public"
+  on storage.objects
   for select
   using (bucket_id = 'team-logos');
+
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
 -- The three write policies (insert / update / delete) call is_team_manager()
 -- and are therefore declared in 0210, in the "policies deferred from 0200"
 -- section. The bucket itself has no such dependency and stays here.
 
-create index if not exists teams_search_trgm on public.teams using gin(search_name gin_trgm_ops)
-where
-  status = 'active' and privacy = 'public';
+create index if not exists teams_search_trgm
+  on public.teams using gin (
+    search_name gin_trgm_ops
+  )
+  where status = 'active' and privacy = 'public';

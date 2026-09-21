@@ -1,0 +1,13 @@
+{
+  "parser": "postgresql",
+  "printWidth": 88,
+  "tabWidth": 2,
+  "useTabs": false,
+  "sqlKeywordCase": "lower",
+  "sqlLiteralCase": "lower",
+  "sqlTypeCase": "lower",
+  "sqlIdentifierCase": "preserve",
+  "sqlFunctionCase": "preserve",
+  "sqlCanonicalSyntax": false,
+  "sqlExperimentalPlpgsql": true
+}

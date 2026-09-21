@@ -1,4 +1,6 @@
--- Migration file: 20260101000212_team_authorization.sql
+-- =============================================================================
+-- Migration: 20260101000212_team_authorization.sql
+-- =============================================================================
 
 -- 0212 · team_authorization — shared predicates, RPCs, and dependent policies
 -- Requires both team_members and team_member_roles.
@@ -24,7 +26,9 @@
 -- coalesce IS the delta semantics — a team row (true OR false) wins over the
 -- global row, and absence of both denies.
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 create or replace function public._role_grants(
   p_team_id uuid,
@@ -32,30 +36,36 @@ create or replace function public._role_grants(
   p_role_key text,
   p_permission text
 )
-  returns boolean
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
-    coalesce((
-      select
-        rp.granted
-      from public.role_permissions rp
-      where
-        rp.team_id = p_team_id
-        and rp.scope = p_scope
-        and rp.role_key = p_role_key
-        and rp.permission_key = p_permission),(
-      select
-        rp.granted
-      from public.role_permissions rp
-      where
-        rp.team_id is null
-        and rp.scope = p_scope
-        and rp.role_key = p_role_key
-        and rp.permission_key = p_permission), false);
+    coalesce(
+      (
+        select
+          rp.granted
+        from public.role_permissions rp
+        where
+          rp.team_id = p_team_id
+          and rp.scope = p_scope
+          and rp.role_key = p_role_key
+          and rp.permission_key = p_permission
+      ),
+      (
+        select
+          rp.granted
+        from public.role_permissions rp
+        where
+          rp.team_id is null
+          and rp.scope = p_scope
+          and rp.role_key = p_role_key
+          and rp.permission_key = p_permission
+      ),
+      false
+    );
 $$;
 
 revoke all on function public._role_grants(uuid, text, text, text) from public;
@@ -67,27 +77,25 @@ create or replace function public.can(
   p_entity_id uuid,
   p_permission text
 )
-  returns boolean
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
     -- 0. Validate first. Fail closed.
-    exists(
+    exists (
       select
         1
-      from
-        public.permission_scopes ps
-      where
-        ps.permission_key = p_permission
-        and ps.scope = p_scope)
-    and(
+      from public.permission_scopes ps
+      where ps.permission_key = p_permission and ps.scope = p_scope
+    )
+    and (
       -- 1. A live direct grant of a directly-grantable permission. Re-checking
       --    direct_grantable here (not only at write time) means clearing the
       --    flag revokes existing grants immediately.
-      exists(
+      exists (
         select
           1
         from
@@ -99,26 +107,31 @@ create or replace function public.can(
           and g.entity_id = p_entity_id
           and g.permission_key = p_permission
           and p.direct_grantable
-          and(g.expires_at is null
-            or g.expires_at > now()))
-        -- 2 + 3. Role-derived. Team scope only for now; tournaments keep
-        --        organizers uuid[] and will need their own assignment relation.
-        or(p_scope = 'team'
-          and exists(
-            select
-              1
-            from
-              public.team_members tm
-              join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
-            where
-              tm.team_id = p_entity_id
-              and tm.user_id = auth.uid()
-              and tm.status = 'active'
-              and(
-                -- The owner is unconditional: no matrix edit, and no per-team
-                -- override, can lock a team out of itself.
-                tmr.role_key = 'owner'
-                or public._role_grants(p_entity_id, tmr.scope, tmr.role_key, p_permission)))));
+          and (g.expires_at is null or g.expires_at > now())
+      )
+      -- 2 + 3. Role-derived. Team scope only for now; tournaments keep
+      --        organizers uuid[] and will need their own assignment relation.
+      or (
+        p_scope = 'team'
+        and exists (
+          select
+            1
+          from
+            public.team_members tm
+            join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
+          where
+            tm.team_id = p_entity_id
+            and tm.user_id = auth.uid()
+            and tm.status = 'active'
+            and (
+              -- The owner is unconditional: no matrix edit, and no per-team
+              -- override, can lock a team out of itself.
+              tmr.role_key = 'owner'
+              or public._role_grants(p_entity_id, tmr.scope, tmr.role_key, p_permission)
+            )
+        )
+      )
+    );
 $$;
 
 revoke all on function public.can(text, uuid, text) from public;
@@ -137,14 +150,14 @@ create or replace function public._user_team_can(
   p_team_id uuid,
   p_permission text
 )
-  returns boolean
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
-    exists(
+    exists (
       select
         1
       from
@@ -154,8 +167,11 @@ create or replace function public._user_team_can(
         tm.team_id = p_team_id
         and tm.user_id = p_user_id
         and tm.status = 'active'
-        and(tmr.role_key = 'owner'
-          or public._role_grants(p_team_id, tmr.scope, tmr.role_key, p_permission)));
+        and (
+          tmr.role_key = 'owner'
+          or public._role_grants(p_team_id, tmr.scope, tmr.role_key, p_permission)
+        )
+    );
 $$;
 
 revoke all on function public._user_team_can(uuid, uuid, text) from public;
@@ -164,12 +180,12 @@ create or replace function public.team_can(
   p_team_id uuid,
   p_permission text
 )
-  returns boolean
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
     public.can('team', p_team_id, p_permission);
 $$;
@@ -184,12 +200,12 @@ grant execute on function public.team_can(uuid, text) to authenticated;
 create or replace function public.is_team_manager(
   p_team_id uuid
 )
-  returns boolean
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
     public.can('team', p_team_id, 'team.roster.write');
 $$;
@@ -201,12 +217,12 @@ grant execute on function public.is_team_manager(uuid) to authenticated;
 create or replace function public.is_team_captain(
   p_team_id uuid
 )
-  returns boolean
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
     public.can('team', p_team_id, 'match.lineup.set');
 $$;
@@ -219,22 +235,19 @@ grant execute on function public.is_team_captain(uuid) to authenticated;
 create or replace function public.is_team_member(
   p_team_id uuid
 )
-  returns boolean
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
-    exists(
+    exists (
       select
         1
-      from
-        public.team_members tm
-      where
-        tm.team_id = p_team_id
-        and tm.user_id = auth.uid()
-        and tm.status = 'active');
+      from public.team_members tm
+      where tm.team_id = p_team_id and tm.user_id = auth.uid() and tm.status = 'active'
+    );
 $$;
 
 revoke all on function public.is_team_member(uuid) from public;
@@ -251,12 +264,12 @@ create or replace function public.team_members_with(
   p_team_id uuid,
   p_permission text
 )
-  returns setof uuid
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select distinct
     tm.user_id
   from
@@ -266,8 +279,10 @@ create or replace function public.team_members_with(
     tm.team_id = p_team_id
     and tm.status = 'active'
     and tm.user_id is not null
-    and(tmr.role_key = 'owner'
-      or public._role_grants(p_team_id, tmr.scope, tmr.role_key, p_permission));
+    and (
+      tmr.role_key = 'owner'
+      or public._role_grants(p_team_id, tmr.scope, tmr.role_key, p_permission)
+    );
 $$;
 
 revoke all on function public.team_members_with(uuid, text) from public;
@@ -279,12 +294,12 @@ grant execute on function public.team_members_with(uuid, text) to authenticated;
 create or replace function public.team_staff_ids(
   p_team_id uuid
 )
-  returns setof uuid
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
     public.team_members_with(p_team_id, 'team.roster.write');
 $$;
@@ -305,39 +320,30 @@ create or replace function public._attach_role(
   p_role_key text,
   p_granted_by uuid default null
 )
-  returns void
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_team_id uuid;
   v_singleton boolean;
 begin
   select
     team_id
-  into
-    v_team_id
-  from
-    public.team_members
-  where
-    membership_id = p_membership_id;
+  into v_team_id
+  from public.team_members
+  where membership_id = p_membership_id;
   if v_team_id is null then
-    raise exception 'No such membership %', p_membership_id
-      using errcode = 'P0002';
+    raise exception 'No such membership %', p_membership_id using errcode = 'P0002';
   end if;
   select
     is_singleton
-  into
-    v_singleton
-  from
-    public.roles
-  where
-    scope = 'team'
-    and key = p_role_key;
+  into v_singleton
+  from public.roles
+  where scope = 'team' and key = p_role_key;
   if v_singleton is null then
-    raise exception 'No such team role "%"', p_role_key
-      using errcode = 'P0002';
+    raise exception 'No such team role "%"', p_role_key using errcode = 'P0002';
   end if;
   -- The conflict target is the PRIMARY KEY and nothing else. A bare
   -- `on conflict do nothing` also swallows a violation of
@@ -345,10 +351,10 @@ begin
   -- person would report success and write nothing, which is how a silent
   -- failure gets shipped. Re-granting a role someone already holds is the only
   -- no-op; taking a singleton someone else holds must raise 23505.
-  insert into public.team_member_roles(membership_id, scope, role_key, team_id, is_singleton, granted_by)
-    values (p_membership_id, 'team', p_role_key, v_team_id, v_singleton, p_granted_by)
-  on conflict (membership_id, scope, role_key)
-    do nothing;
+  insert into public.team_member_roles
+    (membership_id, scope, role_key, team_id, is_singleton, granted_by)
+  values (p_membership_id, 'team', p_role_key, v_team_id, v_singleton, p_granted_by)
+  on conflict (membership_id, scope, role_key) do nothing;
 end;
 $$;
 
@@ -367,11 +373,11 @@ revoke all on function public._attach_role(uuid, text, uuid) from public;
 --    Default 'player' keeps every other path (seeds, add_unclaimed_team_member,
 --    a direct insert by a superuser) correct without ceremony.
 create or replace function public.assign_initial_role()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_role text := nullif(current_setting('matchday.initial_role', true), '');
 begin
@@ -384,22 +390,27 @@ begin
 end;
 $$;
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger team_members_assign_initial_role
-  after insert on public.team_members for each row
+  after insert on public.team_members
+  for each row
   execute function public.assign_initial_role();
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- The ONLY way an owner row is born. teams.created_by is history; this is what
 -- makes the `owner` role the canonical answer to "who runs this team?".
 create or replace function public.create_owner_membership()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_membership uuid;
 begin
@@ -411,23 +422,26 @@ begin
   -- with the {owner, manager, player} exclusion set.
   perform
     set_config('matchday.initial_role', 'owner', true);
-  insert into public.team_members(team_id, user_id, in_squad, added_by)
-    values (new.team_id, new.created_by, true, new.created_by)
-  returning
-    membership_id
-  into
-    v_membership;
+  insert into public.team_members (team_id, user_id, in_squad, added_by)
+  values (new.team_id, new.created_by, true, new.created_by)
+  returning membership_id
+  into v_membership;
   return new;
 end;
 $$;
 
--- Section: Triggers (continued)
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger teams_create_owner_membership
-  after insert on public.teams for each row
+  after insert on public.teams
+  for each row
   execute function public.create_owner_membership();
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- Membership creation. team_members INSERT is RPC-only (policy below), so the
 -- membership and its first role are always created together.
@@ -438,11 +452,11 @@ create or replace function public.add_team_member(
   p_jersey_number integer default null,
   p_in_squad boolean default true
 )
-  returns uuid
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_uid uuid := auth.uid();
   v_membership uuid;
@@ -450,59 +464,48 @@ declare
   v_caller integer;
 begin
   if v_uid is null then
-    raise exception 'Not authenticated'
-      using errcode = '28000';
+    raise exception 'Not authenticated' using errcode = '28000';
   end if;
   if not public.can('team', p_team_id, 'team.roster.write') then
-    raise exception 'Not allowed to add players to this team'
-      using errcode = '42501';
+    raise exception 'Not allowed to add players to this team' using errcode = '42501';
   end if;
   -- You may not seat someone at or above your own rung.
   select
     rank
-  into
-    v_rank
-  from
-    public.roles
-  where
-    scope = 'team'
-    and key = p_role_key;
+  into v_rank
+  from public.roles
+  where scope = 'team' and key = p_role_key;
   select
     max(r.rank)
-  into
-    v_caller
+  into v_caller
   from
     public.team_members tm
     join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
-    join public.roles r on r.scope = tmr.scope
-      and r.key = tmr.role_key
-  where
-    tm.team_id = p_team_id
-    and tm.user_id = v_uid
-    and tm.status = 'active';
+    join public.roles r on r.scope = tmr.scope and r.key = tmr.role_key
+  where tm.team_id = p_team_id and tm.user_id = v_uid and tm.status = 'active';
   if v_rank is null then
-    raise exception 'No such team role "%"', p_role_key
-      using errcode = 'P0002';
+    raise exception 'No such team role "%"', p_role_key using errcode = 'P0002';
   end if;
   if coalesce(v_caller, -1) <= v_rank then
-    raise exception 'Cannot grant a role at or above your own'
-      using errcode = '42501';
+    raise exception 'Cannot grant a role at or above your own' using errcode = '42501';
   end if;
   perform
     set_config('matchday.initial_role', p_role_key, true);
-  insert into public.team_members(team_id, user_id, jersey_number, in_squad, added_by)
-    values (p_team_id, p_user_id, p_jersey_number, p_in_squad, v_uid)
-  returning
-    membership_id
-  into
-    v_membership;
+  insert into public.team_members (team_id, user_id, jersey_number, in_squad, added_by)
+  values (p_team_id, p_user_id, p_jersey_number, p_in_squad, v_uid)
+  returning membership_id
+  into v_membership;
   return v_membership;
 end;
 $$;
 
-revoke all on function public.add_team_member(uuid, uuid, text, integer, boolean) from public;
+revoke all
+on function public.add_team_member(uuid, uuid, text, integer, boolean)
+from public;
 
-grant execute on function public.add_team_member(uuid, uuid, text, integer, boolean) to authenticated;
+grant execute
+on function public.add_team_member(uuid, uuid, text, integer, boolean)
+to authenticated;
 
 -- grant_team_role / revoke_team_role
 -- Roles are added and removed individually now, not swapped within a slot. So
@@ -515,20 +518,18 @@ grant execute on function public.add_team_member(uuid, uuid, text, integer, bool
 create or replace function public._member_rank(
   p_membership_id uuid
 )
-  returns integer
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns integer
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
     coalesce(max(r.rank), -1)
   from
     public.team_member_roles tmr
-    join public.roles r on r.scope = tmr.scope
-      and r.key = tmr.role_key
-  where
-    tmr.membership_id = p_membership_id;
+    join public.roles r on r.scope = tmr.scope and r.key = tmr.role_key
+  where tmr.membership_id = p_membership_id;
 $$;
 
 revoke all on function public._member_rank(uuid) from public;
@@ -536,23 +537,19 @@ revoke all on function public._member_rank(uuid) from public;
 create or replace function public._my_rank(
   p_team_id uuid
 )
-  returns integer
-  language sql
-  stable
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns integer
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
   select
     coalesce(max(r.rank), -1)
   from
     public.team_members tm
     join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
-    join public.roles r on r.scope = tmr.scope
-      and r.key = tmr.role_key
-  where
-    tm.team_id = p_team_id
-    and tm.user_id = auth.uid()
-    and tm.status = 'active';
+    join public.roles r on r.scope = tmr.scope and r.key = tmr.role_key
+  where tm.team_id = p_team_id and tm.user_id = auth.uid() and tm.status = 'active';
 $$;
 
 revoke all on function public._my_rank(uuid) from public;
@@ -561,11 +558,11 @@ create or replace function public.grant_team_role(
   p_membership_id uuid,
   p_role_key text
 )
-  returns void
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_uid uuid := auth.uid();
   v_team_id uuid;
@@ -704,11 +701,11 @@ create or replace function public.revoke_team_role(
   p_membership_id uuid,
   p_role_key text
 )
-  returns void
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_uid uuid := auth.uid();
   v_team_id uuid;
@@ -717,40 +714,28 @@ declare
   v_mine integer;
 begin
   if v_uid is null then
-    raise exception 'Not authenticated'
-      using errcode = '28000';
+    raise exception 'Not authenticated' using errcode = '28000';
   end if;
   -- is_singleton stops a SECOND owner; nothing stops ZERO. Ownership leaves
   -- only by transfer, or by the succession path in delete_user.
   if p_role_key = 'owner' then
-    raise exception 'Transfer ownership instead of revoking it'
-      using errcode = '42501';
+    raise exception 'Transfer ownership instead of revoking it' using errcode = '42501';
   end if;
   select
     tm.team_id,
     tm.user_id
-  into
-    v_team_id,
-    v_target
-  from
-    public.team_members tm
-  where
-    tm.membership_id = p_membership_id
-    and tm.status = 'active'
+  into v_team_id, v_target
+  from public.team_members tm
+  where tm.membership_id = p_membership_id and tm.status = 'active'
   for update;
   if v_team_id is null then
-    raise exception 'No such active membership'
-      using errcode = 'P0002';
+    raise exception 'No such active membership' using errcode = 'P0002';
   end if;
   select
     rank
-  into
-    v_rank
-  from
-    public.roles
-  where
-    scope = 'team'
-    and key = p_role_key;
+  into v_rank
+  from public.roles
+  where scope = 'team' and key = p_role_key;
   v_mine := public._my_rank(v_team_id);
   -- Stepping down from your own non-owner role is always allowed.
   if v_target is distinct from v_uid then
@@ -764,9 +749,7 @@ begin
     end if;
   end if;
   delete from public.team_member_roles
-  where membership_id = p_membership_id
-    and scope = 'team'
-    and role_key = p_role_key;
+  where membership_id = p_membership_id and scope = 'team' and role_key = p_role_key;
   -- Taking away someone's LAST role would trip the at-least-one-role check at
   -- COMMIT. In the domain that is never what "un-captain them" means: they are
   -- still on the team, just not captain any more. Fall back to `player`.
@@ -774,16 +757,17 @@ begin
   -- Without this, a member created as captain-only could never be demoted at
   -- all — the caller would have to know to grant a second role first, in the
   -- same transaction, which is a trap rather than an API.
-  if not exists (
-    select
-      1
-    from
-      public.team_member_roles
-    where
-      membership_id = p_membership_id) then
-  perform
-    public._attach_role(p_membership_id, 'player', v_uid);
-end if;
+  if
+    not exists (
+      select
+        1
+      from public.team_member_roles
+      where membership_id = p_membership_id
+    )
+  then
+    perform
+      public._attach_role(p_membership_id, 'player', v_uid);
+  end if;
 end;
 $$;
 
@@ -796,35 +780,30 @@ create or replace function public.transfer_team_ownership(
   p_team_id uuid,
   p_new_owner_id uuid
 )
-  returns void
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_uid uuid := auth.uid();
   v_mine uuid;
   v_theirs uuid;
 begin
   if v_uid is null then
-    raise exception 'Not authenticated'
-      using errcode = '28000';
+    raise exception 'Not authenticated' using errcode = '28000';
   end if;
   -- Authorize BEFORE the self-transfer short-circuit. Reversed, this returned
   -- success to any caller passing themselves — harmless, but a non-owner being
   -- told "OK" is the kind of answer a client builds wrong UI on.
   select
     tm.membership_id
-  into
-    v_mine
+  into v_mine
   from
     public.team_members tm
-    join public.team_member_roles tmr on tmr.membership_id = tm.membership_id
-      and tmr.role_key = 'owner'
-  where
-    tm.team_id = p_team_id
-    and tm.user_id = v_uid
-    and tm.status = 'active'
+    join public.team_member_roles tmr
+      on tmr.membership_id = tm.membership_id and tmr.role_key = 'owner'
+  where tm.team_id = p_team_id and tm.user_id = v_uid and tm.status = 'active'
   for update;
   if v_mine is null then
     raise exception 'Only the team owner can transfer ownership'
@@ -835,14 +814,9 @@ begin
   end if;
   select
     tm.membership_id
-  into
-    v_theirs
-  from
-    public.team_members tm
-  where
-    tm.team_id = p_team_id
-    and tm.user_id = p_new_owner_id
-    and tm.status = 'active'
+  into v_theirs
+  from public.team_members tm
+  where tm.team_id = p_team_id and tm.user_id = p_new_owner_id and tm.status = 'active'
   for update;
   if v_theirs is null then
     raise exception 'The new owner must already be an active member of the team'
@@ -852,13 +826,12 @@ begin
   -- momentarily. The outgoing owner becomes a manager; the deferred
   -- at-least-one-role check is satisfied at COMMIT either way.
   delete from public.team_member_roles
-  where membership_id = v_mine
-    and scope = 'team'
-    and role_key = 'owner';
+  where membership_id = v_mine and scope = 'team' and role_key = 'owner';
   perform
     public._attach_role(v_mine, 'manager', v_uid);
   delete from public.team_member_roles
-  where membership_id = v_theirs
+  where
+    membership_id = v_theirs
     and scope = 'team'
     and role_key in ('manager', 'player');
   perform
@@ -875,38 +848,30 @@ grant execute on function public.transfer_team_ownership(uuid, uuid) to authenti
 create or replace function public.leave_team(
   p_membership_id uuid
 )
-  returns void
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_uid uuid := auth.uid();
   v_member_user_id uuid;
   v_is_owner boolean;
 begin
   if v_uid is null then
-    raise exception 'Not authenticated'
-      using errcode = '28000';
+    raise exception 'Not authenticated' using errcode = '28000';
   end if;
   select
     tm.user_id,
     exists (
       select
         1
-      from
-        public.team_member_roles tmr
-      where
-        tmr.membership_id = tm.membership_id
-        and tmr.role_key = 'owner')
-  into
-    v_member_user_id,
-    v_is_owner
-  from
-    public.team_members tm
-  where
-    tm.membership_id = p_membership_id
-    and tm.status = 'active'
+      from public.team_member_roles tmr
+      where tmr.membership_id = tm.membership_id and tmr.role_key = 'owner'
+    )
+  into v_member_user_id, v_is_owner
+  from public.team_members tm
+  where tm.membership_id = p_membership_id and tm.status = 'active'
   for update;
   if v_member_user_id is null or v_member_user_id <> v_uid then
     raise exception 'Cannot leave a membership that is not yours'
@@ -919,13 +884,11 @@ begin
   -- Roles are a live assignment, not history: they go with the membership.
   delete from public.team_member_roles
   where membership_id = p_membership_id;
-  update
-    public.team_members
+  update public.team_members
   set
     status = 'inactive',
     left_at = now()
-  where
-    membership_id = p_membership_id;
+  where membership_id = p_membership_id;
 end;
 $$;
 
@@ -933,7 +896,9 @@ revoke all on function public.leave_team(uuid) from public;
 
 grant execute on function public.leave_team(uuid) to authenticated;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
 -- Read: public teams are world-readable; a PRIVATE team's roster only by its
 -- own members. This was `using (true)` until 2026-09-10, which contradicted the
@@ -946,81 +911,102 @@ grant execute on function public.leave_team(uuid) to authenticated;
 --
 -- Two policies, but disjoint TO clauses, so advisor 0006 (one permissive
 -- policy per table+command+ROLE) is satisfied.
-create policy "team_members_read_anon" on public.team_members
-  for select to anon
-  using (exists (
-    select
-      1
-    from
-      public.teams t
-    where
-      t.team_id = team_members.team_id
-      and t.privacy = 'public'));
+create policy "team_members_read_anon"
+  on public.team_members
+  for select
+  to anon
+  using (
+    exists (
+      select
+        1
+      from public.teams t
+      where t.team_id = team_members.team_id and t.privacy = 'public'
+    )
+  );
 
-create policy "team_members_read_public" on public.team_members
-  for select to authenticated
-  using (exists (
-    select
-      1
-    from
-      public.teams t
-    where
-      t.team_id = team_members.team_id
-      and t.privacy = 'public')
-      or (
-        select
-          public.is_team_member(team_id)));
+create policy "team_members_read_public"
+  on public.team_members
+  for select
+  to authenticated
+  using (
+    exists (
+      select
+        1
+      from public.teams t
+      where t.team_id = team_members.team_id and t.privacy = 'public'
+    )
+    or (
+      select
+        public.is_team_member(team_id)
+    )
+  );
 
 -- INSERT is RPC-only: add_team_member() creates the membership and its first
 -- role together. A bare insert would make a roleless member and fail the
 -- deferred check at COMMIT — correct, but a worse error than refusing up front.
-create policy "team_members_insert_rpc_only" on public.team_members
-  for insert to authenticated
+create policy "team_members_insert_rpc_only"
+  on public.team_members
+  for insert
+  to authenticated
   with check (false);
 
-create policy "team_members_update_managers" on public.team_members
-  for update to authenticated
+create policy "team_members_update_managers"
+  on public.team_members
+  for update
+  to authenticated
   using ((
     select
-      public.team_can(team_id, 'team.roster.write')))
+      public.team_can(team_id, 'team.roster.write')
+  ))
   with check ((
     select
-      public.team_can(team_id, 'team.roster.write')));
+      public.team_can(team_id, 'team.roster.write')
+  ));
 
-create policy "team_members_delete_managers" on public.team_members
-  for delete to authenticated
+create policy "team_members_delete_managers"
+  on public.team_members
+  for delete
+  to authenticated
   using ((
     select
-      public.team_can(team_id, 'team.roster.write')));
+      public.team_can(team_id, 'team.roster.write')
+  ));
 
 -- Roles follow the roster's visibility, and are written only through the RPCs.
-create policy "team_member_roles_read_anon" on public.team_member_roles
-  for select to anon
-  using (exists (
-    select
-      1
-    from
-      public.teams t
-    where
-      t.team_id = team_member_roles.team_id
-      and t.privacy = 'public'));
+create policy "team_member_roles_read_anon"
+  on public.team_member_roles
+  for select
+  to anon
+  using (
+    exists (
+      select
+        1
+      from public.teams t
+      where t.team_id = team_member_roles.team_id and t.privacy = 'public'
+    )
+  );
 
-create policy "team_member_roles_read" on public.team_member_roles
-  for select to authenticated
-  using (exists (
-    select
-      1
-    from
-      public.teams t
-    where
-      t.team_id = team_member_roles.team_id
-      and t.privacy = 'public')
-      or (
-        select
-          public.is_team_member(team_id)));
+create policy "team_member_roles_read"
+  on public.team_member_roles
+  for select
+  to authenticated
+  using (
+    exists (
+      select
+        1
+      from public.teams t
+      where t.team_id = team_member_roles.team_id and t.privacy = 'public'
+    )
+    or (
+      select
+        public.is_team_member(team_id)
+    )
+  );
 
-create policy "team_member_roles_write_rpc_only" on public.team_member_roles
-  for all to authenticated
+create policy "team_member_roles_write_rpc_only"
+  on public.team_member_roles
+  for all
+  to authenticated
   using (false)
   with check (false);
 
@@ -1029,93 +1015,145 @@ create policy "team_member_roles_write_rpc_only" on public.team_member_roles
 -- does. Declaring them here beats making the predicate `language plpgsql`,
 -- whose body would go unchecked at CREATE time — exactly the trap §12.0 warns
 -- about. The headers of both files point here.
-create policy "teams_update_managers" on public.teams
-  for update to authenticated
+create policy "teams_update_managers"
+  on public.teams
+  for update
+  to authenticated
   using ((
     select
-      public.team_can(team_id, 'team.profile.write')))
+      public.team_can(team_id, 'team.profile.write')
+  ))
   with check ((
     select
-      public.team_can(team_id, 'team.profile.write')));
+      public.team_can(team_id, 'team.profile.write')
+  ));
 
-create policy "teams_delete_owner" on public.teams
-  for delete to authenticated
+create policy "teams_delete_owner"
+  on public.teams
+  for delete
+  to authenticated
   using ((
     select
-      public.team_can(team_id, 'team.disband')));
+      public.team_can(team_id, 'team.disband')
+  ));
 
-create policy "team_logos_insert_manager" on storage.objects
-  for insert to authenticated
-  with check (bucket_id = 'team-logos'
-  and (
-    select
-      public.team_can(((storage.foldername(name))[1])::uuid, 'team.profile.write')));
-
-create policy "team_logos_update_manager" on storage.objects
-  for update to authenticated
-  using (bucket_id = 'team-logos'
+create policy "team_logos_insert_manager"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'team-logos'
     and (
       select
-        public.team_can(((storage.foldername(name))[1])::uuid, 'team.profile.write')))
-  with check (bucket_id = 'team-logos'
-  and (
-    select
-      public.team_can(((storage.foldername(name))[1])::uuid, 'team.profile.write')));
+        public.team_can(((storage.foldername(name))[1])::uuid, 'team.profile.write')
+    )
+  );
 
-create policy "team_logos_delete_manager" on storage.objects
-  for delete to authenticated
-  using (bucket_id = 'team-logos'
+create policy "team_logos_update_manager"
+  on storage.objects
+  for update
+  to authenticated
+  using (
+    bucket_id = 'team-logos'
     and (
       select
-        public.team_can(((storage.foldername(name))[1])::uuid, 'team.profile.write')));
+        public.team_can(((storage.foldername(name))[1])::uuid, 'team.profile.write')
+    )
+  )
+  with check (
+    bucket_id = 'team-logos'
+    and (
+      select
+        public.team_can(((storage.foldername(name))[1])::uuid, 'team.profile.write')
+    )
+  );
+
+create policy "team_logos_delete_manager"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'team-logos'
+    and (
+      select
+        public.team_can(((storage.foldername(name))[1])::uuid, 'team.profile.write')
+    )
+  );
 
 -- The matrix: global rows are a public catalogue; team overrides are visible to
 -- that team and writable only by whoever holds team.permissions.manage — which
 -- is floored at owner. Nobody may write a global row.
 -- The global matrix is a public catalogue; team overrides are members-only.
-create policy "role_permissions_read_anon" on public.role_permissions
-  for select to anon
+create policy "role_permissions_read_anon"
+  on public.role_permissions
+  for select
+  to anon
   using (team_id is null);
 
-create policy "role_permissions_read" on public.role_permissions
-  for select to authenticated
-  using (team_id is null
+create policy "role_permissions_read"
+  on public.role_permissions
+  for select
+  to authenticated
+  using (
+    team_id is null
     or (
       select
-        public.is_team_member(team_id)));
+        public.is_team_member(team_id)
+    )
+  );
 
-create policy "role_permissions_write_team" on public.role_permissions
-  for all to authenticated
-  using (team_id is not null
+create policy "role_permissions_write_team"
+  on public.role_permissions
+  for all
+  to authenticated
+  using (
+    team_id is not null
     and (
       select
-        public.team_can(team_id, 'team.permissions.manage')))
-  with check (team_id is not null
-  and (
-    select
-      public.team_can(team_id, 'team.permissions.manage')));
+        public.team_can(team_id, 'team.permissions.manage')
+    )
+  )
+  with check (
+    team_id is not null
+    and (
+      select
+        public.team_can(team_id, 'team.permissions.manage')
+    )
+  );
 
 -- ONE permissive policy per (table, command, role) — advisor 0006 — so the two
 -- cases are branches of a single expression rather than two policies.
 -- Readable by: the subject themselves, or whoever can manage roles on the team
 -- the grant is scoped to. Written only through RPCs / the match_officials
 -- mirror trigger.
-create policy "grants_read" on public.grants
-  for select to authenticated
-  using ((
-    select
-      auth.uid()) = subject_id
-      or (scope = 'team'
+create policy "grants_read"
+  on public.grants
+  for select
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = subject_id
+    or (
+      scope = 'team'
       and (
         select
-          public.team_can(entity_id, 'team.roster.role'))));
+          public.team_can(entity_id, 'team.roster.role')
+      )
+    )
+  );
 
-create policy "grants_write_rpc_only" on public.grants
-  for all to authenticated
+create policy "grants_write_rpc_only"
+  on public.grants
+  for all
+  to authenticated
   using (false)
   with check (false);
 
--- Section: Functions (continued)
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- unclaimed_player_contact_for_manager() — the one way to read the PII
 -- unclaimed_players.phone_number / email are column-revoked in 0120: they are
@@ -1128,36 +1166,37 @@ create policy "grants_write_rpc_only" on public.grants
 create or replace function public.unclaimed_player_contact_for_manager(
   p_unclaimed_id uuid
 )
-  returns table(
-    phone_number text,
-    email text)
-  language sql
-  security definer stable
-  set search_path = public,
-  pg_temp
-  as $$
+returns table (phone_number text, email text)
+language sql
+security definer
+stable
+set search_path = public, pg_temp
+as $$
   select
     u.phone_number,
     u.email
-  from
-    public.unclaimed_players u
+  from public.unclaimed_players u
   where
     u.unclaimed_id = p_unclaimed_id
-    and(u.added_by = auth.uid()
-      or exists(
+    and (
+      u.added_by = auth.uid()
+      or exists (
         select
           1
-        from
-          public.team_members tm
+        from public.team_members tm
         where
           tm.unclaimed_id = u.unclaimed_id
           and tm.status = 'active'
-          and public.can('team', tm.team_id, 'team.contact.view')));
+          and public.can('team', tm.team_id, 'team.contact.view')
+      )
+    );
 $$;
 
 revoke all on function public.unclaimed_player_contact_for_manager(uuid) from public;
 
-grant execute on function public.unclaimed_player_contact_for_manager(uuid) to authenticated;
+grant execute
+on function public.unclaimed_player_contact_for_manager(uuid)
+to authenticated;
 
 -- add_unclaimed_cricket_team_member() — Canonical Cricket creation RPC
 create or replace function public.add_unclaimed_cricket_team_member(
@@ -1171,11 +1210,11 @@ create or replace function public.add_unclaimed_cricket_team_member(
   p_preferred_ball_types public.ball_type[] default '{}'::public.ball_type[],
   p_years_playing integer default null
 )
-  returns uuid
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_uid uuid := auth.uid();
   v_sport text;
@@ -1183,58 +1222,95 @@ declare
   v_membership_id uuid;
 begin
   if v_uid is null then
-    raise exception 'Not authenticated'
-      using errcode = '28000';
+    raise exception 'Not authenticated' using errcode = '28000';
   end if;
   select
     t.sport_id
-  into
-    v_sport
-  from
-    public.teams t
-  where
-    t.team_id = p_team_id;
+  into v_sport
+  from public.teams t
+  where t.team_id = p_team_id;
   if v_sport is null then
-    raise exception 'Team not found'
-      using errcode = 'P0002';
+    raise exception 'Team not found' using errcode = 'P0002';
   end if;
   if v_sport <> 'cricket' then
     raise exception 'Cricket player details can only be added to a Cricket team'
       using errcode = '23514';
   end if;
   if not public.can('team', p_team_id, 'team.roster.write') then
-    raise exception 'Only team staff can add players'
-      using errcode = '42501';
+    raise exception 'Only team staff can add players' using errcode = '42501';
   end if;
   if p_years_playing is not null and p_years_playing not between 0 and 80 then
-    raise exception 'years_playing must be between 0 and 80'
-      using errcode = '22023';
+    raise exception 'years_playing must be between 0 and 80' using errcode = '22023';
   end if;
   -- Sport is derived from the team.
-  insert into public.unclaimed_players(sport_id, display_name, phone_number, added_by)
-    values (v_sport, trim(p_display_name), nullif(trim(p_phone_number), ''), v_uid)
-  returning
-    unclaimed_id
-  into
-    v_unclaimed_id;
+  insert into public.unclaimed_players (sport_id, display_name, phone_number, added_by)
+  values (v_sport, trim(p_display_name), nullif(trim(p_phone_number), ''), v_uid)
+  returning unclaimed_id
+  into v_unclaimed_id;
   -- The sport-specific extension is optional.
-  if p_player_role is not null or p_batting_style is not null or p_bowling_style is not null or coalesce(cardinality(p_preferred_ball_types), 0) > 0 or p_years_playing is not null then
-    insert into public.cricket_unclaimed_player_profiles(unclaimed_id, sport_id, player_role, batting_style, bowling_style, preferred_ball_types, years_playing)
-      values (v_unclaimed_id, 'cricket', p_player_role, p_batting_style, p_bowling_style, coalesce(p_preferred_ball_types, '{}'::public.ball_type[]), p_years_playing);
+  if
+    p_player_role is not null
+    or p_batting_style is not null
+    or p_bowling_style is not null
+    or coalesce(cardinality(p_preferred_ball_types), 0) > 0
+    or p_years_playing is not null
+  then
+    insert into public.cricket_unclaimed_player_profiles
+      (
+        unclaimed_id,
+        sport_id,
+        player_role,
+        batting_style,
+        bowling_style,
+        preferred_ball_types,
+        years_playing
+      )
+    values
+      (
+        v_unclaimed_id,
+        'cricket',
+        p_player_role,
+        p_batting_style,
+        p_bowling_style,
+        coalesce(p_preferred_ball_types, '{}'::public.ball_type[]),
+        p_years_playing
+      );
   end if;
-  insert into public.team_members(team_id, unclaimed_id, jersey_number, added_by)
-    values (p_team_id, v_unclaimed_id, p_jersey_number, v_uid)
-  returning
-    membership_id
-  into
-    v_membership_id;
+  insert into public.team_members (team_id, unclaimed_id, jersey_number, added_by)
+  values (p_team_id, v_unclaimed_id, p_jersey_number, v_uid)
+  returning membership_id
+  into v_membership_id;
   return v_membership_id;
 end;
 $$;
 
-revoke all on function public.add_unclaimed_cricket_team_member(uuid, text, text, integer, public.player_role, public.batting_style, public.bowling_style, public.ball_type[], integer) from public;
+revoke all
+on function public.add_unclaimed_cricket_team_member(
+  uuid,
+  text,
+  text,
+  integer,
+  public.player_role,
+  public.batting_style,
+  public.bowling_style,
+  public.ball_type[],
+  integer
+)
+from public;
 
-grant execute on function public.add_unclaimed_cricket_team_member(uuid, text, text, integer, public.player_role, public.batting_style, public.bowling_style, public.ball_type[], integer) to authenticated;
+grant execute
+on function public.add_unclaimed_cricket_team_member(
+  uuid,
+  text,
+  text,
+  integer,
+  public.player_role,
+  public.batting_style,
+  public.bowling_style,
+  public.ball_type[],
+  integer
+)
+to authenticated;
 
 -- Compatibility shim for currently installed app versions
 --
@@ -1248,77 +1324,77 @@ create or replace function public.add_unclaimed_team_member(
   p_jersey_number integer default null,
   p_player_profile jsonb default '{}'::jsonb
 )
-  returns uuid
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_role public.player_role;
   v_batting public.batting_style;
   v_bowling public.bowling_style;
 begin
-  v_role := case coalesce(p_player_profile ->> 'player_role', p_player_profile ->> 'playing_role')
-  when 'batter' then
-    'batter'::public.player_role
-  when 'bowler' then
-    'bowler'::public.player_role
-  when 'all_rounder' then
-    'all_rounder'::public.player_role
-  when 'wicket_keeper' then
-    'wicket_keeper'::public.player_role
-  else
-    null
+  v_role := case coalesce(
+    p_player_profile ->> 'player_role',
+    p_player_profile ->> 'playing_role'
+  )
+    when 'batter' then 'batter'::public.player_role
+    when 'bowler' then 'bowler'::public.player_role
+    when 'all_rounder' then 'all_rounder'::public.player_role
+    when 'wicket_keeper' then 'wicket_keeper'::public.player_role
+    else null
   end;
   v_batting := case p_player_profile ->> 'batting_style'
-  when 'rhb' then
-    'right_hand'::public.batting_style
-  when 'right_hand' then
-    'right_hand'::public.batting_style
-  when 'lhb' then
-    'left_hand'::public.batting_style
-  when 'left_hand' then
-    'left_hand'::public.batting_style
-  else
-    null
+    when 'rhb' then 'right_hand'::public.batting_style
+    when 'right_hand' then 'right_hand'::public.batting_style
+    when 'lhb' then 'left_hand'::public.batting_style
+    when 'left_hand' then 'left_hand'::public.batting_style
+    else null
   end;
   v_bowling := case p_player_profile ->> 'bowling_style'
-  when 'rfm' then
-    'right_arm_fast'::public.bowling_style
-  when 'rmf' then
-    'right_arm_medium'::public.bowling_style
-  when 'lfm' then
-    'left_arm_fast'::public.bowling_style
-  when 'os' then
-    'right_arm_spin'::public.bowling_style
-  when 'lbg' then
-    'right_arm_spin'::public.bowling_style
-  when 'sla' then
-    'left_arm_spin'::public.bowling_style
-  when 'slc' then
-    'left_arm_spin'::public.bowling_style
-  when 'right_arm_fast' then
-    'right_arm_fast'::public.bowling_style
-  when 'right_arm_medium' then
-    'right_arm_medium'::public.bowling_style
-  when 'right_arm_spin' then
-    'right_arm_spin'::public.bowling_style
-  when 'left_arm_fast' then
-    'left_arm_fast'::public.bowling_style
-  when 'left_arm_spin' then
-    'left_arm_spin'::public.bowling_style
-  when 'doesnt_bowl' then
-    'doesnt_bowl'::public.bowling_style
-  else
-    null
+    when 'rfm' then 'right_arm_fast'::public.bowling_style
+    when 'rmf' then 'right_arm_medium'::public.bowling_style
+    when 'lfm' then 'left_arm_fast'::public.bowling_style
+    when 'os' then 'right_arm_spin'::public.bowling_style
+    when 'lbg' then 'right_arm_spin'::public.bowling_style
+    when 'sla' then 'left_arm_spin'::public.bowling_style
+    when 'slc' then 'left_arm_spin'::public.bowling_style
+    when 'right_arm_fast' then 'right_arm_fast'::public.bowling_style
+    when 'right_arm_medium' then 'right_arm_medium'::public.bowling_style
+    when 'right_arm_spin' then 'right_arm_spin'::public.bowling_style
+    when 'left_arm_fast' then 'left_arm_fast'::public.bowling_style
+    when 'left_arm_spin' then 'left_arm_spin'::public.bowling_style
+    when 'doesnt_bowl' then 'doesnt_bowl'::public.bowling_style
+    else null
   end;
-  return public.add_unclaimed_cricket_team_member(p_team_id => p_team_id, p_display_name => p_display_name, p_phone_number => p_phone_number, p_jersey_number => p_jersey_number, p_player_role => v_role, p_batting_style => v_batting, p_bowling_style => v_bowling, p_preferred_ball_types => '{}'::public.ball_type[], p_years_playing => null);
+  return public.add_unclaimed_cricket_team_member(
+    p_team_id => p_team_id,
+    p_display_name => p_display_name,
+    p_phone_number => p_phone_number,
+    p_jersey_number => p_jersey_number,
+    p_player_role => v_role,
+    p_batting_style => v_batting,
+    p_bowling_style => v_bowling,
+    p_preferred_ball_types => '{}'::public.ball_type[],
+    p_years_playing => null
+  );
 end;
 $$;
 
-revoke all on function public.add_unclaimed_team_member(uuid, text, text, integer, jsonb) from public;
+revoke all
+on function public.add_unclaimed_team_member(uuid, text, text, integer, jsonb)
+from public;
 
-grant execute on function public.add_unclaimed_team_member(uuid, text, text, integer, jsonb) to authenticated;
+grant execute
+on function public.add_unclaimed_team_member(uuid, text, text, integer, jsonb)
+to authenticated;
 
-comment on function public.add_unclaimed_team_member(uuid, text, text, integer, jsonb) is 'Deprecated compatibility RPC. New clients use '
+comment on function public.add_unclaimed_team_member(
+  uuid,
+  text,
+  text,
+  integer,
+  jsonb
+) is
+  'Deprecated compatibility RPC. New clients use '
   'add_unclaimed_cricket_team_member().';

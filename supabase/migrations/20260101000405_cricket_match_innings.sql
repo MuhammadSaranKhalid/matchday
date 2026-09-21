@@ -1,15 +1,21 @@
--- Migration file: 20260101000405_cricket_match_innings.sql
+-- =============================================================================
+-- Migration: 20260101000405_cricket_match_innings.sql
+-- =============================================================================
 
 -- 0405 · cricket_match_innings
 -- Innings definitions and their allocation/completion state.
 -- Spec: docs/matches-schema-architecture.md
 -- Innings & Live Hot State
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.cricket_match_innings(
+create table public.cricket_match_innings (
   innings_id        uuid primary key default gen_random_uuid(),
-  match_id          uuid not null references public.matches(match_id) on delete cascade,
+  match_id          uuid not null
+    references public.matches (match_id)
+    on delete cascade,
   innings_number    smallint not null check (innings_number between 1 and 4),
   batting_team_side text not null check (batting_team_side in ('team_a', 'team_b')),
   bowling_team_side text not null check (bowling_team_side in ('team_a', 'team_b')),
@@ -32,23 +38,34 @@ create table public.cricket_match_innings(
   unique (innings_id, match_id, innings_number)
 );
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 alter table public.cricket_match_innings enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
 drop policy if exists "cricket_match_innings_read_all" on public.cricket_match_innings;
 
-create policy "cricket_match_innings_read_all" on public.cricket_match_innings
-  for select to anon, authenticated
+create policy "cricket_match_innings_read_all"
+  on public.cricket_match_innings
+  for select
+  to anon, authenticated
   using (true);
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index if not exists idx_innings_match on public.cricket_match_innings(match_id);
+create index if not exists idx_innings_match
+  on public.cricket_match_innings (match_id);
 
--- Section: Tables and constraints (continued)
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
 -- Make the innings engine structurally Cricket-only
 --
@@ -57,7 +74,10 @@ create index if not exists idx_innings_match on public.cricket_match_innings(mat
 -- Football or another sport even though the table still has a legacy generic
 -- name.
 alter table public.cricket_match_innings
-  add constraint cricket_match_innings_cricket_match_fkey foreign key (match_id) references public.cricket_matches(match_id) on delete cascade;
+add constraint cricket_match_innings_cricket_match_fkey
+  foreign key (match_id) references public.cricket_matches (match_id)
+    on delete cascade;
 
-comment on table public.cricket_match_innings is 'CRICKET ENGINE TABLE (legacy generic name). Every row is constrained to '
+comment on table public.cricket_match_innings is
+  'CRICKET ENGINE TABLE (legacy generic name). Every row is constrained to '
   'a cricket_matches parent. Planned rename: cricket_match_innings.';

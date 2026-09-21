@@ -1,75 +1,163 @@
--- Migration file: 20260101000817_realtime_authorization.sql
+-- =============================================================================
+-- Migration: 20260101000817_realtime_authorization.sql
+-- =============================================================================
 
 -- 0817 · realtime_authorization — Supabase Realtime Authorization Policies
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 create or replace function public._try_topic_uuid(
   p_topic text,
   p_pos int
 )
-  returns uuid
-  language sql
-  immutable
-  set search_path = public, pg_temp
-  as $$
+returns uuid
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
   select
-    case when split_part(p_topic, ':', p_pos) ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
-      split_part(p_topic, ':', p_pos)::uuid
-    else
-      null
+    case
+      when split_part(
+        p_topic,
+        ':',
+        p_pos
+      ) ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then split_part(
+        p_topic,
+        ':',
+        p_pos
+      )::uuid
+      else null
     end;
 $$;
 
 grant execute on function public._try_topic_uuid(text, int) to authenticated, anon;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
 drop policy if exists "realtime_join_authorized" on realtime.messages;
 
-create policy "realtime_join_authorized" on realtime.messages
-  for select to authenticated
-  using (realtime.messages.extension = 'broadcast'
-    and ((split_part((
-      select
-        realtime.topic()), ':', 1) = 'user'
-    and split_part((
-      select
-        realtime.topic()), ':', 2) =(
-      select
-        auth.uid())::text)
-        or (split_part((
+create policy "realtime_join_authorized"
+  on realtime.messages
+  for select
+  to authenticated
+  using (
+    realtime.messages.extension = 'broadcast'
+    and (
+      (
+        split_part(
+          (
+            select
+              realtime.topic()
+          ),
+          ':',
+          1
+        ) = 'user'
+        and split_part(
+          (
+            select
+              realtime.topic()
+          ),
+          ':',
+          2
+        ) = (
           select
-            realtime.topic()), ':', 1) = 'match')
-        or (split_part((
-          select
-            realtime.topic()), ':', 1) = 'tournament')
-        or (split_part((
-          select
-            realtime.topic()), ':', 1) = 'post')
-        or (split_part((
-          select
-            realtime.topic()), ':', 1) = 'chat'
-        and public.is_chat_member(public._try_topic_uuid((
-          select
-            realtime.topic()), 2)))));
+            auth.uid()
+        )::text
+      )
+      or (
+        split_part(
+          (
+            select
+              realtime.topic()
+          ),
+          ':',
+          1
+        ) = 'match'
+      )
+      or (
+        split_part(
+          (
+            select
+              realtime.topic()
+          ),
+          ':',
+          1
+        ) = 'tournament'
+      )
+      or (
+        split_part(
+          (
+            select
+              realtime.topic()
+          ),
+          ':',
+          1
+        ) = 'post'
+      )
+      or (
+        split_part(
+          (
+            select
+              realtime.topic()
+          ),
+          ':',
+          1
+        ) = 'chat'
+        and public.is_chat_member(
+          public._try_topic_uuid(
+            (
+              select
+                realtime.topic()
+            ),
+            2
+          )
+        )
+      )
+    )
+  );
 
 drop policy if exists "realtime_send_typing_self" on realtime.messages;
 
-create policy "realtime_send_typing_self" on realtime.messages
-  for insert to authenticated
-  with check (realtime.messages.extension = 'broadcast'
-  and split_part((
-    select
-      realtime.topic()), ':', 1) = 'chat'
-  and split_part((
-    select
-      realtime.topic()), ':', 3) = 'typing'
-  and public.is_chat_member(public._try_topic_uuid((
-    select
-      realtime.topic()), 2)));
+create policy "realtime_send_typing_self"
+  on realtime.messages
+  for insert
+  to authenticated
+  with check (
+    realtime.messages.extension = 'broadcast'
+    and split_part(
+      (
+        select
+          realtime.topic()
+      ),
+      ':',
+      1
+    ) = 'chat'
+    and split_part(
+      (
+        select
+          realtime.topic()
+      ),
+      ':',
+      3
+    ) = 'typing'
+    and public.is_chat_member(
+      public._try_topic_uuid(
+        (
+          select
+            realtime.topic()
+        ),
+        2
+      )
+    )
+  );
 
--- Section: Dependency-ordered operations
+-- -----------------------------------------------------------------------------
+-- Dependency-ordered operations
+-- -----------------------------------------------------------------------------
 
 do $$
 begin

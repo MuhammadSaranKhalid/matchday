@@ -1,31 +1,47 @@
--- Migration file: 20260101000203_role_exclusion_members.sql
+-- =============================================================================
+-- Migration: 20260101000203_role_exclusion_members.sql
+-- =============================================================================
 
 -- 0203 · role_exclusion_members — roles covered by an exclusion set
 -- Design + decision log: docs/team-roles-design.md
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.role_exclusion_members(
-  set_id   uuid not null references public.role_exclusion_sets(set_id) on delete cascade,
+create table public.role_exclusion_members (
+  set_id   uuid not null
+    references public.role_exclusion_sets (set_id)
+    on delete cascade,
   scope    text not null,
   role_key text not null,
   primary key (set_id, scope, role_key),
-  foreign key (scope, role_key) references public.roles(scope, key) on delete cascade
+  foreign key (scope, role_key)
+    references public.roles (scope, key)
+    on delete cascade
 );
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index idx_role_exclusion_members_role on public.role_exclusion_members(scope, role_key);
+create index idx_role_exclusion_members_role
+  on public.role_exclusion_members (
+    scope,
+    role_key
+  );
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- A set must be able to be satisfied. max_roles >= |members| constrains nothing
 -- (every member could hold them all), and is almost always a typo.
 create or replace function public.guard_exclusion_set_sane()
-  returns trigger
-  language plpgsql
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
 declare
   v_set_id uuid := coalesce(new.set_id, old.set_id);
   v_count integer;
@@ -33,37 +49,40 @@ declare
 begin
   select
     count(*)
-  into
-    v_count
-  from
-    public.role_exclusion_members
-  where
-    set_id = v_set_id;
+  into v_count
+  from public.role_exclusion_members
+  where set_id = v_set_id;
   select
     max_roles
-  into
-    v_max
-  from
-    public.role_exclusion_sets
-  where
-    set_id = v_set_id;
+  into v_max
+  from public.role_exclusion_sets
+  where set_id = v_set_id;
   -- An empty or single-role set is inert, not broken — allow it while a set is
   -- being assembled. Only a set that cannot constrain anything is an error.
   if v_count > 1 and v_max >= v_count then
-    raise exception 'Exclusion set % allows % of % roles — it constrains nothing', v_set_id, v_max, v_count
+    raise exception 'Exclusion set % allows % of % roles — it constrains nothing',
+      v_set_id,
+      v_max,
+      v_count
       using errcode = '23514';
   end if;
   return null;
 end;
 $$;
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create constraint trigger role_exclusion_members_sane
-  after insert or update or delete on public.role_exclusion_members deferrable initially deferred for each row
+  after insert or update or delete on public.role_exclusion_members
+  deferrable initially deferred
+  for each row
   execute function public.guard_exclusion_set_sane();
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- The seed itself lives at the END of this file: the sanity trigger above is
 -- DEFERRABLE, and pending trigger events block a later ALTER TABLE (55006) —
@@ -71,13 +90,19 @@ create constraint trigger role_exclusion_members_sane
 -- Catalogue data is world-readable and writable only by migrations/service_role.
 alter table public.role_exclusion_members enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "role_exclusion_members_read_all" on public.role_exclusion_members
-  for select to anon, authenticated
+create policy "role_exclusion_members_read_all"
+  on public.role_exclusion_members
+  for select
+  to anon, authenticated
   using (true);
 
--- Section: Dependency-ordered operations
+-- -----------------------------------------------------------------------------
+-- Dependency-ordered operations
+-- -----------------------------------------------------------------------------
 
 -- Seed: the one exclusion rule. Last, for the 55006 reason noted above.
 -- "A member is at most ONE of owner / manager / player." That is the whole of

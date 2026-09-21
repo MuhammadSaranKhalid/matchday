@@ -1,4 +1,6 @@
--- Migration file: 20260101000207_grants.sql
+-- =============================================================================
+-- Migration: 20260101000207_grants.sql
+-- =============================================================================
 
 -- 0207 · grants — direct permissions on individual resources
 -- Design + decision log: docs/team-roles-design.md
@@ -12,64 +14,86 @@
 -- same trade-off team_members already makes with its user_id/unclaimed_id XOR.
 -- Cleanup triggers on teams/matches live in their own files.
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.grants(
+create table public.grants (
   grant_id       uuid primary key default gen_random_uuid(),
-  subject_id     uuid not null references public.profiles(user_id) on delete cascade,
+  subject_id     uuid not null
+    references public.profiles (user_id)
+    on delete cascade,
   scope          text not null,
   entity_id      uuid not null,
   permission_key text not null,
-  granted_by     uuid references public.profiles(user_id) on delete set null,
+  granted_by     uuid
+    references public.profiles (user_id)
+    on delete set null,
   expires_at     timestamptz,
   created_at     timestamptz not null default now(),
-  foreign key (permission_key, scope) references public.permission_scopes(permission_key, scope) on delete cascade,
+  foreign key (permission_key, scope)
+    references public.permission_scopes (permission_key, scope)
+    on delete cascade,
   unique (subject_id, scope, entity_id, permission_key)
 );
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index idx_grants_subject on public.grants(subject_id);
+create index idx_grants_subject
+  on public.grants (subject_id);
 
-create index idx_grants_perm on public.grants(permission_key);
+create index idx_grants_perm
+  on public.grants (permission_key);
 
-create index idx_grants_granted_by on public.grants(granted_by);
+create index idx_grants_granted_by
+  on public.grants (granted_by);
 
 -- The index can()'s first branch depends on.
-create index idx_grants_lookup on public.grants(scope, entity_id, permission_key);
+create index idx_grants_lookup
+  on public.grants (scope, entity_id, permission_key);
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- A direct grant has no role, so min_rank cannot apply to it. Without this
 -- check, `grants` would be a clean route around the matrix.
 create or replace function public.guard_grant_is_grantable()
-  returns trigger
-  language plpgsql
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
-  if not exists(
-    select
-      1
-    from
-      public.permissions
-    where
-      permission_key = new.permission_key
-      and direct_grantable) then
-  raise exception 'Permission % cannot be granted directly; it is role-only', new.permission_key
-    using errcode = '42501';
-end if;
+  if
+    not exists (
+      select
+        1
+      from public.permissions
+      where permission_key = new.permission_key and direct_grantable
+    )
+  then
+    raise exception 'Permission % cannot be granted directly; it is role-only',
+      new.permission_key
+      using errcode = '42501';
+  end if;
   return new;
 end;
 $$;
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger grants_grantable
-  before insert or update on public.grants for each row
+  before insert or update on public.grants
+  for each row
   execute function public.guard_grant_is_grantable();
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 alter table public.grants enable row level security;
 

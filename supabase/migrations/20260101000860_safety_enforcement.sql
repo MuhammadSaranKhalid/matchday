@@ -1,30 +1,45 @@
--- Migration file: 20260101000860_safety_enforcement.sql
+-- =============================================================================
+-- Migration: 20260101000860_safety_enforcement.sql
+-- =============================================================================
 
 -- Integration policies depend on social and messaging tables.
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy posts_respect_blocks on public.posts as restrictive
-  for select to authenticated
+create policy posts_respect_blocks
+  on public.posts
+  as restrictive
+  for select
+  to authenticated
   using (not private.is_blocked_with(author_id));
 
-create policy comments_respect_blocks on public.comments as restrictive
-  for select to authenticated
+create policy comments_respect_blocks
+  on public.comments
+  as restrictive
+  for select
+  to authenticated
   using (not private.is_blocked_with(author_id));
 
-create policy messages_respect_blocks on public.messages as restrictive
-  for select to authenticated
+create policy messages_respect_blocks
+  on public.messages
+  as restrictive
+  for select
+  to authenticated
   using (not private.is_blocked_with(sender_id));
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- Triggers also protect writes made through security-definer RPCs.
 create or replace function private.guard_blocked_interaction()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = ''
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
 declare
   target uuid;
 begin
@@ -92,16 +107,21 @@ $$;
 
 revoke all on function private.guard_blocked_interaction() from public;
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger messages_block_guard
-  before insert or update on public.messages for each row
+  before insert or update on public.messages
+  for each row
   execute function private.guard_blocked_interaction();
 
 create trigger comments_block_guard
-  before insert or update on public.comments for each row
+  before insert or update on public.comments
+  for each row
   execute function private.guard_blocked_interaction();
 
 create trigger follows_block_guard
-  before insert or update on public.follows for each row
+  before insert or update on public.follows
+  for each row
   execute function private.guard_blocked_interaction();

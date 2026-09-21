@@ -1,15 +1,25 @@
--- Migration file: 20260101000801_channel_members.sql
+-- =============================================================================
+-- Migration: 20260101000801_channel_members.sql
+-- =============================================================================
 
 -- 0801 · channel_members — conversation membership & horizons
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.channel_members(
-  channel_id                 uuid not null references public.chat_channels(channel_id) on delete cascade,
-  user_id                    uuid not null references public.profiles(user_id) on delete cascade,
+create table public.channel_members (
+  channel_id                 uuid not null
+    references public.chat_channels (channel_id)
+    on delete cascade,
+  user_id                    uuid not null
+    references public.profiles (user_id)
+    on delete cascade,
   role                       public.chat_member_role not null default 'member',
   status                     public.chat_member_status not null default 'active',
-  invited_by                 uuid references public.profiles(user_id) on delete set null,
+  invited_by                 uuid
+    references public.profiles (user_id)
+    on delete set null,
   invited_at                 timestamptz,
   responded_at               timestamptz,
   joined_at                  timestamptz,
@@ -27,18 +37,35 @@ create table public.channel_members(
   primary key (channel_id, user_id)
 );
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index channel_members_user_inbox_idx on public.channel_members(user_id, status, archived_at, pinned_at);
+create index channel_members_user_inbox_idx
+  on public.channel_members (
+    user_id,
+    status,
+    archived_at,
+    pinned_at
+  );
 
-create index channel_members_channel_status_idx on public.channel_members(channel_id, status);
+create index channel_members_channel_status_idx
+  on public.channel_members (
+    channel_id,
+    status
+  );
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger channel_members_set_updated_at
-  before update on public.channel_members for each row
+  before update on public.channel_members
+  for each row
   execute function public.set_updated_at();
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 alter table public.channel_members enable row level security;

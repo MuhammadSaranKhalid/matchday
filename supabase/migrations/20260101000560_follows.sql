@@ -1,4 +1,6 @@
--- Migration file: 20260101000560_follows.sql
+-- =============================================================================
+-- Migration: 20260101000560_follows.sql
+-- =============================================================================
 
 -- 0560 · follows
 -- Spec §6.4, §8.2.6.
@@ -22,36 +24,47 @@
 --   The no_self_follow CHECK forbids `target_type='user' AND
 --   target_id=follower_id`. Following your own team/tournament is allowed.
 
--- Section: Tables and constraints
+-- -----------------------------------------------------------------------------
+-- Tables and constraints
+-- -----------------------------------------------------------------------------
 
-create table public.follows(
+create table public.follows (
   follow_id   uuid primary key default gen_random_uuid(),
-  follower_id uuid not null references public.profiles(user_id) on delete cascade,
+  follower_id uuid not null
+    references public.profiles (user_id)
+    on delete cascade,
   target_type public.follow_target_type not null,
   target_id   uuid not null,
   status      public.follow_status not null default 'active',
   created_at  timestamptz not null default now(),
   unique (follower_id, target_type, target_id),
-  constraint no_self_follow check (not (target_type = 'user' and target_id = follower_id))
+  constraint no_self_follow
+    check (not (target_type = 'user' and target_id = follower_id))
 );
 
--- Section: Indexes
+-- -----------------------------------------------------------------------------
+-- Indexes
+-- -----------------------------------------------------------------------------
 
-create index follows_target on public.follows(target_type, target_id);
+create index follows_target
+  on public.follows (target_type, target_id);
 
-create index follows_follower on public.follows(follower_id);
+create index follows_follower
+  on public.follows (follower_id);
 
--- Section: Functions
+-- -----------------------------------------------------------------------------
+-- Functions
+-- -----------------------------------------------------------------------------
 
 -- cleanup_follows_on_entity_delete — keeps follows clean of dangling targets.
 -- One generic function dispatches on tg_table_name; trigger registered on
 -- each target table separately.
 create or replace function public.cleanup_follows_on_entity_delete()
-  returns trigger
-  language plpgsql
-  security definer
-  set search_path = public, pg_temp
-  as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   if tg_table_name = 'profiles' then
     delete from public.follows
@@ -70,21 +83,28 @@ begin
 end;
 $$;
 
--- Section: Triggers
+-- -----------------------------------------------------------------------------
+-- Triggers
+-- -----------------------------------------------------------------------------
 
 create trigger profiles_cleanup_follows
-  after delete on public.profiles for each row
+  after delete on public.profiles
+  for each row
   execute function public.cleanup_follows_on_entity_delete();
 
 create trigger teams_cleanup_follows
-  after delete on public.teams for each row
+  after delete on public.teams
+  for each row
   execute function public.cleanup_follows_on_entity_delete();
 
 create trigger tournaments_cleanup_follows
-  after delete on public.tournaments for each row
+  after delete on public.tournaments
+  for each row
   execute function public.cleanup_follows_on_entity_delete();
 
--- Section: Enable row-level security
+-- -----------------------------------------------------------------------------
+-- Enable row-level security
+-- -----------------------------------------------------------------------------
 
 -- NOTIFICATION TRIGGER MOVED → 20260101000620_notification_triggers.sql
 --
@@ -96,29 +116,51 @@ create trigger tournaments_cleanup_follows
 -- follower themselves.
 alter table public.follows enable row level security;
 
--- Section: Policies
+-- -----------------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------------
 
-create policy "follows_read_public" on public.follows
-  for select to anon, authenticated
+create policy "follows_read_public"
+  on public.follows
+  for select
+  to anon, authenticated
   using (true);
 
-create policy "follows_insert_self" on public.follows
-  for insert to authenticated
-  with check ((
-    select
-      auth.uid()) = follower_id);
+create policy "follows_insert_self"
+  on public.follows
+  for insert
+  to authenticated
+  with check (
+    (
+      select
+        auth.uid()
+    ) = follower_id
+  );
 
-create policy "follows_update_self" on public.follows
-  for update to authenticated
-  using ((
-    select
-      auth.uid()) = follower_id)
-  with check ((
-    select
-      auth.uid()) = follower_id);
+create policy "follows_update_self"
+  on public.follows
+  for update
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = follower_id
+  )
+  with check (
+    (
+      select
+        auth.uid()
+    ) = follower_id
+  );
 
-create policy "follows_delete_self" on public.follows
-  for delete to authenticated
-  using ((
-    select
-      auth.uid()) = follower_id);
+create policy "follows_delete_self"
+  on public.follows
+  for delete
+  to authenticated
+  using (
+    (
+      select
+        auth.uid()
+    ) = follower_id
+  );

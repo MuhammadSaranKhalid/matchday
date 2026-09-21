@@ -518,8 +518,8 @@ begin
     raise exception 'Both teams must have a captain or owner before a match can be created'
       using errcode = '23502';
   end if;
-  insert into public.matches(match_type, tournament_id, team_a_id, team_b_id, team_a_captain, team_b_captain, format, venue, scheduled_start_time, status, created_by)
-    values ('friendly', null, v_req.from_team_id, v_to_team, v_a_captain, v_b_captain, v_format, v_venue, v_start, 'scheduled', auth.uid())
+  insert into public.matches(match_type, tournament_id, team_a_id, team_b_id, format, venue, scheduled_start_time, status, created_by)
+    values ('friendly', null, v_req.from_team_id, v_to_team, v_format, v_venue, v_start, 'scheduled', auth.uid())
   returning
     match_id
   into
@@ -563,21 +563,14 @@ begin
   --   by replacing the whole function later in the run; the base is now correct
   --   in its own right.
   -- ---------------------------------------------------------------------------
-  insert into public.match_players(match_id, team_side, user_id, unclaimed_id, display_name, role)
+  -- Populate Team A match_players (sport-neutral identity)
+  insert into public.match_players(match_id, team_side, user_id, unclaimed_id, display_name)
   select
     v_match_id,
     'team_a',
     tm.user_id,
     tm.unclaimed_id,
-    coalesce(p.display_name, u.display_name, 'Player'),
-    case when coalesce(tm.user_id = v_a_captain, false) then
-      'captain'::public.match_role
-    when coalesce(tm.user_id = v_req.from_team_keeper_id
-      or tm.unclaimed_id = v_req.from_team_keeper_id, false) then
-      'wicket_keeper'::public.match_role
-    else
-      'player'::public.match_role
-    end
+    coalesce(p.display_name, u.display_name, 'Player')
   from
     public.team_members tm
     left join public.profiles p on p.user_id = tm.user_id
@@ -586,26 +579,17 @@ begin
     tm.team_id = v_req.from_team_id
     and tm.status = 'active'
     and (
-      -- Empty XI = include the full active roster.
       coalesce(array_length(v_req.from_team_xi, 1), 0) = 0
-      -- Non-empty XI = filter to the picked players.
       or tm.user_id = any (v_req.from_team_xi)
       or tm.unclaimed_id = any (v_req.from_team_xi));
-  insert into public.match_players(match_id, team_side, user_id, unclaimed_id, display_name, role)
+  -- Populate Team B match_players (sport-neutral identity)
+  insert into public.match_players(match_id, team_side, user_id, unclaimed_id, display_name)
   select
     v_match_id,
     'team_b',
     tm.user_id,
     tm.unclaimed_id,
-    coalesce(p.display_name, u.display_name, 'Player'),
-    case when coalesce(tm.user_id = v_b_captain, false) then
-      'captain'::public.match_role
-    when coalesce(tm.user_id = v_to_keeper
-      or tm.unclaimed_id = v_to_keeper, false) then
-      'wicket_keeper'::public.match_role
-    else
-      'player'::public.match_role
-    end
+    coalesce(p.display_name, u.display_name, 'Player')
   from
     public.team_members tm
     left join public.profiles p on p.user_id = tm.user_id
@@ -614,20 +598,27 @@ begin
     tm.team_id = v_to_team
     and tm.status = 'active'
     and (
-      -- Empty XI = include the full active roster.
       coalesce(array_length(v_to_team_xi, 1), 0) = 0
-      -- Non-empty XI = filter to the picked players.
       or tm.user_id = any (v_to_team_xi)
       or tm.unclaimed_id = any (v_to_team_xi));
-  -- Populate cricket_match_players.
-  insert into public.cricket_match_players(match_player_id, match_id, is_playing_xi, batting_order, is_captain, is_wicket_keeper)
+  -- Populate cricket_match_players with captain/keeper flags derived from
+  -- v_a_captain / v_b_captain / keeper params (not from a stale role column).
+  insert into public.cricket_match_players(match_player_id, match_id, is_captain, is_wicket_keeper)
   select
     mp.match_player_id,
     mp.match_id,
-    mp.is_in_playing_xi,
-    mp.batting_order,
-    mp.role = 'captain',
-    mp.role = 'wicket_keeper'
+    coalesce(
+      (mp.team_side = 'team_a' and mp.user_id = v_a_captain)
+      or (mp.team_side = 'team_b' and mp.user_id = v_b_captain),
+      false
+    ),
+    coalesce(
+      mp.user_id      = v_req.from_team_keeper_id
+      or mp.unclaimed_id = v_req.from_team_keeper_id
+      or mp.user_id      = v_to_keeper
+      or mp.unclaimed_id = v_to_keeper,
+      false
+    )
   from
     public.match_players mp
   where

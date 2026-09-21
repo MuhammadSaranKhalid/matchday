@@ -42,9 +42,23 @@ create or replace function public._is_match_captain(
         public.matches m
       where
         m.match_id = p_match_id
-        and(m.created_by = auth.uid()
-          or m.team_a_captain = auth.uid()
-          or m.team_b_captain = auth.uid()));
+        and(
+          m.created_by = auth.uid()
+          -- captain of either side (cricket_match_players is the authoritative
+          -- captain record; team_a_captain / team_b_captain no longer exist as
+          -- stored columns on matches).
+          or exists (
+            select 1
+            from public.match_players mp
+            join public.cricket_match_players cmp
+              on cmp.match_player_id = mp.match_player_id
+             and cmp.match_id       = mp.match_id
+            where mp.match_id  = p_match_id
+              and mp.user_id   = auth.uid()
+              and cmp.is_captain = true
+          )
+        )
+    );
 $$;
 
 -- Who may score which innings  (design doc D12)
@@ -113,17 +127,22 @@ select
       batting b
     where
       -- Practice matches have no opposition to hand over to.
-(b.match_type = 'practice'
+      (b.match_type = 'practice'
         and b.created_by = auth.uid())
-      -- The captain of the batting side.
-      or(b.batting_team_id = b.team_a_id
-        and b.team_a_captain = auth.uid())
-      or(b.batting_team_id = b.team_b_id
-        and b.team_b_captain = auth.uid())
+      -- The captain of the batting side (derived from cricket_match_players;
+      -- team_a_captain / team_b_captain no longer exist as stored columns).
+      or exists (
+        select 1
+        from public.match_players mp
+        join public.cricket_match_players cmp
+          on cmp.match_player_id = mp.match_player_id
+         and cmp.match_id       = mp.match_id
+        where mp.match_id   = b.match_id
+          and mp.user_id    = auth.uid()
+          and mp.team_side  = case when b.batting_team_id = b.team_a_id then 'team_a' else 'team_b' end
+          and cmp.is_captain = true
+      )
       -- The batting side, via the authorization engine (2026-09-11).
-      -- Superseded by the definition in 20260822120000, which adds the
-      -- match-scope delegation branch — grants/match_officials are not wired
-      -- up yet at this point in the run.
       or public.can('team', b.batting_team_id, 'match.score'));
 $$;
 
@@ -217,8 +236,17 @@ create or replace function public.list_my_matches()
     public.matches m
   where
     m.created_by = auth.uid()
-    or m.team_a_captain = auth.uid()
-    or m.team_b_captain = auth.uid()
+    -- captain of either side (derived from cricket_match_players)
+    or exists (
+      select 1
+      from public.match_players mp
+      join public.cricket_match_players cmp
+        on cmp.match_player_id = mp.match_player_id
+       and cmp.match_id       = mp.match_id
+      where mp.match_id   = m.match_id
+        and mp.user_id    = auth.uid()
+        and cmp.is_captain = true
+    )
     or exists(
       select
         1
@@ -354,7 +382,9 @@ where
 grant select on public.cricket_match_details to anon, authenticated, service_role;
 
 comment on view public.cricket_match_details is 'Canonical Cricket aggregate. lifecycle_status is the generic parent '
-   'lifecycle; 
+  'lifecycle; cricket_phase is the exact Cricket phase; status/start_phase are '
+  'compatibility projections for the current Cricket Flutter UI.';
+
 create function public.list_my_cricket_matches()
   returns setof public.cricket_match_details
   language sql

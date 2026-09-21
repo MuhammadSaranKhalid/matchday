@@ -216,8 +216,8 @@ begin
   end if;
   v_format := public._normalize_match_format(v_req.proposed_format);
   -- Insert match row
-  insert into public.matches(match_type, tournament_id, team_a_id, team_b_id, team_a_captain, team_b_captain, format, venue, scheduled_start_time, status, created_by)
-    values ('friendly', null, v_req.from_team_id, v_app.applicant_team_id, v_a_captain, v_b_captain, v_format, v_req.proposed_venue, v_req.proposed_start_time, 'scheduled', auth.uid())
+  insert into public.matches(match_type, tournament_id, team_a_id, team_b_id, format, venue, scheduled_start_time, status, created_by)
+    values ('friendly', null, v_req.from_team_id, v_app.applicant_team_id, v_format, v_req.proposed_venue, v_req.proposed_start_time, 'scheduled', auth.uid())
   returning
     match_id
   into
@@ -225,42 +225,64 @@ begin
   -- Cricket extension row.
   insert into public.cricket_matches(match_id, format_code, rules_snapshot)
     values (v_match_id, v_format ->> 'format_preset', v_format);
-  -- Populate Team A match_players
-  insert into public.match_players(match_id, team_side, profile_id, unclaimed_id, is_captain, is_keeper)
+  -- Populate Team A match_players (sport-neutral identity)
+  insert into public.match_players(match_id, team_side, user_id, unclaimed_id, display_name)
   select
     v_match_id,
-    'a',
+    'team_a',
     tm.user_id,
     tm.unclaimed_id,
-    coalesce(tm.user_id = v_a_captain, false),
-    coalesce(tm.user_id = v_req.from_team_keeper_id
-      or tm.unclaimed_id = v_req.from_team_keeper_id, false)
+    coalesce(p.display_name, u.display_name, 'Player')
   from
     public.team_members tm
+    left join public.profiles p on p.user_id = tm.user_id
+    left join public.unclaimed_players u on u.unclaimed_id = tm.unclaimed_id
   where
     tm.team_id = v_req.from_team_id
     and tm.status = 'active'
     and (coalesce(array_length(v_req.from_team_xi, 1), 0) = 0
       or tm.user_id = any (v_req.from_team_xi)
       or tm.unclaimed_id = any (v_req.from_team_xi));
-  -- Populate Team B (Applicant) match_players
-  insert into public.match_players(match_id, team_side, profile_id, unclaimed_id, is_captain, is_keeper)
+  -- Populate Team B (Applicant) match_players (sport-neutral identity)
+  insert into public.match_players(match_id, team_side, user_id, unclaimed_id, display_name)
   select
     v_match_id,
-    'b',
+    'team_b',
     tm.user_id,
     tm.unclaimed_id,
-    coalesce(tm.user_id = v_b_captain, false),
-    coalesce(tm.user_id = v_app.applicant_keeper_id
-      or tm.unclaimed_id = v_app.applicant_keeper_id, false)
+    coalesce(p.display_name, u.display_name, 'Player')
   from
     public.team_members tm
+    left join public.profiles p on p.user_id = tm.user_id
+    left join public.unclaimed_players u on u.unclaimed_id = tm.unclaimed_id
   where
     tm.team_id = v_app.applicant_team_id
     and tm.status = 'active'
     and (coalesce(array_length(v_app.applicant_xi, 1), 0) = 0
       or tm.user_id = any (v_app.applicant_xi)
       or tm.unclaimed_id = any (v_app.applicant_xi));
+  -- Populate cricket_match_players with captain/keeper flags derived from
+  -- v_a_captain / v_b_captain / keeper params.
+  insert into public.cricket_match_players(match_player_id, match_id, is_captain, is_wicket_keeper)
+  select
+    mp.match_player_id,
+    mp.match_id,
+    coalesce(
+      (mp.team_side = 'team_a' and mp.user_id = v_a_captain)
+      or (mp.team_side = 'team_b' and mp.user_id = v_b_captain),
+      false
+    ),
+    coalesce(
+      mp.user_id      = v_req.from_team_keeper_id
+      or mp.unclaimed_id = v_req.from_team_keeper_id
+      or mp.user_id      = v_app.applicant_keeper_id
+      or mp.unclaimed_id = v_app.applicant_keeper_id,
+      false
+    )
+  from
+    public.match_players mp
+  where
+    mp.match_id = v_match_id;
   -- Mark accepted application
   update
     public.match_pool_applications

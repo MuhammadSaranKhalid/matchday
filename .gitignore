@@ -61,3 +61,6 @@ app.*.map.json
 
 # Local DB data backups (contain real prod data - never commit)
 .backups/
+
+# Local isolated feature worktrees
+.worktrees/

@@ -87,7 +87,7 @@ final class MatchStartControllerProvider
 }
 
 String _$matchStartControllerHash() =>
-    r'c79f89c45bf9c5443509e9944bbe8057517a7593';
+    r'8a2aa9c738bef4c3403bea1e304221667b9f7425';
 
 /// Match Start controller.
 ///

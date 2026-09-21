@@ -56,11 +56,14 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
       );
     }
     final inns1 = ref.watch(liveInningsStateProvider(widget.matchId, 1)).value;
-    final players = ref.watch(matchPlayersProvider(widget.matchId)).value ??
+    final players =
+        ref.watch(matchPlayersProvider(widget.matchId)).value ??
         const <MatchPlayer>[];
-    final rosterA = ref.watch(rosterProvider(match.teamAId.value)).value ??
+    final rosterA =
+        ref.watch(rosterProvider(match.teamAId.value)).value ??
         const <RosterMember>[];
-    final rosterB = ref.watch(rosterProvider(match.teamBId.value)).value ??
+    final rosterB =
+        ref.watch(rosterProvider(match.teamBId.value)).value ??
         const <RosterMember>[];
     // Name and avatar come off the lineup row, which resolves them at the data
     // boundary — guests and substitutes have no roster entry to be named by.
@@ -75,10 +78,10 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
     final battingSide =
         battingFirstIsTeamA(match) ? MatchTeamSide.b : MatchTeamSide.a;
     final batters =
-        players.where((p) => p.teamSide == battingSide).toList()
-          ..sort((a, b) => (a.battingOrder ?? 99).compareTo(b.battingOrder ?? 99));
-    final bowlers =
-        players.where((p) => p.teamSide != battingSide).toList();
+        players.where((p) => p.teamSide == battingSide).toList()..sort(
+          (a, b) => (a.battingOrder ?? 99).compareTo(b.battingOrder ?? 99),
+        );
+    final bowlers = players.where((p) => p.teamSide != battingSide).toList();
 
     final target = (inns1?.totalRuns ?? 0) + 1;
 
@@ -97,8 +100,9 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
     // button at the innings break.
     final memberships =
         ref.watch(currentUserTeamMembershipsProvider).value ??
-            const <TeamMembership>[];
-    final canSetup = battingTeam != null &&
+        const <TeamMembership>[];
+    final canSetup =
+        battingTeam != null &&
         currentUserId != null &&
         memberships.any(
           (membership) =>
@@ -106,7 +110,8 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
               membership.relationship.hasMatchAuthority,
         );
 
-    final ready = _strikerId != null &&
+    final ready =
+        _strikerId != null &&
         _nonStrikerId != null &&
         _bowlerId != null &&
         _strikerId != _nonStrikerId &&
@@ -141,29 +146,31 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
             if (canSetup) ...[
               // Same tap-to-pick lineup UI as the first-innings Match Start:
               // slot cards on top, tap a roster row to fill the next slot.
-              Row(children: [
-                Expanded(
-                  child: LineupSlotCard(
-                    label: 'ON STRIKE',
-                    value: slotName(_strikerId),
-                    hot: true,
+              Row(
+                children: [
+                  Expanded(
+                    child: LineupSlotCard(
+                      label: 'ON STRIKE',
+                      value: slotName(_strikerId),
+                      hot: true,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: LineupSlotCard(
-                    label: 'NON-STRIKER',
-                    value: slotName(_nonStrikerId),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: LineupSlotCard(
+                      label: 'NON-STRIKER',
+                      value: slotName(_nonStrikerId),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: LineupSlotCard(
-                    label: 'BOWLER',
-                    value: slotName(_bowlerId),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: LineupSlotCard(
+                      label: 'BOWLER',
+                      value: slotName(_bowlerId),
+                    ),
                   ),
-                ),
-              ]),
+                ],
+              ),
               const SizedBox(height: 22),
               Text('OPENERS — TAP TO PICK', style: CkType.mono(fontSize: 11)),
               const SizedBox(height: 4),
@@ -172,9 +179,10 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
                   name: nameOf(p),
                   photoUrl: p.photoUrl,
                   jersey: jerseyByRef[p.playerRefId],
-                  badge: _strikerId == p.id.value
-                      ? 'STR'
-                      : _nonStrikerId == p.id.value
+                  badge:
+                      _strikerId == p.id.value
+                          ? 'STR'
+                          : _nonStrikerId == p.id.value
                           ? 'NS'
                           : null,
                   onTap: () => setState(() => _tapBatter(p.id.value)),
@@ -188,22 +196,27 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
                   photoUrl: p.photoUrl,
                   jersey: jerseyByRef[p.playerRefId],
                   badge: _bowlerId == p.id.value ? 'BWL' : null,
-                  onTap: () => setState(() =>
-                      _bowlerId = _bowlerId == p.id.value ? null : p.id.value),
+                  onTap:
+                      () => setState(
+                        () =>
+                            _bowlerId =
+                                _bowlerId == p.id.value ? null : p.id.value,
+                      ),
                 ),
               const SizedBox(height: 28),
               FilledButton(
                 onPressed: ready ? () => _start(target) : null,
-                child: _busy
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: CkColors.paper,
-                        ),
-                      )
-                    : const Text('Start the chase'),
+                child:
+                    _busy
+                        ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: CkColors.paper,
+                          ),
+                        )
+                        : const Text('Start the chase'),
               ),
             ] else
               _WaitingForChase(teamName: battingTeam?.name),
@@ -236,7 +249,9 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
     // null, the engine's `targetReached` can never fire, and the chase runs to
     // its full quota of overs even after the runs are knocked off — the most
     // common way a limited-overs match ends simply would not register.
-    final result = await ref.read(matchesRepositoryProvider).startInnings(
+    final result = await ref
+        .read(matchesRepositoryProvider)
+        .startInnings(
           matchId: MatchId(widget.matchId),
           inningsNumber: 2,
           strikerId: _strikerId!,
@@ -247,9 +262,9 @@ class _InningsBreakScreenState extends ConsumerState<InningsBreakScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) => context.go('/matches/${widget.matchId}/score?innings=2'),
     );
   }
@@ -265,9 +280,10 @@ class _WaitingForChase extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final who = (teamName == null || teamName!.isEmpty)
-        ? 'The chasing team'
-        : teamName!;
+    final who =
+        (teamName == null || teamName!.isEmpty)
+            ? 'The chasing team'
+            : teamName!;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),

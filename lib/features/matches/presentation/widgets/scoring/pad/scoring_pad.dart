@@ -29,16 +29,9 @@ class ScoringPad extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          RunKeypad(
-            onRun: onRun,
-            onWicket: onWicket,
-            busy: busy,
-          ),
+          RunKeypad(onRun: onRun, onWicket: onWicket, busy: busy),
           const SizedBox(height: 6),
-          ExtrasKeypad(
-            onExtra: onExtra,
-            busy: busy,
-          ),
+          ExtrasKeypad(onExtra: onExtra, busy: busy),
         ],
       ),
     );

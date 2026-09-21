@@ -90,12 +90,10 @@ class MatchRequest extends Equatable {
 
   /// Most-recent terms — counter takes precedence over proposed, since accept
   /// materialises the match with `coalesce(countered_*, proposed_*)`.
-  DateTime? get effectiveStartTime =>
-      counteredStartTime ?? proposedStartTime;
+  DateTime? get effectiveStartTime => counteredStartTime ?? proposedStartTime;
   String? get effectiveVenue => counteredVenue ?? proposedVenue;
   MatchFormat? get effectiveFormat => counteredFormat ?? proposedFormat;
-  int get effectivePlayersPerSide =>
-      counteredPlayersPerSide ?? playersPerSide;
+  int get effectivePlayersPerSide => counteredPlayersPerSide ?? playersPerSide;
 
   /// True when the request is still actionable — can be accepted, declined,
   /// countered or cancelled.

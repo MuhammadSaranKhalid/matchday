@@ -21,7 +21,9 @@ class MatchPoolRepositoryImpl implements MatchPoolRepository {
     try {
       final dtos = await _requests.listMyMatchChallenges();
       // Filter for open pool challenges (to_team_id == null) that are pending
-      final openDtos = dtos.where((d) => d.toTeamId == null && d.status == 'pending');
+      final openDtos = dtos.where(
+        (d) => d.toTeamId == null && d.status == 'pending',
+      );
       return Right(openDtos.map((d) => d.toEntity()).toList());
     } on Exception catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -34,7 +36,8 @@ class MatchPoolRepositoryImpl implements MatchPoolRepository {
   }) async {
     final all = await getMyPoolChallenges(myTeamIds: myTeamIds);
     return all.map(
-      (list) => list.where((r) => r.status == MatchRequestStatus.pending).toList(),
+      (list) =>
+          list.where((r) => r.status == MatchRequestStatus.pending).toList(),
     );
   }
 
@@ -55,7 +58,9 @@ class MatchPoolRepositoryImpl implements MatchPoolRepository {
   }
 
   @override
-  Future<Either<Failure, MatchRequest?>> findChallengeByCode(String code) async {
+  Future<Either<Failure, MatchRequest?>> findChallengeByCode(
+    String code,
+  ) async {
     final trimmed = code.trim();
     if (trimmed.length != 6) {
       return const Left(ValidationFailure('Share code must be 6 digits'));
@@ -96,7 +101,9 @@ class MatchPoolRepositoryImpl implements MatchPoolRepository {
   ) async {
     try {
       final dtos = await _requests.listPoolApplications(requestId.value);
-      return Right(dtos.map((MatchPoolApplicationDto d) => d.toEntity()).toList());
+      return Right(
+        dtos.map((MatchPoolApplicationDto d) => d.toEntity()).toList(),
+      );
     } on Exception catch (e) {
       return Left(ServerFailure(e.toString()));
     }

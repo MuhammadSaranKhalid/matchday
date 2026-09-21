@@ -32,15 +32,15 @@ EngineInningsState engineStateFrom(MatchInningsState? innings) =>
     );
 
 EngineFormat engineFormatFrom(MatchFormat f) => EngineFormat(
-      oversPerInnings: f.oversPerInnings,
-      playersPerTeam: f.playersPerTeam,
-      ballsPerOver: f.ballsPerOver,
-      endChangeBalls: f.endChangeBalls,
-      maxOversPerBowler: f.maxOversPerBowler,
-      inningsPerSide: f.inningsPerSide,
-      ballType: f.ballType.name,
-      wicketsToAllOut: f.wicketsToAllOut,
-    );
+  oversPerInnings: f.oversPerInnings,
+  playersPerTeam: f.playersPerTeam,
+  ballsPerOver: f.ballsPerOver,
+  endChangeBalls: f.endChangeBalls,
+  maxOversPerBowler: f.maxOversPerBowler,
+  inningsPerSide: f.inningsPerSide,
+  ballType: f.ballType.name,
+  wicketsToAllOut: f.wicketsToAllOut,
+);
 
 /// The kind of the most recent NON-wide delivery, or null before the first.
 ///
@@ -69,24 +69,23 @@ int bowlerLegalBalls(List<Ball> balls, String? bowlerId) {
 EngineContext engineContextFrom({
   required List<Ball> balls,
   required String? bowlerId,
-}) =>
-    EngineContext(
-      prevNonWideKind: prevNonWideKind(balls),
-      bowlerLegalBalls: bowlerLegalBalls(balls, bowlerId),
-    );
+}) => EngineContext(
+  prevNonWideKind: prevNonWideKind(balls),
+  bowlerLegalBalls: bowlerLegalBalls(balls, bowlerId),
+);
 
 /// The delivery the scorer entered, as engine input.
 EngineBallInput engineInputFrom(BallDraft d) => EngineBallInput(
-      isLegalDelivery: d.isLegalDelivery,
-      ballKind: d.ballKind,
-      runsScored: d.runsScored,
-      extras: d.extras,
-      isWicket: d.isWicket,
-      wicketType: d.wicketType,
-      dismissedPlayerId: d.dismissedPlayerId,
-      batsmanId: d.batsmanId,
-      nonStrikerId: d.nonStrikerId,
-      bowlerId: d.bowlerId,
-      fielderId: d.fielderId,
-      commentary: d.commentary,
-    );
+  isLegalDelivery: d.isLegalDelivery,
+  ballKind: d.ballKind,
+  runsScored: d.runsScored,
+  extras: d.extras,
+  isWicket: d.isWicket,
+  wicketType: d.wicketType,
+  dismissedPlayerId: d.dismissedPlayerId,
+  batsmanId: d.batsmanId,
+  nonStrikerId: d.nonStrikerId,
+  bowlerId: d.bowlerId,
+  fielderId: d.fielderId,
+  commentary: d.commentary,
+);

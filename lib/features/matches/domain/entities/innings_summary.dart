@@ -38,6 +38,11 @@ class InningsSummary extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [matchId, inningsNumber, totalRuns, totalWickets, legalBallsFaced];
+  List<Object?> get props => [
+    matchId,
+    inningsNumber,
+    totalRuns,
+    totalWickets,
+    legalBallsFaced,
+  ];
 }

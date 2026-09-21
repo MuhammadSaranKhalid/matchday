@@ -75,7 +75,11 @@ class Scoreboard extends StatelessWidget {
                   suffix: ' /${state.formatOvers}',
                 ),
               ),
-              _Stat(label: 'BALLS', value: '${state.ballsRemaining}', end: true),
+              _Stat(
+                label: 'BALLS',
+                value: '${state.ballsRemaining}',
+                end: true,
+              ),
             ],
           ),
           Padding(
@@ -266,7 +270,10 @@ class BattersAndBowler extends StatelessWidget {
               onTap: state.canScore ? onTapBowler : null,
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: CkColors.hairline),
@@ -377,13 +384,15 @@ List<OverGroup> groupBallsByOver(List<Ball> balls) {
       runs += (b.runsScored + b.extras);
       if (b.isWicket) wickets += 1;
     }
-    groups.add(OverGroup(
-      overNumber: overNum,
-      bowlerId: bowlerId,
-      balls: overBalls,
-      totalRuns: runs,
-      totalWickets: wickets,
-    ));
+    groups.add(
+      OverGroup(
+        overNumber: overNum,
+        bowlerId: bowlerId,
+        balls: overBalls,
+        totalRuns: runs,
+        totalWickets: wickets,
+      ),
+    );
   }
   return groups;
 }
@@ -414,10 +423,10 @@ class BallLog extends StatelessWidget {
   }
 
   String _describe(Ball b) => describeBall(
-        b,
-        batterName: _name(b.dismissedPlayerId ?? b.batsmanId),
-        fielderName: _name(b.fielderId),
-      );
+    b,
+    batterName: _name(b.dismissedPlayerId ?? b.batsmanId),
+    fielderName: _name(b.fielderId),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -461,11 +470,15 @@ class BallLog extends StatelessWidget {
               children: [
                 // Over Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: isCurrentOver
-                        ? CkColors.paper2
-                        : const Color(0x08000000),
+                    color:
+                        isCurrentOver
+                            ? CkColors.paper2
+                            : const Color(0x08000000),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(11),
                     ),
@@ -473,7 +486,10 @@ class BallLog extends StatelessWidget {
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: isCurrentOver ? CkColors.ink : CkColors.muted,
                           borderRadius: BorderRadius.circular(4),
@@ -512,7 +528,10 @@ class BallLog extends StatelessWidget {
                 ),
                 // Deliveries in this over (reversed so newest in over is on top)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
                   child: Column(
                     children: [
                       for (final ball in group.balls.reversed)
@@ -579,10 +598,7 @@ class BallLogRow extends StatelessWidget {
             child: Text(
               description,
               overflow: TextOverflow.ellipsis,
-              style: CkType.body(
-                fontSize: 12,
-                color: CkColors.ink2,
-              ),
+              style: CkType.body(fontSize: 12, color: CkColors.ink2),
             ),
           ),
         ],
@@ -596,13 +612,13 @@ class _EmptyBallSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 22,
-        height: 22,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: CkColors.line, width: 1.5),
-        ),
-      );
+    width: 22,
+    height: 22,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(color: CkColors.line, width: 1.5),
+    ),
+  );
 }
 
 class BatterCard extends StatelessWidget {
@@ -640,87 +656,80 @@ class BatterCard extends StatelessWidget {
               width: onStrike ? 1.5 : 1,
             ),
           ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Avatar(
-                    mono: personInitials(name),
-                    imageUrl: photoUrl,
-                    size: 20,
-                    tone: onStrike ? AvatarTone.ink : AvatarTone.paper,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      name,
-                      overflow: TextOverflow.ellipsis,
-                      style: CkType.body(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: onStrike ? CkColors.ink : CkColors.ink2,
+                  Row(
+                    children: [
+                      Avatar(
+                        mono: personInitials(name),
+                        imageUrl: photoUrl,
+                        size: 20,
+                        tone: onStrike ? AvatarTone.ink : AvatarTone.paper,
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          name,
+                          overflow: TextOverflow.ellipsis,
+                          style: CkType.body(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: onStrike ? CkColors.ink : CkColors.ink2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        '${stats.runs}',
+                        style: CkType.display(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '(${stats.balls})',
+                        style: CkType.mono(fontSize: 11, color: CkColors.muted),
+                      ),
+                      const SizedBox(width: 6),
+                      // Flexible, not a Spacer + fixed Text: with a Spacer the
+                      // boundary tally had no way to give ground, so two of these
+                      // cards side by side on a phone overflowed the row. Letting
+                      // it ellipsise keeps the runs figure — the number actually
+                      // being read — intact instead.
+                      Expanded(
+                        child: Text(
+                          '${stats.fours}×4 ${stats.sixes}×6',
+                          textAlign: TextAlign.right,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: CkType.mono(
+                            fontSize: 10,
+                            color: CkColors.muted,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 2),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    '${stats.runs}',
-                    style: CkType.display(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '(${stats.balls})',
-                    style: CkType.mono(
-                      fontSize: 11,
-                      color: CkColors.muted,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  // Flexible, not a Spacer + fixed Text: with a Spacer the
-                  // boundary tally had no way to give ground, so two of these
-                  // cards side by side on a phone overflowed the row. Letting
-                  // it ellipsise keeps the runs figure — the number actually
-                  // being read — intact instead.
-                  Expanded(
-                    child: Text(
-                      '${stats.fours}×4 ${stats.sixes}×6',
-                      textAlign: TextAlign.right,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: CkType.mono(
-                        fontSize: 10,
-                        color: CkColors.muted,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              if (onStrike)
+                const Positioned(top: 0, right: 0, child: _StrikeDot()),
             ],
           ),
-          if (onStrike)
-            const Positioned(
-              top: 0,
-              right: 0,
-              child: _StrikeDot(),
-            ),
-        ],
+        ),
       ),
-    ),
-  ),
-);
+    );
   }
 }
 

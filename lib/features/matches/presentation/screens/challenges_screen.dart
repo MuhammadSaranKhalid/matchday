@@ -52,19 +52,21 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
           // "Chrome is real from the first frame; only counts and rows are
           // skeletal. No spinner: the page never blanks, so returning from a
           // detail screen feels instant."
-          loading: () => const _Frame(
-            count: null,
-            countSkeleton: true,
-            tabs: _TabsSkeleton(),
-            child: _Skeleton(),
-          ),
-          error: (e, _) => _Frame(
-            count: null,
-            tabs: null,
-            child: _ErrorState(
-              onRetry: () => ref.invalidate(challengesViewProvider),
-            ),
-          ),
+          loading:
+              () => const _Frame(
+                count: null,
+                countSkeleton: true,
+                tabs: _TabsSkeleton(),
+                child: _Skeleton(),
+              ),
+          error:
+              (e, _) => _Frame(
+                count: null,
+                tabs: null,
+                child: _ErrorState(
+                  onRetry: () => ref.invalidate(challengesViewProvider),
+                ),
+              ),
           data: (view) => _body(view),
         ),
       ),
@@ -91,48 +93,54 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
         waitingCount: view.waitingOnThem.length,
         onSelect: (v) => setState(() => _needsYouTab = v),
       ),
-      header: _needsYouTab && visibleNeeds.isNotEmpty
-          ? _HeaderLine(
-              waiting: visibleNeeds.length,
-              oldest: view.oldestWait,
-              urgent: visibleNeeds
-                  .where((r) => r.tier == ExpiryTier.urgent)
-                  .length,
-            )
-          : null,
-      child: rows.isEmpty
-          ? (_needsYouTab
-              ? _QueueEmpty(
-                  outstanding: view.waitingOnThem.length,
-                  onSwitch: () => setState(() => _needsYouTab = false),
-                )
-              : _WaitingEmpty(
-                  onSwitch: () => setState(() => _needsYouTab = true),
-                ))
-          : RefreshIndicator.adaptive(
-              onRefresh: () async {
-                ref.invalidate(challengesViewProvider);
-                await ref.read(challengesViewProvider.future);
-              },
-              child: ListView.separated(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(15, 4, 15, 28),
-                itemCount: rows.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (_, i) {
-                  final row = rows[i];
-                  return ChallengeCard(
-                    row: row,
-                    onOpen: () => context.push('/challenges/${row.requestId}'),
-                    onAccept: () => _accept(row),
-                    onCounter: () =>
-                        context.push('/challenges/${row.requestId}/counter'),
-                    onDecline: () => _decline(row),
-                    onWithdraw: () => _withdraw(row),
-                  );
+      header:
+          _needsYouTab && visibleNeeds.isNotEmpty
+              ? _HeaderLine(
+                waiting: visibleNeeds.length,
+                oldest: view.oldestWait,
+                urgent:
+                    visibleNeeds
+                        .where((r) => r.tier == ExpiryTier.urgent)
+                        .length,
+              )
+              : null,
+      child:
+          rows.isEmpty
+              ? (_needsYouTab
+                  ? _QueueEmpty(
+                    outstanding: view.waitingOnThem.length,
+                    onSwitch: () => setState(() => _needsYouTab = false),
+                  )
+                  : _WaitingEmpty(
+                    onSwitch: () => setState(() => _needsYouTab = true),
+                  ))
+              : RefreshIndicator.adaptive(
+                onRefresh: () async {
+                  ref.invalidate(challengesViewProvider);
+                  await ref.read(challengesViewProvider.future);
                 },
+                child: ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(15, 4, 15, 28),
+                  itemCount: rows.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final row = rows[i];
+                    return ChallengeCard(
+                      row: row,
+                      onOpen:
+                          () => context.push('/challenges/${row.requestId}'),
+                      onAccept: () => _accept(row),
+                      onCounter:
+                          () => context.push(
+                            '/challenges/${row.requestId}/counter',
+                          ),
+                      onDecline: () => _decline(row),
+                      onWithdraw: () => _withdraw(row),
+                    );
+                  },
+                ),
               ),
-            ),
     );
   }
 
@@ -153,13 +161,14 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
     );
     if (ok != true || !mounted) return;
 
-    final res = await ref.read(matchesRepositoryProvider).acceptMatchChallenge(
-          requestId: MatchRequestId(row.requestId),
-        );
+    final res = await ref
+        .read(matchesRepositoryProvider)
+        .acceptMatchChallenge(requestId: MatchRequestId(row.requestId));
     if (!mounted) return;
     res.fold(
-      (f) => ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(f.message))),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) {
         _invalidate();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -194,17 +203,14 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
     await controller.closed;
     if (undone || !mounted) return;
 
-    final res = await ref.read(matchesRepositoryProvider).declineMatchChallenge(
-          requestId: MatchRequestId(row.requestId),
-        );
+    final res = await ref
+        .read(matchesRepositoryProvider)
+        .declineMatchChallenge(requestId: MatchRequestId(row.requestId));
     if (!mounted) return;
-    res.fold(
-      (f) {
-        setState(() => _declined.remove(row.requestId));
-        messenger.showSnackBar(SnackBar(content: Text(f.message)));
-      },
-      (_) => _invalidate(),
-    );
+    res.fold((f) {
+      setState(() => _declined.remove(row.requestId));
+      messenger.showSnackBar(SnackBar(content: Text(f.message)));
+    }, (_) => _invalidate());
   }
 
   Future<void> _withdraw(ChallengeRow row) async {
@@ -218,14 +224,17 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
       builder: (_) => WithdrawSheet(opponentName: row.opponentName),
     );
     if (result == null || !mounted) return;
-    final res = await ref.read(matchesRepositoryProvider).withdrawMatchChallenge(
+    final res = await ref
+        .read(matchesRepositoryProvider)
+        .withdrawMatchChallenge(
           requestId: MatchRequestId(row.requestId),
           decisionNote: result.note,
         );
     if (!mounted) return;
     res.fold(
-      (f) => ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(f.message))),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) => _invalidate(),
     );
   }
@@ -262,79 +271,84 @@ class _Frame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            // 12 rather than the design's 16: the canvas pulls the 44px tap
-            // target 4px left with `margin-left:-4px` so the 36px circle
-            // optically aligns to the 16px page gutter. Flutter's Container
-            // asserts `margin.isNonNegative`, so the same result is reached by
-            // taking the 4px off the gutter instead. Circle centre is 12+22=34
-            // either way.
-            padding: const EdgeInsets.fromLTRB(12, 10, 16, 12),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: CkColors.hairline)),
-            ),
-            child: Row(
-              children: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => context.canPop()
-                      ? context.pop()
-                      : context.go('/my/matches'),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    alignment: Alignment.center,
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: CkColors.paper2,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.arrow_back,
-                          size: 17, color: CkColors.ink),
-                    ),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Container(
+        // 12 rather than the design's 16: the canvas pulls the 44px tap
+        // target 4px left with `margin-left:-4px` so the 36px circle
+        // optically aligns to the 16px page gutter. Flutter's Container
+        // asserts `margin.isNonNegative`, so the same result is reached by
+        // taking the 4px off the gutter instead. Circle centre is 12+22=34
+        // either way.
+        padding: const EdgeInsets.fromLTRB(12, 10, 16, 12),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: CkColors.hairline)),
+        ),
+        child: Row(
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap:
+                  () =>
+                      context.canPop()
+                          ? context.pop()
+                          : context.go('/my/matches'),
+              child: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: CkColors.paper2,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back,
+                    size: 17,
+                    color: CkColors.ink,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Challenges',
-                    style: CkType.display(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.02,
-                      color: CkColors.ink,
-                    ),
-                  ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Challenges',
+                style: CkType.display(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.02,
+                  color: CkColors.ink,
                 ),
-                if (countSkeleton)
-                  const CkShimmerBox(width: 22, height: 11, radius: 4)
-                else if (count != null)
-                  Text(
-                    count!.toString().padLeft(2, '0'),
-                    style: CkType.mono(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.08,
-                      color: CkColors.muted,
-                    ),
-                  ),
-              ],
+              ),
             ),
-          ),
-          if (tabs != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: tabs!,
-            ),
-          if (header != null) header!,
-          Expanded(child: child),
-        ],
-      );
+            if (countSkeleton)
+              const CkShimmerBox(width: 22, height: 11, radius: 4)
+            else if (count != null)
+              Text(
+                count!.toString().padLeft(2, '0'),
+                style: CkType.mono(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.08,
+                  color: CkColors.muted,
+                ),
+              ),
+          ],
+        ),
+      ),
+      if (tabs != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: tabs!,
+        ),
+      if (header != null) header!,
+      Expanded(child: child),
+    ],
+  );
 }
 
 class _Tabs extends StatelessWidget {
@@ -352,107 +366,107 @@ class _Tabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: CkColors.paper2,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: CkColors.line),
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: CkColors.paper2,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: CkColors.line),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: _tab(
+            label: 'Needs you',
+            count: needsYouCount,
+            active: needsYou,
+            onTap: () => onSelect(true),
+          ),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: _tab(
-                label: 'Needs you',
-                count: needsYouCount,
-                active: needsYou,
-                onTap: () => onSelect(true),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              child: _tab(
-                label: 'Waiting on them',
-                count: waitingCount,
-                active: !needsYou,
-                onTap: () => onSelect(false),
-              ),
-            ),
-          ],
+        const SizedBox(width: 4),
+        Expanded(
+          child: _tab(
+            label: 'Waiting on them',
+            count: waitingCount,
+            active: !needsYou,
+            onTap: () => onSelect(false),
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _tab({
     required String label,
     required int count,
     required bool active,
     required VoidCallback onTap,
-  }) =>
-      GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          height: 44,
-          alignment: Alignment.center,
-          decoration: active
+  }) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: Container(
+      height: 44,
+      alignment: Alignment.center,
+      decoration:
+          active
               ? BoxDecoration(
-                  color: CkColors.surface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: CkColors.line),
-                )
+                color: CkColors.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: CkColors.line),
+              )
               : null,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  label.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: CkType.mono(
-                    fontSize: 11,
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w600,
-                    letterSpacing: 0.08,
-                    color: active ? CkColors.ink : CkColors.muted,
-                  ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.mono(
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                letterSpacing: 0.08,
+                color: active ? CkColors.ink : CkColors.muted,
+              ),
+            ),
+          ),
+          const SizedBox(width: 7),
+          // The active tab's count is a solid pill — it is the badge the
+          // menu row mirrors. The inactive one is plain muted type.
+          if (active)
+            Container(
+              constraints: const BoxConstraints(minWidth: 18),
+              height: 18,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: const BoxDecoration(
+                color: CkColors.ink,
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.all(Radius.circular(999)),
+              ),
+              child: Text(
+                '$count',
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: CkColors.paper,
                 ),
               ),
-              const SizedBox(width: 7),
-              // The active tab's count is a solid pill — it is the badge the
-              // menu row mirrors. The inactive one is plain muted type.
-              if (active)
-                Container(
-                  constraints: const BoxConstraints(minWidth: 18),
-                  height: 18,
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  decoration: const BoxDecoration(
-                    color: CkColors.ink,
-                    shape: BoxShape.rectangle,
-                    borderRadius: BorderRadius.all(Radius.circular(999)),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: CkType.mono(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: CkColors.paper,
-                    ),
-                  ),
-                )
-              else
-                Text(
-                  '$count',
-                  style: CkType.mono(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: CkColors.soft,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
+            )
+          else
+            Text(
+              '$count',
+              style: CkType.mono(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: CkColors.soft,
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// "4 WAITING · OLDEST 46H AGO · 1 EXPIRES IN 2H". The red clause appears only
@@ -472,9 +486,12 @@ class _HeaderLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final o = oldest;
-    final oldestLabel = o == null
-        ? null
-        : (o.inHours >= 1 ? 'OLDEST ${o.inHours}H AGO' : 'OLDEST ${o.inMinutes}M AGO');
+    final oldestLabel =
+        o == null
+            ? null
+            : (o.inHours >= 1
+                ? 'OLDEST ${o.inHours}H AGO'
+                : 'OLDEST ${o.inMinutes}M AGO');
     return Padding(
       padding: const EdgeInsets.fromLTRB(17, 10, 17, 8),
       child: Row(
@@ -530,32 +547,33 @@ class _TabsSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: CkColors.paper2,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: CkColors.line),
-        ),
-        child: Row(
-          children: [
-            Expanded(child: _tab('Needs you', active: true, pill: 18)),
-            const SizedBox(width: 4),
-            Expanded(child: _tab('Waiting on them', active: false, pill: 14)),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: CkColors.paper2,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: CkColors.line),
+    ),
+    child: Row(
+      children: [
+        Expanded(child: _tab('Needs you', active: true, pill: 18)),
+        const SizedBox(width: 4),
+        Expanded(child: _tab('Waiting on them', active: false, pill: 14)),
+      ],
+    ),
+  );
 
   Widget _tab(String label, {required bool active, required double pill}) =>
       Container(
         height: 44,
         alignment: Alignment.center,
-        decoration: active
-            ? BoxDecoration(
-                color: CkColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: CkColors.line),
-              )
-            : null,
+        decoration:
+            active
+                ? BoxDecoration(
+                  color: CkColors.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: CkColors.line),
+                )
+                : null,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -591,54 +609,54 @@ class _Skeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        children: const [
-          // Stands in for "4 WAITING · OLDEST 46H AGO".
-          Padding(
-            padding: EdgeInsets.fromLTRB(17, 15, 17, 12),
-            child: CkShimmer(
-              child: CkShimmerBox(width: 168, height: 10, radius: 4),
+    physics: const NeverScrollableScrollPhysics(),
+    padding: EdgeInsets.zero,
+    children: const [
+      // Stands in for "4 WAITING · OLDEST 46H AGO".
+      Padding(
+        padding: EdgeInsets.fromLTRB(17, 15, 17, 12),
+        child: CkShimmer(
+          child: CkShimmerBox(width: 168, height: 10, radius: 4),
+        ),
+      ),
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: 15),
+        child: Column(
+          children: [
+            _SkeletonCard(
+              opacity: 1,
+              live: true,
+              nameFactor: 0.62,
+              statusFactor: 0.34,
+              whenFactor: 0.56,
+              metaFactor: 0.74,
+              timerWidth: 52,
             ),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 15),
-            child: Column(
-              children: [
-                _SkeletonCard(
-                  opacity: 1,
-                  live: true,
-                  nameFactor: 0.62,
-                  statusFactor: 0.34,
-                  whenFactor: 0.56,
-                  metaFactor: 0.74,
-                  timerWidth: 52,
-                ),
-                SizedBox(height: 11),
-                _SkeletonCard(
-                  opacity: 0.75,
-                  live: false,
-                  nameFactor: 0.52,
-                  statusFactor: 0.30,
-                  whenFactor: 0.48,
-                  metaFactor: 0.68,
-                  timerWidth: 44,
-                ),
-                SizedBox(height: 11),
-                // The last card is clipped by the fold: no timer, no second
-                // meta line, no actions.
-                _SkeletonCard(
-                  opacity: 0.45,
-                  live: false,
-                  nameFactor: 0.58,
-                  statusFactor: 0.26,
-                  whenFactor: 0.44,
-                ),
-              ],
+            SizedBox(height: 11),
+            _SkeletonCard(
+              opacity: 0.75,
+              live: false,
+              nameFactor: 0.52,
+              statusFactor: 0.30,
+              whenFactor: 0.48,
+              metaFactor: 0.68,
+              timerWidth: 44,
             ),
-          ),
-        ],
-      );
+            SizedBox(height: 11),
+            // The last card is clipped by the fold: no timer, no second
+            // meta line, no actions.
+            _SkeletonCard(
+              opacity: 0.45,
+              live: false,
+              nameFactor: 0.58,
+              statusFactor: 0.26,
+              whenFactor: 0.44,
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
 class _SkeletonCard extends StatelessWidget {
@@ -788,12 +806,12 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Centered(
-        title: "Couldn't load your challenges.",
-        body:
-            'Nothing has been lost — every challenge and its clock live on the '
-            'server. Check your connection and try again.',
-        action: _PrimaryButton(label: 'Try again', onTap: onRetry),
-      );
+    title: "Couldn't load your challenges.",
+    body:
+        'Nothing has been lost — every challenge and its clock live on the '
+        'server. Check your connection and try again.',
+    action: _PrimaryButton(label: 'Try again', onTap: onRetry),
+  );
 }
 
 /// Queue-empty, not app-empty: the count zeroes and the only offer is the other
@@ -806,17 +824,19 @@ class _QueueEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Centered(
-        title: 'Nothing needs you.',
-        body: "You've cleared the queue. Challenges from other teams land "
-            "here, and you'll get a push the moment one arrives.",
-        action: outstanding == 0
+    title: 'Nothing needs you.',
+    body:
+        "You've cleared the queue. Challenges from other teams land "
+        "here, and you'll get a push the moment one arrives.",
+    action:
+        outstanding == 0
             ? null
             : _GhostRow(
-                label: '$outstanding of yours still out',
-                trailing: 'Waiting on them',
-                onTap: onSwitch,
-              ),
-      );
+              label: '$outstanding of yours still out',
+              trailing: 'Waiting on them',
+              onTap: onSwitch,
+            ),
+  );
 }
 
 class _WaitingEmpty extends StatelessWidget {
@@ -826,14 +846,14 @@ class _WaitingEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Centered(
-        title: 'Nothing outstanding.',
-        body: 'Challenges you send sit here until the other manager replies.',
-        action: _GhostRow(
-          label: 'Back to your queue',
-          trailing: 'Needs you',
-          onTap: onSwitch,
-        ),
-      );
+    title: 'Nothing outstanding.',
+    body: 'Challenges you send sit here until the other manager replies.',
+    action: _GhostRow(
+      label: 'Back to your queue',
+      trailing: 'Needs you',
+      onTap: onSwitch,
+    ),
+  );
 }
 
 class _FirstRunEmpty extends StatelessWidget {
@@ -841,37 +861,37 @@ class _FirstRunEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Centered(
-        title: 'No challenges yet.',
-        body: 'A challenge is how a fixture starts: you propose a day, a '
-            'ground and a format, and the other manager accepts, counters or '
-            'declines.',
-        action: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _PrimaryButton(
-              label: '+  Challenge a team',
-              onTap: () => _push(context, '/challenge'),
-            ),
-            const SizedBox(height: 10),
-            _GhostRow(
-              label: 'Post to the open pool',
-              onTap: () =>
-                  _push(context, '/matches/send-challenge?mode=open'),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'PENDING CHALLENGES EXPIRE AFTER 48H · COUNTERED ONES AFTER 24H',
-              textAlign: TextAlign.center,
-              style: CkType.mono(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.08,
-                color: CkColors.soft,
-              ),
-            ),
-          ],
+    title: 'No challenges yet.',
+    body:
+        'A challenge is how a fixture starts: you propose a day, a '
+        'ground and a format, and the other manager accepts, counters or '
+        'declines.',
+    action: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _PrimaryButton(
+          label: '+  Challenge a team',
+          onTap: () => _push(context, '/challenge'),
         ),
-      );
+        const SizedBox(height: 10),
+        _GhostRow(
+          label: 'Post to the open pool',
+          onTap: () => _push(context, '/matches/send-challenge?mode=open'),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'PENDING CHALLENGES EXPIRE AFTER 48H · COUNTERED ONES AFTER 24H',
+          textAlign: TextAlign.center,
+          style: CkType.mono(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.08,
+            color: CkColors.soft,
+          ),
+        ),
+      ],
+    ),
+  );
 
   static void _push(BuildContext context, String route) =>
       GoRouter.of(context).push(route);
@@ -886,35 +906,28 @@ class _Centered extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(28, 72, 28, 28),
-        children: [
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: CkType.display(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.015,
-              color: CkColors.ink,
-            ),
-          ),
-          const SizedBox(height: 9),
-          Text(
-            body,
-            textAlign: TextAlign.center,
-            style: CkType.body(
-              fontSize: 13,
-              height: 1.6,
-              color: CkColors.muted,
-            ),
-          ),
-          if (action != null) ...[
-            const SizedBox(height: 22),
-            action!,
-          ],
-        ],
-      );
+    physics: const AlwaysScrollableScrollPhysics(),
+    padding: const EdgeInsets.fromLTRB(28, 72, 28, 28),
+    children: [
+      Text(
+        title,
+        textAlign: TextAlign.center,
+        style: CkType.display(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.015,
+          color: CkColors.ink,
+        ),
+      ),
+      const SizedBox(height: 9),
+      Text(
+        body,
+        textAlign: TextAlign.center,
+        style: CkType.body(fontSize: 13, height: 1.6, color: CkColors.muted),
+      ),
+      if (action != null) ...[const SizedBox(height: 22), action!],
+    ],
+  );
 }
 
 class _PrimaryButton extends StatelessWidget {
@@ -925,26 +938,26 @@ class _PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          height: 48,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: CkColors.ink,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            label.toUpperCase(),
-            style: CkType.mono(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.08,
-              color: CkColors.paper,
-            ),
-          ),
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: Container(
+      height: 48,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: CkColors.ink,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: CkType.mono(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.08,
+          color: CkColors.paper,
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _GhostRow extends StatelessWidget {
@@ -956,54 +969,54 @@ class _GhostRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: CkColors.paper2,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: CkColors.line),
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: Container(
+      height: 46,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: CkColors.paper2,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: CkColors.line),
+      ),
+      child: Row(
+        children: [
+          // Both labels are long mono strings with wide letter-spacing;
+          // at 393px "2 OF YOURS STILL OUT" + "WAITING ON THEM →" overran
+          // the row (caught by challenges_screen_test).
+          Expanded(
+            child: Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.08,
+                color: CkColors.ink2,
+              ),
+            ),
           ),
-          child: Row(
-            children: [
-              // Both labels are long mono strings with wide letter-spacing;
-              // at 393px "2 OF YOURS STILL OUT" + "WAITING ON THEM →" overran
-              // the row (caught by challenges_screen_test).
-              Expanded(
-                child: Text(
-                  label.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: CkType.mono(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: CkColors.ink2,
-                  ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                '${trailing!.toUpperCase()}  →',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.08,
+                  color: CkColors.muted,
                 ),
               ),
-              if (trailing != null) ...[
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    '${trailing!.toUpperCase()}  →',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: CkType.mono(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.08,
-                      color: CkColors.muted,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      );
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
 }
 
 /// Accept confirm — artboard 11. Names the consequence rather than asking a
@@ -1015,113 +1028,109 @@ class _AcceptSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          18,
-          20,
-          20 + MediaQuery.of(context).viewInsets.bottom,
+    padding: EdgeInsets.fromLTRB(
+      20,
+      18,
+      20,
+      20 + MediaQuery.of(context).viewInsets.bottom,
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            width: 38,
+            height: 4,
+            decoration: BoxDecoration(
+              color: CkColors.soft,
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: CkColors.soft,
-                  borderRadius: BorderRadius.circular(99),
+        const SizedBox(height: 18),
+        Text(
+          'Accept this challenge?',
+          style: CkType.display(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.015,
+            color: CkColors.ink,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'This turns the challenge into a real fixture against '
+          '${row.opponentName}, with both line-ups created.',
+          style: CkType.body(fontSize: 13, height: 1.55, color: CkColors.ink2),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: CkColors.paper2,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: CkColors.line),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                row.whenLabel,
+                style: CkType.display(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: CkColors.ink,
                 ),
               ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'Accept this challenge?',
-              style: CkType.display(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.015,
-                color: CkColors.ink,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'This turns the challenge into a real fixture against '
-              '${row.opponentName}, with both line-ups created.',
-              style: CkType.body(
-                fontSize: 13,
-                height: 1.55,
-                color: CkColors.ink2,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: CkColors.paper2,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: CkColors.line),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    row.whenLabel,
-                    style: CkType.display(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: CkColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    row.metaLabel.toUpperCase(),
-                    style: CkType.mono(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.07,
-                      color: CkColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _PrimaryButton(
-              label: 'Accept · create match',
-              onTap: () => Navigator.of(context).pop(true),
-            ),
-            const SizedBox(height: 10),
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).pop(false),
-              child: Container(
-                height: 46,
-                alignment: Alignment.center,
-                child: Text(
-                  'NOT YET',
-                  style: CkType.mono(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: CkColors.muted,
-                  ),
+              const SizedBox(height: 4),
+              Text(
+                row.metaLabel.toUpperCase(),
+                style: CkType.mono(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.07,
+                  color: CkColors.muted,
                 ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Declining can be undone for 5 seconds · accepting cannot',
-              textAlign: TextAlign.center,
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _PrimaryButton(
+          label: 'Accept · create match',
+          onTap: () => Navigator.of(context).pop(true),
+        ),
+        const SizedBox(height: 10),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Navigator.of(context).pop(false),
+          child: Container(
+            height: 46,
+            alignment: Alignment.center,
+            child: Text(
+              'NOT YET',
               style: CkType.mono(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.07,
-                color: CkColors.soft,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.08,
+                color: CkColors.muted,
               ),
             ),
-          ],
+          ),
         ),
-      );
+        const SizedBox(height: 4),
+        Text(
+          'Declining can be undone for 5 seconds · accepting cannot',
+          textAlign: TextAlign.center,
+          style: CkType.mono(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.07,
+            color: CkColors.soft,
+          ),
+        ),
+      ],
+    ),
+  );
 }

@@ -99,17 +99,17 @@ class _Label extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.fromLTRB(16, top, 16, 4),
-        child: Text(
-          text.toUpperCase(),
-          style: CkType.mono(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.10,
-            color: CkColors.muted,
-          ),
-        ),
-      );
+    padding: EdgeInsets.fromLTRB(16, top, 16, 4),
+    child: Text(
+      text.toUpperCase(),
+      style: CkType.mono(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.10,
+        color: CkColors.muted,
+      ),
+    ),
+  );
 }
 
 class _PlayerRow extends StatelessWidget {
@@ -245,11 +245,11 @@ class _PlayerRow extends StatelessWidget {
   // The team-level role. Keeping is NOT one of these any more — it is a
   // per-match choice, made by the C/WK marks on this very screen.
   static String _role(RosterMember m) => switch (m.member.topRole) {
-        MemberRole.owner => 'Owner',
-        MemberRole.manager => 'Manager',
-        MemberRole.captain => 'Captain',
-        MemberRole.player => 'Player',
-      };
+    MemberRole.owner => 'Owner',
+    MemberRole.manager => 'Manager',
+    MemberRole.captain => 'Captain',
+    MemberRole.player => 'Player',
+  };
 }
 
 /// Either the badge the player wears, or the "C · WK" affordance to give them

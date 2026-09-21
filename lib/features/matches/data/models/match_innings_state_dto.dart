@@ -22,12 +22,12 @@ part 'match_innings_state_dto.g.dart';
 /// back — so every ball would have looked like a failed write while the
 /// server had in fact recorded it.
 int intFromWire(Object? v) => switch (v) {
-      null => 0,
-      final int i => i,
-      final num n => n.toInt(),
-      final String s => int.tryParse(s) ?? 0,
-      _ => 0,
-    };
+  null => 0,
+  final int i => i,
+  final num n => n.toInt(),
+  final String s => int.tryParse(s) ?? 0,
+  _ => 0,
+};
 
 /// Wire-format `match_innings_state` row. One row per
 /// (match_id, innings_number). The on-field trio columns are
@@ -56,28 +56,30 @@ abstract class MatchInningsStateDto with _$MatchInningsStateDto {
 
   factory MatchInningsStateDto.fromJson(Map<String, dynamic> json) {
     final modified = Map<String, dynamic>.from(json);
-    modified['match_id'] = (modified['match_id'] ?? modified['id'] ?? '').toString();
-    modified['updated_at'] = (modified['updated_at'] ?? DateTime.now().toIso8601String()).toString();
+    modified['match_id'] =
+        (modified['match_id'] ?? modified['id'] ?? '').toString();
+    modified['updated_at'] =
+        (modified['updated_at'] ?? DateTime.now().toIso8601String()).toString();
     return _$MatchInningsStateDtoFromJson(modified);
   }
 
-  Map<String, dynamic> toJson() => _$MatchInningsStateDtoToJson(this as _MatchInningsStateDto);
+  Map<String, dynamic> toJson() =>
+      _$MatchInningsStateDtoToJson(this as _MatchInningsStateDto);
 
   MatchInningsState toEntity() => MatchInningsState(
-        matchId: MatchId(matchId),
-        inningsNumber: inningsNumber,
-        strikerId: strikerId == null ? null : MatchPlayerId(strikerId!),
-        nonStrikerId:
-            nonStrikerId == null ? null : MatchPlayerId(nonStrikerId!),
-        bowlerId: bowlerId == null ? null : MatchPlayerId(bowlerId!),
-        legalBallCount: legalBallCount,
-        totalRuns: totalRuns,
-        totalWickets: totalWickets,
-        totalExtras: totalExtras,
-        isDeclared: isDeclared,
-        isAllOut: isAllOut,
-        target: target,
-        version: version,
-        updatedAt: DateTime.parse(updatedAt),
-      );
+    matchId: MatchId(matchId),
+    inningsNumber: inningsNumber,
+    strikerId: strikerId == null ? null : MatchPlayerId(strikerId!),
+    nonStrikerId: nonStrikerId == null ? null : MatchPlayerId(nonStrikerId!),
+    bowlerId: bowlerId == null ? null : MatchPlayerId(bowlerId!),
+    legalBallCount: legalBallCount,
+    totalRuns: totalRuns,
+    totalWickets: totalWickets,
+    totalExtras: totalExtras,
+    isDeclared: isDeclared,
+    isAllOut: isAllOut,
+    target: target,
+    version: version,
+    updatedAt: DateTime.parse(updatedAt),
+  );
 }

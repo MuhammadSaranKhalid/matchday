@@ -25,10 +25,10 @@ class ResultScreen extends ConsumerWidget {
     }
     final inns1 = ref.watch(liveInningsStateProvider(matchId, 1)).value;
     final inns2 = ref.watch(liveInningsStateProvider(matchId, 2)).value;
-    final teamA = ref.watch(teamProvider(match.teamAId.value)).value?.name ??
-        'Team A';
-    final teamB = ref.watch(teamProvider(match.teamBId.value)).value?.name ??
-        'Team B';
+    final teamA =
+        ref.watch(teamProvider(match.teamAId.value)).value?.name ?? 'Team A';
+    final teamB =
+        ref.watch(teamProvider(match.teamBId.value)).value?.name ?? 'Team B';
 
     final batsFirstA = battingFirstIsTeamA(match);
     final firstName = batsFirstA ? teamA : teamB;
@@ -76,11 +76,12 @@ bool battingFirstIsTeamA(Match match) {
   final won = match.tossWonBy?.value;
   final dec = match.tossDecision;
   if (won != null && dec != null) {
-    final firstId = dec == TossDecision.bat
-        ? won
-        : (won == match.teamAId.value
-            ? match.teamBId.value
-            : match.teamAId.value);
+    final firstId =
+        dec == TossDecision.bat
+            ? won
+            : (won == match.teamAId.value
+                ? match.teamBId.value
+                : match.teamAId.value);
     return firstId == match.teamAId.value;
   }
   return true; // fallback: team A bats first
@@ -93,9 +94,10 @@ class InningsScoreLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final score = inns == null
-        ? '—'
-        : '${inns!.totalRuns}/${inns!.totalWickets}  (${inns!.oversText})';
+    final score =
+        inns == null
+            ? '—'
+            : '${inns!.totalRuns}/${inns!.totalWickets}  (${inns!.oversText})';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       decoration: BoxDecoration(

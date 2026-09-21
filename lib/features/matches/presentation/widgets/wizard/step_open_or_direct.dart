@@ -42,7 +42,8 @@ class StepOpenOrDirect extends StatelessWidget {
         _ForkCard(
           icon: PoolIcons.broadcast,
           title: 'Open challenge',
-          body: 'Post to the Open Match Pool. Any team in range can apply — '
+          body:
+              'Post to the Open Match Pool. Any team in range can apply — '
               'you review applicants and pick your opponent.',
           footnote: 'Recommended · you choose who plays',
           selected: isOpen,
@@ -52,7 +53,8 @@ class StepOpenOrDirect extends StatelessWidget {
         _ForkCard(
           icon: PoolIcons.target,
           title: 'Direct challenge',
-          body: 'Send to one specific team you already know. They accept or '
+          body:
+              'Send to one specific team you already know. They accept or '
               'decline — no pool, no applicants.',
           selected: !isOpen,
           onTap: () => onSelect(false),
@@ -141,8 +143,10 @@ class _ForkCard extends StatelessWidget {
                           height: 20,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border:
-                                Border.all(color: CkColors.soft, width: 1.5),
+                            border: Border.all(
+                              color: CkColors.soft,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                     ],

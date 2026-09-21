@@ -58,30 +58,27 @@ Map<String, dynamic> recordBallParams(
     'is_all_out': computed.isAllOut,
     'innings_ended': computed.inningsEnded,
   };
-  return {
-    ...core,
-    for (final e in core.entries) 'p_${e.key}': e.value,
-  };
+  return {...core, for (final e in core.entries) 'p_${e.key}': e.value};
 }
 
 /// A queued delivery, as stored in the write-ahead log.
 Map<String, dynamic> ballDraftToWal(BallDraft d) => <String, dynamic>{
-      'v': _walVersion,
-      'match_id': d.matchId.value,
-      'innings_number': d.inningsNumber,
-      'is_legal_delivery': d.isLegalDelivery,
-      'ball_type': d.ballKind.wire,
-      'runs_scored': d.runsScored,
-      'extras': d.extras,
-      'is_wicket': d.isWicket,
-      'wicket_type': d.wicketType?.wire,
-      'dismissed_player_id': d.dismissedPlayerId,
-      'batsman_id': d.batsmanId,
-      'non_striker_id': d.nonStrikerId,
-      'bowler_id': d.bowlerId,
-      'fielder_id': d.fielderId,
-      'commentary': d.commentary,
-    };
+  'v': _walVersion,
+  'match_id': d.matchId.value,
+  'innings_number': d.inningsNumber,
+  'is_legal_delivery': d.isLegalDelivery,
+  'ball_type': d.ballKind.wire,
+  'runs_scored': d.runsScored,
+  'extras': d.extras,
+  'is_wicket': d.isWicket,
+  'wicket_type': d.wicketType?.wire,
+  'dismissed_player_id': d.dismissedPlayerId,
+  'batsman_id': d.batsmanId,
+  'non_striker_id': d.nonStrikerId,
+  'bowler_id': d.bowlerId,
+  'fielder_id': d.fielderId,
+  'commentary': d.commentary,
+};
 
 /// Read a queued delivery back out of the log.
 ///
@@ -137,15 +134,14 @@ Map<String, dynamic> trioToWal({
   required String nonStrikerId,
   required String bowlerId,
   int? target,
-}) =>
-    <String, dynamic>{
-      'match_id': matchId,
-      'innings_number': inningsNumber,
-      'striker_id': strikerId,
-      'non_striker_id': nonStrikerId,
-      'bowler_id': bowlerId,
-      'target': target,
-    };
+}) => <String, dynamic>{
+  'match_id': matchId,
+  'innings_number': inningsNumber,
+  'striker_id': strikerId,
+  'non_striker_id': nonStrikerId,
+  'bowler_id': bowlerId,
+  'target': target,
+};
 
 /// Read a queued trio change back out of the log. Null when the row predates
 /// the fields it needs, in which case there is nothing to replay or send.
@@ -156,7 +152,8 @@ Map<String, dynamic> trioToWal({
   String nonStrikerId,
   String bowlerId,
   int? target,
-})? trioFromWal(Map<String, dynamic> json) {
+})?
+trioFromWal(Map<String, dynamic> json) {
   String? str(String key) {
     final v = json[key] ?? json['p_$key'];
     return v is String ? v : null;
@@ -178,14 +175,16 @@ Map<String, dynamic> trioToWal({
 
   return (
     matchId: matchId,
-    inningsNumber: rawInnings is num
-        ? rawInnings.toInt()
-        : int.tryParse('$rawInnings') ?? 1,
+    inningsNumber:
+        rawInnings is num
+            ? rawInnings.toInt()
+            : int.tryParse('$rawInnings') ?? 1,
     strikerId: striker,
     nonStrikerId: nonStriker,
     bowlerId: bowler,
-    target: rawTarget is num
-        ? rawTarget.toInt()
-        : (rawTarget == null ? null : int.tryParse('$rawTarget')),
+    target:
+        rawTarget is num
+            ? rawTarget.toInt()
+            : (rawTarget == null ? null : int.tryParse('$rawTarget')),
   );
 }

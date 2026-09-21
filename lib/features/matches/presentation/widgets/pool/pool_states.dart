@@ -122,8 +122,7 @@ class _ShareCodeRow extends StatelessWidget {
             ),
             const SizedBox(width: 11),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
               decoration: BoxDecoration(
                 color: CkColors.paper,
                 borderRadius: BorderRadius.circular(999),

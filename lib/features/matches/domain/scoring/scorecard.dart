@@ -56,7 +56,6 @@ class InningsCard extends Equatable {
   /// Named, in one line, under the batting card — the tail that never came in.
   final List<String> didNotBat;
 
-
   /// "15.1" — completed overs and the balls into the next.
   String get oversLabel =>
       '${legalBalls ~/ ballsPerOver}.${legalBalls % ballsPerOver}';
@@ -82,9 +81,7 @@ class InningsCard extends Equatable {
   /// Running total after each over — the worm.
   List<int> get cumulativeRuns {
     var running = 0;
-    return [
-      for (final o in runsPerOver) running += o,
-    ];
+    return [for (final o in runsPerOver) running += o];
   }
 
   @override
@@ -257,9 +254,8 @@ class Partnership extends Equatable {
   String get label {
     final span = '$startedAtScore → $endedAtScore';
     if (unbroken) return '$span · unbroken';
-    final at = endedAtOvers == null
-        ? ''
-        : ' (${endedAtOvers!.toStringAsFixed(1)})';
+    final at =
+        endedAtOvers == null ? '' : ' (${endedAtOvers!.toStringAsFixed(1)})';
     return '$span · ended $wicketNumber-$endedAtScore$at';
   }
 
@@ -368,7 +364,8 @@ InningsCard buildInningsCard({
     if (b.isLegalDelivery) bLegal[id] = (bLegal[id] ?? 0) + 1;
 
     // Byes and leg-byes are not charged to the bowler; wides and no-balls are.
-    final charged = b.runsScored +
+    final charged =
+        b.runsScored +
         (b.ballKind == BallKind.bye || b.ballKind == BallKind.legBye
             ? 0
             : b.extras);
@@ -399,13 +396,19 @@ InningsCard buildInningsCard({
         name: name(id),
         legalBalls: bLegal[id] ?? 0,
         // A maiden is a COMPLETE over that cost nothing.
-        maidens: (overRuns[id] ?? {}).entries.where((e) {
-          final legalInOver = balls
-              .where((b) =>
-                  b.bowlerId == id && b.overNumber == e.key && b.isLegalDelivery)
-              .length;
-          return e.value == 0 && legalInOver >= ballsPerOver;
-        }).length,
+        maidens:
+            (overRuns[id] ?? {}).entries.where((e) {
+              final legalInOver =
+                  balls
+                      .where(
+                        (b) =>
+                            b.bowlerId == id &&
+                            b.overNumber == e.key &&
+                            b.isLegalDelivery,
+                      )
+                      .length;
+              return e.value == 0 && legalInOver >= ballsPerOver;
+            }).length,
         runs: bRuns[id] ?? 0,
         wickets: bWkts[id] ?? 0,
         wides: bWides[id] ?? 0,
@@ -417,8 +420,10 @@ InningsCard buildInningsCard({
 
   // ── Fall of wickets ───────────────────────────────────────────────────────
   final fow = [
-    for (final w in (wickets.toList()
-      ..sort((a, b) => a.fallOfWicketNumber.compareTo(b.fallOfWicketNumber))))
+    for (final w
+        in (wickets.toList()..sort(
+          (a, b) => a.fallOfWicketNumber.compareTo(b.fallOfWicketNumber),
+        )))
       FallOfWicket(
         number: w.fallOfWicketNumber,
         score: w.fallOfWicketScore,
@@ -430,11 +435,11 @@ InningsCard buildInningsCard({
   // ── Runs per over ─────────────────────────────────────────────────────────
   final perOver = <int, int>{};
   for (final b in balls) {
-    perOver[b.overNumber] = (perOver[b.overNumber] ?? 0) + b.runsScored + b.extras;
+    perOver[b.overNumber] =
+        (perOver[b.overNumber] ?? 0) + b.runsScored + b.extras;
   }
-  final maxOver = perOver.keys.isEmpty
-      ? -1
-      : perOver.keys.reduce((a, b) => a > b ? a : b);
+  final maxOver =
+      perOver.keys.isEmpty ? -1 : perOver.keys.reduce((a, b) => a > b ? a : b);
   final runsPerOver = [for (var o = 0; o <= maxOver; o++) perOver[o] ?? 0];
 
   return InningsCard(
@@ -499,8 +504,9 @@ List<Partnership> _partnerships(
   String Function(String?) name,
 ) {
   if (balls.isEmpty) return const [];
-  final sorted = wickets.toList()
-    ..sort((a, b) => a.fallOfWicketNumber.compareTo(b.fallOfWicketNumber));
+  final sorted =
+      wickets.toList()
+        ..sort((a, b) => a.fallOfWicketNumber.compareTo(b.fallOfWicketNumber));
 
   final out = <Partnership>[];
   var startScore = 0;
@@ -516,15 +522,17 @@ List<Partnership> _partnerships(
     if (!isEnd) continue;
 
     final segment = balls.sublist(startIndex, i + 1);
-    out.add(_stand(
-      wicketNumber: sorted[w].fallOfWicketNumber,
-      segment: segment,
-      startedAtScore: startScore,
-      runs: running - startScore,
-      unbroken: false,
-      name: name,
-      endedAtOvers: sorted[w].fallOfWicketOvers,
-    ));
+    out.add(
+      _stand(
+        wicketNumber: sorted[w].fallOfWicketNumber,
+        segment: segment,
+        startedAtScore: startScore,
+        runs: running - startScore,
+        unbroken: false,
+        name: name,
+        endedAtOvers: sorted[w].fallOfWicketOvers,
+      ),
+    );
     startScore = running;
     startIndex = i + 1;
     w++;
@@ -533,14 +541,16 @@ List<Partnership> _partnerships(
   // Whatever is left is unbroken — nobody got them out.
   if (startIndex < balls.length) {
     final segment = balls.sublist(startIndex);
-    out.add(_stand(
-      wicketNumber: out.length + 1,
-      segment: segment,
-      startedAtScore: startScore,
-      runs: running - startScore,
-      unbroken: true,
-      name: name,
-    ));
+    out.add(
+      _stand(
+        wicketNumber: out.length + 1,
+        segment: segment,
+        startedAtScore: startScore,
+        runs: running - startScore,
+        unbroken: true,
+        name: name,
+      ),
+    );
   }
   return out;
 }

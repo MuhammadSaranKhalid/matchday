@@ -89,24 +89,24 @@ class ScoringProjection extends Equatable {
   final List<String> rejectedOpIds;
 
   ScoringProjection copyWith({bool? canScore}) => ScoringProjection(
-        match: match,
-        innings: innings,
-        balls: balls,
-        matchPlayers: matchPlayers,
-        canScore: canScore ?? this.canScore,
-        pendingCount: pendingCount,
-        computedByOpId: computedByOpId,
-        rejectedOpIds: rejectedOpIds,
-      );
+    match: match,
+    innings: innings,
+    balls: balls,
+    matchPlayers: matchPlayers,
+    canScore: canScore ?? this.canScore,
+    pendingCount: pendingCount,
+    computedByOpId: computedByOpId,
+    rejectedOpIds: rejectedOpIds,
+  );
 
   @override
   List<Object?> get props => [
-        match,
-        innings,
-        balls,
-        matchPlayers,
-        canScore,
-        pendingCount,
-        rejectedOpIds,
-      ];
+    match,
+    innings,
+    balls,
+    matchPlayers,
+    canScore,
+    pendingCount,
+    rejectedOpIds,
+  ];
 }

@@ -58,9 +58,7 @@ class BallChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         shape: BoxShape.circle,
-        border: border
-            ? Border.all(color: CkColors.hairline, width: 1)
-            : null,
+        border: border ? Border.all(color: CkColors.hairline, width: 1) : null,
       ),
       alignment: Alignment.center,
       child: Text(
@@ -118,18 +116,18 @@ String ballNumberLabel(Ball b) =>
 /// Human label for a dismissal. [WicketType.wire] is the database spelling
 /// (`run_out`, `hit_wicket`) and used to reach the UI verbatim.
 String wicketLabel(WicketType? t) => switch (t) {
-      WicketType.bowled => 'bowled',
-      WicketType.caught => 'caught',
-      WicketType.lbw => 'LBW',
-      WicketType.runOut => 'run out',
-      WicketType.stumped => 'stumped',
-      WicketType.hitWicket => 'hit wicket',
-      WicketType.retiredHurt => 'retired hurt',
-      WicketType.obstructing => 'obstructing the field',
-      WicketType.timedOut => 'timed out',
-      WicketType.handledBall => 'handled the ball',
-      null => 'out',
-    };
+  WicketType.bowled => 'bowled',
+  WicketType.caught => 'caught',
+  WicketType.lbw => 'LBW',
+  WicketType.runOut => 'run out',
+  WicketType.stumped => 'stumped',
+  WicketType.hitWicket => 'hit wicket',
+  WicketType.retiredHurt => 'retired hurt',
+  WicketType.obstructing => 'obstructing the field',
+  WicketType.timedOut => 'timed out',
+  WicketType.handledBall => 'handled the ball',
+  null => 'out',
+};
 
 /// One-line description of a delivery.
 ///
@@ -137,21 +135,18 @@ String wicketLabel(WicketType? t) => switch (t) {
 /// resolve them. When they are available a wicket reads "Shaheen c Haris"
 /// instead of the previous "WICKET · caught", which named nobody — the scorer
 /// could not tell from the log who had actually been dismissed.
-String describeBall(
-  Ball b, {
-  String? batterName,
-  String? fielderName,
-}) {
+String describeBall(Ball b, {String? batterName, String? fielderName}) {
   if (b.isWicket) {
     final how = wicketLabel(b.wicketType);
-    final by = (fielderName != null && fielderName.trim().isNotEmpty)
-        ? switch (b.wicketType) {
-            WicketType.caught => 'c $fielderName',
-            WicketType.stumped => 'st $fielderName',
-            WicketType.runOut => 'run out ($fielderName)',
-            _ => how,
-          }
-        : how;
+    final by =
+        (fielderName != null && fielderName.trim().isNotEmpty)
+            ? switch (b.wicketType) {
+              WicketType.caught => 'c $fielderName',
+              WicketType.stumped => 'st $fielderName',
+              WicketType.runOut => 'run out ($fielderName)',
+              _ => how,
+            }
+            : how;
     return (batterName != null && batterName.trim().isNotEmpty)
         ? '$batterName · $by'
         : 'WICKET · $by';

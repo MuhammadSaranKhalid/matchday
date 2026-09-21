@@ -26,14 +26,14 @@ abstract class MatchInningsDto with _$MatchInningsDto {
       _$MatchInningsDtoFromJson(json);
 
   MatchInnings toEntity() => MatchInnings(
-        inningsId: inningsId,
-        matchId: MatchId(matchId),
-        inningsNumber: inningsNumber,
-        battingTeamSide: battingTeamSide,
-        bowlingTeamSide: bowlingTeamSide,
-        oversAllocated: oversAllocated,
-        isCompleted: isCompleted,
-        startTime: startTime == null ? null : DateTime.parse(startTime!),
-        endTime: endTime == null ? null : DateTime.parse(endTime!),
-      );
+    inningsId: inningsId,
+    matchId: MatchId(matchId),
+    inningsNumber: inningsNumber,
+    battingTeamSide: battingTeamSide,
+    bowlingTeamSide: bowlingTeamSide,
+    oversAllocated: oversAllocated,
+    isCompleted: isCompleted,
+    startTime: startTime == null ? null : DateTime.parse(startTime!),
+    endTime: endTime == null ? null : DateTime.parse(endTime!),
+  );
 }

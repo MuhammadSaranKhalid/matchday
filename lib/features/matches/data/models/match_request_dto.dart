@@ -49,13 +49,13 @@ abstract class MatchRequestDto with _$MatchRequestDto {
     MatchFormat? format(Map<String, dynamic>? m) {
       if (m == null) return null;
       return MatchFormat(
-        oversPerInnings: (m['overs_per_innings'] as num?)?.toInt() ??
+        oversPerInnings:
+            (m['overs_per_innings'] as num?)?.toInt() ??
             (m['overs'] as num?)?.toInt() ??
             20,
         playersPerTeam: (m['players_per_team'] as num?)?.toInt() ?? 11,
         ballType: MatchBallType.fromWire(m['ball_type'] as String?),
-        maxOversPerBowler:
-            (m['max_overs_per_bowler'] as num?)?.toInt() ?? 4,
+        maxOversPerBowler: (m['max_overs_per_bowler'] as num?)?.toInt() ?? 4,
         ballsPerOver: (m['balls_per_over'] as num?)?.toInt() ?? 6,
         inningsPerSide: (m['innings_per_side'] as num?)?.toInt() ?? 1,
         wicketsToAllOut: (m['wickets_to_all_out'] as num?)?.toInt(),
@@ -63,8 +63,7 @@ abstract class MatchRequestDto with _$MatchRequestDto {
       );
     }
 
-    DateTime? parse(String? s) =>
-        s == null ? null : DateTime.tryParse(s);
+    DateTime? parse(String? s) => s == null ? null : DateTime.tryParse(s);
 
     return MatchRequest(
       id: MatchRequestId(requestId),
@@ -86,9 +85,10 @@ abstract class MatchRequestDto with _$MatchRequestDto {
       decidedBy: decidedBy,
       decidedAt: parse(decidedAt),
       decisionNote: decisionNote,
-      decisionReason: decisionReason == null
-          ? null
-          : DeclineReason.fromWire(decisionReason),
+      decisionReason:
+          decisionReason == null
+              ? null
+              : DeclineReason.fromWire(decisionReason),
       matchId: matchId == null ? null : MatchId(matchId!),
       shareCode: shareCode,
       codeExpiresAt: parse(codeExpiresAt),
@@ -101,13 +101,13 @@ abstract class MatchRequestDto with _$MatchRequestDto {
 
   /// Inverse: serialise a [MatchFormat] into the jsonb shape the RPCs expect.
   static Map<String, dynamic> formatToJson(MatchFormat f) => {
-        'overs_per_innings': f.oversPerInnings,
-        'players_per_team': f.playersPerTeam,
-        'ball_type': f.ballType.wire,
-        'max_overs_per_bowler': f.maxOversPerBowler,
-        'balls_per_over': f.ballsPerOver,
-        'innings_per_side': f.inningsPerSide,
-        if (f.wicketsToAllOut != null) 'wickets_to_all_out': f.wicketsToAllOut,
-        if (f.endChangeBalls != null) 'end_change_balls': f.endChangeBalls,
-      };
+    'overs_per_innings': f.oversPerInnings,
+    'players_per_team': f.playersPerTeam,
+    'ball_type': f.ballType.wire,
+    'max_overs_per_bowler': f.maxOversPerBowler,
+    'balls_per_over': f.ballsPerOver,
+    'innings_per_side': f.inningsPerSide,
+    if (f.wicketsToAllOut != null) 'wickets_to_all_out': f.wicketsToAllOut,
+    if (f.endChangeBalls != null) 'end_change_balls': f.endChangeBalls,
+  };
 }

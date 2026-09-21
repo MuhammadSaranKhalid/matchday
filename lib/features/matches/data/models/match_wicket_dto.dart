@@ -29,18 +29,18 @@ abstract class MatchWicketDto with _$MatchWicketDto {
       _$MatchWicketDtoFromJson(json);
 
   MatchWicket toEntity() => MatchWicket(
-        wicketId: wicketId,
-        deliveryId: deliveryId,
-        inningsId: inningsId,
-        playerOutId: playerOutId,
-        dismissalKind: dismissalKind,
-        isBowlerCredited: isBowlerCredited,
-        creditedBowlerId: creditedBowlerId,
-        primaryFielderId: primaryFielderId,
-        assistedFielderId: assistedFielderId,
-        fallOfWicketScore: fallOfWicketScore,
-        fallOfWicketNumber: fallOfWicketNumber,
-        fallOfWicketOvers: fallOfWicketOvers,
-        createdAt: DateTime.parse(createdAt),
-      );
+    wicketId: wicketId,
+    deliveryId: deliveryId,
+    inningsId: inningsId,
+    playerOutId: playerOutId,
+    dismissalKind: dismissalKind,
+    isBowlerCredited: isBowlerCredited,
+    creditedBowlerId: creditedBowlerId,
+    primaryFielderId: primaryFielderId,
+    assistedFielderId: assistedFielderId,
+    fallOfWicketScore: fallOfWicketScore,
+    fallOfWicketNumber: fallOfWicketNumber,
+    fallOfWicketOvers: fallOfWicketOvers,
+    createdAt: DateTime.parse(createdAt),
+  );
 }

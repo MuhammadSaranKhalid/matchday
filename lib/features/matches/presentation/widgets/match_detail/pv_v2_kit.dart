@@ -11,7 +11,8 @@ abstract final class PvIcons {
   static const next = '<path d="M9 18l6-6-6-6"/>';
   static const check = '<polyline points="20 6 9 17 4 12"/>';
   static const close = '<path d="M6 6l12 12M18 6L6 18"/>';
-  static const search = '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>';
+  static const search =
+      '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>';
   static const cal =
       '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>';
   static const plus = '<path d="M12 5v14M5 12h14"/>';
@@ -19,7 +20,8 @@ abstract final class PvIcons {
       '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>';
   static const share =
       '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>';
-  static const info = '<circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/>';
+  static const info =
+      '<circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/>';
   static const flag = '<path d="M4 22V4M4 4h13l-2 4 2 4H4"/>';
   static const swords =
       '<path d="M14.5 17.5 22 10l-2-2-7.5 7.5M9.5 6.5 2 14l2 2 7.5-7.5"/>';
@@ -43,11 +45,26 @@ abstract final class PvIcons {
 
   /// Lookup by the string names used in the account/data layer.
   static const Map<String, String> byName = {
-    'back': back, 'next': next, 'check': check, 'close': close,
-    'search': search, 'cal': cal, 'plus': plus, 'users': users,
-    'share': share, 'info': info, 'flag': flag, 'swords': swords,
-    'pencil': pencil, 'msg': msg, 'bell': bell, 'star': star,
-    'trophy': trophy, 'play': play, 'dots': dots, 'whistle': whistle,
+    'back': back,
+    'next': next,
+    'check': check,
+    'close': close,
+    'search': search,
+    'cal': cal,
+    'plus': plus,
+    'users': users,
+    'share': share,
+    'info': info,
+    'flag': flag,
+    'swords': swords,
+    'pencil': pencil,
+    'msg': msg,
+    'bell': bell,
+    'star': star,
+    'trophy': trophy,
+    'play': play,
+    'dots': dots,
+    'whistle': whistle,
     'ticket': ticket,
   };
 }
@@ -69,9 +86,13 @@ class PvIcon extends StatelessWidget {
     double size = 18,
     Color color = CkColors.ink,
     double sw = 2,
-  }) =>
-      PvIcon(PvIcons.byName[name] ?? PvIcons.info,
-          key: key, size: size, color: color, sw: sw);
+  }) => PvIcon(
+    PvIcons.byName[name] ?? PvIcons.info,
+    key: key,
+    size: size,
+    color: color,
+    sw: sw,
+  );
 
   final String path;
   final double size;
@@ -86,8 +107,16 @@ class PvIcon extends StatelessWidget {
 // ── Mono label helper ───────────────────────────────────────────────────────
 
 /// JetBrains Mono, 700, 0.10em uppercase (the prototype's `mono` style).
-TextStyle pvMono(double size, {Color color = CkColors.muted, FontWeight weight = FontWeight.w700}) =>
-    CkType.mono(fontSize: size, fontWeight: weight, letterSpacing: 0.10, color: color);
+TextStyle pvMono(
+  double size, {
+  Color color = CkColors.muted,
+  FontWeight weight = FontWeight.w700,
+}) => CkType.mono(
+  fontSize: size,
+  fontWeight: weight,
+  letterSpacing: 0.10,
+  color: color,
+);
 
 // ── Pill ────────────────────────────────────────────────────────────────────
 
@@ -95,16 +124,21 @@ enum PvTone { red, amber, green, neutral }
 
 /// phase → (pill label, tone, live).
 (String, PvTone, bool) pvPhaseConf(PvPhase p) => switch (p) {
-      PvPhase.live => ('LIVE', PvTone.red, true),
-      PvPhase.startsSoon => ('STARTS SOON', PvTone.amber, false),
-      PvPhase.scheduled => ('SCHEDULED', PvTone.neutral, false),
-      PvPhase.awaitingReply => ('AWAITING REPLY', PvTone.amber, false),
-      PvPhase.completed => ('FINAL', PvTone.neutral, false),
-    };
+  PvPhase.live => ('LIVE', PvTone.red, true),
+  PvPhase.startsSoon => ('STARTS SOON', PvTone.amber, false),
+  PvPhase.scheduled => ('SCHEDULED', PvTone.neutral, false),
+  PvPhase.awaitingReply => ('AWAITING REPLY', PvTone.amber, false),
+  PvPhase.completed => ('FINAL', PvTone.neutral, false),
+};
 
 /// Mono status pill with a leading colour dot (pulses when [live]).
 class PvPill extends StatelessWidget {
-  const PvPill(this.label, {super.key, this.tone = PvTone.neutral, this.live = false});
+  const PvPill(
+    this.label, {
+    super.key,
+    this.tone = PvTone.neutral,
+    this.live = false,
+  });
 
   final String label;
   final PvTone tone;
@@ -120,7 +154,10 @@ class PvPill extends StatelessWidget {
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(5)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(5),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -136,7 +173,12 @@ class PvPill extends StatelessWidget {
 /// A small round dot. When [pulse] is set it fades 1 → 0.3 → 1 on a 1.4s loop
 /// (the prototype's `ck-pulse` keyframe).
 class PvDot extends StatefulWidget {
-  const PvDot({super.key, required this.color, this.size = 6, this.pulse = false});
+  const PvDot({
+    super.key,
+    required this.color,
+    this.size = 6,
+    this.pulse = false,
+  });
 
   final Color color;
   final double size;

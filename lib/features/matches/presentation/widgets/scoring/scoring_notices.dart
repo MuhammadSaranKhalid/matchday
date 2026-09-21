@@ -26,9 +26,7 @@ class ScoringLoading extends StatelessWidget {
                 icon: const Icon(Icons.close, color: CkColors.ink),
               ),
             ),
-            const Center(
-              child: CircularProgressIndicator(color: CkColors.ink),
-            ),
+            const Center(child: CircularProgressIndicator(color: CkColors.ink)),
           ],
         ),
       ),
@@ -110,9 +108,10 @@ class ReadOnlyScoringNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final who = (battingTeamName == null || battingTeamName!.isEmpty)
-        ? 'The batting team'
-        : battingTeamName!;
+    final who =
+        (battingTeamName == null || battingTeamName!.isEmpty)
+            ? 'The batting team'
+            : battingTeamName!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
       child: Container(
@@ -148,7 +147,8 @@ class ReadOnlyScoringNotice extends StatelessWidget {
 // (innings start, or after a completed over). Tapping it opens the bowler
 // picker. This is the hard gate that makes scoring-without-a-bowler impossible.
 class SelectBowlerNotice extends StatelessWidget {
-  const SelectBowlerNotice({super.key, 
+  const SelectBowlerNotice({
+    super.key,
     required this.onSelect,
     required this.isOpening,
   });
@@ -229,9 +229,7 @@ class SelectBatterNotice extends StatelessWidget {
             decoration: BoxDecoration(
               color: anyAvailable ? CkColors.amber : CkColors.cream,
               borderRadius: BorderRadius.circular(16),
-              border: anyAvailable
-                  ? null
-                  : Border.all(color: CkColors.line),
+              border: anyAvailable ? null : Border.all(color: CkColors.line),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -307,7 +305,6 @@ class InningsCompleteNotice extends StatelessWidget {
     );
   }
 }
-
 
 class ScoringToast extends StatelessWidget {
   const ScoringToast({super.key, required this.message});

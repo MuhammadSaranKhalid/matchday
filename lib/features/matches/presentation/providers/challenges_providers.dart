@@ -21,12 +21,14 @@ part 'challenges_providers.g.dart';
 @riverpod
 Future<ChallengesView> challengesView(Ref ref) async {
   // Memberships are a one-shot scoped read; no permanent team stream is kept.
-  final memberships =
-      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final memberships = await ref.watch(
+    currentUserTeamMembershipsProvider.future,
+  );
   final teams = [for (final membership in memberships) membership.team];
   if (teams.isEmpty) return const ChallengesView.empty();
 
-  final result = await ref.watch(matchesRepositoryProvider).listMyMatchChallenges();
+  final result =
+      await ref.watch(matchesRepositoryProvider).listMyMatchChallenges();
   final all = result.fold<List<MatchRequest>>((_) => const [], (l) => l);
 
   final myIds = {for (final t in teams) t.id.value};
@@ -37,12 +39,15 @@ Future<ChallengesView> challengesView(Ref ref) async {
   // Targeted challenges only. Open pool posts are a different object (one
   // decision over N applicants) and live on the Pool surface — see the note on
   // the screen about the designer's 1b recommendation.
-  final mine = all
-      .where((r) => r.toTeamId != null && live(r))
-      .where((r) =>
-          myIds.contains(r.fromTeamId.value) ||
-          myIds.contains(r.toTeamId!.value))
-      .toList();
+  final mine =
+      all
+          .where((r) => r.toTeamId != null && live(r))
+          .where(
+            (r) =>
+                myIds.contains(r.fromTeamId.value) ||
+                myIds.contains(r.toTeamId!.value),
+          )
+          .toList();
   if (mine.isEmpty) return const ChallengesView.empty();
 
   final teamsById = <String, Team>{for (final t in teams) t.id.value: t};
@@ -104,16 +109,19 @@ ChallengeRow _rowFor(
 
   // The governing clock: countering restarts a tighter 24h budget, so once
   // countered that is the deadline that matters.
-  final expires = countered
-      ? (r.counterExpiresAt ?? r.proposalExpiresAt)
-      : r.proposalExpiresAt;
+  final expires =
+      countered
+          ? (r.counterExpiresAt ?? r.proposalExpiresAt)
+          : r.proposalExpiresAt;
 
-  final liveStart = countered ? (r.counteredStartTime ?? r.proposedStartTime)
-                              : r.proposedStartTime;
-  final liveVenue = countered ? (r.counteredVenue ?? r.proposedVenue)
-                              : r.proposedVenue;
-  final liveFormat = countered ? (r.counteredFormat ?? r.proposedFormat)
-                               : r.proposedFormat;
+  final liveStart =
+      countered
+          ? (r.counteredStartTime ?? r.proposedStartTime)
+          : r.proposedStartTime;
+  final liveVenue =
+      countered ? (r.counteredVenue ?? r.proposedVenue) : r.proposedVenue;
+  final liveFormat =
+      countered ? (r.counteredFormat ?? r.proposedFormat) : r.proposedFormat;
 
   return ChallengeRow(
     requestId: r.id.value,
@@ -131,13 +139,15 @@ ChallengeRow _rowFor(
     // On a countered row the ledger shows what was superseded against what is
     // now on the table. Only the fields that actually changed are worth
     // repeating, so both sides are rendered as one terms line.
-    supersededLabel: countered
-        ? _terms(r.proposedStartTime, r.proposedVenue)
-        : null,
-    counterLabel: countered
-        ? _terms(r.counteredStartTime ?? r.proposedStartTime,
-            r.counteredVenue ?? r.proposedVenue)
-        : null,
+    supersededLabel:
+        countered ? _terms(r.proposedStartTime, r.proposedVenue) : null,
+    counterLabel:
+        countered
+            ? _terms(
+              r.counteredStartTime ?? r.proposedStartTime,
+              r.counteredVenue ?? r.proposedVenue,
+            )
+            : null,
   );
 }
 
@@ -163,18 +173,16 @@ String _when(DateTime? d) {
 }
 
 String _terms(DateTime? d, String? venue) {
-  final when = d == null
-      ? null
-      : DateFormat('EEE d MMM · h:mm a').format(d.toLocal());
+  final when =
+      d == null ? null : DateFormat('EEE d MMM · h:mm a').format(d.toLocal());
   return [when, venue].where((s) => (s ?? '').isNotEmpty).join(' · ');
 }
 
 String _meta(String? venue, MatchFormat? f, int playersPerSide) {
-  final overs = f == null
-      ? null
-      : (f.oversPerInnings == 0 ? 'Unlimited' : '${f.oversPerInnings} ov');
+  final overs =
+      f == null
+          ? null
+          : (f.oversPerInnings == 0 ? 'Unlimited' : '${f.oversPerInnings} ov');
   final side = '$playersPerSide-a-side';
-  return [venue, overs, side]
-      .where((s) => (s ?? '').isNotEmpty)
-      .join(' · ');
+  return [venue, overs, side].where((s) => (s ?? '').isNotEmpty).join(' · ');
 }

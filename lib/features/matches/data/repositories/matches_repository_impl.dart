@@ -64,9 +64,14 @@ class MatchesRepositoryImpl implements MatchesRepository {
       final cached = await local.getCachedMatch(id.value);
       if (cached != null) {
         // Return cached immediately; refresh in background if online
-        unawaited(_remote.getById(id.value).then((dto) {
-          if (dto != null) local.cacheMatch(dto);
-        }).catchError((_) {}));
+        unawaited(
+          _remote
+              .getById(id.value)
+              .then((dto) {
+                if (dto != null) local.cacheMatch(dto);
+              })
+              .catchError((_) {}),
+        );
         return Right(cached.toEntity());
       }
     }
@@ -121,7 +126,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
 
   @override
   Future<Either<Failure, Map<MatchId, List<InningsSummary>>>>
-      listInningsForMatches(Iterable<MatchId> matchIds) async {
+  listInningsForMatches(Iterable<MatchId> matchIds) async {
     try {
       final ids = matchIds.toList();
       if (ids.isEmpty) return const Right({});
@@ -167,14 +172,18 @@ class MatchesRepositoryImpl implements MatchesRepository {
       final grouped = <MatchId, List<InningsSummary>>{};
       for (final acc in byKey.values) {
         final mid = MatchId(acc.matchId);
-        grouped.putIfAbsent(mid, () => []).add(InningsSummary(
-              matchId: mid,
-              inningsNumber: acc.inningsNumber,
-              battingTeamId: TeamId(acc.battingTeamId),
-              totalRuns: acc.totalRuns,
-              totalWickets: acc.wickets,
-              legalBallsFaced: acc.legalBalls,
-            ));
+        grouped
+            .putIfAbsent(mid, () => [])
+            .add(
+              InningsSummary(
+                matchId: mid,
+                inningsNumber: acc.inningsNumber,
+                battingTeamId: TeamId(acc.battingTeamId),
+                totalRuns: acc.totalRuns,
+                totalWickets: acc.wickets,
+                legalBallsFaced: acc.legalBalls,
+              ),
+            );
       }
       for (final list in grouped.values) {
         list.sort((a, b) => a.inningsNumber.compareTo(b.inningsNumber));
@@ -307,6 +316,23 @@ class MatchesRepositoryImpl implements MatchesRepository {
     }
   }
 
+  @override
+  Future<Either<Failure, Unit>> cancelMatch({
+    required MatchId id,
+    String? reason,
+  }) async {
+    try {
+      await _remote.cancelMatch(matchId: id.value, reason: reason);
+      return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
   // ─── Scoring ─────────────────────────────────────────────────────────────
 
   @override
@@ -362,9 +388,16 @@ class MatchesRepositoryImpl implements MatchesRepository {
     if (local != null) {
       final cached = await local.getCachedMatchPlayers(matchId.value);
       if (cached.isNotEmpty) {
-        unawaited(_remote.listMatchPlayers(matchId.value).then((dtos) {
-          if (dtos.isNotEmpty) local.cacheMatchPlayers(matchId.value, dtos);
-        }).catchError((_) {}));
+        unawaited(
+          _remote
+              .listMatchPlayers(matchId.value)
+              .then((dtos) {
+                if (dtos.isNotEmpty) {
+                  local.cacheMatchPlayers(matchId.value, dtos);
+                }
+              })
+              .catchError((_) {}),
+        );
         return Right(cached.map((d) => d.toEntity()).toList());
       }
     }
@@ -395,12 +428,17 @@ class MatchesRepositoryImpl implements MatchesRepository {
         inningsNumber: inningsNumber,
       );
       if (cached != null) {
-        unawaited(_remote.getMatchInningsState(
-          matchId: matchId.value,
-          inningsNumber: inningsNumber,
-        ).then((dto) {
-          if (dto != null) local.cacheInningsState(matchId.value, dto);
-        }).catchError((_) {}));
+        unawaited(
+          _remote
+              .getMatchInningsState(
+                matchId: matchId.value,
+                inningsNumber: inningsNumber,
+              )
+              .then((dto) {
+                if (dto != null) local.cacheInningsState(matchId.value, dto);
+              })
+              .catchError((_) {}),
+        );
         return Right(cached.toEntity());
       }
     }
@@ -426,13 +464,12 @@ class MatchesRepositoryImpl implements MatchesRepository {
   Stream<MatchInningsState?> watchMatchInningsState({
     required MatchId matchId,
     required int inningsNumber,
-  }) =>
-      _remote
-          .watchMatchInningsState(
-            matchId: matchId.value,
-            inningsNumber: inningsNumber,
-          )
-          .map((dto) => dto?.toEntity());
+  }) => _remote
+      .watchMatchInningsState(
+        matchId: matchId.value,
+        inningsNumber: inningsNumber,
+      )
+      .map((dto) => dto?.toEntity());
 
   @override
   Future<Either<Failure, bool>> canScoreInnings({
@@ -485,39 +522,53 @@ class MatchesRepositoryImpl implements MatchesRepository {
               final rawExtras = p['extras'] ?? p['p_extras'];
               final int extras = rawExtras is num ? rawExtras.toInt() : 0;
               final isWicket = (p['is_wicket'] ?? p['p_is_wicket']) == true;
-              final rawWicket = (p['wicket_type'] ?? p['p_wicket_type']) as String?;
-              final wicketType = rawWicket != null
-                  ? WicketType.values.where((w) => w.wire == rawWicket).firstOrNull
-                  : null;
-              final isLegal = (p['is_legal_delivery'] ?? p['p_is_legal_delivery']) == true;
-              final rawKind = (p['ball_type'] ?? p['p_ball_type'] ?? 'legal') as String;
-              final ballKind = BallKind.values.where((k) => k.wire == rawKind).firstOrNull ?? BallKind.legal;
+              final rawWicket =
+                  (p['wicket_type'] ?? p['p_wicket_type']) as String?;
+              final wicketType =
+                  rawWicket != null
+                      ? WicketType.values
+                          .where((w) => w.wire == rawWicket)
+                          .firstOrNull
+                      : null;
+              final isLegal =
+                  (p['is_legal_delivery'] ?? p['p_is_legal_delivery']) == true;
+              final rawKind =
+                  (p['ball_type'] ?? p['p_ball_type'] ?? 'legal') as String;
+              final ballKind =
+                  BallKind.values.where((k) => k.wire == rawKind).firstOrNull ??
+                  BallKind.legal;
               final rawOver = p['over_number'] ?? p['p_over_number'];
               final int overNumber = rawOver is num ? rawOver.toInt() : 0;
               final rawBallInOver = p['ball_in_over'] ?? p['p_ball_in_over'];
-              final int ballInOver = rawBallInOver is num ? rawBallInOver.toInt() : 0;
+              final int ballInOver =
+                  rawBallInOver is num ? rawBallInOver.toInt() : 0;
 
-              balls.add(Ball(
-                id: BallId('local:${op.opId}'),
-                matchId: matchId,
-                inningsNumber: inningsNumber,
-                seq: op.localSeq,
-                overNumber: overNumber,
-                ballInOver: ballInOver,
-                isLegalDelivery: isLegal,
-                ballKind: ballKind,
-                runsScored: runsScored,
-                extras: extras,
-                isWicket: isWicket,
-                isFreeHit: (p['is_free_hit'] ?? p['p_is_free_hit']) == true,
-                wicketType: wicketType,
-                dismissedPlayerId: (p['dismissed_player_id'] ?? p['p_dismissed_player_id']) as String?,
-                batsmanId: (p['batsman_id'] ?? p['p_batsman_id']) as String?,
-                nonStrikerId: (p['non_striker_id'] ?? p['p_non_striker_id']) as String?,
-                bowlerId: (p['bowler_id'] ?? p['p_bowler_id']) as String?,
-                fielderId: (p['fielder_id'] ?? p['p_fielder_id']) as String?,
-                commentary: (p['commentary'] ?? p['p_commentary']) as String?,
-              ));
+              balls.add(
+                Ball(
+                  id: BallId('local:${op.opId}'),
+                  matchId: matchId,
+                  inningsNumber: inningsNumber,
+                  seq: op.localSeq,
+                  overNumber: overNumber,
+                  ballInOver: ballInOver,
+                  isLegalDelivery: isLegal,
+                  ballKind: ballKind,
+                  runsScored: runsScored,
+                  extras: extras,
+                  isWicket: isWicket,
+                  isFreeHit: (p['is_free_hit'] ?? p['p_is_free_hit']) == true,
+                  wicketType: wicketType,
+                  dismissedPlayerId:
+                      (p['dismissed_player_id'] ?? p['p_dismissed_player_id'])
+                          as String?,
+                  batsmanId: (p['batsman_id'] ?? p['p_batsman_id']) as String?,
+                  nonStrikerId:
+                      (p['non_striker_id'] ?? p['p_non_striker_id']) as String?,
+                  bowlerId: (p['bowler_id'] ?? p['p_bowler_id']) as String?,
+                  fielderId: (p['fielder_id'] ?? p['p_fielder_id']) as String?,
+                  commentary: (p['commentary'] ?? p['p_commentary']) as String?,
+                ),
+              );
             }
           }
           return Right(balls);
@@ -633,7 +684,8 @@ class MatchesRepositoryImpl implements MatchesRepository {
     int? counteredPlayersPerSide,
     String? decisionNote,
   }) async {
-    final changesAny = counteredStartTime != null ||
+    final changesAny =
+        counteredStartTime != null ||
         (counteredVenue != null && counteredVenue.trim().isNotEmpty) ||
         counteredFormat != null ||
         counteredPlayersPerSide != null;
@@ -767,9 +819,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
   }) async {
     final desc = description.trim();
     if (desc.isEmpty) {
-      return const Left(
-        ValidationFailure('A result is required'),
-      );
+      return const Left(ValidationFailure('A result is required'));
     }
 
     try {
@@ -967,9 +1017,10 @@ String _battingTeamForInnings(_MatchInfo info, int inningsNumber) {
   final decision = info.tossDecision;
   final String batsFirst;
   if (tossWon != null && decision != null) {
-    batsFirst = decision == 'bat'
-        ? tossWon
-        : (tossWon == info.teamAId ? info.teamBId : info.teamAId);
+    batsFirst =
+        decision == 'bat'
+            ? tossWon
+            : (tossWon == info.teamAId ? info.teamBId : info.teamAId);
   } else {
     batsFirst = info.teamAId;
   }

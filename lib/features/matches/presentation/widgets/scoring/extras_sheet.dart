@@ -34,9 +34,10 @@ class _ExtrasSheetState extends State<ExtrasSheet> {
   @override
   void initState() {
     super.initState();
-    _runs = widget.kind == BallKind.noBall
-        ? 0
-        : widget.kind == BallKind.wide
+    _runs =
+        widget.kind == BallKind.noBall
+            ? 0
+            : widget.kind == BallKind.wide
             ? 0
             : 1;
     _freeHit = widget.kind == BallKind.noBall;
@@ -72,9 +73,10 @@ class _ExtrasSheetState extends State<ExtrasSheet> {
       BallKind.legal => '',
     };
     final batRuns = kind == BallKind.noBall;
-    final runLabel = batRuns
-        ? 'RUNS OFF THE BAT'
-        : kind == BallKind.wide
+    final runLabel =
+        batRuns
+            ? 'RUNS OFF THE BAT'
+            : kind == BallKind.wide
             ? 'EXTRA RUNS RUN'
             : 'RUNS TAKEN';
     // 3 belongs on the wide and no-ball rows: running three off either is
@@ -122,36 +124,30 @@ class _ExtrasSheetState extends State<ExtrasSheet> {
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
-                        color: _freeHit
-                            ? CkColors.cream
-                            : CkColors.paper,
+                        color: _freeHit ? CkColors.cream : CkColors.paper,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: _freeHit
-                              ? kFreeHitBorder
-                              : CkColors.hairline,
+                          color: _freeHit ? kFreeHitBorder : CkColors.hairline,
                         ),
                       ),
                       child: Row(
                         children: [
                           AnimatedContainer(
-                            duration:
-                                const Duration(milliseconds: 200),
+                            duration: const Duration(milliseconds: 200),
                             width: 40,
                             height: 24,
                             decoration: BoxDecoration(
-                              color: _freeHit
-                                  ? CkColors.amber
-                                  : CkColors.line,
+                              color: _freeHit ? CkColors.amber : CkColors.line,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Stack(
                               children: [
                                 AnimatedPositioned(
-                                  duration: const Duration(
-                                      milliseconds: 200),
+                                  duration: const Duration(milliseconds: 200),
                                   top: 2,
                                   left: _freeHit ? 18 : 2,
                                   child: Container(
@@ -169,8 +165,7 @@ class _ExtrasSheetState extends State<ExtrasSheet> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   'Next ball is a free hit',
@@ -252,13 +247,14 @@ class _ExtrasSheetState extends State<ExtrasSheet> {
                   flex: 2,
                   child: SheetPrimaryButton(
                     label: 'Add ${title.toLowerCase()}',
-                    onTap: () => Navigator.of(context).pop(
-                      ExtraResult(
-                        kind: kind,
-                        runs: _runs,
-                        freeHit: kind == BallKind.noBall ? _freeHit : false,
-                      ),
-                    ),
+                    onTap:
+                        () => Navigator.of(context).pop(
+                          ExtraResult(
+                            kind: kind,
+                            runs: _runs,
+                            freeHit: kind == BallKind.noBall ? _freeHit : false,
+                          ),
+                        ),
                   ),
                 ),
               ],

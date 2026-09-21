@@ -45,73 +45,78 @@ abstract class MatchDto with _$MatchDto {
 
   factory MatchDto.fromJson(Map<String, dynamic> json) {
     final modified = Map<String, dynamic>.from(json);
-    modified['match_id'] = (modified['match_id'] ?? modified['id'] ?? '').toString();
+    modified['match_id'] =
+        (modified['match_id'] ?? modified['id'] ?? '').toString();
     modified['team_a_id'] = (modified['team_a_id'] ?? '').toString();
     modified['team_b_id'] = (modified['team_b_id'] ?? '').toString();
-    modified['format'] = (modified['format'] as Map<String, dynamic>?) ??
+    modified['format'] =
+        (modified['format'] as Map<String, dynamic>?) ??
         (modified['rules_config'] as Map<String, dynamic>?) ??
         <String, dynamic>{};
-    modified['created_at'] = (modified['created_at'] ?? DateTime.now().toIso8601String()).toString();
+    modified['created_at'] =
+        (modified['created_at'] ?? DateTime.now().toIso8601String()).toString();
     return _$MatchDtoFromJson(modified);
   }
 
   Map<String, dynamic> toJson() => _$MatchDtoToJson(this as _MatchDto);
 
   Match toEntity() => Match(
-        id: MatchId(matchId),
-        teamAId: TeamId(teamAId),
-        teamBId: TeamId(teamBId),
-        teamACaptain: teamACaptain,
-        teamBCaptain: teamBCaptain,
-        setupTeamId: setupTeamId == null ? null : TeamId(setupTeamId!),
-        format: MatchFormat(
-          oversPerInnings: (format['overs_per_innings'] as num?)?.toInt() ?? 0,
-          playersPerTeam: (format['players_per_team'] as num?)?.toInt() ?? 11,
-          ballType: MatchBallType.fromWire(format['ball_type'] as String?),
-          maxOversPerBowler:
-              (format['max_overs_per_bowler'] as num?)?.toInt() ?? 0,
-          ballsPerOver: (format['balls_per_over'] as num?)?.toInt() ?? 6,
-          inningsPerSide: (format['innings_per_side'] as num?)?.toInt() ?? 1,
-          wicketsToAllOut: (format['wickets_to_all_out'] as num?)?.toInt(),
-          endChangeBalls: (format['end_change_balls'] as num?)?.toInt(),
-        ),
-        // Deployed schema: matches.venue is a single text column. Split a
-        // "<ground> · <city>" form if present so existing UI binds keep
-        // working; otherwise the whole string lands in ground.
-        venue: (venue == null || venue!.trim().isEmpty)
+    id: MatchId(matchId),
+    teamAId: TeamId(teamAId),
+    teamBId: TeamId(teamBId),
+    teamACaptain: teamACaptain,
+    teamBCaptain: teamBCaptain,
+    setupTeamId: setupTeamId == null ? null : TeamId(setupTeamId!),
+    format: MatchFormat(
+      oversPerInnings: (format['overs_per_innings'] as num?)?.toInt() ?? 0,
+      playersPerTeam: (format['players_per_team'] as num?)?.toInt() ?? 11,
+      ballType: MatchBallType.fromWire(format['ball_type'] as String?),
+      maxOversPerBowler: (format['max_overs_per_bowler'] as num?)?.toInt() ?? 0,
+      ballsPerOver: (format['balls_per_over'] as num?)?.toInt() ?? 6,
+      inningsPerSide: (format['innings_per_side'] as num?)?.toInt() ?? 1,
+      wicketsToAllOut: (format['wickets_to_all_out'] as num?)?.toInt(),
+      endChangeBalls: (format['end_change_balls'] as num?)?.toInt(),
+    ),
+    // Deployed schema: matches.venue is a single text column. Split a
+    // "<ground> · <city>" form if present so existing UI binds keep
+    // working; otherwise the whole string lands in ground.
+    venue:
+        (venue == null || venue!.trim().isEmpty)
             ? null
             : () {
-                final parts = venue!.split(' · ');
-                return Venue(
-                  ground: parts.first.trim(),
-                  city: parts.length > 1
-                      ? parts.sublist(1).join(' · ').trim()
-                      : null,
-                );
-              }(),
-        scheduledStartTime: scheduledStartTime == null
+              final parts = venue!.split(' · ');
+              return Venue(
+                ground: parts.first.trim(),
+                city:
+                    parts.length > 1
+                        ? parts.sublist(1).join(' · ').trim()
+                        : null,
+              );
+            }(),
+    scheduledStartTime:
+        scheduledStartTime == null
             ? null
             : DateTime.tryParse(scheduledStartTime!),
-        actualStartTime: actualStartTime == null
-            ? null
-            : DateTime.tryParse(actualStartTime!),
-        resultDescription: result?['description'] as String?,
-        status: MatchStatus.fromWire(status),
-        matchType: MatchType.fromWire(matchType),
-        tossWonBy: tossWonBy == null ? null : TeamId(tossWonBy!),
-        tossDecision:
-            tossDecision == null ? null : TossDecision.fromWire(tossDecision),
-        tossFace: tossFace,
-        tossRecordedBy: tossRecordedBy,
-        startPhase: MatchStartPhase.fromWire(startPhase),
-        openersSubmittedBy: openersSubmittedBy,
-        openersSubmittedAt: openersSubmittedAt == null
+    actualStartTime:
+        actualStartTime == null ? null : DateTime.tryParse(actualStartTime!),
+    resultDescription: result?['description'] as String?,
+    status: MatchStatus.fromWire(status),
+    matchType: MatchType.fromWire(matchType),
+    tossWonBy: tossWonBy == null ? null : TeamId(tossWonBy!),
+    tossDecision:
+        tossDecision == null ? null : TossDecision.fromWire(tossDecision),
+    tossFace: tossFace,
+    tossRecordedBy: tossRecordedBy,
+    startPhase: MatchStartPhase.fromWire(startPhase),
+    openersSubmittedBy: openersSubmittedBy,
+    openersSubmittedAt:
+        openersSubmittedAt == null
             ? null
             : DateTime.tryParse(openersSubmittedAt!),
-        // createdBy is nullable on the wire (matches.created_by is now
-        // SET NULL on profile deletion) — anonymised matches still
-        // render. Empty string preserves the entity's String contract.
-        createdBy: createdBy ?? '',
-        createdAt: DateTime.parse(createdAt),
-      );
+    // createdBy is nullable on the wire (matches.created_by is now
+    // SET NULL on profile deletion) — anonymised matches still
+    // render. Empty string preserves the entity's String contract.
+    createdBy: createdBy ?? '',
+    createdAt: DateTime.parse(createdAt),
+  );
 }

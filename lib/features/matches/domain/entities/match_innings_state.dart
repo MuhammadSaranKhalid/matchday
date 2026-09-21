@@ -112,24 +112,22 @@ class MatchInningsState extends Equatable {
     int? target,
     int? version,
     DateTime? updatedAt,
-  }) =>
-      MatchInningsState(
-        matchId: matchId,
-        inningsNumber: inningsNumber,
-        version: version ?? this.version,
-        updatedAt: updatedAt ?? this.updatedAt,
-        strikerId: clearStriker ? null : (strikerId ?? this.strikerId),
-        nonStrikerId:
-            clearNonStriker ? null : (nonStrikerId ?? this.nonStrikerId),
-        bowlerId: clearBowler ? null : (bowlerId ?? this.bowlerId),
-        legalBallCount: legalBallCount ?? this.legalBallCount,
-        totalRuns: totalRuns ?? this.totalRuns,
-        totalWickets: totalWickets ?? this.totalWickets,
-        totalExtras: totalExtras ?? this.totalExtras,
-        isDeclared: isDeclared ?? this.isDeclared,
-        isAllOut: isAllOut ?? this.isAllOut,
-        target: target ?? this.target,
-      );
+  }) => MatchInningsState(
+    matchId: matchId,
+    inningsNumber: inningsNumber,
+    version: version ?? this.version,
+    updatedAt: updatedAt ?? this.updatedAt,
+    strikerId: clearStriker ? null : (strikerId ?? this.strikerId),
+    nonStrikerId: clearNonStriker ? null : (nonStrikerId ?? this.nonStrikerId),
+    bowlerId: clearBowler ? null : (bowlerId ?? this.bowlerId),
+    legalBallCount: legalBallCount ?? this.legalBallCount,
+    totalRuns: totalRuns ?? this.totalRuns,
+    totalWickets: totalWickets ?? this.totalWickets,
+    totalExtras: totalExtras ?? this.totalExtras,
+    isDeclared: isDeclared ?? this.isDeclared,
+    isAllOut: isAllOut ?? this.isAllOut,
+    target: target ?? this.target,
+  );
 
   /// Completed overs as a decimal number — 19 + 4/6 ≈ 19.67. Useful for
   /// NRR / target calculations.
@@ -149,19 +147,19 @@ class MatchInningsState extends Equatable {
 
   @override
   List<Object?> get props => [
-        matchId,
-        inningsNumber,
-        strikerId,
-        nonStrikerId,
-        bowlerId,
-        legalBallCount,
-        totalRuns,
-        totalWickets,
-        totalExtras,
-        isDeclared,
-        isAllOut,
-        target,
-        version,
-        updatedAt,
-      ];
+    matchId,
+    inningsNumber,
+    strikerId,
+    nonStrikerId,
+    bowlerId,
+    legalBallCount,
+    totalRuns,
+    totalWickets,
+    totalExtras,
+    isDeclared,
+    isAllOut,
+    target,
+    version,
+    updatedAt,
+  ];
 }

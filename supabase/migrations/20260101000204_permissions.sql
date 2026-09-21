@@ -146,6 +146,15 @@ values
     null,
     true,
     150
+  ),
+  (
+    'match.cancel',
+    'match',
+    'cancel',
+    'Cancel a confirmed non-tournament match before it goes live',
+    null,
+    true,
+    160
   );
 
 -- -----------------------------------------------------------------------------

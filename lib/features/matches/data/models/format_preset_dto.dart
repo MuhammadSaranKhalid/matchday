@@ -29,29 +29,20 @@ abstract class FormatPresetDto with _$FormatPresetDto {
       _$FormatPresetDtoFromJson(json);
 
   FormatPreset toEntity() => FormatPreset(
-        id: id,
-        label: label,
-        defaultScoringMode: ScoringMode.fromWire(
-          defaultScoringMode ??
-              config['default_scoring_mode']?.toString(),
-        ),
-        format: MatchFormat(
-          oversPerInnings:
-              (config['overs_per_innings'] as num?)?.toInt() ?? 0,
-          playersPerTeam:
-              (config['players_per_team'] as num?)?.toInt() ?? 11,
-          ballType:
-              MatchBallType.fromWire(config['ball_type'] as String?),
-          maxOversPerBowler:
-              (config['max_overs_per_bowler'] as num?)?.toInt() ?? 0,
-          ballsPerOver:
-              (config['balls_per_over'] as num?)?.toInt() ?? 6,
-          inningsPerSide:
-              (config['innings_per_side'] as num?)?.toInt() ?? 1,
-          wicketsToAllOut:
-              (config['wickets_to_all_out'] as num?)?.toInt(),
-          endChangeBalls:
-              (config['end_change_balls'] as num?)?.toInt(),
-        ),
-      );
+    id: id,
+    label: label,
+    defaultScoringMode: ScoringMode.fromWire(
+      defaultScoringMode ?? config['default_scoring_mode']?.toString(),
+    ),
+    format: MatchFormat(
+      oversPerInnings: (config['overs_per_innings'] as num?)?.toInt() ?? 0,
+      playersPerTeam: (config['players_per_team'] as num?)?.toInt() ?? 11,
+      ballType: MatchBallType.fromWire(config['ball_type'] as String?),
+      maxOversPerBowler: (config['max_overs_per_bowler'] as num?)?.toInt() ?? 0,
+      ballsPerOver: (config['balls_per_over'] as num?)?.toInt() ?? 6,
+      inningsPerSide: (config['innings_per_side'] as num?)?.toInt() ?? 1,
+      wicketsToAllOut: (config['wickets_to_all_out'] as num?)?.toInt(),
+      endChangeBalls: (config['end_change_balls'] as num?)?.toInt(),
+    ),
+  );
 }

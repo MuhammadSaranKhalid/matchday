@@ -31,14 +31,18 @@ class MatchDetailScreen extends ConsumerWidget {
       backgroundColor: CkColors.paper,
       body: switch (detailAsync) {
         AsyncError(:final error) => _error(
-            context,
-            error is FailureWrapper ? error.failure.message : error.toString(),
-            () => ref.invalidate(matchDetailProvider(matchId)),
-          ),
-        _ when detailAsync.hasValue && detailAsync.value != null => PvMatchDetail(
+          context,
+          error is FailureWrapper ? error.failure.message : error.toString(),
+          () => ref.invalidate(matchDetailProvider(matchId)),
+        ),
+        _ when detailAsync.hasValue && detailAsync.value != null =>
+          PvMatchDetail(
             m: detailAsync.value!,
-            onBack: () =>
-                context.canPop() ? context.pop() : context.go('/my/matches'),
+            onBack:
+                () =>
+                    context.canPop()
+                        ? context.pop()
+                        : context.go('/my/matches'),
             onAction: (id, action) => _onAction(context, ref, id, action),
           ),
         AsyncLoading() => const Center(child: CircularProgressIndicator()),
@@ -48,7 +52,12 @@ class MatchDetailScreen extends ConsumerWidget {
   }
 
   // ── actions ──
-  void _onAction(BuildContext context, WidgetRef ref, String id, String action) {
+  void _onAction(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+    String action,
+  ) {
     switch (action) {
       case 'resume':
         _pushAndRefresh(context, ref, '/matches/$id/score');
@@ -60,7 +69,7 @@ class MatchDetailScreen extends ConsumerWidget {
       case 'withdraw':
         _withdraw(context, ref, id);
       case 'cancel':
-        _comingSoon(context, 'Cancelling a match is coming soon.');
+        _cancel(context, ref, id);
       case 'share':
         _comingSoon(context, 'Sharing match results is coming soon.');
     }
@@ -73,13 +82,19 @@ class MatchDetailScreen extends ConsumerWidget {
   }
 
   Future<void> _pushAndRefresh(
-      BuildContext context, WidgetRef ref, String location) async {
+    BuildContext context,
+    WidgetRef ref,
+    String location,
+  ) async {
     await context.push(location);
     if (context.mounted) ref.invalidate(myMatchesViewProvider);
   }
 
   Future<void> _withdraw(
-      BuildContext context, WidgetRef ref, String requestId) async {
+    BuildContext context,
+    WidgetRef ref,
+    String requestId,
+  ) async {
     final result = await showModalBottomSheet<WithdrawResult>(
       context: context,
       backgroundColor: CkColors.paper,
@@ -95,11 +110,71 @@ class MatchDetailScreen extends ConsumerWidget {
         .withdraw(requestId: requestId, note: result.note);
     if (!context.mounted) return;
     res.fold(
-      (f) => ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(f.message))),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) {
         // Controller already invalidated the workspace providers.
         if (context.canPop()) context.pop();
+      },
+    );
+  }
+
+  Future<void> _cancel(
+    BuildContext context,
+    WidgetRef ref,
+    String matchId,
+  ) async {
+    // Destructive operations should require an explicit confirmation.
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Cancel match?'),
+            content: const Text(
+              'This will cancel the confirmed match for both teams. '
+              'This action cannot be treated as a normal Match Start step.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Keep match'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Cancel match'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+
+    final result = await ref
+        .read(matchDetailControllerProvider.notifier)
+        .cancelMatch(matchId: matchId);
+
+    if (!context.mounted) {
+      return;
+    }
+
+    result.fold(
+      (failure) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(failure.message)));
+      },
+      (_) {
+        // Cancellation removes this fixture from the confirmed schedule.
+        //
+        // Return to My Matches rather than leaving the user on a stale detail.
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/my/matches');
+        }
       },
     );
   }
@@ -116,20 +191,29 @@ class MatchDetailScreen extends ConsumerWidget {
           children: [
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () =>
-                  context.canPop() ? context.pop() : context.go('/my/matches'),
+              onTap:
+                  () =>
+                      context.canPop()
+                          ? context.pop()
+                          : context.go('/my/matches'),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('← My Matches',
-                    style: CkType.body(fontSize: 14, fontWeight: FontWeight.w600)),
+                child: Text(
+                  '← My Matches',
+                  style: CkType.body(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            Text('Match not available',
-                style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700)),
+            Text(
+              'Match not available',
+              style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 6),
-            Text('It may have been withdrawn or removed.',
-                style: CkType.body(fontSize: 12.5, color: CkColors.muted)),
+            Text(
+              'It may have been withdrawn or removed.',
+              style: CkType.body(fontSize: 12.5, color: CkColors.muted),
+            ),
           ],
         ),
       ),
@@ -145,19 +229,29 @@ class MatchDetailScreen extends ConsumerWidget {
           children: [
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () =>
-                  context.canPop() ? context.pop() : context.go('/my/matches'),
+              onTap:
+                  () =>
+                      context.canPop()
+                          ? context.pop()
+                          : context.go('/my/matches'),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('← My Matches',
-                    style: CkType.body(fontSize: 14, fontWeight: FontWeight.w600)),
+                child: Text(
+                  '← My Matches',
+                  style: CkType.body(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            Text("Couldn't load this match.",
-                style: CkType.display(fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(
+              "Couldn't load this match.",
+              style: CkType.display(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 6),
-            Text(message, style: CkType.body(fontSize: 12, color: CkColors.muted)),
+            Text(
+              message,
+              style: CkType.body(fontSize: 12, color: CkColors.muted),
+            ),
             const SizedBox(height: 12),
             OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
           ],

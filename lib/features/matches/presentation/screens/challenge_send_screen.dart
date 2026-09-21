@@ -81,7 +81,6 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   // When & where — Flexible drops the time so the card reads "Flexible".
   bool _flexible = false;
 
-
   final _venueCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
 
@@ -103,12 +102,12 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   /// squads are locked to the registration list, and they are not created
   /// through this wizard.
   List<_Step> get _steps => [
-        if (widget.fromTeamId == null) _Step.team,
-        if (!widget.openOnly) _Step.opponent,
-        _Step.format,
-        _Step.whenWhere,
-        _Step.review,
-      ];
+    if (widget.fromTeamId == null) _Step.team,
+    if (!widget.openOnly) _Step.opponent,
+    _Step.format,
+    _Step.whenWhere,
+    _Step.review,
+  ];
 
   @override
   void initState() {
@@ -136,16 +135,18 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
     ).add(soon.minute <= 30 ? Duration.zero : const Duration(hours: 1));
 
     final tooLate = rounded.hour >= 21 || rounded.day != DateTime.now().day;
-    final start = tooLate
-        ? DateTime(
-            DateTime.now().year,
-            DateTime.now().month,
-            DateTime.now().day,
-          ).add(const Duration(days: 1, hours: 9))
-        : rounded;
+    final start =
+        tooLate
+            ? DateTime(
+              DateTime.now().year,
+              DateTime.now().month,
+              DateTime.now().day,
+            ).add(const Duration(days: 1, hours: 9))
+            : rounded;
 
     _pickedDay = DateTime(start.year, start.month, start.day);
-    _pickedTime = '${start.hour.toString().padLeft(2, '0')}:'
+    _pickedTime =
+        '${start.hour.toString().padLeft(2, '0')}:'
         '${start.minute.toString().padLeft(2, '0')}';
   }
 
@@ -192,8 +193,7 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   }
 
   /// Effective from-team id — either the route param or the picked team.
-  String? get _resolvedFromTeamId =>
-      widget.fromTeamId ?? _fromTeam?.id.value;
+  String? get _resolvedFromTeamId => widget.fromTeamId ?? _fromTeam?.id.value;
 
   @override
   Widget build(BuildContext context) {
@@ -208,18 +208,16 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
               onBack: _onBack,
               trailing: _barTrailing,
             ),
-            WizardProgress(
-              index: _steps.indexOf(_step),
-              total: _steps.length,
-            ),
+            WizardProgress(index: _steps.indexOf(_step), total: _steps.length),
             Expanded(child: _body()),
             WizardFooter(
               label: _ctaLabel,
               enabled: _canContinue,
               busy: _busy,
-              hint: _step == _Step.format
-                  ? 'Both captains can change format up to 12h before the toss.'
-                  : null,
+              hint:
+                  _step == _Step.format
+                      ? 'Both captains can change format up to 12h before the toss.'
+                      : null,
               onPressed: _advance,
             ),
           ],
@@ -230,13 +228,10 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
 
   /// Most steps are "New challenge"; the two that are really their own screen
   /// say what they are.
-  String get _barTitle =>
-      _step == _Step.review ? 'Review' : 'New challenge';
+  String get _barTitle => _step == _Step.review ? 'Review' : 'New challenge';
 
-  Widget get _barTrailing => WizardStepCount(
-        index: _steps.indexOf(_step),
-        total: _steps.length,
-      );
+  Widget get _barTrailing =>
+      WizardStepCount(index: _steps.indexOf(_step), total: _steps.length);
 
   String get _ctaLabel {
     // Artboard 06–09 all read plainly "Continue"; only the commit names what
@@ -272,9 +267,13 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
     final opp = _opponent;
     final start = _startTime;
     final fromId = _resolvedFromTeamId;
-    if ((!_isOpenChallenge && opp == null) || start == null || fromId == null) return;
+    if ((!_isOpenChallenge && opp == null) || start == null || fromId == null) {
+      return;
+    }
     setState(() => _busy = true);
-    final result = await ref.read(matchesRepositoryProvider).sendMatchChallenge(
+    final result = await ref
+        .read(matchesRepositoryProvider)
+        .sendMatchChallenge(
           fromTeamId: TeamId(fromId),
           toTeamId: _isOpenChallenge ? null : opp?.id,
           proposedStartTime: start,
@@ -288,9 +287,10 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
             inningsPerSide: _inningsPerSide,
             endChangeBalls: _endChangeBalls,
           ),
-          message: _messageCtrl.text.trim().isEmpty
-              ? null
-              : _messageCtrl.text.trim(),
+          message:
+              _messageCtrl.text.trim().isEmpty
+                  ? null
+                  : _messageCtrl.text.trim(),
           playersPerSide: _playersPerSide,
           // Empty by design: the accept RPC fills the match with the full
           // active roster, and the lineup screen picks the XI at the ground.
@@ -300,9 +300,9 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (id) {
         ref.invalidate(myMatchChallengesProvider);
         context.go('/challenges/${id.value}/sent');
@@ -332,14 +332,16 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
         final fromId = _resolvedFromTeamId;
         if (fromId == null) {
           return const Center(
-              child: Text('Pick a team to issue the challenge as.'));
+            child: Text('Pick a team to issue the challenge as.'),
+          );
         }
         return StepOpenOrDirect(
           isOpen: _isOpenChallenge,
-          onSelect: (bool open) => setState(() {
-            _isOpenChallenge = open;
-            if (open) _opponent = null;
-          }),
+          onSelect:
+              (bool open) => setState(() {
+                _isOpenChallenge = open;
+                if (open) _opponent = null;
+              }),
           // The design draws only the fork, because its Open card is selected.
           // Direct has to name a team somewhere and the flow is six steps
           // either way, so the picker unfolds under the card that asked for it
@@ -368,11 +370,12 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           flexible: _flexible,
           venueController: _venueCtrl,
           onDay: (d) => setState(() => _pickedDay = d),
-          onTime: (m) => setState(() {
-            _pickedTime =
-                '${(m ~/ 60).toString().padLeft(2, '0')}:'
-                '${(m % 60).toString().padLeft(2, '0')}';
-          }),
+          onTime:
+              (m) => setState(() {
+                _pickedTime =
+                    '${(m ~/ 60).toString().padLeft(2, '0')}:'
+                    '${(m % 60).toString().padLeft(2, '0')}';
+              }),
           onFlexible: (v) => setState(() => _flexible = v),
         );
       case _Step.review:
@@ -382,11 +385,12 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           opponent: _opponent,
           isOpen: _isOpenChallenge,
           day: _pickedDay,
-          timeLabel: _flexible
-              ? 'Flexible'
-              : (_pickedTime == null
-                  ? 'Not set'
-                  : clockLabel(_minutesFromHhmm(_pickedTime)!)),
+          timeLabel:
+              _flexible
+                  ? 'Flexible'
+                  : (_pickedTime == null
+                      ? 'Not set'
+                      : clockLabel(_minutesFromHhmm(_pickedTime)!)),
           venue: _venueCtrl.text.trim(),
           formatLine: formatSpecLine(
             overs: _overs,
@@ -457,15 +461,28 @@ class _ReviewStepHost extends ConsumerWidget {
 /// "Today" / "Tomorrow" / "Sat, Sep 6" for the review's When row.
 String _dayLabel(DateTime d) {
   final now = DateTime.now();
-  final delta = DateTime(d.year, d.month, d.day)
-      .difference(DateTime(now.year, now.month, now.day))
-      .inDays;
+  final delta =
+      DateTime(
+        d.year,
+        d.month,
+        d.day,
+      ).difference(DateTime(now.year, now.month, now.day)).inDays;
   if (delta == 0) return 'Today';
   if (delta == 1) return 'Tomorrow';
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${days[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}';
 }
@@ -487,14 +504,17 @@ class _TeamStep extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final mineAsync = ref.watch(currentUserTeamMembershipsProvider);
     return mineAsync.when(
-      loading: () =>
-          const Center(child: CircularProgressIndicator(color: CkColors.ink)),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(e.toString(), textAlign: TextAlign.center),
-        ),
-      ),
+      loading:
+          () => const Center(
+            child: CircularProgressIndicator(color: CkColors.ink),
+          ),
+      error:
+          (e, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(e.toString(), textAlign: TextAlign.center),
+            ),
+          ),
       data: (memberships) {
         final mine = memberships
             .where((membership) => membership.relationship.canSendChallenge)
@@ -647,10 +667,7 @@ class _MyTeamRow extends StatelessWidget {
                       _secondaryLine(team),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: CkType.body(
-                        fontSize: 12,
-                        color: CkColors.muted,
-                      ),
+                      style: CkType.body(fontSize: 12, color: CkColors.muted),
                     ),
                     if (disabledNote != null)
                       Padding(
@@ -677,7 +694,11 @@ class _MyTeamRow extends StatelessWidget {
                     color: CkColors.ink,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.check, size: 14, color: CkColors.paper),
+                  child: const Icon(
+                    Icons.check,
+                    size: 14,
+                    color: CkColors.paper,
+                  ),
                 ),
             ],
           ),
@@ -701,12 +722,9 @@ class _RolePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, bg, fg) = switch (role) {
       TeamRelationship.owner => ('OWNER', CkColors.red, CkColors.paper),
-      TeamRelationship.manager =>
-        ('MANAGER', CkColors.paper2, CkColors.ink2),
-      TeamRelationship.captain =>
-        ('CAPTAIN', CkColors.cream, CkColors.ink2),
-      TeamRelationship.player =>
-        ('PLAYER', CkColors.paper2, CkColors.ink2),
+      TeamRelationship.manager => ('MANAGER', CkColors.paper2, CkColors.ink2),
+      TeamRelationship.captain => ('CAPTAIN', CkColors.cream, CkColors.ink2),
+      TeamRelationship.player => ('PLAYER', CkColors.paper2, CkColors.ink2),
       TeamRelationship.none => ('MEMBER', CkColors.paper2, CkColors.ink2),
     };
     return Container(
@@ -788,10 +806,11 @@ class _OpponentPicker extends ConsumerWidget {
     final all =
         ref.watch(discoverableTeamsProvider(query)).value ?? const <Team>[];
     final q = query.trim().toLowerCase();
-    final visible = all
-        .where((t) => t.id != fromTeamId)
-        .where((t) => q.isEmpty || t.name.toLowerCase().contains(q))
-        .toList();
+    final visible =
+        all
+            .where((t) => t.id != fromTeamId)
+            .where((t) => q.isEmpty || t.name.toLowerCase().contains(q))
+            .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -803,7 +822,11 @@ class _OpponentPicker extends ConsumerWidget {
             isDense: true,
             hintText: 'Search teams',
             hintStyle: CkType.body(fontSize: 14, color: CkColors.soft),
-            prefixIcon: const Icon(Icons.search, size: 18, color: CkColors.muted),
+            prefixIcon: const Icon(
+              Icons.search,
+              size: 18,
+              color: CkColors.muted,
+            ),
             contentPadding: const EdgeInsets.symmetric(vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -869,51 +892,55 @@ class _TeamRow extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Row(children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: _teamColor(team.primaryColor),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(_short(team),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _teamColor(team.primaryColor),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _short(team),
                 style: CkType.display(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: CkColors.paper,
-                )),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(team.name,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    team.name,
                     style: CkType.display(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.01,
-                    )),
-                if (team.homeGround != null)
-                  Text(team.homeGround!,
-                      style: CkType.body(
-                        fontSize: 12,
-                        color: CkColors.muted,
-                      )),
-              ],
+                    ),
+                  ),
+                  if (team.homeGround != null)
+                    Text(
+                      team.homeGround!,
+                      style: CkType.body(fontSize: 12, color: CkColors.muted),
+                    ),
+                ],
+              ),
             ),
-          ),
-          if (selected)
-            const Icon(Icons.check, size: 18, color: CkColors.ink),
-        ]),
+            if (selected)
+              const Icon(Icons.check, size: 18, color: CkColors.ink),
+          ],
+        ),
       ),
     );
   }
 }
-
 
 // ─── Atoms ───────────────────────────────────────────────────────────────
 
@@ -925,13 +952,15 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-      child: Text(label.toUpperCase(),
-          style: CkType.mono(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.1,
-            color: CkColors.muted,
-          )),
+      child: Text(
+        label.toUpperCase(),
+        style: CkType.mono(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.1,
+          color: CkColors.muted,
+        ),
+      ),
     );
   }
 }
@@ -941,12 +970,13 @@ class _SectionLabel extends StatelessWidget {
 String _short(Team t) {
   final mono = t.logoMonogram;
   if (mono != null && mono.isNotEmpty) return mono.toUpperCase();
-  final letters = t.name
-      .split(RegExp(r'\s+'))
-      .where((w) => w.isNotEmpty)
-      .take(2)
-      .map((w) => w[0])
-      .join();
+  final letters =
+      t.name
+          .split(RegExp(r'\s+'))
+          .where((w) => w.isNotEmpty)
+          .take(2)
+          .map((w) => w[0])
+          .join();
   return letters.isEmpty ? '??' : letters.toUpperCase();
 }
 
@@ -962,4 +992,3 @@ Color _teamColor(String? hex) {
   }
   return CkColors.muted;
 }
-

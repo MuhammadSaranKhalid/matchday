@@ -13,7 +13,9 @@ abstract class MatchPoolApplicationDto with _$MatchPoolApplicationDto {
     @JsonKey(name: 'request_id') required String requestId,
     @JsonKey(name: 'applicant_team_id') required String applicantTeamId,
     @JsonKey(name: 'applicant_user_id') required String applicantUserId,
-    @JsonKey(name: 'applicant_xi') @Default(<String>[]) List<String> applicantXi,
+    @JsonKey(name: 'applicant_xi')
+    @Default(<String>[])
+    List<String> applicantXi,
     @JsonKey(name: 'applicant_keeper_id') String? applicantKeeperId,
     String? message,
     @Default('pending') String status,
@@ -29,17 +31,17 @@ abstract class MatchPoolApplicationDto with _$MatchPoolApplicationDto {
       _$MatchPoolApplicationDtoFromJson(json);
 
   MatchPoolApplication toEntity() => MatchPoolApplication(
-        id: applicationId,
-        requestId: requestId,
-        applicantTeamId: TeamId(applicantTeamId),
-        applicantUserId: applicantUserId,
-        applicantXi: applicantXi,
-        applicantKeeperId: applicantKeeperId,
-        message: message,
-        status: PoolApplicationStatus.fromWire(status),
-        decisionNote: decisionNote,
-        decidedAt: decidedAt == null ? null : DateTime.tryParse(decidedAt!),
-        createdAt: DateTime.parse(createdAt),
-        updatedAt: DateTime.parse(updatedAt),
-      );
+    id: applicationId,
+    requestId: requestId,
+    applicantTeamId: TeamId(applicantTeamId),
+    applicantUserId: applicantUserId,
+    applicantXi: applicantXi,
+    applicantKeeperId: applicantKeeperId,
+    message: message,
+    status: PoolApplicationStatus.fromWire(status),
+    decisionNote: decisionNote,
+    decidedAt: decidedAt == null ? null : DateTime.tryParse(decidedAt!),
+    createdAt: DateTime.parse(createdAt),
+    updatedAt: DateTime.parse(updatedAt),
+  );
 }

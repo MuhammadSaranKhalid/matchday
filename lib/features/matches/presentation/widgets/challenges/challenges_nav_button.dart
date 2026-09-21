@@ -24,15 +24,15 @@ class ChallengesNavButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final needs = ref.watch(challengesViewProvider).value?.needsYou ??
+    final needs =
+        ref.watch(challengesViewProvider).value?.needsYou ??
         const <ChallengeRow>[];
     final urgent = needs.any((r) => r.tier == ExpiryTier.urgent);
 
     return Semantics(
       button: true,
-      label: needs.isEmpty
-          ? 'Challenges'
-          : 'Challenges, ${needs.length} need you',
+      label:
+          needs.isEmpty ? 'Challenges' : 'Challenges, ${needs.length} need you',
       child: InkWell(
         onTap: () => context.push('/my/challenges'),
         customBorder: const CircleBorder(),

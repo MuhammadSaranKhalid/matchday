@@ -46,11 +46,11 @@ class ScoringActions {
     required int inningsNumber,
     required void Function(String message) onToast,
     required VoidCallback onUndoFlash,
-  })  : _ref = ref,
-        _matchId = matchId,
-        _inningsNumber = inningsNumber,
-        _onToast = onToast,
-        _onUndoFlash = onUndoFlash;
+  }) : _ref = ref,
+       _matchId = matchId,
+       _inningsNumber = inningsNumber,
+       _onToast = onToast,
+       _onUndoFlash = onUndoFlash;
 
   final WidgetRef _ref;
   final String _matchId;
@@ -64,9 +64,8 @@ class ScoringActions {
   /// The opening-bowler sheet offers itself once, unless it is dismissed.
   bool _openingBowlerPromptShown = false;
 
-  ScoringController get _controller => _ref.read(
-        scoringControllerProvider(_matchId, _inningsNumber).notifier,
-      );
+  ScoringController get _controller =>
+      _ref.read(scoringControllerProvider(_matchId, _inningsNumber).notifier);
 
   ScoringState? get _state =>
       _ref.read(scoringControllerProvider(_matchId, _inningsNumber)).value;
@@ -149,17 +148,18 @@ class ScoringActions {
       backgroundColor: Colors.transparent,
       barrierColor: const Color(0x6B1A1810),
       isScrollControlled: true,
-      builder: (_) => WicketSheet(
-        overs: s.overText,
-        totalRuns: s.totalRuns,
-        totalWickets: s.totalWickets,
-        strikerName: s.strikerName,
-        nonStrikerName: s.nonStrikerName,
-        bowlerName: s.bowlerName,
-        fielders: _sheetPeople(s.fieldingXi),
-        bench: _sheetPeople(s.availableBatters),
-        freeHit: s.freeHitActive,
-      ),
+      builder:
+          (_) => WicketSheet(
+            overs: s.overText,
+            totalRuns: s.totalRuns,
+            totalWickets: s.totalWickets,
+            strikerName: s.strikerName,
+            nonStrikerName: s.nonStrikerName,
+            bowlerName: s.bowlerName,
+            fielders: _sheetPeople(s.fieldingXi),
+            bench: _sheetPeople(s.availableBatters),
+            freeHit: s.freeHitActive,
+          ),
     );
     if (result == null || !context.mounted) return;
     await _commitWicket(context, s, result);
@@ -170,9 +170,10 @@ class ScoringActions {
     ScoringState before,
     WicketResult r,
   ) async {
-    final dismissedId = r.whoOutNonStriker
-        ? before.innings?.nonStrikerId?.value
-        : before.innings?.strikerId?.value;
+    final dismissedId =
+        r.whoOutNonStriker
+            ? before.innings?.nonStrikerId?.value
+            : before.innings?.strikerId?.value;
 
     final recorded = await _recordDelivery(
       context,
@@ -237,13 +238,14 @@ class ScoringActions {
       isScrollControlled: true,
       isDismissible: !opening,
       enableDrag: !opening,
-      builder: (_) => NewBowlerSheet(
-        overNumber: opening ? 0 : s.legalBalls ~/ s.ballsPerOver,
-        justBowled: opening ? null : s.lastOverBowlerName,
-        people: _sheetPeople(opening ? s.fieldingXi : s.availableBowlers),
-        title: opening ? 'Pick opening bowler' : 'Next bowler?',
-        kicker: opening ? 'INNINGS $_inningsNumber' : null,
-      ),
+      builder:
+          (_) => NewBowlerSheet(
+            overNumber: opening ? 0 : s.legalBalls ~/ s.ballsPerOver,
+            justBowled: opening ? null : s.lastOverBowlerName,
+            people: _sheetPeople(opening ? s.fieldingXi : s.availableBowlers),
+            title: opening ? 'Pick opening bowler' : 'Next bowler?',
+            kicker: opening ? 'INNINGS $_inningsNumber' : null,
+          ),
     );
     if (pick == null) {
       if (opening) _openingBowlerPromptShown = false;
@@ -273,14 +275,15 @@ class ScoringActions {
       backgroundColor: Colors.transparent,
       barrierColor: const Color(0x6B1A1810),
       isScrollControlled: true,
-      builder: (_) => NewBowlerSheet(
-        overNumber: s.legalBalls ~/ s.ballsPerOver,
-        justBowled: null,
-        people: _sheetPeople(bench),
-        title: 'Next batter in?',
-        kicker: '${s.totalWickets} DOWN',
-        subtitle: 'Pick who comes to the crease.',
-      ),
+      builder:
+          (_) => NewBowlerSheet(
+            overNumber: s.legalBalls ~/ s.ballsPerOver,
+            justBowled: null,
+            people: _sheetPeople(bench),
+            title: 'Next batter in?',
+            kicker: '${s.totalWickets} DOWN',
+            subtitle: 'Pick who comes to the crease.',
+          ),
     );
     if (pick == null || !context.mounted) return;
     await _dispatch(
@@ -290,9 +293,9 @@ class ScoringActions {
   }
 
   List<SheetPerson> _sheetPeople(List<ScoringPerson> people) => [
-        for (final p in people)
-          SheetPerson(id: p.matchPlayerId, name: p.name, photoUrl: p.photoUrl),
-      ];
+    for (final p in people)
+      SheetPerson(id: p.matchPlayerId, name: p.name, photoUrl: p.photoUrl),
+  ];
 
   // ── Undo & dialogs ───────────────────────────────────────────────────────
 
@@ -314,33 +317,40 @@ class ScoringActions {
     final over = '${last.overNumber}.${last.ballInOver}';
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: CkColors.paper,
-        title: Text('Undo this ball?', style: CkType.display(fontSize: 18)),
-        content: Text(
-          'Removes $over — ${describeBall(last)} — from the scorecard and '
-          'rewinds the score. This cannot be redone.',
-          style: CkType.body(fontSize: 13, height: 1.45, color: CkColors.ink2),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text('Keep it',
-                style: CkType.body(fontSize: 14, color: CkColors.muted)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(
-              'Undo ball',
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: CkColors.paper,
+            title: Text('Undo this ball?', style: CkType.display(fontSize: 18)),
+            content: Text(
+              'Removes $over — ${describeBall(last)} — from the scorecard and '
+              'rewinds the score. This cannot be redone.',
               style: CkType.body(
-                fontSize: 14,
-                color: CkColors.red,
-                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                height: 1.45,
+                color: CkColors.ink2,
               ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(
+                  'Keep it',
+                  style: CkType.body(fontSize: 14, color: CkColors.muted),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(
+                  'Undo ball',
+                  style: CkType.body(
+                    fontSize: 14,
+                    color: CkColors.red,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
     return confirmed ?? false;
   }
@@ -362,34 +372,41 @@ class ScoringActions {
 
     final leave = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: CkColors.paper,
-        title: Text('Stop scoring?', style: CkType.display(fontSize: 18)),
-        content: Text(
-          'The innings is still in progress at ${s.overText} overs. Nothing '
-          'is lost — every ball is already saved — but nobody is scoring '
-          'until you or another scorer comes back.',
-          style: CkType.body(fontSize: 13, height: 1.45, color: CkColors.ink2),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text('Keep scoring',
-                style: CkType.body(fontSize: 14, color: CkColors.muted)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(
-              'Leave',
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: CkColors.paper,
+            title: Text('Stop scoring?', style: CkType.display(fontSize: 18)),
+            content: Text(
+              'The innings is still in progress at ${s.overText} overs. Nothing '
+              'is lost — every ball is already saved — but nobody is scoring '
+              'until you or another scorer comes back.',
               style: CkType.body(
-                fontSize: 14,
-                color: CkColors.red,
-                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                height: 1.45,
+                color: CkColors.ink2,
               ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(
+                  'Keep scoring',
+                  style: CkType.body(fontSize: 14, color: CkColors.muted),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(
+                  'Leave',
+                  style: CkType.body(
+                    fontSize: 14,
+                    color: CkColors.red,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
     return leave ?? false;
   }
@@ -419,14 +436,12 @@ class ScoringActions {
     final dynamic result = await action();
     if (result is Either<Failure, Unit>) {
       if (!context.mounted) return result.isRight();
-      return result.fold(
-        (f) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(f.message)));
-          return false;
-        },
-        (_) => true,
-      );
+      return result.fold((f) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(f.message)));
+        return false;
+      }, (_) => true);
     }
     return true;
   }

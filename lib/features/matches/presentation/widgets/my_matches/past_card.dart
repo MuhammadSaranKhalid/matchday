@@ -17,93 +17,93 @@ class PastCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: CkColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: CkColors.line),
-          ),
-          clipBehavior: Clip.antiAlias,
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: Container(
+      decoration: BoxDecoration(
+        color: CkColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: CkColors.line),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _head(),
+          // A walkover was never bowled. Printing 0/0 would be a lie, so
+          // the score block is replaced by the reason.
+          if (v.showScores) ...[
+            _scoreRow(
+              short: v.homeShort,
+              color: v.homeColor,
+              name: v.homeName,
+              runs: v.homeRuns,
+              wkts: v.homeWkts,
+              overs: v.homeOvers,
+              isYou: v.mineIsHome,
+              won: v.homeWon,
+              padding: const EdgeInsets.fromLTRB(13, 9, 13, 4),
+            ),
+            _scoreRow(
+              short: v.awayShort,
+              color: v.awayColor,
+              name: v.awayName,
+              runs: v.awayRuns,
+              wkts: v.awayWkts,
+              overs: v.awayOvers,
+              isYou: !v.mineIsHome,
+              won: !v.homeWon,
+              padding: const EdgeInsets.fromLTRB(13, 4, 13, 11),
+            ),
+          ],
+          if ((v.note ?? '').isNotEmpty) _note(),
+          if (v.mine.trim().isNotEmpty) _personal(),
+        ],
+      ),
+    ),
+  );
+
+  Widget _head() => Container(
+    padding: const EdgeInsets.fromLTRB(13, 11, 13, 9),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: CkColors.hairline)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _head(),
-              // A walkover was never bowled. Printing 0/0 would be a lie, so
-              // the score block is replaced by the reason.
-              if (v.showScores) ...[
-                _scoreRow(
-                  short: v.homeShort,
-                  color: v.homeColor,
-                  name: v.homeName,
-                  runs: v.homeRuns,
-                  wkts: v.homeWkts,
-                  overs: v.homeOvers,
-                  isYou: v.mineIsHome,
-                  won: v.homeWon,
-                  padding: const EdgeInsets.fromLTRB(13, 9, 13, 4),
+              Text(
+                v.sentence.isEmpty ? v.result : v.sentence,
+                style: CkType.display(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.01,
+                  color: CkColors.ink,
                 ),
-                _scoreRow(
-                  short: v.awayShort,
-                  color: v.awayColor,
-                  name: v.awayName,
-                  runs: v.awayRuns,
-                  wkts: v.awayWkts,
-                  overs: v.awayOvers,
-                  isYou: !v.mineIsHome,
-                  won: !v.homeWon,
-                  padding: const EdgeInsets.fromLTRB(13, 4, 13, 11),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                v.metaLine.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: CkType.mono(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.07,
+                  color: CkColors.muted,
                 ),
-              ],
-              if ((v.note ?? '').isNotEmpty) _note(),
-              if (v.mine.trim().isNotEmpty) _personal(),
+              ),
             ],
           ),
         ),
-      );
-
-  Widget _head() => Container(
-        padding: const EdgeInsets.fromLTRB(13, 11, 13, 9),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: CkColors.hairline)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    v.sentence.isEmpty ? v.result : v.sentence,
-                    style: CkType.display(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.01,
-                      color: CkColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    v.metaLine.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: CkType.mono(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.07,
-                      color: CkColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            _chip(),
-          ],
-        ),
-      );
+        const SizedBox(width: 10),
+        _chip(),
+      ],
+    ),
+  );
 
   /// Won is the only green on the board. Tied takes cream — it is a result,
   /// but not a win. Everything else is neutral: a walkover or an abandonment
@@ -224,40 +224,40 @@ class PastCard extends StatelessWidget {
 
   /// Says why a number is missing, rather than leaving a blank to interpret.
   Widget _note() => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-        decoration: const BoxDecoration(
-          color: CkColors.paper,
-          border: Border(top: BorderSide(color: CkColors.hairline)),
-        ),
-        child: Text(
-          v.note!.toUpperCase(),
-          style: CkType.mono(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.08,
-            color: CkColors.muted,
-          ),
-        ),
-      );
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+    decoration: const BoxDecoration(
+      color: CkColors.paper,
+      border: Border(top: BorderSide(color: CkColors.hairline)),
+    ),
+    child: Text(
+      v.note!.toUpperCase(),
+      style: CkType.mono(
+        fontSize: 9.5,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.08,
+        color: CkColors.muted,
+      ),
+    ),
+  );
 
   /// "YOU: 78 (52)". The design reserves this band so the row does not need
   /// re-laying-out when per-player aggregates land.
   Widget _personal() => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-        decoration: const BoxDecoration(
-          color: CkColors.paper,
-          border: Border(top: BorderSide(color: CkColors.line)),
-        ),
-        child: Text(
-          v.mine.toUpperCase(),
-          style: CkType.mono(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.08,
-            color: CkColors.ink2,
-          ),
-        ),
-      );
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+    decoration: const BoxDecoration(
+      color: CkColors.paper,
+      border: Border(top: BorderSide(color: CkColors.line)),
+    ),
+    child: Text(
+      v.mine.toUpperCase(),
+      style: CkType.mono(
+        fontSize: 9.5,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.08,
+        color: CkColors.ink2,
+      ),
+    ),
+  );
 }

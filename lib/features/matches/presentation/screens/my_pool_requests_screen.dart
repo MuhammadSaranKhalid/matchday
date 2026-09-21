@@ -34,13 +34,14 @@ class MyPoolRequestsScreen extends ConsumerWidget {
             bottom: false,
             child: CkPushNav(
               title: 'My Challenges',
-              onBack: () =>
-                  context.canPop() ? context.pop() : context.go('/pool'),
+              onBack:
+                  () => context.canPop() ? context.pop() : context.go('/pool'),
               // The create action stays pinned at the bottom (artboard 12), so
               // the nav's trailing slot carries the live count instead.
               action: switch (view) {
-                AsyncData(value: final v) when v.live.isNotEmpty =>
-                  CkNavCount('${v.live.length} live'),
+                AsyncData(value: final v) when v.live.isNotEmpty => CkNavCount(
+                  '${v.live.length} live',
+                ),
                 _ => null,
               },
             ),
@@ -49,13 +50,12 @@ class MyPoolRequestsScreen extends ConsumerWidget {
             child: switch (view) {
               AsyncLoading() => const _Scroll(child: PoolLoadingState()),
               AsyncError(:final error) => Center(
-                  child: PoolErrorState(
-                    onRetry: () => ref.invalidate(myChallengesProvider),
-                    code: error.toString(),
-                  ),
+                child: PoolErrorState(
+                  onRetry: () => ref.invalidate(myChallengesProvider),
+                  code: error.toString(),
                 ),
-              AsyncData(value: final v) when v.isEmpty =>
-                _Empty(onPost: post),
+              ),
+              AsyncData(value: final v) when v.isEmpty => _Empty(onPost: post),
               AsyncData(value: final v) => _List(view: v),
             },
           ),
@@ -95,10 +95,7 @@ class _List extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         children: [
           for (final row in view.live) ...[
-            MyChallengeCard(
-              row: row,
-              onTap: () => open(row.request.id.value),
-            ),
+            MyChallengeCard(row: row, onTap: () => open(row.request.id.value)),
             const SizedBox(height: 13),
           ],
           if (view.past.isNotEmpty) ...[
@@ -188,6 +185,5 @@ class _Scroll extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) =>
-      SingleChildScrollView(child: child);
+  Widget build(BuildContext context) => SingleChildScrollView(child: child);
 }

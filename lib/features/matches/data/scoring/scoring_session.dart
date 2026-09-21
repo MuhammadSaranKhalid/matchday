@@ -46,11 +46,11 @@ class ScoringSession {
     MatchesLocalDataSource? local,
     Uuid uuid = const Uuid(),
     Duration retryDelay = const Duration(seconds: 8),
-  })  : _repository = repository,
-        _remote = remote,
-        _local = local,
-        _uuid = uuid,
-        _retryDelay = retryDelay;
+  }) : _repository = repository,
+       _remote = remote,
+       _local = local,
+       _uuid = uuid,
+       _retryDelay = retryDelay;
 
   final MatchesRepository _repository;
   final MatchesRemoteDataSource _remote;
@@ -117,10 +117,11 @@ class ScoringSession {
       matchId: MatchId(matchId),
       inningsNumber: inningsNumber,
     );
-    final ballsResult =
-        await _repository.listBalls(MatchId(matchId), inningsNumber);
-    final playersResult =
-        await _repository.listMatchPlayers(MatchId(matchId));
+    final ballsResult = await _repository.listBalls(
+      MatchId(matchId),
+      inningsNumber,
+    );
+    final playersResult = await _repository.listMatchPlayers(MatchId(matchId));
     final canScoreResult = await _repository.canScoreInnings(
       matchId: MatchId(matchId),
       inningsNumber: inningsNumber,
@@ -139,8 +140,10 @@ class ScoringSession {
       matchId: MatchId(matchId),
       inningsNumber: inningsNumber,
     );
-    final ballsResult =
-        await _repository.listBalls(MatchId(matchId), inningsNumber);
+    final ballsResult = await _repository.listBalls(
+      MatchId(matchId),
+      inningsNumber,
+    );
     _innings = inningsResult.fold((_) => _innings, (s) => s);
     _balls = ballsResult.fold((_) => _balls, (b) => b);
     _emit();
@@ -382,11 +385,11 @@ class ScoringSession {
             _adopt(result);
 
           case PendingTrio(
-              :final strikerId,
-              :final nonStrikerId,
-              :final bowlerId,
-              :final target,
-            ):
+            :final strikerId,
+            :final nonStrikerId,
+            :final bowlerId,
+            :final target,
+          ):
             await _remote.startInnings(
               matchId: matchId,
               inningsNumber: inningsNumber,
@@ -502,10 +505,8 @@ class ScoringSession {
 
   Future<void> _discard(String opId) async => _local?.discardOp(opId);
 
-  Future<void> _prune() async => _local?.pruneOps(
-        matchId: matchId,
-        inningsNumber: inningsNumber,
-      );
+  Future<void> _prune() async =>
+      _local?.pruneOps(matchId: matchId, inningsNumber: inningsNumber);
 
   void dispose() {
     _disposed = true;

@@ -39,8 +39,7 @@ abstract class MatchPlayerDto with _$MatchPlayerDto {
     modified['match_player_id'] =
         (modified['match_player_id'] ?? modified['id'] ?? '').toString();
     modified['match_id'] = (modified['match_id'] ?? '').toString();
-    modified['team_side'] =
-        (modified['team_side'] ?? 'team_a').toString();
+    modified['team_side'] = (modified['team_side'] ?? 'team_a').toString();
 
     if (modified['profile_id'] == null && modified['user_id'] != null) {
       modified['profile_id'] = modified['user_id'];
@@ -68,9 +67,7 @@ abstract class MatchPlayerDto with _$MatchPlayerDto {
     if (modified['display_name'] != null &&
         modified['profile'] == null &&
         modified['unclaimed'] == null) {
-      modified['unclaimed'] = {
-        'display_name': modified['display_name'],
-      };
+      modified['unclaimed'] = {'display_name': modified['display_name']};
     }
 
     return _$MatchPlayerDtoFromJson(modified);
@@ -97,17 +94,17 @@ abstract class MatchPlayerDto with _$MatchPlayerDto {
   }
 
   MatchPlayer toEntity() => MatchPlayer(
-        id: MatchPlayerId(matchPlayerId),
-        matchId: MatchId(matchId),
-        teamSide: MatchTeamSide.fromWire(teamSide),
-        profileId: profileId,
-        unclaimedId: unclaimedId,
-        displayName: displayName,
-        photoUrl: photoUrl,
-        battingOrder: battingOrder,
-        jerseyNumber: jerseyNumber,
-        isCaptain: isCaptain,
-        isKeeper: isKeeper,
-        isSubstitute: isSubstitute,
-      );
+    id: MatchPlayerId(matchPlayerId),
+    matchId: MatchId(matchId),
+    teamSide: MatchTeamSide.fromWire(teamSide),
+    profileId: profileId,
+    unclaimedId: unclaimedId,
+    displayName: displayName,
+    photoUrl: photoUrl,
+    battingOrder: battingOrder,
+    jerseyNumber: jerseyNumber,
+    isCaptain: isCaptain,
+    isKeeper: isKeeper,
+    isSubstitute: isSubstitute,
+  );
 }

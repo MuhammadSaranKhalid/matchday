@@ -239,14 +239,14 @@ class BallResult {
     required ComputedBall this.ball,
     required NewInningsState this.newState,
     required InningsEvents this.events,
-  })  : ok = true,
-        error = null;
+  }) : ok = true,
+       error = null;
 
   const BallResult.failure(EngineError this.error)
-      : ok = false,
-        ball = null,
-        newState = null,
-        events = null;
+    : ok = false,
+      ball = null,
+      newState = null,
+      events = null;
 
   final bool ok;
   final EngineError? error;

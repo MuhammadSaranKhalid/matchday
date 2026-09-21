@@ -149,44 +149,119 @@ class Match extends Equatable {
     MatchStartPhase? startPhase,
     String? openersSubmittedBy,
     DateTime? openersSubmittedAt,
-  }) =>
-      Match(
-        id: id ?? this.id,
-        teamAId: teamAId ?? this.teamAId,
-        teamBId: teamBId ?? this.teamBId,
-        format: format ?? this.format,
-        status: status ?? this.status,
-        matchType: matchType ?? this.matchType,
-        createdBy: createdBy ?? this.createdBy,
-        createdAt: createdAt ?? this.createdAt,
-        teamACaptain: teamACaptain ?? this.teamACaptain,
-        teamBCaptain: teamBCaptain ?? this.teamBCaptain,
-        setupTeamId: setupTeamId ?? this.setupTeamId,
-        venue: venue ?? this.venue,
-        scheduledStartTime: scheduledStartTime ?? this.scheduledStartTime,
-        actualStartTime: actualStartTime ?? this.actualStartTime,
-        resultDescription: resultDescription ?? this.resultDescription,
-        tossWonBy: tossWonBy ?? this.tossWonBy,
-        tossDecision: tossDecision ?? this.tossDecision,
-        tossFace: tossFace ?? this.tossFace,
-        tossRecordedBy: tossRecordedBy ?? this.tossRecordedBy,
-        startPhase: startPhase ?? this.startPhase,
-        openersSubmittedBy: openersSubmittedBy ?? this.openersSubmittedBy,
-        openersSubmittedAt: openersSubmittedAt ?? this.openersSubmittedAt,
-      );
+  }) => Match(
+    id: id ?? this.id,
+    teamAId: teamAId ?? this.teamAId,
+    teamBId: teamBId ?? this.teamBId,
+    format: format ?? this.format,
+    status: status ?? this.status,
+    matchType: matchType ?? this.matchType,
+    createdBy: createdBy ?? this.createdBy,
+    createdAt: createdAt ?? this.createdAt,
+    teamACaptain: teamACaptain ?? this.teamACaptain,
+    teamBCaptain: teamBCaptain ?? this.teamBCaptain,
+    setupTeamId: setupTeamId ?? this.setupTeamId,
+    venue: venue ?? this.venue,
+    scheduledStartTime: scheduledStartTime ?? this.scheduledStartTime,
+    actualStartTime: actualStartTime ?? this.actualStartTime,
+    resultDescription: resultDescription ?? this.resultDescription,
+    tossWonBy: tossWonBy ?? this.tossWonBy,
+    tossDecision: tossDecision ?? this.tossDecision,
+    tossFace: tossFace ?? this.tossFace,
+    tossRecordedBy: tossRecordedBy ?? this.tossRecordedBy,
+    startPhase: startPhase ?? this.startPhase,
+    openersSubmittedBy: openersSubmittedBy ?? this.openersSubmittedBy,
+    openersSubmittedAt: openersSubmittedAt ?? this.openersSubmittedAt,
+  );
 
   @override
   List<Object?> get props => [
-        id,
-        teamAId,
-        teamBId,
-        setupTeamId,
-        status,
-        scheduledStartTime,
-        tossWonBy,
-        tossDecision,
-        startPhase,
-      ];
+    id,
+    teamAId,
+    teamBId,
+    setupTeamId,
+    status,
+    scheduledStartTime,
+    tossWonBy,
+    tossDecision,
+    startPhase,
+  ];
+}
+
+/// Cricket Match Start workflow helpers.
+///
+/// These helpers answer DOMAIN questions only:
+///
+/// - Who bats first?
+/// - Which team currently controls Cricket setup?
+/// - Is this match still in the pre-live setup workflow?
+///
+/// They deliberately do NOT answer:
+///
+/// "May the current user perform the action?"
+///
+/// User authorization belongs to the RBAC engine (`can` / `team_can`).
+/// Keeping these concerns separate prevents role names or UI state from
+/// becoming accidental authorization logic.
+extension CricketMatchSetupX on Match {
+  /// The team that bats in innings 1 according to the committed toss.
+  ///
+  /// Before the toss is recorded there is no batting team yet.
+  TeamId? get battingFirstTeamId {
+    final winner = tossWonBy;
+    final decision = tossDecision;
+
+    if (winner == null || decision == null) {
+      return null;
+    }
+
+    // Toss winner chose to bat, so they bat first.
+    if (decision == TossDecision.bat) {
+      return winner;
+    }
+
+    // Toss winner chose to bowl, therefore the OTHER team bats first.
+    if (winner == teamAId) {
+      return teamBId;
+    }
+
+    if (winner == teamBId) {
+      return teamAId;
+    }
+
+    // Defensive fail-closed branch. A valid toss winner should always be one
+    // of the two participating teams.
+    return null;
+  }
+
+  /// Team whose TEAM-SCOPED `cricket.match.setup` permission controls the
+  /// current Match Start stage.
+  ///
+  /// Match-scoped grants are deliberately NOT represented here because they
+  /// are independent of either team and are checked separately by RBAC.
+  TeamId? get currentSetupAuthorityTeamId {
+    switch (startPhase) {
+      case MatchStartPhase.toss:
+        // Before the toss, authority comes from cricket_matches.setup_side.
+        return setupTeamId;
+      case MatchStartPhase.lineup:
+      case MatchStartPhase.ready:
+        // Once the toss is committed, authority transfers to the batting side.
+        return battingFirstTeamId;
+      case MatchStartPhase.live:
+        // Match Start has finished. Scoring uses match.score instead.
+        return null;
+    }
+  }
+
+  /// Whether this fixture is still in the Match Start workflow.
+  ///
+  /// There is intentionally NO time rule here.
+  ///
+  /// A future product rule such as "only 30 minutes before start" must be
+  /// introduced separately. Time does not currently determine authorization.
+  bool get isPreLiveCricketSetup =>
+      status.isUpcoming && startPhase != MatchStartPhase.live;
 }
 
 class MatchId extends Equatable {
@@ -232,15 +307,15 @@ class MatchFormat extends Equatable {
 
   @override
   List<Object?> get props => [
-        oversPerInnings,
-        playersPerTeam,
-        ballType,
-        maxOversPerBowler,
-        ballsPerOver,
-        inningsPerSide,
-        wicketsToAllOut,
-        endChangeBalls,
-      ];
+    oversPerInnings,
+    playersPerTeam,
+    ballType,
+    maxOversPerBowler,
+    ballsPerOver,
+    inningsPerSide,
+    wicketsToAllOut,
+    endChangeBalls,
+  ];
 }
 
 class Venue extends Equatable {
@@ -339,13 +414,10 @@ enum MatchStatus {
   /// Confirmed-upcoming: cards in this state belong in the "Confirmed" tab on
   /// My Matches.
   bool get isUpcoming =>
-      this == scheduled ||
-      this == toss ||
-      this == rescheduled;
+      this == scheduled || this == toss || this == rescheduled;
 
   /// In-play.
-  bool get isLive =>
-      this == live || this == inningsBreak || this == superOver;
+  bool get isLive => this == live || this == inningsBreak || this == superOver;
 
   /// Past — match has a final result (or terminal non-result).
   bool get isPast =>

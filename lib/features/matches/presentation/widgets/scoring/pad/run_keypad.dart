@@ -54,9 +54,7 @@ class RunKeypad extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            Expanded(
-              child: WicketButton(onTap: enabled ? onWicket : null),
-            ),
+            Expanded(child: WicketButton(onTap: enabled ? onWicket : null)),
           ],
         ),
       ],

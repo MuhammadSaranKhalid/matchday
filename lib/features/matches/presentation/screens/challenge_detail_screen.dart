@@ -33,8 +33,7 @@ class ChallengeDetailScreen extends ConsumerStatefulWidget {
       _ChallengeDetailScreenState();
 }
 
-class _ChallengeDetailScreenState
-    extends ConsumerState<ChallengeDetailScreen> {
+class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen> {
   bool _busy = false;
 
   @override
@@ -44,12 +43,16 @@ class _ChallengeDetailScreenState
       backgroundColor: CkColors.paper,
       body: SafeArea(
         child: async.when(
-          loading: () =>
-              const Center(child: CircularProgressIndicator(color: CkColors.ink)),
+          loading:
+              () => const Center(
+                child: CircularProgressIndicator(color: CkColors.ink),
+              ),
           error: (e, _) => Center(child: Text(e.toString())),
-          data: (req) => req == null
-              ? const Center(child: Text('Challenge not found'))
-              : _body(req),
+          data:
+              (req) =>
+                  req == null
+                      ? const Center(child: Text('Challenge not found'))
+                      : _body(req),
         ),
       ),
     );
@@ -57,13 +60,14 @@ class _ChallengeDetailScreenState
 
   Widget _body(MatchRequest req) {
     final from = ref.watch(teamProvider(req.fromTeamId.value)).value;
-    final to = req.toTeamId == null
-        ? null
-        : ref.watch(teamProvider(req.toTeamId!.value)).value;
+    final to =
+        req.toTeamId == null
+            ? null
+            : ref.watch(teamProvider(req.toTeamId!.value)).value;
 
     final memberships =
         ref.watch(currentUserTeamMembershipsProvider).value ??
-            const <TeamMembership>[];
+        const <TeamMembership>[];
     final actingTeams = [
       for (final membership in memberships)
         if (membership.relationship.canSendChallenge) membership.team,
@@ -74,9 +78,10 @@ class _ChallengeDetailScreenState
     final actionable = req.isPending;
 
     // Watch applications if it's an open pool post
-    final appsAsync = isOpenPool
-        ? ref.watch(poolApplicationsProvider(req.id.value))
-        : const AsyncValue.data(<MatchPoolApplication>[]);
+    final appsAsync =
+        isOpenPool
+            ? ref.watch(poolApplicationsProvider(req.id.value))
+            : const AsyncValue.data(<MatchPoolApplication>[]);
 
     final applications = appsAsync.value ?? const <MatchPoolApplication>[];
 
@@ -87,13 +92,17 @@ class _ChallengeDetailScreenState
       return HostDetailView(
         request: req,
         applications: applications,
-        onBack: () =>
-            context.canPop() ? context.pop() : context.go('/my/pool-requests'),
+        onBack:
+            () =>
+                context.canPop()
+                    ? context.pop()
+                    : context.go('/my/pool-requests'),
         onShare: () => _onShareCode(req),
         onWithdraw: () => _onWithdrawChallenge(req, applications),
-        onOpenApplicant: (app) => context.push(
-          '/challenges/${req.id.value}/applicants/${app.id}',
-        ),
+        onOpenApplicant:
+            (app) => context.push(
+              '/challenges/${req.id.value}/applicants/${app.id}',
+            ),
       );
     }
 
@@ -108,16 +117,21 @@ class _ChallengeDetailScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Header(
-          onBack: () =>
-              context.canPop() ? context.pop() : context.go('/my/matches'),
-          kicker: viewerIsSender
-              ? (isOpenPool ? 'OPEN CHALLENGE POSTED' : 'CHALLENGE SENT')
-              : (isOpenPool ? 'OPEN MATCH POOL' : 'INCOMING CHALLENGE'),
-          title: viewerIsSender
-              ? (isOpenPool ? 'Open Pool Broadcast' : 'To ${to?.name ?? 'a team'}')
-              : (isOpenPool
-                  ? 'Challenge from ${from?.name ?? 'Open Challenger'}'
-                  : 'From ${from?.name ?? 'a team'}'),
+          onBack:
+              () =>
+                  context.canPop() ? context.pop() : context.go('/my/matches'),
+          kicker:
+              viewerIsSender
+                  ? (isOpenPool ? 'OPEN CHALLENGE POSTED' : 'CHALLENGE SENT')
+                  : (isOpenPool ? 'OPEN MATCH POOL' : 'INCOMING CHALLENGE'),
+          title:
+              viewerIsSender
+                  ? (isOpenPool
+                      ? 'Open Pool Broadcast'
+                      : 'To ${to?.name ?? 'a team'}')
+                  : (isOpenPool
+                      ? 'Challenge from ${from?.name ?? 'Open Challenger'}'
+                      : 'From ${from?.name ?? 'a team'}'),
         ),
         Expanded(
           child: ListView(
@@ -133,9 +147,11 @@ class _ChallengeDetailScreenState
               const _SectionLabel('Match spec'),
               _Spec(req: req),
               if (req.message != null && req.message!.isNotEmpty) ...[
-                _SectionLabel(viewerIsSender
-                    ? 'Your note'
-                    : 'Note from ${_firstName(from?.name)}'),
+                _SectionLabel(
+                  viewerIsSender
+                      ? 'Your note'
+                      : 'Note from ${_firstName(from?.name)}',
+                ),
                 _Note(text: req.message!, sentAt: req.createdAt),
               ],
               // For Poster of Open Pool: Show Applicants List
@@ -200,7 +216,7 @@ class _ChallengeDetailScreenState
   Future<void> _onApplyToPool(MatchRequest req) async {
     final memberships =
         ref.read(currentUserTeamMembershipsProvider).value ??
-            const <TeamMembership>[];
+        const <TeamMembership>[];
     final eligibleTeams = [
       for (final membership in memberships)
         if (membership.relationship.canSendChallenge &&
@@ -209,7 +225,9 @@ class _ChallengeDetailScreenState
     ];
     if (eligibleTeams.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You need to create or manage a team to apply.')),
+        const SnackBar(
+          content: Text('You need to create or manage a team to apply.'),
+        ),
       );
       return;
     }
@@ -225,74 +243,93 @@ class _ChallengeDetailScreenState
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        builder: (ctx) => SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(ctx).size.height * 0.75,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: CkColors.hairline,
-                        borderRadius: BorderRadius.circular(2),
+        builder:
+            (ctx) => SafeArea(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: CkColors.hairline,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Select Your Team',
+                        style: CkType.display(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Which team are you applying with?',
+                        style: CkType.body(
+                          fontSize: 12.5,
+                          color: CkColors.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: eligibleTeams.length,
+                          separatorBuilder:
+                              (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (_, i) {
+                            final t = eligibleTeams[i];
+                            return ListTile(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: const BorderSide(
+                                  color: CkColors.hairline,
+                                ),
+                              ),
+                              leading: Crest(
+                                short: _short(t, fallback: 'TM'),
+                                color: _teamColor(t.primaryColor),
+                                size: 36,
+                              ),
+                              title: Text(
+                                t.name,
+                                style: CkType.display(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                t.homeGround ?? 'Local Club',
+                                style: CkType.body(
+                                  fontSize: 11.5,
+                                  color: CkColors.muted,
+                                ),
+                              ),
+                              trailing: const Icon(
+                                Icons.chevron_right_rounded,
+                                color: CkColors.ink,
+                              ),
+                              onTap: () => Navigator.of(ctx).pop(t),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Select Your Team',
-                    style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Which team are you applying with?',
-                    style: CkType.body(fontSize: 12.5, color: CkColors.muted),
-                  ),
-                  const SizedBox(height: 14),
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: eligibleTeams.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (_, i) {
-                        final t = eligibleTeams[i];
-                        return ListTile(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: CkColors.hairline),
-                          ),
-                          leading: Crest(
-                            short: _short(t, fallback: 'TM'),
-                            color: _teamColor(t.primaryColor),
-                            size: 36,
-                          ),
-                          title: Text(
-                            t.name,
-                            style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700),
-                          ),
-                          subtitle: Text(
-                            t.homeGround ?? 'Local Club',
-                            style: CkType.body(fontSize: 11.5, color: CkColors.muted),
-                          ),
-                          trailing: const Icon(Icons.chevron_right_rounded, color: CkColors.ink),
-                          onTap: () => Navigator.of(ctx).pop(t),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
       );
       if (selectedTeam == null || !mounted) return;
     }
@@ -305,83 +342,96 @@ class _ChallengeDetailScreenState
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          left: 20,
-          right: 20,
-          top: 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Apply to Match Pool',
-              style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
+      builder:
+          (ctx) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              left: 20,
+              right: 20,
+              top: 20,
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Apply to play against ${ref.read(teamProvider(req.fromTeamId.value)).value?.name ?? 'host'} with ${selectedTeam!.name}. The host captain will review and accept.',
-              style: CkType.body(fontSize: 13, color: CkColors.muted),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: noteController,
-              decoration: const InputDecoration(
-                labelText: 'Optional message to host captain',
-                hintText: 'e.g. We have our full squad ready on time!',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 20),
-            Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(ctx).pop(false),
-                    child: const Text('Cancel'),
+                Text(
+                  'Apply to Match Pool',
+                  style: CkType.display(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: CkColors.ink,
-                      foregroundColor: CkColors.paper,
+                const SizedBox(height: 6),
+                Text(
+                  'Apply to play against ${ref.read(teamProvider(req.fromTeamId.value)).value?.name ?? 'host'} with ${selectedTeam!.name}. The host captain will review and accept.',
+                  style: CkType.body(fontSize: 13, color: CkColors.muted),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Optional message to host captain',
+                    hintText: 'e.g. We have our full squad ready on time!',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Cancel'),
+                      ),
                     ),
-                    onPressed: () => Navigator.of(ctx).pop(true),
-                    child: const Text('Submit Application'),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CkColors.ink,
+                          foregroundColor: CkColors.paper,
+                        ),
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text('Submit Application'),
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 24),
               ],
             ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
+          ),
     );
 
     if (shouldApply != true || !mounted) return;
 
     setState(() => _busy = true);
-    final result = await ref.read(matchPoolRepositoryProvider).applyToMatchPool(
+    final result = await ref
+        .read(matchPoolRepositoryProvider)
+        .applyToMatchPool(
           requestId: req.id,
           teamId: selectedTeam.id,
-          message: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+          message:
+              noteController.text.trim().isEmpty
+                  ? null
+                  : noteController.text.trim(),
         );
 
     if (!mounted) return;
     setState(() => _busy = false);
 
     result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Application submitted! Host captain has been notified.')),
+          const SnackBar(
+            content: Text(
+              'Application submitted! Host captain has been notified.',
+            ),
+          ),
         );
         ref.invalidate(poolApplicationsProvider(req.id.value));
         ref.invalidate(matchesFeedProvider);
@@ -401,62 +451,66 @@ class _ChallengeDetailScreenState
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Accept Applicant & Lock Match?',
-              style: CkType.display(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Accepting ${appTeam?.name ?? 'this team'} will immediately create the match fixture and automatically reject all other pending applications for this post.',
-              style: CkType.body(fontSize: 13, color: CkColors.muted),
-            ),
-            const SizedBox(height: 20),
-            Row(
+      builder:
+          (ctx) => Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(ctx).pop(false),
-                    child: const Text('Cancel'),
+                Text(
+                  'Accept Applicant & Lock Match?',
+                  style: CkType.display(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: CkColors.green,
-                      foregroundColor: CkColors.paper,
+                const SizedBox(height: 8),
+                Text(
+                  'Accepting ${appTeam?.name ?? 'this team'} will immediately create the match fixture and automatically reject all other pending applications for this post.',
+                  style: CkType.body(fontSize: 13, color: CkColors.muted),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Cancel'),
+                      ),
                     ),
-                    onPressed: () => Navigator.of(ctx).pop(true),
-                    child: const Text('Accept & Lock Match'),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CkColors.green,
+                          foregroundColor: CkColors.paper,
+                        ),
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text('Accept & Lock Match'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
     );
 
     if (confirm != true || !mounted) return;
 
     setState(() => _busy = true);
-    final result = await ref.read(matchPoolRepositoryProvider).acceptPoolApplication(
-          applicationId: app.id,
-        );
+    final result = await ref
+        .read(matchPoolRepositoryProvider)
+        .acceptPoolApplication(applicationId: app.id);
 
     if (!mounted) return;
     setState(() => _busy = false);
 
     result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (matchId) {
         ref.invalidate(myMatchChallengesProvider);
         ref.invalidate(myMatchesViewProvider);
@@ -473,16 +527,16 @@ class _ChallengeDetailScreenState
 
   Future<void> _onRejectApplication(MatchPoolApplication app) async {
     setState(() => _busy = true);
-    final result = await ref.read(matchPoolRepositoryProvider).rejectPoolApplication(
-          applicationId: app.id,
-        );
+    final result = await ref
+        .read(matchPoolRepositoryProvider)
+        .rejectPoolApplication(applicationId: app.id);
     if (!mounted) return;
     setState(() => _busy = false);
 
     result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) {
         ref.invalidate(poolApplicationsProvider(app.requestId));
       },
@@ -491,9 +545,10 @@ class _ChallengeDetailScreenState
 
   Future<void> _onAcceptDirect(MatchRequest req) async {
     final fromTeam = ref.read(teamProvider(req.fromTeamId.value)).value;
-    final toTeam = req.toTeamId == null
-        ? null
-        : ref.read(teamProvider(req.toTeamId!.value)).value;
+    final toTeam =
+        req.toTeamId == null
+            ? null
+            : ref.read(teamProvider(req.toTeamId!.value)).value;
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
@@ -502,28 +557,26 @@ class _ChallengeDetailScreenState
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _AcceptConfirmSheet(
-        fromName: fromTeam?.name ?? 'Them',
-        toName: toTeam?.name ?? 'You',
-        startTime: req.effectiveStartTime,
-        venue: req.effectiveVenue,
-      ),
+      builder:
+          (_) => _AcceptConfirmSheet(
+            fromName: fromTeam?.name ?? 'Them',
+            toName: toTeam?.name ?? 'You',
+            startTime: req.effectiveStartTime,
+            venue: req.effectiveVenue,
+          ),
     );
     if (confirmed != true || !mounted) return;
 
     setState(() => _busy = true);
     final result = await ref
         .read(matchesRepositoryProvider)
-        .acceptMatchChallenge(
-          requestId: req.id,
-          toTeamId: toTeam?.id,
-        );
+        .acceptMatchChallenge(requestId: req.id, toTeamId: toTeam?.id);
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) {
         ref.invalidate(myMatchChallengesProvider);
         ref.invalidate(myMatchesViewProvider);
@@ -545,7 +598,9 @@ class _ChallengeDetailScreenState
     );
     if (picked == null || !mounted) return;
     setState(() => _busy = true);
-    final result = await ref.read(matchesRepositoryProvider).declineMatchChallenge(
+    final result = await ref
+        .read(matchesRepositoryProvider)
+        .declineMatchChallenge(
           requestId: req.id,
           decisionReason: picked.reason,
           decisionNote: picked.note,
@@ -553,9 +608,9 @@ class _ChallengeDetailScreenState
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) {
         ref.invalidate(myMatchChallengesProvider);
         context.go('/my/matches');
@@ -573,9 +628,7 @@ class _ChallengeDetailScreenState
       return;
     }
     await SharePlus.instance.share(
-      ShareParams(
-        text: 'Join our match on matchday — share code $code',
-      ),
+      ShareParams(text: 'Join our match on matchday — share code $code'),
     );
   }
 
@@ -587,13 +640,13 @@ class _ChallengeDetailScreenState
     List<MatchPoolApplication> applications,
   ) async {
     final hostTeam = ref.read(teamProvider(req.fromTeamId.value)).value;
-    final pending = applications
-        .where((a) => a.status == PoolApplicationStatus.pending)
-        .length;
+    final pending =
+        applications
+            .where((a) => a.status == PoolApplicationStatus.pending)
+            .length;
 
     final summary = [
-      if (req.proposedFormat?.oversPerInnings case final o? when o > 0)
-        '$o ov',
+      if (req.proposedFormat?.oversPerInnings case final o? when o > 0) '$o ov',
       if (req.proposedStartTime case final start?)
         poolStartLabel(start).replaceFirst(' · ', ' '),
       if (pending > 0) '$pending pending',
@@ -615,9 +668,9 @@ class _ChallengeDetailScreenState
     setState(() => _busy = false);
 
     res.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) {
         ref.invalidate(myMatchChallengesProvider);
         ref.invalidate(myChallengesProvider);
@@ -628,9 +681,10 @@ class _ChallengeDetailScreenState
   }
 
   Future<void> _onWithdraw(MatchRequest req) async {
-    final to = req.toTeamId == null
-        ? null
-        : ref.read(teamProvider(req.toTeamId!.value)).value;
+    final to =
+        req.toTeamId == null
+            ? null
+            : ref.read(teamProvider(req.toTeamId!.value)).value;
     final result = await showModalBottomSheet<WithdrawResult>(
       context: context,
       backgroundColor: CkColors.paper,
@@ -642,23 +696,20 @@ class _ChallengeDetailScreenState
     );
     if (result == null || !mounted) return;
     setState(() => _busy = true);
-    final res = await ref.read(matchesRepositoryProvider).withdrawMatchChallenge(
-          requestId: req.id,
-          decisionNote: result.note,
-        );
+    final res = await ref
+        .read(matchesRepositoryProvider)
+        .withdrawMatchChallenge(requestId: req.id, decisionNote: result.note);
     if (!mounted) return;
     setState(() => _busy = false);
     res.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) {
         ref.invalidate(myMatchChallengesProvider);
         ref.invalidate(myMatchesViewProvider);
         ref.invalidate(matchChallengeProvider(widget.requestId));
-        context.canPop()
-            ? context.pop()
-            : context.go('/my/matches');
+        context.canPop() ? context.pop() : context.go('/my/matches');
       },
     );
   }
@@ -755,17 +806,20 @@ class _Hero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final start = req.effectiveStartTime;
-    final expiry = req.status == MatchRequestStatus.countered
-        ? req.counterExpiresAt
-        : (req.proposalExpiresAt ?? req.codeExpiresAt);
-    final expiresLabel = expiry == null
-        ? (isOpenPool ? 'OPEN MATCH POOL' : 'CHALLENGE')
-        : (isOpenPool
-            ? 'OPEN POOL · EXPIRES ${_humanRemaining(expiry)}'
-            : 'CHALLENGE · EXPIRES ${_humanRemaining(expiry)}');
-    final whenLabel = start == null
-        ? ''
-        : '${_dowShort(start)} ${start.day} · ${_hhmm(start)}';
+    final expiry =
+        req.status == MatchRequestStatus.countered
+            ? req.counterExpiresAt
+            : (req.proposalExpiresAt ?? req.codeExpiresAt);
+    final expiresLabel =
+        expiry == null
+            ? (isOpenPool ? 'OPEN MATCH POOL' : 'CHALLENGE')
+            : (isOpenPool
+                ? 'OPEN POOL · EXPIRES ${_humanRemaining(expiry)}'
+                : 'CHALLENGE · EXPIRES ${_humanRemaining(expiry)}');
+    final whenLabel =
+        start == null
+            ? ''
+            : '${_dowShort(start)} ${start.day} · ${_hhmm(start)}';
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -781,9 +835,7 @@ class _Hero extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
             decoration: const BoxDecoration(
               color: CkColors.paper2,
-              border: Border(
-                bottom: BorderSide(color: CkColors.hairline),
-              ),
+              border: Border(bottom: BorderSide(color: CkColors.hairline)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -791,7 +843,9 @@ class _Hero extends StatelessWidget {
                 Flexible(
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 3),
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: isOpenPool ? CkColors.green : CkColors.red,
                       borderRadius: BorderRadius.circular(4),
@@ -847,12 +901,14 @@ class _Hero extends StatelessWidget {
                   child: _CrestColumn(
                     team: to,
                     fallback: isOpenPool ? '?' : 'B',
-                    overrideName: viewerIsSender
-                        ? (isOpenPool ? 'Open Pool' : null)
-                        : (isOpenPool ? 'Open Slot (You)' : 'You'),
-                    captain: viewerIsSender
-                        ? (isOpenPool ? 'Anyone' : 'Captain')
-                        : 'Your Team',
+                    overrideName:
+                        viewerIsSender
+                            ? (isOpenPool ? 'Open Pool' : null)
+                            : (isOpenPool ? 'Open Slot (You)' : 'You'),
+                    captain:
+                        viewerIsSender
+                            ? (isOpenPool ? 'Anyone' : 'Captain')
+                            : 'Your Team',
                   ),
                 ),
               ],
@@ -876,10 +932,7 @@ class _Hero extends StatelessWidget {
                 Flexible(
                   child: Text.rich(
                     TextSpan(
-                      style: CkType.body(
-                        fontSize: 11.5,
-                        color: CkColors.ink2,
-                      ),
+                      style: CkType.body(fontSize: 11.5, color: CkColors.ink2),
                       children: const [
                         TextSpan(text: 'Head-to-head · '),
                         TextSpan(
@@ -958,10 +1011,7 @@ class _CrestColumn extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          captain,
-          style: CkType.body(fontSize: 11, color: CkColors.muted),
-        ),
+        Text(captain, style: CkType.body(fontSize: 11, color: CkColors.muted)),
       ],
     );
   }
@@ -1004,9 +1054,10 @@ class _Spec extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
               decoration: BoxDecoration(
                 border: Border(
-                  bottom: i < rows.length - 1
-                      ? const BorderSide(color: CkColors.hairline)
-                      : BorderSide.none,
+                  bottom:
+                      i < rows.length - 1
+                          ? const BorderSide(color: CkColors.hairline)
+                          : BorderSide.none,
                 ),
               ),
               child: Row(
@@ -1085,9 +1136,7 @@ class _Note extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: const BoxDecoration(
           color: CkColors.paper2,
-          border: Border(
-            left: BorderSide(color: CkColors.red, width: 3),
-          ),
+          border: Border(left: BorderSide(color: CkColors.red, width: 3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1124,10 +1173,16 @@ class _StatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      MatchRequestStatus.accepted => ('Accepted — match created.', CkColors.green),
+      MatchRequestStatus.accepted => (
+        'Accepted — match created.',
+        CkColors.green,
+      ),
       MatchRequestStatus.declined => ('Declined.', CkColors.red),
       MatchRequestStatus.cancelled => ('Withdrawn by sender.', CkColors.muted),
-      MatchRequestStatus.expired => ('Expired — too late to act.', CkColors.muted),
+      MatchRequestStatus.expired => (
+        'Expired — too late to act.',
+        CkColors.muted,
+      ),
       _ => ('No longer actionable.', CkColors.muted),
     };
     return Container(
@@ -1136,11 +1191,10 @@ class _StatusBanner extends StatelessWidget {
         color: CkColors.paper,
         border: Border(left: BorderSide(color: color, width: 3)),
       ),
-      child: Text(label,
-          style: CkType.body(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          )),
+      child: Text(
+        label,
+        style: CkType.body(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }
@@ -1164,32 +1218,41 @@ class _ApplyBar extends StatelessWidget {
         color: CkColors.paper,
         border: Border(top: BorderSide(color: CkColors.hairline)),
       ),
-      child: hasAlreadyApplied
-          ? Container(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: CkColors.hairline,
-                borderRadius: BorderRadius.circular(12),
+      child:
+          hasAlreadyApplied
+              ? Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: CkColors.hairline,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.hourglass_top_rounded,
+                      size: 18,
+                      color: CkColors.muted,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Application Pending Host Review',
+                      style: CkType.display(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: CkColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : _ReplyButton(
+                label: 'Apply to Play →',
+                onTap: busy ? null : onApply,
+                primary: true,
+                busy: busy,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.hourglass_top_rounded, size: 18, color: CkColors.muted),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Application Pending Host Review',
-                    style: CkType.display(fontSize: 14, fontWeight: FontWeight.w700, color: CkColors.muted),
-                  ),
-                ],
-              ),
-            )
-          : _ReplyButton(
-              label: 'Apply to Play →',
-              onTap: busy ? null : onApply,
-              primary: true,
-              busy: busy,
-            ),
     );
   }
 }
@@ -1214,7 +1277,8 @@ class _ApplicantCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final team = ref.watch(teamProvider(application.applicantTeamId.value)).value;
+    final team =
+        ref.watch(teamProvider(application.applicantTeamId.value)).value;
     final isPending = application.status == PoolApplicationStatus.pending;
 
     return Container(
@@ -1224,9 +1288,10 @@ class _ApplicantCard extends ConsumerWidget {
         color: CkColors.paper,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: application.status == PoolApplicationStatus.accepted
-              ? CkColors.green
-              : CkColors.hairline,
+          color:
+              application.status == PoolApplicationStatus.accepted
+                  ? CkColors.green
+                  : CkColors.hairline,
           width: application.status == PoolApplicationStatus.accepted ? 1.5 : 1,
         ),
       ),
@@ -1247,7 +1312,10 @@ class _ApplicantCard extends ConsumerWidget {
                   children: [
                     Text(
                       team?.name ?? 'Team Applicant',
-                      style: CkType.display(fontSize: 15, fontWeight: FontWeight.w700),
+                      style: CkType.display(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -1260,9 +1328,10 @@ class _ApplicantCard extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: application.status == PoolApplicationStatus.accepted
-                      ? CkColors.green.withValues(alpha: 0.12)
-                      : application.status == PoolApplicationStatus.rejected
+                  color:
+                      application.status == PoolApplicationStatus.accepted
+                          ? CkColors.green.withValues(alpha: 0.12)
+                          : application.status == PoolApplicationStatus.rejected
                           ? CkColors.red.withValues(alpha: 0.12)
                           : CkColors.ink.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(6),
@@ -1271,14 +1340,16 @@ class _ApplicantCard extends ConsumerWidget {
                   application.status == PoolApplicationStatus.accepted
                       ? 'ACCEPTED'
                       : application.status == PoolApplicationStatus.rejected
-                          ? 'DECLINED'
-                          : 'APPLICANT',
+                      ? 'DECLINED'
+                      : 'APPLICANT',
                   style: CkType.mono(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: application.status == PoolApplicationStatus.accepted
-                        ? CkColors.green
-                        : application.status == PoolApplicationStatus.rejected
+                    color:
+                        application.status == PoolApplicationStatus.accepted
+                            ? CkColors.green
+                            : application.status ==
+                                PoolApplicationStatus.rejected
                             ? CkColors.red
                             : CkColors.ink,
                   ),
@@ -1286,7 +1357,8 @@ class _ApplicantCard extends ConsumerWidget {
               ),
             ],
           ),
-          if (application.message != null && application.message!.isNotEmpty) ...[
+          if (application.message != null &&
+              application.message!.isNotEmpty) ...[
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(10),
@@ -1296,9 +1368,10 @@ class _ApplicantCard extends ConsumerWidget {
               ),
               child: Text(
                 '“${application.message}”',
-                style: CkType.body(fontSize: 12.5, color: CkColors.ink).copyWith(
-                  fontStyle: FontStyle.italic,
-                ),
+                style: CkType.body(
+                  fontSize: 12.5,
+                  color: CkColors.ink,
+                ).copyWith(fontStyle: FontStyle.italic),
               ),
             ),
           ],
@@ -1449,28 +1522,27 @@ class _ReplyButton extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: bg,
-          border: primary
-              ? null
-              : Border.all(color: CkColors.line, width: 1),
+          border: primary ? null : Border.all(color: CkColors.line, width: 1),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: busy
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: CkColors.paper,
+        child:
+            busy
+                ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: CkColors.paper,
+                  ),
+                )
+                : Text(
+                  label,
+                  style: CkType.body(
+                    fontSize: primary ? 14 : 13,
+                    fontWeight: primary ? FontWeight.w700 : FontWeight.w600,
+                    color: fg,
+                  ),
                 ),
-              )
-            : Text(
-                label,
-                style: CkType.body(
-                  fontSize: primary ? 14 : 13,
-                  fontWeight: primary ? FontWeight.w700 : FontWeight.w600,
-                  color: fg,
-                ),
-              ),
       ),
     );
   }
@@ -1495,9 +1567,10 @@ class _AcceptConfirmSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final headline = 'Accept $fromName vs $toName?';
-    final timeLabel = startTime == null
-        ? ''
-        : '${_dowShort(startTime!)} ${startTime!.day} · ${_hhmm(startTime!)}';
+    final timeLabel =
+        startTime == null
+            ? ''
+            : '${_dowShort(startTime!)} ${startTime!.day} · ${_hhmm(startTime!)}';
     return SafeArea(
       top: false,
       child: Padding(
@@ -1524,7 +1597,9 @@ class _AcceptConfirmSheet extends StatelessWidget {
               Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 7, vertical: 3),
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: CkColors.green,
                     borderRadius: BorderRadius.circular(4),
@@ -1572,19 +1647,23 @@ class _AcceptConfirmSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (timeLabel.isNotEmpty)
-                        Text(timeLabel,
-                            style: CkType.display(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.02,
-                            )),
+                        Text(
+                          timeLabel,
+                          style: CkType.display(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.02,
+                          ),
+                        ),
                       if (venue != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             venue!,
                             style: CkType.body(
-                                fontSize: 12, color: CkColors.muted),
+                              fontSize: 12,
+                              color: CkColors.muted,
+                            ),
                           ),
                         ),
                     ],
@@ -1623,9 +1702,7 @@ class _AcceptConfirmSheet extends StatelessWidget {
                 width: double.infinity,
                 child: TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  style: TextButton.styleFrom(
-                    foregroundColor: CkColors.muted,
-                  ),
+                  style: TextButton.styleFrom(foregroundColor: CkColors.muted),
                   child: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 10),
                     child: Text('Cancel'),
@@ -1703,19 +1780,23 @@ class _DeclineSheetState extends State<_DeclineSheet> {
               const SizedBox(height: 16),
               Center(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: CkColors.red,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text('DECLINE',
-                      style: CkType.mono(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.08,
-                        color: CkColors.paper,
-                      )),
+                  child: Text(
+                    'DECLINE',
+                    style: CkType.mono(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.08,
+                      color: CkColors.paper,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1736,35 +1817,40 @@ class _DeclineSheetState extends State<_DeclineSheet> {
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: CkColors.paper,
                         border: Border.all(
-                          color: _selected == r
-                              ? CkColors.ink
-                              : CkColors.hairline,
+                          color:
+                              _selected == r ? CkColors.ink : CkColors.hairline,
                           width: _selected == r ? 2 : 1,
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Row(children: [
-                        Icon(
-                          _selected == r
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_unchecked,
-                          size: 18,
-                          color:
-                              _selected == r ? CkColors.ink : CkColors.muted,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(r.label,
+                      child: Row(
+                        children: [
+                          Icon(
+                            _selected == r
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 18,
+                            color:
+                                _selected == r ? CkColors.ink : CkColors.muted,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              r.label,
                               style: CkType.body(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                              )),
-                        ),
-                      ]),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1791,12 +1877,16 @@ class _DeclineSheetState extends State<_DeclineSheet> {
                     backgroundColor: CkColors.red,
                     foregroundColor: CkColors.paper,
                   ),
-                  onPressed: () => Navigator.of(context).pop(_DeclineResult(
-                    reason: _selected,
-                    note: _noteCtrl.text.trim().isEmpty
-                        ? null
-                        : _noteCtrl.text.trim(),
-                  )),
+                  onPressed:
+                      () => Navigator.of(context).pop(
+                        _DeclineResult(
+                          reason: _selected,
+                          note:
+                              _noteCtrl.text.trim().isEmpty
+                                  ? null
+                                  : _noteCtrl.text.trim(),
+                        ),
+                      ),
                   child: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 14),
                     child: Text('Decline & send reason'),
@@ -1817,12 +1907,13 @@ String _short(Team? t, {required String fallback}) {
   if (t == null) return fallback;
   final mono = t.logoMonogram;
   if (mono != null && mono.isNotEmpty) return mono.toUpperCase();
-  final letters = t.name
-      .split(RegExp(r'\s+'))
-      .where((w) => w.isNotEmpty)
-      .take(2)
-      .map((w) => w[0])
-      .join();
+  final letters =
+      t.name
+          .split(RegExp(r'\s+'))
+          .where((w) => w.isNotEmpty)
+          .take(2)
+          .map((w) => w[0])
+          .join();
   return letters.isEmpty ? fallback : letters.toUpperCase();
 }
 

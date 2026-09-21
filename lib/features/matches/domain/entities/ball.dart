@@ -77,7 +77,14 @@ class Ball extends Equatable {
   bool get isSix => ballKind == BallKind.legal && runsScored == 6;
 
   @override
-  List<Object?> get props => [id, seq, isWicket, runsScored, extras, dismissedPlayerId];
+  List<Object?> get props => [
+    id,
+    seq,
+    isWicket,
+    runsScored,
+    extras,
+    dismissedPlayerId,
+  ];
 }
 
 class BallId extends Equatable {
@@ -273,25 +280,24 @@ class BallDraft {
     String? fielderId,
     String? commentary,
     ComputedDelivery? computed,
-  }) =>
-      BallDraft(
-        opId: opId ?? this.opId,
-        matchId: matchId ?? this.matchId,
-        inningsNumber: inningsNumber ?? this.inningsNumber,
-        isLegalDelivery: isLegalDelivery ?? this.isLegalDelivery,
-        ballKind: ballKind ?? this.ballKind,
-        runsScored: runsScored ?? this.runsScored,
-        extras: extras ?? this.extras,
-        isWicket: isWicket ?? this.isWicket,
-        wicketType: wicketType ?? this.wicketType,
-        dismissedPlayerId: dismissedPlayerId ?? this.dismissedPlayerId,
-        batsmanId: batsmanId ?? this.batsmanId,
-        nonStrikerId: nonStrikerId ?? this.nonStrikerId,
-        bowlerId: bowlerId ?? this.bowlerId,
-        fielderId: fielderId ?? this.fielderId,
-        commentary: commentary ?? this.commentary,
-        computed: computed ?? this.computed,
-      );
+  }) => BallDraft(
+    opId: opId ?? this.opId,
+    matchId: matchId ?? this.matchId,
+    inningsNumber: inningsNumber ?? this.inningsNumber,
+    isLegalDelivery: isLegalDelivery ?? this.isLegalDelivery,
+    ballKind: ballKind ?? this.ballKind,
+    runsScored: runsScored ?? this.runsScored,
+    extras: extras ?? this.extras,
+    isWicket: isWicket ?? this.isWicket,
+    wicketType: wicketType ?? this.wicketType,
+    dismissedPlayerId: dismissedPlayerId ?? this.dismissedPlayerId,
+    batsmanId: batsmanId ?? this.batsmanId,
+    nonStrikerId: nonStrikerId ?? this.nonStrikerId,
+    bowlerId: bowlerId ?? this.bowlerId,
+    fielderId: fielderId ?? this.fielderId,
+    commentary: commentary ?? this.commentary,
+    computed: computed ?? this.computed,
+  );
 }
 
 /// Which of undo's two paths was taken.
@@ -315,13 +321,11 @@ enum UndoKind {
 /// waiting in the queue. Undo used to re-read unconditionally.
 class UndoOutcome extends Equatable {
   const UndoOutcome.discardedPending(String this.opId)
-      : kind = UndoKind.discardedPending;
+    : kind = UndoKind.discardedPending;
   const UndoOutcome.removedStored()
-      : kind = UndoKind.removedStored,
-        opId = null;
-  const UndoOutcome.nothing()
-      : kind = UndoKind.nothing,
-        opId = null;
+    : kind = UndoKind.removedStored,
+      opId = null;
+  const UndoOutcome.nothing() : kind = UndoKind.nothing, opId = null;
 
   final UndoKind kind;
 

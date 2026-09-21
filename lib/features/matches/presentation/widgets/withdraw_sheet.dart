@@ -37,7 +37,9 @@ class _WithdrawSheetState extends State<WithdrawSheet> {
   Widget build(BuildContext context) {
     final who = widget.opponentName ?? 'The other team';
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SafeArea(
         top: false,
         child: Padding(
@@ -59,19 +61,23 @@ class _WithdrawSheetState extends State<WithdrawSheet> {
               const SizedBox(height: 16),
               Center(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: CkColors.red,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text('WITHDRAW',
-                      style: CkType.mono(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.08,
-                        color: CkColors.paper,
-                      )),
+                  child: Text(
+                    'WITHDRAW',
+                    style: CkType.mono(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.08,
+                      color: CkColors.paper,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -117,13 +123,15 @@ class _WithdrawSheetState extends State<WithdrawSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: () => Navigator.of(context).pop(
-                    WithdrawResult(
-                      note: _noteCtrl.text.trim().isEmpty
-                          ? null
-                          : _noteCtrl.text.trim(),
-                    ),
-                  ),
+                  onPressed:
+                      () => Navigator.of(context).pop(
+                        WithdrawResult(
+                          note:
+                              _noteCtrl.text.trim().isEmpty
+                                  ? null
+                                  : _noteCtrl.text.trim(),
+                        ),
+                      ),
                   child: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 14),
                     child: Text('Withdraw challenge'),

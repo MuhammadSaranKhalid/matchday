@@ -115,9 +115,10 @@ class _UndoButton extends StatelessWidget {
         duration: const Duration(milliseconds: 250),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: flashing
-              ? CkColors.cream
-              : (enabled ? CkColors.paper2 : CkColors.paper),
+          color:
+              flashing
+                  ? CkColors.cream
+                  : (enabled ? CkColors.paper2 : CkColors.paper),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: enabled ? CkColors.line : CkColors.hairline,
@@ -162,11 +163,7 @@ class _PendingSyncPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.cloud_off_rounded,
-            size: 12,
-            color: Colors.white,
-          ),
+          const Icon(Icons.cloud_off_rounded, size: 12, color: Colors.white),
           const SizedBox(width: 5),
           Text(
             'SAVED · $count QUEUED',
@@ -228,14 +225,14 @@ class _MoreMenu extends StatelessWidget {
   final ValueChanged<ScoringMenuAction> onSelected;
 
   static String _label(ScoringMenuAction a) => switch (a) {
-        ScoringMenuAction.viewScorecard => 'View scorecard',
-        ScoringMenuAction.changeBowler => 'Change bowler',
-      };
+    ScoringMenuAction.viewScorecard => 'View scorecard',
+    ScoringMenuAction.changeBowler => 'Change bowler',
+  };
 
   static IconData _icon(ScoringMenuAction a) => switch (a) {
-        ScoringMenuAction.viewScorecard => Icons.list_alt_outlined,
-        ScoringMenuAction.changeBowler => Icons.sports_cricket_outlined,
-      };
+    ScoringMenuAction.viewScorecard => Icons.list_alt_outlined,
+    ScoringMenuAction.changeBowler => Icons.sports_cricket_outlined,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -244,22 +241,23 @@ class _MoreMenu extends StatelessWidget {
       tooltip: 'More',
       color: CkColors.paper,
       position: PopupMenuPosition.under,
-      itemBuilder: (context) => [
-        for (final a in actions)
-          PopupMenuItem(
-            value: a,
-            child: Row(
-              children: [
-                Icon(_icon(a), size: 16, color: CkColors.ink2),
-                const SizedBox(width: 10),
-                Text(
-                  _label(a),
-                  style: CkType.body(fontSize: 13, color: CkColors.ink),
+      itemBuilder:
+          (context) => [
+            for (final a in actions)
+              PopupMenuItem(
+                value: a,
+                child: Row(
+                  children: [
+                    Icon(_icon(a), size: 16, color: CkColors.ink2),
+                    const SizedBox(width: 10),
+                    Text(
+                      _label(a),
+                      style: CkType.body(fontSize: 13, color: CkColors.ink),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-      ],
+              ),
+          ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(

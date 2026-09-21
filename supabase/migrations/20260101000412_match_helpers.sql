@@ -467,7 +467,11 @@ select
       and mp.user_id is not null
     order by cmp.updated_at desc, mp.created_at asc
     limit 1
-  ) as team_b_captain
+  ) as team_b_captain,
+
+  cm.setup_side,
+  setup_slot.team_id as setup_team_id,
+  cm.toss_recorded_by
 
 from public.matches m
 join public.cricket_matches cm
@@ -478,6 +482,9 @@ join public.match_teams team_a
 join public.match_teams team_b
   on team_b.match_id = m.match_id
  and team_b.team_side = 'team_b'
+left join public.match_teams setup_slot
+  on setup_slot.match_id = m.match_id
+ and setup_slot.team_side = cm.setup_side
 left join public.match_teams winner_slot
   on winner_slot.match_id = m.match_id
  and winner_slot.team_side = m.winner_side

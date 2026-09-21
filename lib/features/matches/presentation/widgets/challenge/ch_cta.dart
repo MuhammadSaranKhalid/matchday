@@ -97,8 +97,11 @@ class _ErrorPill extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded,
-              size: 14, color: CkColors.red),
+          const Icon(
+            Icons.warning_amber_rounded,
+            size: 14,
+            color: CkColors.red,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -114,8 +117,7 @@ class _ErrorPill extends StatelessWidget {
           GestureDetector(
             onTap: onRetry,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
               decoration: BoxDecoration(
                 color: CkColors.red,
                 borderRadius: BorderRadius.circular(7),
@@ -163,42 +165,43 @@ class _PrimaryButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         alignment: Alignment.center,
-        child: busy
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: CkColors.paper,
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: CkType.body(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: fg,
+        child:
+            busy
+                ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: CkColors.paper,
+                  ),
+                )
+                : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: CkType.body(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: fg,
+                        ),
                       ),
                     ),
-                  ),
-                  if (!disabled) ...[
-                    const SizedBox(width: 8),
-                    V2Svg(
-                      ChIcons.arrow,
-                      size: 15,
-                      color: fg,
-                      strokeWidth: 2.2,
-                    ),
+                    if (!disabled) ...[
+                      const SizedBox(width: 8),
+                      V2Svg(
+                        ChIcons.arrow,
+                        size: 15,
+                        color: fg,
+                        strokeWidth: 2.2,
+                      ),
+                    ],
                   ],
-                ],
-              ),
+                ),
       ),
     );
   }

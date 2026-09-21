@@ -102,7 +102,8 @@ class CompletedSide {
   final int? wickets;
   final String? oversLabel;
 
-  String get scoreLabel => batted && runs != null ? '$runs/${wickets ?? 0}' : '';
+  String get scoreLabel =>
+      batted && runs != null ? '$runs/${wickets ?? 0}' : '';
 }
 
 /// The single band of colour on the screen, spent once.

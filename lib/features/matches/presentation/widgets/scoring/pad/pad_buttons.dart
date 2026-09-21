@@ -21,14 +21,16 @@ class RunButton extends StatelessWidget {
     final isSix = value == 6;
     final isDot = value == 0;
 
-    final bg = isFour
-        ? CkColors.greenSoft
-        : isSix
+    final bg =
+        isFour
+            ? CkColors.greenSoft
+            : isSix
             ? CkColors.ink
             : CkColors.surface;
-    final fg = isSix
-        ? CkColors.paper
-        : isFour
+    final fg =
+        isSix
+            ? CkColors.paper
+            : isFour
             ? const Color(0xFF1F5828)
             : CkColors.ink;
     final label = isDot ? '•' : '$value';
@@ -40,15 +42,16 @@ class RunButton extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(14),
         border: isSix ? null : Border.all(color: CkColors.hairline, width: 1),
-        boxShadow: isSix
-            ? const [
-                BoxShadow(
-                  color: Color(0x14281E0F),
-                  blurRadius: 28,
-                  offset: Offset(0, 8),
-                ),
-              ]
-            : null,
+        boxShadow:
+            isSix
+                ? const [
+                  BoxShadow(
+                    color: Color(0x14281E0F),
+                    blurRadius: 28,
+                    offset: Offset(0, 8),
+                  ),
+                ]
+                : null,
       ),
       alignment: Alignment.center,
       child: Text(
@@ -114,11 +117,7 @@ class WicketButton extends StatelessWidget {
 
 /// Single extra type button (Wide, No-ball, Bye, Leg-bye).
 class ExtraButton extends StatelessWidget {
-  const ExtraButton({
-    super.key,
-    required this.label,
-    required this.onTap,
-  });
+  const ExtraButton({super.key, required this.label, required this.onTap});
 
   final String label;
   final VoidCallback? onTap;

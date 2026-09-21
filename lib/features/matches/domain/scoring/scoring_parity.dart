@@ -65,8 +65,11 @@ ParityReport compareParity({
   check('ball.overNumber', predictedBall.overNumber, actualBall.overNumber);
   check('ball.ballInOver', predictedBall.ballInOver, actualBall.ballInOver);
   check('ball.isFreeHit', predictedBall.isFreeHit, actualBall.isFreeHit);
-  check('ball.isLegalDelivery', predictedBall.isLegalDelivery,
-      actualBall.isLegalDelivery);
+  check(
+    'ball.isLegalDelivery',
+    predictedBall.isLegalDelivery,
+    actualBall.isLegalDelivery,
+  );
   check('ball.ballKind', predictedBall.ballKind, actualBall.ballKind);
   check('ball.runsScored', predictedBall.runsScored, actualBall.runsScored);
   check('ball.extras', predictedBall.extras, actualBall.extras);
@@ -79,19 +82,37 @@ ParityReport compareParity({
   // rotated the wrong way is exactly the shape of the wide-attribution bug —
   // a right-looking scoreboard over a wrong scorecard.
   if (actualInnings != null) {
-    check('state.legalBallCount', predictedState.legalBallCount,
-        actualInnings.legalBallCount);
+    check(
+      'state.legalBallCount',
+      predictedState.legalBallCount,
+      actualInnings.legalBallCount,
+    );
     check('state.totalRuns', predictedState.totalRuns, actualInnings.totalRuns);
-    check('state.totalWickets', predictedState.totalWickets,
-        actualInnings.totalWickets);
-    check('state.totalExtras', predictedState.totalExtras,
-        actualInnings.totalExtras);
-    check('state.strikerId', predictedState.strikerId,
-        actualInnings.strikerId?.value);
-    check('state.nonStrikerId', predictedState.nonStrikerId,
-        actualInnings.nonStrikerId?.value);
-    check('state.bowlerId', predictedState.bowlerId,
-        actualInnings.bowlerId?.value);
+    check(
+      'state.totalWickets',
+      predictedState.totalWickets,
+      actualInnings.totalWickets,
+    );
+    check(
+      'state.totalExtras',
+      predictedState.totalExtras,
+      actualInnings.totalExtras,
+    );
+    check(
+      'state.strikerId',
+      predictedState.strikerId,
+      actualInnings.strikerId?.value,
+    );
+    check(
+      'state.nonStrikerId',
+      predictedState.nonStrikerId,
+      actualInnings.nonStrikerId?.value,
+    );
+    check(
+      'state.bowlerId',
+      predictedState.bowlerId,
+      actualInnings.bowlerId?.value,
+    );
   }
 
   return ParityReport(diffs);

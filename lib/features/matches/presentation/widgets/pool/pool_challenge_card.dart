@@ -107,8 +107,7 @@ class PoolChallengeCard extends StatelessWidget {
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.05,
-                    color:
-                        expiry.urgent ? CkColors.amberInk : CkColors.muted,
+                    color: expiry.urgent ? CkColors.amberInk : CkColors.muted,
                   ),
                 ),
               ],
@@ -190,7 +189,11 @@ String teamMonogram(Team? team) {
   if (override != null && override.isNotEmpty) return override.toUpperCase();
 
   final words =
-      team.name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+      team.name
+          .trim()
+          .split(RegExp(r'\s+'))
+          .where((w) => w.isNotEmpty)
+          .toList();
   if (words.length >= 2) {
     return '${words[0][0]}${words[1][0]}'.toUpperCase();
   }
@@ -228,8 +231,18 @@ String poolStartLabel(DateTime dt) {
 
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${days[dt.weekday - 1]}, ${months[dt.month - 1]} ${dt.day} · $time';
 }

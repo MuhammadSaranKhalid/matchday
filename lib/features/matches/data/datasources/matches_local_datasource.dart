@@ -104,10 +104,7 @@ abstract class MatchesLocalDataSource {
     required int inningsNumber,
   });
 
-  Future<void> pruneOps({
-    required String matchId,
-    required int inningsNumber,
-  });
+  Future<void> pruneOps({required String matchId, required int inningsNumber});
 
   // ── Match Hydration Cache (Offline-First) ────────────────────────────────
 
@@ -132,18 +129,18 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
   final AppDatabase _db;
 
   LocalScoringOp _toOp(ScoringOpRow r) => LocalScoringOp(
-        opId: r.opId,
-        matchId: r.matchId,
-        inningsNumber: r.inningsNumber,
-        localSeq: r.localSeq,
-        kind: r.kind,
-        payload: jsonDecode(r.payload) as Map<String, dynamic>,
-        createdAt: r.createdAt,
-        syncedAt: r.syncedAt,
-        refusedAt: r.refusedAt,
-        attempts: r.attempts,
-        lastError: r.lastError,
-      );
+    opId: r.opId,
+    matchId: r.matchId,
+    inningsNumber: r.inningsNumber,
+    localSeq: r.localSeq,
+    kind: r.kind,
+    payload: jsonDecode(r.payload) as Map<String, dynamic>,
+    createdAt: r.createdAt,
+    syncedAt: r.syncedAt,
+    refusedAt: r.refusedAt,
+    attempts: r.attempts,
+    lastError: r.lastError,
+  );
 
   @override
   Future<LocalScoringOp> appendOp({
@@ -152,43 +149,48 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
     required int inningsNumber,
     required String kind,
     required Map<String, dynamic> payload,
-  }) =>
-      _db.transaction(() async {
-        final last = await (_db.select(_db.scoringOps)
-              ..where((t) =>
-                  t.matchId.equals(matchId) &
-                  t.inningsNumber.equals(inningsNumber))
+  }) => _db.transaction(() async {
+    final last =
+        await (_db.select(_db.scoringOps)
+              ..where(
+                (t) =>
+                    t.matchId.equals(matchId) &
+                    t.inningsNumber.equals(inningsNumber),
+              )
               ..orderBy([(t) => OrderingTerm.desc(t.localSeq)])
               ..limit(1))
             .getSingleOrNull();
 
-        final row = ScoringOpRow(
-          opId: opId,
-          matchId: matchId,
-          inningsNumber: inningsNumber,
-          localSeq: (last?.localSeq ?? 0) + 1,
-          kind: kind,
-          payload: jsonEncode(payload),
-          createdAt: DateTime.now(),
-          attempts: 0,
-        );
-        await _db.into(_db.scoringOps).insert(row);
-        return _toOp(row);
-      });
+    final row = ScoringOpRow(
+      opId: opId,
+      matchId: matchId,
+      inningsNumber: inningsNumber,
+      localSeq: (last?.localSeq ?? 0) + 1,
+      kind: kind,
+      payload: jsonEncode(payload),
+      createdAt: DateTime.now(),
+      attempts: 0,
+    );
+    await _db.into(_db.scoringOps).insert(row);
+    return _toOp(row);
+  });
 
   @override
   Future<List<LocalScoringOp>> pendingOps({
     required String matchId,
     required int inningsNumber,
   }) async {
-    final rows = await (_db.select(_db.scoringOps)
-          ..where((t) =>
-              t.matchId.equals(matchId) &
-              t.inningsNumber.equals(inningsNumber) &
-              t.syncedAt.isNull() &
-              t.refusedAt.isNull())
-          ..orderBy([(t) => OrderingTerm.asc(t.localSeq)]))
-        .get();
+    final rows =
+        await (_db.select(_db.scoringOps)
+              ..where(
+                (t) =>
+                    t.matchId.equals(matchId) &
+                    t.inningsNumber.equals(inningsNumber) &
+                    t.syncedAt.isNull() &
+                    t.refusedAt.isNull(),
+              )
+              ..orderBy([(t) => OrderingTerm.asc(t.localSeq)]))
+            .get();
     return rows.map(_toOp).toList();
   }
 
@@ -197,13 +199,16 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
     required String matchId,
     required int inningsNumber,
   }) async {
-    final rows = await (_db.select(_db.scoringOps)
-          ..where((t) =>
-              t.matchId.equals(matchId) &
-              t.inningsNumber.equals(inningsNumber) &
-              t.refusedAt.isNotNull())
-          ..orderBy([(t) => OrderingTerm.asc(t.localSeq)]))
-        .get();
+    final rows =
+        await (_db.select(_db.scoringOps)
+              ..where(
+                (t) =>
+                    t.matchId.equals(matchId) &
+                    t.inningsNumber.equals(inningsNumber) &
+                    t.refusedAt.isNotNull(),
+              )
+              ..orderBy([(t) => OrderingTerm.asc(t.localSeq)]))
+            .get();
     return rows.map(_toOp).toList();
   }
 
@@ -211,34 +216,35 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
   Future<int> pendingOpsCount({
     required String matchId,
     required int inningsNumber,
-  }) =>
-      _db.pendingScoringOps(matchId: matchId, inningsNumber: inningsNumber);
+  }) => _db.pendingScoringOps(matchId: matchId, inningsNumber: inningsNumber);
 
   @override
-  Future<void> markOpSynced(String opId) =>
-      (_db.update(_db.scoringOps)..where((t) => t.opId.equals(opId)))
-          .write(ScoringOpsCompanion(syncedAt: Value(DateTime.now())));
+  Future<void> markOpSynced(String opId) => (_db.update(_db.scoringOps)..where(
+    (t) => t.opId.equals(opId),
+  )).write(ScoringOpsCompanion(syncedAt: Value(DateTime.now())));
 
   @override
   Future<void> markOpFailed(String opId, String error) async {
-    final row = await (_db.select(_db.scoringOps)
-          ..where((t) => t.opId.equals(opId)))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.scoringOps)
+          ..where((t) => t.opId.equals(opId))).getSingleOrNull();
     if (row == null) return;
-    await (_db.update(_db.scoringOps)..where((t) => t.opId.equals(opId)))
-        .write(ScoringOpsCompanion(
-      attempts: Value(row.attempts + 1),
-      lastError: Value(error),
-    ));
+    await (_db.update(_db.scoringOps)..where((t) => t.opId.equals(opId))).write(
+      ScoringOpsCompanion(
+        attempts: Value(row.attempts + 1),
+        lastError: Value(error),
+      ),
+    );
   }
 
   @override
   Future<void> markOpRefused(String opId, String reason) =>
-      (_db.update(_db.scoringOps)..where((t) => t.opId.equals(opId)))
-          .write(ScoringOpsCompanion(
-        refusedAt: Value(DateTime.now()),
-        lastError: Value(reason),
-      ));
+      (_db.update(_db.scoringOps)..where((t) => t.opId.equals(opId))).write(
+        ScoringOpsCompanion(
+          refusedAt: Value(DateTime.now()),
+          lastError: Value(reason),
+        ),
+      );
 
   @override
   Future<void> discardOp(String opId) =>
@@ -250,27 +256,28 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
     required int inningsNumber,
     required Map<String, dynamic> state,
     required int throughSeq,
-  }) =>
-      _db.into(_db.scoringSnapshots).insertOnConflictUpdate(
-            ScoringSnapshotRow(
-              matchId: matchId,
-              inningsNumber: inningsNumber,
-              state: jsonEncode(state),
-              throughSeq: throughSeq,
-              updatedAt: DateTime.now(),
-            ),
-          );
+  }) => _db
+      .into(_db.scoringSnapshots)
+      .insertOnConflictUpdate(
+        ScoringSnapshotRow(
+          matchId: matchId,
+          inningsNumber: inningsNumber,
+          state: jsonEncode(state),
+          throughSeq: throughSeq,
+          updatedAt: DateTime.now(),
+        ),
+      );
 
   @override
   Future<({Map<String, dynamic> state, int throughSeq})?> getSnapshot({
     required String matchId,
     required int inningsNumber,
   }) async {
-    final row = await (_db.select(_db.scoringSnapshots)
-          ..where((t) =>
-              t.matchId.equals(matchId) &
-              t.inningsNumber.equals(inningsNumber)))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.scoringSnapshots)..where(
+          (t) =>
+              t.matchId.equals(matchId) & t.inningsNumber.equals(inningsNumber),
+        )).getSingleOrNull();
     if (row == null) return null;
     return (
       state: jsonDecode(row.state) as Map<String, dynamic>,
@@ -286,36 +293,35 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
     required String matchId,
     required int inningsNumber,
   }) async {
-    await (_db.delete(_db.scoringOps)
-          ..where((t) =>
-              t.matchId.equals(matchId) &
-              t.inningsNumber.equals(inningsNumber) &
-              t.syncedAt.isNotNull()))
-        .go();
+    await (_db.delete(_db.scoringOps)..where(
+      (t) =>
+          t.matchId.equals(matchId) &
+          t.inningsNumber.equals(inningsNumber) &
+          t.syncedAt.isNotNull(),
+    )).go();
   }
 
   // ── Match Hydration Cache Implementation ──────────────────────────────────
 
   @override
-  Future<void> cacheMatch(MatchDto match) =>
-      _db.into(_db.cachedMatches).insertOnConflictUpdate(
-            CachedMatchRow(
-              matchId: match.matchId,
-              payload: jsonEncode(match.toJson()),
-              updatedAt: DateTime.now(),
-            ),
-          );
+  Future<void> cacheMatch(MatchDto match) => _db
+      .into(_db.cachedMatches)
+      .insertOnConflictUpdate(
+        CachedMatchRow(
+          matchId: match.matchId,
+          payload: jsonEncode(match.toJson()),
+          updatedAt: DateTime.now(),
+        ),
+      );
 
   @override
   Future<MatchDto?> getCachedMatch(String matchId) async {
-    final row = await (_db.select(_db.cachedMatches)
-          ..where((t) => t.matchId.equals(matchId)))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.cachedMatches)
+          ..where((t) => t.matchId.equals(matchId))).getSingleOrNull();
     if (row == null) return null;
     try {
-      return MatchDto.fromJson(
-        jsonDecode(row.payload) as Map<String, dynamic>,
-      );
+      return MatchDto.fromJson(jsonDecode(row.payload) as Map<String, dynamic>);
     } catch (_) {
       return null;
     }
@@ -325,20 +331,21 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
   Future<void> cacheMatchPlayers(
     String matchId,
     List<MatchPlayerDto> players,
-  ) =>
-      _db.into(_db.cachedMatchPlayers).insertOnConflictUpdate(
-            CachedMatchPlayersRow(
-              matchId: matchId,
-              payload: jsonEncode(players.map((p) => p.toJson()).toList()),
-              updatedAt: DateTime.now(),
-            ),
-          );
+  ) => _db
+      .into(_db.cachedMatchPlayers)
+      .insertOnConflictUpdate(
+        CachedMatchPlayersRow(
+          matchId: matchId,
+          payload: jsonEncode(players.map((p) => p.toJson()).toList()),
+          updatedAt: DateTime.now(),
+        ),
+      );
 
   @override
   Future<List<MatchPlayerDto>> getCachedMatchPlayers(String matchId) async {
-    final row = await (_db.select(_db.cachedMatchPlayers)
-          ..where((t) => t.matchId.equals(matchId)))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.cachedMatchPlayers)
+          ..where((t) => t.matchId.equals(matchId))).getSingleOrNull();
     if (row == null) return const [];
     try {
       final list = jsonDecode(row.payload) as List<dynamic>;
@@ -351,11 +358,10 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
   }
 
   @override
-  Future<void> cacheInningsState(
-    String matchId,
-    MatchInningsStateDto state,
-  ) =>
-      _db.into(_db.cachedInningsStates).insertOnConflictUpdate(
+  Future<void> cacheInningsState(String matchId, MatchInningsStateDto state) =>
+      _db
+          .into(_db.cachedInningsStates)
+          .insertOnConflictUpdate(
             CachedInningsStateRow(
               matchId: matchId,
               inningsNumber: state.inningsNumber,
@@ -369,11 +375,11 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
     required String matchId,
     required int inningsNumber,
   }) async {
-    final row = await (_db.select(_db.cachedInningsStates)
-          ..where((t) =>
-              t.matchId.equals(matchId) &
-              t.inningsNumber.equals(inningsNumber)))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.cachedInningsStates)..where(
+          (t) =>
+              t.matchId.equals(matchId) & t.inningsNumber.equals(inningsNumber),
+        )).getSingleOrNull();
     if (row == null) return null;
     try {
       return MatchInningsStateDto.fromJson(
@@ -388,4 +394,3 @@ class MatchesLocalDataSourceImpl implements MatchesLocalDataSource {
 @Riverpod(keepAlive: true)
 MatchesLocalDataSource matchesLocalDataSource(Ref ref) =>
     MatchesLocalDataSourceImpl(ref.watch(appDatabaseProvider));
-

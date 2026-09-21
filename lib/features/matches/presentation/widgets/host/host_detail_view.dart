@@ -50,12 +50,14 @@ class HostDetailView extends ConsumerWidget {
       timeLabel: '',
     );
 
-    final pending = applications
-        .where((a) => a.status == PoolApplicationStatus.pending)
-        .toList();
-    final settled = applications
-        .where((a) => a.status != PoolApplicationStatus.pending)
-        .toList();
+    final pending =
+        applications
+            .where((a) => a.status == PoolApplicationStatus.pending)
+            .toList();
+    final settled =
+        applications
+            .where((a) => a.status != PoolApplicationStatus.pending)
+            .toList();
     final waiting = applications.isEmpty;
 
     return Column(
@@ -73,40 +75,46 @@ class HostDetailView extends ConsumerWidget {
         Expanded(
           child: ListView(
             padding: EdgeInsets.zero,
-            children: waiting
-                ? [
-                    _WaitingHeader(item: item),
-                    _SpecTable(item: item),
-                    const HostSectionLabel('Applicants · 0'),
-                    _WaitingCard(code: request.shareCode),
-                    const SizedBox(height: 20),
-                  ]
-                : [
-                    HostSectionLabel(
-                      'Applicants · ${applications.length}',
-                      padding: const EdgeInsets.fromLTRB(16, 15, 16, 8),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        children: [
-                          for (final app in [...pending, ...settled]) ...[
-                            _ApplicantRow(
-                              application: app,
-                              playersPerSide: request.playersPerSide,
-                              onTap: () => onOpenApplicant(app),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                        ],
+            children:
+                waiting
+                    ? [
+                      _WaitingHeader(item: item),
+                      _SpecTable(item: item),
+                      const HostSectionLabel('Applicants · 0'),
+                      _WaitingCard(code: request.shareCode),
+                      const SizedBox(height: 20),
+                    ]
+                    : [
+                      HostSectionLabel(
+                        'Applicants · ${applications.length}',
+                        padding: const EdgeInsets.fromLTRB(16, 15, 16, 8),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: [
+                            for (final app in [...pending, ...settled]) ...[
+                              _ApplicantRow(
+                                application: app,
+                                playersPerSide: request.playersPerSide,
+                                onTap: () => onOpenApplicant(app),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
           ),
         ),
         HostBottomBar(
-          padding: EdgeInsets.fromLTRB(16, waiting ? 14 : 12, 16, waiting ? 20 : 18),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            waiting ? 14 : 12,
+            16,
+            waiting ? 20 : 18,
+          ),
           child: WithdrawLink(onTap: onWithdraw),
         ),
       ],
@@ -193,8 +201,7 @@ class _ContextBar extends StatelessWidget {
     final team = item.fromTeam;
     final start = item.startTime;
     final summary = [
-      if (item.request.proposedFormat?.oversPerInnings case final o?
-          when o > 0)
+      if (item.request.proposedFormat?.oversPerInnings case final o? when o > 0)
         '$o ov',
       switch (item.ballType.wire) {
         'leather' => 'Leather',
@@ -319,19 +326,20 @@ class _SpecTable extends StatelessWidget {
   }
 
   static TextStyle get _value => CkType.display(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: CkColors.ink,
-        letterSpacing: 0,
-      );
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: CkColors.ink,
+    letterSpacing: 0,
+  );
 
   Widget _row(String label, Widget value, {bool first = false}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
       decoration: BoxDecoration(
-        border: first
-            ? null
-            : const Border(top: BorderSide(color: CkColors.hairline)),
+        border:
+            first
+                ? null
+                : const Border(top: BorderSide(color: CkColors.hairline)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,24 +485,23 @@ class _DashedRoundedBorder extends ShapeBorder {
 
   @override
   Path getOuterPath(Rect rect, {TextDirection? textDirection}) =>
-      Path()..addRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(radius)),
-      );
+      Path()..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
 
   @override
   void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = width;
+    final paint =
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width;
 
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          rect.deflate(width / 2),
-          Radius.circular(radius),
-        ),
-      );
+    final path =
+        Path()..addRRect(
+          RRect.fromRectAndRadius(
+            rect.deflate(width / 2),
+            Radius.circular(radius),
+          ),
+        );
 
     for (final metric in path.computeMetrics()) {
       var distance = 0.0;
@@ -535,9 +542,7 @@ class _ApplicantRow extends ConsumerWidget {
       decoration: BoxDecoration(
         color: CkColors.paper,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: pending ? CkColors.line : CkColors.hairline,
-        ),
+        border: Border.all(color: pending ? CkColors.line : CkColors.hairline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -650,9 +655,10 @@ String applicantSummary(
   required int playersPerSide,
 }) {
   final named = app.applicantXi.length;
-  final squad = named == 0
-      ? 'No XI named'
-      : named >= playersPerSide
+  final squad =
+      named == 0
+          ? 'No XI named'
+          : named >= playersPerSide
           ? 'Full squad'
           : '$named named';
   return '$squad · applied ${compactAgo(app.createdAt)}';

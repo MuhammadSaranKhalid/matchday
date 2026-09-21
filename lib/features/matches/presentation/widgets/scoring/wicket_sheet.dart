@@ -25,7 +25,8 @@ class WicketResult {
 enum _WicketStage { type, fielder, runout, batter }
 
 class WicketSheet extends StatefulWidget {
-  const WicketSheet({super.key, 
+  const WicketSheet({
+    super.key,
     required this.overs,
     required this.totalRuns,
     required this.totalWickets,
@@ -84,12 +85,13 @@ class _WicketSheetState extends State<WicketSheet> {
   /// sheet does not offer them on any delivery, free hit or not.
   static const _freeHitTypes = [WicketType.runOut, WicketType.hitWicket];
 
-  List<(WicketType, String, String)> get _types => widget.freeHit
-      ? [
-          for (final t in _allTypes)
-            if (_freeHitTypes.contains(t.$1)) t,
-        ]
-      : _allTypes;
+  List<(WicketType, String, String)> get _types =>
+      widget.freeHit
+          ? [
+            for (final t in _allTypes)
+              if (_freeHitTypes.contains(t.$1)) t,
+          ]
+          : _allTypes;
 
   bool get _needsFielder =>
       _type == WicketType.caught || _type == WicketType.stumped;
@@ -129,8 +131,7 @@ class _WicketSheetState extends State<WicketSheet> {
       }
       return;
     }
-    if (_stage == _WicketStage.fielder ||
-        _stage == _WicketStage.runout) {
+    if (_stage == _WicketStage.fielder || _stage == _WicketStage.runout) {
       setState(() => _stage = _WicketStage.batter);
       return;
     }
@@ -172,15 +173,13 @@ class _WicketSheetState extends State<WicketSheet> {
                       child: Container(
                         height: 3,
                         decoration: BoxDecoration(
-                          color: i <= activeIdx
-                              ? CkColors.red
-                              : CkColors.paper2,
+                          color:
+                              i <= activeIdx ? CkColors.red : CkColors.paper2,
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
                     ),
-                    if (i != stages.length - 1)
-                      const SizedBox(width: 5),
+                    if (i != stages.length - 1) const SizedBox(width: 5),
                   ],
                 ],
               ),
@@ -194,8 +193,7 @@ class _WicketSheetState extends State<WicketSheet> {
               children: [
                 Expanded(
                   child: SheetGhostButton(
-                    label:
-                        _stage == _WicketStage.type ? 'Cancel' : 'Back',
+                    label: _stage == _WicketStage.type ? 'Cancel' : 'Back',
                     onTap: () {
                       if (_stage == _WicketStage.type) {
                         Navigator.of(context).pop();
@@ -223,36 +221,38 @@ class _WicketSheetState extends State<WicketSheet> {
   }
 
   List<Widget> _typeStage() => [
-        SheetHead(
-          kicker: widget.freeHit
+    SheetHead(
+      kicker:
+          widget.freeHit
               ? 'FREE HIT · ${widget.overs} · ${widget.totalRuns}/${widget.totalWickets}'
               : 'WICKET · ${widget.overs} · ${widget.totalRuns}/${widget.totalWickets}',
-          kickerColor: CkColors.red,
-          title: 'How was the batter out?',
-          subtitle: widget.freeHit
+      kickerColor: CkColors.red,
+      title: 'How was the batter out?',
+      subtitle:
+          widget.freeHit
               ? '${widget.strikerName} on strike · free hit — only a run-out '
                   'or hit wicket can dismiss.'
               : '${widget.strikerName} on strike · bowler ${widget.bowlerName}',
-        ),
-        GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 6,
-          mainAxisSpacing: 6,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 2.4,
-          children: [
-            for (final entry in _types)
-              SheetChoiceButton(
-                title: entry.$2,
-                subtitle: entry.$3,
-                active: _type == entry.$1,
-                onTap: () => setState(() => _type = entry.$1),
-                tone: SheetChoiceTone.red,
-              ),
-          ],
-        ),
-      ];
+    ),
+    GridView.count(
+      crossAxisCount: 2,
+      crossAxisSpacing: 6,
+      mainAxisSpacing: 6,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      childAspectRatio: 2.4,
+      children: [
+        for (final entry in _types)
+          SheetChoiceButton(
+            title: entry.$2,
+            subtitle: entry.$3,
+            active: _type == entry.$1,
+            onTap: () => setState(() => _type = entry.$1),
+            tone: SheetChoiceTone.red,
+          ),
+      ],
+    ),
+  ];
 
   List<Widget> _fielderStage() {
     final isStumped = _type == WicketType.stumped;
@@ -261,8 +261,7 @@ class _WicketSheetState extends State<WicketSheet> {
         kicker: isStumped ? 'STUMPED BY' : 'CAUGHT BY',
         kickerColor: CkColors.red,
         title: isStumped ? 'Who stumped them?' : 'Who took the catch?',
-        subtitle:
-            '${widget.strikerName} · b ${widget.bowlerName}',
+        subtitle: '${widget.strikerName} · b ${widget.bowlerName}',
       ),
       SheetPersonGrid(
         people: widget.fielders,

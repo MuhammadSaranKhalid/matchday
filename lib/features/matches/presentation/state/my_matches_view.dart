@@ -24,12 +24,12 @@ class MyMatchesView {
   });
 
   const MyMatchesView.empty()
-      : confirmed = const [],
-        past = const [],
-        totalPastCount = 0,
-        pendingRequestsCount = 0,
-        sent = const [],
-        inbound = const [];
+    : confirmed = const [],
+      past = const [],
+      totalPastCount = 0,
+      pendingRequestsCount = 0,
+      sent = const [],
+      inbound = const [];
 
   final List<MyMatchConfirmed> confirmed;
   final List<MyMatchPast> past;
@@ -294,7 +294,7 @@ class MyMatchPast {
   switch (kind) {
     case MatchRoleKind.captain:
       return (
-        label: match.status.isLive ? 'Captain · Live' : 'Captain · pick XI',
+        label: match.status.isLive ? 'Captain · Live' : 'Captain',
         urgent: isToday || match.status.isLive,
       );
     case MatchRoleKind.scoring:
@@ -304,7 +304,10 @@ class MyMatchPast {
       );
     case MatchRoleKind.xi:
       return (
-        label: match.status.isLive ? 'In Playing XI · Playing now' : 'Selected in XI',
+        label:
+            match.status.isLive
+                ? 'In Playing XI · Playing now'
+                : 'Selected in XI',
         urgent: isToday,
       );
     case MatchRoleKind.optional:

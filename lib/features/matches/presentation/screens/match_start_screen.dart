@@ -36,13 +36,10 @@ class MatchStartScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.listen(
-      matchStartControllerProvider(matchId),
-      (prev, next) {
-        final state = next.value;
-        if (state != null) _handleRedirect(context, state);
-      },
-    );
+    ref.listen(matchStartControllerProvider(matchId), (prev, next) {
+      final state = next.value;
+      if (state != null) _handleRedirect(context, state);
+    });
 
     final async = ref.watch(matchStartControllerProvider(matchId));
 
@@ -63,10 +60,11 @@ class MatchStartScreen extends ConsumerWidget {
                 MatchStartHeader(state: state),
                 Expanded(
                   child: switch (state.phase) {
-                    MatchStartPhase.toss =>
-                      MatchStartTossStage(matchId: matchId, state: state),
-                    MatchStartPhase.lineup ||
-                    MatchStartPhase.ready =>
+                    MatchStartPhase.toss => MatchStartTossStage(
+                      matchId: matchId,
+                      state: state,
+                    ),
+                    MatchStartPhase.lineup || MatchStartPhase.ready =>
                       MatchStartLineupStage(matchId: matchId, state: state),
                     MatchStartPhase.live => const SizedBox.shrink(),
                   },
@@ -84,14 +82,13 @@ class MatchStartScreen extends ConsumerWidget {
   /// Where a match that is no longer in setup belongs, or null while it is
   /// still on its way to the first ball.
   String? _terminalRoute(Match match) => switch (match.status) {
-        MatchStatus.completed ||
-        MatchStatus.abandoned ||
-        MatchStatus.walkover =>
-          '/matches/$matchId/result',
-        // Innings 2 setup has its own screen until phase 3 unifies them.
-        MatchStatus.inningsBreak => '/matches/$matchId/innings-break',
-        _ => null,
-      };
+    MatchStatus.completed ||
+    MatchStatus.abandoned ||
+    MatchStatus.walkover => '/matches/$matchId/result',
+    // Innings 2 setup has its own screen until phase 3 unifies them.
+    MatchStatus.inningsBreak => '/matches/$matchId/innings-break',
+    _ => null,
+  };
 }
 
 class _ErrorView extends StatelessWidget {

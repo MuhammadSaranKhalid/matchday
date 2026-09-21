@@ -24,25 +24,25 @@ class BallPill extends StatelessWidget {
       _ when b.isSix => (CkColors.ink, CkColors.paper, '6'),
       _ when b.isFour => (CkColors.greenSoft, CkColors.green, '4'),
       _ when b.ballKind == BallKind.wide => (
-          CkColors.cream,
-          CkColors.ink2,
-          b.totalRuns > 1 ? '${b.totalRuns}wd' : 'wd'
-        ),
+        CkColors.cream,
+        CkColors.ink2,
+        b.totalRuns > 1 ? '${b.totalRuns}wd' : 'wd',
+      ),
       _ when b.ballKind == BallKind.noBall => (
-          CkColors.cream,
-          CkColors.ink2,
-          b.totalRuns > 1 ? '${b.totalRuns}nb' : 'nb'
-        ),
+        CkColors.cream,
+        CkColors.ink2,
+        b.totalRuns > 1 ? '${b.totalRuns}nb' : 'nb',
+      ),
       _ when b.ballKind == BallKind.bye => (
-          CkColors.paper2,
-          CkColors.ink2,
-          b.extras > 1 ? '${b.extras}b' : 'b'
-        ),
+        CkColors.paper2,
+        CkColors.ink2,
+        b.extras > 1 ? '${b.extras}b' : 'b',
+      ),
       _ when b.ballKind == BallKind.legBye => (
-          CkColors.paper2,
-          CkColors.ink2,
-          b.extras > 1 ? '${b.extras}lb' : 'lb'
-        ),
+        CkColors.paper2,
+        CkColors.ink2,
+        b.extras > 1 ? '${b.extras}lb' : 'lb',
+      ),
       _ when b.runsScored == 0 => (CkColors.paper2, CkColors.muted, '•'),
       _ => (CkColors.surface, CkColors.ink, '${b.runsScored}'),
     };
@@ -56,9 +56,14 @@ class BallPill extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-      child: Text(label,
-          style: CkType.mono(
-              fontSize: size * 0.42, fontWeight: FontWeight.w700, color: fg)),
+      child: Text(
+        label,
+        style: CkType.mono(
+          fontSize: size * 0.42,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
     );
   }
 }

@@ -26,9 +26,10 @@ class LineupSlotCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final filled = value != null;
-    final border = hot && filled
-        ? CkColors.red
-        : filled
+    final border =
+        hot && filled
+            ? CkColors.red
+            : filled
             ? CkColors.ink
             : CkColors.hairline;
     return Container(
@@ -41,13 +42,15 @@ class LineupSlotCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: CkType.mono(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.08,
-                color: hot && filled ? CkColors.red : CkColors.muted,
-              )),
+          Text(
+            label,
+            style: CkType.mono(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.08,
+              color: hot && filled ? CkColors.red : CkColors.muted,
+            ),
+          ),
           const SizedBox(height: 4),
           Text(
             value ?? '— tap below —',
@@ -97,64 +100,64 @@ class LineupRosterRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
           color: badge != null ? CkColors.paper2 : CkColors.paper,
-          border: const Border(
-            top: BorderSide(color: CkColors.hairline),
-          ),
+          border: const Border(top: BorderSide(color: CkColors.hairline)),
         ),
-        child: Row(children: [
-          Avatar(
-            mono: personInitials(name),
-            imageUrl: photoUrl,
-            size: 28,
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              name,
-              overflow: TextOverflow.ellipsis,
-              style: CkType.display(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          if (badge != null) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: badge == 'STR'
-                    ? CkColors.red
-                    : badge == 'NS'
-                        ? CkColors.ink
-                        : _bowlerBadge,
-                borderRadius: BorderRadius.circular(4),
-              ),
+        child: Row(
+          children: [
+            Avatar(mono: personInitials(name), imageUrl: photoUrl, size: 28),
+            const SizedBox(width: 12),
+            Flexible(
               child: Text(
-                badge!,
-                style: CkType.mono(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.08,
-                  color: CkColors.paper,
+                name,
+                overflow: TextOverflow.ellipsis,
+                style: CkType.display(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-          ],
-          const Spacer(),
-          if (jersey != null)
-            Text('#$jersey',
+            if (badge != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color:
+                      badge == 'STR'
+                          ? CkColors.red
+                          : badge == 'NS'
+                          ? CkColors.ink
+                          : _bowlerBadge,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  badge!,
+                  style: CkType.mono(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.08,
+                    color: CkColors.paper,
+                  ),
+                ),
+              ),
+            ],
+            const Spacer(),
+            if (jersey != null)
+              Text(
+                '#$jersey',
                 style: CkType.mono(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.04,
                   color: CkColors.muted,
-                )),
-        ]),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
-const _bowlerBadge = Color(0xFF1A6A2E); // green, matches the scoring bowler chip
+const _bowlerBadge = Color(
+  0xFF1A6A2E,
+); // green, matches the scoring bowler chip

@@ -55,9 +55,10 @@ class BowlerSpell extends Equatable {
   final int runs;
   final int wickets;
 
-  double get economy => (overs + (ballsThisOver / 6.0)) > 0
-      ? runs / (overs + (ballsThisOver / 6.0))
-      : 0.0;
+  double get economy =>
+      (overs + (ballsThisOver / 6.0)) > 0
+          ? runs / (overs + (ballsThisOver / 6.0))
+          : 0.0;
 
   static const none = BowlerSpell();
 
@@ -67,10 +68,7 @@ class BowlerSpell extends Equatable {
 
 /// Current partnership stats between the two active batters.
 class PartnershipStats extends Equatable {
-  const PartnershipStats({
-    this.runs = 0,
-    this.balls = 0,
-  });
+  const PartnershipStats({this.runs = 0, this.balls = 0});
 
   final int runs;
   final int balls;
@@ -99,15 +97,14 @@ class PartnershipStats extends Equatable {
 /// Whether a dismissal is credited to the bowler. Run-outs and the like are
 /// not.
 bool creditedToBowler(WicketType? kind) => switch (kind) {
-      null => false,
-      WicketType.runOut ||
-      WicketType.obstructing ||
-      WicketType.handledBall ||
-      WicketType.retiredHurt ||
-      WicketType.timedOut =>
-        false,
-      _ => true,
-    };
+  null => false,
+  WicketType.runOut ||
+  WicketType.obstructing ||
+  WicketType.handledBall ||
+  WicketType.retiredHurt ||
+  WicketType.timedOut => false,
+  _ => true,
+};
 
 /// [matchPlayerId]'s figures from the deliveries they faced.
 BatterStats batterStatsFor(List<Ball> balls, String? matchPlayerId) {

@@ -8,14 +8,78 @@ part of 'match_detail_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Match Detail provider.
+///
+/// IMPORTANT ARCHITECTURE:
+///
+/// The OLD implementation primarily converted:
+///
+/// MyMatchesView -> PvMatch
+///
+/// That is a list-card projection and throws away important match state and
+/// effective capabilities.
+///
+/// Real fixtures are now built from:
+///
+/// Match
+/// + teams
+/// + viewer memberships
+/// + current Cricket phase
+/// + effective RBAC
+///
+/// Pending challenge/request IDs still fall back to MyMatchesView because they
+/// are not yet real `matches` rows.
 
 @ProviderFor(matchDetail)
 final matchDetailProvider = MatchDetailFamily._();
+
+/// Match Detail provider.
+///
+/// IMPORTANT ARCHITECTURE:
+///
+/// The OLD implementation primarily converted:
+///
+/// MyMatchesView -> PvMatch
+///
+/// That is a list-card projection and throws away important match state and
+/// effective capabilities.
+///
+/// Real fixtures are now built from:
+///
+/// Match
+/// + teams
+/// + viewer memberships
+/// + current Cricket phase
+/// + effective RBAC
+///
+/// Pending challenge/request IDs still fall back to MyMatchesView because they
+/// are not yet real `matches` rows.
 
 final class MatchDetailProvider
     extends
         $FunctionalProvider<AsyncValue<PvMatch?>, PvMatch?, FutureOr<PvMatch?>>
     with $FutureModifier<PvMatch?>, $FutureProvider<PvMatch?> {
+  /// Match Detail provider.
+  ///
+  /// IMPORTANT ARCHITECTURE:
+  ///
+  /// The OLD implementation primarily converted:
+  ///
+  /// MyMatchesView -> PvMatch
+  ///
+  /// That is a list-card projection and throws away important match state and
+  /// effective capabilities.
+  ///
+  /// Real fixtures are now built from:
+  ///
+  /// Match
+  /// + teams
+  /// + viewer memberships
+  /// + current Cricket phase
+  /// + effective RBAC
+  ///
+  /// Pending challenge/request IDs still fall back to MyMatchesView because they
+  /// are not yet real `matches` rows.
   MatchDetailProvider._({
     required MatchDetailFamily super.from,
     required String super.argument,
@@ -59,7 +123,29 @@ final class MatchDetailProvider
   }
 }
 
-String _$matchDetailHash() => r'34d04e3e333a6a5410048a638163e90fe054171e';
+String _$matchDetailHash() => r'b69af523cdeabbd5a75233bbbb44a45e0299e319';
+
+/// Match Detail provider.
+///
+/// IMPORTANT ARCHITECTURE:
+///
+/// The OLD implementation primarily converted:
+///
+/// MyMatchesView -> PvMatch
+///
+/// That is a list-card projection and throws away important match state and
+/// effective capabilities.
+///
+/// Real fixtures are now built from:
+///
+/// Match
+/// + teams
+/// + viewer memberships
+/// + current Cricket phase
+/// + effective RBAC
+///
+/// Pending challenge/request IDs still fall back to MyMatchesView because they
+/// are not yet real `matches` rows.
 
 final class MatchDetailFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<PvMatch?>, String> {
@@ -71,6 +157,28 @@ final class MatchDetailFamily extends $Family
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
+
+  /// Match Detail provider.
+  ///
+  /// IMPORTANT ARCHITECTURE:
+  ///
+  /// The OLD implementation primarily converted:
+  ///
+  /// MyMatchesView -> PvMatch
+  ///
+  /// That is a list-card projection and throws away important match state and
+  /// effective capabilities.
+  ///
+  /// Real fixtures are now built from:
+  ///
+  /// Match
+  /// + teams
+  /// + viewer memberships
+  /// + current Cricket phase
+  /// + effective RBAC
+  ///
+  /// Pending challenge/request IDs still fall back to MyMatchesView because they
+  /// are not yet real `matches` rows.
 
   MatchDetailProvider call(String matchId) =>
       MatchDetailProvider._(argument: matchId, from: this);

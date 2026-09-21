@@ -10,6 +10,7 @@ const ACTIONS = new Set<Action>([
   "record_toss",
   "submit_match_openers",
   "start_match_now",
+  "cancel_match",
   "start_innings",
   "undo_last_ball",
   "complete_cricket_match",

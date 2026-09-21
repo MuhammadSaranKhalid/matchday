@@ -31,6 +31,7 @@ class StepReview extends StatelessWidget {
   final String formatLine;
   final String whenLine;
   final String whereLine;
+
   /// Null on a friendly or open challenge, which settles scheduling only —
   /// the XI is picked at the ground, so there is nothing to review here.
   final String? xiLine;
@@ -95,7 +96,12 @@ class StepReview extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: Column(
             children: [
-              _Row(label: 'Format', value: formatLine, onEdit: onEditFormat, first: true),
+              _Row(
+                label: 'Format',
+                value: formatLine,
+                onEdit: onEditFormat,
+                first: true,
+              ),
               _Row(label: 'When', value: whenLine, onEdit: onEditWhen),
               _Row(label: 'Where', value: whereLine, onEdit: onEditWhere),
               if (xiLine case final line?)
@@ -166,11 +172,11 @@ class StepReview extends StatelessWidget {
   }
 
   static TextStyle get _strong => CkType.body(
-        fontSize: 11.5,
-        height: 1.5,
-        fontWeight: FontWeight.w600,
-        color: CkColors.ink2,
-      );
+    fontSize: 11.5,
+    height: 1.5,
+    fontWeight: FontWeight.w600,
+    color: CkColors.ink2,
+  );
 }
 
 class _Row extends StatelessWidget {
@@ -194,9 +200,10 @@ class _Row extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
         decoration: BoxDecoration(
-          border: first
-              ? null
-              : const Border(top: BorderSide(color: CkColors.hairline)),
+          border:
+              first
+                  ? null
+                  : const Border(top: BorderSide(color: CkColors.hairline)),
         ),
         child: Row(
           children: [

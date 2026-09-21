@@ -55,8 +55,10 @@ class MatchRequestsRemoteDataSource {
       if (fromTeamKeeperId != null) 'p_from_team_keeper_id': fromTeamKeeperId,
     };
     try {
-      final res =
-          await _supabase.functions.invoke('send-match-request', body: body);
+      final res = await _supabase.functions.invoke(
+        'send-match-request',
+        body: body,
+      );
       final data = res.data;
       if (data is Map && data['request_id'] is String) {
         return data['request_id'] as String;
@@ -80,18 +82,21 @@ class MatchRequestsRemoteDataSource {
     String? toTeamKeeperId,
   }) async {
     try {
-      final result =
-          await _supabase.rpc<dynamic>('accept_match_request', params: {
-        'p_request_id': requestId,
-        if (scheduledStartTime != null)
-          'p_scheduled_start_time': scheduledStartTime.toUtc().toIso8601String(),
-        if (venue != null) 'p_venue': venue,
-        if (format != null) 'p_format': MatchRequestDto.formatToJson(format),
-        if (decisionNote != null) 'p_decision_note': decisionNote,
-        if (toTeamId != null) 'p_to_team_id': toTeamId,
-        'p_to_team_xi': toTeamXi,
-        if (toTeamKeeperId != null) 'p_to_team_keeper_id': toTeamKeeperId,
-      });
+      final result = await _supabase.rpc<dynamic>(
+        'accept_match_request',
+        params: {
+          'p_request_id': requestId,
+          if (scheduledStartTime != null)
+            'p_scheduled_start_time':
+                scheduledStartTime.toUtc().toIso8601String(),
+          if (venue != null) 'p_venue': venue,
+          if (format != null) 'p_format': MatchRequestDto.formatToJson(format),
+          if (decisionNote != null) 'p_decision_note': decisionNote,
+          if (toTeamId != null) 'p_to_team_id': toTeamId,
+          'p_to_team_xi': toTeamXi,
+          if (toTeamKeeperId != null) 'p_to_team_keeper_id': toTeamKeeperId,
+        },
+      );
       if (result is String) return result;
       if (result is List && result.isNotEmpty) return result.first.toString();
       return null;
@@ -109,17 +114,21 @@ class MatchRequestsRemoteDataSource {
     String? decisionNote,
   }) async {
     try {
-      await _supabase.rpc<void>('counter_match_request', params: {
-        'p_request_id': requestId,
-        if (counteredStartTime != null)
-          'p_countered_start_time': counteredStartTime.toUtc().toIso8601String(),
-        if (counteredVenue != null) 'p_countered_venue': counteredVenue,
-        if (counteredFormat != null)
-          'p_countered_format': MatchRequestDto.formatToJson(counteredFormat),
-        if (counteredPlayersPerSide != null)
-          'p_countered_players_per_side': counteredPlayersPerSide,
-        if (decisionNote != null) 'p_decision_note': decisionNote,
-      });
+      await _supabase.rpc<void>(
+        'counter_match_request',
+        params: {
+          'p_request_id': requestId,
+          if (counteredStartTime != null)
+            'p_countered_start_time':
+                counteredStartTime.toUtc().toIso8601String(),
+          if (counteredVenue != null) 'p_countered_venue': counteredVenue,
+          if (counteredFormat != null)
+            'p_countered_format': MatchRequestDto.formatToJson(counteredFormat),
+          if (counteredPlayersPerSide != null)
+            'p_countered_players_per_side': counteredPlayersPerSide,
+          if (decisionNote != null) 'p_decision_note': decisionNote,
+        },
+      );
     } on PostgrestException catch (e) {
       throw _rpcException(e);
     }
@@ -131,11 +140,14 @@ class MatchRequestsRemoteDataSource {
     String? decisionReason,
   }) async {
     try {
-      await _supabase.rpc<void>('decline_match_request', params: {
-        'p_request_id': requestId,
-        if (decisionNote != null) 'p_decision_note': decisionNote,
-        if (decisionReason != null) 'p_decision_reason': decisionReason,
-      });
+      await _supabase.rpc<void>(
+        'decline_match_request',
+        params: {
+          'p_request_id': requestId,
+          if (decisionNote != null) 'p_decision_note': decisionNote,
+          if (decisionReason != null) 'p_decision_reason': decisionReason,
+        },
+      );
     } on PostgrestException catch (e) {
       throw _rpcException(e);
     }
@@ -146,10 +158,13 @@ class MatchRequestsRemoteDataSource {
     String? decisionNote,
   }) async {
     try {
-      await _supabase.rpc<void>('cancel_match_request', params: {
-        'p_request_id': requestId,
-        if (decisionNote != null) 'p_decision_note': decisionNote,
-      });
+      await _supabase.rpc<void>(
+        'cancel_match_request',
+        params: {
+          'p_request_id': requestId,
+          if (decisionNote != null) 'p_decision_note': decisionNote,
+        },
+      );
     } on PostgrestException catch (e) {
       throw _rpcException(e);
     }
@@ -157,11 +172,12 @@ class MatchRequestsRemoteDataSource {
 
   Future<MatchRequestDto?> getMatchChallenge(String requestId) async {
     try {
-      final row = await _supabase
-          .from(_table)
-          .select()
-          .eq('request_id', requestId)
-          .maybeSingle();
+      final row =
+          await _supabase
+              .from(_table)
+              .select()
+              .eq('request_id', requestId)
+              .maybeSingle();
       return row == null ? null : MatchRequestDto.fromJson(row);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -301,14 +317,18 @@ class MatchRequestsRemoteDataSource {
     switch (e.status) {
       case 401:
       case 403:
-        return UnauthorizedException(msg ?? 'Not allowed to send this challenge');
+        return UnauthorizedException(
+          msg ?? 'Not allowed to send this challenge',
+        );
       case 409:
         return ConflictException(msg ?? 'A pending request already exists');
       case 422:
         return ServerException(msg ?? 'Validation failed', statusCode: 422);
       default:
-        return ServerException(msg ?? 'send-match-request failed',
-            statusCode: e.status);
+        return ServerException(
+          msg ?? 'send-match-request failed',
+          statusCode: e.status,
+        );
     }
   }
 }

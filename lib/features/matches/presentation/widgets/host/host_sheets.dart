@@ -25,10 +25,11 @@ Future<bool> showAcceptApplicantSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (sheet) => _AcceptSheet(
-      applicant: applicant,
-      otherApplicantNames: otherApplicantNames,
-    ),
+    builder:
+        (sheet) => _AcceptSheet(
+          applicant: applicant,
+          otherApplicantNames: otherApplicantNames,
+        ),
   );
   return confirmed ?? false;
 }
@@ -101,16 +102,19 @@ class _AcceptSheet extends StatelessWidget {
                 const _Consequence(
                   icon: PoolIcons.consequenceGood,
                   title: 'A match will be created',
-                  body: 'Both line-ups populate and it appears in Matches '
+                  body:
+                      'Both line-ups populate and it appears in Matches '
                       'for both teams.',
                 ),
                 if (others > 0)
                   _Consequence(
                     icon: PoolIcons.consequenceWarning,
-                    title: others == 1
-                        ? 'The other applicant is declined'
-                        : 'The other $others applicants are declined',
-                    body: '${_names(otherApplicantNames)} '
+                    title:
+                        others == 1
+                            ? 'The other applicant is declined'
+                            : 'The other $others applicants are declined',
+                    body:
+                        '${_names(otherApplicantNames)} '
                         '${others == 1 ? 'is' : 'are'} notified '
                         "automatically. This can't be undone.",
                     ground: CkColors.redSoft,
@@ -168,9 +172,10 @@ class _Consequence extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
       decoration: BoxDecoration(
         color: ground,
-        border: ruled
-            ? const Border(top: BorderSide(color: CkColors.hairline))
-            : null,
+        border:
+            ruled
+                ? const Border(top: BorderSide(color: CkColors.hairline))
+                : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,9 +267,9 @@ class _RejectSheetState extends State<_RejectSheet> {
   void _confirm() {
     final note = _note.text.trim();
     final parts = [if (_chip != null) _chip!, if (note.isNotEmpty) note];
-    Navigator.of(context).pop(
-      RejectDecision(reason: parts.isEmpty ? null : parts.join(' — ')),
-    );
+    Navigator.of(
+      context,
+    ).pop(RejectDecision(reason: parts.isEmpty ? null : parts.join(' — ')));
   }
 
   @override
@@ -333,8 +338,10 @@ class _RejectSheetState extends State<_RejectSheet> {
               const SizedBox(width: 5),
               Text(
                 '· optional',
-                style: CkType.body(fontSize: 11, color: CkColors.soft)
-                    .copyWith(fontStyle: FontStyle.italic),
+                style: CkType.body(
+                  fontSize: 11,
+                  color: CkColors.soft,
+                ).copyWith(fontStyle: FontStyle.italic),
               ),
             ],
           ),
@@ -349,8 +356,8 @@ class _RejectSheetState extends State<_RejectSheet> {
                   active: _chip == chip,
                   // Tapping the active chip clears it: the reason is optional,
                   // so a mis-tap must be undoable without closing the sheet.
-                  onTap: () =>
-                      setState(() => _chip = _chip == chip ? null : chip),
+                  onTap:
+                      () => setState(() => _chip = _chip == chip ? null : chip),
                 ),
             ],
           ),
@@ -365,10 +372,15 @@ class _RejectSheetState extends State<_RejectSheet> {
               filled: false,
               counterText: '',
               hintText: 'Add a short note (optional)…',
-              hintStyle:
-                  CkType.body(fontSize: 13, height: 1.5, color: CkColors.soft),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              hintStyle: CkType.body(
+                fontSize: 13,
+                height: 1.5,
+                color: CkColors.soft,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 13,
+              ),
               border: _border(CkColors.line),
               enabledBorder: _border(CkColors.line),
               focusedBorder: _border(CkColors.ink),
@@ -391,9 +403,9 @@ class _RejectSheetState extends State<_RejectSheet> {
   }
 
   OutlineInputBorder _border(Color color) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: color),
-      );
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: color),
+  );
 }
 
 class _ReasonChip extends StatelessWidget {
@@ -450,11 +462,12 @@ Future<bool> showWithdrawChallengeSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _WithdrawSheet(
-      hostTeam: hostTeam,
-      summary: summary,
-      pendingApplicants: pendingApplicants,
-    ),
+    builder:
+        (_) => _WithdrawSheet(
+          hostTeam: hostTeam,
+          summary: summary,
+          pendingApplicants: pendingApplicants,
+        ),
   );
   return confirmed ?? false;
 }
@@ -507,15 +520,17 @@ class _WithdrawSheet extends StatelessWidget {
               ),
               children: [
                 const TextSpan(
-                  text: "It leaves the pool immediately and can't be "
+                  text:
+                      "It leaves the pool immediately and can't be "
                       'reinstated.',
                 ),
                 if (pendingApplicants > 0) ...[
                   const TextSpan(text: ' All '),
                   TextSpan(
-                    text: pendingApplicants == 1
-                        ? '1 applicant'
-                        : '$pendingApplicants applicants',
+                    text:
+                        pendingApplicants == 1
+                            ? '1 applicant'
+                            : '$pendingApplicants applicants',
                     style: CkType.body(
                       fontSize: 13,
                       height: 1.6,
@@ -524,7 +539,8 @@ class _WithdrawSheet extends StatelessWidget {
                     ),
                   ),
                   const TextSpan(
-                    text: ' will be notified that the challenge was '
+                    text:
+                        ' will be notified that the challenge was '
                         'cancelled.',
                   ),
                 ],

@@ -40,11 +40,7 @@ class PoolFacetBar extends StatelessWidget {
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
+  const _Chip({required this.label, required this.active, required this.onTap});
 
   final String label;
   final bool active;
@@ -60,9 +56,7 @@ class _Chip extends StatelessWidget {
         decoration: BoxDecoration(
           color: active ? CkColors.ink : CkColors.paper2,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: active ? CkColors.ink : CkColors.hairline,
-          ),
+          border: Border.all(color: active ? CkColors.ink : CkColors.hairline),
         ),
         child: Text(
           label.toUpperCase(),

@@ -107,16 +107,15 @@ class CkStatusPill extends StatelessWidget {
     String label, {
     Color background = CkColors.cream,
     Color foreground = CkColors.amberInk,
-  }) =>
-      CkStatusPill._(
-        label: label,
-        background: background,
-        foreground: foreground,
-        fontSize: 9,
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-        radius: 6,
-        weight: FontWeight.w600,
-      );
+  }) => CkStatusPill._(
+    label: label,
+    background: background,
+    foreground: foreground,
+    fontSize: 9,
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+    radius: 6,
+    weight: FontWeight.w600,
+  );
 
   /// Solid, and states a role rather than a state — Hosting, Matched.
   factory CkStatusPill.banner(
@@ -124,18 +123,18 @@ class CkStatusPill extends StatelessWidget {
     required Color background,
     Color foreground = CkColors.ink,
     bool compact = false,
-  }) =>
-      CkStatusPill._(
-        label: label,
-        background: background,
-        foreground: foreground,
-        fontSize: compact ? 9 : 10,
-        padding: compact
+  }) => CkStatusPill._(
+    label: label,
+    background: background,
+    foreground: foreground,
+    fontSize: compact ? 9 : 10,
+    padding:
+        compact
             ? const EdgeInsets.symmetric(horizontal: 7, vertical: 3)
             : const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        radius: compact ? 5 : 6,
-        weight: compact ? FontWeight.w700 : FontWeight.w600,
-      );
+    radius: compact ? 5 : 6,
+    weight: compact ? FontWeight.w700 : FontWeight.w600,
+  );
 
   final String label;
   final Color background;
@@ -224,14 +223,15 @@ class HostSectionLabel extends StatelessWidget {
 
     return Padding(
       padding: padding,
-      child: trailing == null
-          ? label
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [label, trailing!],
-            ),
+      child:
+          trailing == null
+              ? label
+              : Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [label, trailing!],
+              ),
     );
   }
 }
@@ -290,33 +290,34 @@ class HostActionButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
         ),
         child: Center(
-          child: busy
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: CkColors.paper,
-                  ),
-                )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (icon != null) ...[
-                      PoolIcon(icon!, size: 15),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      label,
-                      style: CkType.display(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: CkColors.paper,
-                        letterSpacing: -0.01,
-                      ),
+          child:
+              busy
+                  ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: CkColors.paper,
                     ),
-                  ],
-                ),
+                  )
+                  : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (icon != null) ...[
+                        PoolIcon(icon!, size: 15),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        label,
+                        style: CkType.display(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: CkColors.paper,
+                          letterSpacing: -0.01,
+                        ),
+                      ),
+                    ],
+                  ),
         ),
       ),
     );
@@ -325,7 +326,11 @@ class HostActionButton extends StatelessWidget {
 
 /// The one Withdraw treatment in the app — a red text link, never a button.
 class WithdrawLink extends StatelessWidget {
-  const WithdrawLink({super.key, required this.onTap, this.label = 'Withdraw challenge'});
+  const WithdrawLink({
+    super.key,
+    required this.onTap,
+    this.label = 'Withdraw challenge',
+  });
 
   final VoidCallback onTap;
   final String label;

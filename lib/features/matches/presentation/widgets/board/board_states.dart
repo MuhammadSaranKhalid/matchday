@@ -133,25 +133,25 @@ class BoardEmptyState extends StatelessWidget {
   }
 
   String _title() => switch (tab) {
-        MatchesBoardTab.live => 'No match is on right now',
-        MatchesBoardTab.forYou => 'Nothing here for you yet',
-        MatchesBoardTab.upcoming => 'No matches scheduled',
-        MatchesBoardTab.finished => 'No matches finished this week',
-      };
+    MatchesBoardTab.live => 'No match is on right now',
+    MatchesBoardTab.forYou => 'Nothing here for you yet',
+    MatchesBoardTab.upcoming => 'No matches scheduled',
+    MatchesBoardTab.finished => 'No matches finished this week',
+  };
 
   String _body() => switch (tab) {
-        MatchesBoardTab.live =>
-          'Local cricket starts in the afternoon. Matches appear here the '
-              'moment a scorer opens one, and the tab counts them while they '
-              'run.',
-        MatchesBoardTab.forYou =>
-          'Follow a team, or join a tournament, and their matches will show '
-              'up here.',
-        MatchesBoardTab.upcoming =>
-          'Nothing is on the calendar for the next seven days.',
-        MatchesBoardTab.finished =>
-          'Results from the last seven days land here once a match is over.',
-      };
+    MatchesBoardTab.live =>
+      'Local cricket starts in the afternoon. Matches appear here the '
+          'moment a scorer opens one, and the tab counts them while they '
+          'run.',
+    MatchesBoardTab.forYou =>
+      'Follow a team, or join a tournament, and their matches will show '
+          'up here.',
+    MatchesBoardTab.upcoming =>
+      'Nothing is on the calendar for the next seven days.',
+    MatchesBoardTab.finished =>
+      'Results from the last seven days land here once a match is over.',
+  };
 }
 
 /// Loading — `Matches.dc.html` artboard 06.

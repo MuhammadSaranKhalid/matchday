@@ -35,8 +35,7 @@ import 'scoring_types.dart';
 /// itself answers "is this sent yet", not the shape of an id.
 const kProvisionalBallPrefix = 'local:';
 
-BallId provisionalBallId(String opId) =>
-    BallId('$kProvisionalBallPrefix$opId');
+BallId provisionalBallId(String opId) => BallId('$kProvisionalBallPrefix$opId');
 
 /// Fold [pending] over the confirmed state.
 ScoringProjection replayScoring({
@@ -58,11 +57,11 @@ ScoringProjection replayScoring({
   for (final op in pending) {
     switch (op) {
       case PendingTrio(
-          :final strikerId,
-          :final nonStrikerId,
-          :final bowlerId,
-          :final target,
-        ):
+        :final strikerId,
+        :final nonStrikerId,
+        :final bowlerId,
+        :final target,
+      ):
         projected = projected?.copyWith(
           strikerId: MatchPlayerId(strikerId),
           nonStrikerId: MatchPlayerId(nonStrikerId),
@@ -161,19 +160,17 @@ MatchInningsState? _advance(
   MatchInningsState? current,
   NewInningsState next,
   InningsEvents events,
-) =>
-    current?.copyWith(
-      legalBallCount: next.legalBallCount,
-      totalRuns: next.totalRuns,
-      totalWickets: next.totalWickets,
-      totalExtras: next.totalExtras,
-      strikerId:
-          next.strikerId == null ? null : MatchPlayerId(next.strikerId!),
-      clearStriker: next.strikerId == null,
-      nonStrikerId:
-          next.nonStrikerId == null ? null : MatchPlayerId(next.nonStrikerId!),
-      clearNonStriker: next.nonStrikerId == null,
-      bowlerId: next.bowlerId == null ? null : MatchPlayerId(next.bowlerId!),
-      clearBowler: next.bowlerId == null,
-      isAllOut: events.allOut || current.isAllOut,
-    );
+) => current?.copyWith(
+  legalBallCount: next.legalBallCount,
+  totalRuns: next.totalRuns,
+  totalWickets: next.totalWickets,
+  totalExtras: next.totalExtras,
+  strikerId: next.strikerId == null ? null : MatchPlayerId(next.strikerId!),
+  clearStriker: next.strikerId == null,
+  nonStrikerId:
+      next.nonStrikerId == null ? null : MatchPlayerId(next.nonStrikerId!),
+  clearNonStriker: next.nonStrikerId == null,
+  bowlerId: next.bowlerId == null ? null : MatchPlayerId(next.bowlerId!),
+  clearBowler: next.bowlerId == null,
+  isAllOut: events.allOut || current.isAllOut,
+);

@@ -77,7 +77,8 @@ class SheetScrim extends StatelessWidget {
 }
 
 class SheetHead extends StatelessWidget {
-  const SheetHead({super.key, 
+  const SheetHead({
+    super.key,
     required this.kicker,
     required this.title,
     this.subtitle,
@@ -131,7 +132,8 @@ class SheetHead extends StatelessWidget {
 }
 
 class SheetPrimaryButton extends StatelessWidget {
-  const SheetPrimaryButton({super.key, 
+  const SheetPrimaryButton({
+    super.key,
     required this.label,
     required this.onTap,
     this.danger = false,
@@ -151,9 +153,10 @@ class SheetPrimaryButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 13),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: disabled
-                ? CkColors.paper2
-                : danger
+            color:
+                disabled
+                    ? CkColors.paper2
+                    : danger
                     ? CkColors.red
                     : CkColors.ink,
             borderRadius: BorderRadius.circular(12),
@@ -184,8 +187,7 @@ class SheetGhostButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
+          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: CkColors.paper,
@@ -207,7 +209,8 @@ class SheetGhostButton extends StatelessWidget {
 }
 
 class SheetChoiceButton extends StatelessWidget {
-  const SheetChoiceButton({super.key, 
+  const SheetChoiceButton({
+    super.key,
     required this.title,
     required this.subtitle,
     required this.active,
@@ -221,8 +224,7 @@ class SheetChoiceButton extends StatelessWidget {
   final SheetChoiceTone tone;
   @override
   Widget build(BuildContext context) {
-    final accent =
-        tone == SheetChoiceTone.red ? CkColors.red : CkColors.ink;
+    final accent = tone == SheetChoiceTone.red ? CkColors.red : CkColors.ink;
     final activeBg =
         tone == SheetChoiceTone.red ? CkColors.redSoft : CkColors.paper2;
     return Material(
@@ -231,8 +233,7 @@ class SheetChoiceButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(11),
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
             color: active ? activeBg : CkColors.paper,
             borderRadius: BorderRadius.circular(11),
@@ -254,10 +255,7 @@ class SheetChoiceButton extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: CkType.body(
-                  fontSize: 11,
-                  color: CkColors.muted,
-                ),
+                style: CkType.body(fontSize: 11, color: CkColors.muted),
               ),
             ],
           ),
@@ -270,7 +268,8 @@ class SheetChoiceButton extends StatelessWidget {
 enum SheetChoiceTone { ink, red }
 
 class SheetRunChips extends StatelessWidget {
-  const SheetRunChips({super.key, 
+  const SheetRunChips({
+    super.key,
     required this.value,
     required this.options,
     required this.onPick,
@@ -300,9 +299,8 @@ class SheetRunChips extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: value == r ? accent : CkColors.surface,
                   borderRadius: BorderRadius.circular(11),
-                  border: value == r
-                      ? null
-                      : Border.all(color: CkColors.hairline),
+                  border:
+                      value == r ? null : Border.all(color: CkColors.hairline),
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -322,7 +320,8 @@ class SheetRunChips extends StatelessWidget {
 }
 
 class SheetPersonGrid extends StatelessWidget {
-  const SheetPersonGrid({super.key, 
+  const SheetPersonGrid({
+    super.key,
     required this.people,
     required this.value,
     required this.onPick,
@@ -336,8 +335,7 @@ class SheetPersonGrid extends StatelessWidget {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate:
-          const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 6,
         mainAxisSpacing: 6,
@@ -353,8 +351,7 @@ class SheetPersonGrid extends StatelessWidget {
             onTap: () => onPick(p.id),
             borderRadius: BorderRadius.circular(11),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 11, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
               decoration: BoxDecoration(
                 color: on ? CkColors.paper2 : CkColors.paper,
                 borderRadius: BorderRadius.circular(11),
@@ -405,4 +402,3 @@ class SheetPersonGrid extends StatelessWidget {
     );
   }
 }
-

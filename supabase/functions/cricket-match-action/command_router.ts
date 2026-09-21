@@ -7,6 +7,7 @@ import type {
 import { recordToss } from "./commands/record_toss.ts";
 import { submitMatchOpeners } from "./commands/submit_match_openers.ts";
 import { startMatchNow } from "./commands/start_match_now.ts";
+import { cancelMatch } from "./commands/cancel_match.ts";
 import { startInnings } from "./commands/start_innings.ts";
 import { undoLastBall } from "./commands/undo_last_ball.ts";
 import { completeCricketMatch } from "./commands/complete_cricket_match.ts";
@@ -31,6 +32,9 @@ export async function dispatchCommand(
 
     case "start_match_now":
       return await startMatchNow(ctx);
+
+    case "cancel_match":
+      return await cancelMatch(ctx);
 
     case "start_innings":
       return await startInnings(ctx);

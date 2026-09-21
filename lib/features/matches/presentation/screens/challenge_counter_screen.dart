@@ -40,13 +40,16 @@ class _ChallengeCounterScreenState
       backgroundColor: CkColors.paper,
       body: SafeArea(
         child: async.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(color: CkColors.ink),
-          ),
+          loading:
+              () => const Center(
+                child: CircularProgressIndicator(color: CkColors.ink),
+              ),
           error: (e, _) => Center(child: Text(e.toString())),
-          data: (req) => req == null
-              ? const Center(child: Text('Challenge not found'))
-              : _body(req),
+          data:
+              (req) =>
+                  req == null
+                      ? const Center(child: Text('Challenge not found'))
+                      : _body(req),
         ),
       ),
     );
@@ -56,7 +59,8 @@ class _ChallengeCounterScreenState
     final origStart = req.proposedStartTime;
     final origVenue = req.proposedVenue;
     final changedStart = _newStart != null && _newStart != origStart;
-    final changedVenue = _venueCtrl.text.trim().isNotEmpty &&
+    final changedVenue =
+        _venueCtrl.text.trim().isNotEmpty &&
         _venueCtrl.text.trim() != (origVenue ?? '');
     final canSubmit = (changedStart || changedVenue) && !_busy;
 
@@ -65,9 +69,11 @@ class _ChallengeCounterScreenState
       children: [
         _Header(
           changeCount: (changedStart ? 1 : 0) + (changedVenue ? 1 : 0),
-          onBack: () => context.canPop()
-              ? context.pop()
-              : context.go('/my/challenges'),
+          onBack:
+              () =>
+                  context.canPop()
+                      ? context.pop()
+                      : context.go('/my/challenges'),
         ),
         Expanded(
           child: ListView(
@@ -100,8 +106,7 @@ class _ChallengeCounterScreenState
                 maxLength: 280,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText:
-                      'Half the squad busy at 18:30. 16:00 works for us.',
+                  hintText: 'Half the squad busy at 18:30. 16:00 works for us.',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(color: CkColors.hairline),
@@ -118,23 +123,25 @@ class _ChallengeCounterScreenState
             color: CkColors.paper,
             border: Border(top: BorderSide(color: CkColors.hairline)),
           ),
-          child: Row(children: [
-            Expanded(
-              child: CkButton.secondary(
-                label: 'Cancel',
-                onPressed: _busy ? null : () => context.pop(),
+          child: Row(
+            children: [
+              Expanded(
+                child: CkButton.secondary(
+                  label: 'Cancel',
+                  onPressed: _busy ? null : () => context.pop(),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: CkButton(
-                label: 'Send counter →',
-                busy: _busy,
-                onPressed: canSubmit ? () => _submit(req) : null,
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: CkButton(
+                  label: 'Send counter →',
+                  busy: _busy,
+                  onPressed: canSubmit ? () => _submit(req) : null,
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
         ),
       ],
     );
@@ -155,27 +162,35 @@ class _ChallengeCounterScreenState
     );
     if (time == null || !mounted) return;
     setState(() {
-      _newStart = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      _newStart = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
     });
   }
 
   Future<void> _submit(MatchRequest req) async {
     setState(() => _busy = true);
-    final result = await ref.read(matchesRepositoryProvider).counterMatchChallenge(
+    final result = await ref
+        .read(matchesRepositoryProvider)
+        .counterMatchChallenge(
           requestId: MatchRequestId(widget.requestId),
           counteredFormat: null,
-          counteredVenue: _venueCtrl.text.trim().isEmpty ? null : _venueCtrl.text.trim(),
+          counteredVenue:
+              _venueCtrl.text.trim().isEmpty ? null : _venueCtrl.text.trim(),
           counteredStartTime: _newStart,
-          decisionNote: _noteCtrl.text.trim().isEmpty
-              ? null
-              : _noteCtrl.text.trim(),
+          decisionNote:
+              _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
         );
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(f.message)),
-      ),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) {
         ref.invalidate(myMatchChallengesProvider);
         ref.invalidate(matchChallengeProvider(req.id.value));
@@ -201,22 +216,27 @@ class _Header extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            IconButton(
-              onPressed: onBack,
-              icon: const Icon(Icons.chevron_left_rounded, color: CkColors.ink),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'COUNTER · ${changeCount == 0 ? 'NO CHANGE' : '$changeCount CHANGE${changeCount == 1 ? '' : 'S'}'}',
-              style: CkType.mono(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.1,
-                color: changeCount == 0 ? CkColors.muted : CkColors.amber,
+          Row(
+            children: [
+              IconButton(
+                onPressed: onBack,
+                icon: const Icon(
+                  Icons.chevron_left_rounded,
+                  color: CkColors.ink,
+                ),
               ),
-            ),
-          ]),
+              const SizedBox(width: 4),
+              Text(
+                'COUNTER · ${changeCount == 0 ? 'NO CHANGE' : '$changeCount CHANGE${changeCount == 1 ? '' : 'S'}'}',
+                style: CkType.mono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.1,
+                  color: changeCount == 0 ? CkColors.muted : CkColors.amber,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 0, 0),
@@ -258,20 +278,24 @@ class _DiffRow extends StatelessWidget {
         decoration: BoxDecoration(
           color: changed ? CkColors.cream : CkColors.paper,
           border: Border.all(
-              color: changed ? CkColors.amber : CkColors.hairline, width: 1),
+            color: changed ? CkColors.amber : CkColors.hairline,
+            width: 1,
+          ),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
             SizedBox(
               width: 54,
-              child: Text(label.toUpperCase(),
-                  style: CkType.mono(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: CkColors.muted,
-                  )),
+              child: Text(
+                label.toUpperCase(),
+                style: CkType.mono(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.08,
+                  color: CkColors.muted,
+                ),
+              ),
             ),
             Expanded(
               child: Text.rich(
@@ -315,13 +339,15 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 6, 0, 6),
-      child: Text(label.toUpperCase(),
-          style: CkType.mono(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.1,
-            color: CkColors.muted,
-          )),
+      child: Text(
+        label.toUpperCase(),
+        style: CkType.mono(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.1,
+          color: CkColors.muted,
+        ),
+      ),
     );
   }
 }

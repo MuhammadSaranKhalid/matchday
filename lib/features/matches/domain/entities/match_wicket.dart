@@ -37,18 +37,18 @@ class MatchWicket extends Equatable {
 
   @override
   List<Object?> get props => [
-        wicketId,
-        deliveryId,
-        inningsId,
-        playerOutId,
-        dismissalKind,
-        isBowlerCredited,
-        creditedBowlerId,
-        primaryFielderId,
-        assistedFielderId,
-        fallOfWicketScore,
-        fallOfWicketNumber,
-        fallOfWicketOvers,
-        createdAt,
-      ];
+    wicketId,
+    deliveryId,
+    inningsId,
+    playerOutId,
+    dismissalKind,
+    isBowlerCredited,
+    creditedBowlerId,
+    primaryFielderId,
+    assistedFielderId,
+    fallOfWicketScore,
+    fallOfWicketNumber,
+    fallOfWicketOvers,
+    createdAt,
+  ];
 }

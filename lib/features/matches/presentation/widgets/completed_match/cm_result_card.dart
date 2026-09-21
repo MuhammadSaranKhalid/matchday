@@ -30,7 +30,12 @@ class CmResultCard extends StatelessWidget {
           children: [
             for (final (i, s) in view.sides.indexed)
               Padding(
-                padding: EdgeInsets.fromLTRB(13, i == 0 ? 11 : 6, 13, i == 0 ? 6 : 11),
+                padding: EdgeInsets.fromLTRB(
+                  13,
+                  i == 0 ? 11 : 6,
+                  13,
+                  i == 0 ? 6 : 11,
+                ),
                 child: _SideRow(side: s),
               ),
             Container(
@@ -90,8 +95,7 @@ class _SideRow extends StatelessWidget {
               // colour on this screen means "won", and "yours" is not "won".
               if (side.isYou) ...[
                 const SizedBox(width: 5),
-                Text('YOU',
-                    style: CmText.label(size: 9, color: CkColors.soft)),
+                Text('YOU', style: CmText.label(size: 9, color: CkColors.soft)),
               ],
             ],
           ),
@@ -117,12 +121,14 @@ class _SideRow extends StatelessWidget {
           ),
         ] else
           // Never 0/0: a side that never batted was not bowled out for nothing.
-          Text('Did not bat',
-              style: CmText.name(
-                size: 12,
-                weight: FontWeight.w500,
-                color: CkColors.muted,
-              )),
+          Text(
+            'Did not bat',
+            style: CmText.name(
+              size: 12,
+              weight: FontWeight.w500,
+              color: CkColors.muted,
+            ),
+          ),
       ],
     );
   }

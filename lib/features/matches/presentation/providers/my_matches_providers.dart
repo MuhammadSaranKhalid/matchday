@@ -39,31 +39,42 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   // the matches screen (mirrors the innings fold below).
   final reqResult =
       await ref.watch(matchesRepositoryProvider).listMyMatchChallenges();
-  final allRequests =
-      reqResult.fold<List<MatchRequest>>((_) => const [], (list) => list);
+  final allRequests = reqResult.fold<List<MatchRequest>>(
+    (_) => const [],
+    (list) => list,
+  );
 
   // Current memberships are fetched once and carry both the team and the
   // canonical multi-role-aware relationship used below.
-  final memberships =
-      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final memberships = await ref.watch(
+    currentUserTeamMembershipsProvider.future,
+  );
   final teams = [for (final membership in memberships) membership.team];
-  final myTeamIds = {for (final membership in memberships) membership.team.id.value};
+  final myTeamIds = {
+    for (final membership in memberships) membership.team.id.value,
+  };
 
-  final outbound = allRequests
-      .where((r) =>
-          r.toTeamId != null &&
-          myTeamIds.contains(r.fromTeamId.value) &&
-          (r.status == MatchRequestStatus.pending ||
-              r.status == MatchRequestStatus.countered))
-      .toList();
+  final outbound =
+      allRequests
+          .where(
+            (r) =>
+                r.toTeamId != null &&
+                myTeamIds.contains(r.fromTeamId.value) &&
+                (r.status == MatchRequestStatus.pending ||
+                    r.status == MatchRequestStatus.countered),
+          )
+          .toList();
 
-  final inbound = allRequests
-      .where((r) =>
-          r.toTeamId != null &&
-          myTeamIds.contains(r.toTeamId!.value) &&
-          (r.status == MatchRequestStatus.pending ||
-              r.status == MatchRequestStatus.countered))
-      .toList();
+  final inbound =
+      allRequests
+          .where(
+            (r) =>
+                r.toTeamId != null &&
+                myTeamIds.contains(r.toTeamId!.value) &&
+                (r.status == MatchRequestStatus.pending ||
+                    r.status == MatchRequestStatus.countered),
+          )
+          .toList();
 
   // Nothing at all to show.
   if (matches.isEmpty && outbound.isEmpty && inbound.isEmpty) {
@@ -79,8 +90,12 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   // Fan-out: any team referenced by a match OR requests that isn't already loaded.
   final missingTeamIds = <String>{};
   for (final m in matches) {
-    if (!teamsById.containsKey(m.teamAId.value)) missingTeamIds.add(m.teamAId.value);
-    if (!teamsById.containsKey(m.teamBId.value)) missingTeamIds.add(m.teamBId.value);
+    if (!teamsById.containsKey(m.teamAId.value)) {
+      missingTeamIds.add(m.teamAId.value);
+    }
+    if (!teamsById.containsKey(m.teamBId.value)) {
+      missingTeamIds.add(m.teamBId.value);
+    }
   }
   for (final r in outbound) {
     final to = r.toTeamId?.value;
@@ -93,8 +108,9 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   if (missingTeamIds.isNotEmpty) {
     await Future.wait(
       missingTeamIds.map((id) async {
-        final result =
-            await ref.read(teamsRepositoryProvider).getTeam(TeamId(id));
+        final result = await ref
+            .read(teamsRepositoryProvider)
+            .getTeam(TeamId(id));
         final team = result.fold((_) => null, (t) => t);
         if (team != null) teamsById[id] = team;
       }),
@@ -105,7 +121,8 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   // Ravi Ground 2 · 16 ov"; without this the card could only say the literal
   // word "Tournament", which tells the reader nothing they did not know.
   final tournamentNames = <String, String>{};
-  for (final id in matches.map((m) => m.tournamentId).whereType<String>().toSet()) {
+  for (final id
+      in matches.map((m) => m.tournamentId).whereType<String>().toSet()) {
     try {
       final t = await ref.watch(tournamentDetailProvider(id).future);
       tournamentNames[id] = t.name;
@@ -116,10 +133,9 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
   }
 
   final past = matches.where((m) => m.status.isPast).toList();
-  final upcoming = matches
-      .where((m) => m.status.isUpcoming || m.status.isLive)
-      .toList()
-    ..sort(_byScheduledThenCreated);
+  final upcoming =
+      matches.where((m) => m.status.isUpcoming || m.status.isLive).toList()
+        ..sort(_byScheduledThenCreated);
 
   Map<MatchId, List<InningsSummary>> inningsByMatch = const {};
   if (past.isNotEmpty) {
@@ -147,7 +163,7 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
       );
       final canMatch = matchScoped.fold((_) => false, (v) => v);
 
-      final teamId = _setupAuthorityTeam(m);
+      final teamId = m.currentSetupAuthorityTeamId;
       var canTeam = false;
       if (teamId != null) {
         final teamScoped = await repo.canTeamPermission(
@@ -163,22 +179,30 @@ Future<MyMatchesView> myMatchesView(Ref ref) async {
 
   final confirmedRows = [
     for (final m in upcoming)
-      _confirmedFor(m, teamsById,
-          currentUserId: userId,
-          myRoles: myRoles,
-          canSetup: canSetupByMatchId[m.id.value] ?? false,
-          tournamentNames: tournamentNames),
+      _confirmedFor(
+        m,
+        teamsById,
+        currentUserId: userId,
+        myRoles: myRoles,
+        canSetup: canSetupByMatchId[m.id.value] ?? false,
+        tournamentNames: tournamentNames,
+      ),
   ];
   final pastRows = [
     for (final m in past)
-      _pastFor(m, teamsById,
-          innings: inningsByMatch[m.id] ?? const [],
-          currentUserId: userId,
-          myRoles: myRoles,
-          tournamentNames: tournamentNames),
+      _pastFor(
+        m,
+        teamsById,
+        innings: inningsByMatch[m.id] ?? const [],
+        currentUserId: userId,
+        myRoles: myRoles,
+        tournamentNames: tournamentNames,
+      ),
   ];
   final sentRows = [for (final r in outbound) sentRequestRow(r, teamsById)];
-  final inboundRows = [for (final r in inbound) inboundRequestRow(r, teamsById)];
+  final inboundRows = [
+    for (final r in inbound) inboundRequestRow(r, teamsById),
+  ];
 
   return MyMatchesView(
     confirmed: confirmedRows,
@@ -196,29 +220,6 @@ int _byScheduledThenCreated(Match a, Match b) {
   final aT = a.scheduledStartTime ?? a.createdAt;
   final bT = b.scheduledStartTime ?? b.createdAt;
   return aT.compareTo(bT);
-}
-
-/// Team whose role matrix controls the current pre-live setup action.
-///
-/// Toss -> Cricket setup team.
-/// Lineup/ready -> batting team.
-/// Match-scoped official authority is checked separately.
-TeamId? _setupAuthorityTeam(Match m) {
-  if (m.startPhase == MatchStartPhase.toss) {
-    return m.setupTeamId;
-  }
-
-  if (m.startPhase == MatchStartPhase.lineup ||
-      m.startPhase == MatchStartPhase.ready) {
-    final won = m.tossWonBy;
-    final decision = m.tossDecision;
-    if (won == null || decision == null) return null;
-    if (decision == TossDecision.bat) return won;
-    if (won == m.teamAId) return m.teamBId;
-    if (won == m.teamBId) return m.teamAId;
-  }
-
-  return null;
 }
 
 MyMatchConfirmed _confirmedFor(
@@ -245,38 +246,29 @@ MyMatchConfirmed _confirmedFor(
   final role = roleOnMatch(m, currentUserId, userTeamIds: userTeamIds);
   final roleLine = roleLineFor(role, m, isToday: isToday);
 
-  // Match Start CTA is capability-driven. A team-specific role override may
-  // allow or deny owner/manager/captain independently, and an assigned match
-  // official may act through a match-scoped grant.
-  final now = DateTime.now();
-  final timeBracket = start != null &&
-      now.isAfter(start.subtract(const Duration(minutes: 30))) &&
-      now.isBefore(start.add(const Duration(hours: 6)));
+  // Effective permission + current Cricket phase is enough.
+  //
+  // There is deliberately NO time gating in the current product.
+  //
+  // If a time-window rule is introduced later, do not confuse that rule with
+  // RBAC. If it becomes a hard business restriction it must also be enforced by
+  // the server command.
+  final tossReady = canSetup && m.isPreLiveCricketSetup;
 
-  final setupInProgress =
-      canSetup &&
-      (m.status == MatchStatus.toss ||
-          m.startPhase == MatchStartPhase.lineup ||
-          m.startPhase == MatchStartPhase.ready);
-
-  final tossReady = setupInProgress ||
-      (canSetup &&
-          (m.status == MatchStatus.scheduled ||
-              m.status == MatchStatus.rescheduled) &&
-          timeBracket);
-
-  final when = tossReady
-      ? 'Match setup · ${_hhmm(start ?? DateTime.now())}'
-      : _formatWhen(start, m.createdAt);
+  final when =
+      tossReady
+          ? 'Match setup · ${_hhmm(start ?? DateTime.now())}'
+          : _formatWhen(start, m.createdAt);
   final role0 = tossReady ? 'Match setup · ready when you are' : roleLine.label;
-  final countdown =
-      tossReady ? 'Now' : _countdown(start, status: m.status);
-  final urgent = tossReady || roleLine.urgent || _isUrgent(start, status: m.status);
-  final helper = tossReady
-      ? (m.startPhase == MatchStartPhase.toss
-          ? 'The Cricket setup side records the complete toss: winner plus bat/bowl choice.'
-          : 'The batting side selects the openers and starts the match.')
-      : null;
+  final countdown = tossReady ? 'Now' : _countdown(start, status: m.status);
+  final urgent =
+      tossReady || roleLine.urgent || _isUrgent(start, status: m.status);
+  final helper =
+      tossReady
+          ? (m.startPhase == MatchStartPhase.toss
+              ? 'The Cricket setup side records the complete toss: winner plus bat/bowl choice.'
+              : 'The batting side selects the openers and starts the match.')
+          : null;
 
   return MyMatchConfirmed(
     id: m.id.value,
@@ -287,13 +279,14 @@ MyMatchConfirmed _confirmedFor(
     ballsPerOver: m.format.ballsPerOver,
     playersPerTeam: m.format.playersPerTeam,
     ballType: m.format.ballType.wire,
-    formatCode: m.matchType == MatchType.tournament
-        ? 'Tournament'
-        : (m.format.oversPerInnings == 20
-            ? 'T20'
-            : (m.format.oversPerInnings > 0
-                ? '${m.format.oversPerInnings}O'
-                : 'Cricket')),
+    formatCode:
+        m.matchType == MatchType.tournament
+            ? 'Tournament'
+            : (m.format.oversPerInnings == 20
+                ? 'T20'
+                : (m.format.oversPerInnings > 0
+                    ? '${m.format.oversPerInnings}O'
+                    : 'Cricket')),
     homeShort: _short(home, fallback: 'A'),
     homeColor: _color(home?.primaryColor, fallback: const Color(0xFF7A746A)),
     homeName: home?.name ?? 'Team A',
@@ -313,18 +306,19 @@ MyMatchConfirmed _confirmedFor(
     metaLine: _metaLine(m, tournamentNames),
     // Match Start duty is capability-based. Live scoring duty keeps its
     // existing presentation role until the scoring UI is capability-refactored.
-    roleIsDuty: tossReady ||
-        (role == MatchRoleKind.scoring && m.status.isLive),
+    roleIsDuty: tossReady || (role == MatchRoleKind.scoring && m.status.isLive),
     liveState: switch (m.status) {
       MatchStatus.live => 'LIVE',
       MatchStatus.inningsBreak => 'BREAK',
       MatchStatus.superOver => 'SUPER OVER',
       _ => null,
     },
-    liveSince: m.status.isLive && m.actualStartTime != null
-        ? 'Started ${_hhmm(m.actualStartTime!)}'
-        : null,
-    youIsHome: userTeamIds.contains(m.teamAId.value) ||
+    liveSince:
+        m.status.isLive && m.actualStartTime != null
+            ? 'Started ${_hhmm(m.actualStartTime!)}'
+            : null,
+    youIsHome:
+        userTeamIds.contains(m.teamAId.value) ||
         m.teamACaptain == currentUserId,
     opponentTbc: away == null && m.tournamentId != null,
   );
@@ -342,12 +336,13 @@ MyMatchPast _pastFor(
   final away = teamsById[m.teamBId.value];
 
   // Per-team final score = innings where batting_team_id matches.
-  InningsSummary? innFor(TeamId id) =>
-      innings.where((i) => i.battingTeamId == id).fold<InningsSummary?>(
-            null,
-            (acc, it) =>
-                acc == null || it.inningsNumber > acc.inningsNumber ? it : acc,
-          );
+  InningsSummary? innFor(TeamId id) => innings
+      .where((i) => i.battingTeamId == id)
+      .fold<InningsSummary?>(
+        null,
+        (acc, it) =>
+            acc == null || it.inningsNumber > acc.inningsNumber ? it : acc,
+      );
   final homeInn = innFor(m.teamAId);
   final awayInn = innFor(m.teamBId);
 
@@ -357,7 +352,8 @@ MyMatchPast _pastFor(
   // uuid[] columns directly; per-match XI now lives on match_players.
   // For the past-tile attribution v1, manager-or-captain is enough —
   // matches without a clear winner-side fallback still render correctly.
-  final onHome = (myRoles[m.teamAId.value]?.hasMatchAuthority ?? false) ||
+  final onHome =
+      (myRoles[m.teamAId.value]?.hasMatchAuthority ?? false) ||
       m.teamACaptain == currentUserId;
   final myWon = onHome ? homeWon : !homeWon;
 
@@ -414,13 +410,15 @@ MyMatchRequest sentRequestRow(MatchRequest r, Map<String, Team> teamsById) {
     isInbound: false,
     opponentName: isOpen ? 'Open challenge' : (opp?.name ?? 'A team'),
     opponentShort: isOpen ? 'OPN' : _short(opp, fallback: '?'),
-    opponentColor: isOpen
-        ? const Color(0xFF7A746A)
-        : _color(opp?.primaryColor, fallback: const Color(0xFF7A746A)),
+    opponentColor:
+        isOpen
+            ? const Color(0xFF7A746A)
+            : _color(opp?.primaryColor, fallback: const Color(0xFF7A746A)),
     shareCode: r.shareCode,
-    statusLabel: r.status == MatchRequestStatus.countered
-        ? 'Countered'
-        : 'Awaiting reply',
+    statusLabel:
+        r.status == MatchRequestStatus.countered
+            ? 'Countered'
+            : 'Awaiting reply',
     expiresLabel: _expiresLabel(r),
     status: r.status,
   );
@@ -435,11 +433,15 @@ MyMatchRequest inboundRequestRow(MatchRequest r, Map<String, Team> teamsById) {
     isInbound: true,
     opponentName: challenger?.name ?? 'Challenging Team',
     opponentShort: _short(challenger, fallback: 'CH'),
-    opponentColor: _color(challenger?.primaryColor, fallback: const Color(0xFF7A746A)),
+    opponentColor: _color(
+      challenger?.primaryColor,
+      fallback: const Color(0xFF7A746A),
+    ),
     shareCode: r.shareCode,
-    statusLabel: r.status == MatchRequestStatus.countered
-        ? 'Countered by you'
-        : 'Needs your reply',
+    statusLabel:
+        r.status == MatchRequestStatus.countered
+            ? 'Countered by you'
+            : 'Needs your reply',
     expiresLabel: _expiresLabel(r),
     status: r.status,
   );
@@ -448,9 +450,10 @@ MyMatchRequest inboundRequestRow(MatchRequest r, Map<String, Team> teamsById) {
 /// "expires 41h" / "expires 12m" / "expires 2d" for an active request. Picks
 /// the timer that governs the current state. Empty when no expiry is set.
 String _expiresLabel(MatchRequest r) {
-  final expiry = r.status == MatchRequestStatus.countered
-      ? r.counterExpiresAt
-      : r.proposalExpiresAt;
+  final expiry =
+      r.status == MatchRequestStatus.countered
+          ? r.counterExpiresAt
+          : r.proposalExpiresAt;
   if (expiry == null) return '';
   final remaining = expiry.difference(DateTime.now());
   if (remaining.isNegative) return 'expiring now';
@@ -497,9 +500,20 @@ String _hhmm(DateTime t) =>
 String _dayOfWeekShort(DateTime t) =>
     const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][t.weekday - 1];
 
-String _monthShort(DateTime t) => const [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+String _monthShort(DateTime t) =>
+    const [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ][t.month - 1];
 
 String _countdown(DateTime? scheduled, {required MatchStatus status}) {
@@ -601,16 +615,16 @@ Future<LivePanelMatch?> livePanelMatch(Ref ref) async {
 /// A friendly says so where a tournament would name itself.
 String _metaLine(Match m, [Map<String, String> tournamentNames = const {}]) {
   final tid = m.tournamentId;
-  final comp = tid == null
-      ? 'Friendly'
-      : (tournamentNames[tid] ?? 'Tournament');
+  final comp =
+      tid == null ? 'Friendly' : (tournamentNames[tid] ?? 'Tournament');
   final ground = m.venue?.ground;
-  final overs = m.format.oversPerInnings == 0
-      ? null
-      : '${m.format.oversPerInnings} ov';
-  return [comp, ground, overs]
-      .where((p) => p != null && p.isNotEmpty)
-      .join(' · ');
+  final overs =
+      m.format.oversPerInnings == 0 ? null : '${m.format.oversPerInnings} ov';
+  return [
+    comp,
+    ground,
+    overs,
+  ].where((p) => p != null && p.isNotEmpty).join(' · ');
 }
 
 /// Overs faced, from the legal-ball count: 98 balls at 6 per over is "16.2".

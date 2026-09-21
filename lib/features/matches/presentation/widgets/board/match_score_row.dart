@@ -87,10 +87,7 @@ class MatchScoreRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: _meta(_contextLine())),
-          if (item.isLive) ...[
-            const SizedBox(width: 8),
-            const LivePip(),
-          ],
+          if (item.isLive) ...[const SizedBox(width: 8), const LivePip()],
         ],
       ),
     );
@@ -135,16 +132,16 @@ class MatchScoreRow extends StatelessWidget {
   }
 
   static Widget _meta(String text) => Text(
-        text.toUpperCase(),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: CkType.mono(
-          fontSize: 9.5,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.07,
-          color: CkColors.muted,
-        ),
-      );
+    text.toUpperCase(),
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: CkType.mono(
+      fontSize: 9.5,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.07,
+      color: CkColors.muted,
+    ),
+  );
 
   /// "Group A · Gaddafi B · 16 ov" — round, ground, format, whatever is set.
   String _contextLine() {
@@ -171,8 +168,8 @@ class MatchScoreRow extends StatelessWidget {
     final m = item.match;
     return switch (m.status) {
       MatchStatus.scheduled => [
-          TextSpan(text: 'Starts ${_startLabel(m.scheduledStartTime)}'),
-        ],
+        TextSpan(text: 'Starts ${_startLabel(m.scheduledStartTime)}'),
+      ],
       MatchStatus.toss => [TextSpan(text: _tossLine())],
       MatchStatus.live => _liveLine(),
       MatchStatus.inningsBreak => _breakLine(),
@@ -210,7 +207,9 @@ class MatchScoreRow extends StatelessWidget {
       // On, but no ball bowled yet: the toss is the only thing that has
       // happened, so say that rather than inventing a score situation.
       final toss = _tossLine();
-      return [TextSpan(text: toss == 'Toss under way' ? 'Match under way' : toss)];
+      return [
+        TextSpan(text: toss == 'Toss under way' ? 'Match under way' : toss),
+      ];
     }
 
     final current = item.innings.last;
@@ -265,18 +264,20 @@ class MatchScoreRow extends StatelessWidget {
       return [TextSpan(text: 'Tied at $tiedAt · super over')];
     }
     return [
-      TextSpan(text: 'Tied at $tiedAt · ${_nameOf(current.battingTeamId)} need '),
+      TextSpan(
+        text: 'Tied at $tiedAt · ${_nameOf(current.battingTeamId)} need ',
+      ),
       TextSpan(text: '$need off $balls', style: _figure),
     ];
   }
 
   /// The figures inside a state sentence step up to ink.
   static TextStyle get _figure => CkType.body(
-        fontSize: 11.5,
-        height: 1.4,
-        fontWeight: FontWeight.w600,
-        color: CkColors.ink,
-      );
+    fontSize: 11.5,
+    height: 1.4,
+    fontWeight: FontWeight.w600,
+    color: CkColors.ink,
+  );
 
   /// "Lions won the toss and will bat".
   String _tossLine() {
@@ -335,14 +336,15 @@ class _TeamLine extends StatelessWidget {
           SizedBox(
             width: 5,
             height: 5,
-            child: batting
-                ? const DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: CkColors.ink,
-                      shape: BoxShape.circle,
-                    ),
-                  )
-                : null,
+            child:
+                batting
+                    ? const DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: CkColors.ink,
+                        shape: BoxShape.circle,
+                      ),
+                    )
+                    : null,
           ),
           const SizedBox(width: 9),
           Crest(
@@ -356,14 +358,17 @@ class _TeamLine extends StatelessWidget {
           Expanded(child: _name()),
           const SizedBox(width: 8),
           Text(
-            innings == null ? '—' : '${innings.totalRuns}-${innings.totalWickets}',
+            innings == null
+                ? '—'
+                : '${innings.totalRuns}-${innings.totalWickets}',
             style: CkType.mono(
               fontSize: 15,
               fontWeight: dimmed ? FontWeight.w600 : FontWeight.w700,
               letterSpacing: 0,
-              color: innings == null
-                  ? CkColors.muted
-                  : (dimmed ? CkColors.ink2 : CkColors.ink),
+              color:
+                  innings == null
+                      ? CkColors.muted
+                      : (dimmed ? CkColors.ink2 : CkColors.ink),
             ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
           ),
           SizedBox(
@@ -449,11 +454,7 @@ class _StateStrip extends StatelessWidget {
       ),
       child: Text.rich(
         TextSpan(
-          style: CkType.body(
-            fontSize: 11.5,
-            height: 1.4,
-            color: CkColors.ink2,
-          ),
+          style: CkType.body(fontSize: 11.5, height: 1.4, color: CkColors.ink2),
           children: spans,
         ),
       ),
@@ -472,8 +473,7 @@ class LivePip extends StatefulWidget {
   State<LivePip> createState() => _LivePipState();
 }
 
-class _LivePipState extends State<LivePip>
-    with SingleTickerProviderStateMixin {
+class _LivePipState extends State<LivePip> with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1600),
@@ -491,9 +491,10 @@ class _LivePipState extends State<LivePip>
       mainAxisSize: MainAxisSize.min,
       children: [
         FadeTransition(
-          opacity: Tween<double>(begin: 1, end: 0.25).animate(
-            CurvedAnimation(parent: _c, curve: Curves.easeInOut),
-          ),
+          opacity: Tween<double>(
+            begin: 1,
+            end: 0.25,
+          ).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
           child: Container(
             width: 6,
             height: 6,

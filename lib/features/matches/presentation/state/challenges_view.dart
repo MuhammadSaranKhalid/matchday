@@ -11,14 +11,9 @@ import '../../domain/entities/match_request.dart';
 /// always answers the only question the manager is asking.
 @immutable
 class ChallengesView {
-  const ChallengesView({
-    required this.needsYou,
-    required this.waitingOnThem,
-  });
+  const ChallengesView({required this.needsYou, required this.waitingOnThem});
 
-  const ChallengesView.empty()
-      : needsYou = const [],
-        waitingOnThem = const [];
+  const ChallengesView.empty() : needsYou = const [], waitingOnThem = const [];
 
   /// Sorted nearest-to-expiry first. Position carries the urgency, which is
   /// what lets the screen stay calm when nothing is urgent (design rationale 1).
@@ -142,9 +137,7 @@ class ChallengeRow {
     if (r == null) return '';
     switch (tier) {
       case ExpiryTier.calm:
-        return r.inDays >= 2
-            ? 'Expires ${r.inDays}d'
-            : 'Expires ${r.inHours}h';
+        return r.inDays >= 2 ? 'Expires ${r.inDays}d' : 'Expires ${r.inHours}h';
       case ExpiryTier.soon:
         return '${r.inHours}h';
       case ExpiryTier.urgent:

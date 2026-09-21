@@ -1,4 +1,3 @@
-
 import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/ball.dart';
@@ -89,10 +88,12 @@ class ScoringState extends Equatable {
 
   // ── On-field trio ────────────────────────────────────────────────────────
 
-  String? get strikerRefId => matchPlayers.playerRefIdOf(innings?.strikerId?.value);
+  String? get strikerRefId =>
+      matchPlayers.playerRefIdOf(innings?.strikerId?.value);
   String? get nonStrikerRefId =>
       matchPlayers.playerRefIdOf(innings?.nonStrikerId?.value);
-  String? get bowlerRefId => matchPlayers.playerRefIdOf(innings?.bowlerId?.value);
+  String? get bowlerRefId =>
+      matchPlayers.playerRefIdOf(innings?.bowlerId?.value);
 
   String nameOf(String? refId) =>
       refId == null ? '—' : (matchPlayers.byRefId(refId)?.displayName ?? '—');
@@ -149,8 +150,7 @@ class ScoringState extends Equatable {
   // The ball list is still the fallback for an innings with no row yet, where
   // it is the only thing there is to count.
   int get legalBalls =>
-      innings?.legalBallCount ??
-      balls.where((b) => b.isLegalDelivery).length;
+      innings?.legalBallCount ?? balls.where((b) => b.isLegalDelivery).length;
 
   int get totalRuns =>
       innings?.totalRuns ?? balls.fold<int>(0, (sum, b) => sum + b.totalRuns);
@@ -164,7 +164,8 @@ class ScoringState extends Equatable {
   int get formatOvers =>
       match.format.oversPerInnings == 0 ? 20 : match.format.oversPerInnings;
 
-  String get overText => '${legalBalls ~/ ballsPerOver}.${legalBalls % ballsPerOver}';
+  String get overText =>
+      '${legalBalls ~/ ballsPerOver}.${legalBalls % ballsPerOver}';
 
   int get ballsRemaining => (formatOvers * ballsPerOver) - legalBalls;
 
@@ -182,8 +183,7 @@ class ScoringState extends Equatable {
   /// the ball log again here. It is asked at a different moment — "is the NEXT
   /// delivery a free hit", where the ball row answers "was THAT one" — but it
   /// is the same question of the same data, so it is the same code.
-  bool get freeHitActive =>
-      prevNonWideKind(balls) == BallKind.noBall;
+  bool get freeHitActive => prevNonWideKind(balls) == BallKind.noBall;
 
   /// The innings has ended.
   ///
@@ -215,9 +215,10 @@ class ScoringState extends Equatable {
   bool get overJustCompleted {
     if (balls.isEmpty) return false;
     final lastOver = balls.last.overNumber;
-    final legalInOver = balls
-        .where((b) => b.overNumber == lastOver && b.isLegalDelivery)
-        .length;
+    final legalInOver =
+        balls
+            .where((b) => b.overNumber == lastOver && b.isLegalDelivery)
+            .length;
     return legalInOver >= ballsPerOver;
   }
 
@@ -255,14 +256,14 @@ class ScoringState extends Equatable {
       battingSide == MatchTeamSide.a ? MatchTeamSide.b : MatchTeamSide.a;
 
   List<ScoringPerson> _squad(MatchTeamSide side) => [
-        for (final p in matchPlayers)
-          if (p.teamSide == side)
-            ScoringPerson(
-              matchPlayerId: p.id.value,
-              name: p.displayName,
-              photoUrl: p.photoUrl,
-            ),
-      ];
+    for (final p in matchPlayers)
+      if (p.teamSide == side)
+        ScoringPerson(
+          matchPlayerId: p.id.value,
+          name: p.displayName,
+          photoUrl: p.photoUrl,
+        ),
+  ];
 
   /// The fielding XI — candidate fielders for a dismissal.
   List<ScoringPerson> get fieldingXi => _squad(bowlingSide);
@@ -299,9 +300,10 @@ class ScoringState extends Equatable {
   /// reached the max overs per bowler limit.
   List<ScoringPerson> get availableBowlers {
     final justBowled = innings?.bowlerId?.value ?? lastOverBowlerId;
-    final maxBalls = (match.format.maxOversPerBowler > 0)
-        ? match.format.maxOversPerBowler * ballsPerOver
-        : 0;
+    final maxBalls =
+        (match.format.maxOversPerBowler > 0)
+            ? match.format.maxOversPerBowler * ballsPerOver
+            : 0;
 
     return [
       for (final p in fieldingXi)
@@ -327,7 +329,8 @@ class ScoringState extends Equatable {
 
   int? get target => innings?.target;
   bool get isChase => target != null;
-  int get runsNeeded => target == null ? 0 : (target! - totalRuns).clamp(0, 1 << 30);
+  int get runsNeeded =>
+      target == null ? 0 : (target! - totalRuns).clamp(0, 1 << 30);
 
   double? get requiredRunRate {
     if (target == null || ballsRemaining <= 0) return null;
@@ -337,23 +340,22 @@ class ScoringState extends Equatable {
   // ── Stats ────────────────────────────────────────────────────────────────
 
   BatterStats get strikerStats => batterStats(innings?.strikerId?.value);
-  BatterStats get nonStrikerStats =>
-      batterStats(innings?.nonStrikerId?.value);
+  BatterStats get nonStrikerStats => batterStats(innings?.nonStrikerId?.value);
 
   PartnershipStats get currentPartnership => currentPartnershipFor(
-        balls,
-        innings?.strikerId?.value,
-        innings?.nonStrikerId?.value,
-      );
+    balls,
+    innings?.strikerId?.value,
+    innings?.nonStrikerId?.value,
+  );
 
   BatterStats batterStats(String? matchPlayerId) =>
       batterStatsFor(balls, matchPlayerId);
 
   BowlerSpell get bowlerSpell => bowlerSpellFor(
-        balls,
-        innings?.bowlerId?.value,
-        ballsPerOver: ballsPerOver,
-      );
+    balls,
+    innings?.bowlerId?.value,
+    ballsPerOver: ballsPerOver,
+  );
 
   ScoringState copyWith({
     Match? match,
@@ -364,27 +366,26 @@ class ScoringState extends Equatable {
     bool? canScore,
     bool? isBusy,
     int? pendingCount,
-  }) =>
-      ScoringState(
-        match: match ?? this.match,
-        inningsNumber: inningsNumber ?? this.inningsNumber,
-        innings: innings ?? this.innings,
-        balls: balls ?? this.balls,
-        matchPlayers: matchPlayers ?? this.matchPlayers,
-        canScore: canScore ?? this.canScore,
-        isBusy: isBusy ?? this.isBusy,
-        pendingCount: pendingCount ?? this.pendingCount,
-      );
+  }) => ScoringState(
+    match: match ?? this.match,
+    inningsNumber: inningsNumber ?? this.inningsNumber,
+    innings: innings ?? this.innings,
+    balls: balls ?? this.balls,
+    matchPlayers: matchPlayers ?? this.matchPlayers,
+    canScore: canScore ?? this.canScore,
+    isBusy: isBusy ?? this.isBusy,
+    pendingCount: pendingCount ?? this.pendingCount,
+  );
 
   @override
   List<Object?> get props => [
-        match,
-        inningsNumber,
-        innings,
-        balls,
-        matchPlayers,
-        canScore,
-        isBusy,
-        pendingCount,
-      ];
+    match,
+    inningsNumber,
+    innings,
+    balls,
+    matchPlayers,
+    canScore,
+    isBusy,
+    pendingCount,
+  ];
 }

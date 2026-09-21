@@ -29,194 +29,102 @@ const _cricketSetupPermission = 'cricket.match.setup';
 @riverpod
 class MatchStartController extends _$MatchStartController {
   @override
-  Future<MatchStartState> build(
-    String matchId,
-  ) async {
-    final userId =
-        ref.watch(supabaseClientProvider)
-            .auth
-            .currentUser
-            ?.id;
+  Future<MatchStartState> build(String matchId) async {
+    final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
 
-    final match =
-        ref.watch(
-          liveMatchProvider(matchId),
-        ).value;
+    final match = ref.watch(liveMatchProvider(matchId)).value;
 
     if (match == null) {
-      throw const FailureWrapper(
-        NotFoundFailure(
-          'Match not found',
-        ),
-      );
+      throw const FailureWrapper(NotFoundFailure('Match not found'));
     }
 
     final lineup =
-        ref.watch(
-          matchPlayersProvider(matchId),
-        ).value ??
-        const <MatchPlayer>[];
+        ref.watch(matchPlayersProvider(matchId)).value ?? const <MatchPlayer>[];
 
-    final innings =
-        ref.watch(
-          liveInningsStateProvider(
-            matchId,
-            1,
-          ),
-        ).value;
+    final innings = ref.watch(liveInningsStateProvider(matchId, 1)).value;
 
     final previous = state.value;
 
-    final batting =
-        battingFirstTeam(match);
+    final batting = battingFirstTeam(match);
 
-    final matchScopedSetup =
-        await _canMatchSetup(
-          match.id,
-        );
+    final matchScopedSetup = await _canMatchSetup(match.id);
 
     final canRecordToss =
-        matchScopedSetup ||
-        await _canTeamSetup(
-          match.setupTeamId,
-        );
+        matchScopedSetup || await _canTeamSetup(match.setupTeamId);
 
     final canManageBattingSetup =
-        matchScopedSetup ||
-        await _canTeamSetup(
-          batting,
-        );
+        matchScopedSetup || await _canTeamSetup(batting);
 
     return MatchStartState(
       match: match,
 
       // Display only.
-      viewerRole:
-          viewerRoleOnMatch(
-        match,
-        userId,
-      ),
-      captainOf:
-          captainSideOf(
-        match,
-        userId,
-      ),
+      viewerRole: viewerRoleOnMatch(match, userId),
+      captainOf: captainSideOf(match, userId),
 
-      canRecordToss:
-          canRecordToss,
-      canManageBattingSetup:
-          canManageBattingSetup,
+      canRecordToss: canRecordToss,
+      canManageBattingSetup: canManageBattingSetup,
 
-      battingTeamId:
-          batting,
+      battingTeamId: batting,
       bowlingTeamId:
           batting == null
               ? null
-              : (
-                  batting ==
-                          match.teamAId
-                      ? match.teamBId
-                      : match.teamAId
-                ),
+              : (batting == match.teamAId ? match.teamBId : match.teamAId),
 
-      lockedStriker:
-          lineup.playerRefIdOf(
-        innings?.strikerId?.value,
-      ),
-      lockedNonStriker:
-          lineup.playerRefIdOf(
-        innings?.nonStrikerId?.value,
-      ),
+      lockedStriker: lineup.playerRefIdOf(innings?.strikerId?.value),
+      lockedNonStriker: lineup.playerRefIdOf(innings?.nonStrikerId?.value),
 
-      pendingTossWinner:
-          previous?.pendingTossWinner,
-      pendingDecision:
-          previous?.pendingDecision,
-      pendingStriker:
-          previous?.pendingStriker,
-      pendingNonStriker:
-          previous?.pendingNonStriker,
+      pendingTossWinner: previous?.pendingTossWinner,
+      pendingDecision: previous?.pendingDecision,
+      pendingStriker: previous?.pendingStriker,
+      pendingNonStriker: previous?.pendingNonStriker,
 
-      isBusy:
-          previous?.isBusy ?? false,
+      isBusy: previous?.isBusy ?? false,
     );
   }
 
   // ── Capability reads ──────────────────────────────────────────────────────
 
-  Future<bool> _canTeamSetup(
-    TeamId? teamId,
-  ) async {
+  Future<bool> _canTeamSetup(TeamId? teamId) async {
     if (teamId == null) {
       return false;
     }
 
-    final result =
-        await _repo.canTeamPermission(
+    final result = await _repo.canTeamPermission(
       teamId: teamId,
       permission: _cricketSetupPermission,
     );
 
-    return result.fold(
-      (_) => false,
-      (allowed) => allowed,
-    );
+    return result.fold((_) => false, (allowed) => allowed);
   }
 
-  Future<bool> _canMatchSetup(
-    MatchId id,
-  ) async {
-    final result =
-        await _repo.canMatchPermission(
+  Future<bool> _canMatchSetup(MatchId id) async {
+    final result = await _repo.canMatchPermission(
       matchId: id,
       permission: _cricketSetupPermission,
     );
 
-    return result.fold(
-      (_) => false,
-      (allowed) => allowed,
-    );
+    return result.fold((_) => false, (allowed) => allowed);
   }
 
   // ── Atomic toss form ──────────────────────────────────────────────────────
 
-  void pickTossWinner(
-    TeamId winner,
-  ) {
-    _update(
-      (s) => s.copyWith(
-        pendingTossWinner:
-            () => winner,
-      ),
-    );
+  void pickTossWinner(TeamId winner) {
+    _update((s) => s.copyWith(pendingTossWinner: () => winner));
   }
 
-  void pickTossDecision(
-    TossDecision decision,
-  ) {
-    _update(
-      (s) => s.copyWith(
-        pendingDecision:
-            () => decision,
-      ),
-    );
+  void pickTossDecision(TossDecision decision) {
+    _update((s) => s.copyWith(pendingDecision: () => decision));
   }
 
-  Future<Either<Failure, Unit>>
-      submitToss() {
+  Future<Either<Failure, Unit>> submitToss() {
     final current = state.value;
 
-    final winner =
-        current?.pendingTossWinner;
+    final winner = current?.pendingTossWinner;
 
-    final decision =
-        current?.pendingDecision;
+    final decision = current?.pendingDecision;
 
-    if (
-      current == null ||
-      winner == null ||
-      decision == null
-    ) {
+    if (current == null || winner == null || decision == null) {
       return Future.value(
         const Left(
           ValidationFailure(
@@ -228,62 +136,40 @@ class MatchStartController extends _$MatchStartController {
 
     return _busy(
       () => _repo.recordToss(
-        id:
-            MatchId(matchId),
-        wonBy:
-            winner,
-        decision:
-            decision,
+        id: MatchId(matchId),
+        wonBy: winner,
+        decision: decision,
       ),
-      label:
-          'recordToss',
+      label: 'recordToss',
       reset: (s) {
         final batting =
-            decision ==
-                    TossDecision.bat
+            decision == TossDecision.bat
                 ? winner
-                : (
-                    winner ==
-                            s.match.teamAId
-                        ? s.match.teamBId
-                        : s.match.teamAId
-                  );
+                : (winner == s.match.teamAId
+                    ? s.match.teamBId
+                    : s.match.teamAId);
 
         final bowling =
-            batting ==
-                    s.match.teamAId
-                ? s.match.teamBId
-                : s.match.teamAId;
+            batting == s.match.teamAId ? s.match.teamBId : s.match.teamAId;
 
-        final updatedMatch =
-            s.match.copyWith(
-          tossWonBy:
-              winner,
-          tossDecision:
-              decision,
-          startPhase:
-              MatchStartPhase.lineup,
-          status:
-              MatchStatus.toss,
+        final updatedMatch = s.match.copyWith(
+          tossWonBy: winner,
+          tossDecision: decision,
+          startPhase: MatchStartPhase.lineup,
+          status: MatchStatus.toss,
         );
 
         return s.copyWith(
-          match:
-              updatedMatch,
-          battingTeamId:
-              batting,
-          bowlingTeamId:
-              bowling,
+          match: updatedMatch,
+          battingTeamId: batting,
+          bowlingTeamId: bowling,
 
           // The live provider rebuild immediately following the committed
           // snapshot recalculates effective RBAC for the batting side.
-          canRecordToss:
-              false,
+          canRecordToss: false,
 
-          pendingTossWinner:
-              () => null,
-          pendingDecision:
-              () => null,
+          pendingTossWinner: () => null,
+          pendingDecision: () => null,
         );
       },
     );
@@ -291,90 +177,44 @@ class MatchStartController extends _$MatchStartController {
 
   // ── Openers ──────────────────────────────────────────────────────────────
 
-  void tapOpener(
-    String refId,
-  ) {
+  void tapOpener(String refId) {
     _update((s) {
-      final striker =
-          s.striker;
-      final nonStriker =
-          s.nonStriker;
+      final striker = s.striker;
+      final nonStriker = s.nonStriker;
 
-      final (
-        String? nextStriker,
-        String? nextNonStriker
-      ) = switch ((
+      final (String? nextStriker, String? nextNonStriker) = switch ((
         striker,
         nonStriker,
       )) {
-        (null, _) => (
-            refId,
-            nonStriker == refId
-                ? null
-                : nonStriker,
-          ),
-        (_, null) => (
-            striker == refId
-                ? null
-                : striker,
-            refId,
-          ),
-        _ => (
-            refId,
-            nonStriker == refId
-                ? striker
-                : nonStriker,
-          ),
+        (null, _) => (refId, nonStriker == refId ? null : nonStriker),
+        (_, null) => (striker == refId ? null : striker, refId),
+        _ => (refId, nonStriker == refId ? striker : nonStriker),
       };
 
       return s.copyWith(
-        pendingStriker:
-            () => nextStriker,
-        pendingNonStriker:
-            () => nextNonStriker,
+        pendingStriker: () => nextStriker,
+        pendingNonStriker: () => nextNonStriker,
       );
     });
   }
 
-  Future<Either<Failure, Unit>>
-      submitOpeners() {
+  Future<Either<Failure, Unit>> submitOpeners() {
     final current = state.value;
 
-    if (
-      current == null ||
-      !current.isLineupReady
-    ) {
+    if (current == null || !current.isLineupReady) {
       return Future.value(
-        const Left(
-          ValidationFailure(
-            'Please select both openers',
-          ),
-        ),
+        const Left(ValidationFailure('Please select both openers')),
       );
     }
 
     final lineup =
-        ref.read(
-          matchPlayersProvider(
-            matchId,
-          ),
-        ).value ??
-        const <MatchPlayer>[];
+        ref.read(matchPlayersProvider(matchId)).value ?? const <MatchPlayer>[];
 
-    final strikerId =
-        lineup.matchPlayerIdOf(
-      current.striker,
-    );
+    final strikerId = lineup.matchPlayerIdOf(current.striker);
 
-    final nonStrikerId =
-        lineup.matchPlayerIdOf(
-      current.nonStriker,
-    );
+    final nonStrikerId = lineup.matchPlayerIdOf(current.nonStriker);
 
-    if (
-      strikerId == null ||
-      nonStrikerId == null
-    ) {
+    if (strikerId == null || nonStrikerId == null) {
       return Future.value(
         const Left(
           ValidationFailure(
@@ -387,63 +227,36 @@ class MatchStartController extends _$MatchStartController {
 
     return _busy(
       () => _repo.submitMatchOpeners(
-        id:
-            MatchId(matchId),
-        strikerId:
-            strikerId,
-        nonStrikerId:
-            nonStrikerId,
+        id: MatchId(matchId),
+        strikerId: strikerId,
+        nonStrikerId: nonStrikerId,
       ),
-      label:
-          'submitOpeners',
-      reset: (s) => s.copyWith(
-        pendingStriker:
-            () => null,
-        pendingNonStriker:
-            () => null,
-      ),
+      label: 'submitOpeners',
+      reset:
+          (s) => s.copyWith(
+            pendingStriker: () => null,
+            pendingNonStriker: () => null,
+          ),
     );
   }
 
-  Future<Either<Failure, Unit>>
-      submitOpenersAndStart() async {
+  Future<Either<Failure, Unit>> submitOpenersAndStart() async {
     final current = state.value;
 
-    if (
-      current == null ||
-      !current.isLineupReady
-    ) {
+    if (current == null || !current.isLineupReady) {
       return Future.value(
-        const Left(
-          ValidationFailure(
-            'Please select both openers',
-          ),
-        ),
+        const Left(ValidationFailure('Please select both openers')),
       );
     }
 
     final lineup =
-        ref.read(
-          matchPlayersProvider(
-            matchId,
-          ),
-        ).value ??
-        const <MatchPlayer>[];
+        ref.read(matchPlayersProvider(matchId)).value ?? const <MatchPlayer>[];
 
-    final strikerId =
-        lineup.matchPlayerIdOf(
-      current.striker,
-    );
+    final strikerId = lineup.matchPlayerIdOf(current.striker);
 
-    final nonStrikerId =
-        lineup.matchPlayerIdOf(
-      current.nonStriker,
-    );
+    final nonStrikerId = lineup.matchPlayerIdOf(current.nonStriker);
 
-    if (
-      strikerId == null ||
-      nonStrikerId == null
-    ) {
+    if (strikerId == null || nonStrikerId == null) {
       return Future.value(
         const Left(
           ValidationFailure(
@@ -456,33 +269,23 @@ class MatchStartController extends _$MatchStartController {
 
     return _busy(
       () async {
-        final openerResult =
-            await _repo
-                .submitMatchOpeners(
-          id:
-              MatchId(matchId),
-          strikerId:
-              strikerId,
-          nonStrikerId:
-              nonStrikerId,
+        final openerResult = await _repo.submitMatchOpeners(
+          id: MatchId(matchId),
+          strikerId: strikerId,
+          nonStrikerId: nonStrikerId,
         );
 
         return openerResult.fold(
           Left.new,
-          (_) => _repo
-              .startMatchNow(
-            MatchId(matchId),
-          ),
+          (_) => _repo.startMatchNow(MatchId(matchId)),
         );
       },
-      label:
-          'submitOpenersAndStart',
-      reset: (s) => s.copyWith(
-        pendingStriker:
-            () => null,
-        pendingNonStriker:
-            () => null,
-      ),
+      label: 'submitOpenersAndStart',
+      reset:
+          (s) => s.copyWith(
+            pendingStriker: () => null,
+            pendingNonStriker: () => null,
+          ),
     );
   }
 
@@ -491,68 +294,38 @@ class MatchStartController extends _$MatchStartController {
   MatchesRepository get _repo =>
       (_cachedRepo ??= ref.read(matchesRepositoryProvider))!;
 
-  Future<Either<Failure, Unit>>
-      startMatchNow() =>
-          _busy(
-            () => _repo
-                .startMatchNow(
-              MatchId(matchId),
-            ),
-            label:
-                'startMatch',
-          );
+  Future<Either<Failure, Unit>> startMatchNow() =>
+      _busy(() => _repo.startMatchNow(MatchId(matchId)), label: 'startMatch');
 
   // ── Plumbing ─────────────────────────────────────────────────────────────
 
-  void _update(
-    MatchStartState Function(
-      MatchStartState,
-    ) edit,
-  ) {
+  void _update(MatchStartState Function(MatchStartState) edit) {
     if (!ref.mounted) {
       return;
     }
 
-    final current =
-        state.value;
+    final current = state.value;
 
     if (current == null) {
       return;
     }
 
-    state =
-        AsyncData(
-      edit(current),
-    );
+    state = AsyncData(edit(current));
   }
 
   Future<Either<Failure, Unit>> _busy(
-    Future<Either<Failure, Unit>>
-        Function()
-        action, {
+    Future<Either<Failure, Unit>> Function() action, {
     String label = 'action',
-    MatchStartState Function(
-      MatchStartState,
-    )? reset,
+    MatchStartState Function(MatchStartState)? reset,
   }) async {
-    _update(
-      (s) => s.copyWith(
-        isBusy: true,
-      ),
-    );
+    _update((s) => s.copyWith(isBusy: true));
 
-    final result =
-        await action();
+    final result = await action();
 
     _update((s) {
-      final settled =
-          s.copyWith(
-        isBusy: false,
-      );
+      final settled = s.copyWith(isBusy: false);
 
-      return reset == null
-          ? settled
-          : reset(settled);
+      return reset == null ? settled : reset(settled);
     });
 
     return result;

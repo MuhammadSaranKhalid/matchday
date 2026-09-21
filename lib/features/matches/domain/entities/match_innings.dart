@@ -37,19 +37,18 @@ class MatchInnings extends Equatable {
   final DateTime? endTime;
 
   /// 'a' / 'b', to compare against [MatchPlayer.teamSide].
-  String get battingSideLetter =>
-      battingTeamSide.endsWith('b') ? 'b' : 'a';
+  String get battingSideLetter => battingTeamSide.endsWith('b') ? 'b' : 'a';
 
   @override
   List<Object?> get props => [
-        inningsId,
-        matchId,
-        inningsNumber,
-        battingTeamSide,
-        bowlingTeamSide,
-        oversAllocated,
-        isCompleted,
-        startTime,
-        endTime,
-      ];
+    inningsId,
+    matchId,
+    inningsNumber,
+    battingTeamSide,
+    bowlingTeamSide,
+    oversAllocated,
+    isCompleted,
+    startTime,
+    endTime,
+  ];
 }

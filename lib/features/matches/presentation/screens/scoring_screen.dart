@@ -131,9 +131,10 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
       case AsyncError(:final error):
         return ScoringLoadFailure(
           message: failureMessageOf(error),
-          onRetry: () => ref.invalidate(
-            scoringControllerProvider(widget.matchId, widget.inningsNumber),
-          ),
+          onRetry:
+              () => ref.invalidate(
+                scoringControllerProvider(widget.matchId, widget.inningsNumber),
+              ),
         );
       case AsyncData(:final value):
         s = value;
@@ -193,11 +194,8 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                   Scoreboard(state: s),
                   BattersAndBowler(
                     state: s,
-                    onTapBowler: () => _actions.promptBowler(
-                      context,
-                      s,
-                      opening: false,
-                    ),
+                    onTapBowler:
+                        () => _actions.promptBowler(context, s, opening: false),
                   ),
                   if (s.freeHitActive) const FreeHitBanner(),
                   const SizedBox(height: 6),
@@ -214,11 +212,12 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
                     onRun: (runs) => _actions.run(context, runs),
                     onWicket: () => _actions.openWicket(context, s),
                     onExtra: (kind) => _actions.openExtras(context, s, kind),
-                    onSelectBowler: () => _actions.promptBowler(
-                      context,
-                      s,
-                      opening: s.balls.isEmpty,
-                    ),
+                    onSelectBowler:
+                        () => _actions.promptBowler(
+                          context,
+                          s,
+                          opening: s.balls.isEmpty,
+                        ),
                     onSelectBatter: () => _actions.promptBatter(context, s),
                   ),
                 ],

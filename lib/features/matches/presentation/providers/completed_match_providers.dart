@@ -28,10 +28,9 @@ Future<CompletedMatchView> completedMatch(Ref ref, String matchId) async {
   final repo = ref.watch(matchesRepositoryProvider);
   final id = MatchId(matchId);
 
-  final match = (await repo.getMatch(id)).fold(
-    (f) => throw FailureWrapper(f),
-    (m) => m,
-  );
+  final match = (await repo.getMatch(
+    id,
+  )).fold((f) => throw FailureWrapper(f), (m) => m);
   if (match == null) {
     throw const FailureWrapper(NotFoundFailure('That match no longer exists.'));
   }
@@ -57,10 +56,14 @@ Future<CompletedMatchView> completedMatch(Ref ref, String matchId) async {
     innings.map((inn) async {
       final ballsFuture = repo.listBalls(id, inn.inningsNumber);
       final wicketsFuture = repo.getWickets(inn.inningsId);
-      final balls =
-          (await ballsFuture).fold<List<Ball>>((_) => const [], (v) => v);
-      final wickets = (await wicketsFuture)
-          .fold<List<MatchWicket>>((_) => const [], (v) => v);
+      final balls = (await ballsFuture).fold<List<Ball>>(
+        (_) => const [],
+        (v) => v,
+      );
+      final wickets = (await wicketsFuture).fold<List<MatchWicket>>(
+        (_) => const [],
+        (v) => v,
+      );
       return buildInningsCard(
         inningsNumber: inn.inningsNumber,
         battingTeamSide: inn.battingSideLetter,
@@ -76,14 +79,16 @@ Future<CompletedMatchView> completedMatch(Ref ref, String matchId) async {
   final teams = <String, Team>{};
   await Future.wait(
     {match.teamAId.value, match.teamBId.value}.map((tid) async {
-      final t = (await ref.read(teamsRepositoryProvider).getTeam(TeamId(tid)))
-          .fold((_) => null, (t) => t);
+      final t = (await ref
+          .read(teamsRepositoryProvider)
+          .getTeam(TeamId(tid))).fold((_) => null, (t) => t);
       if (t != null) teams[tid] = t;
     }),
   );
 
-  final memberships =
-      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final memberships = await ref.watch(
+    currentUserTeamMembershipsProvider.future,
+  );
   final myTeamIds = memberships.map((m) => m.team.id.value).toSet();
 
   return _assemble(
@@ -127,36 +132,41 @@ CompletedMatchView _assemble({
   // Who won. The result sentence is authored server-side; deciding the winner
   // by comparing our own totals would let a provisional local sum contradict
   // it, so the sentence is matched against the team names instead.
-  final sentence = match.resultDescription?.trim().isNotEmpty == true
-      ? match.resultDescription!.trim()
-      : switch (match.status) {
-          MatchStatus.tied => 'Match tied · scores level',
-          MatchStatus.noResult => 'No result',
-          MatchStatus.abandoned => 'Abandoned',
-          MatchStatus.walkover => 'Awarded by walkover',
-          _ => 'Match complete',
-        };
+  final sentence =
+      match.resultDescription?.trim().isNotEmpty == true
+          ? match.resultDescription!.trim()
+          : switch (match.status) {
+            MatchStatus.tied => 'Match tied · scores level',
+            MatchStatus.noResult => 'No result',
+            MatchStatus.abandoned => 'Abandoned',
+            MatchStatus.walkover => 'Awarded by walkover',
+            _ => 'Match complete',
+          };
   bool won(String name) =>
       tone == ResultTone.won &&
       name.isNotEmpty &&
       sentence.toLowerCase().contains(name.split(' ').last.toLowerCase());
 
-  CompletedSide side(String tid, String letter, String name, Team? team,
-          InningsCard? card, String fallbackShort) =>
-      CompletedSide(
-        teamId: tid,
-        sideLetter: letter,
-        name: name,
-        short: teamShort(team, fallback: fallbackShort),
-        color: teamColor(team?.primaryColor,
-            fallback: const Color(0xFF7A746A)),
-        isYou: myTeamIds.contains(tid),
-        won: won(name),
-        batted: card != null && card.legalBalls > 0,
-        runs: card?.totalRuns,
-        wickets: card?.wickets,
-        oversLabel: card?.oversLabel,
-      );
+  CompletedSide side(
+    String tid,
+    String letter,
+    String name,
+    Team? team,
+    InningsCard? card,
+    String fallbackShort,
+  ) => CompletedSide(
+    teamId: tid,
+    sideLetter: letter,
+    name: name,
+    short: teamShort(team, fallback: fallbackShort),
+    color: teamColor(team?.primaryColor, fallback: const Color(0xFF7A746A)),
+    isYou: myTeamIds.contains(tid),
+    won: won(name),
+    batted: card != null && card.legalBalls > 0,
+    runs: card?.totalRuns,
+    wickets: card?.wickets,
+    oversLabel: card?.oversLabel,
+  );
 
   // The result card prints the sides in the order they batted, so a chase
   // reads top-to-bottom the way it happened.
@@ -184,18 +194,18 @@ CompletedMatchView _assemble({
       MatchStatus.walkover =>
         'The fixture was awarded without a ball being bowled. No toss was '
             'made and no innings began.',
-      _ => 'The fixture was called off before a ball was bowled. No toss was '
-          'made and no innings began.',
+      _ =>
+        'The fixture was called off before a ball was bowled. No toss was '
+            'made and no innings began.',
     };
   }
 
   final tossTeam = match.tossWonBy?.value;
-  final tossName = tossTeam == null
-      ? null
-      : (tossTeam == aId ? aName : bName);
-  final tossLine = (tossName == null || match.tossDecision == null)
-      ? null
-      : '$tossName, chose to ${match.tossDecision == TossDecision.bat ? 'bat' : 'bowl'}';
+  final tossName = tossTeam == null ? null : (tossTeam == aId ? aName : bName);
+  final tossLine =
+      (tossName == null || match.tossDecision == null)
+          ? null
+          : '$tossName, chose to ${match.tossDecision == TossDecision.bat ? 'bat' : 'bowl'}';
 
   final aCount = squad.where((p) => p.teamSide == MatchTeamSide.a).length;
   final bCount = squad.where((p) => p.teamSide == MatchTeamSide.b).length;
@@ -210,21 +220,22 @@ CompletedMatchView _assemble({
     headline: headline,
     absenceNote: absence,
     tossLine: tossLine,
-    squadsLine: (aCount + bCount) == 0
-        ? null
-        : '$aCount v $bCount · named on the card',
+    squadsLine:
+        (aCount + bCount) == 0 ? null : '$aCount v $bCount · named on the card',
     recordRows: [
       if (when != null)
         (
           label: 'Scheduled',
-          value: '${df.format(when.toLocal())} · '
-              '${DateFormat('h:mm a').format(when.toLocal())}'
+          value:
+              '${df.format(when.toLocal())} · '
+              '${DateFormat('h:mm a').format(when.toLocal())}',
         ),
       if (match.venue != null) (label: 'Ground', value: match.venue!.ground),
       (
         label: 'Format',
-        value: '${_formatLabel(match.format)} · '
-            '${match.format.playersPerTeam}-a-side'
+        value:
+            '${_formatLabel(match.format)} · '
+            '${match.format.playersPerTeam}-a-side',
       ),
     ],
   );

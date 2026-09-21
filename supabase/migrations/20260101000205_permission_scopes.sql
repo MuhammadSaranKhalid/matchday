@@ -39,6 +39,10 @@ select
 union all
 select
   'cricket.match.setup',
+  'match'
+union all
+select
+  'match.cancel',
   'match';
 
 -- -----------------------------------------------------------------------------

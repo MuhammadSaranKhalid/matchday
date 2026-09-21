@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import 'sheet_kit.dart';
 
 class NewBowlerSheet extends StatefulWidget {
-  const NewBowlerSheet({super.key, 
+  const NewBowlerSheet({
+    super.key,
     required this.overNumber,
     required this.justBowled,
     required this.people,
@@ -32,7 +33,8 @@ class _NewBowlerSheetState extends State<NewBowlerSheet> {
   @override
   Widget build(BuildContext context) {
     final kicker = widget.kicker ?? 'OVER ${widget.overNumber} COMPLETE';
-    final sub = widget.subtitle ??
+    final sub =
+        widget.subtitle ??
         (widget.justBowled == null
             ? 'Pick the player who will bowl the first over.'
             : '${widget.justBowled} can\'t bowl two overs in a row.');
@@ -42,11 +44,7 @@ class _NewBowlerSheetState extends State<NewBowlerSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            SheetHead(
-              kicker: kicker,
-              title: widget.title,
-              subtitle: sub,
-            ),
+            SheetHead(kicker: kicker, title: widget.title, subtitle: sub),
             SheetPersonGrid(
               people: widget.people,
               value: _pick,
@@ -66,9 +64,10 @@ class _NewBowlerSheetState extends State<NewBowlerSheet> {
                   flex: 2,
                   child: SheetPrimaryButton(
                     label: 'Start over',
-                    onTap: _pick == null
-                        ? null
-                        : () => Navigator.of(context).pop(_pick),
+                    onTap:
+                        _pick == null
+                            ? null
+                            : () => Navigator.of(context).pop(_pick),
                   ),
                 ),
               ],

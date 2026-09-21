@@ -12,8 +12,13 @@ import 'pv_v2_data.dart';
 import 'pv_v2_kit.dart';
 
 class _FooterAction {
-  const _FooterAction(this.action, this.label,
-      {this.primary = false, this.icon, this.danger = false});
+  const _FooterAction(
+    this.action,
+    this.label, {
+    this.primary = false,
+    this.icon,
+    this.danger = false,
+  });
   final String action;
   final String label;
   final bool primary;
@@ -39,31 +44,49 @@ class PvMatchDetail extends StatelessWidget {
     final done = m.phase == PvPhase.completed;
     final awaiting = m.phase == PvPhase.awaitingReply;
 
-    final (String headline, String subline) = live
-        ? (m.scoreA ?? 'In play', '${m.when} · ${m.venue}')
-        : done
+    final (String headline, String subline) =
+        live
+            ? (m.scoreA ?? 'In play', '${m.when} · ${m.venue}')
+            : done
             ? (m.sub, '${m.when} · ${m.venue}')
             : (m.when, m.venue);
 
-    // Sticky footer — phase-aware. Mirrors the design's `footer` array
-    // (`pavilion-matches-v2.jsx:169-182`). Actions without a real
-    // backend (message / reschedule / cancel / share) are still rendered for
-    // design fidelity; their handlers in `pavilion_match_detail_screen.dart`
-    // surface a "Coming soon" SnackBar.
+    // Sticky footer — capability- and phase-aware.
+    // Start Match is strictly capability-gated by `canStartMatch`.
     final footer = <_FooterAction>[
       if (live)
-        const _FooterAction('resume', 'Resume scoring',
-            primary: true, icon: PvIcons.whistle, danger: true)
-      else if (m.phase == PvPhase.startsSoon || m.phase == PvPhase.scheduled) ...[
-        const _FooterAction('start', 'Start match',
-            primary: true, icon: PvIcons.play),
-      ] else if (awaiting)
-        const _FooterAction('withdraw', 'Withdraw challenge',
-            primary: true, icon: PvIcons.close, danger: true)
+        const _FooterAction(
+          'resume',
+          'Resume scoring',
+          primary: true,
+          icon: PvIcons.whistle,
+          danger: true,
+        )
+      else if ((m.phase == PvPhase.startsSoon ||
+              m.phase == PvPhase.scheduled) &&
+          m.canStartMatch)
+        const _FooterAction(
+          'start',
+          'Start match',
+          primary: true,
+          icon: PvIcons.play,
+        )
+      else if (awaiting)
+        const _FooterAction(
+          'withdraw',
+          'Withdraw challenge',
+          primary: true,
+          icon: PvIcons.close,
+          danger: true,
+        )
       else if (done) ...[
         const _FooterAction('share', 'Share', icon: PvIcons.share),
-        const _FooterAction('scorecard', 'View scorecard',
-            primary: true, icon: PvIcons.ticket),
+        const _FooterAction(
+          'scorecard',
+          'View scorecard',
+          primary: true,
+          icon: PvIcons.ticket,
+        ),
       ],
     ];
 
@@ -78,16 +101,23 @@ class PvMatchDetail extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
                 children: [
                   _closeButtonRow(),
-                  _hero(live: live, done: done, headline: headline, subline: subline),
+                  _hero(
+                    live: live,
+                    done: done,
+                    headline: headline,
+                    subline: subline,
+                  ),
                   if (done) _completedScore(),
                   const _DetailSectionH('Match spec'),
-                  _KvCard(rows: [
-                    ('Format', m.formatDisplay),
-                    ('Overs', m.oversDisplay),
-                    ('Ball', m.ballDisplay),
-                    ('Venue', m.venue),
-                    ('When', m.when),
-                  ]),
+                  _KvCard(
+                    rows: [
+                      ('Format', m.formatDisplay),
+                      ('Overs', m.oversDisplay),
+                      ('Ball', m.ballDisplay),
+                      ('Venue', m.venue),
+                      ('When', m.when),
+                    ],
+                  ),
                   // Manage rows — design `pavilion-matches-v2.jsx:184-190`.
                   // Hidden for completed / awaiting-reply.
                   if (!done && !awaiting) ..._manageSection(),
@@ -104,26 +134,31 @@ class PvMatchDetail extends StatelessWidget {
 
   // ── top close row on main page ──
   Widget _closeButtonRow() => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text('MATCH', style: pvMono(10, color: CkColors.muted)),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onBack,
-            child: Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: CkColors.paper2,
-                shape: BoxShape.circle,
-                border: Border.all(color: CkColors.hairline),
-              ),
-              child: const PvIcon(PvIcons.close, size: 14, color: CkColors.ink, sw: 2.2),
-            ),
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text('MATCH', style: pvMono(10, color: CkColors.muted)),
+      GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onBack,
+        child: Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: CkColors.paper2,
+            shape: BoxShape.circle,
+            border: Border.all(color: CkColors.hairline),
           ),
-        ],
-      );
+          child: const PvIcon(
+            PvIcons.close,
+            size: 14,
+            color: CkColors.ink,
+            sw: 2.2,
+          ),
+        ),
+      ),
+    ],
+  );
 
   // ── hero ──
   Widget _hero({
@@ -164,19 +199,32 @@ class PvMatchDetail extends StatelessWidget {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    _heroSide(m.me, 'you · ${m.role}',
-                        live: live, fg: fg, mutedFg: mutedFg),
+                    _heroSide(
+                      m.me,
+                      m.meSubtitleDisplay,
+                      live: live,
+                      fg: fg,
+                      mutedFg: mutedFg,
+                    ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: PvIcon(PvIcons.swords,
-                          size: 20,
-                          color: live
-                              ? Colors.white.withValues(alpha: 0.5)
-                              : CkColors.muted,
-                          sw: 2),
+                      child: PvIcon(
+                        PvIcons.swords,
+                        size: 20,
+                        color:
+                            live
+                                ? Colors.white.withValues(alpha: 0.5)
+                                : CkColors.muted,
+                        sw: 2,
+                      ),
                     ),
-                    _heroSide(m.them, 'opponent',
-                        live: live, fg: fg, mutedFg: mutedFg),
+                    _heroSide(
+                      m.them,
+                      m.themSubtitleDisplay,
+                      live: live,
+                      fg: fg,
+                      mutedFg: mutedFg,
+                    ),
                   ],
                 ),
                 Container(
@@ -185,9 +233,11 @@ class PvMatchDetail extends StatelessWidget {
                   decoration: BoxDecoration(
                     border: Border(
                       top: BorderSide(
-                          color: live
-                              ? Colors.white.withValues(alpha: 0.14)
-                              : CkColors.hairline),
+                        color:
+                            live
+                                ? Colors.white.withValues(alpha: 0.14)
+                                : CkColors.hairline,
+                      ),
                     ),
                   ),
                   child: Column(
@@ -195,26 +245,33 @@ class PvMatchDetail extends StatelessWidget {
                       Text(
                         headline,
                         textAlign: TextAlign.center,
-                        style: (live || done)
-                            ? CkType.mono(
-                                fontSize: live ? 26 : 18,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.01,
-                                color: fg)
-                            : CkType.display(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: fg),
+                        style:
+                            (live || done)
+                                ? CkType.mono(
+                                  fontSize: live ? 26 : 18,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.01,
+                                  color: fg,
+                                )
+                                : CkType.display(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: fg,
+                                ),
                       ),
                       Padding(
                         padding: const EdgeInsets.only(top: 3),
-                        child: Text(subline,
-                            textAlign: TextAlign.center,
-                            style: CkType.body(
-                                fontSize: 12,
-                                color: live
+                        child: Text(
+                          subline,
+                          textAlign: TextAlign.center,
+                          style: CkType.body(
+                            fontSize: 12,
+                            color:
+                                live
                                     ? Colors.white.withValues(alpha: 0.7)
-                                    : CkColors.muted)),
+                                    : CkColors.muted,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -227,27 +284,42 @@ class PvMatchDetail extends StatelessWidget {
     );
   }
 
-  Widget _heroSide(PvCrest c, String role,
-      {required bool live, required Color fg, required Color mutedFg}) {
+  Widget _heroSide(
+    PvCrest c,
+    String role, {
+    required bool live,
+    required Color fg,
+    required Color mutedFg,
+  }) {
     return Expanded(
       child: Column(
         children: [
           Crest(
-              short: c.short,
-              color: c.color,
-              logoUrl: c.logoUrl,
-              size: 52,
-              radius: 14),
+            short: c.short,
+            color: c.color,
+            logoUrl: c.logoUrl,
+            size: 52,
+            radius: 14,
+          ),
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text(c.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: CkType.display(fontSize: 13.5, fontWeight: FontWeight.w700, color: fg)),
+            child: Text(
+              c.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.display(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: fg,
+              ),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text(role, style: CkType.body(fontSize: 10.5, color: mutedFg)),
+            child: Text(
+              role,
+              style: CkType.body(fontSize: 10.5, color: mutedFg),
+            ),
           ),
         ],
       ),
@@ -257,28 +329,36 @@ class PvMatchDetail extends StatelessWidget {
   // ── completed score line ──
   Widget _completedScore() {
     Widget box(String short, String? score, bool win) => Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: win ? CkColors.greenSoft : CkColors.paper,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: CkColors.hairline),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: win ? CkColors.greenSoft : CkColors.paper,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: CkColors.hairline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$short${win ? ' · WON' : ''}',
+              style: pvMono(9, color: CkColors.muted),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$short${win ? ' · WON' : ''}', style: pvMono(9, color: CkColors.muted)),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(score ?? '',
-                      style: CkType.mono(
-                          fontSize: 18, fontWeight: FontWeight.w700, color: CkColors.ink)),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                score ?? '',
+                style: CkType.mono(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: CkColors.ink,
                 ),
-              ],
+              ),
             ),
-          ),
-        );
+          ],
+        ),
+      ),
+    );
     final meWon = m.result == 'W';
     return Padding(
       padding: const EdgeInsets.only(top: 12),
@@ -294,39 +374,47 @@ class PvMatchDetail extends StatelessWidget {
 
   // ── sticky footer ──
   Widget _footerBar(List<_FooterAction> footer) => Container(
-        decoration: const BoxDecoration(
-          color: CkColors.paper,
-          border: Border(top: BorderSide(color: CkColors.hairline)),
-        ),
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-        child: SafeArea(
-          top: false,
-          child: Row(
-            children: [
-              for (var i = 0; i < footer.length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                Expanded(
-                  flex: footer[i].primary ? 14 : 10,
-                  child: _footerButton(footer[i]),
-                ),
-              ],
-            ],
-          ),
-        ),
-      );
+    decoration: const BoxDecoration(
+      color: CkColors.paper,
+      border: Border(top: BorderSide(color: CkColors.hairline)),
+    ),
+    padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+    child: SafeArea(
+      top: false,
+      child: Row(
+        children: [
+          for (var i = 0; i < footer.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(
+              flex: footer[i].primary ? 14 : 10,
+              child: _footerButton(footer[i]),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
 
-  // ── manage rows — design `pavilion-matches-v2.jsx:283-297` ──
-  // Tappable card of stacked rows. Row visibility depends on phase + role.
+  // ---------------------------------------------------------------------------
+  // Management actions
+  // ---------------------------------------------------------------------------
+  //
+  // Cancellation is intentionally the only management action currently exposed
+  // here.
+  //
+  // There is:
+  //
+  // - no reschedule
+  // - no lineup management
+  // - no role-name authorization
+  // - no fake "Coming soon" cancel button
+  //
+  // The row exists only when effective `match.cancel` evaluates to true.
   List<Widget> _manageSection() {
-    final captain = m.role == 'captain' || m.role == 'owner';
-    final live = m.phase == PvPhase.live;
-    final rows = <(String action, String label, String icon, bool danger)>[
-      if (!live && captain)
-        ('start', 'Start match / Toss', PvIcons.play, false),
-      if (!live && captain)
-        ('cancel', 'Cancel match', PvIcons.close, true),
-    ];
-    if (rows.isEmpty) return const [];
+    if (!m.canCancelMatch) {
+      return const [];
+    }
+
     return [
       const _DetailSectionH('Manage'),
       Container(
@@ -336,55 +424,49 @@ class PvMatchDetail extends StatelessWidget {
           border: Border.all(color: CkColors.hairline),
         ),
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < rows.length; i++)
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onAction(m.id, rows[i].$1),
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: i == 0
-                          ? BorderSide.none
-                          : const BorderSide(color: CkColors.hairline),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onAction(m.id, 'cancel'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            child: Row(
+              children: [
+                const PvIcon(
+                  PvIcons.close,
+                  size: 16,
+                  color: CkColors.red,
+                  sw: 1.8,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Cancel match',
+                    style: CkType.body(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                      color: CkColors.red,
                     ),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
-                  child: Row(
-                    children: [
-                      PvIcon(rows[i].$3,
-                          size: 16,
-                          color: rows[i].$4 ? CkColors.red : CkColors.ink2,
-                          sw: 1.8),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          rows[i].$2,
-                          style: CkType.body(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color:
-                                  rows[i].$4 ? CkColors.red : CkColors.ink),
-                        ),
-                      ),
-                      const PvIcon(PvIcons.next,
-                          size: 14, color: CkColors.soft, sw: 2),
-                    ],
-                  ),
                 ),
-              ),
-          ],
+                const PvIcon(
+                  PvIcons.next,
+                  size: 14,
+                  color: CkColors.soft,
+                  sw: 2,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     ];
   }
 
   Widget _footerButton(_FooterAction f) {
-    final fg = f.primary ? CkColors.paper : (f.danger ? CkColors.red : CkColors.ink);
-    final bg = f.primary ? (f.danger ? CkColors.red : CkColors.ink) : CkColors.paper;
+    final fg =
+        f.primary ? CkColors.paper : (f.danger ? CkColors.red : CkColors.ink);
+    final bg =
+        f.primary ? (f.danger ? CkColors.red : CkColors.ink) : CkColors.paper;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onAction(m.id, f.action),
@@ -404,11 +486,14 @@ class PvMatchDetail extends StatelessWidget {
               PvIcon(f.icon!, size: 15, color: fg, sw: 2),
               const SizedBox(width: 7),
             ],
-            Text(f.label,
-                style: CkType.body(
-                    fontSize: 13.5,
-                    fontWeight: f.primary ? FontWeight.w700 : FontWeight.w600,
-                    color: fg)),
+            Text(
+              f.label,
+              style: CkType.body(
+                fontSize: 13.5,
+                fontWeight: f.primary ? FontWeight.w700 : FontWeight.w600,
+                color: fg,
+              ),
+            ),
           ],
         ),
       ),
@@ -440,10 +525,11 @@ class _HeroEllipsePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
+    final paint =
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.08)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0;
     final center = Offset(size.width / 2, size.height / 2);
     canvas.drawOval(
       Rect.fromCenter(center: center, width: 180, height: 112),
@@ -478,7 +564,10 @@ class _KvCard extends StatelessWidget {
             Container(
               decoration: BoxDecoration(
                 border: Border(
-                  top: i == 0 ? BorderSide.none : const BorderSide(color: CkColors.hairline),
+                  top:
+                      i == 0
+                          ? BorderSide.none
+                          : const BorderSide(color: CkColors.hairline),
                 ),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
@@ -486,14 +575,22 @@ class _KvCard extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: 78,
-                    child: Text(rows[i].$1.toUpperCase(), style: pvMono(9.5, color: CkColors.muted)),
+                    child: Text(
+                      rows[i].$1.toUpperCase(),
+                      style: pvMono(9.5, color: CkColors.muted),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(rows[i].$2,
-                        textAlign: TextAlign.right,
-                        style: CkType.body(
-                            fontSize: 13, fontWeight: FontWeight.w500, color: CkColors.ink)),
+                    child: Text(
+                      rows[i].$2,
+                      textAlign: TextAlign.right,
+                      style: CkType.body(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: CkColors.ink,
+                      ),
+                    ),
                   ),
                 ],
               ),

@@ -40,13 +40,13 @@ class MatchStartHeader extends StatelessWidget {
   final MatchStartState state;
 
   String get _title => switch (state.phase) {
-        MatchStartPhase.toss => 'The toss.',
-        MatchStartPhase.lineup ||
-        MatchStartPhase.ready => state.isViewerBattingCaptain
-            ? 'Pick your openers.'
-            : 'Waiting on the batting team.',
-        MatchStartPhase.live => 'Live.',
-      };
+    MatchStartPhase.toss => 'The toss.',
+    MatchStartPhase.lineup || MatchStartPhase.ready =>
+      state.isViewerBattingCaptain
+          ? 'Pick your openers.'
+          : 'Waiting on the batting team.',
+    MatchStartPhase.live => 'Live.',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +72,10 @@ class MatchStartHeader extends StatelessWidget {
                   IconButton(
                     onPressed: () => context.pop(),
                     padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 32, minHeight: 32),
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
                     icon: const Icon(
                       Icons.chevron_left_rounded,
                       color: CkColors.ink,
@@ -124,13 +126,13 @@ class _PhonePill extends ConsumerWidget {
     final (teamId, roleLabel) = switch (state.viewerRole) {
       MatchStartViewerRole.captain => (state.captainOf, 'CAPTAIN'),
       MatchStartViewerRole.battingCaptain => (
-          state.battingTeamId,
-          'BATTING CAPTAIN',
-        ),
+        state.battingTeamId,
+        'BATTING CAPTAIN',
+      ),
       MatchStartViewerRole.bowlingCaptain => (
-          state.bowlingTeamId,
-          'BOWLING CAPTAIN',
-        ),
+        state.bowlingTeamId,
+        'BOWLING CAPTAIN',
+      ),
       MatchStartViewerRole.spectator => (null, 'SPECTATOR'),
     };
     if (teamId == null) return const SizedBox.shrink();
@@ -227,9 +229,10 @@ class _ProgressBar extends StatelessWidget {
               child: Container(
                 height: 3,
                 decoration: BoxDecoration(
-                  color: i < stepIndex
-                      ? CkColors.green
-                      : i == stepIndex
+                  color:
+                      i < stepIndex
+                          ? CkColors.green
+                          : i == stepIndex
                           ? CkColors.ink
                           : _pending,
                   borderRadius: BorderRadius.circular(2),

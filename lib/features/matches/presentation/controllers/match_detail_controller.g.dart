@@ -42,7 +42,7 @@ final class MatchDetailControllerProvider
 }
 
 String _$matchDetailControllerHash() =>
-    r'461fff2b8adb45bd582061ce75421365ca64e42d';
+    r'b66ca87bf656b27bc4731ea0dd414fdb23e827bc';
 
 abstract class _$MatchDetailController extends $Notifier<void> {
   void build();

@@ -50,16 +50,16 @@ class _CompletedMatchScreenState extends ConsumerState<CompletedMatchScreen> {
       body: SafeArea(
         child: switch (async) {
           AsyncData(:final value) => _Loaded(
-              view: value,
-              tab: _tab,
-              innings: _innings,
-              onTab: (i) => setState(() => _tab = i),
-              onInnings: (i) => setState(() => _innings = i),
-            ),
+            view: value,
+            tab: _tab,
+            innings: _innings,
+            onTab: (i) => setState(() => _tab = i),
+            onInnings: (i) => setState(() => _innings = i),
+          ),
           AsyncError(:final error) => _Error(
-              matchId: widget.matchId,
-              message: _messageFor(error),
-            ),
+            matchId: widget.matchId,
+            message: _messageFor(error),
+          ),
           _ => const _Skeleton(),
         },
       ),
@@ -80,37 +80,37 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        child: Row(
-          children: [
-            _CircleButton(
-              icon: Icons.arrow_back,
-              onTap: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go('/my-matches');
-                }
-              },
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: CkType.display(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.02,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            const _CircleButton(icon: Icons.add),
-          ],
+    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+    child: Row(
+      children: [
+        _CircleButton(
+          icon: Icons.arrow_back,
+          onTap: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/my-matches');
+            }
+          },
         ),
-      );
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: CkType.display(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.02,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        const _CircleButton(icon: Icons.add),
+      ],
+    ),
+  );
 }
 
 class _CircleButton extends StatelessWidget {
@@ -121,18 +121,18 @@ class _CircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: const BoxDecoration(
-            color: CkColors.paper2,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 17, color: CkColors.ink),
-        ),
-      );
+    onTap: onTap,
+    behavior: HitTestBehavior.opaque,
+    child: Container(
+      width: 36,
+      height: 36,
+      decoration: const BoxDecoration(
+        color: CkColors.paper2,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, size: 17, color: CkColors.ink),
+    ),
+  );
 }
 
 class _Loaded extends StatelessWidget {
@@ -168,10 +168,7 @@ class _Loaded extends StatelessWidget {
         else ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 11, 16, 0),
-            child: _TabBar(
-              index: tab,
-              onChanged: onTab,
-            ),
+            child: _TabBar(index: tab, onChanged: onTab),
           ),
           // Card and Overs speak about ONE innings, so they carry a switcher.
           if ((tab == 1 || tab == 2) && view.innings.length > 1)
@@ -186,9 +183,9 @@ class _Loaded extends StatelessWidget {
           Expanded(
             child: switch (tab) {
               1 => CmCardTab(
-                  card: view.innings[safeInnings],
-                  teamColor: _colorFor(view, view.innings[safeInnings]),
-                ),
+                card: view.innings[safeInnings],
+                teamColor: _colorFor(view, view.innings[safeInnings]),
+              ),
               2 => CmOversTab(card: view.innings[safeInnings]),
               3 => CmStatsTab(view: view),
               _ => CmSummaryTab(view: view),
@@ -217,47 +214,47 @@ class _TabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: CkColors.paper2,
-          border: Border.all(color: CkColors.line),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            for (final (i, label) in _labels.indexed)
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => onChanged(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    height: 44,
-                    margin: EdgeInsets.only(right: i == 3 ? 0 : 3),
-                    alignment: Alignment.center,
-                    decoration: i == index
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: CkColors.paper2,
+      border: Border.all(color: CkColors.line),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
+      children: [
+        for (final (i, label) in _labels.indexed)
+          Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(i),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                height: 44,
+                margin: EdgeInsets.only(right: i == 3 ? 0 : 3),
+                alignment: Alignment.center,
+                decoration:
+                    i == index
                         ? BoxDecoration(
-                            color: CkColors.surface,
-                            border: Border.all(color: CkColors.line),
-                            borderRadius: BorderRadius.circular(10),
-                          )
+                          color: CkColors.surface,
+                          border: Border.all(color: CkColors.line),
+                          borderRadius: BorderRadius.circular(10),
+                        )
                         : null,
-                    child: Text(
-                      label.toUpperCase(),
-                      style: CmText.label(
-                        size: 10,
-                        color: i == index ? CkColors.ink : CkColors.muted,
-                      ).copyWith(
-                        fontWeight:
-                            i == index ? FontWeight.w700 : FontWeight.w600,
-                        letterSpacing: 10 * 0.07,
-                      ),
-                    ),
+                child: Text(
+                  label.toUpperCase(),
+                  style: CmText.label(
+                    size: 10,
+                    color: i == index ? CkColors.ink : CkColors.muted,
+                  ).copyWith(
+                    fontWeight: i == index ? FontWeight.w700 : FontWeight.w600,
+                    letterSpacing: 10 * 0.07,
                   ),
                 ),
               ),
-          ],
-        ),
-      );
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class _InningsSwitcher extends StatelessWidget {
@@ -273,34 +270,34 @@ class _InningsSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        children: [
-          for (final (i, inn) in view.innings.indexed) ...[
-            GestureDetector(
-              onTap: () => onChanged(i),
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: i == index ? CkColors.ink : Colors.transparent,
-                  border: Border.all(
-                      color: i == index ? CkColors.ink : CkColors.line),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '${_shortTeam(view, inn.battingTeamSide)} '
-                  '${inn.inningsNumber == 1 ? '1ST' : '2ND'}',
-                  style: CmText.label(
-                    size: 9.5,
-                    color: i == index ? CkColors.paper : CkColors.muted,
-                  ).copyWith(letterSpacing: 9.5 * 0.07),
-                ),
+    children: [
+      for (final (i, inn) in view.innings.indexed) ...[
+        GestureDetector(
+          onTap: () => onChanged(i),
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: i == index ? CkColors.ink : Colors.transparent,
+              border: Border.all(
+                color: i == index ? CkColors.ink : CkColors.line,
               ),
+              borderRadius: BorderRadius.circular(999),
             ),
-            const SizedBox(width: 7),
-          ],
-        ],
-      );
+            child: Text(
+              '${_shortTeam(view, inn.battingTeamSide)} '
+              '${inn.inningsNumber == 1 ? '1ST' : '2ND'}',
+              style: CmText.label(
+                size: 9.5,
+                color: i == index ? CkColors.paper : CkColors.muted,
+              ).copyWith(letterSpacing: 9.5 * 0.07),
+            ),
+          ),
+        ),
+        const SizedBox(width: 7),
+      ],
+    ],
+  );
 
   static String _shortTeam(CompletedMatchView v, String side) =>
       v.sides
@@ -317,71 +314,68 @@ class _Skeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 10, 16, 10),
-            child: Row(
-              children: [
-                _CircleButton(icon: Icons.arrow_back),
-                SizedBox(width: 10),
-                Expanded(
-                  child: CkShimmer(
-                    child: CkShimmerBox(width: 170, height: 18, radius: 5),
-                  ),
-                ),
-                SizedBox(width: 10),
-                _CircleButton(icon: Icons.add),
-              ],
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const Padding(
+        padding: EdgeInsets.fromLTRB(16, 10, 16, 10),
+        child: Row(
+          children: [
+            _CircleButton(icon: Icons.arrow_back),
+            SizedBox(width: 10),
+            Expanded(
+              child: CkShimmer(
+                child: CkShimmerBox(width: 170, height: 18, radius: 5),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: CmPanel(
-              children: [
-                for (var i = 0; i < 2; i++)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 13, vertical: 9),
-                    child: Row(
-                      children: [
-                        CkShimmer(
-                          child:
-                              CkShimmerBox(width: 20, height: 20, radius: 6),
-                        ),
-                        SizedBox(width: 9),
-                        Expanded(
-                          child: CkShimmer(
-                            child:
-                                CkShimmerBox(width: 120, height: 13, radius: 4),
-                          ),
-                        ),
-                        CkShimmer(
-                          child: CkShimmerBox(width: 52, height: 14, radius: 4),
-                        ),
-                      ],
+            SizedBox(width: 10),
+            _CircleButton(icon: Icons.add),
+          ],
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: CmPanel(
+          children: [
+            for (var i = 0; i < 2; i++)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                child: Row(
+                  children: [
+                    CkShimmer(
+                      child: CkShimmerBox(width: 20, height: 20, radius: 6),
                     ),
-                  ),
-                Container(
-                  height: 36,
-                  color: CkColors.paper2,
-                  padding: const EdgeInsets.symmetric(horizontal: 13),
-                  alignment: Alignment.centerLeft,
-                  child: const CkShimmer(
-                    child: CkShimmerBox(width: 180, height: 12, radius: 4),
-                  ),
+                    SizedBox(width: 9),
+                    Expanded(
+                      child: CkShimmer(
+                        child: CkShimmerBox(width: 120, height: 13, radius: 4),
+                      ),
+                    ),
+                    CkShimmer(
+                      child: CkShimmerBox(width: 52, height: 14, radius: 4),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            Container(
+              height: 36,
+              color: CkColors.paper2,
+              padding: const EdgeInsets.symmetric(horizontal: 13),
+              alignment: Alignment.centerLeft,
+              child: const CkShimmer(
+                child: CkShimmerBox(width: 180, height: 12, radius: 4),
+              ),
             ),
-          ),
-          const Divider(height: 1, color: CkColors.line),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 11, 16, 0),
-            child: _TabBar(index: 0, onChanged: (_) {}),
-          ),
-          const Expanded(child: SizedBox.shrink()),
-        ],
-      );
+          ],
+        ),
+      ),
+      const Divider(height: 1, color: CkColors.line),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 11, 16, 0),
+        child: _TabBar(index: 0, onChanged: (_) {}),
+      ),
+      const Expanded(child: SizedBox.shrink()),
+    ],
+  );
 }
 
 /// Ink, never red — a failed read is not an error the reader caused.
@@ -393,45 +387,48 @@ class _Error extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Column(
-        children: [
-          const _Header(title: 'Match'),
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      message,
-                      textAlign: TextAlign.center,
-                      style: CkType.display(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.01,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    GestureDetector(
-                      onTap: () =>
-                          ref.invalidate(completedMatchProvider(matchId)),
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 11),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: CkColors.line),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text('TRY AGAIN',
-                            style: CmText.label(size: 10, color: CkColors.ink)),
-                      ),
-                    ),
-                  ],
+    children: [
+      const _Header(title: 'Match'),
+      Expanded(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: CkType.display(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.01,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 14),
+                GestureDetector(
+                  onTap: () => ref.invalidate(completedMatchProvider(matchId)),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 11,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: CkColors.line),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'TRY AGAIN',
+                      style: CmText.label(size: 10, color: CkColors.ink),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      );
+        ),
+      ),
+    ],
+  );
 }

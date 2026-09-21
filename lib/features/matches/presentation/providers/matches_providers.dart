@@ -20,11 +20,11 @@ part 'matches_providers.g.dart';
 
 @Riverpod(keepAlive: true)
 MatchesRepository matchesRepository(Ref ref) => MatchesRepositoryImpl(
-      ref.watch(matchesRemoteDataSourceProvider),
-      ref.watch(matchRequestsRemoteDataSourceProvider),
-      ref.watch(formatPresetsRemoteDataSourceProvider),
-      ref.watch(matchesLocalDataSourceProvider),
-    );
+  ref.watch(matchesRemoteDataSourceProvider),
+  ref.watch(matchRequestsRemoteDataSourceProvider),
+  ref.watch(formatPresetsRemoteDataSourceProvider),
+  ref.watch(matchesLocalDataSourceProvider),
+);
 
 /// Live scoring for one innings.
 ///
@@ -53,8 +53,7 @@ ScoringSession scoringSession(Ref ref, String matchId, int inningsNumber) {
 /// this instead of a hardcoded list).
 @riverpod
 Future<List<FormatPreset>> formatPresets(Ref ref) async {
-  final result =
-      await ref.watch(matchesRepositoryProvider).listFormatPresets();
+  final result = await ref.watch(matchesRepositoryProvider).listFormatPresets();
   return result.fold((f) => throw FailureWrapper(f), (list) => list);
 }
 
@@ -62,8 +61,9 @@ Future<List<FormatPreset>> formatPresets(Ref ref) async {
 /// [FailureWrapper] on error so the UI can show it via AsyncError.
 @riverpod
 Future<Match?> match(Ref ref, String matchId) async {
-  final result =
-      await ref.watch(matchesRepositoryProvider).getMatch(MatchId(matchId));
+  final result = await ref
+      .watch(matchesRepositoryProvider)
+      .getMatch(MatchId(matchId));
   return result.fold((f) => throw FailureWrapper(f), (m) => m);
 }
 
@@ -117,7 +117,9 @@ Stream<MatchInningsState?> liveInningsState(
   int inningsNumber,
 ) {
   ref.watch(appResumeCountProvider);
-  return ref.watch(matchesRepositoryProvider).watchMatchInningsState(
+  return ref
+      .watch(matchesRepositoryProvider)
+      .watchMatchInningsState(
         matchId: MatchId(matchId),
         inningsNumber: inningsNumber,
       );
@@ -127,14 +129,9 @@ Stream<MatchInningsState?> liveInningsState(
 /// `inningsNumber` is read off the match row; spectators + scorers both
 /// subscribe to the same stream.
 @riverpod
-Stream<List<Ball>> liveBalls(
-  Ref ref,
-  String matchId,
-  int inningsNumber,
-) =>
-    ref
-        .watch(matchesRepositoryProvider)
-        .watchBalls(MatchId(matchId), inningsNumber);
+Stream<List<Ball>> liveBalls(Ref ref, String matchId, int inningsNumber) => ref
+    .watch(matchesRepositoryProvider)
+    .watchBalls(MatchId(matchId), inningsNumber);
 
 /// Whether this device may record deliveries for (match, innings).
 ///
@@ -143,20 +140,15 @@ Stream<List<Ball>> liveBalls(
 /// changes — control passes to the other side at the innings break, and the
 /// answer flips at exactly that moment.
 @riverpod
-Future<bool> canScoreInnings(
-  Ref ref,
-  String matchId,
-  int inningsNumber,
-) async {
+Future<bool> canScoreInnings(Ref ref, String matchId, int inningsNumber) async {
   ref.watch(appResumeCountProvider);
   // Re-ask when the match row moves: the toss decides who bats, and the
   // innings break hands scoring to the other team.
   ref.watch(liveMatchProvider(matchId));
 
-  final result = await ref.watch(matchesRepositoryProvider).canScoreInnings(
-        matchId: MatchId(matchId),
-        inningsNumber: inningsNumber,
-      );
+  final result = await ref
+      .watch(matchesRepositoryProvider)
+      .canScoreInnings(matchId: MatchId(matchId), inningsNumber: inningsNumber);
   // Fail closed: if we cannot establish permission, show the read-only
   // scoreboard rather than controls whose taps the server would reject.
   return result.getOrElse((_) => false);
@@ -195,11 +187,9 @@ Future<List<MatchPoolApplication>> poolApplications(
 
 /// Wickets fallen for an innings (fall of wickets timeline).
 @riverpod
-Future<List<MatchWicket>> inningsWickets(
-  Ref ref,
-  String inningsId,
-) async {
-  final result =
-      await ref.watch(matchesRepositoryProvider).getWickets(inningsId);
+Future<List<MatchWicket>> inningsWickets(Ref ref, String inningsId) async {
+  final result = await ref
+      .watch(matchesRepositoryProvider)
+      .getWickets(inningsId);
   return result.fold((f) => throw FailureWrapper(f), (list) => list);
 }

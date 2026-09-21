@@ -37,8 +37,7 @@ class ApplicantDetailScreen extends ConsumerStatefulWidget {
       _ApplicantDetailScreenState();
 }
 
-class _ApplicantDetailScreenState
-    extends ConsumerState<ApplicantDetailScreen> {
+class _ApplicantDetailScreenState extends ConsumerState<ApplicantDetailScreen> {
   bool _busy = false;
 
   @override
@@ -46,9 +45,10 @@ class _ApplicantDetailScreenState
     final apps = ref.watch(poolApplicationsProvider(widget.requestId));
     final request = ref.watch(matchChallengeProvider(widget.requestId)).value;
 
-    void back() => context.canPop()
-        ? context.pop()
-        : context.go('/challenges/${widget.requestId}');
+    void back() =>
+        context.canPop()
+            ? context.pop()
+            : context.go('/challenges/${widget.requestId}');
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -60,33 +60,32 @@ class _ApplicantDetailScreenState
           ),
           Expanded(
             child: switch (apps) {
-              AsyncLoading() =>
-                const SingleChildScrollView(child: PoolLoadingState()),
+              AsyncLoading() => const SingleChildScrollView(
+                child: PoolLoadingState(),
+              ),
               AsyncError() => Center(
-                  child: PoolErrorState(
-                    onRetry: () => ref.invalidate(
-                      poolApplicationsProvider(widget.requestId),
-                    ),
+                child: PoolErrorState(
+                  onRetry:
+                      () => ref.invalidate(
+                        poolApplicationsProvider(widget.requestId),
+                      ),
+                ),
+              ),
+              AsyncData(value: final list) => switch (_find(list)) {
+                null => Center(
+                  child: Text(
+                    'This application is no longer available.',
+                    style: CkType.body(fontSize: 13, color: CkColors.muted),
                   ),
                 ),
-              AsyncData(value: final list) => switch (_find(list)) {
-                  null => Center(
-                      child: Text(
-                        'This application is no longer available.',
-                        style: CkType.body(
-                          fontSize: 13,
-                          color: CkColors.muted,
-                        ),
-                      ),
-                    ),
-                  final app => _Body(
-                      application: app,
-                      playersPerSide: request?.playersPerSide ?? 11,
-                      busy: _busy,
-                      onAccept: () => _accept(app, list),
-                      onReject: () => _reject(app),
-                    ),
-                },
+                final app => _Body(
+                  application: app,
+                  playersPerSide: request?.playersPerSide ?? 11,
+                  busy: _busy,
+                  onAccept: () => _accept(app, list),
+                  onReject: () => _reject(app),
+                ),
+              },
             },
           ),
         ],
@@ -105,8 +104,7 @@ class _ApplicantDetailScreenState
     MatchPoolApplication app,
     List<MatchPoolApplication> all,
   ) async {
-    final applicant =
-        ref.read(teamProvider(app.applicantTeamId.value)).value;
+    final applicant = ref.read(teamProvider(app.applicantTeamId.value)).value;
 
     // The sheet needs to name who else loses out, so gather the other pending
     // teams before opening it.
@@ -114,8 +112,7 @@ class _ApplicantDetailScreenState
     for (final other in all) {
       if (other.id == app.id) continue;
       if (other.status != PoolApplicationStatus.pending) continue;
-      final team =
-          ref.read(teamProvider(other.applicantTeamId.value)).value;
+      final team = ref.read(teamProvider(other.applicantTeamId.value)).value;
       others.add(team?.name ?? 'A team');
     }
 
@@ -133,40 +130,32 @@ class _ApplicantDetailScreenState
     if (!mounted) return;
     setState(() => _busy = false);
 
-    result.fold(
-      (failure) => _toast(failure.message),
-      (matchId) {
-        _invalidate();
-        context.go('/matches/${matchId.value}');
-      },
-    );
+    result.fold((failure) => _toast(failure.message), (matchId) {
+      _invalidate();
+      context.go('/matches/${matchId.value}');
+    });
   }
 
   Future<void> _reject(MatchPoolApplication app) async {
-    final applicant =
-        ref.read(teamProvider(app.applicantTeamId.value)).value;
+    final applicant = ref.read(teamProvider(app.applicantTeamId.value)).value;
 
-    final decision =
-        await showRejectApplicantSheet(context, applicant: applicant);
+    final decision = await showRejectApplicantSheet(
+      context,
+      applicant: applicant,
+    );
     if (decision == null || !mounted) return;
 
     setState(() => _busy = true);
     final result = await ref
         .read(matchPoolRepositoryProvider)
-        .rejectPoolApplication(
-          applicationId: app.id,
-          reason: decision.reason,
-        );
+        .rejectPoolApplication(applicationId: app.id, reason: decision.reason);
     if (!mounted) return;
     setState(() => _busy = false);
 
-    result.fold(
-      (failure) => _toast(failure.message),
-      (_) {
-        _invalidate();
-        if (context.canPop()) context.pop();
-      },
-    );
+    result.fold((failure) => _toast(failure.message), (_) {
+      _invalidate();
+      if (context.canPop()) context.pop();
+    });
   }
 
   void _invalidate() {
@@ -176,9 +165,9 @@ class _ApplicantDetailScreenState
   }
 
   void _toast(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -203,7 +192,7 @@ class _Body extends ConsumerWidget {
         ref.watch(teamProvider(application.applicantTeamId.value)).value;
     final roster =
         ref.watch(rosterProvider(application.applicantTeamId.value)).value ??
-            const [];
+        const [];
     final entries = resolveXi(
       xi: application.applicantXi,
       roster: roster,
@@ -278,8 +267,10 @@ class _Body extends ConsumerWidget {
               if (message != null && message.isNotEmpty)
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 13,
+                  ),
                   decoration: BoxDecoration(
                     color: CkColors.paper2,
                     borderRadius: BorderRadius.circular(14),
@@ -336,23 +327,23 @@ class _Body extends ConsumerWidget {
   }
 
   Widget _statusPill(PoolApplicationStatus status) => switch (status) {
-        PoolApplicationStatus.pending => CkStatusPill.card('Pending'),
-        PoolApplicationStatus.accepted => CkStatusPill.banner(
-            'Accepted',
-            background: CkColors.greenSoft,
-            foreground: CkColors.greenInk,
-          ),
-        PoolApplicationStatus.rejected => CkStatusPill.banner(
-            'Declined',
-            background: CkColors.soft,
-            foreground: CkColors.paper,
-          ),
-        PoolApplicationStatus.withdrawn => CkStatusPill.banner(
-            'Withdrawn',
-            background: CkColors.soft,
-            foreground: CkColors.paper,
-          ),
-      };
+    PoolApplicationStatus.pending => CkStatusPill.card('Pending'),
+    PoolApplicationStatus.accepted => CkStatusPill.banner(
+      'Accepted',
+      background: CkColors.greenSoft,
+      foreground: CkColors.greenInk,
+    ),
+    PoolApplicationStatus.rejected => CkStatusPill.banner(
+      'Declined',
+      background: CkColors.soft,
+      foreground: CkColors.paper,
+    ),
+    PoolApplicationStatus.withdrawn => CkStatusPill.banner(
+      'Withdrawn',
+      background: CkColors.soft,
+      foreground: CkColors.paper,
+    ),
+  };
 }
 
 /// Outlined in red rather than filled: rejecting is destructive but it is not

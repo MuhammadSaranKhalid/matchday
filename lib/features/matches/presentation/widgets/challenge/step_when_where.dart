@@ -50,11 +50,7 @@ class StepWhenWhere extends StatelessWidget {
         const SizedBox(height: 11),
         Row(
           children: [
-            _DayChip(
-              label: 'Today',
-              selected: isToday,
-              onTap: () => onDay(t0),
-            ),
+            _DayChip(label: 'Today', selected: isToday, onTap: () => onDay(t0)),
             const SizedBox(width: 8),
             _DayChip(
               label: 'Tomorrow',
@@ -63,9 +59,10 @@ class StepWhenWhere extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _DayChip(
-              label: day != null && !isToday && !isTomorrow
-                  ? _shortDate(day!)
-                  : 'Pick',
+              label:
+                  day != null && !isToday && !isTomorrow
+                      ? _shortDate(day!)
+                      : 'Pick',
               selected: day != null && !isToday && !isTomorrow,
               icon: PoolIcons.calendar,
               onTap: () => _pickDay(context, t0),
@@ -90,7 +87,11 @@ class StepWhenWhere extends StatelessWidget {
         const SizedBox(height: 9),
         Text(
           "Leave blank if you'll agree the ground with your opponent later.",
-          style: CkType.body(fontSize: 11.5, height: 1.4, color: CkColors.muted),
+          style: CkType.body(
+            fontSize: 11.5,
+            height: 1.4,
+            color: CkColors.muted,
+          ),
         ),
       ],
     );
@@ -108,9 +109,10 @@ class StepWhenWhere extends StatelessWidget {
 
   Future<void> _pickTime(BuildContext context) async {
     if (flexible) return;
-    final initial = time == null
-        ? const TimeOfDay(hour: 16, minute: 30)
-        : TimeOfDay(hour: time! ~/ 60, minute: time! % 60);
+    final initial =
+        time == null
+            ? const TimeOfDay(hour: 16, minute: 30)
+            : TimeOfDay(hour: time! ~/ 60, minute: time! % 60);
     final picked = await showTimePicker(context: context, initialTime: initial);
     if (picked != null) onTime(picked.hour * 60 + picked.minute);
   }
@@ -121,8 +123,18 @@ bool _sameDay(DateTime a, DateTime b) =>
 
 String _shortDate(DateTime d) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${months[d.month - 1]} ${d.day}';
 }
@@ -154,7 +166,10 @@ class _DayChip extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: icon == null ? 16 : 14, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: icon == null ? 16 : 14,
+          vertical: 10,
+        ),
         decoration: BoxDecoration(
           color: selected ? CkColors.ink : CkColors.paper,
           borderRadius: BorderRadius.circular(12),
@@ -270,16 +285,16 @@ class _TimeField extends StatelessWidget {
                 // looks unanswered rather than answered with words.
                 style: CkType.display(
                   fontSize: minutes == null && !disabled ? 15 : 20,
-                  fontWeight: minutes == null && !disabled
-                      ? FontWeight.w500
-                      : FontWeight.w700,
-                  color: minutes == null && !disabled
-                      ? CkColors.soft
-                      : CkColors.ink,
+                  fontWeight:
+                      minutes == null && !disabled
+                          ? FontWeight.w500
+                          : FontWeight.w700,
+                  color:
+                      minutes == null && !disabled
+                          ? CkColors.soft
+                          : CkColors.ink,
                   letterSpacing: -0.01,
-                ).copyWith(
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
               ),
               const PoolIcon(PoolIcons.clockMuted, size: 16),
             ],

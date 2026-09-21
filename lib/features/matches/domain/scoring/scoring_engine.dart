@@ -57,10 +57,12 @@ BallResult applyBall(
     );
   }
   if (!input.isWicket && input.wicketType != null) {
-    return const BallResult.failure(EngineError(
-      'wicket_type_unexpected',
-      'wicket_type must be null when this delivery is not a wicket',
-    ));
+    return const BallResult.failure(
+      EngineError(
+        'wicket_type_unexpected',
+        'wicket_type must be null when this delivery is not a wicket',
+      ),
+    );
   }
   if (runs < 0 || extras < 0) {
     return const BallResult.failure(
@@ -74,16 +76,20 @@ BallResult applyBall(
   // the batter's score and understated extras — a wrong scorecard behind a
   // right-looking scoreboard.
   if (input.ballKind == BallKind.wide && runs > 0) {
-    return const BallResult.failure(EngineError(
-      'wide_runs_to_batter',
-      'Runs off a wide are extras — send them in `extras`, not `runsScored`',
-    ));
+    return const BallResult.failure(
+      EngineError(
+        'wide_runs_to_batter',
+        'Runs off a wide are extras — send them in `extras`, not `runsScored`',
+      ),
+    );
   }
   if (input.ballKind == BallKind.wide && extras < 1) {
-    return const BallResult.failure(EngineError(
-      'wide_missing_penalty',
-      'A wide must carry at least the 1-run penalty in `extras`',
-    ));
+    return const BallResult.failure(
+      EngineError(
+        'wide_missing_penalty',
+        'A wide must carry at least the 1-run penalty in `extras`',
+      ),
+    );
   }
 
   // ── Bowler over cap ───────────────────────────────────────────────────────
@@ -91,10 +97,12 @@ BallResult applyBall(
   if (isLegal &&
       format.maxOversPerBowler > 0 &&
       ctx.bowlerLegalBalls >= format.maxOversPerBowler * ballsPerOver) {
-    return BallResult.failure(EngineError(
-      'bowler_over_cap',
-      'Bowler has reached the ${format.maxOversPerBowler}-over limit',
-    ));
+    return BallResult.failure(
+      EngineError(
+        'bowler_over_cap',
+        'Bowler has reached the ${format.maxOversPerBowler}-over limit',
+      ),
+    );
   }
 
   // ── Over / ball position, from the count BEFORE this ball ─────────────────
@@ -106,11 +114,13 @@ BallResult applyBall(
 
   if (isFreeHit && input.isWicket) {
     if (!_freeHitDismissals.contains(input.wicketType)) {
-      return const BallResult.failure(EngineError(
-        'free_hit_dismissal',
-        'On a free hit the batter can only be run out, hit wicket, '
-            'obstructing, or handled ball',
-      ));
+      return const BallResult.failure(
+        EngineError(
+          'free_hit_dismissal',
+          'On a free hit the batter can only be run out, hit wicket, '
+              'obstructing, or handled ball',
+        ),
+      );
     }
   }
 
@@ -147,7 +157,8 @@ BallResult applyBall(
   // ENDS change every endChangeBalls — equal for normal cricket, but 10 for
   // The Hundred, which is two 5-ball sets per end.
   final overEnded = isLegal && (state.legalBallCount + 1) % ballsPerOver == 0;
-  final endChanged = isLegal && (state.legalBallCount + 1) % endChangeBalls == 0;
+  final endChanged =
+      isLegal && (state.legalBallCount + 1) % endChangeBalls == 0;
   if (endChanged) swap = !swap;
 
   final newLegal = state.legalBallCount + (isLegal ? 1 : 0);
@@ -157,19 +168,23 @@ BallResult applyBall(
   final endAOccupant = swap ? state.nonStrikerId : state.strikerId;
   final endBOccupant = swap ? state.strikerId : state.nonStrikerId;
 
-  final isNonStrikerOut = input.isWicket &&
+  final isNonStrikerOut =
+      input.isWicket &&
       input.dismissedPlayerId != null &&
       input.dismissedPlayerId == state.nonStrikerId;
-  final dismissed = input.isWicket
-      ? (isNonStrikerOut ? state.nonStrikerId : state.strikerId)
-      : null;
+  final dismissed =
+      input.isWicket
+          ? (isNonStrikerOut ? state.nonStrikerId : state.strikerId)
+          : null;
 
-  final newStriker = input.isWicket
-      ? (endAOccupant == dismissed ? null : endAOccupant)
-      : endAOccupant;
-  final newNonStriker = input.isWicket
-      ? (endBOccupant == dismissed ? null : endBOccupant)
-      : endBOccupant;
+  final newStriker =
+      input.isWicket
+          ? (endAOccupant == dismissed ? null : endAOccupant)
+          : endAOccupant;
+  final newNonStriker =
+      input.isWicket
+          ? (endBOccupant == dismissed ? null : endBOccupant)
+          : endBOccupant;
   final newBowler = overEnded ? null : state.bowlerId;
 
   // ── Innings termination ───────────────────────────────────────────────────
@@ -198,7 +213,11 @@ BallResult applyBall(
       extras: extras,
       isWicket: input.isWicket,
       wicketType: input.wicketType,
-      dismissedPlayerId: input.dismissedPlayerId ?? (input.isWicket ? (isNonStrikerOut ? state.nonStrikerId : state.strikerId) : null),
+      dismissedPlayerId:
+          input.dismissedPlayerId ??
+          (input.isWicket
+              ? (isNonStrikerOut ? state.nonStrikerId : state.strikerId)
+              : null),
       batsmanId: input.batsmanId,
       nonStrikerId: input.nonStrikerId,
       bowlerId: input.bowlerId,
@@ -253,22 +272,24 @@ InningsTermination evaluateTermination({
   final wicketsToAllOut = format.wicketsToAllOut ?? (format.playersPerTeam - 1);
 
   final allOut = wicketsToAllOut > 0 && totalWickets >= wicketsToAllOut;
-  final oversComplete = format.oversPerInnings > 0 &&
+  final oversComplete =
+      format.oversPerInnings > 0 &&
       legalBallCount >= format.oversPerInnings * ballsPerOver;
   final targetReached = target != null && totalRuns >= target;
   final ended = allOut || oversComplete || targetReached || isDeclared;
 
   // Precedence: a chase won (target) beats all-out beats overs-exhausted beats
   // a standing declaration.
-  final InningsEndReason? reason = targetReached
-      ? InningsEndReason.target
-      : allOut
+  final InningsEndReason? reason =
+      targetReached
+          ? InningsEndReason.target
+          : allOut
           ? InningsEndReason.allOut
           : oversComplete
-              ? InningsEndReason.overs
-              : isDeclared
-                  ? InningsEndReason.declared
-                  : null;
+          ? InningsEndReason.overs
+          : isDeclared
+          ? InningsEndReason.declared
+          : null;
 
   return InningsTermination(
     allOut: allOut,

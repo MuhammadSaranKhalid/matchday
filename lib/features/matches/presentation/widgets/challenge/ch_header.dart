@@ -72,9 +72,10 @@ class ChHeader extends StatelessWidget {
                     margin: EdgeInsets.only(left: i == 0 ? 0 : 4),
                     height: 3,
                     decoration: BoxDecoration(
-                      color: i < step!
-                          ? CkColors.ink
-                          : CkColors.ink.withValues(alpha: 0.10),
+                      color:
+                          i < step!
+                              ? CkColors.ink
+                              : CkColors.ink.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),

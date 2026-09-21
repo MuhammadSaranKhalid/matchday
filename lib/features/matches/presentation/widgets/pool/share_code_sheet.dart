@@ -182,24 +182,25 @@ class _ShareCodeSheetState extends ConsumerState<_ShareCodeSheet> {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Center(
-                  child: _busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: CkColors.paper,
+                  child:
+                      _busy
+                          ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: CkColors.paper,
+                            ),
+                          )
+                          : Text(
+                            'Find challenge',
+                            style: CkType.display(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: CkColors.paper,
+                              letterSpacing: -0.01,
+                            ),
                           ),
-                        )
-                      : Text(
-                          'Find challenge',
-                          style: CkType.display(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: CkColors.paper,
-                            letterSpacing: -0.01,
-                          ),
-                        ),
                 ),
               ),
             ),

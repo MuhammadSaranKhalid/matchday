@@ -38,8 +38,10 @@ class _CmOversTabState extends State<CmOversTab> {
     final overs = _groupIntoOvers(widget.card.balls);
     if (overs.isEmpty) {
       return Center(
-        child: Text('No deliveries in this innings.',
-            style: CkType.body(fontSize: 13, color: CkColors.muted)),
+        child: Text(
+          'No deliveries in this innings.',
+          style: CkType.body(fontSize: 13, color: CkColors.muted),
+        ),
       );
     }
 
@@ -54,16 +56,19 @@ class _CmOversTabState extends State<CmOversTab> {
             children: [
               const Spacer(),
               GestureDetector(
-                onTap: () => _controller.animateTo(
-                  _controller.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 400),
-                  curve: Curves.easeOutCubic,
-                ),
+                onTap:
+                    () => _controller.animateTo(
+                      _controller.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeOutCubic,
+                    ),
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Text('↑ FIRST OVER',
-                      style: CmText.label(size: 9.5, color: CkColors.ink2)),
+                  child: Text(
+                    '↑ FIRST OVER',
+                    style: CmText.label(size: 9.5, color: CkColors.ink2),
+                  ),
                 ),
               ),
             ],
@@ -88,8 +93,7 @@ class _Over {
   final int number;
   final List<Ball> balls = [];
 
-  int get runs =>
-      balls.fold(0, (a, b) => a + b.runsScored + b.extras);
+  int get runs => balls.fold(0, (a, b) => a + b.runsScored + b.extras);
   int get wickets => balls.where((b) => b.isWicket).length;
 }
 
@@ -109,33 +113,36 @@ class _OverBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => CmPanel(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-            decoration: const BoxDecoration(
-              color: CkColors.paper,
-              border: Border(bottom: BorderSide(color: CkColors.hairline)),
+    children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+        decoration: const BoxDecoration(
+          color: CkColors.paper,
+          border: Border(bottom: BorderSide(color: CkColors.hairline)),
+        ),
+        child: Row(
+          children: [
+            Text(
+              'OVER ${over.number + 1}',
+              style: CmText.label(size: 9.5, color: CkColors.ink),
             ),
-            child: Row(
-              children: [
-                Text('OVER ${over.number + 1}',
-                    style: CmText.label(size: 9.5, color: CkColors.ink)),
-                const Spacer(),
-                Text(
-                  '${over.runs} run${over.runs == 1 ? '' : 's'}'
-                  '${over.wickets > 0 ? ' · ${over.wickets} w' : ''}',
-                  style: CmText.figure(
-                      size: 10,
-                      weight: FontWeight.w600,
-                      color: CkColors.muted),
-                ),
-              ],
+            const Spacer(),
+            Text(
+              '${over.runs} run${over.runs == 1 ? '' : 's'}'
+              '${over.wickets > 0 ? ' · ${over.wickets} w' : ''}',
+              style: CmText.figure(
+                size: 10,
+                weight: FontWeight.w600,
+                color: CkColors.muted,
+              ),
             ),
-          ),
-          for (final (i, b) in over.balls.indexed)
-            _BallRow(ball: b, last: i == over.balls.length - 1),
-        ],
-      );
+          ],
+        ),
+      ),
+      for (final (i, b) in over.balls.indexed)
+        _BallRow(ball: b, last: i == over.balls.length - 1),
+    ],
+  );
 }
 
 class _BallRow extends StatelessWidget {
@@ -150,9 +157,10 @@ class _BallRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
       decoration: BoxDecoration(
-        border: last
-            ? null
-            : const Border(bottom: BorderSide(color: CkColors.hairline)),
+        border:
+            last
+                ? null
+                : const Border(bottom: BorderSide(color: CkColors.hairline)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -164,7 +172,10 @@ class _BallRow extends StatelessWidget {
               // extras runs longer than six entries.
               '${ball.overNumber}.${ball.ballInOver}',
               style: CmText.figure(
-                  size: 10, weight: FontWeight.w600, color: CkColors.muted),
+                size: 10,
+                weight: FontWeight.w600,
+                color: CkColors.muted,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -174,7 +185,11 @@ class _BallRow extends StatelessWidget {
             child: Text(
               _outcome(ball),
               maxLines: 2,
-              style: CkType.body(fontSize: 12, height: 1.4, color: CkColors.ink2),
+              style: CkType.body(
+                fontSize: 12,
+                height: 1.4,
+                color: CkColors.ink2,
+              ),
             ),
           ),
         ],
@@ -192,8 +207,10 @@ enum _Tone { plain, wicket, extra }
     BallKind.noBall => ('nb', _Tone.extra),
     BallKind.bye => ('b', _Tone.extra),
     BallKind.legBye => ('lb', _Tone.extra),
-    BallKind.legal =>
-      (b.runsScored == 0 ? '•' : '${b.runsScored}', _Tone.plain),
+    BallKind.legal => (
+      b.runsScored == 0 ? '•' : '${b.runsScored}',
+      _Tone.plain,
+    ),
   };
 }
 
@@ -206,12 +223,12 @@ String _outcome(Ball b) {
     BallKind.bye => 'Bye · $runs run${runs == 1 ? '' : 's'}',
     BallKind.legBye => 'Leg bye · $runs run${runs == 1 ? '' : 's'}',
     BallKind.legal => switch (b.runsScored) {
-        0 => 'Dot ball',
-        4 => 'Four',
-        6 => 'Six',
-        1 => 'Single',
-        _ => '${b.runsScored} runs',
-      },
+      0 => 'Dot ball',
+      4 => 'Four',
+      6 => 'Six',
+      1 => 'Single',
+      _ => '${b.runsScored} runs',
+    },
   };
 }
 
@@ -236,8 +253,7 @@ class _Token extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(7),
       ),
-      child: Text(text,
-          style: CmText.figure(size: 10.5, color: fg)),
+      child: Text(text, style: CmText.figure(size: 10.5, color: fg)),
     );
   }
 }

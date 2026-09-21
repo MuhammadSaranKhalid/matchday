@@ -86,10 +86,7 @@ class BoardMatch {
 
 /// A competition's fixtures, or the trailing Friendlies group.
 class BoardGroup {
-  const BoardGroup({
-    required this.matches,
-    this.tournament,
-  });
+  const BoardGroup({required this.matches, this.tournament});
 
   final List<BoardMatch> matches;
 
@@ -102,10 +99,7 @@ class BoardGroup {
 }
 
 class MatchesBoardView {
-  const MatchesBoardView({
-    required this.groups,
-    required this.liveCount,
-  });
+  const MatchesBoardView({required this.groups, required this.liveCount});
 
   final List<BoardGroup> groups;
 
@@ -144,36 +138,37 @@ Future<MatchesBoardView> matchesBoard(Ref ref, MatchesBoardTab tab) async {
   final matches = switch (tab) {
     MatchesBoardTab.live => live,
     MatchesBoardTab.upcoming => await read(
+      statuses: const {MatchStatus.scheduled},
+      from: now,
+      to: now.add(const Duration(days: 7)),
+    ),
+    MatchesBoardTab.finished => await read(
+      statuses: kFinishedStatuses,
+      from: now.subtract(const Duration(days: 7)),
+      to: now,
+      newestFirst: true,
+    ),
+    // For you spans every status — it is a relevance cut, not a status one.
+    MatchesBoardTab.forYou => [
+      ...live,
+      ...await read(
         statuses: const {MatchStatus.scheduled},
         from: now,
         to: now.add(const Duration(days: 7)),
       ),
-    MatchesBoardTab.finished => await read(
+      ...await read(
         statuses: kFinishedStatuses,
         from: now.subtract(const Duration(days: 7)),
         to: now,
         newestFirst: true,
       ),
-    // For you spans every status — it is a relevance cut, not a status one.
-    MatchesBoardTab.forYou => [
-        ...live,
-        ...await read(
-          statuses: const {MatchStatus.scheduled},
-          from: now,
-          to: now.add(const Duration(days: 7)),
-        ),
-        ...await read(
-          statuses: kFinishedStatuses,
-          from: now.subtract(const Duration(days: 7)),
-          to: now,
-          newestFirst: true,
-        ),
-      ],
+    ],
   };
 
-  final shown = tab == MatchesBoardTab.forYou
-      ? await _narrowToForYou(ref, matches)
-      : matches;
+  final shown =
+      tab == MatchesBoardTab.forYou
+          ? await _narrowToForYou(ref, matches)
+          : matches;
 
   return _group(ref, shown, liveCount: live.length);
 }
@@ -188,8 +183,9 @@ Future<List<Match>> _narrowToForYou(Ref ref, List<Match> matches) async {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return const [];
 
-  final memberships =
-      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final memberships = await ref.watch(
+    currentUserTeamMembershipsProvider.future,
+  );
   final myTeams = [for (final membership in memberships) membership.team];
   final followed = <String>{
     ...myTeams.map((t) => t.id.value),
@@ -219,18 +215,19 @@ Future<MatchesBoardView> _group(
   }
 
   final userId = ref.watch(currentUserIdProvider);
-  final memberships =
-      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final memberships = await ref.watch(
+    currentUserTeamMembershipsProvider.future,
+  );
   final myTeams = [for (final membership in memberships) membership.team];
-  final myTeamIds = userId == null
-      ? <String>{}
-      : myTeams.map((t) => t.id.value).toSet();
+  final myTeamIds =
+      userId == null ? <String>{} : myTeams.map((t) => t.id.value).toSet();
 
   // One round trip for every score on the board.
   final inningsByMatch = (await ref
-          .watch(matchesRepositoryProvider)
-          .listInningsForMatches(matches.map((m) => m.id)))
-      .getOrElse((_) => const {});
+      .watch(matchesRepositoryProvider)
+      .listInningsForMatches(
+        matches.map((m) => m.id),
+      )).getOrElse((_) => const {});
 
   final board = <BoardMatch>[];
   for (final m in matches) {
@@ -243,9 +240,10 @@ Future<MatchesBoardView> _group(
         teamA: teamA,
         teamB: teamB,
         innings: inningsByMatch[m.id] ?? const [],
-        viewerTeamId: myTeamIds.contains(m.teamAId.value)
-            ? m.teamAId
-            : (myTeamIds.contains(m.teamBId.value) ? m.teamBId : null),
+        viewerTeamId:
+            myTeamIds.contains(m.teamAId.value)
+                ? m.teamAId
+                : (myTeamIds.contains(m.teamBId.value) ? m.teamBId : null),
       ),
     );
   }
@@ -267,8 +265,7 @@ Future<MatchesBoardView> _group(
     // so a group survives without its header metadata rather than vanishing.
     Tournament? tournament;
     try {
-      tournament =
-          await ref.watch(tournamentDetailProvider(entry.key).future);
+      tournament = await ref.watch(tournamentDetailProvider(entry.key).future);
     } catch (_) {
       tournament = null;
     }

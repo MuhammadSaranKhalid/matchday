@@ -45,11 +45,7 @@ List<XiEntry> resolveXi({
           keeper: id == keeperId,
         )
       else
-        XiEntry(
-          name: 'Unnamed player',
-          initials: '—',
-          keeper: id == keeperId,
-        ),
+        XiEntry(name: 'Unnamed player', initials: '—', keeper: id == keeperId),
   ];
 }
 
@@ -101,9 +97,8 @@ class _ApplicantXiListState extends State<ApplicantXiList> {
     }
 
     final hidden = all.length - widget.previewCount;
-    final shown = _expanded || hidden <= 0
-        ? all
-        : all.take(widget.previewCount).toList();
+    final shown =
+        _expanded || hidden <= 0 ? all : all.take(widget.previewCount).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

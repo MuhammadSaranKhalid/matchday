@@ -41,20 +41,21 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
       body: SafeArea(
         bottom: false,
         child: async.when(
-          loading: () => const _Frame(
-            confirmed: null,
-            past: null,
-            child: _Skeleton(),
-          ),
-          error: (e, _) => _Frame(
-            confirmed: null,
-            past: null,
-            child: _ErrorState(
-              message:
-                  e is FailureWrapper ? e.failure.message : 'err_net_timeout',
-              onRetry: () => ref.invalidate(myMatchesViewProvider),
-            ),
-          ),
+          loading:
+              () =>
+                  const _Frame(confirmed: null, past: null, child: _Skeleton()),
+          error:
+              (e, _) => _Frame(
+                confirmed: null,
+                past: null,
+                child: _ErrorState(
+                  message:
+                      e is FailureWrapper
+                          ? e.failure.message
+                          : 'err_net_timeout',
+                  onRetry: () => ref.invalidate(myMatchesViewProvider),
+                ),
+              ),
           data: _body,
         ),
       ),
@@ -65,11 +66,7 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
     // First run: tabs are suppressed, exactly as on the Challenges board —
     // two empty tabs is a filing cabinet with no files.
     if (view.confirmed.isEmpty && view.past.isEmpty) {
-      return const _Frame(
-        confirmed: null,
-        past: null,
-        child: _FirstRunEmpty(),
-      );
+      return const _Frame(confirmed: null, past: null, child: _FirstRunEmpty());
     }
 
     return _Frame(
@@ -90,12 +87,11 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
 
   Widget _confirmedBody(MyMatchesView view) {
     if (view.confirmed.isEmpty) {
-      return _ConfirmedEmpty(onSwitch: () => setState(() => _confirmedTab = false));
+      return _ConfirmedEmpty(
+        onSwitch: () => setState(() => _confirmedTab = false),
+      );
     }
-    final groups = _groupByDay(
-      view.confirmed,
-      (c) => c.startTime,
-    );
+    final groups = _groupByDay(view.confirmed, (c) => c.startTime);
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
@@ -104,10 +100,7 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
           _DateRule(label: g.label, first: g == groups.first),
           const SizedBox(height: 10),
           for (final c in g.items) ...[
-            FixtureCard(
-              v: c,
-              onTap: () => _openFixture(c),
-            ),
+            FixtureCard(v: c, onTap: () => _openFixture(c)),
             const SizedBox(height: 10),
           ],
         ],
@@ -195,8 +188,8 @@ List<_DayGroup<T>> _groupByDay<T>(List<T> items, DateTime? Function(T) at) {
         k == today
             ? 'TODAY · ${_dayLabel(k)}'
             : k == tomorrow
-                ? 'TOMORROW · ${_dayLabel(k)}'
-                : _dayLabel(k),
+            ? 'TOMORROW · ${_dayLabel(k)}'
+            : _dayLabel(k),
         buckets[k]!,
       ),
   ];
@@ -209,8 +202,18 @@ List<_DayGroup<T>> _groupByDay<T>(List<T> items, DateTime? Function(T) at) {
 String _dayLabel(DateTime t) {
   const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const months = [
-    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
   ];
   return '${days[t.weekday - 1]} ${t.day} ${months[t.month - 1]}';
 }
@@ -223,23 +226,23 @@ class _DateRule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.only(top: first ? 0 : 4),
-        child: Row(
-          children: [
-            Text(
-              label,
-              style: CkType.mono(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.10,
-                color: CkColors.ink,
-              ),
-            ),
-            const SizedBox(width: 9),
-            const Expanded(child: Divider(height: 1, color: CkColors.line)),
-          ],
+    padding: EdgeInsets.only(top: first ? 0 : 4),
+    child: Row(
+      children: [
+        Text(
+          label,
+          style: CkType.mono(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.10,
+            color: CkColors.ink,
+          ),
         ),
-      );
+        const SizedBox(width: 9),
+        const Expanded(child: Divider(height: 1, color: CkColors.line)),
+      ],
+    ),
+  );
 }
 
 // ─── Chrome ─────────────────────────────────────────────────────────────────
@@ -264,71 +267,69 @@ class _Frame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Header(),
-          if (confirmed != null && past != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: _Tabs(
-                confirmedActive: confirmedActive,
-                confirmed: confirmed!,
-                past: past!,
-                onSelect: onSelect ?? (_) {},
-              ),
-            ),
-          if (banner != null) banner!,
-          Expanded(child: child),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _Header(),
+      if (confirmed != null && past != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: _Tabs(
+            confirmedActive: confirmedActive,
+            confirmed: confirmed!,
+            past: past!,
+            onSelect: onSelect ?? (_) {},
+          ),
+        ),
+      if (banner != null) banner!,
+      Expanded(child: child),
+    ],
+  );
 }
 
 class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: CkColors.hairline)),
-        ),
-        child: Row(
-          children: [
-            InkWell(
-              onTap: () =>
-                  context.canPop() ? context.pop() : context.go('/home'),
-              customBorder: const CircleBorder(),
-              child: Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: CkColors.paper2,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.arrow_back,
-                    size: 17, color: CkColors.ink),
-              ),
+    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: CkColors.hairline)),
+    ),
+    child: Row(
+      children: [
+        InkWell(
+          onTap: () => context.canPop() ? context.pop() : context.go('/home'),
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: CkColors.paper2,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'My Matches',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: CkType.display(
-                  fontSize: 23,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.022,
-                  color: CkColors.ink,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            const ChallengesNavButton(),
-            const SizedBox(width: 8),
-            _CreatePill(onTap: () => context.push('/challenge')),
-          ],
+            child: const Icon(Icons.arrow_back, size: 17, color: CkColors.ink),
+          ),
         ),
-      );
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'My Matches',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: CkType.display(
+              fontSize: 23,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.022,
+              color: CkColors.ink,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        const ChallengesNavButton(),
+        const SizedBox(width: 8),
+        _CreatePill(onTap: () => context.push('/challenge')),
+      ],
+    ),
+  );
 }
 
 class _CreatePill extends StatelessWidget {
@@ -338,40 +339,40 @@ class _CreatePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 13),
-          decoration: BoxDecoration(
-            color: CkColors.ink,
-            borderRadius: BorderRadius.circular(999),
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 13),
+      decoration: BoxDecoration(
+        color: CkColors.ink,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '+',
+            style: CkType.body(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: CkColors.paper,
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '+',
-                style: CkType.body(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: CkColors.paper,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'CHALLENGE',
-                style: CkType.mono(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.08,
-                  color: CkColors.paper,
-                ),
-              ),
-            ],
+          const SizedBox(width: 6),
+          Text(
+            'CHALLENGE',
+            style: CkType.mono(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.08,
+              color: CkColors.paper,
+            ),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 class _Tabs extends StatelessWidget {
@@ -389,25 +390,29 @@ class _Tabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: CkColors.paper2,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: CkColors.line),
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: CkColors.paper2,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: CkColors.line),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: _tab(
+            'Confirmed',
+            confirmed,
+            confirmedActive,
+            () => onSelect(true),
+          ),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: _tab('Confirmed', confirmed, confirmedActive,
-                  () => onSelect(true)),
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              child: _tab('Past', past, !confirmedActive, () => onSelect(false)),
-            ),
-          ],
+        const SizedBox(width: 4),
+        Expanded(
+          child: _tab('Past', past, !confirmedActive, () => onSelect(false)),
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _tab(String label, int count, bool active, VoidCallback onTap) =>
       GestureDetector(
@@ -416,13 +421,14 @@ class _Tabs extends StatelessWidget {
         child: Container(
           height: 44,
           alignment: Alignment.center,
-          decoration: active
-              ? BoxDecoration(
-                  color: CkColors.surface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: CkColors.line),
-                )
-              : null,
+          decoration:
+              active
+                  ? BoxDecoration(
+                    color: CkColors.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: CkColors.line),
+                  )
+                  : null,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -485,7 +491,8 @@ class _ChallengesBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final needs =
-        ref.watch(challengesViewProvider).value?.needsYou ?? const <ChallengeRow>[];
+        ref.watch(challengesViewProvider).value?.needsYou ??
+        const <ChallengeRow>[];
     final urgent = needs.where((r) => r.tier == ExpiryTier.urgent).toList();
     if (urgent.isEmpty) return const SizedBox.shrink();
 
@@ -565,18 +572,18 @@ class _Skeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-        children: const [
-          CkShimmer(child: CkShimmerBox(width: 132, height: 10, radius: 4)),
-          SizedBox(height: 12),
-          _SkeletonFixture(opacity: 1, live: true),
-          SizedBox(height: 10),
-          _SkeletonFixture(opacity: 0.7, live: false),
-          SizedBox(height: 10),
-          _SkeletonFixture(opacity: 0.4, live: false),
-        ],
-      );
+    physics: const NeverScrollableScrollPhysics(),
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+    children: const [
+      CkShimmer(child: CkShimmerBox(width: 132, height: 10, radius: 4)),
+      SizedBox(height: 12),
+      _SkeletonFixture(opacity: 1, live: true),
+      SizedBox(height: 10),
+      _SkeletonFixture(opacity: 0.7, live: false),
+      SizedBox(height: 10),
+      _SkeletonFixture(opacity: 0.4, live: false),
+    ],
+  );
 }
 
 class _SkeletonFixture extends StatelessWidget {
@@ -608,9 +615,7 @@ class _SkeletonFixture extends StatelessWidget {
                 color: CkColors.paper,
                 border: Border(right: BorderSide(color: CkColors.hairline)),
               ),
-              child: shim(
-                const CkShimmerBox(width: 44, height: 16, radius: 4),
-              ),
+              child: shim(const CkShimmerBox(width: 44, height: 16, radius: 4)),
             ),
             Expanded(
               child: Padding(
@@ -646,12 +651,13 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Centered(
-        title: "Couldn't load your matches.",
-        body: 'Nothing has been lost — fixtures, lineups and scorecards all '
-            'live on the server. Check your connection and try again.',
-        action: _InkButton(label: 'Try again', onTap: onRetry),
-        footnote: message,
-      );
+    title: "Couldn't load your matches.",
+    body:
+        'Nothing has been lost — fixtures, lineups and scorecards all '
+        'live on the server. Check your connection and try again.',
+    action: _InkButton(label: 'Try again', onTap: onRetry),
+    footnote: message,
+  );
 }
 
 /// The offer is a challenge, and if a queue exists it is named: an empty
@@ -664,13 +670,15 @@ class _ConfirmedEmpty extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final needs =
-        ref.watch(challengesViewProvider).value?.needsYou ?? const <ChallengeRow>[];
+        ref.watch(challengesViewProvider).value?.needsYou ??
+        const <ChallengeRow>[];
     return _Centered(
       title: 'Nothing on the schedule.',
-      body: needs.isEmpty
-          ? 'Fixtures appear here once a challenge is accepted.'
-          : 'Fixtures appear here once a challenge is accepted. Send one, or '
-              'answer the ${needs.length} already waiting on you.',
+      body:
+          needs.isEmpty
+              ? 'Fixtures appear here once a challenge is accepted.'
+              : 'Fixtures appear here once a challenge is accepted. Send one, or '
+                  'answer the ${needs.length} already waiting on you.',
       action: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -681,9 +689,10 @@ class _ConfirmedEmpty extends ConsumerWidget {
           if (needs.isNotEmpty) ...[
             const SizedBox(height: 10),
             _GhostRow(
-              label: needs.length == 1
-                  ? '1 challenge needs you'
-                  : '${needs.length} challenges need you',
+              label:
+                  needs.length == 1
+                      ? '1 challenge needs you'
+                      : '${needs.length} challenges need you',
               onTap: () => context.push('/my/challenges'),
             ),
           ],
@@ -703,17 +712,19 @@ class _PastEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Centered(
-        title: 'No past matches.',
-        body: 'Scorecards land here the moment a match finishes — yours and '
-            'every match you were in the squad for.',
-        action: confirmedCount == 0
+    title: 'No past matches.',
+    body:
+        'Scorecards land here the moment a match finishes — yours and '
+        'every match you were in the squad for.',
+    action:
+        confirmedCount == 0
             ? null
             : _GhostRow(
-                label: 'Confirmed',
-                trailing: '$confirmedCount',
-                onTap: onSwitch,
-              ),
-      );
+              label: 'Confirmed',
+              trailing: '$confirmedCount',
+              onTap: onSwitch,
+            ),
+  );
 }
 
 class _FirstRunEmpty extends StatelessWidget {
@@ -721,26 +732,27 @@ class _FirstRunEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Centered(
-        title: 'No matches yet.',
-        body: 'Every fixture starts as a challenge: propose a day, a ground '
-            'and a format, and it appears here the moment the other manager '
-            'accepts.',
-        action: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _InkButton(
-              label: '+  Challenge a team',
-              onTap: () => context.push('/challenge'),
-            ),
-            const SizedBox(height: 10),
-            _GhostRow(
-              label: 'Post to the open pool',
-              onTap: () => context.push('/matches/send-challenge?mode=open'),
-            ),
-          ],
+    title: 'No matches yet.',
+    body:
+        'Every fixture starts as a challenge: propose a day, a ground '
+        'and a format, and it appears here the moment the other manager '
+        'accepts.',
+    action: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _InkButton(
+          label: '+  Challenge a team',
+          onTap: () => context.push('/challenge'),
         ),
-        footnote: 'Accepted challenges become fixtures · nothing else does',
-      );
+        const SizedBox(height: 10),
+        _GhostRow(
+          label: 'Post to the open pool',
+          onTap: () => context.push('/matches/send-challenge?mode=open'),
+        ),
+      ],
+    ),
+    footnote: 'Accepted challenges become fixtures · nothing else does',
+  );
 }
 
 class _SeeAll extends StatelessWidget {
@@ -750,35 +762,35 @@ class _SeeAll extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(top: 2),
-        padding: const EdgeInsets.only(top: 14),
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: CkColors.hairline)),
+    margin: const EdgeInsets.only(top: 2),
+    padding: const EdgeInsets.only(top: 14),
+    decoration: const BoxDecoration(
+      border: Border(top: BorderSide(color: CkColors.hairline)),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'SEE ALL $total MATCHES',
+          style: CkType.mono(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.09,
+            color: CkColors.ink2,
+          ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'SEE ALL $total MATCHES',
-              style: CkType.mono(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.09,
-                color: CkColors.ink2,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '→',
-              style: CkType.mono(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: CkColors.muted,
-              ),
-            ),
-          ],
+        const SizedBox(width: 8),
+        Text(
+          '→',
+          style: CkType.mono(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: CkColors.muted,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 // ─── Shared bits ────────────────────────────────────────────────────────────
@@ -798,41 +810,41 @@ class _Centered extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(28, 72, 28, 28),
-        children: [
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: CkType.display(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.015,
-              color: CkColors.ink,
-            ),
+    physics: const AlwaysScrollableScrollPhysics(),
+    padding: const EdgeInsets.fromLTRB(28, 72, 28, 28),
+    children: [
+      Text(
+        title,
+        textAlign: TextAlign.center,
+        style: CkType.display(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.015,
+          color: CkColors.ink,
+        ),
+      ),
+      const SizedBox(height: 9),
+      Text(
+        body,
+        textAlign: TextAlign.center,
+        style: CkType.body(fontSize: 13, height: 1.6, color: CkColors.muted),
+      ),
+      if (action != null) ...[const SizedBox(height: 22), action!],
+      if (footnote != null) ...[
+        const SizedBox(height: 18),
+        Text(
+          footnote!.toUpperCase(),
+          textAlign: TextAlign.center,
+          style: CkType.mono(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.08,
+            color: CkColors.soft,
           ),
-          const SizedBox(height: 9),
-          Text(
-            body,
-            textAlign: TextAlign.center,
-            style: CkType.body(fontSize: 13, height: 1.6, color: CkColors.muted),
-          ),
-          if (action != null) ...[const SizedBox(height: 22), action!],
-          if (footnote != null) ...[
-            const SizedBox(height: 18),
-            Text(
-              footnote!.toUpperCase(),
-              textAlign: TextAlign.center,
-              style: CkType.mono(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.08,
-                color: CkColors.soft,
-              ),
-            ),
-          ],
-        ],
-      );
+        ),
+      ],
+    ],
+  );
 }
 
 class _InkButton extends StatelessWidget {
@@ -843,26 +855,26 @@ class _InkButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          height: 48,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: CkColors.ink,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            label.toUpperCase(),
-            style: CkType.mono(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.08,
-              color: CkColors.paper,
-            ),
-          ),
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: Container(
+      height: 48,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: CkColors.ink,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: CkType.mono(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.08,
+          color: CkColors.paper,
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _GhostRow extends StatelessWidget {
@@ -874,53 +886,53 @@ class _GhostRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: CkColors.paper2,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: CkColors.line),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: CkType.mono(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: CkColors.ink2,
-                  ),
-                ),
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: Container(
+      height: 46,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: CkColors.paper2,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: CkColors.line),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.08,
+                color: CkColors.ink2,
               ),
-              const SizedBox(width: 8),
-              if (trailing != null)
-                Text(
-                  trailing!,
-                  style: CkType.mono(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: CkColors.muted,
-                  ),
-                ),
-              const SizedBox(width: 8),
-              Text(
-                '→',
-                style: CkType.mono(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: CkColors.muted,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      );
+          const SizedBox(width: 8),
+          if (trailing != null)
+            Text(
+              trailing!,
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.08,
+                color: CkColors.muted,
+              ),
+            ),
+          const SizedBox(width: 8),
+          Text(
+            '→',
+            style: CkType.mono(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: CkColors.muted,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

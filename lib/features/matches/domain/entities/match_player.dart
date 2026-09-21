@@ -31,9 +31,9 @@ class MatchPlayer extends Equatable {
     this.isKeeper = false,
     this.isSubstitute = false,
   }) : assert(
-          (profileId == null) != (unclaimedId == null),
-          'Exactly one of profileId / unclaimedId must be set (XOR).',
-        );
+         (profileId == null) != (unclaimedId == null),
+         'Exactly one of profileId / unclaimedId must be set (XOR).',
+       );
 
   /// Stable per-match identity. The same uuid is used by balls.batsmanId,
   /// MatchInningsState.strikerId, etc. — never changes for the lifetime
@@ -99,19 +99,19 @@ class MatchPlayer extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        matchId,
-        teamSide,
-        profileId,
-        unclaimedId,
-        displayName,
-        photoUrl,
-        battingOrder,
-        jerseyNumber,
-        isCaptain,
-        isKeeper,
-        isSubstitute,
-      ];
+    id,
+    matchId,
+    teamSide,
+    profileId,
+    unclaimedId,
+    displayName,
+    photoUrl,
+    battingOrder,
+    jerseyNumber,
+    isCaptain,
+    isKeeper,
+    isSubstitute,
+  ];
 }
 
 /// Translation between the two id spaces a match deals in: the per-match

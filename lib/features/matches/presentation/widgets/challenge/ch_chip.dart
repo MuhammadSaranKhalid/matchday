@@ -22,9 +22,8 @@ class ChChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = active ? CkColors.ink : CkColors.paper;
-    final fg = active
-        ? CkColors.paper
-        : (disabled ? CkColors.soft : CkColors.ink);
+    final fg =
+        active ? CkColors.paper : (disabled ? CkColors.soft : CkColors.ink);
     return GestureDetector(
       onTap: disabled ? null : onTap,
       child: Container(
@@ -33,9 +32,7 @@ class ChChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: active ? CkColors.ink : CkColors.hairline,
-          ),
+          border: Border.all(color: active ? CkColors.ink : CkColors.hairline),
         ),
         alignment: Alignment.center,
         child: Text(

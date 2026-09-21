@@ -66,12 +66,13 @@ class MatchesRemoteDataSource {
 
   Future<MatchDto> update(String id, Map<String, dynamic> changes) async {
     try {
-      final row = await _supabase
-          .from(_matches)
-          .update(changes)
-          .eq('match_id', id)
-          .select()
-          .single();
+      final row =
+          await _supabase
+              .from(_matches)
+              .update(changes)
+              .eq('match_id', id)
+              .select()
+              .single();
       return MatchDto.fromJson(row);
     } on PostgrestException catch (e) {
       if (e.code == 'PGRST116') {
@@ -83,11 +84,12 @@ class MatchesRemoteDataSource {
 
   Future<MatchDto?> getById(String id) async {
     try {
-      final row = await _supabase
-          .from(_matches)
-          .select()
-          .eq('match_id', id)
-          .maybeSingle();
+      final row =
+          await _supabase
+              .from(_matches)
+              .select()
+              .eq('match_id', id)
+              .maybeSingle();
       return row == null ? null : MatchDto.fromJson(row);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -142,11 +144,13 @@ class MatchesRemoteDataSource {
   /// union of both definitions now lives in the RPC alone.
   Future<List<MatchDto>> list() async {
     try {
-      final rows =
-          await _supabase.rpc<List<dynamic>>('list_my_cricket_matches');
+      final rows = await _supabase.rpc<List<dynamic>>(
+        'list_my_cricket_matches',
+      );
       return rows
-          .map((row) =>
-              MatchDto.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) => MatchDto.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
           .toList();
     } on PostgrestException catch (e) {
       throw _rpcException(e);
@@ -156,7 +160,6 @@ class MatchesRemoteDataSource {
     }
   }
 
-
   Future<Map<String, dynamic>> _matchAction(
     String action,
     Map<String, dynamic> params,
@@ -164,10 +167,7 @@ class MatchesRemoteDataSource {
     try {
       final res = await _supabase.functions.invoke(
         'cricket-match-action',
-        body: {
-          'action': action,
-          ...params,
-        },
+        body: {'action': action, ...params},
       );
 
       final data = res.data;
@@ -207,10 +207,7 @@ class MatchesRemoteDataSource {
     }
   }
 
-  Future<void> _startRpc(
-    String action,
-    Map<String, dynamic> params,
-  ) async {
+  Future<void> _startRpc(String action, Map<String, dynamic> params) async {
     await _matchAction(action, params);
   }
 
@@ -219,13 +216,12 @@ class MatchesRemoteDataSource {
     required String wonBy,
     required String decision,
     String? face,
-  }) =>
-      _startRpc('record_toss', {
-        'p_match_id': matchId,
-        'p_won_by': wonBy,
-        'p_decision': decision,
-        if (face != null) 'p_face': face,
-      });
+  }) => _startRpc('record_toss', {
+    'p_match_id': matchId,
+    'p_won_by': wonBy,
+    'p_decision': decision,
+    if (face != null) 'p_face': face,
+  });
 
   Future<bool> canTeamPermission({
     required String teamId,
@@ -234,10 +230,7 @@ class MatchesRemoteDataSource {
     try {
       final allowed = await _supabase.rpc<dynamic>(
         'team_can',
-        params: {
-          'p_team_id': teamId,
-          'p_permission': permission,
-        },
+        params: {'p_team_id': teamId, 'p_permission': permission},
       );
       return allowed == true;
     } on PostgrestException catch (e) {
@@ -268,15 +261,21 @@ class MatchesRemoteDataSource {
     required String matchId,
     required String strikerId,
     required String nonStrikerId,
-  }) =>
-      _startRpc('submit_match_openers', {
-        'p_match_id': matchId,
-        'p_striker_id': strikerId,
-        'p_non_striker_id': nonStrikerId,
-      });
+  }) => _startRpc('submit_match_openers', {
+    'p_match_id': matchId,
+    'p_striker_id': strikerId,
+    'p_non_striker_id': nonStrikerId,
+  });
 
   Future<void> startMatchNow(String matchId) =>
       _startRpc('start_match_now', {'p_match_id': matchId});
+
+  Future<void> cancelMatch({required String matchId, String? reason}) =>
+      _startRpc('cancel_match', {
+        'p_match_id': matchId,
+        if (reason != null && reason.trim().isNotEmpty)
+          'p_reason': reason.trim(),
+      });
 
   /// Whether the signed-in user may record deliveries for this innings.
   ///
@@ -287,10 +286,10 @@ class MatchesRemoteDataSource {
     required int inningsNumber,
   }) async {
     try {
-      final allowed = await _supabase.rpc<dynamic>('can_score_innings', params: {
-        'p_match_id': matchId,
-        'p_innings_number': inningsNumber,
-      });
+      final allowed = await _supabase.rpc<dynamic>(
+        'can_score_innings',
+        params: {'p_match_id': matchId, 'p_innings_number': inningsNumber},
+      );
       return allowed == true;
     } on PostgrestException catch (e) {
       throw _rpcException(e);
@@ -337,9 +336,7 @@ class MatchesRemoteDataSource {
         emit(dto, 'snapshot·$reason');
       } catch (e) {
         if (!hasEmitted && !controller.isClosed) {
-          controller.addError(
-            ServerException('Could not load match $matchId'),
-          );
+          controller.addError(ServerException('Could not load match $matchId'));
         }
       } finally {
         refreshing = false;
@@ -349,10 +346,14 @@ class MatchesRemoteDataSource {
     final channelName = 'match:$matchId:state';
     final channel = _ablyService.getChannel(channelName);
 
-    final subscription = channel.subscribe(name: 'match_state_updated').listen((ably.Message msg) {
+    final subscription = channel.subscribe(name: 'match_state_updated').listen((
+      ably.Message msg,
+    ) {
       if (msg.data is Map) {
         try {
-          final dto = MatchDto.fromJson(Map<String, dynamic>.from(msg.data as Map));
+          final dto = MatchDto.fromJson(
+            Map<String, dynamic>.from(msg.data as Map),
+          );
           emit(dto, 'live');
         } catch (_) {
           resnapshot('bad-frame');
@@ -411,13 +412,12 @@ class MatchesRemoteDataSource {
           .select(_matchPlayersSelect)
           .eq('match_id', matchId);
 
-      final dtos = rows.map(MatchPlayerDto.fromJson).toList()
-        ..sort((a, b) {
-          final side = a.teamSide.compareTo(b.teamSide);
-          if (side != 0) return side;
-          return (a.battingOrder ?? 999)
-              .compareTo(b.battingOrder ?? 999);
-        });
+      final dtos =
+          rows.map(MatchPlayerDto.fromJson).toList()..sort((a, b) {
+            final side = a.teamSide.compareTo(b.teamSide);
+            if (side != 0) return side;
+            return (a.battingOrder ?? 999).compareTo(b.battingOrder ?? 999);
+          });
 
       return dtos;
     } on PostgrestException catch (e) {
@@ -434,12 +434,13 @@ class MatchesRemoteDataSource {
     required int inningsNumber,
   }) async {
     try {
-      final row = await _supabase
-          .from(_matchInningsState)
-          .select()
-          .eq('match_id', matchId)
-          .eq('innings_number', inningsNumber)
-          .maybeSingle();
+      final row =
+          await _supabase
+              .from(_matchInningsState)
+              .select()
+              .eq('match_id', matchId)
+              .eq('innings_number', inningsNumber)
+              .maybeSingle();
       return row == null ? null : MatchInningsStateDto.fromJson(row);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -489,18 +490,22 @@ class MatchesRemoteDataSource {
     final channelName = 'match:$matchId:state';
     final channel = _ablyService.getChannel(channelName);
 
-    final subscription = channel.subscribe(name: 'innings_state_updated').listen((ably.Message msg) {
-      if (msg.data is Map) {
-        try {
-          final dto = MatchInningsStateDto.fromJson(Map<String, dynamic>.from(msg.data as Map));
-          if (dto.inningsNumber == inningsNumber) {
-            emit(dto, 'live');
+    final subscription = channel
+        .subscribe(name: 'innings_state_updated')
+        .listen((ably.Message msg) {
+          if (msg.data is Map) {
+            try {
+              final dto = MatchInningsStateDto.fromJson(
+                Map<String, dynamic>.from(msg.data as Map),
+              );
+              if (dto.inningsNumber == inningsNumber) {
+                emit(dto, 'live');
+              }
+            } catch (_) {
+              resnapshot('bad-frame');
+            }
           }
-        } catch (_) {
-          resnapshot('bad-frame');
-        }
-      }
-    });
+        });
 
     unawaited(resnapshot('open'));
 
@@ -531,18 +536,22 @@ class MatchesRemoteDataSource {
   Future<RecordBallResult> recordBall(Map<String, dynamic> params) =>
       _transport(() async {
         try {
-          final res =
-              await _supabase.functions.invoke('record-ball', body: params);
+          final res = await _supabase.functions.invoke(
+            'record-ball',
+            body: params,
+          );
           final data = res.data;
           final ball = data is Map ? data['ball'] : null;
           if (ball is Map) {
             final innings = data is Map ? data['innings'] : null;
             return RecordBallResult(
               ball: BallDto.fromJson(Map<String, dynamic>.from(ball)),
-              innings: innings is Map
-                  ? MatchInningsStateDto.fromJson(
-                      Map<String, dynamic>.from(innings))
-                  : null,
+              innings:
+                  innings is Map
+                      ? MatchInningsStateDto.fromJson(
+                        Map<String, dynamic>.from(innings),
+                      )
+                      : null,
             );
           }
           throw ServerException('record-ball returned no ball row');
@@ -554,14 +563,13 @@ class MatchesRemoteDataSource {
   Future<bool> undoLastBall({
     required String matchId,
     required int inningsNumber,
-  }) =>
-      _transport(() async {
-        final data = await _matchAction('undo_last_ball', {
-          'p_match_id': matchId,
-          'p_innings_number': inningsNumber,
-        });
-        return data['result'] == true;
-      });
+  }) => _transport(() async {
+    final data = await _matchAction('undo_last_ball', {
+      'p_match_id': matchId,
+      'p_innings_number': inningsNumber,
+    });
+    return data['result'] == true;
+  });
 
   Future<MatchDto> completeCricketMatch({
     required String matchId,
@@ -577,9 +585,7 @@ class MatchesRemoteDataSource {
       throw ServerException('Match completion returned no snapshot');
     }
 
-    return MatchDto.fromJson(
-      Map<String, dynamic>.from(match),
-    );
+    return MatchDto.fromJson(Map<String, dynamic>.from(match));
   }
 
   /// Initial-hydration GET for balls in (match, innings) — feeds the
@@ -608,17 +614,24 @@ class MatchesRemoteDataSource {
     required int inningsNumber,
   }) async* {
     // Initial hydration.
-    var current = await listBalls(matchId: matchId, inningsNumber: inningsNumber);
+    var current = await listBalls(
+      matchId: matchId,
+      inningsNumber: inningsNumber,
+    );
     yield current;
 
     final controller = StreamController<List<BallDto>>();
     final channelName = 'match:$matchId:balls';
     final channel = _ablyService.getChannel(channelName);
 
-    final subRecorded = channel.subscribe(name: 'ball_recorded').listen((ably.Message msg) {
+    final subRecorded = channel.subscribe(name: 'ball_recorded').listen((
+      ably.Message msg,
+    ) {
       if (msg.data is Map) {
         try {
-          final dto = BallDto.fromJson(Map<String, dynamic>.from(msg.data as Map));
+          final dto = BallDto.fromJson(
+            Map<String, dynamic>.from(msg.data as Map),
+          );
           if (dto.inningsNumber != inningsNumber) return;
           current = [...current, dto]..sort((a, b) => a.seq.compareTo(b.seq));
           controller.add(List.unmodifiable(current));
@@ -628,7 +641,9 @@ class MatchesRemoteDataSource {
       }
     });
 
-    final subDeleted = channel.subscribe(name: 'ball_deleted').listen((ably.Message msg) {
+    final subDeleted = channel.subscribe(name: 'ball_deleted').listen((
+      ably.Message msg,
+    ) {
       if (msg.data is Map) {
         final data = Map<String, dynamic>.from(msg.data as Map);
         final deletedId = (data['delivery_id'] ?? data['ball_id']) as String?;
@@ -638,8 +653,9 @@ class MatchesRemoteDataSource {
       }
     });
 
-    final subResync =
-        channel.subscribe(name: 'balls_resync').listen((ably.Message msg) async {
+    final subResync = channel.subscribe(name: 'balls_resync').listen((
+      ably.Message msg,
+    ) async {
       final data = msg.data;
       if (data is! Map) return;
 
@@ -705,7 +721,9 @@ class MatchesRemoteDataSource {
   /// retried forever. Mirrors the precedent in
   /// `messages_remote_datasource.dart`.
   static bool _isTransportFailure(Object e) =>
-      e is SocketException || e is http.ClientException || e is TimeoutException;
+      e is SocketException ||
+      e is http.ClientException ||
+      e is TimeoutException;
 
   /// Wraps a call so transport failures surface as [NetworkException] while
   /// everything else keeps whatever the inner `on` clauses already threw.
@@ -884,10 +902,7 @@ class MatchesRemoteDataSource {
     try {
       final res = await _supabase.rpc<dynamic>(
         'acquire_scorer_lease',
-        params: {
-          'p_match_id': matchId,
-          'p_device_id': deviceId,
-        },
+        params: {'p_match_id': matchId, 'p_device_id': deviceId},
       );
       return res is Map ? Map<String, dynamic>.from(res) : {'acquired': false};
     } on PostgrestException catch (e) {
@@ -902,10 +917,7 @@ class MatchesRemoteDataSource {
     try {
       final res = await _supabase.rpc<dynamic>(
         'heartbeat_scorer_lease',
-        params: {
-          'p_match_id': matchId,
-          'p_device_id': deviceId,
-        },
+        params: {'p_match_id': matchId, 'p_device_id': deviceId},
       );
       return res is Map ? Map<String, dynamic>.from(res) : {'valid': false};
     } on PostgrestException catch (e) {
@@ -915,11 +927,12 @@ class MatchesRemoteDataSource {
 
   Future<Map<String, dynamic>?> getScorerLease(String matchId) async {
     try {
-      final row = await _supabase
-          .from(_scorerLeases)
-          .select()
-          .eq('match_id', matchId)
-          .maybeSingle();
+      final row =
+          await _supabase
+              .from(_scorerLeases)
+              .select()
+              .eq('match_id', matchId)
+              .maybeSingle();
       return row;
     } on PostgrestException catch (e) {
       throw ServerException(e.message);

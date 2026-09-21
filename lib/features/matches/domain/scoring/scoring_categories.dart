@@ -68,9 +68,10 @@ Set<String> scoringCategories({
   // Hundred's shape, whatever it is called. That distinction is the only
   // reason the category exists, so detect it structurally rather than by name.
   final ballsPerOver = format.ballsPerOver > 0 ? format.ballsPerOver : 6;
-  final endChange = (format.endChangeBalls != null && format.endChangeBalls! > 0)
-      ? format.endChangeBalls!
-      : ballsPerOver;
+  final endChange =
+      (format.endChangeBalls != null && format.endChangeBalls! > 0)
+          ? format.endChangeBalls!
+          : ballsPerOver;
   if (endChange != ballsPerOver) out.add('hundred');
 
   if (!result.ok) {

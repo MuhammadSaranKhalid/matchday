@@ -8,12 +8,7 @@ import '../../domain/entities/match.dart';
 /// IMPORTANT: this enum is NOT an authorization source. Buttons are gated by
 /// [canRecordToss] and [canManageBattingSetup], which come from the generic
 /// RBAC engine.
-enum MatchStartViewerRole {
-  captain,
-  battingCaptain,
-  bowlingCaptain,
-  spectator,
-}
+enum MatchStartViewerRole { captain, battingCaptain, bowlingCaptain, spectator }
 
 const int matchStartStepCount = 2;
 
@@ -89,27 +84,23 @@ class MatchStartState extends Equatable {
   TeamId? get tossWinnerTeamId => match.tossWonBy;
 
   int get stepIndex => switch (phase) {
-        MatchStartPhase.toss => 0,
-        MatchStartPhase.lineup ||
-        MatchStartPhase.ready ||
-        MatchStartPhase.live => 1,
-      };
+    MatchStartPhase.toss => 0,
+    MatchStartPhase.lineup ||
+    MatchStartPhase.ready ||
+    MatchStartPhase.live => 1,
+  };
 
   bool get isViewerBattingCaptain =>
       viewerRole == MatchStartViewerRole.battingCaptain;
 
   bool get viewerCanAct => switch (phase) {
-        MatchStartPhase.toss => canRecordToss,
-        MatchStartPhase.lineup ||
-        MatchStartPhase.ready =>
-          canManageBattingSetup,
-        MatchStartPhase.live => false,
-      };
+    MatchStartPhase.toss => canRecordToss,
+    MatchStartPhase.lineup || MatchStartPhase.ready => canManageBattingSetup,
+    MatchStartPhase.live => false,
+  };
 
   /// Atomic toss needs both values.
-  bool get isTossReady =>
-      pendingTossWinner != null &&
-      pendingDecision != null;
+  bool get isTossReady => pendingTossWinner != null && pendingDecision != null;
 
   /// Preview of the first batting team using this phone's pending toss form.
   TeamId? get pendingBattingTeamId {
@@ -135,16 +126,12 @@ class MatchStartState extends Equatable {
     return null;
   }
 
-  String? get striker =>
-      pendingStriker ?? lockedStriker;
+  String? get striker => pendingStriker ?? lockedStriker;
 
-  String? get nonStriker =>
-      pendingNonStriker ?? lockedNonStriker;
+  String? get nonStriker => pendingNonStriker ?? lockedNonStriker;
 
   bool get isLineupReady =>
-      striker != null &&
-      nonStriker != null &&
-      striker != nonStriker;
+      striker != null && nonStriker != null && striker != nonStriker;
 
   MatchStartState copyWith({
     Match? match,
@@ -164,69 +151,52 @@ class MatchStartState extends Equatable {
   }) {
     return MatchStartState(
       match: match ?? this.match,
-      viewerRole:
-          viewerRole ?? this.viewerRole,
-      captainOf:
-          captainOf ?? this.captainOf,
-      canRecordToss:
-          canRecordToss ?? this.canRecordToss,
+      viewerRole: viewerRole ?? this.viewerRole,
+      captainOf: captainOf ?? this.captainOf,
+      canRecordToss: canRecordToss ?? this.canRecordToss,
       canManageBattingSetup:
-          canManageBattingSetup ??
-          this.canManageBattingSetup,
-      battingTeamId:
-          battingTeamId ?? this.battingTeamId,
-      bowlingTeamId:
-          bowlingTeamId ?? this.bowlingTeamId,
-      lockedStriker:
-          lockedStriker ?? this.lockedStriker,
-      lockedNonStriker:
-          lockedNonStriker ??
-          this.lockedNonStriker,
+          canManageBattingSetup ?? this.canManageBattingSetup,
+      battingTeamId: battingTeamId ?? this.battingTeamId,
+      bowlingTeamId: bowlingTeamId ?? this.bowlingTeamId,
+      lockedStriker: lockedStriker ?? this.lockedStriker,
+      lockedNonStriker: lockedNonStriker ?? this.lockedNonStriker,
       pendingTossWinner:
           pendingTossWinner != null
               ? pendingTossWinner()
               : this.pendingTossWinner,
       pendingDecision:
-          pendingDecision != null
-              ? pendingDecision()
-              : this.pendingDecision,
+          pendingDecision != null ? pendingDecision() : this.pendingDecision,
       pendingStriker:
-          pendingStriker != null
-              ? pendingStriker()
-              : this.pendingStriker,
+          pendingStriker != null ? pendingStriker() : this.pendingStriker,
       pendingNonStriker:
           pendingNonStriker != null
               ? pendingNonStriker()
               : this.pendingNonStriker,
-      isBusy:
-          isBusy ?? this.isBusy,
+      isBusy: isBusy ?? this.isBusy,
     );
   }
 
   @override
   List<Object?> get props => [
-        match,
-        viewerRole,
-        captainOf,
-        canRecordToss,
-        canManageBattingSetup,
-        battingTeamId,
-        bowlingTeamId,
-        lockedStriker,
-        lockedNonStriker,
-        pendingTossWinner,
-        pendingDecision,
-        pendingStriker,
-        pendingNonStriker,
-        isBusy,
-      ];
+    match,
+    viewerRole,
+    captainOf,
+    canRecordToss,
+    canManageBattingSetup,
+    battingTeamId,
+    bowlingTeamId,
+    lockedStriker,
+    lockedNonStriker,
+    pendingTossWinner,
+    pendingDecision,
+    pendingStriker,
+    pendingNonStriker,
+    isBusy,
+  ];
 }
 
 /// Display-only helper. Match write authorization must use RBAC instead.
-TeamId? captainSideOf(
-  Match m,
-  String? userId,
-) {
+TeamId? captainSideOf(Match m, String? userId) {
   if (userId == null || userId.isEmpty) {
     return null;
   }
@@ -243,19 +213,14 @@ TeamId? captainSideOf(
 }
 
 /// Display-only role helper.
-MatchStartViewerRole viewerRoleOnMatch(
-  Match m,
-  String? userId,
-) {
-  final side =
-      captainSideOf(m, userId);
+MatchStartViewerRole viewerRoleOnMatch(Match m, String? userId) {
+  final side = captainSideOf(m, userId);
 
   if (side == null) {
     return MatchStartViewerRole.spectator;
   }
 
-  final batting =
-      battingFirstTeam(m);
+  final batting = battingFirstTeam(m);
 
   if (batting == null) {
     return MatchStartViewerRole.captain;
@@ -266,45 +231,18 @@ MatchStartViewerRole viewerRoleOnMatch(
       : MatchStartViewerRole.bowlingCaptain;
 }
 
-/// Team batting innings 1 from the committed toss.
-TeamId? battingFirstTeam(Match m) {
-  final won = m.tossWonBy;
-  final decision = m.tossDecision;
+/// Display-only helper. Match write authorization must use RBAC instead.
+/// Delegates to the domain extension [CricketMatchSetupX.battingFirstTeamId].
+TeamId? battingFirstTeam(Match m) => m.battingFirstTeamId;
 
-  if (won == null || decision == null) {
-    return null;
-  }
-
-  if (decision == TossDecision.bat) {
-    return won;
-  }
-
-  if (won == m.teamAId) {
-    return m.teamBId;
-  }
-
-  if (won == m.teamBId) {
-    return m.teamAId;
-  }
-
-  return null;
-}
-
-String? matchStartCountdownLabel(
-  DateTime? scheduledStart,
-  DateTime now,
-) {
+String? matchStartCountdownLabel(DateTime? scheduledStart, DateTime now) {
   if (scheduledStart == null) {
     return null;
   }
 
-  final delta =
-      scheduledStart.difference(now);
+  final delta = scheduledStart.difference(now);
 
-  if (
-    delta.isNegative &&
-    delta.inHours > -2
-  ) {
+  if (delta.isNegative && delta.inHours > -2) {
     return 'STARTING NOW';
   }
 

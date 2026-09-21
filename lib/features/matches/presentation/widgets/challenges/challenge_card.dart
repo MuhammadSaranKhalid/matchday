@@ -63,37 +63,37 @@ class ChallengeCard extends StatelessWidget {
   // ─── Head: crest · name · status · timer ──────────────────────────────────
 
   Widget _head() => Padding(
-        padding: const EdgeInsets.fromLTRB(13, 12, 13, 0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _Crest(short: row.opponentShort, color: row.opponentColor),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    row.opponentName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: CkType.display(
-                      fontSize: 16.5,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.01,
-                      color: CkColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  _statusLine(),
-                ],
+    padding: const EdgeInsets.fromLTRB(13, 12, 13, 0),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Crest(short: row.opponentShort, color: row.opponentColor),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                row.opponentName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: CkType.display(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.01,
+                  color: CkColors.ink,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            ExpiryChip(row: row),
-          ],
+              const SizedBox(height: 3),
+              _statusLine(),
+            ],
+          ),
         ),
-      );
+        const SizedBox(width: 8),
+        ExpiryChip(row: row),
+      ],
+    ),
+  );
 
   Widget _statusLine() {
     final label = Text(
@@ -146,129 +146,127 @@ class ChallengeCard extends StatelessWidget {
 
   /// A plain (uncountered) row states ONE proposal.
   Widget _terms() => Padding(
-        padding: const EdgeInsets.fromLTRB(60, 10, 13, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              row.whenLabel,
-              style: CkType.display(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                color: CkColors.ink,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              row.metaLabel.toUpperCase(),
-              style: CkType.mono(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.07,
-                color: CkColors.muted,
-              ),
-            ),
-            if ((row.message ?? '').trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.only(top: 8),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: CkColors.hairline),
-                  ),
-                ),
-                child: Text(
-                  '“${row.message!.trim()}”',
-                  style: CkType.body(
-                    fontSize: 12.5,
-                    height: 1.45,
-                    color: CkColors.ink2,
-                  ),
-                ),
-              ),
-            ],
-          ],
+    padding: const EdgeInsets.fromLTRB(60, 10, 13, 0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          row.whenLabel,
+          style: CkType.display(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            color: CkColors.ink,
+          ),
         ),
-      );
+        const SizedBox(height: 4),
+        Text(
+          row.metaLabel.toUpperCase(),
+          style: CkType.mono(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.07,
+            color: CkColors.muted,
+          ),
+        ),
+        if ((row.message ?? '').trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.only(top: 8),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: CkColors.hairline)),
+            ),
+            child: Text(
+              '“${row.message!.trim()}”',
+              style: CkType.body(
+                fontSize: 12.5,
+                height: 1.45,
+                color: CkColors.ink2,
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
 
   /// A countered row states TWO proposals, and the difference between them is
   /// the whole decision — so it reads as a ledger rather than a card. The
   /// superseded terms are struck through in muted; the live ones are ink.
   Widget _ledger() => Container(
-        margin: const EdgeInsets.fromLTRB(60, 10, 13, 0),
-        decoration: BoxDecoration(
-          color: CkColors.paper2,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: CkColors.line),
+    margin: const EdgeInsets.fromLTRB(60, 10, 13, 0),
+    decoration: BoxDecoration(
+      color: CkColors.paper2,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: CkColors.line),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: CkColors.line)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                row.isInbound ? 'YOU PROPOSED' : 'THEY PROPOSED',
+                style: CkType.mono(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.10,
+                  color: CkColors.muted,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                row.supersededLabel ?? '—',
+                // Struck through: these terms are superseded. CkType.body
+                // has no decoration slot, so it is applied on the result.
+                style: CkType.body(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: CkColors.muted,
+                ).copyWith(
+                  decoration: TextDecoration.lineThrough,
+                  decorationColor: CkColors.soft,
+                ),
+              ),
+            ],
+          ),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: CkColors.line)),
+        Container(
+          color: CkColors.surface,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                row.isInbound ? 'THEY PROPOSED' : 'YOU PROPOSED',
+                style: CkType.mono(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.10,
+                  color: CkColors.amberInk,
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    row.isInbound ? 'YOU PROPOSED' : 'THEY PROPOSED',
-                    style: CkType.mono(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.10,
-                      color: CkColors.muted,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    row.supersededLabel ?? '—',
-                    // Struck through: these terms are superseded. CkType.body
-                    // has no decoration slot, so it is applied on the result.
-                    style: CkType.body(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                      color: CkColors.muted,
-                    ).copyWith(
-                      decoration: TextDecoration.lineThrough,
-                      decorationColor: CkColors.soft,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 3),
+              Text(
+                row.counterLabel ?? row.whenLabel,
+                style: CkType.display(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: CkColors.ink,
+                ),
               ),
-            ),
-            Container(
-              color: CkColors.surface,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    row.isInbound ? 'THEY PROPOSED' : 'YOU PROPOSED',
-                    style: CkType.mono(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.10,
-                      color: CkColors.amberInk,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    row.counterLabel ?? row.whenLabel,
-                    style: CkType.display(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: CkColors.ink,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
@@ -480,22 +478,22 @@ class _Crest extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 36,
-        height: 36,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          short.toUpperCase(),
-          style: CkType.display(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-      );
+    width: 36,
+    height: 36,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text(
+      short.toUpperCase(),
+      style: CkType.display(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: Colors.white,
+      ),
+    ),
+  );
 }
 
 enum _ActionKind { quiet, outlined, filled }
@@ -528,15 +526,17 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         height: 44,
         alignment: Alignment.center,
-        padding: kind == _ActionKind.quiet
-            ? const EdgeInsets.symmetric(horizontal: 14)
-            : EdgeInsets.zero,
+        padding:
+            kind == _ActionKind.quiet
+                ? const EdgeInsets.symmetric(horizontal: 14)
+                : EdgeInsets.zero,
         decoration: BoxDecoration(
           color: kind == _ActionKind.filled ? CkColors.ink : null,
           borderRadius: BorderRadius.circular(10),
-          border: kind == _ActionKind.outlined
-              ? Border.all(color: CkColors.ink)
-              : null,
+          border:
+              kind == _ActionKind.outlined
+                  ? Border.all(color: CkColors.ink)
+                  : null,
         ),
         child: text,
       ),

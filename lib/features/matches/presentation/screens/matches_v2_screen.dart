@@ -53,9 +53,10 @@ class _MatchesV2ScreenState extends ConsumerState<MatchesV2Screen> {
             BoardTabs(
               selected: tab,
               liveCount: liveCount,
-              onSelect: (t) => ref
-                  .read(matchesBoardTabControllerProvider.notifier)
-                  .select(t),
+              onSelect:
+                  (t) => ref
+                      .read(matchesBoardTabControllerProvider.notifier)
+                      .select(t),
             ),
             Expanded(
               child: RefreshIndicator(
@@ -66,24 +67,26 @@ class _MatchesV2ScreenState extends ConsumerState<MatchesV2Screen> {
                   await ref.read(matchesBoardProvider(tab).future);
                 },
                 child: switch (board) {
-                  AsyncLoading(hasValue: false) =>
-                    const _Scroll(child: BoardLoadingState()),
+                  AsyncLoading(hasValue: false) => const _Scroll(
+                    child: BoardLoadingState(),
+                  ),
                   AsyncError(hasValue: false) => _Scroll(
-                      fill: true,
-                      child: BoardErrorState(
-                        onRetry: () => ref.invalidate(matchesBoardProvider),
-                        code: 'Error · matches_unavailable',
-                      ),
+                    fill: true,
+                    child: BoardErrorState(
+                      onRetry: () => ref.invalidate(matchesBoardProvider),
+                      code: 'Error · matches_unavailable',
                     ),
+                  ),
                   AsyncValue(value: final view?) when view.isEmpty =>
                     BoardEmptyState(tab: tab),
                   AsyncValue(value: final view?) => _Board(
-                      view: view,
-                      collapsed: _collapsed,
-                      onToggle: (id) => setState(() {
-                        if (!_collapsed.remove(id)) _collapsed.add(id);
-                      }),
-                    ),
+                    view: view,
+                    collapsed: _collapsed,
+                    onToggle:
+                        (id) => setState(() {
+                          if (!_collapsed.remove(id)) _collapsed.add(id);
+                        }),
+                  ),
                   _ => const _Scroll(child: BoardLoadingState()),
                 },
               ),
@@ -125,8 +128,7 @@ class _Board extends StatelessWidget {
     );
   }
 
-  static String _key(BoardGroup g) =>
-      g.tournament?.id ?? '__friendlies__';
+  static String _key(BoardGroup g) => g.tournament?.id ?? '__friendlies__';
 }
 
 class _Group extends StatelessWidget {
@@ -149,24 +151,19 @@ class _Group extends StatelessWidget {
           group: group,
           collapsed: collapsed,
           onToggle: onToggle,
-          onOpen: group.tournament == null
-              ? null
-              : () => context.push('/tournaments/${group.tournament!.id}'),
+          onOpen:
+              group.tournament == null
+                  ? null
+                  : () => context.push('/tournaments/${group.tournament!.id}'),
         ),
         if (!collapsed)
           for (final item in group.matches) ...[
             const SizedBox(height: 9),
             // Upcoming fixtures have no score, so the time becomes the figure.
             if (item.match.status == MatchStatus.scheduled)
-              UpcomingMatchRow(
-                item: item,
-                onTap: () => _open(context, item),
-              )
+              UpcomingMatchRow(item: item, onTap: () => _open(context, item))
             else
-              MatchScoreRow(
-                item: item,
-                onTap: () => _open(context, item),
-              ),
+              MatchScoreRow(item: item, onTap: () => _open(context, item)),
           ],
       ],
     );

@@ -200,9 +200,21 @@ class _PlayersRow extends StatelessWidget {
 
     return Row(
       children: [
-        Expanded(child: _Tile(label: '8', selected: value == 8, onTap: () => onChanged(8))),
+        Expanded(
+          child: _Tile(
+            label: '8',
+            selected: value == 8,
+            onTap: () => onChanged(8),
+          ),
+        ),
         const SizedBox(width: 9),
-        Expanded(child: _Tile(label: '11', selected: value == 11, onTap: () => onChanged(11))),
+        Expanded(
+          child: _Tile(
+            label: '11',
+            selected: value == 11,
+            onTap: () => onChanged(11),
+          ),
+        ),
         const SizedBox(width: 9),
         Expanded(
           child: _Tile(
@@ -220,59 +232,62 @@ class _PlayersRow extends StatelessWidget {
     final picked = await showModalBottomSheet<int>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const WizardFieldLabel('Players per side'),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 9,
-                runSpacing: 9,
+      builder:
+          (_) => Container(
+            decoration: const BoxDecoration(
+              color: CkColors.paper,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (var n = _min; n <= _max; n++)
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => Navigator.of(context).pop(n),
-                      child: Container(
-                        width: 52,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        decoration: BoxDecoration(
-                          color: n == value ? CkColors.ink : CkColors.paper,
-                          borderRadius: BorderRadius.circular(14),
-                          border: n == value
-                              ? null
-                              : Border.all(color: CkColors.line),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '$n',
-                            style: CkType.display(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: n == value
-                                  ? CkColors.paper
-                                  : CkColors.ink2,
-                              letterSpacing: 0,
+                  const WizardFieldLabel('Players per side'),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 9,
+                    runSpacing: 9,
+                    children: [
+                      for (var n = _min; n <= _max; n++)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => Navigator.of(context).pop(n),
+                          child: Container(
+                            width: 52,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            decoration: BoxDecoration(
+                              color: n == value ? CkColors.ink : CkColors.paper,
+                              borderRadius: BorderRadius.circular(14),
+                              border:
+                                  n == value
+                                      ? null
+                                      : Border.all(color: CkColors.line),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$n',
+                                style: CkType.display(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color:
+                                      n == value
+                                          ? CkColors.paper
+                                          : CkColors.ink2,
+                                  letterSpacing: 0,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
+                    ],
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
     if (picked != null) onChanged(picked);
   }
@@ -309,9 +324,10 @@ class _Tile extends StatelessWidget {
             style: CkType.display(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: selected
-                  ? CkColors.paper
-                  : (muted ? CkColors.muted : CkColors.ink2),
+              color:
+                  selected
+                      ? CkColors.paper
+                      : (muted ? CkColors.muted : CkColors.ink2),
               letterSpacing: 0,
             ),
           ),

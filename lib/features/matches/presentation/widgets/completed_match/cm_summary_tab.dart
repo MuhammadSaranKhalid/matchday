@@ -33,11 +33,13 @@ class CmSummaryTab extends StatelessWidget {
         if (batting.isNotEmpty)
           CmPanel(
             children: [
-              const CmTableHeader(cells: [
-                (text: 'Batting', width: null),
-                (text: 'R (B)', width: 54),
-                (text: 'SR', width: 38),
-              ]),
+              const CmTableHeader(
+                cells: [
+                  (text: 'Batting', width: null),
+                  (text: 'R (B)', width: 54),
+                  (text: 'SR', width: 38),
+                ],
+              ),
               for (final (i, b) in batting.indexed)
                 _PerformerRow(
                   color: _sideColor(view, b.side),
@@ -53,11 +55,13 @@ class CmSummaryTab extends StatelessWidget {
           const SizedBox(height: 11),
           CmPanel(
             children: [
-              const CmTableHeader(cells: [
-                (text: 'Bowling', width: null),
-                (text: 'W-R', width: 44),
-                (text: 'Econ', width: 38),
-              ]),
+              const CmTableHeader(
+                cells: [
+                  (text: 'Bowling', width: null),
+                  (text: 'W-R', width: 44),
+                  (text: 'Econ', width: 38),
+                ],
+              ),
               for (final (i, b) in bowling.indexed)
                 _PerformerRow(
                   color: _sideColor(view, b.side),
@@ -76,7 +80,10 @@ class CmSummaryTab extends StatelessWidget {
             background: CkColors.paper,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 11,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -122,9 +129,9 @@ List<({BowlingLine line, String side})> _topBowling(List<InningsCard> innings) {
         // The bowling side is the other one.
         (line: b, side: i.battingTeamSide == 'a' ? 'b' : 'a'),
   ]..sort((x, y) {
-      final byWickets = y.line.wickets.compareTo(x.line.wickets);
-      return byWickets != 0 ? byWickets : x.line.runs.compareTo(y.line.runs);
-    });
+    final byWickets = y.line.wickets.compareTo(x.line.wickets);
+    return byWickets != 0 ? byWickets : x.line.runs.compareTo(y.line.runs);
+  });
   return all.where((b) => b.line.legalBalls > 0).take(2).toList();
 }
 
@@ -147,35 +154,38 @@ class _PerformerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-        decoration: BoxDecoration(
-          border: last
+    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+    decoration: BoxDecoration(
+      border:
+          last
               ? null
               : const Border(bottom: BorderSide(color: CkColors.hairline)),
+    ),
+    child: Row(
+      children: [
+        CmCrest(color),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: CmText.name(),
+          ),
         ),
-        child: Row(
-          children: [
-            CmCrest(color),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Text(name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: CmText.name()),
-            ),
-            const SizedBox(width: 9),
-            CmFigureCell(primary, width: primaryWidth),
-            const SizedBox(width: 9),
-            CmFigureCell(
-              secondary,
-              width: 38,
-              size: 11,
-              weight: FontWeight.w600,
-              color: CkColors.ink2,
-            ),
-          ],
+        const SizedBox(width: 9),
+        CmFigureCell(primary, width: primaryWidth),
+        const SizedBox(width: 9),
+        CmFigureCell(
+          secondary,
+          width: 38,
+          size: 11,
+          weight: FontWeight.w600,
+          color: CkColors.ink2,
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _MetaRow extends StatelessWidget {
@@ -186,20 +196,22 @@ class _MetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 56,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(label.toUpperCase(), style: CmText.label(size: 9)),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(value,
-                style: CkType.body(fontSize: 12.5, fontWeight: FontWeight.w500)),
-          ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        width: 56,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(label.toUpperCase(), style: CmText.label(size: 9)),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          value,
+          style: CkType.body(fontSize: 12.5, fontWeight: FontWeight.w500),
+        ),
+      ),
+    ],
+  );
 }

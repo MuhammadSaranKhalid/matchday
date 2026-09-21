@@ -235,15 +235,15 @@ class PastChallengeRow extends StatelessWidget {
               const SizedBox(width: 10),
               row.matched
                   ? CkStatusPill.banner(
-                      'Matched',
-                      background: CkColors.greenSoft,
-                      foreground: CkColors.greenInk,
-                    )
+                    'Matched',
+                    background: CkColors.greenSoft,
+                    foreground: CkColors.greenInk,
+                  )
                   : CkStatusPill.banner(
-                      'Closed',
-                      background: CkColors.soft,
-                      foreground: CkColors.paper,
-                    ),
+                    'Closed',
+                    background: CkColors.soft,
+                    foreground: CkColors.paper,
+                  ),
             ],
           ),
         ),
@@ -253,19 +253,29 @@ class PastChallengeRow extends StatelessWidget {
 }
 
 String _statusWord(MyChallengeRow row) => switch (row.request.status) {
-      MatchRequestStatus.accepted => 'Accepted',
-      MatchRequestStatus.declined => 'Declined',
-      MatchRequestStatus.cancelled => 'Withdrawn',
-      MatchRequestStatus.expired => 'Expired',
-      _ => 'Closed',
-    };
+  MatchRequestStatus.accepted => 'Accepted',
+  MatchRequestStatus.declined => 'Declined',
+  MatchRequestStatus.cancelled => 'Withdrawn',
+  MatchRequestStatus.expired => 'Expired',
+  _ => 'Closed',
+};
 
 /// "Aug 17" — the past list is a ledger, so the year is only worth the space
 /// once the entry is not from this one.
 String _shortDate(DateTime dt) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   final label = '${months[dt.month - 1]} ${dt.day}';
   return dt.year == DateTime.now().year ? label : '$label ${dt.year}';

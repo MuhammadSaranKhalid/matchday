@@ -24,9 +24,10 @@ class ChallengeSentScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(matchChallengeProvider(requestId));
 
-    void done() => context.canPop()
-        ? context.go('/my/pool-requests')
-        : context.go('/my/pool-requests');
+    void done() =>
+        context.canPop()
+            ? context.go('/my/pool-requests')
+            : context.go('/my/pool-requests');
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -59,18 +60,19 @@ class ChallengeSentScreen extends ConsumerWidget {
             ),
             Expanded(
               child: switch (async) {
-                AsyncLoading() =>
-                  const SingleChildScrollView(child: PoolLoadingState()),
+                AsyncLoading() => const SingleChildScrollView(
+                  child: PoolLoadingState(),
+                ),
                 AsyncError() => Center(
-                    child: PoolErrorState(
-                      onRetry: () =>
-                          ref.invalidate(matchChallengeProvider(requestId)),
-                    ),
+                  child: PoolErrorState(
+                    onRetry:
+                        () => ref.invalidate(matchChallengeProvider(requestId)),
                   ),
+                ),
                 AsyncData(value: final req) => _Body(
-                    code: req?.shareCode,
-                    isOpen: req?.toTeamId == null,
-                  ),
+                  code: req?.shareCode,
+                  isOpen: req?.toTeamId == null,
+                ),
               },
             ),
             WizardFooter(
@@ -246,11 +248,12 @@ class _Actions extends StatelessWidget {
             label: 'Share',
             icon: PoolIcons.sharePaper,
             filled: true,
-            onTap: () => SharePlus.instance.share(
-              ShareParams(
-                text: 'Join our match on matchday — share code $code',
-              ),
-            ),
+            onTap:
+                () => SharePlus.instance.share(
+                  ShareParams(
+                    text: 'Join our match on matchday — share code $code',
+                  ),
+                ),
           ),
         ),
         const SizedBox(width: 9),

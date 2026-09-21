@@ -192,14 +192,19 @@ Future<MatchesFeedState> matchesFeed(Ref ref) async {
   }
 
   // 5. Partition matches
-  final liveMatches = allMatches.where((m) => m.status.isLive || m.status == MatchStatus.toss).toList();
+  final liveMatches =
+      allMatches
+          .where((m) => m.status.isLive || m.status == MatchStatus.toss)
+          .toList();
   final upcomingMatches = allMatches.where((m) => m.status.isUpcoming).toList();
   final pastMatches = allMatches.where((m) => m.status.isPast).toList();
 
   // Innings for past matches
   Map<MatchId, List<InningsSummary>> inningsByMatch = const {};
   if (pastMatches.isNotEmpty) {
-    final res = await matchesRepo.listInningsForMatches(pastMatches.map((m) => m.id));
+    final res = await matchesRepo.listInningsForMatches(
+      pastMatches.map((m) => m.id),
+    );
     inningsByMatch = res.fold((_) => const {}, (map) => map);
   }
 
@@ -212,8 +217,14 @@ Future<MatchesFeedState> matchesFeed(Ref ref) async {
         teamB: teamsById[m.teamBId.value],
         scoreA: m.tossWonBy != null ? 'Innings in progress' : 'Toss underway',
         scoreB: '—',
-        need: m.status == MatchStatus.toss ? 'Toss completed · Lineups locking' : 'Match live',
-        rate: m.format.oversPerInnings > 0 ? '${m.format.oversPerInnings} Overs Match' : 'Live Friendly',
+        need:
+            m.status == MatchStatus.toss
+                ? 'Toss completed · Lineups locking'
+                : 'Match live',
+        rate:
+            m.format.oversPerInnings > 0
+                ? '${m.format.oversPerInnings} Overs Match'
+                : 'Live Friendly',
       ),
   ];
 
@@ -225,14 +236,18 @@ Future<MatchesFeedState> matchesFeed(Ref ref) async {
         match: m,
         teamA: teamsById[m.teamAId.value],
         teamB: teamsById[m.teamBId.value],
-        whenFormatted: m.scheduledStartTime != null
-            ? _formatMatchTime(m.scheduledStartTime!)
-            : 'Scheduled',
-        contextLabel: m.format.oversPerInnings > 0
-            ? '${m.format.oversPerInnings} Overs · ${m.format.ballType.wire.toUpperCase()}'
-            : 'Friendly Fixture',
+        whenFormatted:
+            m.scheduledStartTime != null
+                ? _formatMatchTime(m.scheduledStartTime!)
+                : 'Scheduled',
+        contextLabel:
+            m.format.oversPerInnings > 0
+                ? '${m.format.oversPerInnings} Overs · ${m.format.ballType.wire.toUpperCase()}'
+                : 'Friendly Fixture',
         venue: m.venue?.ground ?? 'Ground TBD',
-        isToday: m.scheduledStartTime != null && _isSameDay(m.scheduledStartTime!, now),
+        isToday:
+            m.scheduledStartTime != null &&
+            _isSameDay(m.scheduledStartTime!, now),
       ),
   ];
 
@@ -246,27 +261,33 @@ Future<MatchesFeedState> matchesFeed(Ref ref) async {
         scoreA: _scoreLabel(inningsByMatch[m.id], 1),
         scoreB: _scoreLabel(inningsByMatch[m.id], 2),
         resultSummary: m.resultDescription ?? 'Match concluded',
-        contextLabel: m.format.oversPerInnings > 0
-            ? '${m.format.oversPerInnings} Overs · Final'
-            : 'Match Result',
+        contextLabel:
+            m.format.oversPerInnings > 0
+                ? '${m.format.oversPerInnings} Overs · Final'
+                : 'Match Result',
       ),
   ];
 
   // Map Open Pool Items (strictly open matchmaking broadcast pool with no target team)
-  final openPoolRequests = allChallenges
-      .where((c) => c.status == MatchRequestStatus.pending && c.toTeamId == null)
-      .toList();
+  final openPoolRequests =
+      allChallenges
+          .where(
+            (c) => c.status == MatchRequestStatus.pending && c.toTeamId == null,
+          )
+          .toList();
   final poolItems = [
     for (final req in openPoolRequests)
       OpenMatchPoolItem(
         request: req,
         fromTeam: teamsById[req.fromTeamId.value],
-        formatLabel: '${req.proposedFormat?.oversPerInnings ?? 20} Overs · ${req.proposedFormat?.ballType.wire.toUpperCase() ?? 'TAPE'}',
+        formatLabel:
+            '${req.proposedFormat?.oversPerInnings ?? 20} Overs · ${req.proposedFormat?.ballType.wire.toUpperCase() ?? 'TAPE'}',
         venue: req.proposedVenue ?? 'Lahore Ground',
         shareCode: req.shareCode ?? '—',
-        timeLabel: req.proposedStartTime != null
-            ? _formatMatchTime(req.proposedStartTime!)
-            : 'Today',
+        timeLabel:
+            req.proposedStartTime != null
+                ? _formatMatchTime(req.proposedStartTime!)
+                : 'Today',
       ),
   ];
 
@@ -290,7 +311,8 @@ String _formatMatchTime(DateTime dt) {
 
 String _scoreLabel(List<InningsSummary>? summaries, int inningsNum) {
   if (summaries == null || summaries.isEmpty) return '—';
-  final match = summaries.where((s) => s.inningsNumber == inningsNum).firstOrNull;
+  final match =
+      summaries.where((s) => s.inningsNumber == inningsNum).firstOrNull;
   if (match == null) return '—';
   final overs = match.legalBallsFaced ~/ 6;
   final balls = match.legalBallsFaced % 6;

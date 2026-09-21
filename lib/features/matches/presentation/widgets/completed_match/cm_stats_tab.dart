@@ -29,21 +29,25 @@ class CmStatsTab extends StatelessWidget {
         const SizedBox(height: 13),
         const CmSectionHeading('Manhattan · runs per over'),
         const SizedBox(height: 11),
-        CmPanel(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(13, 14, 13, 10),
-            child: _Manhattan(innings: innings),
-          ),
-        ]),
+        CmPanel(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(13, 14, 13, 10),
+              child: _Manhattan(innings: innings),
+            ),
+          ],
+        ),
         const SizedBox(height: 13),
         const CmSectionHeading('Worm · cumulative runs'),
         const SizedBox(height: 11),
-        CmPanel(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(13, 14, 13, 10),
-            child: _Worm(innings: innings),
-          ),
-        ]),
+        CmPanel(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(13, 14, 13, 10),
+              child: _Worm(innings: innings),
+            ),
+          ],
+        ),
         const SizedBox(height: 13),
         const CmSectionHeading('Where the runs came from'),
         const SizedBox(height: 11),
@@ -60,26 +64,26 @@ class _Legend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        children: [
-          for (final (i, inn) in view.innings.indexed) ...[
-            Container(
-              width: 16,
-              height: 10,
-              decoration: BoxDecoration(
-                color: i == 0 ? CkColors.ink : Colors.transparent,
-                border: i == 0 ? null : Border.all(color: CkColors.ink2),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _teamName(view, inn.battingTeamSide),
-              style: CmText.label(size: 9.5, color: CkColors.ink2),
-            ),
-            if (i == 0) const SizedBox(width: 16),
-          ],
-        ],
-      );
+    children: [
+      for (final (i, inn) in view.innings.indexed) ...[
+        Container(
+          width: 16,
+          height: 10,
+          decoration: BoxDecoration(
+            color: i == 0 ? CkColors.ink : Colors.transparent,
+            border: i == 0 ? null : Border.all(color: CkColors.ink2),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          _teamName(view, inn.battingTeamSide),
+          style: CmText.label(size: 9.5, color: CkColors.ink2),
+        ),
+        if (i == 0) const SizedBox(width: 16),
+      ],
+    ],
+  );
 }
 
 String _teamName(CompletedMatchView v, String side) =>
@@ -97,9 +101,7 @@ class _Manhattan extends StatelessWidget {
   Widget build(BuildContext context) {
     final series = innings.map((i) => i.runsPerOver).toList();
     final overs = series.fold<int>(0, (a, b) => a > b.length ? a : b.length);
-    final max = series
-        .expand((s) => s)
-        .fold<int>(1, (a, b) => a > b ? a : b);
+    final max = series.expand((s) => s).fold<int>(1, (a, b) => a > b ? a : b);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,15 +124,21 @@ class _Manhattan extends StatelessWidget {
                           Expanded(
                             child: Container(
                               height: (o < s.length ? s[o] : 0) / max * 100,
-                              margin: const EdgeInsets.symmetric(horizontal: 0.5),
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 0.5,
+                              ),
                               decoration: BoxDecoration(
                                 color: i == 0 ? CkColors.ink : null,
-                                border: i == 0
-                                    ? null
-                                    : Border.all(
-                                        color: CkColors.ink2, width: 1),
+                                border:
+                                    i == 0
+                                        ? null
+                                        : Border.all(
+                                          color: CkColors.ink2,
+                                          width: 1,
+                                        ),
                                 borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(2)),
+                                  top: Radius.circular(2),
+                                ),
                               ),
                             ),
                           ),
@@ -164,30 +172,30 @@ class _Worm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 120,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: _WormPainter(
-                series: innings.map((i) => i.cumulativeRuns).toList(),
-              ),
-            ),
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        height: 120,
+        width: double.infinity,
+        child: CustomPaint(
+          painter: _WormPainter(
+            series: innings.map((i) => i.cumulativeRuns).toList(),
           ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('0', style: CmText.label(size: 9)),
-              Text(
-                '${innings.map((i) => i.runsPerOver.length).fold<int>(0, (a, b) => a > b ? a : b)} OV',
-                style: CmText.label(size: 9),
-              ),
-            ],
+        ),
+      ),
+      const SizedBox(height: 6),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('0', style: CmText.label(size: 9)),
+          Text(
+            '${innings.map((i) => i.runsPerOver.length).fold<int>(0, (a, b) => a > b ? a : b)} OV',
+            style: CmText.label(size: 9),
           ),
         ],
-      );
+      ),
+    ],
+  );
 }
 
 class _WormPainter extends CustomPainter {
@@ -211,11 +219,12 @@ class _WormPainter extends CustomPainter {
           size.height - runs / maxRuns * size.height,
         );
       }
-      final paint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = i == 0 ? 2 : 1.5
-        ..strokeCap = StrokeCap.round
-        ..color = i == 0 ? CkColors.ink : CkColors.ink2;
+      final paint =
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = i == 0 ? 2 : 1.5
+            ..strokeCap = StrokeCap.round
+            ..color = i == 0 ? CkColors.ink : CkColors.ink2;
 
       if (i == 0) {
         canvas.drawPath(path, paint);
@@ -248,49 +257,52 @@ class _RunSources extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => CmPanel(
-        children: [
-          for (final (i, inn) in view.innings.indexed)
-            Container(
-              padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
-              decoration: BoxDecoration(
-                border: i == view.innings.length - 1
+    children: [
+      for (final (i, inn) in view.innings.indexed)
+        Container(
+          padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
+          decoration: BoxDecoration(
+            border:
+                i == view.innings.length - 1
                     ? null
                     : const Border(
-                        bottom: BorderSide(color: CkColors.hairline)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                      bottom: BorderSide(color: CkColors.hairline),
+                    ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _teamName(view, inn.battingTeamSide),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: CmText.name(size: 13),
-                        ),
-                      ),
-                      Text('${inn.dots} DOTS', style: CmText.label(size: 9)),
-                    ],
+                  Expanded(
+                    child: Text(
+                      _teamName(view, inn.battingTeamSide),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: CmText.name(size: 13),
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  _SourceBar(card: inn),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${inn.fours} fours · ${inn.sixes} sixes · '
-                    '${inn.runsInOnesAndTwos} in ones & twos · '
-                    '${inn.extras.total} extras',
-                    style: CmText.figure(
-                        size: 9.5,
-                        weight: FontWeight.w600,
-                        color: CkColors.muted),
-                  ),
+                  Text('${inn.dots} DOTS', style: CmText.label(size: 9)),
                 ],
               ),
-            ),
-        ],
-      );
+              const SizedBox(height: 8),
+              _SourceBar(card: inn),
+              const SizedBox(height: 6),
+              Text(
+                '${inn.fours} fours · ${inn.sixes} sixes · '
+                '${inn.runsInOnesAndTwos} in ones & twos · '
+                '${inn.extras.total} extras',
+                style: CmText.figure(
+                  size: 9.5,
+                  weight: FontWeight.w600,
+                  color: CkColors.muted,
+                ),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
 }
 
 class _SourceBar extends StatelessWidget {
@@ -300,12 +312,13 @@ class _SourceBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final parts = <(int, Color)>[
-      (card.fours * 4, CkColors.ink),
-      (card.sixes * 6, CkColors.ink2),
-      (card.runsInOnesAndTwos, CkColors.soft),
-      (card.extras.total, CkColors.line),
-    ].where((p) => p.$1 > 0).toList();
+    final parts =
+        <(int, Color)>[
+          (card.fours * 4, CkColors.ink),
+          (card.sixes * 6, CkColors.ink2),
+          (card.runsInOnesAndTwos, CkColors.soft),
+          (card.extras.total, CkColors.line),
+        ].where((p) => p.$1 > 0).toList();
 
     if (parts.isEmpty) return const SizedBox(height: 10);
 

@@ -5,11 +5,7 @@ import 'pad_buttons.dart';
 
 /// Row of extra delivery triggers (Wide, No-ball, Bye, Leg-bye).
 class ExtrasKeypad extends StatelessWidget {
-  const ExtrasKeypad({
-    super.key,
-    required this.onExtra,
-    this.busy = false,
-  });
+  const ExtrasKeypad({super.key, required this.onExtra, this.busy = false});
 
   final ValueChanged<BallKind> onExtra;
   final bool busy;

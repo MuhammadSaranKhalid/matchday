@@ -85,8 +85,8 @@ class OpenMatchPoolScreen extends ConsumerWidget {
     return _Board(
       items: board.value ?? const [],
       facet: ref.watch(openMatchPoolFilterProvider),
-      onSelect: (f) =>
-          ref.read(openMatchPoolFilterProvider.notifier).setFilter(f),
+      onSelect:
+          (f) => ref.read(openMatchPoolFilterProvider.notifier).setFilter(f),
       onEnterCode: () => showShareCodeSheet(context),
     );
   }
@@ -140,9 +140,10 @@ class _Board extends ConsumerWidget {
                   for (final item in items) ...[
                     PoolChallengeCard(
                       item: item,
-                      onTap: () => context.push(
-                        '/challenges/${item.request.id.value}',
-                      ),
+                      onTap:
+                          () => context.push(
+                            '/challenges/${item.request.id.value}',
+                          ),
                     ),
                     if (item != items.last) const SizedBox(height: 11),
                   ],
@@ -245,10 +246,7 @@ class _Scroll extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         if (fill)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(child: child),
-          )
+          SliverFillRemaining(hasScrollBody: false, child: Center(child: child))
         else
           SliverToBoxAdapter(child: child),
       ],

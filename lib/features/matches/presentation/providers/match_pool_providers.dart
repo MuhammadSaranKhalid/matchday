@@ -27,9 +27,13 @@ MatchPoolRepository matchPoolRepository(Ref ref) {
 
 String _formatMatchTime(DateTime dt) {
   final now = DateTime.now();
-  final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+  final isToday =
+      dt.year == now.year && dt.month == now.month && dt.day == now.day;
   final tomorrow = now.add(const Duration(days: 1));
-  final isTomorrow = dt.year == tomorrow.year && dt.month == tomorrow.month && dt.day == tomorrow.day;
+  final isTomorrow =
+      dt.year == tomorrow.year &&
+      dt.month == tomorrow.month &&
+      dt.day == tomorrow.day;
 
   final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
   final ampm = dt.hour >= 12 ? 'PM' : 'AM';
@@ -40,7 +44,20 @@ String _formatMatchTime(DateTime dt) {
   if (isTomorrow) return 'Tomorrow · $timeStr';
 
   final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  final months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
   final dow = days[dt.weekday - 1];
   final mon = months[dt.month - 1];
   return '$dow, $mon ${dt.day} · $timeStr';
@@ -50,8 +67,9 @@ String _formatMatchTime(DateTime dt) {
 @riverpod
 Future<List<OpenMatchPoolItem>> openMatchPool(Ref ref) async {
   final repo = ref.watch(matchPoolRepositoryProvider);
-  final memberships =
-      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final memberships = await ref.watch(
+    currentUserTeamMembershipsProvider.future,
+  );
   final myTeams = [for (final membership in memberships) membership.team];
   final myTeamIds = myTeams.map((t) => t.id.value).toSet();
 
@@ -62,9 +80,8 @@ Future<List<OpenMatchPoolItem>> openMatchPool(Ref ref) async {
   );
 
   // Filter out any broadcasts hosted by the user's own teams
-  final otherTeamChallenges = challenges
-      .where((c) => !myTeamIds.contains(c.fromTeamId.value))
-      .toList();
+  final otherTeamChallenges =
+      challenges.where((c) => !myTeamIds.contains(c.fromTeamId.value)).toList();
 
   final items = <OpenMatchPoolItem>[];
   for (final req in otherTeamChallenges) {
@@ -73,12 +90,14 @@ Future<List<OpenMatchPoolItem>> openMatchPool(Ref ref) async {
       OpenMatchPoolItem(
         request: req,
         fromTeam: fromTeam,
-        formatLabel: '${req.proposedFormat?.oversPerInnings ?? 20} Overs · ${req.proposedFormat?.ballType.wire.toUpperCase() ?? 'TAPE'}',
+        formatLabel:
+            '${req.proposedFormat?.oversPerInnings ?? 20} Overs · ${req.proposedFormat?.ballType.wire.toUpperCase() ?? 'TAPE'}',
         venue: req.proposedVenue ?? 'Lahore Ground',
         shareCode: req.shareCode ?? '—',
-        timeLabel: req.proposedStartTime != null
-            ? _formatMatchTime(req.proposedStartTime!)
-            : 'Flexible',
+        timeLabel:
+            req.proposedStartTime != null
+                ? _formatMatchTime(req.proposedStartTime!)
+                : 'Flexible',
       ),
     );
   }
@@ -90,8 +109,9 @@ Future<List<OpenMatchPoolItem>> openMatchPool(Ref ref) async {
 @riverpod
 Future<List<OpenMatchPoolItem>> myPoolRequests(Ref ref) async {
   final repo = ref.watch(matchPoolRepositoryProvider);
-  final memberships =
-      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final memberships = await ref.watch(
+    currentUserTeamMembershipsProvider.future,
+  );
   final myTeams = [for (final membership in memberships) membership.team];
   final myTeamIds = myTeams.map((t) => t.id).toSet();
 
@@ -108,12 +128,14 @@ Future<List<OpenMatchPoolItem>> myPoolRequests(Ref ref) async {
       OpenMatchPoolItem(
         request: req,
         fromTeam: fromTeam,
-        formatLabel: '${req.proposedFormat?.oversPerInnings ?? 20} Overs · ${req.proposedFormat?.ballType.wire.toUpperCase() ?? 'TAPE'}',
+        formatLabel:
+            '${req.proposedFormat?.oversPerInnings ?? 20} Overs · ${req.proposedFormat?.ballType.wire.toUpperCase() ?? 'TAPE'}',
         venue: req.proposedVenue ?? 'Lahore Ground',
         shareCode: req.shareCode ?? '—',
-        timeLabel: req.proposedStartTime != null
-            ? _formatMatchTime(req.proposedStartTime!)
-            : 'Flexible',
+        timeLabel:
+            req.proposedStartTime != null
+                ? _formatMatchTime(req.proposedStartTime!)
+                : 'Flexible',
       ),
     );
   }
@@ -159,8 +181,9 @@ class MyChallengesView {
 @riverpod
 Future<MyChallengesView> myChallenges(Ref ref) async {
   final repo = ref.watch(matchPoolRepositoryProvider);
-  final memberships =
-      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final memberships = await ref.watch(
+    currentUserTeamMembershipsProvider.future,
+  );
   final myTeams = [for (final membership in memberships) membership.team];
   final myTeamIds = myTeams.map((t) => t.id).toSet();
   if (myTeamIds.isEmpty) {
@@ -179,13 +202,19 @@ Future<MyChallengesView> myChallenges(Ref ref) async {
 
     // The applications carry both the pending count the card shows and, once
     // settled, the opponent it settled on — so one read serves both.
-    final apps = (await repo.listPoolApplications(req.id)).getOrElse((_) => const []);
-    final accepted = apps
-        .where((a) => a.status == PoolApplicationStatus.accepted)
-        .firstOrNull;
-    final opponent = accepted == null
-        ? null
-        : await ref.watch(teamProvider(accepted.applicantTeamId.value).future);
+    final apps = (await repo.listPoolApplications(
+      req.id,
+    )).getOrElse((_) => const []);
+    final accepted =
+        apps
+            .where((a) => a.status == PoolApplicationStatus.accepted)
+            .firstOrNull;
+    final opponent =
+        accepted == null
+            ? null
+            : await ref.watch(
+              teamProvider(accepted.applicantTeamId.value).future,
+            );
 
     rows.add(
       MyChallengeRow(
@@ -214,8 +243,9 @@ Future<MyChallengesView> myChallenges(Ref ref) async {
   }
 
   final live = rows.where((r) => r.isLive).toList()..sort(byStart);
-  final past = rows.where((r) => !r.isLive).toList()
-    ..sort((a, b) => b.request.updatedAt.compareTo(a.request.updatedAt));
+  final past =
+      rows.where((r) => !r.isLive).toList()
+        ..sort((a, b) => b.request.updatedAt.compareTo(a.request.updatedAt));
 
   return MyChallengesView(live: live, past: past);
 }
@@ -273,7 +303,8 @@ Future<List<OpenMatchPoolItem>> filteredOpenMatchPool(Ref ref) async {
       items.where((i) => i.ballType == MatchBallType.tape).toList(),
     PoolFacet.leather =>
       items.where((i) => i.ballType == MatchBallType.leather).toList(),
-    PoolFacet.today => items.where((i) {
+    PoolFacet.today =>
+      items.where((i) {
         final start = i.startTime;
         if (start == null) return false;
         final now = DateTime.now();
@@ -294,7 +325,8 @@ Future<bool> viewerManagesTeam(Ref ref) async {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return false;
   // Challenge authority comes from the canonical membership relationship.
-  final memberships =
-      await ref.watch(currentUserTeamMembershipsProvider.future);
+  final memberships = await ref.watch(
+    currentUserTeamMembershipsProvider.future,
+  );
   return memberships.any((m) => m.relationship.canSendChallenge);
 }

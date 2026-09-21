@@ -15,6 +15,8 @@ const CRICKET_SETUP_PERMISSION =
   "cricket.match.setup";
 const SCORE_PERMISSION =
   "match.score";
+const CANCEL_PERMISSION =
+  "match.cancel";
 
 export class AuthorizationRepository {
   // Stable generic authorization primitive. The transaction injects the
@@ -299,6 +301,73 @@ export class AuthorizationRepository {
     if (rows[0]?.allowed !== true) {
       forbidden(
         "Only a tournament organizer can perform this action",
+      );
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Match cancellation
+  // -------------------------------------------------------------------------
+
+  /// Cancellation can come from:
+  ///
+  /// 1. explicit match-scoped match.cancel grant
+  ///
+  /// OR
+  ///
+  /// 2. match.cancel on either participating team.
+  ///
+  /// The default matrix grants the team permission to owner + manager.
+  /// Captain may receive it through a team-specific override, but does not get
+  /// it automatically.
+  async canCancelMatch(
+    tx: Tx,
+    match: MatchBundle,
+  ): Promise<boolean> {
+    if (
+      await this.canMatch(
+        tx,
+        match.matchId,
+        CANCEL_PERMISSION,
+      )
+    ) {
+      return true;
+    }
+
+    for (
+      const teamId of
+      [match.teamAId, match.teamBId]
+    ) {
+      if (!teamId) continue;
+
+      if (
+        await this.canTeam(
+          tx,
+          teamId,
+          CANCEL_PERMISSION,
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  async requireCancelMatch(
+    tx: Tx,
+    match: MatchBundle,
+  ): Promise<void> {
+    if (
+      !(
+        await this.canCancelMatch(
+          tx,
+          match,
+        )
+      )
+    ) {
+      forbidden(
+        "This user is not allowed to cancel this match",
       );
     }
   }

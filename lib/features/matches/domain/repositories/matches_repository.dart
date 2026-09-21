@@ -42,7 +42,7 @@ abstract class MatchesRepository {
   /// Matches with no balls return an empty list. Returns a map keyed by
   /// match id.
   Future<Either<Failure, Map<MatchId, List<InningsSummary>>>>
-      listInningsForMatches(Iterable<MatchId> matchIds);
+  listInningsForMatches(Iterable<MatchId> matchIds);
 
   /// Real-time match row updates. Subscribes to the broadcast channel
   /// `match:<id>:state` (per migration 0810) and decodes the payload into
@@ -88,6 +88,18 @@ abstract class MatchesRepository {
   /// status → live, start_phase → live,
   /// stamps actual_start_time, and adds the caller to `assigned_scorers`.
   Future<Either<Failure, Unit>> startMatchNow(MatchId id);
+
+  /// Cancel a confirmed, non-tournament match before it goes live.
+  ///
+  /// Authorization:
+  /// - effective team-scoped `match.cancel` on either participating team
+  /// - OR an explicit match-scoped `match.cancel` grant
+  ///
+  /// The Edge Function re-checks this authoritatively.
+  Future<Either<Failure, Unit>> cancelMatch({
+    required MatchId id,
+    String? reason,
+  });
 
   // ─── Match Requests (challenge handshake) ────────────────────────────────
 
@@ -273,9 +285,7 @@ abstract class MatchesRepository {
   /// deliveries carry only an innings number.
   Future<Either<Failure, List<MatchInnings>>> listInnings(MatchId matchId);
 
-  Future<Either<Failure, List<MatchWicket>>> getWickets(
-    String inningsId,
-  );
+  Future<Either<Failure, List<MatchWicket>>> getWickets(String inningsId);
 
   // ─── Scorer Lease ───────────────────────────────────────────────────────
 

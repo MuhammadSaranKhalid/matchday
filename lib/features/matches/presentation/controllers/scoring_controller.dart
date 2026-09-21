@@ -67,31 +67,31 @@ class ScoringController extends _$ScoringController {
   }
 
   ScoringState _toState(ScoringProjection p) => ScoringState(
-        match: p.match,
-        inningsNumber: inningsNumber,
-        innings: p.innings,
-        balls: p.balls,
-        matchPlayers: p.matchPlayers,
-        canScore: p.canScore,
-        pendingCount: p.pendingCount,
-        isBusy: _isBusy,
-      );
+    match: p.match,
+    inningsNumber: inningsNumber,
+    innings: p.innings,
+    balls: p.balls,
+    matchPlayers: p.matchPlayers,
+    canScore: p.canScore,
+    pendingCount: p.pendingCount,
+    isBusy: _isBusy,
+  );
 
   // ── Deliveries ───────────────────────────────────────────────────────────
 
   /// A normal delivery off the bat (0/1/2/3/4/6).
   Future<Either<Failure, Unit>> recordRun(int runs) => _record(
-        (s) => BallDraft(
-          matchId: s.match.id,
-          inningsNumber: inningsNumber,
-          isLegalDelivery: true,
-          ballKind: BallKind.legal,
-          runsScored: runs,
-          batsmanId: s.innings?.strikerId?.value,
-          nonStrikerId: s.innings?.nonStrikerId?.value,
-          bowlerId: s.innings?.bowlerId?.value,
-        ),
-      );
+    (s) => BallDraft(
+      matchId: s.match.id,
+      inningsNumber: inningsNumber,
+      isLegalDelivery: true,
+      ballKind: BallKind.legal,
+      runsScored: runs,
+      batsmanId: s.innings?.strikerId?.value,
+      nonStrikerId: s.innings?.nonStrikerId?.value,
+      bowlerId: s.innings?.bowlerId?.value,
+    ),
+  );
 
   /// A wide, no-ball, bye or leg-bye.
   Future<Either<Failure, Unit>> recordExtra({
@@ -119,24 +119,22 @@ class ScoringController extends _$ScoringController {
     int runsBefore = 0,
     String? dismissedMatchPlayerId,
     String? fielderMatchPlayerId,
-  }) =>
-      _record(
-        (s) => BallDraft(
-          matchId: s.match.id,
-          inningsNumber: inningsNumber,
-          isLegalDelivery: true,
-          ballKind: BallKind.legal,
-          runsScored: runsBefore,
-          isWicket: true,
-          wicketType: type,
-          dismissedPlayerId:
-              dismissedMatchPlayerId ?? s.innings?.strikerId?.value,
-          batsmanId: s.innings?.strikerId?.value,
-          nonStrikerId: s.innings?.nonStrikerId?.value,
-          bowlerId: s.innings?.bowlerId?.value,
-          fielderId: fielderMatchPlayerId,
-        ),
-      );
+  }) => _record(
+    (s) => BallDraft(
+      matchId: s.match.id,
+      inningsNumber: inningsNumber,
+      isLegalDelivery: true,
+      ballKind: BallKind.legal,
+      runsScored: runsBefore,
+      isWicket: true,
+      wicketType: type,
+      dismissedPlayerId: dismissedMatchPlayerId ?? s.innings?.strikerId?.value,
+      batsmanId: s.innings?.strikerId?.value,
+      nonStrikerId: s.innings?.nonStrikerId?.value,
+      bowlerId: s.innings?.bowlerId?.value,
+      fielderId: fielderMatchPlayerId,
+    ),
+  );
 
   /// Undo the last delivery — one step back, never further.
   Future<Either<Failure, Unit>> undoLastBall() => _busy(_session.undo);
@@ -185,22 +183,20 @@ class ScoringController extends _$ScoringController {
     final s = state.value;
     if (s == null) return _notReady();
 
-    final striker = forNonStriker
-        ? (s.innings?.strikerId?.value ?? '')
-        : batterMatchPlayerId;
-    final nonStriker = forNonStriker
-        ? batterMatchPlayerId
-        : (s.innings?.nonStrikerId?.value ?? '');
+    final striker =
+        forNonStriker
+            ? (s.innings?.strikerId?.value ?? '')
+            : batterMatchPlayerId;
+    final nonStriker =
+        forNonStriker
+            ? batterMatchPlayerId
+            : (s.innings?.nonStrikerId?.value ?? '');
     final bowler = s.innings?.bowlerId?.value ?? '';
     if (striker.isEmpty || nonStriker.isEmpty || bowler.isEmpty) {
       return _refuse('Set the bowler and both batters before resuming.');
     }
 
-    return _setTrio(
-      striker: striker,
-      nonStriker: nonStriker,
-      bowler: bowler,
-    );
+    return _setTrio(striker: striker, nonStriker: nonStriker, bowler: bowler);
   }
 
   /// Send everything the queue still owes the server.
@@ -212,14 +208,13 @@ class ScoringController extends _$ScoringController {
     required String striker,
     required String nonStriker,
     required String bowler,
-  }) =>
-      _busy(
-        () => _session.setTrio(
-          strikerId: striker,
-          nonStrikerId: nonStriker,
-          bowlerId: bowler,
-        ),
-      );
+  }) => _busy(
+    () => _session.setTrio(
+      strikerId: striker,
+      nonStrikerId: nonStriker,
+      bowlerId: bowler,
+    ),
+  );
 
   /// The guards that exist to produce a sentence the scorer can act on.
   ///
@@ -228,7 +223,9 @@ class ScoringController extends _$ScoringController {
   /// reached 182/5 through four consecutive wickets and then logged a single
   /// with the non-striker's end empty. The pad gates on this too; this is the
   /// backstop for every other route into a write.
-  Future<Either<Failure, Unit>> _record(BallDraft Function(ScoringState) draft) {
+  Future<Either<Failure, Unit>> _record(
+    BallDraft Function(ScoringState) draft,
+  ) {
     final s = state.value;
     if (s == null) return _notReady();
     if (!s.bowlerSet) {

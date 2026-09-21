@@ -1,6 +1,6 @@
--- =============================================================================
+-- Migration file: 20260101000101_player_sports.sql
+
 -- 0101 · player_sports
--- =============================================================================
 --
 -- Canonical registered-player identity per sport.
 --
@@ -30,39 +30,26 @@
 --   3. Claiming an unclaimed player
 --
 -- Future sport-specific onboarding may add another backend activation path.
--- =============================================================================
 
+-- Section: Tables and constraints
 
-create table public.player_sports (
-  user_id uuid not null
-    references public.profiles(user_id)
-    on delete cascade,
-
-  sport_id text not null
-    references public.sports(sport_id)
-    on update restrict
-    on delete restrict,
-
+create table public.player_sports(
+  user_id    uuid not null references public.profiles(user_id) on delete cascade,
+  sport_id   text not null references public.sports(sport_id) on update restrict on delete restrict,
   created_at timestamptz not null default now(),
-
   primary key (user_id, sport_id)
 );
 
-
-comment on table public.player_sports is
-  'Canonical registered-player identity per sport. '
+comment on table public.player_sports is 'Canonical registered-player identity per sport. '
   'A row means this Matchday account has established a player identity '
   'in that sport. Team membership and sport-specific attributes are stored '
   'elsewhere.';
 
+comment on column public.player_sports.user_id is 'Global Matchday account identity.';
 
-comment on column public.player_sports.user_id is
-  'Global Matchday account identity.';
+comment on column public.player_sports.sport_id is 'Sport in which this account has established a player identity.';
 
-
-comment on column public.player_sports.sport_id is
-  'Sport in which this account has established a player identity.';
-
+-- Section: Indexes
 
 -- PK is (user_id, sport_id), which is ideal for:
 --
@@ -72,31 +59,23 @@ comment on column public.player_sports.sport_id is
 --
 --   "find Cricket players"
 --   "find Football players"
+create index player_sports_sport_user on public.player_sports(sport_id, user_id);
 
-create index player_sports_sport_user
-  on public.player_sports (sport_id, user_id);
+-- Section: Enable row-level security
 
-
--- =============================================================================
 -- RLS / Data API
--- =============================================================================
+alter table public.player_sports enable row level security;
 
-alter table public.player_sports
-  enable row level security;
-
+-- Section: Policies
 
 -- Player sport identity is public, just like the public player/profile model.
-
-create policy "player_sports_read_public"
-  on public.player_sports
-  for select
-  to anon, authenticated
+create policy "player_sports_read_public" on public.player_sports
+  for select to anon, authenticated
   using (true);
 
+-- Section: Permissions
 
--- =============================================================================
 -- Domain ownership
--- =============================================================================
 --
 -- player_sports is NOT directly writable through Flutter.
 --
@@ -112,18 +91,8 @@ create policy "player_sports_read_public"
 --   * deleting an identity while match/team history still depends on it
 --
 -- Account deletion naturally removes rows through profiles ON DELETE CASCADE.
--- =============================================================================
+revoke all on table public.player_sports from anon, authenticated;
 
-revoke all
-  on table public.player_sports
-  from anon, authenticated;
+grant select on table public.player_sports to anon, authenticated;
 
-
-grant select
-  on table public.player_sports
-  to anon, authenticated;
-
-
-grant all
-  on table public.player_sports
-  to service_role;
+grant all on table public.player_sports to service_role;

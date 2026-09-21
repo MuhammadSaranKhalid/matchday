@@ -95,6 +95,9 @@ For specific patterns, the canonical references are:
 
 Create a project; copy URL + anon (publishable) key. The schema is defined in `supabase/migrations/`; either apply those migrations to your project or use the Supabase CLI to link your local project.
 
+Follow the [migration SQL style guide](docs/database/migration-style.md) for section
+order, formatting, and the repeatable formatter/check commands.
+
 ### 2. Auth providers
 
 `Authentication → Providers` — enable Email (for OTP) and Google. For Google, paste the **web client ID and secret** from Google Cloud Console; the Android/iOS OAuth clients are configured on-device via `google_sign_in`.

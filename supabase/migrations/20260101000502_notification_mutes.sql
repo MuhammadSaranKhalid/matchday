@@ -1,6 +1,6 @@
--- =============================================================================
+-- Migration file: 20260101000502_notification_mutes.sql
+
 -- 0502 · notification_mutes — "stop telling me about THIS one"
--- =============================================================================
 -- Design + decision log: docs/notifications-design.md
 --
 -- The other half of preferences (0501). Category toggles answer "what kinds of
@@ -31,56 +31,66 @@
 -- posts / chats / profiles, the same problem `follows` has. Orphans are
 -- harmless here (a mute for a deleted team is never consulted again), so the
 -- follows cleanup-trigger machinery is not warranted.
--- =============================================================================
 
-create table public.notification_mutes (
-  user_id      uuid not null
-                    references public.profiles(user_id) on delete cascade,
-  scope        text not null
-                    check (scope in ('team', 'match', 'tournament',
-                                     'post', 'chat', 'user')),
-  entity_id    uuid not null,
+-- Section: Tables and constraints
+
+create table public.notification_mutes(
+  user_id     uuid not null references public.profiles(user_id) on delete cascade,
+  scope       text not null check (scope in ('team', 'match', 'tournament', 'post', 'chat', 'user')),
+  entity_id   uuid not null,
   -- NULL = muted forever. A timestamp = "snooze", which is what the UI's
   -- "mute for 8 hours" offers. notify() compares against now(), so an expired
   -- row simply stops matching; a nightly sweep is not required.
-  muted_until  timestamptz,
-  created_at   timestamptz not null default now(),
-
+  muted_until timestamptz,
+  created_at  timestamptz not null default now(),
   primary key (user_id, scope, entity_id)
 );
+
+-- Section: Indexes
 
 -- The lookup notify() actually makes is "is THIS user muting THIS entity",
 -- which the PK serves. This index serves the reverse question the UI asks:
 -- "how many people muted this tournament" / cleanup by entity.
-create index notification_mutes_entity
-  on public.notification_mutes (scope, entity_id);
+create index notification_mutes_entity on public.notification_mutes(scope, entity_id);
 
--- -----------------------------------------------------------------------------
+-- Section: Enable row-level security
+
 -- RLS — a user reads and writes only their own mutes.
--- -----------------------------------------------------------------------------
 alter table public.notification_mutes enable row level security;
 
-create policy "notification_mutes_select_self"
-  on public.notification_mutes for select
-  to authenticated
-  using ((select auth.uid()) = user_id);
+-- Section: Policies
 
-create policy "notification_mutes_insert_self"
-  on public.notification_mutes for insert
-  to authenticated
-  with check ((select auth.uid()) = user_id);
+create policy "notification_mutes_select_self" on public.notification_mutes
+  for select to authenticated
+  using ((
+    select
+      auth.uid()) = user_id);
 
-create policy "notification_mutes_update_self"
-  on public.notification_mutes for update
-  to authenticated
-  using ((select auth.uid()) = user_id)
-  with check ((select auth.uid()) = user_id);
+create policy "notification_mutes_insert_self" on public.notification_mutes
+  for insert to authenticated
+  with check ((
+    select
+      auth.uid()) = user_id);
 
-create policy "notification_mutes_delete_self"
-  on public.notification_mutes for delete
-  to authenticated
-  using ((select auth.uid()) = user_id);
+create policy "notification_mutes_update_self" on public.notification_mutes
+  for update to authenticated
+  using ((
+    select
+      auth.uid()) = user_id)
+  with check ((
+    select
+      auth.uid()) = user_id);
+
+create policy "notification_mutes_delete_self" on public.notification_mutes
+  for delete to authenticated
+  using ((
+    select
+      auth.uid()) = user_id);
+
+-- Section: Permissions
 
 revoke all on public.notification_mutes from anon, authenticated;
+
 grant select, insert, update, delete on public.notification_mutes to authenticated;
+
 grant all on public.notification_mutes to service_role;

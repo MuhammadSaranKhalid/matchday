@@ -1,6 +1,6 @@
--- =============================================================================
+-- Migration file: 20260101000240_team_invites.sql
+
 -- 0240 · team_invites
--- =============================================================================
 -- Spec §2.9. Manager-initiated "invite a registered user to join a team".
 -- This is the only roster-add path in v1.0 — the inverse direction
 -- (player → team join requests) was removed as redundant.
@@ -26,26 +26,23 @@
 -- Single-pending invariant:
 --   `team_invites_one_pending` keeps a manager from spamming invites at the
 --   same user. Resending after a decline/cancel is fine — only pending is unique.
--- =============================================================================
 
-create table public.team_invites (
+-- Section: Tables and constraints
+
+create table public.team_invites(
   invite_id     uuid primary key default gen_random_uuid(),
-  team_id       uuid not null
-                    references public.teams(team_id) on delete cascade,
+  team_id       uuid not null references public.teams(team_id) on delete cascade,
   -- The user being invited. They make the accept/decline decision.
-  invitee_id    uuid not null
-                    references public.profiles(user_id) on delete cascade,
+  invitee_id    uuid not null references public.profiles(user_id) on delete cascade,
   -- The manager who sent the invite. Captured for audit + notification payload.
-  invited_by    uuid not null
-                    references public.profiles(user_id) on delete cascade,
+  invited_by    uuid not null references public.profiles(user_id) on delete cascade,
   message       text check (message is null or length(message) <= 500),
   -- Pre-set role + jersey: when the manager already knows where the invitee
   -- fits. If null, accept_team_invite uses sensible defaults.
   -- A role KEY (public.roles), not an enum — roles are data since 2026-09-11.
   -- Capped at 'captain' so an invite cannot hand out staff on accept, bypassing
   -- grant_team_role()'s "never grant at or above your own rank" rule.
-  role          text default 'player'
-                    check (role is null or role in ('player', 'captain')),
+  role          text default 'player' check (role is null or role in ('player', 'captain')),
   jersey_number integer,
   -- request_status enum lives in 0000_shared_helpers.
   status        public.request_status not null default 'pending',
@@ -53,57 +50,73 @@ create table public.team_invites (
   decided_at    timestamptz,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
-
   -- Decision metadata is set together with the status flip; cancellations
   -- (manager-initiated recall) don't require a decided_by since the actor is
   -- the same as invited_by.
-  constraint invite_decision_consistency check (
-    (status = 'pending'   and decided_by is null and decided_at is null)
-    or (status in ('approved', 'rejected') and decided_at is not null)
-    or (status = 'cancelled')
-  )
+  constraint invite_decision_consistency check ((status = 'pending' and decided_by is null and decided_at is null) or (status in ('approved', 'rejected') and decided_at is not null) or (status = 'cancelled'))
 );
 
-create unique index team_invites_one_pending
-  on public.team_invites (team_id, invitee_id)
-  where status = 'pending';
+-- Section: Indexes
 
-create index team_invites_team    on public.team_invites (team_id);
-create index team_invites_invitee on public.team_invites (invitee_id);
+create unique index team_invites_one_pending on public.team_invites(team_id, invitee_id)
+where
+  status = 'pending';
+
+create index team_invites_team on public.team_invites(team_id);
+
+create index team_invites_invitee on public.team_invites(invitee_id);
+
+-- Section: Triggers
 
 create trigger team_invites_set_updated_at
-  before update on public.team_invites
-  for each row execute function public.set_updated_at();
+  before update on public.team_invites for each row
+  execute function public.set_updated_at();
 
--- -----------------------------------------------------------------------------
+-- Section: Functions
+
 -- accept_team_invite — atomic accept RPC.
 -- Inserts the team_members row first, then marks the invite approved. Both
 -- writes happen in a single transaction so a partial failure (e.g. a unique
 -- constraint on jersey_number) leaves nothing behind.
--- -----------------------------------------------------------------------------
-create or replace function public.accept_team_invite(p_invite_id uuid)
-returns uuid
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
+create or replace function public.accept_team_invite(
+  p_invite_id uuid
+)
+  returns uuid
+  language plpgsql
+  security definer
+  set search_path = public, pg_temp
+  as $$
 declare
-  v_uid           uuid := auth.uid();
-  v_team_id       uuid;
-  v_invitee_id    uuid;
-  v_role          text;
-  v_jersey        integer;
-  v_invited_by    uuid;
+  v_uid uuid := auth.uid();
+  v_team_id uuid;
+  v_invitee_id uuid;
+  v_role text;
+  v_jersey integer;
+  v_invited_by uuid;
   v_membership_id uuid;
 begin
   if v_uid is null then
-    raise exception 'Not authenticated' using errcode = '28000';
+    raise exception 'Not authenticated'
+      using errcode = '28000';
   end if;
-  select team_id, invitee_id, role, jersey_number, invited_by
-    into v_team_id, v_invitee_id, v_role, v_jersey, v_invited_by
-    from public.team_invites
-   where invite_id = p_invite_id and status = 'pending'
-   for update;
+  select
+    team_id,
+    invitee_id,
+    role,
+    jersey_number,
+    invited_by
+  into
+    v_team_id,
+    v_invitee_id,
+    v_role,
+    v_jersey,
+    v_invited_by
+  from
+    public.team_invites
+  where
+    invite_id = p_invite_id
+    and status = 'pending'
+  for update;
   if v_team_id is null then
     raise exception 'Invite not found or not pending'
       using errcode = 'P0002';
@@ -112,35 +125,48 @@ begin
     raise exception 'Only the invitee can accept this invite'
       using errcode = '42501';
   end if;
-
-  insert into public.team_members
-       (team_id, user_id, role,                          jersey_number, added_by)
-  values (v_team_id, v_invitee_id, coalesce(v_role, 'player'), v_jersey,      v_invited_by)
-  returning membership_id into v_membership_id;
-
-  update public.team_invites
-     set status     = 'approved',
-         decided_by = v_uid,
-         decided_at = now()
-   where invite_id = p_invite_id;
-
+  -- Set initial role for the trigger team_members_assign_initial_role
+  perform
+    set_config('matchday.initial_role', coalesce(v_role, 'player'), true);
+  insert into public.team_members(team_id, user_id, jersey_number, added_by)
+    values (v_team_id, v_invitee_id, v_jersey, v_invited_by)
+  returning
+    membership_id
+  into
+    v_membership_id;
+  -- If the invite was for 'captain', ensure they also hold 'player' role
+  if v_role = 'captain' then
+    perform
+      public._attach_role(v_membership_id, 'player', v_invited_by);
+  end if;
+  update
+    public.team_invites
+  set
+    status = 'approved',
+    decided_by = v_uid,
+    decided_at = now()
+  where
+    invite_id = p_invite_id;
   return v_membership_id;
 end;
 $$;
 
 revoke all on function public.accept_team_invite(uuid) from public;
+
 grant execute on function public.accept_team_invite(uuid) to authenticated;
 
--- -----------------------------------------------------------------------------
+revoke all on function public.accept_team_invite(uuid) from public;
+
+grant execute on function public.accept_team_invite(uuid) to authenticated;
+
+-- Section: Enable row-level security
+
 -- NOTIFICATION TRIGGER MOVED → 20260101000620_notification_triggers.sql
 --
 -- notify_on_team_invite now calls public.notify() (0570), which is declared
 -- AFTER this file. A plpgsql body referencing a not-yet-created function
 -- compiles but fails at runtime (§12.0), so the trigger follows its dependency
 -- — the same remedy the teams UPDATE policies got when they moved to 0210.
--- -----------------------------------------------------------------------------
-
--- -----------------------------------------------------------------------------
 -- RLS:
 --   - read:   invitee or any manager of the team.
 --   - insert: any manager of the team. Invites are the only roster-add path
@@ -148,38 +174,43 @@ grant execute on function public.accept_team_invite(uuid) to authenticated;
 --     redundant), so there's no toggle gating this.
 --   - update: invitee (decline) OR manager (cancel). Accept rides the RPC
 --     because it has to write to two tables atomically.
--- -----------------------------------------------------------------------------
 alter table public.team_invites enable row level security;
 
-create policy "team_invites_read_self_or_manager"
-  on public.team_invites for select
-  to authenticated
-  using ((select auth.uid()) = invitee_id or public.is_team_manager(team_id));
+-- Section: Policies
 
-create policy "team_invites_insert_manager"
-  on public.team_invites for insert
-  to authenticated
-  with check (
-    public.is_team_manager(team_id)
-    and (select auth.uid()) = invited_by
-  );
+create policy "team_invites_read_self_or_manager" on public.team_invites
+  for select to authenticated
+  using ((
+    select
+      auth.uid()) = invitee_id
+      or public.is_team_manager(team_id));
 
-create policy "team_invites_update_self_or_manager"
-  on public.team_invites for update
-  to authenticated
-  using ((select auth.uid()) = invitee_id or public.is_team_manager(team_id))
-  with check ((select auth.uid()) = invitee_id or public.is_team_manager(team_id));
+create policy "team_invites_insert_manager" on public.team_invites
+  for insert to authenticated
+  with check (public.is_team_manager(team_id)
+  and (
+    select
+      auth.uid()) = invited_by);
 
--- -----------------------------------------------------------------------------
+create policy "team_invites_update_self_or_manager" on public.team_invites
+  for update to authenticated
+  using ((
+    select
+      auth.uid()) = invitee_id
+      or public.is_team_manager(team_id))
+  with check ((
+    select
+      auth.uid()) = invitee_id
+      or public.is_team_manager(team_id));
+
+-- Section: Indexes (continued)
+
 -- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
--- -----------------------------------------------------------------------------
 -- Postgres does NOT index the referencing side of a foreign key for you. Every
 -- one of these columns points at a parent that gets deleted or updated
 -- (profiles on account deletion, matches/teams on cascade), and without an
 -- index each such statement seq-scans this table once per affected parent row.
 -- They are also the columns joined on when reading.
+create index if not exists idx_team_invites_decided_by on public.team_invites(decided_by);
 
-create index if not exists idx_team_invites_decided_by
-  on public.team_invites (decided_by);
-create index if not exists idx_team_invites_invited_by
-  on public.team_invites (invited_by);
+create index if not exists idx_team_invites_invited_by on public.team_invites(invited_by);

@@ -1,6 +1,6 @@
--- =============================================================================
+-- Migration file: 20260101000330_grounds.sql
+
 -- 0330 · grounds
--- =============================================================================
 -- Promotes a ground from a string to a row.
 --
 -- Until now a ground was `tournaments.venues` (a jsonb array of {name, city})
@@ -42,96 +42,96 @@
 -- managed the way team search already manages them: a trigram index so the
 -- picker can offer "did you mean …" before a new row is created. Edits stay
 -- with whoever created the row until there is a moderation story.
--- =============================================================================
-
--- -----------------------------------------------------------------------------
 -- Surface types are declared in shared_helpers.
--- -----------------------------------------------------------------------------
-
--- -----------------------------------------------------------------------------
 -- 2. grounds.
--- -----------------------------------------------------------------------------
-create table if not exists public.grounds (
-  ground_id        uuid primary key default gen_random_uuid(),
-  name             text not null check (length(btrim(name)) between 2 and 80),
 
+-- Section: Tables and constraints
+
+create table if not exists public.grounds(
+  ground_id       uuid primary key default gen_random_uuid(),
+  name            text not null check (length(btrim(name)) between 2 and 80),
   -- Same shape as teams.location / profiles.location: {city, lat, lng,
   -- place_id, country_code}. The generated point is what proximity reads.
-  location         jsonb not null default '{}'::jsonb,
-  location_point   geography(point, 4326) generated always as (
-                      case
-                        when location ? 'lat' and location ? 'lng' then
-                          st_setsrid(
-                            st_makepoint(
-                              (location->>'lng')::double precision,
-                              (location->>'lat')::double precision
-                            ),
-                            4326
-                          )::geography
-                        else null
-                      end
-                    ) stored,
-
+  location        jsonb not null default '{}'::jsonb,
+  location_point  geography(point, 4326) generated always as ( case when location ? 'lat' and location ? 'lng' then
+    st_setsrid(st_makepoint((location ->> 'lng')::double precision,(location ->> 'lat')::double precision), 4326)::geography
+  else
+    null
+  end) stored,
   -- The "Turf · floodlights" line the create wizard collects and previously
   -- discarded into free text.
-  surface          public.ground_surface,
-  has_floodlights  boolean not null default false,
-  notes            text check (notes is null or length(notes) <= 300),
-
+  surface         public.ground_surface,
+  has_floodlights boolean not null default false,
+  notes           text check (notes is null or length(notes) <= 300),
   -- Normalised for trigram search. f_unaccent is the IMMUTABLE two-arg
   -- wrapper defined in 20260101000000_shared_helpers.
-  search_name      text generated always as (
-                      lower(public.f_unaccent(name))
-                    ) stored,
-
-  created_by       uuid references public.profiles(user_id) on delete set null,
-  created_at       timestamptz not null default now(),
-  updated_at       timestamptz not null default now()
+  search_name     text generated always as (lower(public.f_unaccent(name))) stored,
+  created_by      uuid references public.profiles(user_id) on delete set null,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
 );
 
-create index if not exists grounds_city
-  on public.grounds ((location->>'city'));
-create index if not exists grounds_location_point
-  on public.grounds using gist (location_point);
-create index if not exists grounds_search_trgm
-  on public.grounds using gin (search_name gin_trgm_ops);
-create index if not exists grounds_created_by
-  on public.grounds (created_by);
+-- Section: Indexes
+
+create index if not exists grounds_city on public.grounds((location ->> 'city'));
+
+create index if not exists grounds_location_point on public.grounds using gist(location_point);
+
+create index if not exists grounds_search_trgm on public.grounds using gin(search_name gin_trgm_ops);
+
+create index if not exists grounds_created_by on public.grounds(created_by);
+
+-- Section: Triggers
 
 drop trigger if exists grounds_set_updated_at on public.grounds;
+
 create trigger grounds_set_updated_at
-  before update on public.grounds
-  for each row execute function public.set_updated_at();
+  before update on public.grounds for each row
+  execute function public.set_updated_at();
+
+-- Section: Enable row-level security
 
 alter table public.grounds enable row level security;
 
+-- Section: Policies
+
 -- A ground is a public place; everyone can see it.
 drop policy if exists "grounds_read_public" on public.grounds;
-create policy "grounds_read_public"
-  on public.grounds for select
-  to anon, authenticated
+
+create policy "grounds_read_public" on public.grounds
+  for select to anon, authenticated
   using (true);
 
 drop policy if exists "grounds_insert_authenticated" on public.grounds;
-create policy "grounds_insert_authenticated"
-  on public.grounds for insert
-  to authenticated
-  with check ((select auth.uid()) = created_by);
+
+create policy "grounds_insert_authenticated" on public.grounds
+  for insert to authenticated
+  with check ((
+    select
+      auth.uid()) = created_by);
 
 -- Only the creator may correct a ground. Broad edit rights on a shared row
 -- invite vandalism, and there is no moderation queue yet.
 drop policy if exists "grounds_update_creator" on public.grounds;
-create policy "grounds_update_creator"
-  on public.grounds for update
-  to authenticated
-  using ((select auth.uid()) = created_by)
-  with check ((select auth.uid()) = created_by);
+
+create policy "grounds_update_creator" on public.grounds
+  for update to authenticated
+  using ((
+    select
+      auth.uid()) = created_by)
+  with check ((
+    select
+      auth.uid()) = created_by);
 
 drop policy if exists "grounds_delete_creator" on public.grounds;
-create policy "grounds_delete_creator"
-  on public.grounds for delete
-  to authenticated
-  using ((select auth.uid()) = created_by);
+
+create policy "grounds_delete_creator" on public.grounds
+  for delete to authenticated
+  using ((
+    select
+      auth.uid()) = created_by);
+
+-- Section: Functions
 
 -- -- -----------------------------------------------------------------------------
 -- -- 4. matches.ground_id — additive, nullable.
@@ -141,11 +141,9 @@ create policy "grounds_delete_creator"
 -- -- so that it runs BEFORE matches, which lets that FK be an inline column
 -- -- reference instead of a late ALTER. grounds depends only on profiles (0100)
 -- -- and tournaments (0300), so nothing else moves.
-
 -- -- (matches.ground_coordinates carried a 'DEPRECATED — never written' comment
 -- --  here. It was dropped at the source on 2026-09-06; coordinates live on
 -- --  grounds.location_point and only there.)
-
 -- -- -----------------------------------------------------------------------------
 -- -- 5. Backfill.
 -- -- -----------------------------------------------------------------------------
@@ -188,73 +186,83 @@ create policy "grounds_delete_creator"
 --    where lower(public.f_unaccent(g.name)) = lower(public.f_unaccent(d.name))
 --      and coalesce(g.location->>'city', '') = coalesce(d.tournament_city, '')
 -- );
-
--- -----------------------------------------------------------------------------
 -- 6. Ground search for the picker (the "did you mean …" step).
--- -----------------------------------------------------------------------------
 -- Ranked by trigram similarity, then by proximity when the caller supplies a
 -- coordinate. Mirrors the ranking recipe used by team search: never a hard
 -- radius cutoff, just a distance tie-break.
 create or replace function public.search_grounds(
   p_query text default null,
-  p_lat   double precision default null,
-  p_lng   double precision default null,
+  p_lat double precision default null,
+  p_lng double precision default null,
   p_limit integer default 12
 )
-returns table (
-  ground_id       uuid,
-  name            text,
-  city            text,
-  surface         text,
-  has_floodlights boolean,
-  distance_km     double precision,
-  match_score     real
+  returns table(
+    ground_id uuid,
+    name text,
+    city text,
+    surface text,
+    has_floodlights boolean,
+    distance_km double precision,
+    match_score real)
+  language sql
+  stable
+  security definer
+  set search_path = public,
+  pg_temp
+  as $$
+  with origin as(
+    select
+      case when p_lat is null
+        or p_lng is null then
+        null
+      else
+        st_setsrid(st_makepoint(p_lng, p_lat), 4326)::geography
+      end as pt
 )
-language sql
-stable
-security definer
-set search_path = public, pg_temp
-as $$
-  with origin as (
-    select case
-             when p_lat is null or p_lng is null then null
-             else st_setsrid(st_makepoint(p_lng, p_lat), 4326)::geography
-           end as pt
-  )
   select
     g.ground_id,
     g.name,
-    g.location->>'city',
+    g.location ->> 'city',
     g.surface::text,
     g.has_floodlights,
-    case
-      when o.pt is null or g.location_point is null then null
-      else st_distance(g.location_point, o.pt) / 1000.0
+    case when o.pt is null
+      or g.location_point is null then
+      null
+    else
+      st_distance(g.location_point, o.pt) / 1000.0
     end,
-    case
-      when p_query is null or btrim(p_query) = '' then 1.0::real
-      else word_similarity(lower(public.f_unaccent(p_query)), g.search_name)
+    case when p_query is null
+      or btrim(p_query) = '' then
+      1.0::real
+    else
+      word_similarity(lower(public.f_unaccent(p_query)), g.search_name)
     end
-  from public.grounds g
+  from
+    public.grounds g
   cross join origin o
-  where
-    p_query is null
-    or btrim(p_query) = ''
-    or lower(public.f_unaccent(p_query)) <% g.search_name
-  order by
-    -- Strongest name match first; with no query every row scores equally and
-    -- the distance tie-break below becomes the real ordering.
-    case
-      when p_query is null or btrim(p_query) = '' then 0::real
-      else word_similarity(lower(public.f_unaccent(p_query)), g.search_name)
-    end desc,
-    case
-      when o.pt is null or g.location_point is null then null
-      else st_distance(g.location_point, o.pt)
-    end asc nulls last,
-    g.name asc
-  limit greatest(1, least(coalesce(p_limit, 12), 50));
+where
+  p_query is null
+  or btrim(p_query) = ''
+  or lower(public.f_unaccent(p_query)) <% g.search_name
+order by
+  -- Strongest name match first; with no query every row scores equally and
+  -- the distance tie-break below becomes the real ordering.
+  case when p_query is null
+    or btrim(p_query) = '' then
+    0::real
+  else
+    word_similarity(lower(public.f_unaccent(p_query)), g.search_name)
+  end desc,
+  case when o.pt is null
+    or g.location_point is null then
+    null
+  else
+    st_distance(g.location_point, o.pt)
+  end asc nulls last,
+  g.name asc
+limit greatest(1, least(coalesce(p_limit, 12), 50));
 $$;
 
 revoke all on function public.search_grounds(text, double precision, double precision, integer) from public;
+
 grant execute on function public.search_grounds(text, double precision, double precision, integer) to authenticated;

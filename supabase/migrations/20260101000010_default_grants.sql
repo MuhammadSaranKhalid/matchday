@@ -1,6 +1,6 @@
--- =============================================================================
+-- Migration file: 20260101000010_default_grants.sql
+
 -- 0010 · Default grants on public for anon / authenticated / service_role
--- =============================================================================
 -- Hosted Supabase projects ship with these grants pre-seeded on `public`. If
 -- the schema ever gets dropped + recreated (e.g. wiping a project before
 -- repurposing it, or a fresh self-hosted setup), those defaults are lost and
@@ -11,7 +11,8 @@
 -- Runs after 0000 (extensions / helpers) and before any migration that
 -- creates a table, so every subsequent `create table public.foo` inherits
 -- privileges automatically via ALTER DEFAULT PRIVILEGES.
--- =============================================================================
+
+-- Section: Permissions
 
 grant usage on schema public to anon, authenticated, service_role;
 
@@ -24,19 +25,23 @@ grant usage on schema public to anon, authenticated, service_role;
 -- RLS narrows the rows. service_role gets ALL because Edge Functions /
 -- migration tooling run as it. Explicit FOR ROLE postgres pins the grantor
 -- so self-hosted setups don't inherit the wrong owner.
-alter default privileges for role postgres in schema public
-  grant select on tables to anon;
-alter default privileges for role postgres in schema public
-  grant select, insert, update, delete on tables to authenticated;
-alter default privileges for role postgres in schema public
-  grant all on tables to service_role;
+alter default privileges for role postgres in schema public grant
+select
+  on tables to anon;
 
-alter default privileges for role postgres in schema public
-  grant usage on sequences to anon;
-alter default privileges for role postgres in schema public
-  grant usage, select on sequences to authenticated;
-alter default privileges for role postgres in schema public
-  grant all on sequences to service_role;
+alter default privileges for role postgres in schema public grant
+select
+, insert, update, delete on tables to authenticated;
+
+alter default privileges for role postgres in schema public grant all on tables to service_role;
+
+alter default privileges for role postgres in schema public grant usage on sequences to anon;
+
+alter default privileges for role postgres in schema public grant usage,
+select
+  on sequences to authenticated;
+
+alter default privileges for role postgres in schema public grant all on sequences to service_role;
 
 -- ⚠️ The REVOKE is load-bearing and must come first. Postgres grants EXECUTE
 -- on every newly created function to PUBLIC automatically, and `anon` inherits
@@ -50,19 +55,17 @@ alter default privileges for role postgres in schema public
 -- Default privileges apply to objects created AFTER this statement, and this
 -- migration runs before every table and function, so one revoke here fixes the
 -- whole run.
-alter default privileges for role postgres in schema public
-  revoke execute on functions from public;
+alter default privileges for role postgres in schema public revoke execute on functions from public;
 
-alter default privileges for role postgres in schema public
-  grant execute on functions to authenticated, service_role;
+alter default privileges for role postgres in schema public grant execute on functions to authenticated, service_role;
+
+-- Section: Dependency-ordered operations
+
 -- anon explicitly gets no function execute by default; any RPC that wants
 -- to be reachable from the signed-out spectator surface (e.g. the public
 -- match link) must `grant execute ... to anon` at its declaration site.
 -- Two do: get_follow_list (0561) and _try_topic_uuid (0810).
-
--- -----------------------------------------------------------------------------
 -- PostGIS system table — KNOWN GAP, cannot be closed from here
--- -----------------------------------------------------------------------------
 -- `postgis` installs spatial_ref_sys into public, where PostgREST exposes it.
 -- The 2026-09-06 audit flagged it as RLS-disabled and world-writable.
 --
@@ -88,9 +91,13 @@ alter default privileges for role postgres in schema public
 -- could corrupt projections and break geo queries. No user data lives in it.
 do $$
 begin
-  revoke insert, update, delete, truncate on table public.spatial_ref_sys
-    from public, anon, authenticated;
+  revoke insert, update, delete, truncate
+    on table public.spatial_ref_sys from public,
+    anon,
+    authenticated;
 exception
-  when insufficient_privilege or undefined_table then
+  when insufficient_privilege
+    or undefined_table then
     raise notice 'spatial_ref_sys: not owner — writes left as PostGIS granted them.';
-end $$;
+end
+$$;

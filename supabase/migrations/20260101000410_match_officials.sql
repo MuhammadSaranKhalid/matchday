@@ -1,6 +1,6 @@
--- =============================================================================
+-- Migration file: 20260101000410_match_officials.sql
+
 -- 0410 · match_officials — per-match scorer / umpire assignment
--- =============================================================================
 -- Its own migration, per the one-table-one-migration convention, and numbered
 -- 0410 so it lands immediately after matches (0400).
 --
@@ -16,34 +16,37 @@
 -- keeps only the RPCs that write it.
 --
 -- is_tournament_organizer() (used by the write policy) comes from 0300.
--- =============================================================================
-
 -- Shape mirrors the table already deployed (see the drift note above): no
 -- created_at/updated_at, and the umpire roles split by position.
-create table if not exists public.match_officials (
+
+-- Section: Tables and constraints
+
+create table if not exists public.match_officials(
   match_id    uuid not null references public.matches(match_id) on delete cascade,
   user_id     uuid not null references public.profiles(user_id) on delete cascade,
-  role        text not null
-                check (role in ('scorer', 'umpire_main', 'umpire_leg',
-                                'umpire_third', 'referee')),
+  role        text not null check (role in ('scorer', 'umpire_main', 'umpire_leg', 'umpire_third', 'referee')),
   assigned_at timestamptz not null default now(),
   assigned_by uuid references public.profiles(user_id) on delete set null,
-
   primary key (match_id, user_id, role)
 );
 
-create index if not exists match_officials_user
-  on public.match_officials (user_id);
+-- Section: Indexes
+
+create index if not exists match_officials_user on public.match_officials(user_id);
+
+-- Section: Enable row-level security
 
 alter table public.match_officials enable row level security;
+
+-- Section: Policies
 
 -- Read: anyone who can already see the match's tournament, plus the official
 -- themselves. Kept permissive on select because a scorer's name is shown on
 -- the public Live Ops and fixture surfaces.
 drop policy if exists "match_officials_read" on public.match_officials;
-create policy "match_officials_read"
-  on public.match_officials for select
-  to authenticated
+
+create policy "match_officials_read" on public.match_officials
+  for select to authenticated
   using (true);
 
 -- Write: whoever runs the fixture. Assignment is always someone else's act —
@@ -63,51 +66,52 @@ create policy "match_officials_read"
 -- ONE permissive policy per (table, command, role) — Supabase advisor 0006 —
 -- so the two cases are branches of a single expression, not two policies.
 drop policy if exists "match_officials_write_organizers" on public.match_officials;
-create policy "match_officials_write_organizers"
-  on public.match_officials for all
-  to authenticated
-  using (
-    exists (
-      select 1 from public.matches m
-       where m.match_id = match_officials.match_id
-         and (
-           case
-             when m.tournament_id is not null
-               then public.is_tournament_organizer(m.tournament_id)
-             else public.is_team_captain(m.team_a_id)
-               or public.is_team_captain(m.team_b_id)
-           end
-         )
-    )
-  )
-  with check (
-    exists (
-      select 1 from public.matches m
-       where m.match_id = match_officials.match_id
-         and (
-           case
-             when m.tournament_id is not null
-               then public.is_tournament_organizer(m.tournament_id)
-             else public.is_team_captain(m.team_a_id)
-               or public.is_team_captain(m.team_b_id)
-           end
-         )
-    )
-    -- A captain may hand out scoring, not umpiring: neutral officials on a
-    -- casual match would be self-appointed by one of the two sides.
-    and (
-      match_officials.role = 'scorer'
-      or exists (
-        select 1 from public.matches m
-         where m.match_id = match_officials.match_id
-           and m.tournament_id is not null
-      )
-    )
-  );
 
--- =============================================================================
+create policy "match_officials_write_organizers" on public.match_officials
+  for all to authenticated
+  using (exists (
+    select
+      1
+    from
+      public.matches m
+    where
+      m.match_id = match_officials.match_id
+      and (
+        case when m.tournament_id is not null then
+          public.is_tournament_organizer(m.tournament_id)
+        else
+          public.is_team_captain(m.team_a_id)
+          or public.is_team_captain(m.team_b_id)
+        end)))
+  with check (exists (
+    select
+      1
+    from
+      public.matches m
+    where
+      m.match_id = match_officials.match_id
+      and (
+        case when m.tournament_id is not null then
+          public.is_tournament_organizer(m.tournament_id)
+        else
+          public.is_team_captain(m.team_a_id)
+          or public.is_team_captain(m.team_b_id)
+        end))
+        -- A captain may hand out scoring, not umpiring: neutral officials on a
+        -- casual match would be self-appointed by one of the two sides.
+        and (match_officials.role = 'scorer'
+        or exists (
+          select
+            1
+          from
+            public.matches m
+          where
+            m.match_id = match_officials.match_id
+            and m.tournament_id is not null)));
+
+-- Section: Functions
+
 -- The scorer appointment IS an authorization grant (2026-09-11)
--- =============================================================================
 -- match_officials keeps its rows: they are the record of who officiated, shown
 -- on the scorecard, and they cover umpires and referees who need no permission
 -- at all. But a `scorer` row has to actually GRANT something.
@@ -120,45 +124,44 @@ create policy "match_officials_write_organizers"
 -- The mirror is one-directional on purpose: match_officials is the editable
 -- record, grants is derived. Deleting the official removes the grant.
 create or replace function public.mirror_scorer_grant()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
+  returns trigger
+  language plpgsql
+  security definer
+  set search_path = public, pg_temp
+  as $$
 begin
   if tg_op = 'DELETE' then
     if old.role = 'scorer' then
       delete from public.grants
-       where subject_id = old.user_id
-         and scope = 'match' and entity_id = old.match_id
-         and permission_key = 'match.score';
+      where subject_id = old.user_id
+        and scope = 'match'
+        and entity_id = old.match_id
+        and permission_key = 'match.score';
     end if;
     return old;
   end if;
-
   if new.role = 'scorer' then
-    insert into public.grants
-      (subject_id, scope, entity_id, permission_key, granted_by)
-    values
-      (new.user_id, 'match', new.match_id, 'match.score', new.assigned_by)
-    on conflict (subject_id, scope, entity_id, permission_key) do nothing;
+    insert into public.grants(subject_id, scope, entity_id, permission_key, granted_by)
+      values(new.user_id, 'match', new.match_id, 'match.score', new.assigned_by)
+    on conflict(subject_id, scope, entity_id, permission_key)
+      do nothing;
   end if;
   return new;
 end;
 $$;
 
-create trigger match_officials_mirror_scorer
-  after insert or update or delete on public.match_officials
-  for each row execute function public.mirror_scorer_grant();
+-- Section: Triggers
 
--- -----------------------------------------------------------------------------
+create trigger match_officials_mirror_scorer
+  after insert or update or delete on public.match_officials for each row
+  execute function public.mirror_scorer_grant();
+
+-- Section: Indexes (continued)
+
 -- Foreign-key indexes (Supabase advisor 0001_unindexed_foreign_keys)
--- -----------------------------------------------------------------------------
 -- Postgres does NOT index the referencing side of a foreign key for you. Every
 -- one of these columns points at a parent that gets deleted or updated
 -- (profiles on account deletion, matches/teams on cascade), and without an
 -- index each such statement seq-scans this table once per affected parent row.
 -- They are also the columns joined on when reading.
-
-create index if not exists idx_match_officials_assigned_by
-  on public.match_officials (assigned_by);
+create index if not exists idx_match_officials_assigned_by on public.match_officials(assigned_by);

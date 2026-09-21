@@ -1,6 +1,0 @@
--- =============================================================================
--- 0822c · Repair two RPCs that fail at runtime (Superceded / Retired)
--- =============================================================================
--- Both undo_last_ball and start_innings have been migrated to the
--- cricket-match-action TypeScript Edge Function executing direct SQL transactions.
--- No database RPCs are created here.

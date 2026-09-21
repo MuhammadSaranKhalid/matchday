@@ -485,38 +485,6 @@ exception
   when duplicate_object then null;
 end $$;
 
--- Legacy aliases for backwards compatibility
-do $$
-begin
-  create type public.toss_decision as enum('bat', 'bowl');
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$
-begin
-  create type public.scoring_mode as enum('basic', 'standard', 'advanced', 'live_ball_by_ball');
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$
-begin
-  create type public.delivery_kind as enum('legal', 'wide', 'no_ball', 'bye', 'leg_bye', 'penalty_runs');
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$
-begin
-  create type public.wicket_kind as enum(
-    'bowled', 'caught', 'lbw', 'run_out', 'stumped', 'hit_wicket',
-    'retired_hurt', 'retired_out', 'timed_out', 'handled_ball',
-    'obstructing_field', 'hit_ball_twice'
-  );
-exception
-  when duplicate_object then null;
-end $$;
 
 do $$
 begin

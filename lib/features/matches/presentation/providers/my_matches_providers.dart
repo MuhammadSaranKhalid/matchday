@@ -280,11 +280,20 @@ MyMatchConfirmed _confirmedFor(
 
   return MyMatchConfirmed(
     id: m.id.value,
-    tag: 'Friendly',
+    tag: m.matchType == MatchType.tournament ? 'Tournament' : 'Friendly',
     homeTeamId: m.teamAId.value,
     awayTeamId: m.teamBId.value,
     oversPerInnings: m.format.oversPerInnings,
     ballsPerOver: m.format.ballsPerOver,
+    playersPerTeam: m.format.playersPerTeam,
+    ballType: m.format.ballType.wire,
+    formatCode: m.matchType == MatchType.tournament
+        ? 'Tournament'
+        : (m.format.oversPerInnings == 20
+            ? 'T20'
+            : (m.format.oversPerInnings > 0
+                ? '${m.format.oversPerInnings}O'
+                : 'Cricket')),
     homeShort: _short(home, fallback: 'A'),
     homeColor: _color(home?.primaryColor, fallback: const Color(0xFF7A746A)),
     homeName: home?.name ?? 'Team A',

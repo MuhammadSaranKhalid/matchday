@@ -39,6 +39,11 @@ class PvMatch {
     required this.when,
     required this.venue,
     required this.sub,
+    this.oversPerInnings,
+    this.ballsPerOver,
+    this.playersPerTeam,
+    this.ballType,
+    this.formatCode,
     this.lineupSet,
     this.scoreA,
     this.scoreB,
@@ -53,12 +58,41 @@ class PvMatch {
   final String when;
   final String venue;
   final String sub;
+  final int? oversPerInnings;
+  final int? ballsPerOver;
+  final int? playersPerTeam;
+  final String? ballType;
+  final String? formatCode;
   final bool? lineupSet;
   final String? scoreA;
   final String? scoreB;
   final String? result;
 
   bool get isCaptain => role == 'captain' || role == 'owner';
+
+  String get formatDisplay {
+    final players = playersPerTeam ?? 11;
+    final code = formatCode ??
+        (oversPerInnings == 20
+            ? 'T20'
+            : (oversPerInnings != null && oversPerInnings! > 0
+                ? '${oversPerInnings}O'
+                : 'Cricket'));
+    return '$code · $players-a-side';
+  }
+
+  String get oversDisplay {
+    final overs = (oversPerInnings == null || oversPerInnings == 0)
+        ? 'Unlimited'
+        : '$oversPerInnings';
+    final balls = ballsPerOver ?? 6;
+    return '$overs · $balls-ball';
+  }
+
+  String get ballDisplay {
+    if (ballType == null || ballType!.isEmpty) return 'Tape';
+    return ballType![0].toUpperCase() + ballType!.substring(1).toLowerCase();
+  }
 }
 
 // ── Teams ───────────────────────────────────────────────────────────────────

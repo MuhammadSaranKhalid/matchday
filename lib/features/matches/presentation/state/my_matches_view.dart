@@ -101,6 +101,9 @@ class MyMatchConfirmed {
     required this.awayTeamId,
     required this.oversPerInnings,
     required this.ballsPerOver,
+    this.playersPerTeam = 11,
+    this.ballType = 'tape',
+    this.formatCode,
     required this.homeShort,
     required this.homeColor,
     required this.homeName,
@@ -140,6 +143,9 @@ class MyMatchConfirmed {
   /// `oversPerInnings` is 0 for unlimited (Test / first-class).
   final int oversPerInnings;
   final int ballsPerOver;
+  final int playersPerTeam;
+  final String ballType;
+  final String? formatCode;
 
   final String homeShort;
   final Color homeColor;

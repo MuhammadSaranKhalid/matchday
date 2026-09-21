@@ -40,7 +40,11 @@ List<PvMatch> pvMatchesFromView(MyMatchesView v, {required PvCrest meFallback}) 
       when: c.when,
       venue: c.venue,
       sub: c.tag,
-      // lineupSet / live score are not surfaced by the view → left null.
+      oversPerInnings: c.oversPerInnings,
+      ballsPerOver: c.ballsPerOver,
+      playersPerTeam: c.playersPerTeam,
+      ballType: c.ballType,
+      formatCode: c.formatCode,
     ));
   }
 

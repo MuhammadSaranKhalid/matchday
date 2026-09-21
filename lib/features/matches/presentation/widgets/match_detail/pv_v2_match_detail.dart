@@ -82,16 +82,12 @@ class PvMatchDetail extends StatelessWidget {
                   if (done) _completedScore(),
                   const _DetailSectionH('Match spec'),
                   _KvCard(rows: [
-                    ('Format', 'T20 · 11-a-side'),
-                    ('Overs', '20 · 6-ball'),
-                    ('Ball', 'Tape'),
+                    ('Format', m.formatDisplay),
+                    ('Overs', m.oversDisplay),
+                    ('Ball', m.ballDisplay),
                     ('Venue', m.venue),
                     ('When', m.when),
                   ]),
-                  if (!awaiting) ...[
-                    const _DetailSectionH('Head to head'),
-                    _headToHead(),
-                  ],
                   // Manage rows — design `pavilion-matches-v2.jsx:184-190`.
                   // Hidden for completed / awaiting-reply.
                   if (!done && !awaiting) ..._manageSection(),
@@ -295,44 +291,6 @@ class PvMatchDetail extends StatelessWidget {
       ),
     );
   }
-
-  // ── head to head ──
-  Widget _headToHead() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: CkColors.paper,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: CkColors.hairline),
-        ),
-        child: Row(
-          children: [
-            Text.rich(TextSpan(children: [
-              TextSpan(
-                  text: '3',
-                  style: CkType.display(fontSize: 22, fontWeight: FontWeight.w700)),
-              TextSpan(text: ' – ', style: CkType.body(fontSize: 13, color: CkColors.muted)),
-              TextSpan(
-                  text: '2',
-                  style: CkType.display(fontSize: 22, fontWeight: FontWeight.w700)),
-            ])),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text.rich(
-                TextSpan(
-                  style: CkType.body(fontSize: 11.5, height: 1.5, color: CkColors.muted),
-                  children: [
-                    const TextSpan(text: '5 meetings · last: '),
-                    TextSpan(
-                        text: '${m.me.short} won by 12',
-                        style: CkType.body(
-                            fontSize: 11.5, fontWeight: FontWeight.w700, color: CkColors.ink2)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
 
   // ── sticky footer ──
   Widget _footerBar(List<_FooterAction> footer) => Container(

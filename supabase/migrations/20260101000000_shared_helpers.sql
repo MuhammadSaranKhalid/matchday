@@ -479,7 +479,7 @@ end $$;
 
 do $$
 begin
-  create type public.cricket_delivery_kind as enum('legal', 'wide', 'no_ball', 'bye', 'leg_bye', 'penalty_runs');
+  create type public.cricket_delivery_kind as enum('legal', 'wide', 'no_ball', 'bye', 'leg_bye', 'penalty', 'penalty_runs');
 exception
   when duplicate_object then null;
 end $$;

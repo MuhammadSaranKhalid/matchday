@@ -153,10 +153,4 @@ create trigger match_players_activate_player_sport
   match_id on public.match_players for each row
   execute function public.activate_player_sport_from_match_player();
 
--- Cricket participant extension
--- Transitional legacy column comments
-  '(is_captain, is_wicket_keeper, is_substitute).';
 
-  'cricket_match_players.is_playing_xi.';
-
-  'cricket_match_players.batting_order.';

@@ -93,21 +93,27 @@ set search_path = public, pg_temp
 as $$
   with
     m as (
+      -- Join cricket_matches to get toss state; toss_won_by / toss_decision
+      -- live on the cricket extension, not the sport-neutral matches table.
       select
-        *
-      from public.matches
-      where match_id = p_match_id
+        mt.*,
+        cm.toss_won_by,
+        cm.toss_decision
+      from public.matches mt
+      left join public.cricket_matches cm on cm.match_id = mt.match_id
+      where mt.match_id = p_match_id
     ),
     sides as (
       select
         m.*,
-        -- The team batting first: the toss winner if they chose to bat,
-        -- otherwise the other team. Falls back to team_a before the toss.
+        -- toss_won_by is 'team_a' | 'team_b' text in cricket_matches.
+        -- Derive bats_first as the corresponding team uuid.
         case
           when m.toss_won_by is null
           or m.toss_decision is null then m.team_a_id
-          when m.toss_decision = 'bat' then m.toss_won_by
-          when m.toss_won_by = m.team_a_id then m.team_b_id
+          when m.toss_decision = 'bat' and m.toss_won_by = 'team_a' then m.team_a_id
+          when m.toss_decision = 'bat' and m.toss_won_by = 'team_b' then m.team_b_id
+          when m.toss_won_by = 'team_a' then m.team_b_id
           else m.team_a_id
         end as bats_first
       from m
@@ -201,33 +207,10 @@ $$;
 -- them with views"; on 2026-09-06 the decision was made and they were dropped.
 -- Scorecards are derived from the delivery ledger on the client
 -- (see scoring_rules.dart), which is the only place the rules live.
--- Match Lifecycle RPCs
-create or replace function public.record_match_toss(
-  p_match_id uuid,
-  p_won_by uuid,
-  p_decision public.toss_decision,
-  p_face char default null
-)
-returns void
-language plpgsql
-security definer
-as $$
-begin
-  if not public._is_match_captain(p_match_id) then
-    raise exception 'Only team captains can record the toss' using errcode = '42501';
-  end if;
-  update public.matches
-  set
-    toss_won_by = p_won_by,
-    toss_decision = p_decision,
-    toss_face = p_face,
-    toss_recorded_at = now(),
-    start_phase = 'lineup',
-    status = 'toss',
-    updated_at = now()
-  where match_id = p_match_id;
-end;
-$$;
+-- Toss commands (record_toss_winner, record_toss_decision) are now executed
+-- via direct SQL in cricket-match-action Edge Function.
+drop function if exists public.record_match_toss(uuid, uuid, public.toss_decision, char);
+
 
 -- submit_match_openers, start_match_now, and start_innings RPCs
 -- have been moved to TypeScript Edge Functions (cricket-match-action) executing direct SQL.
@@ -443,48 +426,3 @@ revoke all on function public.list_my_cricket_matches() from public, anon;
 
 grant execute on function public.list_my_cricket_matches() to authenticated;
 
-create or replace function public._can_score_innings(
-  p_match_id uuid,
-  p_innings_number smallint
-)
-returns boolean
-language sql
-security definer
-stable
-set search_path = public, pg_temp
-as $$
-  select
-    exists (
-      select 1
-      from public.match_scorer_leases l
-      where
-        l.match_id = p_match_id
-        and l.innings_number = p_innings_number
-        and l.scorer_id = auth.uid()
-        and l.expires_at > now()
-    )
-    or exists (
-      select 1
-      from public.matches m
-      where
-        m.match_id = p_match_id
-        and (m.created_by = auth.uid() or public._is_match_captain(p_match_id))
-    );
-$$;
-
-grant execute on function public._can_score_innings(uuid, smallint) to authenticated;
-
-create or replace function public.can_score_innings(
-  p_match_id uuid,
-  p_innings_number smallint
-)
-returns boolean
-language sql
-security definer
-stable
-set search_path = public, pg_temp
-as $$
-  select public._can_score_innings(p_match_id, p_innings_number);
-$$;
-
-grant execute on function public.can_score_innings(uuid, smallint) to authenticated;

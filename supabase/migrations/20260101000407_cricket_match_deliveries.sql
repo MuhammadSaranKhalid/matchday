@@ -1,6 +1,6 @@
--- Migration file: 20260101000405_cricket_match_deliveries.sql
+-- Migration file: 20260101000407_cricket_match_deliveries.sql
 
--- 0405 · cricket_match_deliveries
+-- 0407 · cricket_match_deliveries
 -- The delivery ledger and its compatibility view.
 -- Spec: docs/matches-schema-architecture.md
 -- Deliveries & Dismissals Ledger

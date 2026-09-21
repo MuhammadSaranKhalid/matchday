@@ -1,6 +1,6 @@
--- Migration file: 20260101000403_cricket_match_innings.sql
+-- Migration file: 20260101000405_cricket_match_innings.sql
 
--- 0403 · cricket_match_innings
+-- 0405 · cricket_match_innings
 -- Innings definitions and their allocation/completion state.
 -- Spec: docs/matches-schema-architecture.md
 -- Innings & Live Hot State

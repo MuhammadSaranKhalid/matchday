@@ -1,6 +1,6 @@
--- Migration file: 20260101000408_match_result_history.sql
+-- Migration file: 20260101000410_match_result_history.sql
 
--- 0408 · match_result_history
+-- 0410 · match_result_history
 -- Append-only audit history for match result overrides.
 -- Spec: docs/matches-schema-architecture.md
 

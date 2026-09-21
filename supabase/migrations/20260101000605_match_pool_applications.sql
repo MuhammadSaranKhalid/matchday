@@ -1,6 +1,6 @@
--- Migration file: 20260817090000_match_pool_applications.sql
+-- Migration file: 20260101000605_match_pool_applications.sql
 
--- Migration: Match Pool Applications & Poster Selection System
+-- 0605 · match_pool_applications
 
 -- Section: Tables and constraints
 

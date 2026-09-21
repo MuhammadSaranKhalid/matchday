@@ -1,6 +1,6 @@
--- Migration file: 20260101000404_cricket_match_innings_state.sql
+-- Migration file: 20260101000406_cricket_match_innings_state.sql
 
--- 0404 · cricket_match_innings_state
+-- 0406 · cricket_match_innings_state
 -- Live innings totals and the on-field players.
 -- Spec: docs/matches-schema-architecture.md
 

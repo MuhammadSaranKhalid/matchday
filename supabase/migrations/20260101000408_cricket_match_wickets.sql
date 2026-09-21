@@ -1,6 +1,6 @@
--- Migration file: 20260101000406_cricket_match_wickets.sql
+-- Migration file: 20260101000408_cricket_match_wickets.sql
 
--- 0406 · cricket_match_wickets
+-- 0408 · cricket_match_wickets
 -- Dismissal details attached to deliveries.
 -- Spec: docs/matches-schema-architecture.md
 

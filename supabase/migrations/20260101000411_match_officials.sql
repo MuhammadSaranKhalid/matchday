@@ -1,6 +1,6 @@
--- Migration file: 20260101000410_match_officials.sql
+-- Migration file: 20260101000411_match_officials.sql
 
--- 0410 · match_officials — per-match scorer / umpire assignment
+-- 0411 · match_officials — per-match scorer / umpire assignment
 -- Its own migration, per the one-table-one-migration convention, and numbered
 -- 0410 so it lands immediately after matches (0400).
 --

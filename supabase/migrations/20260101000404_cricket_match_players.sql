@@ -1,4 +1,4 @@
--- Migration file: 20260101000412_cricket_match_players.sql
+-- Migration file: 20260101000404_cricket_match_players.sql
 
 -- 20260101000412 · cricket_match_players
 -- Cricket-specific per-match player state (role flags, batting order).

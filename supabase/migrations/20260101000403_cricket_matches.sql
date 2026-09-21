@@ -1,6 +1,6 @@
--- Migration file: 20260101000411_cricket_matches.sql
+-- Migration file: 20260101000403_cricket_matches.sql
 
--- 0411 · cricket_matches
+-- 0403 · cricket_matches
 -- Cricket-specific extension of the matches shell. One row per Cricket match.
 -- Section: Tables and constraints
 

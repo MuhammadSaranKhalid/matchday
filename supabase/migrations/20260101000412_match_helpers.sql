@@ -1,6 +1,6 @@
--- Migration file: 20260101000409_match_helpers.sql
+-- Migration file: 20260101000412_match_helpers.sql
 
--- 0409 · match_helpers
+-- 0412 · match_helpers
 -- Cross-table match lifecycle and scoring helpers; circular lineup FK.
 -- Spec: docs/matches-schema-architecture.md
 -- Table declarations and their RLS/indexes live in their named migrations.

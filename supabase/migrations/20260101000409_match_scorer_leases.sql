@@ -1,6 +1,6 @@
--- Migration file: 20260101000407_match_scorer_leases.sql
+-- Migration file: 20260101000409_match_scorer_leases.sql
 
--- 0407 · match_scorer_leases
+-- 0409 · match_scorer_leases
 -- The current scoring device lease for a match.
 -- Spec: docs/matches-schema-architecture.md
 

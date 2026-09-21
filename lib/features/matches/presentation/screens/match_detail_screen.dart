@@ -53,22 +53,12 @@ class MatchDetailScreen extends ConsumerWidget {
       case 'resume':
         _pushAndRefresh(context, ref, '/matches/$id/score');
       case 'start':
-      case 'lineup':
-      case 'viewlineup':
         _pushAndRefresh(context, ref, '/matches/$id/start');
       case 'scorecard':
       case 'view':
         _pushAndRefresh(context, ref, '/matches/$id/scorecard');
       case 'withdraw':
         _withdraw(context, ref, id);
-      // Design-fidelity actions without a real backend yet — render the
-      // button per the design and surface "Coming soon" so the user knows
-      // the affordance exists but isn't wired. Replace each handler when
-      // the underlying flow lands.
-      case 'message':
-        _comingSoon(context, 'Messaging the opponent is coming soon.');
-      case 'reschedule':
-        _comingSoon(context, 'Rescheduling is coming soon.');
       case 'cancel':
         _comingSoon(context, 'Cancelling a match is coming soon.');
       case 'share':

@@ -54,19 +54,9 @@ class PvMatchDetail extends StatelessWidget {
       if (live)
         const _FooterAction('resume', 'Resume scoring',
             primary: true, icon: PvIcons.whistle, danger: true)
-      else if (m.phase == PvPhase.startsSoon) ...[
-        if (m.lineupSet == false)
-          const _FooterAction('lineup', 'Set lineup', icon: PvIcons.users),
+      else if (m.phase == PvPhase.startsSoon || m.phase == PvPhase.scheduled) ...[
         const _FooterAction('start', 'Start match',
             primary: true, icon: PvIcons.play),
-      ] else if (m.phase == PvPhase.scheduled) ...[
-        const _FooterAction('reschedule', 'Reschedule', icon: PvIcons.cal),
-        _FooterAction(
-          m.lineupSet == false ? 'lineup' : 'viewlineup',
-          m.lineupSet == false ? 'Set lineup' : 'View lineup',
-          primary: true,
-          icon: PvIcons.users,
-        ),
       ] else if (awaiting)
         const _FooterAction('withdraw', 'Withdraw challenge',
             primary: true, icon: PvIcons.close, danger: true)
@@ -83,11 +73,11 @@ class PvMatchDetail extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            _topBar(),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
                 children: [
+                  _closeButtonRow(),
                   _hero(live: live, done: done, headline: headline, subline: subline),
                   if (done) _completedScore(),
                   const _DetailSectionH('Match spec'),
@@ -98,11 +88,6 @@ class PvMatchDetail extends StatelessWidget {
                     ('Venue', m.venue),
                     ('When', m.when),
                   ]),
-                  if (!done && !awaiting) ...[
-                    _DetailSectionH('Squad & lineup',
-                        side: m.lineupSet == false ? 'not set' : 'XI locked'),
-                    _squad(),
-                  ],
                   if (!awaiting) ...[
                     const _DetailSectionH('Head to head'),
                     _headToHead(),
@@ -121,38 +106,27 @@ class PvMatchDetail extends StatelessWidget {
     );
   }
 
-  // ── top bar ──
-  Widget _topBar() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: CkColors.hairline)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onBack,
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const PvIcon(PvIcons.back, size: 18, color: CkColors.ink, sw: 2),
-                    const SizedBox(width: 4),
-                    Text('Pavilion',
-                        style: CkType.body(fontSize: 14, fontWeight: FontWeight.w600)),
-                  ],
-                ),
+  // ── top close row on main page ──
+  Widget _closeButtonRow() => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('MATCH', style: pvMono(10, color: CkColors.muted)),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onBack,
+            child: Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: CkColors.paper2,
+                shape: BoxShape.circle,
+                border: Border.all(color: CkColors.hairline),
               ),
+              child: const PvIcon(PvIcons.close, size: 14, color: CkColors.ink, sw: 2.2),
             ),
-            Text('MATCH', style: pvMono(9, color: CkColors.muted)),
-            const Padding(
-              padding: EdgeInsets.all(6),
-              child: PvIcon(PvIcons.dots, size: 18, color: CkColors.ink2, sw: 2),
-            ),
-          ],
-        ),
+          ),
+        ],
       );
 
   // ── hero ──
@@ -322,81 +296,6 @@ class PvMatchDetail extends StatelessWidget {
     );
   }
 
-  // ── squad & lineup ──
-  Widget _squad() {
-    final rsvpYes = m.phase == PvPhase.startsSoon ? 11 : 9;
-    const stack = [
-      ('BA', null),
-      ('AS', Color(0xFF8A8F98)),
-      ('FK', Color(0xFFB0784A)),
-      ('HT', Color(0xFF5A7D52)),
-    ];
-    Widget chip(String mono, Color bg, Color fg, bool monoFont) => Container(
-          width: 28,
-          height: 28,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: bg,
-            shape: BoxShape.circle,
-            border: Border.all(color: CkColors.paper, width: 2),
-          ),
-          child: Text(mono,
-              style: (monoFont
-                      ? CkType.mono(fontSize: 9, fontWeight: FontWeight.w700, color: fg)
-                      : CkType.display(fontSize: 9, fontWeight: FontWeight.w700, color: fg))),
-        );
-    // Overlapping avatar cluster. Flutter forbids negative margins, so the
-    // design's -10px overlap is rebuilt with a Stack: 28px chips on an 18px
-    // step. Later children paint on top, matching the design's z-order.
-    const step = 18.0;
-    final count = stack.length + 1; // avatars + the "+N" chip
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(
-        color: CkColors.paper,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: CkColors.hairline),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: (count - 1) * step + 28,
-            height: 28,
-            child: Stack(
-              children: [
-                for (var i = 0; i < stack.length; i++)
-                  Positioned(
-                    left: i * step,
-                    child: chip(stack[i].$1, stack[i].$2 ?? m.me.color, CkColors.paper, false),
-                  ),
-                Positioned(
-                  left: stack.length * step,
-                  child: chip('+${rsvpYes - 4}', CkColors.paper2, CkColors.ink2, true),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$rsvpYes of 11 confirmed',
-                    style: CkType.body(fontSize: 13, fontWeight: FontWeight.w600)),
-                Padding(
-                  padding: const EdgeInsets.only(top: 1),
-                  child: Text(m.lineupSet == false ? 'Lineup not set yet' : 'Your XI is locked',
-                      style: CkType.body(fontSize: 11, color: CkColors.muted)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── head to head ──
   Widget _headToHead() => Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -466,8 +365,6 @@ class PvMatchDetail extends StatelessWidget {
     final rows = <(String action, String label, String icon, bool danger)>[
       if (!live && captain)
         ('start', 'Start match / Toss', PvIcons.play, false),
-      ('message', 'Message opponent', PvIcons.msg, false),
-      if (!live) ('reschedule', 'Propose a new time', PvIcons.cal, false),
       if (!live && captain)
         ('cancel', 'Cancel match', PvIcons.close, true),
     ];
@@ -564,24 +461,14 @@ class PvMatchDetail extends StatelessWidget {
 // ── shared detail bits ──
 
 class _DetailSectionH extends StatelessWidget {
-  const _DetailSectionH(this.label, {this.side});
+  const _DetailSectionH(this.label);
   final String label;
-  final String? side;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 20, 2, 9),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: pvMono(10, color: CkColors.muted)),
-          if (side != null)
-            Text(side!, style: CkType.body(fontSize: 11, color: CkColors.muted)),
-        ],
-      ),
+      child: Text(label, style: pvMono(10, color: CkColors.muted)),
     );
   }
 }

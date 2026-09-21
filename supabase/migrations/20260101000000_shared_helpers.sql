@@ -517,11 +517,6 @@ begin
 exception
   when duplicate_object then null;
 end $$;
-exception
-  when duplicate_object then
-    null;
-end
-$$;
 
 do $$
 begin

@@ -43,6 +43,7 @@ create table public.matches(
   completed_at timestamptz,
   status public.match_status not null default 'scheduled',
   winner_id uuid references public.teams(team_id) on delete set null,
+  player_of_the_match_id uuid,
   team_a_id uuid references public.teams(team_id) on delete set null,
   team_b_id uuid references public.teams(team_id) on delete set null,
   created_by uuid references public.profiles(user_id) on delete set null,

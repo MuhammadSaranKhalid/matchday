@@ -27,6 +27,7 @@ abstract class MatchPlayerDto with _$MatchPlayerDto {
     @JsonKey(name: 'is_captain') @Default(false) bool isCaptain,
     @JsonKey(name: 'is_keeper') @Default(false) bool isKeeper,
     @JsonKey(name: 'is_substitute') @Default(false) bool isSubstitute,
+    @Default('team_snapshot') String source,
     @JsonKey(includeToJson: false) Map<String, dynamic>? profile,
     @JsonKey(includeToJson: false) Map<String, dynamic>? unclaimed,
   }) = _MatchPlayerDto;
@@ -106,5 +107,6 @@ abstract class MatchPlayerDto with _$MatchPlayerDto {
     isCaptain: isCaptain,
     isKeeper: isKeeper,
     isSubstitute: isSubstitute,
+    source: MatchPlayerSource.fromWire(source),
   );
 }

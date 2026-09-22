@@ -15,6 +15,7 @@ import '../../domain/entities/match_pool_application.dart';
 import '../../domain/entities/match_request.dart';
 import '../../domain/entities/match_innings.dart';
 import '../../domain/entities/match_wicket.dart';
+import '../../domain/entities/match_room_snapshot.dart';
 import '../../domain/repositories/matches_repository.dart';
 import '../datasources/format_presets_remote_datasource.dart';
 import '../datasources/match_requests_remote_datasource.dart';
@@ -205,6 +206,94 @@ class MatchesRepositoryImpl implements MatchesRepository {
       .handleError(
         (Object e) => throw FailureWrapper(ServerFailure(e.toString())),
       );
+
+  @override
+  Future<Either<Failure, MatchRoomSnapshot>> getMatchRoom(MatchId id) async {
+    try {
+      return Right((await _remote.getMatchRoom(id.value)).toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Stream<MatchRoomSnapshot> watchMatchRoom(MatchId id) => _remote
+      .watchMatchRoom(id.value)
+      .map((dto) => dto.toEntity())
+      .handleError(
+        (Object e) => throw FailureWrapper(ServerFailure(e.toString())),
+      );
+
+  @override
+  Future<Either<Failure, MatchRoomSnapshot>> startMatch({
+    required MatchId id,
+    required String strikerId,
+    required String nonStrikerId,
+    required String bowlerId,
+  }) async {
+    if ([strikerId, nonStrikerId, bowlerId].any((id) => id.isEmpty)) {
+      return const Left(
+        ValidationFailure('Striker, non-striker, and bowler are required'),
+      );
+    }
+    if (strikerId == nonStrikerId) {
+      return const Left(
+        ValidationFailure('Striker and non-striker must be different'),
+      );
+    }
+    try {
+      final room = await _remote.startMatch(
+        matchId: id.value,
+        strikerId: strikerId,
+        nonStrikerId: nonStrikerId,
+        bowlerId: bowlerId,
+      );
+      return Right(room.toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, MatchRoomSnapshot>> addMatchParticipant({
+    required MatchId id,
+    required MatchTeamSide side,
+    required String displayName,
+    required String idempotencyKey,
+  }) async {
+    if (displayName.trim().isEmpty) {
+      return const Left(ValidationFailure('Player name is required'));
+    }
+    try {
+      final room = await _remote.addMatchParticipant(
+        matchId: id.value,
+        teamSide: side == MatchTeamSide.a ? 'team_a' : 'team_b',
+        displayName: displayName.trim(),
+        idempotencyKey: idempotencyKey,
+      );
+      return Right(room.toEntity());
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
 
   @override
   Future<Either<Failure, Unit>> recordToss({

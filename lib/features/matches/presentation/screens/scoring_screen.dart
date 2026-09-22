@@ -2,10 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
+import '../../domain/entities/match.dart';
+import '../../domain/entities/match_player.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
+import '../controllers/match_room_controller.dart';
 import '../controllers/scoring_controller.dart';
 import '../state/scoring_state.dart';
 import '../widgets/scoring/scoring_action_bar.dart';
@@ -111,6 +115,18 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(matchRoomControllerProvider(widget.matchId), (previous, next) {
+      final latestInnings = next.value?.snapshot.innings?.inningsNumber;
+      if (latestInnings != null && latestInnings > widget.inningsNumber) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) {
+            context.go(
+              '/matches/${widget.matchId}/score?innings=$latestInnings',
+            );
+          }
+        });
+      }
+    });
     ref.listen(
       scoringControllerProvider(widget.matchId, widget.inningsNumber),
       (prev, next) {
@@ -140,6 +156,14 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
         s = value;
       default:
         return const ScoringLoading();
+    }
+
+    if (s.isInningsBreak) {
+      return _ScoringInningsBreak(
+        matchId: widget.matchId,
+        state: s,
+        actions: _actions,
+      );
     }
 
     // Team name for the read-only notice.
@@ -233,6 +257,143 @@ class _ScoringScreenState extends ConsumerState<ScoringScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ScoringInningsBreak extends StatefulWidget {
+  const _ScoringInningsBreak({
+    required this.matchId,
+    required this.state,
+    required this.actions,
+  });
+
+  final String matchId;
+  final ScoringState state;
+  final ScoringActions actions;
+
+  @override
+  State<_ScoringInningsBreak> createState() => _ScoringInningsBreakState();
+}
+
+class _ScoringInningsBreakState extends State<_ScoringInningsBreak> {
+  String? _striker;
+  String? _nonStriker;
+  String? _bowler;
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final battingFirst = state.match.battingFirstTeamId;
+    final chasingSide =
+        battingFirst == state.match.teamAId ? MatchTeamSide.b : MatchTeamSide.a;
+    final batters =
+        state.matchPlayers.where((p) => p.teamSide == chasingSide).toList();
+    final bowlers =
+        state.matchPlayers.where((p) => p.teamSide != chasingSide).toList();
+    final target = state.totalRuns + 1;
+    final ready =
+        _striker != null &&
+        _nonStriker != null &&
+        _bowler != null &&
+        _striker != _nonStriker &&
+        !_busy;
+
+    return Scaffold(
+      backgroundColor: CkColors.paper,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+          children: [
+            Text('INNINGS BREAK', style: CkType.mono(fontSize: 11)),
+            const SizedBox(height: 8),
+            Text('Target $target', style: CkType.display(fontSize: 30)),
+            const SizedBox(height: 8),
+            Text(
+              'Choose both chasing openers and the opening bowler. This stays inside the scoring session.',
+              style: CkType.body(fontSize: 13, color: CkColors.muted),
+            ),
+            const SizedBox(height: 22),
+            _BreakDropdown(
+              label: 'On strike',
+              value: _striker,
+              players: batters,
+              onChanged: (value) => setState(() => _striker = value),
+            ),
+            const SizedBox(height: 12),
+            _BreakDropdown(
+              label: 'Non-striker',
+              value: _nonStriker,
+              players: batters,
+              onChanged: (value) => setState(() => _nonStriker = value),
+            ),
+            const SizedBox(height: 12),
+            _BreakDropdown(
+              label: 'Opening bowler',
+              value: _bowler,
+              players: bowlers,
+              onChanged: (value) => setState(() => _bowler = value),
+            ),
+            const SizedBox(height: 22),
+            FilledButton(
+              onPressed: ready ? () => _start(target) : null,
+              child: Text(_busy ? 'Starting chase…' : 'Start the chase'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _start(int target) async {
+    setState(() => _busy = true);
+    final error = await widget.actions.startChase(
+      strikerId: _striker!,
+      nonStrikerId: _nonStriker!,
+      bowlerId: _bowler!,
+      target: target,
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    // The canonical Match Room snapshot owns the route transition. Waiting
+    // for its revision prevents a local response and realtime event from both
+    // navigating the scoring shell.
+  }
+}
+
+class _BreakDropdown extends StatelessWidget {
+  const _BreakDropdown({
+    required this.label,
+    required this.value,
+    required this.players,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String? value;
+  final List<MatchPlayer> players;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: InputDecoration(labelText: label),
+      items: [
+        for (final player in players)
+          DropdownMenuItem(
+            value: player.id.value,
+            child: Text(player.displayName),
+          ),
+      ],
+      onChanged: onChanged,
     );
   }
 }

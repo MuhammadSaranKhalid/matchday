@@ -10,6 +10,8 @@ import '../models/ball_dto.dart';
 import '../models/match_dto.dart';
 import '../models/match_innings_state_dto.dart';
 import '../models/match_player_dto.dart';
+import '../models/match_room_snapshot_dto.dart';
+import '../../domain/entities/match_runtime_event.dart';
 import '../models/match_innings_dto.dart';
 import '../models/match_wicket_dto.dart';
 
@@ -269,6 +271,134 @@ class MatchesRemoteDataSource {
 
   Future<void> startMatchNow(String matchId) =>
       _startRpc('start_match_now', {'p_match_id': matchId});
+
+  Future<MatchRoomSnapshotDto> getMatchRoom(String matchId) async {
+    try {
+      final raw = await _supabase.rpc<dynamic>(
+        'get_match_room_snapshot',
+        params: {'p_match_id': matchId},
+      );
+      if (raw is! Map) throw ServerException('Match room was not found');
+      return MatchRoomSnapshotDto.fromJson(Map<String, dynamic>.from(raw));
+    } on PostgrestException catch (e) {
+      throw _rpcException(e);
+    } on FormatException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<MatchRoomSnapshotDto> startMatch({
+    required String matchId,
+    required String strikerId,
+    required String nonStrikerId,
+    required String bowlerId,
+  }) async {
+    final data = await _matchAction('start_match', {
+      'p_match_id': matchId,
+      'p_striker_id': strikerId,
+      'p_non_striker_id': nonStrikerId,
+      'p_bowler_id': bowlerId,
+    });
+    return _roomFromCommand(data);
+  }
+
+  Future<MatchRoomSnapshotDto> addMatchParticipant({
+    required String matchId,
+    required String teamSide,
+    required String displayName,
+    required String idempotencyKey,
+  }) async {
+    final data = await _matchAction('add_match_participant', {
+      'p_match_id': matchId,
+      'p_team_side': teamSide,
+      'p_display_name': displayName,
+      'p_idempotency_key': idempotencyKey,
+    });
+    return _roomFromCommand(data);
+  }
+
+  MatchRoomSnapshotDto _roomFromCommand(Map<String, dynamic> data) {
+    final snapshot = data['snapshot'];
+    if (snapshot is! Map) {
+      throw ServerException('Match command returned no room snapshot');
+    }
+    return MatchRoomSnapshotDto.fromJson(Map<String, dynamic>.from(snapshot));
+  }
+
+  Stream<MatchRoomSnapshotDto> watchMatchRoom(String matchId) {
+    final controller = StreamController<MatchRoomSnapshotDto>();
+    final lease = _ablyService.acquireChannel('match:$matchId:state');
+    final subscriptions = <StreamSubscription<dynamic>>[];
+    MatchRoomSnapshotDto? current;
+    var refreshing = false;
+    var refreshAgain = false;
+    var hasLoaded = false;
+    var requestedRevision = 0;
+
+    Future<void> refresh() async {
+      if (refreshing) {
+        refreshAgain = true;
+        return;
+      }
+      refreshing = true;
+      do {
+        refreshAgain = false;
+        try {
+          final next = await getMatchRoom(matchId);
+          if (current == null || next.revision >= current!.revision) {
+            current = next;
+            hasLoaded = true;
+            if (!controller.isClosed) controller.add(next);
+          }
+        } catch (error) {
+          if (!hasLoaded && !controller.isClosed) {
+            controller.addError(error);
+          }
+        }
+      } while (refreshAgain &&
+          !controller.isClosed &&
+          (current == null || requestedRevision > current!.revision));
+      refreshing = false;
+    }
+
+    void onEvent(ably.Message message) {
+      try {
+        if (message.data is! Map) throw const FormatException();
+        final event = MatchRuntimeEvent.fromJson(
+          Map<String, dynamic>.from(message.data as Map),
+        );
+        if (event.matchId != matchId) return;
+        if (current != null && event.revision <= current!.revision) return;
+        if (event.revision > requestedRevision) {
+          requestedRevision = event.revision;
+        }
+        unawaited(refresh());
+      } catch (_) {
+        unawaited(refresh());
+      }
+    }
+
+    for (final type in MatchRuntimeEventType.values) {
+      subscriptions.add(
+        lease.channel.subscribe(name: type.wire).listen(onEvent),
+      );
+    }
+    subscriptions.add(
+      _ablyService.connectionChanges.listen((status) {
+        if (status == RealtimeConnectionStatus.connected) unawaited(refresh());
+      }),
+    );
+
+    unawaited(refresh());
+    controller.onCancel = () async {
+      for (final subscription in subscriptions) {
+        await subscription.cancel();
+      }
+      await lease.release();
+      await controller.close();
+    };
+    return controller.stream;
+  }
 
   Future<void> cancelMatch({required String matchId, String? reason}) =>
       _startRpc('cancel_match', {
@@ -622,7 +752,22 @@ class MatchesRemoteDataSource {
 
     final controller = StreamController<List<BallDto>>();
     final channelName = 'match:$matchId:balls';
-    final channel = _ablyService.getChannel(channelName);
+    final lease = _ablyService.acquireChannel(channelName);
+    final channel = lease.channel;
+
+    Future<void> reconcile() async {
+      try {
+        current = await listBalls(
+          matchId: matchId,
+          inningsNumber: inningsNumber,
+        );
+        if (!controller.isClosed) controller.add(List.unmodifiable(current));
+      } catch (error) {
+        if (!controller.isClosed) {
+          controller.addError(ServerException(error.toString()));
+        }
+      }
+    }
 
     final subRecorded = channel.subscribe(name: 'ball_recorded').listen((
       ably.Message msg,
@@ -633,7 +778,8 @@ class MatchesRemoteDataSource {
             Map<String, dynamic>.from(msg.data as Map),
           );
           if (dto.inningsNumber != inningsNumber) return;
-          current = [...current, dto]..sort((a, b) => a.seq.compareTo(b.seq));
+          current = [...current.where((ball) => ball.ballId != dto.ballId), dto]
+            ..sort((a, b) => a.seq.compareTo(b.seq));
           controller.add(List.unmodifiable(current));
         } catch (e) {
           controller.addError(ServerException(e.toString()));
@@ -662,18 +808,12 @@ class MatchesRemoteDataSource {
       final n = (data['innings_number'] as num?)?.toInt();
       if (n != inningsNumber) return;
 
-      try {
-        current = await listBalls(
-          matchId: matchId,
-          inningsNumber: inningsNumber,
-        );
-        if (!controller.isClosed) {
-          controller.add(List.unmodifiable(current));
-        }
-      } catch (e) {
-        if (!controller.isClosed) {
-          controller.addError(ServerException(e.toString()));
-        }
+      await reconcile();
+    });
+
+    final connectionSub = _ablyService.connectionChanges.listen((status) {
+      if (status == RealtimeConnectionStatus.connected) {
+        unawaited(reconcile());
       }
     });
 
@@ -682,7 +822,8 @@ class MatchesRemoteDataSource {
         await subRecorded.cancel();
         await subDeleted.cancel();
         await subResync.cancel();
-        await _ablyService.releaseChannel(channelName);
+        await connectionSub.cancel();
+        await lease.release();
         await controller.close();
       },
     );

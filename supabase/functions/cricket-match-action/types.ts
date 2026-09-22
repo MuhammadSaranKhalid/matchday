@@ -16,6 +16,8 @@ export type Tx = any;
 
 export type Action =
   | "record_toss"
+  | "start_match"
+  | "add_match_participant"
   | "submit_match_openers"
   | "start_match_now"
   | "cancel_match"
@@ -85,6 +87,8 @@ export interface MatchBundle {
   rulesSnapshot: Record<string, unknown>;
   revisedConditions: Record<string, unknown> | null;
   result: Record<string, unknown> | null;
+  stateRevision: number;
+  rosterFrozenAt: string | null;
 }
 
 export interface RequestEnvelope {
@@ -104,6 +108,23 @@ export interface CommandResult {
   result?: unknown;
   inningsNumber?: number;
   ballsResync?: boolean;
+  revision?: number;
+  events?: RuntimeEvent[];
+}
+
+export type RuntimeEventType =
+  | "match_changed"
+  | "participants_changed"
+  | "innings_changed"
+  | "match_completed";
+
+export interface RuntimeEvent {
+  eventId: string;
+  matchId: string;
+  revision: number;
+  eventType: RuntimeEventType;
+  inningsNumber?: number;
+  occurredAt: string;
 }
 
 export interface TransactionOutput {
@@ -112,4 +133,7 @@ export interface TransactionOutput {
   innings: unknown;
   inningsNumber: number | null;
   ballsResync: boolean;
+  snapshot: unknown;
+  revision: number;
+  events: RuntimeEvent[];
 }

@@ -28,6 +28,7 @@ import '../../domain/entities/ball.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_innings_state.dart';
 import '../../domain/entities/match_player.dart';
+import '../../domain/entities/match_room_snapshot.dart';
 import '../../domain/entities/scoring_projection.dart';
 import '../../domain/repositories/matches_repository.dart';
 import '../../domain/scoring/scoring_adapter.dart';
@@ -76,6 +77,8 @@ class ScoringSession {
   ScoringProjection? _current;
   Future<void>? _draining;
   Timer? _retryTimer;
+  StreamSubscription<MatchRoomSnapshot>? _roomSubscription;
+  StreamSubscription<List<Ball>>? _ballsSubscription;
   bool _disposed = false;
 
   /// The projection, re-emitted whenever either ingredient changes.
@@ -100,6 +103,7 @@ class ScoringSession {
 
     await _readBase();
     await _restoreQueue();
+    _subscribeToConfirmedBase();
 
     final projection = _emit();
 
@@ -147,6 +151,70 @@ class ScoringSession {
     _innings = inningsResult.fold((_) => _innings, (s) => s);
     _balls = ballsResult.fold((_) => _balls, (b) => b);
     _emit();
+  }
+
+  void _subscribeToConfirmedBase() {
+    try {
+      _roomSubscription = _repository
+          .watchMatchRoom(MatchId(matchId))
+          .listen(
+            (room) {
+              if (_disposed) return;
+              _match = room.match;
+              if (room.innings?.inningsNumber == inningsNumber) {
+                _innings = room.innings;
+              }
+              _players = room.participants;
+              _canScore = room.capabilities.canScore;
+              _emit();
+            },
+            onError: (_) {
+              // The last confirmed base remains usable. The Match Room stream
+              // reconciles again on the next event/reconnect.
+            },
+          );
+    } catch (_) {
+      // Compatibility with repository doubles/older implementations. The
+      // initial confirmed read remains fully functional.
+    }
+
+    try {
+      _ballsSubscription = _repository
+          .watchBalls(MatchId(matchId), inningsNumber)
+          .listen(
+            (balls) {
+              if (_disposed) return;
+              final normalized = _normalizeBalls(balls);
+              if (_hasSequenceGap(normalized)) {
+                unawaited(_refreshBase());
+                return;
+              }
+              _balls = normalized;
+              _emit();
+            },
+            onError: (_) {
+              // Preserve the last confirmed list. The source resnapshots on
+              // reconnect and explicit balls_resync frames.
+            },
+          );
+    } catch (_) {
+      // See the Match Room compatibility note above.
+    }
+  }
+
+  List<Ball> _normalizeBalls(List<Ball> balls) {
+    final byId = <String, Ball>{};
+    for (final ball in balls) {
+      byId[ball.id.value] = ball;
+    }
+    return byId.values.toList()..sort((a, b) => a.seq.compareTo(b.seq));
+  }
+
+  bool _hasSequenceGap(List<Ball> balls) {
+    for (var index = 0; index < balls.length; index += 1) {
+      if (balls[index].seq != index + 1) return true;
+    }
+    return false;
   }
 
   Future<void> _restoreQueue() async {
@@ -511,6 +579,8 @@ class ScoringSession {
   void dispose() {
     _disposed = true;
     _retryTimer?.cancel();
+    unawaited(_roomSubscription?.cancel());
+    unawaited(_ballsSubscription?.cancel());
     _changes.close();
   }
 }

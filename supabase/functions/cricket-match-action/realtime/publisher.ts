@@ -1,15 +1,11 @@
-import type {
-  Action,
-  TransactionOutput,
-} from "../types.ts";
+import type { Action, TransactionOutput } from "../types.ts";
 
 export async function publishAfterCommit(
   matchId: string,
   action: Action,
   out: TransactionOutput,
 ): Promise<void> {
-  const key =
-    Deno.env.get("ABLY_API_KEY");
+  const key = Deno.env.get("ABLY_API_KEY");
 
   if (!key) {
     console.warn(
@@ -19,34 +15,15 @@ export async function publishAfterCommit(
   }
 
   try {
-    const Ably =
-      (await import(
-        "npm:ably@2.4.1"
-      )).default;
+    const Ably = (await import(
+      "npm:ably@2.4.1"
+    )).default;
 
-    const ably =
-      new Ably.Rest(key);
+    const ably = new Ably.Rest(key);
 
-    if (out.match) {
-      await ably.channels
-        .get(
-          `match:${matchId}:state`,
-        )
-        .publish(
-          "match_state_updated",
-          out.match,
-        );
-    }
-
-    if (out.innings) {
-      await ably.channels
-        .get(
-          `match:${matchId}:state`,
-        )
-        .publish(
-          "innings_state_updated",
-          out.innings,
-        );
+    const stateChannel = ably.channels.get(`match:${matchId}:state`);
+    for (const event of out.events) {
+      await stateChannel.publish(event.eventType, event);
     }
 
     if (
@@ -61,8 +38,7 @@ export async function publishAfterCommit(
         .publish(
           "balls_resync",
           {
-            innings_number:
-              out.inningsNumber,
+            innings_number: out.inningsNumber,
           },
         );
     }

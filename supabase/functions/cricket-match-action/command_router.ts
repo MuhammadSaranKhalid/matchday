@@ -1,10 +1,8 @@
-import type {
-  Action,
-  CommandContext,
-  CommandResult,
-} from "./types.ts";
+import type { Action, CommandContext, CommandResult } from "./types.ts";
 
 import { recordToss } from "./commands/record_toss.ts";
+import { startMatch } from "./commands/start_match.ts";
+import { addMatchParticipant } from "./commands/add_match_participant.ts";
 import { submitMatchOpeners } from "./commands/submit_match_openers.ts";
 import { startMatchNow } from "./commands/start_match_now.ts";
 import { cancelMatch } from "./commands/cancel_match.ts";
@@ -26,6 +24,12 @@ export async function dispatchCommand(
   switch (action) {
     case "record_toss":
       return await recordToss(ctx);
+
+    case "start_match":
+      return await startMatch(ctx);
+
+    case "add_match_participant":
+      return await addMatchParticipant(ctx);
 
     case "submit_match_openers":
       return await submitMatchOpeners(ctx);

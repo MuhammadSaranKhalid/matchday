@@ -15,6 +15,87 @@ class _MockAuth extends Mock implements GoTrueClient {}
 class _MockUser extends Mock implements User {}
 
 void main() {
+  test(
+    'roster reads public unclaimed-player fields without requesting contact PII',
+    () async {
+      final requestedSelects = <String>[];
+      final client = SupabaseClient(
+        'https://example.test',
+        'test-key',
+        httpClient: MockClient((request) async {
+          final select = request.url.queryParameters['select'];
+          if (select != null) requestedSelects.add(select);
+
+          return switch (request.url.path) {
+            '/rest/v1/team_members' => http.Response(
+                jsonEncode([
+                  {
+                    'membership_id': 'membership-1',
+                    'team_id': 'team-1',
+                    'user_id': null,
+                    'unclaimed_id': 'unclaimed-1',
+                    'jersey_number': 7,
+                    'added_by': 'manager-1',
+                    'joined_at': '2026-09-21T00:00:00.000Z',
+                    'updated_at': '2026-09-21T00:00:00.000Z',
+                  },
+                ]),
+                200,
+                request: request,
+                headers: {'content-type': 'application/json'},
+              ),
+            '/rest/v1/team_member_roles' => http.Response(
+                jsonEncode([
+                  {
+                    'membership_id': 'membership-1',
+                    'role_key': 'player',
+                  },
+                ]),
+                200,
+                request: request,
+                headers: {'content-type': 'application/json'},
+              ),
+            '/rest/v1/unclaimed_players' => select?.contains('phone_number') ==
+                    true
+                ? http.Response(
+                    jsonEncode({
+                      'code': '42501',
+                      'message':
+                          'permission denied for table unclaimed_players',
+                    }),
+                    403,
+                    request: request,
+                    headers: {'content-type': 'application/json'},
+                  )
+                : http.Response(
+                    jsonEncode([
+                      {
+                        'unclaimed_id': 'unclaimed-1',
+                        'display_name': 'Ali',
+                      },
+                    ]),
+                    200,
+                    request: request,
+                    headers: {'content-type': 'application/json'},
+                  ),
+            _ => http.Response('Not found', 404, request: request),
+          };
+        }),
+      );
+      addTearDown(client.dispose);
+
+      final roster =
+          await TeamMembershipRemoteDataSource(client).getRoster('team-1');
+
+      expect(roster, hasLength(1));
+      expect(roster.single.unclaimed?['display_name'], 'Ali');
+      expect(
+        requestedSelects.where((select) => select.contains('unclaimed_id')),
+        everyElement(isNot(contains('phone_number'))),
+      );
+    },
+  );
+
   /// Creates a [TeamMembershipRemoteDataSource] backed by an [http.MockClient]
   /// that intercepts the [add_unclaimed_cricket_team_member] RPC call and
   /// returns a synthetic Postgres error response with the given [code] and

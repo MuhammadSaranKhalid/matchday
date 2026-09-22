@@ -8,6 +8,49 @@
 
 ---
 
+## Runtime coordination addendum (2026-09-22)
+
+The live match runtime follows one command/snapshot protocol:
+
+```mermaid
+sequenceDiagram
+    participant A as Phone A
+    participant API as Cricket command API
+    participant DB as PostgreSQL
+    participant RT as Ably
+    participant B as Phone B
+
+    A->>API: command(idempotency key, expected state)
+    API->>DB: authorize + lock + mutate atomically
+    DB-->>API: committed canonical snapshot + revision
+    API-->>A: canonical snapshot
+    API--)RT: typed notification after commit
+    RT--)B: revision notification
+    B->>DB: reconcile snapshot on gap/reconnect/resume
+```
+
+- PostgreSQL is authoritative; Ably is a low-latency notification layer.
+- `match_players` is the only participant source for lineup and scoring.
+- Friendly/practice fixtures snapshot eligible team rosters. Tournament
+  fixtures snapshot registered tournament squads.
+- Recording the toss performs the last roster reconciliation and freezes
+  automatic roster synchronization.
+- A scorer may add an unclaimed participant to either match side without
+  creating a `team_members` row. Account claiming remains a later phase.
+- A match becomes live only when striker, non-striker, and opening bowler are
+  committed in the same start command.
+- `/matches/:id` owns pre-live setup; `/matches/:id/score` owns both innings
+  and the innings break. Legacy start and innings-break URLs only redirect.
+- Route-scoped channel leases are reference-counted. A consumer releasing a
+  shared channel cannot detach it while another consumer still holds a lease.
+- Clients accept only newer revisions. Missing or malformed revisions trigger
+  a canonical snapshot read; optimistic scoring operations replay on top of
+  the latest confirmed base.
+
+See `MATCH_RUNTIME_ROLLOUT.md` for deployment and operational safeguards.
+
+---
+
 ## 1. Why this document exists
 
 The earlier Player Identity Architecture answered:

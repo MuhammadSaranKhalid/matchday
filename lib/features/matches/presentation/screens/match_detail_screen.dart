@@ -13,9 +13,12 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../controllers/match_detail_controller.dart';
+import '../controllers/match_room_controller.dart';
 import '../providers/match_detail_provider.dart';
 import '../providers/my_matches_providers.dart';
+import '../state/match_room_state.dart';
 import '../widgets/match_detail/pv_v2_match_detail.dart';
+import '../widgets/match_room/match_room_body.dart';
 import '../widgets/withdraw_sheet.dart';
 
 class MatchDetailScreen extends ConsumerWidget {
@@ -25,6 +28,38 @@ class MatchDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(matchRoomControllerProvider(matchId), (previous, next) {
+      final room = next.value;
+      final navigation = room?.navigation;
+      if (navigation == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        final target = switch (navigation) {
+          MatchRoomNavigation.scoring => '/matches/$matchId/score',
+          MatchRoomNavigation.result => '/matches/$matchId/result',
+        };
+        ref
+            .read(matchRoomControllerProvider(matchId).notifier)
+            .consumeNavigation();
+        context.go(target);
+      });
+    });
+    final roomAsync = ref.watch(matchRoomControllerProvider(matchId));
+    if (roomAsync.hasValue) {
+      return Scaffold(
+        backgroundColor: CkColors.paper,
+        body: MatchRoomBody(matchId: matchId, state: roomAsync.value!),
+      );
+    }
+    if (roomAsync.isLoading) {
+      return const Scaffold(
+        backgroundColor: CkColors.paper,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // A route can also represent a pending challenge, which has no canonical
+    // Match Room yet. Fall back to the existing detail aggregate in that case.
     final detailAsync = ref.watch(matchDetailProvider(matchId));
 
     return Scaffold(
@@ -62,7 +97,7 @@ class MatchDetailScreen extends ConsumerWidget {
       case 'resume':
         _pushAndRefresh(context, ref, '/matches/$id/score');
       case 'start':
-        _pushAndRefresh(context, ref, '/matches/$id/start');
+        _pushAndRefresh(context, ref, '/matches/$id');
       case 'scorecard':
       case 'view':
         _pushAndRefresh(context, ref, '/matches/$id/scorecard');

@@ -1,24 +1,28 @@
-import type {
-  MatchBundle,
-  Tx,
-} from "../types.ts";
-import {
-  battingTeamForInnings,
-  teamIdForSide,
-} from "../domain/cricket.ts";
-import {
-  forbidden,
-  unprocessable,
-} from "../domain/errors.ts";
+import type { MatchBundle, Tx } from "../types.ts";
+import { battingTeamForInnings, teamIdForSide } from "../domain/cricket.ts";
+import { forbidden, unprocessable } from "../domain/errors.ts";
 
-const CRICKET_SETUP_PERMISSION =
-  "cricket.match.setup";
-const SCORE_PERMISSION =
-  "match.score";
-const CANCEL_PERMISSION =
-  "match.cancel";
+const CRICKET_SETUP_PERMISSION = "cricket.match.setup";
+const SCORE_PERMISSION = "match.score";
+const CANCEL_PERMISSION = "match.cancel";
 
 export class AuthorizationRepository {
+  async hasActiveScorerLease(
+    tx: Tx,
+    matchId: string,
+    actorId: string,
+  ): Promise<boolean> {
+    const rows = await tx`
+      select exists (
+        select 1
+        from public.match_scorer_leases sl
+        where sl.match_id = ${matchId}::uuid
+          and sl.active_scorer_id = ${actorId}::uuid
+          and sl.lease_expires_at > now()
+      ) as allowed
+    `;
+    return rows[0]?.allowed === true;
+  }
   // Stable generic authorization primitive. The transaction injects the
   // verified caller into request.jwt.claims, so public.can(...) evaluates the
   // authenticated actor even though this Edge Function uses a trusted direct
@@ -100,11 +104,10 @@ export class AuthorizationRepository {
       return false;
     }
 
-    const setupTeamId =
-      teamIdForSide(
-        match,
-        match.setupSide,
-      );
+    const setupTeamId = teamIdForSide(
+      match,
+      match.setupSide,
+    );
 
     return await this.canTeam(
       tx,
@@ -146,11 +149,10 @@ export class AuthorizationRepository {
       return true;
     }
 
-    const battingTeamId =
-      battingTeamForInnings(
-        match,
-        inningsNumber,
-      );
+    const battingTeamId = battingTeamForInnings(
+      match,
+      inningsNumber,
+    );
 
     return await this.canTeam(
       tx,
@@ -164,11 +166,10 @@ export class AuthorizationRepository {
     match: MatchBundle,
     inningsNumber = 1,
   ): Promise<string> {
-    const battingTeamId =
-      battingTeamForInnings(
-        match,
-        inningsNumber,
-      );
+    const battingTeamId = battingTeamForInnings(
+      match,
+      inningsNumber,
+    );
 
     if (
       await this.canMatch(
@@ -214,11 +215,10 @@ export class AuthorizationRepository {
       return true;
     }
 
-    const battingTeamId =
-      battingTeamForInnings(
-        match,
-        inningsNumber,
-      );
+    const battingTeamId = battingTeamForInnings(
+      match,
+      inningsNumber,
+    );
 
     if (
       await this.canTeam(
@@ -252,8 +252,7 @@ export class AuthorizationRepository {
     }
 
     for (
-      const teamId of
-      [match.teamAId, match.teamBId]
+      const teamId of [match.teamAId, match.teamBId]
     ) {
       if (
         teamId &&
@@ -335,8 +334,7 @@ export class AuthorizationRepository {
     }
 
     for (
-      const teamId of
-      [match.teamAId, match.teamBId]
+      const teamId of [match.teamAId, match.teamBId]
     ) {
       if (!teamId) continue;
 

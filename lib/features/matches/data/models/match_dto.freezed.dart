@@ -11,6 +11,7 @@ part of 'match_dto.dart';
 
 // dart format off
 T _$identity<T>(T value) => value;
+
 /// @nodoc
 mixin _$MatchDto {
 
@@ -21,6 +22,8 @@ mixin _$MatchDto {
 @pragma('vm:prefer-inline')
 $MatchDtoCopyWith<MatchDto> get copyWith => _$MatchDtoCopyWithImpl<MatchDto>(this as MatchDto, _$identity);
 
+  /// Serializes this MatchDto to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -28,7 +31,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchDto&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamAId, teamAId) || other.teamAId == teamAId)&&(identical(other.teamBId, teamBId) || other.teamBId == teamBId)&&(identical(other.teamACaptain, teamACaptain) || other.teamACaptain == teamACaptain)&&(identical(other.teamBCaptain, teamBCaptain) || other.teamBCaptain == teamBCaptain)&&(identical(other.setupTeamId, setupTeamId) || other.setupTeamId == setupTeamId)&&const DeepCollectionEquality().equals(other.format, format)&&(identical(other.venue, venue) || other.venue == venue)&&(identical(other.scheduledStartTime, scheduledStartTime) || other.scheduledStartTime == scheduledStartTime)&&(identical(other.actualStartTime, actualStartTime) || other.actualStartTime == actualStartTime)&&const DeepCollectionEquality().equals(other.result, result)&&(identical(other.status, status) || other.status == status)&&(identical(other.matchType, matchType) || other.matchType == matchType)&&(identical(other.tossWonBy, tossWonBy) || other.tossWonBy == tossWonBy)&&(identical(other.tossDecision, tossDecision) || other.tossDecision == tossDecision)&&(identical(other.tossFace, tossFace) || other.tossFace == tossFace)&&(identical(other.tossRecordedBy, tossRecordedBy) || other.tossRecordedBy == tossRecordedBy)&&(identical(other.startPhase, startPhase) || other.startPhase == startPhase)&&(identical(other.openersSubmittedBy, openersSubmittedBy) || other.openersSubmittedBy == openersSubmittedBy)&&(identical(other.openersSubmittedAt, openersSubmittedAt) || other.openersSubmittedAt == openersSubmittedAt)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hashAll([runtimeType,matchId,teamAId,teamBId,teamACaptain,teamBCaptain,setupTeamId,const DeepCollectionEquality().hash(format),venue,scheduledStartTime,actualStartTime,const DeepCollectionEquality().hash(result),status,matchType,tossWonBy,tossDecision,tossFace,tossRecordedBy,startPhase,openersSubmittedBy,openersSubmittedAt,createdBy,createdAt]);
 
@@ -224,11 +227,11 @@ return $default(_that.matchId,_that.teamAId,_that.teamBId,_that.teamACaptain,_th
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _MatchDto extends MatchDto {
   const _MatchDto({@JsonKey(name: 'match_id') required this.matchId, @JsonKey(name: 'team_a_id') required this.teamAId, @JsonKey(name: 'team_b_id') required this.teamBId, @JsonKey(name: 'team_a_captain') this.teamACaptain, @JsonKey(name: 'team_b_captain') this.teamBCaptain, @JsonKey(name: 'setup_team_id') this.setupTeamId, required final  Map<String, dynamic> format, this.venue, @JsonKey(name: 'scheduled_start_time') this.scheduledStartTime, @JsonKey(name: 'actual_start_time') this.actualStartTime, final  Map<String, dynamic>? result, this.status = 'scheduled', @JsonKey(name: 'match_type') this.matchType = 'friendly', @JsonKey(name: 'toss_won_by') this.tossWonBy, @JsonKey(name: 'toss_decision') this.tossDecision, @JsonKey(name: 'toss_face') this.tossFace, @JsonKey(name: 'toss_recorded_by') this.tossRecordedBy, @JsonKey(name: 'start_phase') this.startPhase = 'toss', @JsonKey(name: 'openers_submitted_by') this.openersSubmittedBy, @JsonKey(name: 'openers_submitted_at') this.openersSubmittedAt, @JsonKey(name: 'created_by') this.createdBy, @JsonKey(name: 'created_at') required this.createdAt}): _format = format,_result = result,super._();
-  
+  factory _MatchDto.fromJson(Map<String, dynamic> json) => _$MatchDtoFromJson(json);
 
 @override@JsonKey(name: 'match_id') final  String matchId;
 @override@JsonKey(name: 'team_a_id') final  String teamAId;
@@ -273,14 +276,17 @@ class _MatchDto extends MatchDto {
 @pragma('vm:prefer-inline')
 _$MatchDtoCopyWith<_MatchDto> get copyWith => __$MatchDtoCopyWithImpl<_MatchDto>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$MatchDtoToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchDto&&(identical(other.matchId, matchId) || other.matchId == matchId)&&(identical(other.teamAId, teamAId) || other.teamAId == teamAId)&&(identical(other.teamBId, teamBId) || other.teamBId == teamBId)&&(identical(other.teamACaptain, teamACaptain) || other.teamACaptain == teamACaptain)&&(identical(other.teamBCaptain, teamBCaptain) || other.teamBCaptain == teamBCaptain)&&(identical(other.setupTeamId, setupTeamId) || other.setupTeamId == setupTeamId)&&const DeepCollectionEquality().equals(other._format, _format)&&(identical(other.venue, venue) || other.venue == venue)&&(identical(other.scheduledStartTime, scheduledStartTime) || other.scheduledStartTime == scheduledStartTime)&&(identical(other.actualStartTime, actualStartTime) || other.actualStartTime == actualStartTime)&&const DeepCollectionEquality().equals(other._result, _result)&&(identical(other.status, status) || other.status == status)&&(identical(other.matchType, matchType) || other.matchType == matchType)&&(identical(other.tossWonBy, tossWonBy) || other.tossWonBy == tossWonBy)&&(identical(other.tossDecision, tossDecision) || other.tossDecision == tossDecision)&&(identical(other.tossFace, tossFace) || other.tossFace == tossFace)&&(identical(other.tossRecordedBy, tossRecordedBy) || other.tossRecordedBy == tossRecordedBy)&&(identical(other.startPhase, startPhase) || other.startPhase == startPhase)&&(identical(other.openersSubmittedBy, openersSubmittedBy) || other.openersSubmittedBy == openersSubmittedBy)&&(identical(other.openersSubmittedAt, openersSubmittedAt) || other.openersSubmittedAt == openersSubmittedAt)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hashAll([runtimeType,matchId,teamAId,teamBId,teamACaptain,teamBCaptain,setupTeamId,const DeepCollectionEquality().hash(_format),venue,scheduledStartTime,actualStartTime,const DeepCollectionEquality().hash(_result),status,matchType,tossWonBy,tossDecision,tossFace,tossRecordedBy,startPhase,openersSubmittedBy,openersSubmittedAt,createdBy,createdAt]);
 

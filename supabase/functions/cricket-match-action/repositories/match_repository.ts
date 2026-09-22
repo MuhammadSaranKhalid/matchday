@@ -1,13 +1,6 @@
-import type {
-  MatchBundle,
-  Tx,
-} from "../types.ts";
-import {
-  jsonObject,
-} from "../domain/cricket.ts";
-import {
-  notFound,
-} from "../domain/errors.ts";
+import type { MatchBundle, Tx } from "../types.ts";
+import { jsonObject } from "../domain/cricket.ts";
+import { notFound } from "../domain/errors.ts";
 
 export class MatchRepository {
   // Lock the complete authoritative Cricket command context:
@@ -59,6 +52,8 @@ export class MatchRepository {
         cm.rules_snapshot,
         cm.revised_conditions,
         cm.result
+        ,cm.state_revision
+        ,cm.roster_frozen_at
 
       from public.matches m
 
@@ -93,94 +88,70 @@ export class MatchRepository {
     const row = rows[0];
 
     return {
-      matchId:
-        row.match_id as string,
-      tournamentId:
-        row.tournament_id as string | null,
-      matchType:
-        row.match_type as string,
-      sportId:
-        row.sport_id as string,
-      status:
-        row.status,
+      matchId: row.match_id as string,
+      tournamentId: row.tournament_id as string | null,
+      matchType: row.match_type as string,
+      sportId: row.sport_id as string,
+      status: row.status,
 
-      teamAId:
-        row.team_a_id as string | null,
-      teamBId:
-        row.team_b_id as string | null,
-      teamAName:
-        row.team_a_name as string | null,
-      teamBName:
-        row.team_b_name as string | null,
+      teamAId: row.team_a_id as string | null,
+      teamBId: row.team_b_id as string | null,
+      teamAName: row.team_a_name as string | null,
+      teamBName: row.team_b_name as string | null,
 
-      createdBy:
-        row.created_by as string | null,
-      venue:
-        row.venue as string | null,
+      createdBy: row.created_by as string | null,
+      venue: row.venue as string | null,
 
-      scheduledStartTime:
-        row.scheduled_start_time
-          ?.toISOString?.()
-        ?? row.scheduled_start_time
-        ?? null,
+      scheduledStartTime: row.scheduled_start_time
+        ?.toISOString?.() ??
+        row.scheduled_start_time ??
+        null,
 
-      actualStartTime:
-        row.actual_start_time
-          ?.toISOString?.()
-        ?? row.actual_start_time
-        ?? null,
+      actualStartTime: row.actual_start_time
+        ?.toISOString?.() ??
+        row.actual_start_time ??
+        null,
 
-      completedAt:
-        row.completed_at
-          ?.toISOString?.()
-        ?? row.completed_at
-        ?? null,
+      completedAt: row.completed_at
+        ?.toISOString?.() ??
+        row.completed_at ??
+        null,
 
-      winnerSide:
-        row.winner_side,
+      winnerSide: row.winner_side,
 
-      setupSide:
-        row.setup_side,
+      setupSide: row.setup_side,
 
-      phase:
-        row.phase,
+      phase: row.phase,
 
-      tossWonBy:
-        row.toss_won_by,
+      tossWonBy: row.toss_won_by,
 
-      tossDecision:
-        row.toss_decision,
+      tossDecision: row.toss_decision,
 
-      tossFace:
-        row.toss_face as string | null,
+      tossFace: row.toss_face as string | null,
 
-      tossRecordedAt:
-        row.toss_recorded_at
-          ?.toISOString?.()
-        ?? row.toss_recorded_at
-        ?? null,
+      tossRecordedAt: row.toss_recorded_at
+        ?.toISOString?.() ??
+        row.toss_recorded_at ??
+        null,
 
-      tossRecordedBy:
-        row.toss_recorded_by as string | null,
+      tossRecordedBy: row.toss_recorded_by as string | null,
 
-      rulesSnapshot:
-        jsonObject(
-          row.rules_snapshot,
-        ),
+      rulesSnapshot: jsonObject(
+        row.rules_snapshot,
+      ),
 
-      revisedConditions:
-        row.revised_conditions == null
-          ? null
-          : jsonObject(
-              row.revised_conditions,
-            ),
+      revisedConditions: row.revised_conditions == null ? null : jsonObject(
+        row.revised_conditions,
+      ),
 
-      result:
-        row.result == null
-          ? null
-          : jsonObject(
-              row.result,
-            ),
+      result: row.result == null ? null : jsonObject(
+        row.result,
+      ),
+      stateRevision: Number(row.state_revision ?? 0),
+      rosterFrozenAt: row.roster_frozen_at
+        ?.toISOString?.() ??
+        row.roster_frozen_at ??
+        null,
     };
   }
 }

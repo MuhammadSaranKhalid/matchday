@@ -49,10 +49,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-import {
-  corsPreflight,
-  json,
-} from "../_shared/http.ts";
+import { corsPreflight, json } from "../_shared/http.ts";
 import { db } from "../_shared/db.ts";
 import {
   authenticateRequest,
@@ -61,14 +58,10 @@ import {
 
 import { dispatchCommand } from "./command_router.ts";
 import { parseEnvelope } from "./domain/validation.ts";
-import {
-  normalizeUnexpectedError,
-} from "./domain/errors.ts";
+import { normalizeUnexpectedError } from "./domain/errors.ts";
 import { SnapshotRepository } from "./repositories/snapshot_repository.ts";
 import { publishAfterCommit } from "./realtime/publisher.ts";
-import type {
-  TransactionOutput,
-} from "./types.ts";
+import type { TransactionOutput } from "./types.ts";
 
 const snapshots = new SnapshotRepository();
 
@@ -89,11 +82,9 @@ Deno.serve(async (req) => {
       {
         ok: false,
         error: {
-          code:
-            auth.error?.code ??
+          code: auth.error?.code ??
             "UNAUTHENTICATED",
-          message:
-            auth.error?.message ??
+          message: auth.error?.message ??
             "Invalid or missing session",
         },
       },
@@ -122,8 +113,7 @@ Deno.serve(async (req) => {
   try {
     envelope = parseEnvelope(raw);
   } catch (error) {
-    const err =
-      normalizeUnexpectedError(error);
+    const err = normalizeUnexpectedError(error);
 
     return json(err.status, {
       ok: false,
@@ -146,59 +136,68 @@ Deno.serve(async (req) => {
     // -------------------------------------------------------------------------
     // 3. ONE database transaction per command
     // -------------------------------------------------------------------------
-    const out =
-      await sql.begin<TransactionOutput>(
-        async (tx) => {
-          // public.can(...) and any policy/helper using auth.uid() see the
-          // verified caller, even though this is a trusted direct DB connection.
-          await setTransactionJwtClaims(
+    const out = await sql.begin<TransactionOutput>(
+      async (tx) => {
+        // public.can(...) and any policy/helper using auth.uid() see the
+        // verified caller, even though this is a trusted direct DB connection.
+        await setTransactionJwtClaims(
+          tx,
+          auth.actorId!,
+        );
+
+        // Business behavior lives here, in TypeScript command modules.
+        const command = await dispatchCommand(
+          action,
+          {
             tx,
-            auth.actorId!,
-          );
+            actorId: auth.actorId!,
+            matchId,
+            body,
+          },
+        );
 
-          // Business behavior lives here, in TypeScript command modules.
-          const command =
-            await dispatchCommand(
-              action,
-              {
-                tx,
-                actorId: auth.actorId!,
-                matchId,
-                body,
-              },
-            );
+        // Snapshot is loaded INSIDE the transaction after all writes so the
+        // response/realtime payload represents exactly what was committed.
+        const match = await snapshots.match(
+          tx,
+          matchId,
+        );
 
-          // Snapshot is loaded INSIDE the transaction after all writes so the
-          // response/realtime payload represents exactly what was committed.
-          const match =
-            await snapshots.match(
-              tx,
-              matchId,
-            );
+        const inningsNumber = command.inningsNumber ?? null;
 
-          const inningsNumber =
-            command.inningsNumber ?? null;
+        const innings = inningsNumber == null ? null : await snapshots.innings(
+          tx,
+          matchId,
+          inningsNumber,
+        );
 
-          const innings =
-            inningsNumber == null
-              ? null
-              : await snapshots.innings(
-                  tx,
-                  matchId,
-                  inningsNumber,
-                );
+        const snapshot = await snapshots.room(
+          tx,
+          matchId,
+        );
 
-          return {
-            result:
-              command.result ?? null,
-            match,
-            innings,
-            inningsNumber,
-            ballsResync:
-              command.ballsResync === true,
-          };
-        },
-      );
+        const snapshotRevision = snapshot &&
+            typeof snapshot === "object" &&
+            "revision" in snapshot
+          ? Number(
+            (snapshot as Record<string, unknown>)
+              .revision ?? 0,
+          )
+          : 0;
+
+        return {
+          result: command.result ?? null,
+          match,
+          innings,
+          inningsNumber,
+          ballsResync: command.ballsResync === true,
+          snapshot,
+          revision: command.revision ??
+            snapshotRevision,
+          events: command.events ?? [],
+        };
+      },
+    );
 
     // -------------------------------------------------------------------------
     // 4. COMMIT has happened. Realtime is now safe to publish.
@@ -214,10 +213,11 @@ Deno.serve(async (req) => {
       result: out.result,
       match: out.match,
       innings: out.innings,
+      snapshot: out.snapshot,
+      revision: out.revision,
     });
   } catch (error) {
-    const err =
-      normalizeUnexpectedError(error);
+    const err = normalizeUnexpectedError(error);
 
     console.error(
       "[cricket-match-action]",

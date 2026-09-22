@@ -1,8 +1,17 @@
-import type {
-  Tx,
-} from "../types.ts";
+import type { Tx } from "../types.ts";
 
 export class SnapshotRepository {
+  async room(
+    tx: Tx,
+    matchId: string,
+  ): Promise<unknown> {
+    const rows = await tx`
+      select public.get_match_room_snapshot(
+        ${matchId}::uuid
+      ) as snapshot
+    `;
+    return rows[0]?.snapshot ?? null;
+  }
   async match(
     tx: Tx,
     matchId: string,

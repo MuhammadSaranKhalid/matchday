@@ -214,7 +214,7 @@ class TeamMembershipRemoteDataSource {
       if (unclaimedIds.isNotEmpty) {
         final rows = await _supabase
             .from('unclaimed_players')
-            .select('unclaimed_id, display_name, phone_number')
+            .select('unclaimed_id, display_name')
             .inFilter('unclaimed_id', unclaimedIds)
             .timeout(_readTimeout);
         for (final row in rows) {

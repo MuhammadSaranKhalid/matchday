@@ -142,8 +142,6 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
   void _openFixture(MyMatchConfirmed c) {
     if (c.live) {
       context.push('/matches/${c.id}/score');
-    } else if (c.tossReady) {
-      context.push('/matches/${c.id}/start');
     } else {
       context.push('/matches/${c.id}');
     }

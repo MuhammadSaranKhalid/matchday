@@ -39,12 +39,10 @@ import '../features/matches/presentation/screens/applicant_detail_screen.dart';
 import '../features/matches/presentation/screens/challenge_detail_screen.dart';
 import '../features/matches/presentation/screens/challenge_send_screen.dart';
 import '../features/matches/presentation/screens/challenge_sent_screen.dart';
-import '../features/matches/presentation/screens/match_start_screen.dart';
 import '../features/matches/presentation/screens/challenges_screen.dart';
 import '../features/matches/presentation/screens/my_pool_requests_screen.dart';
 import '../features/matches/presentation/screens/open_match_pool_screen.dart';
 import '../features/matches/presentation/screens/scoring_screen.dart';
-import '../features/matches/presentation/screens/innings_break_screen.dart';
 import '../features/matches/presentation/screens/completed_match_screen.dart';
 import '../features/matches/presentation/screens/scorecard_screen.dart';
 import '../features/matches/presentation/screens/result_screen.dart';
@@ -507,9 +505,7 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/matches/:matchId/start',
-        builder:
-            (_, state) =>
-                MatchStartScreen(matchId: state.pathParameters['matchId']!),
+        redirect: (_, state) => '/matches/${state.pathParameters['matchId']!}',
       ),
       GoRoute(
         path: '/matches/:matchId/score',
@@ -531,9 +527,9 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/matches/:matchId/innings-break',
-        builder:
+        redirect:
             (_, state) =>
-                InningsBreakScreen(matchId: state.pathParameters['matchId']!),
+                '/matches/${state.pathParameters['matchId']!}/score?innings=1',
       ),
       // The completed-match record. Distinct from /scorecard, which serves
       // matches still in progress: this one derives everything from the final

@@ -1,11 +1,5 @@
-import type {
-  CommandContext,
-  CommandResult,
-  TossDecision,
-} from "../types.ts";
-import {
-  MatchRepository,
-} from "../repositories/match_repository.ts";
+import type { CommandContext, CommandResult, TossDecision } from "../types.ts";
+import { MatchRepository } from "../repositories/match_repository.ts";
 import {
   AuthorizationRepository,
 } from "../repositories/authorization_repository.ts";
@@ -14,18 +8,12 @@ import {
   requiredEnum,
   requiredUuid,
 } from "../domain/validation.ts";
-import {
-  teamSideFor,
-} from "../domain/cricket.ts";
-import {
-  unprocessable,
-} from "../domain/errors.ts";
+import { teamSideFor } from "../domain/cricket.ts";
+import { unprocessable } from "../domain/errors.ts";
 
-const matches =
-  new MatchRepository();
+const matches = new MatchRepository();
 
-const authz =
-  new AuthorizationRepository();
+const authz = new AuthorizationRepository();
 
 // Atomic physical-toss recording.
 //
@@ -35,30 +23,26 @@ const authz =
 export async function recordToss(
   ctx: CommandContext,
 ): Promise<CommandResult> {
-  const wonByTeamId =
-    requiredUuid(
-      ctx.body,
-      "p_won_by",
-    );
+  const wonByTeamId = requiredUuid(
+    ctx.body,
+    "p_won_by",
+  );
 
-  const decision =
-    requiredEnum<TossDecision>(
-      ctx.body,
-      "p_decision",
-      ["bat", "bowl"],
-    );
+  const decision = requiredEnum<TossDecision>(
+    ctx.body,
+    "p_decision",
+    ["bat", "bowl"],
+  );
 
-  const face =
-    optionalString(
-      ctx.body,
-      "p_face",
-    );
+  const face = optionalString(
+    ctx.body,
+    "p_face",
+  );
 
-  const match =
-    await matches.lockCricketMatch(
-      ctx.tx,
-      ctx.matchId,
-    );
+  const match = await matches.lockCricketMatch(
+    ctx.tx,
+    ctx.matchId,
+  );
 
   // A fresh toss may be recorded exactly once through this command.
   //
@@ -90,13 +74,21 @@ export async function recordToss(
 
   // Flutter sends a concrete team UUID for ergonomics. Persist the canonical
   // match-local side identity.
-  const winningSide =
-    teamSideFor(
-      match,
-      wonByTeamId,
-    );
+  const winningSide = teamSideFor(
+    match,
+    wonByTeamId,
+  );
 
+  // The match row is already locked. Reconcile one final time before freezing
+  // so a roster addition that raced the toss is either fully before or fully
+  // after this boundary.
   await ctx.tx`
+    select public.sync_match_participants(
+      ${ctx.matchId}::uuid
+    )
+  `;
+
+  const revisions = await ctx.tx`
     update public.cricket_matches
     set
       toss_won_by =
@@ -111,11 +103,25 @@ export async function recordToss(
         now(),
       phase =
         'lineup',
+      roster_frozen_at =
+        now(),
+      state_revision =
+        state_revision + 1,
       updated_at =
         now()
-    where match_id =
-            ${ctx.matchId}::uuid
+    where match_id = ${ctx.matchId}::uuid
+    returning state_revision
   `;
 
-  return {};
+  const revision = Number(revisions[0].state_revision);
+  return {
+    revision,
+    events: [{
+      eventId: crypto.randomUUID(),
+      matchId: ctx.matchId,
+      revision,
+      eventType: "match_changed",
+      occurredAt: new Date().toISOString(),
+    }],
+  };
 }

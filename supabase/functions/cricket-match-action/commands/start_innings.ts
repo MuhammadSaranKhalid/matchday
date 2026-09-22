@@ -179,7 +179,7 @@ export async function startInnings(
     },
   );
 
-  await ctx.tx`
+  const revisions = await ctx.tx`
     update public.cricket_matches
     set
       phase = case
@@ -187,9 +187,11 @@ export async function startInnings(
           then 'super_over'::public.cricket_match_phase
         else 'live'::public.cricket_match_phase
       end,
+      state_revision = state_revision + 1,
       updated_at = now()
     where match_id =
             ${ctx.matchId}::uuid
+    returning state_revision
   `;
 
   await ctx.tx`
@@ -207,7 +209,28 @@ export async function startInnings(
             ${ctx.matchId}::uuid
   `;
 
+  const revision = Number(revisions[0].state_revision);
+  const occurredAt = new Date().toISOString();
   return {
     inningsNumber,
+    revision,
+    events: [
+      {
+        eventId: crypto.randomUUID(),
+        matchId: ctx.matchId,
+        revision,
+        eventType: "match_changed",
+        inningsNumber,
+        occurredAt,
+      },
+      {
+        eventId: crypto.randomUUID(),
+        matchId: ctx.matchId,
+        revision,
+        eventType: "innings_changed",
+        inningsNumber,
+        occurredAt,
+      },
+    ],
   };
 }

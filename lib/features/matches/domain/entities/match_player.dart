@@ -30,6 +30,7 @@ class MatchPlayer extends Equatable {
     this.isCaptain = false,
     this.isKeeper = false,
     this.isSubstitute = false,
+    this.source = MatchPlayerSource.teamSnapshot,
   }) : assert(
          (profileId == null) != (unclaimedId == null),
          'Exactly one of profileId / unclaimedId must be set (XOR).',
@@ -88,6 +89,8 @@ class MatchPlayer extends Equatable {
   /// Substitute / impact player added mid-match.
   final bool isSubstitute;
 
+  final MatchPlayerSource source;
+
   /// True if this row references a real profile (the user has an account).
   /// False means an unclaimed placeholder.
   bool get isClaimed => profileId != null;
@@ -111,7 +114,24 @@ class MatchPlayer extends Equatable {
     isCaptain,
     isKeeper,
     isSubstitute,
+    source,
   ];
+}
+
+enum MatchPlayerSource {
+  teamSnapshot('team_snapshot'),
+  tournamentSquad('tournament_squad'),
+  matchAdded('match_added');
+
+  const MatchPlayerSource(this.wire);
+  final String wire;
+
+  static MatchPlayerSource fromWire(Object? value) {
+    for (final source in values) {
+      if (source.wire == value) return source;
+    }
+    return teamSnapshot;
+  }
 }
 
 /// Translation between the two id spaces a match deals in: the per-match

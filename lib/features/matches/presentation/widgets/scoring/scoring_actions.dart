@@ -31,6 +31,7 @@ import '../../../../../core/theme/circk_theme.dart';
 import '../../../domain/entities/ball.dart';
 import '../../../domain/entities/match.dart';
 import '../../controllers/scoring_controller.dart';
+import '../../providers/matches_providers.dart';
 import '../../state/scoring_state.dart';
 import 'ball_chip.dart';
 import 'extras_sheet.dart';
@@ -88,28 +89,30 @@ class ScoringActions {
 
   void maybeRouteOnInningsEnd(BuildContext context, ScoringState s) {
     if (_inningsEndRouted || !s.inningsOver) return;
+    if (!s.isTerminal) return;
     _inningsEndRouted = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) context.go(_postInningsRoute(s.match));
+      if (context.mounted) context.go('/matches/$_matchId/result');
     });
   }
 
-  String _postInningsRoute(Match match) {
-    switch (match.status) {
-      case MatchStatus.completed:
-      case MatchStatus.abandoned:
-      case MatchStatus.walkover:
-        return '/matches/$_matchId/result';
-      case MatchStatus.inningsBreak:
-        return '/matches/$_matchId/innings-break';
-      default:
-        final perSide =
-            match.format.inningsPerSide <= 0 ? 1 : match.format.inningsPerSide;
-        final isFinalInnings = _inningsNumber >= perSide * 2;
-        return isFinalInnings
-            ? '/matches/$_matchId/result'
-            : '/matches/$_matchId/innings-break';
-    }
+  Future<String?> startChase({
+    required String strikerId,
+    required String nonStrikerId,
+    required String bowlerId,
+    required int target,
+  }) async {
+    final result = await _ref
+        .read(matchesRepositoryProvider)
+        .startInnings(
+          matchId: MatchId(_matchId),
+          inningsNumber: 2,
+          strikerId: strikerId,
+          nonStrikerId: nonStrikerId,
+          bowlerId: bowlerId,
+          target: target,
+        );
+    return result.fold((failure) => failure.message, (_) => null);
   }
 
   // ── Deliveries ───────────────────────────────────────────────────────────

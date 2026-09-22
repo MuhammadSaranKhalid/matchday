@@ -1,10 +1,30 @@
 // Repository for isolated database queries and transactions in record-ball.
 
-import type {
-  RecordDeliveryInput,
-} from "../schemas/record_ball_schema.ts";
+import type { RecordDeliveryInput } from "../schemas/record_ball_schema.ts";
 
 export class MatchRepository {
+  // deno-lint-ignore no-explicit-any
+  async getOrIncrementRevision(
+    tx: any,
+    matchId: string,
+    readOnly: boolean,
+  ): Promise<number> {
+    const rows = readOnly
+      ? await tx`
+          select state_revision
+          from public.cricket_matches
+          where match_id = ${matchId}::uuid
+        `
+      : await tx`
+          update public.cricket_matches
+          set state_revision = state_revision + 1,
+              updated_at = now()
+          where match_id = ${matchId}::uuid
+          returning state_revision
+        `;
+    return Number(rows[0]?.state_revision ?? 0);
+  }
+
   // deno-lint-ignore no-explicit-any
   async checkWriterEntitlement(
     tx: any,
@@ -26,10 +46,12 @@ export class MatchRepository {
     tx: any,
     matchId: string,
     inningsNumber: number,
-  ): Promise<{
-    inningsId: string;
-    version: number;
-  } | null> {
+  ): Promise<
+    {
+      inningsId: string;
+      version: number;
+    } | null
+  > {
     const rows = await tx`
       select
         innings_id,
@@ -46,10 +68,8 @@ export class MatchRepository {
     }
 
     return {
-      inningsId:
-        rows[0].innings_id as string,
-      version:
-        Number(rows[0].version),
+      inningsId: rows[0].innings_id as string,
+      version: Number(rows[0].version),
     };
   }
 
@@ -144,14 +164,11 @@ export class MatchRepository {
     nextSeq: number,
     actor: string,
   ) {
-    const isFour =
-      input.runsScored === 4;
+    const isFour = input.runsScored === 4;
 
-    const isSix =
-      input.runsScored === 6;
+    const isSix = input.runsScored === 6;
 
-    const isBoundary =
-      isFour || isSix;
+    const isBoundary = isFour || isSix;
 
     const inserted = await tx`
       insert into public.cricket_match_deliveries (
@@ -256,8 +273,10 @@ export class MatchRepository {
       select
         ${deliveryId}::uuid,
         ${inningsId}::uuid,
-        ${input.dismissedPlayerId
-          ?? input.batsmanId}::uuid,
+        ${
+      input.dismissedPlayerId ??
+        input.batsmanId
+    }::uuid,
         ${input.wicketType!},
         ${input.isBowlerCredited},
         ${input.bowlerId}::uuid,
@@ -459,19 +478,16 @@ export class MatchRepository {
     matchId: string,
     result: unknown,
   ): Promise<void> {
-    const r =
-      (result ?? {}) as Record<string, unknown>;
+    const r = (result ?? {}) as Record<string, unknown>;
 
-    const winnerSide =
-      r.winner_side === "team_a" ||
-      r.winner_side === "team_b"
-        ? r.winner_side
-        : null;
+    const winnerSide = r.winner_side === "team_a" ||
+        r.winner_side === "team_b"
+      ? r.winner_side
+      : null;
 
-    const description =
-      typeof r.description === "string"
-        ? r.description
-        : null;
+    const description = typeof r.description === "string"
+      ? r.description
+      : null;
 
     await tx`
       update public.cricket_matches
@@ -525,8 +541,7 @@ export class MatchRepository {
       limit 1
     `;
 
-    const winnerTeamId =
-      winnerRows[0]?.team_id as string | null | undefined;
+    const winnerTeamId = winnerRows[0]?.team_id as string | null | undefined;
 
     if (!winnerTeamId) {
       return;
@@ -660,8 +675,6 @@ export class MatchRepository {
       `;
     }
   }
-
 }
 
-export const matchRepository =
-  new MatchRepository();
+export const matchRepository = new MatchRepository();

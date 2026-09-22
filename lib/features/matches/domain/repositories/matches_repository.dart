@@ -11,6 +11,7 @@ import '../entities/match_pool_application.dart';
 import '../entities/match_request.dart';
 import '../entities/match_innings.dart';
 import '../entities/match_wicket.dart';
+import '../entities/match_room_snapshot.dart';
 
 /// Online-only matches contract. Reads/writes hit Supabase directly; no
 /// local mirror. The deployed schema has NO innings table — innings are
@@ -49,6 +50,24 @@ abstract class MatchesRepository {
   /// the [Match] entity. The first event arrives after the initial GET
   /// hydration on subscribe.
   Stream<Match?> watchMatch(MatchId id);
+
+  Future<Either<Failure, MatchRoomSnapshot>> getMatchRoom(MatchId id);
+
+  Stream<MatchRoomSnapshot> watchMatchRoom(MatchId id);
+
+  Future<Either<Failure, MatchRoomSnapshot>> startMatch({
+    required MatchId id,
+    required String strikerId,
+    required String nonStrikerId,
+    required String bowlerId,
+  });
+
+  Future<Either<Failure, MatchRoomSnapshot>> addMatchParticipant({
+    required MatchId id,
+    required MatchTeamSide side,
+    required String displayName,
+    required String idempotencyKey,
+  });
 
   /// Record the complete physical toss atomically.
   ///

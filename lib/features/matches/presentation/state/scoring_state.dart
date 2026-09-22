@@ -86,6 +86,26 @@ class ScoringState extends Equatable {
 
   bool get hasPending => pendingCount > 0;
 
+  int get activeInnings => innings?.inningsNumber ?? inningsNumber;
+
+  bool get isInningsBreak => match.status == MatchStatus.inningsBreak;
+
+  bool get needsTrio =>
+      innings == null ||
+      innings!.strikerId == null ||
+      innings!.nonStrikerId == null ||
+      innings!.bowlerId == null;
+
+  bool get isTerminal => switch (match.status) {
+    MatchStatus.completed ||
+    MatchStatus.cancelled ||
+    MatchStatus.abandoned ||
+    MatchStatus.tied ||
+    MatchStatus.noResult ||
+    MatchStatus.walkover => true,
+    _ => false,
+  };
+
   // ── On-field trio ────────────────────────────────────────────────────────
 
   String? get strikerRefId =>

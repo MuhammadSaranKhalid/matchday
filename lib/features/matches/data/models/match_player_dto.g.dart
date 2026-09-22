@@ -18,6 +18,7 @@ _MatchPlayerDto _$MatchPlayerDtoFromJson(Map<String, dynamic> json) =>
       isCaptain: json['is_captain'] as bool? ?? false,
       isKeeper: json['is_keeper'] as bool? ?? false,
       isSubstitute: json['is_substitute'] as bool? ?? false,
+      source: json['source'] as String? ?? 'team_snapshot',
       profile: json['profile'] as Map<String, dynamic>?,
       unclaimed: json['unclaimed'] as Map<String, dynamic>?,
     );
@@ -34,4 +35,5 @@ Map<String, dynamic> _$MatchPlayerDtoToJson(_MatchPlayerDto instance) =>
       'is_captain': instance.isCaptain,
       'is_keeper': instance.isKeeper,
       'is_substitute': instance.isSubstitute,
+      'source': instance.source,
     };

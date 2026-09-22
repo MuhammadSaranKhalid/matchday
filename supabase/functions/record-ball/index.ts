@@ -1,12 +1,13 @@
 // record-ball — HTTP API Endpoint for recording a cricket delivery.
 //
-// Phase 2 realtime contract:
+// Realtime contract:
 //   ball_recorded          -> raw delivery row
-//   innings_state_updated  -> raw innings-state row
-//   match_state_updated    -> raw cricket_match_details row
+//   innings_changed        -> versioned invalidation envelope
+//   match_completed        -> versioned invalidation envelope
 //
-// Flutter consumes those exact DTO shapes. Do not wrap them in
-// {ball:...}/{innings:...} on the Ably event itself.
+// PostgreSQL remains authoritative; state events tell clients which revision
+// to reconcile. The balls channel retains the full delivery row for the
+// low-latency scoring projection.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsPreflight, json } from "../_shared/http.ts";
@@ -64,17 +65,19 @@ Deno.serve(async (req) => {
           .get(`match:${matchId}:balls`)
           .publish("ball_recorded", out.ball);
 
-        if (out.innings) {
-          await ably.channels
-            .get(`match:${matchId}:state`)
-            .publish("innings_state_updated", out.innings);
-        }
-
-        if (out.match) {
-          await ably.channels
-            .get(`match:${matchId}:state`)
-            .publish("match_state_updated", out.match);
-        }
+        const eventType = out.transition.kind === "completed"
+          ? "match_completed"
+          : "innings_changed";
+        await ably.channels
+          .get(`match:${matchId}:state`)
+          .publish(eventType, {
+            eventId: crypto.randomUUID(),
+            matchId,
+            revision: out.revision,
+            eventType,
+            inningsNumber: validation.data!.inningsNumber,
+            occurredAt: new Date().toISOString(),
+          });
       } catch (ablyErr) {
         console.error("[record-ball] Ably broadcast failed:", ablyErr);
       }
@@ -87,6 +90,7 @@ Deno.serve(async (req) => {
       match: out.match,
       transition: out.transition,
       duplicate: out.duplicate,
+      revision: out.revision,
       data: out,
     });
   } catch (e) {

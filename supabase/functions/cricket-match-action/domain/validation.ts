@@ -1,13 +1,10 @@
-import {
-  badRequest,
-} from "./errors.ts";
-import type {
-  Action,
-  RequestEnvelope,
-} from "../types.ts";
+import { badRequest } from "./errors.ts";
+import type { Action, RequestEnvelope } from "../types.ts";
 
 const ACTIONS = new Set<Action>([
   "record_toss",
+  "start_match",
+  "add_match_participant",
   "submit_match_openers",
   "start_match_now",
   "cancel_match",
@@ -38,8 +35,7 @@ export function parseEnvelope(
     );
   }
 
-  const body =
-    raw as Record<string, unknown>;
+  const body = raw as Record<string, unknown>;
 
   const action = body.action;
 
@@ -54,8 +50,7 @@ export function parseEnvelope(
 
   return {
     action: action as Action,
-    matchId:
-      requiredUuid(body, "p_match_id"),
+    matchId: requiredUuid(body, "p_match_id"),
     body,
   };
 }
@@ -91,17 +86,14 @@ export function optionalString(
   }
 
   const trimmed = value.trim();
-  return trimmed === ""
-    ? null
-    : trimmed;
+  return trimmed === "" ? null : trimmed;
 }
 
 export function requiredUuid(
   body: Record<string, unknown>,
   key: string,
 ): string {
-  const value =
-    requiredString(body, key);
+  const value = requiredString(body, key);
 
   if (!UUID_RE.test(value)) {
     badRequest(
@@ -151,8 +143,7 @@ export function requiredEnum<
   key: string,
   allowed: readonly T[],
 ): T {
-  const value =
-    requiredString(body, key);
+  const value = requiredString(body, key);
 
   if (
     !(allowed as readonly string[])
@@ -170,8 +161,7 @@ export function requiredTimestamp(
   body: Record<string, unknown>,
   key: string,
 ): string {
-  const value =
-    requiredString(body, key);
+  const value = requiredString(body, key);
 
   if (Number.isNaN(Date.parse(value))) {
     badRequest(
@@ -186,8 +176,7 @@ export function optionalTimestamp(
   body: Record<string, unknown>,
   key: string,
 ): string | null {
-  const value =
-    optionalString(body, key);
+  const value = optionalString(body, key);
 
   if (value == null) return null;
 

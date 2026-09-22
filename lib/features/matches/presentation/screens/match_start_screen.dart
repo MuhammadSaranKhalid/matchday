@@ -85,8 +85,7 @@ class MatchStartScreen extends ConsumerWidget {
     MatchStatus.completed ||
     MatchStatus.abandoned ||
     MatchStatus.walkover => '/matches/$matchId/result',
-    // Innings 2 setup has its own screen until phase 3 unifies them.
-    MatchStatus.inningsBreak => '/matches/$matchId/innings-break',
+    MatchStatus.inningsBreak => '/matches/$matchId/score?innings=1',
     _ => null,
   };
 }

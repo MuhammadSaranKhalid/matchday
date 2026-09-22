@@ -150,16 +150,25 @@ class _MatchRoomBodyState extends ConsumerState<MatchRoomBody> {
 
   Widget _lineup(MatchRoomState state) {
     final snapshot = state.snapshot;
-    if (!snapshot.capabilities.canSetupInnings) {
-      return const _Waiting(
-        title: 'Waiting for the lineup',
-        body:
-            'The active scorer is selecting both openers and the opening bowler.',
-      );
-    }
     final battingId = snapshot.match.battingFirstTeamId;
     final battingSide =
         battingId == snapshot.match.teamBId ? MatchTeamSide.b : MatchTeamSide.a;
+
+    // A false capability is an authorization result, not evidence that some
+    // particular phone currently owns a scorer lease. The previous copy said
+    // "the active scorer" even when no lease existed, which made two waiting
+    // phones look like a realtime failure. Name the authoritative batting side
+    // instead: after the toss, that side's effective `match.score` permission
+    // determines who can commit BOTH openers and the opposing opening bowler.
+    if (!snapshot.capabilities.canSetupInnings) {
+      final battingSideLabel =
+          battingSide == MatchTeamSide.a ? 'Team A' : 'Team B';
+      return _Waiting(
+        title: 'Waiting for $battingSideLabel lineup',
+        body:
+            'A scorer authorized for the batting team must select both openers and the opening bowler.',
+      );
+    }
     final bowlingSide =
         battingSide == MatchTeamSide.a ? MatchTeamSide.b : MatchTeamSide.a;
     final batters =

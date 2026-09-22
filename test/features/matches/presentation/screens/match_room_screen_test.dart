@@ -87,6 +87,24 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'waiting copy identifies the batting side without claiming a lease',
+    (tester) async {
+      await _pumpHarness(tester, repository);
+      rooms.add(_room(1, canSetupInnings: false));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Waiting for Team A lineup'), findsOneWidget);
+      expect(
+        find.text(
+          'A scorer authorized for the batting team must select both openers and the opening bowler.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('active scorer'), findsNothing);
+    },
+  );
 }
 
 Future<void> _pumpHarness(WidgetTester tester, MatchesRepository repository) =>
@@ -117,7 +135,11 @@ Future<void> _select(WidgetTester tester, String label, String option) async {
   await tester.pumpAndSettle();
 }
 
-MatchRoomSnapshot _room(int revision, {String status = 'scheduled'}) =>
+MatchRoomSnapshot _room(
+  int revision, {
+  String status = 'scheduled',
+  bool canSetupInnings = true,
+}) =>
     MatchRoomSnapshotDto.fromJson({
       'revision': revision,
       'server_time': '2026-09-21T00:00:00.000Z',
@@ -155,5 +177,8 @@ MatchRoomSnapshot _room(int revision, {String status = 'scheduled'}) =>
           'display_name': 'Bowler One',
         },
       ],
-      'capabilities': {'can_setup_innings': true, 'can_add_participant': true},
+      'capabilities': {
+        'can_setup_innings': canSetupInnings,
+        'can_add_participant': canSetupInnings,
+      },
     }).toEntity();

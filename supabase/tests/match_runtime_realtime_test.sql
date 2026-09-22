@@ -4,7 +4,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(13);
+select plan(14);
 
 insert into public.teams (team_id, team_name, team_type, sport_id)
 values
@@ -161,6 +161,60 @@ select is(
 select ok(
   public.get_match_room_snapshot('13000000-0000-4000-8000-000000000001') ? 'capabilities',
   'the canonical snapshot includes caller capabilities'
+);
+
+-- Reproduce the production authorization shape: the batting team's owner has
+-- `match.score` through a TEAM role, not through a direct MATCH grant. The
+-- Match Room capability must use the same can_score_innings(...) predicate as
+-- the command boundary or the UI hides a command that the server accepts.
+insert into public.team_members (
+  membership_id, team_id, user_id, status, in_squad
+)
+values (
+  '16000000-0000-4000-8000-000000000001',
+  '11000000-0000-4000-8000-000000000001',
+  '00000000-0000-0000-0000-000000000001',
+  'active',
+  true
+);
+
+-- The membership insert assigns the default player role. Owner and player are
+-- intentionally mutually exclusive in the team-authority exclusion set, so
+-- replace that default exactly as the owner-creation workflow does.
+delete from public.team_member_roles
+where membership_id = '16000000-0000-4000-8000-000000000001';
+
+insert into public.team_member_roles (
+  membership_id, scope, role_key, team_id, is_singleton, granted_by
+)
+values (
+  '16000000-0000-4000-8000-000000000001',
+  'team',
+  'owner',
+  '11000000-0000-4000-8000-000000000001',
+  true,
+  '00000000-0000-0000-0000-000000000001'
+);
+
+update public.cricket_matches
+set phase = 'lineup',
+    toss_won_by = 'team_a',
+    toss_decision = 'bat',
+    toss_recorded_at = now(),
+    toss_recorded_by = '00000000-0000-0000-0000-000000000001'
+where match_id = '13000000-0000-4000-8000-000000000001';
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  true
+);
+
+select is(
+  public.get_match_room_snapshot('13000000-0000-4000-8000-000000000001')
+    #>> '{capabilities,can_setup_innings}',
+  'true',
+  'the batting team owner receives the lineup capability through team RBAC'
 );
 
 delete from public.match_players

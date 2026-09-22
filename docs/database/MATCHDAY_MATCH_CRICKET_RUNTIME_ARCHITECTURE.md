@@ -1354,7 +1354,7 @@ match_teams
 
 There is one physical source of truth: `match_teams`.
 
-The acceptance RPCs must not manually insert participant rows. Creating the
+The acceptance commands (orchestrated by the transactional `match-request-action` Edge Function) must not manually insert participant rows. Creating the
 Cricket extension activates the same deferred synchronization trigger used by
 all other match origins, so direct challenges, pool applications, tournament
 fixtures, and winner advancement share one participant invariant.

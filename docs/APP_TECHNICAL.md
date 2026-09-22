@@ -442,7 +442,7 @@ Most server-side logic lives in **edge functions** during dev phase (see §10). 
 |---|---|
 | `start_match_now`, `submit_match_openers`, `record_toss_winner`, `record_toss_decision`, `start_innings`, `undo_last_ball`, `submit_match_result`, `complete_match` (← name varies; see migration) | Match lifecycle write paths. `record_toss_winner` is gated on the match creator, `record_toss_decision` on the captain of the side that won the toss; the rest on `_is_match_captain`, which since 20260906100000 means the two captains only — no longer the creator |
 | `record_ball` | Used as a fallback / direct-DB scoring writer (the typical write path is the `record-ball` edge function) |
-| `accept_match_request`, `counter_match_request`, `decline_match_request`, `cancel_match_request`, `find_match_request_by_code` | Match request handshake |
+| `counter_match_request`, `decline_match_request`, `cancel_match_request`, `find_match_request_by_code` | Match request handshake (acceptance is handled via `match-request-action` Edge Function) |
 | `mark_chat_read` (SECURITY DEFINER) | Sets `chat_members.last_read_at = now()` for the caller (#39 fix) |
 | `delete_user`, `leave_team`, `accept_team_invite`, `approve_claim_request` | Identity / team lifecycle. `leave_team` refuses for the owner — they must transfer first |
 | `set_team_member_role`, `transfer_team_ownership` | The only paths that change `team_members.role`; a trigger blocks direct UPDATE. Enforce "never grant a rung at or above your own" |

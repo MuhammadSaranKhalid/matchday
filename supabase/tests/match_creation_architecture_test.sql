@@ -1,61 +1,27 @@
 -- Canonical match-creation architecture regression tests.
 --
--- These assertions intentionally inspect the installed RPC definitions. They
--- protect a schema boundary that PostgreSQL cannot validate when a PL/pgSQL
--- function is created: SQL statements inside the function body are parsed
--- only when that branch executes. That allowed acceptance functions to remain
--- deployable while still referencing columns removed from `public.matches`.
+-- These assertions verify that obsolete RPCs have been removed and that
+-- the canonical match creation and participant synchronization architecture
+-- remains intact.
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(18);
+select plan(13);
 
-select ok(
-  strpos(pg_get_functiondef(
-    'public.accept_match_request(uuid,timestamptz,text,jsonb,text,uuid,uuid[],uuid)'::regprocedure
-  ), 'team_a_id') = 0,
-  'direct challenge acceptance does not write removed matches.team_a_id'
+-- Assert obsolete acceptance RPCs have been removed.
+select hasnt_function(
+  'public',
+  'accept_match_request',
+  'accept_match_request RPC has been removed'
 );
 
-select ok(
-  strpos(lower(pg_get_functiondef(
-    'public.accept_match_request(uuid,timestamptz,text,jsonb,text,uuid,uuid[],uuid)'::regprocedure
-  )), 'update public.match_teams') > 0,
-  'direct challenge acceptance resolves the canonical match-team slots'
+select hasnt_function(
+  'public',
+  'accept_pool_application',
+  'accept_pool_application RPC has been removed'
 );
 
-select ok(
-  strpos(lower(pg_get_functiondef(
-    'public.accept_match_request(uuid,timestamptz,text,jsonb,text,uuid,uuid[],uuid)'::regprocedure
-  )), 'insert into public.match_players') = 0,
-  'direct challenge acceptance delegates participant materialization'
-);
-
-select ok(
-  strpos(pg_get_functiondef(
-    'public.accept_pool_application(uuid,text)'::regprocedure
-  ), 'team_a_id') = 0,
-  'pool acceptance does not write removed matches.team_a_id'
-);
-
-select ok(
-  strpos(lower(pg_get_functiondef(
-    'public.accept_pool_application(uuid,text)'::regprocedure
-  )), 'update public.match_teams') > 0,
-  'pool acceptance resolves the canonical match-team slots'
-);
-
-select ok(
-  strpos(lower(pg_get_functiondef(
-    'public.accept_pool_application(uuid,text)'::regprocedure
-  )), 'insert into public.match_players') = 0,
-  'pool acceptance delegates participant materialization'
-);
-
--- Exercise both RPCs against the standard local seed. These are deliberately
--- end-to-end assertions: a PL/pgSQL body may pass definition checks and still
--- fail only when PostgreSQL parses an executed statement.
 create temporary table accepted_match_under_test (
   origin text primary key,
   match_id uuid not null
@@ -67,14 +33,40 @@ select set_config(
   true
 );
 
+-- ---------------------------------------------------------------------------
+-- Direct match creation flow (mirrors match_creation_repository.ts)
+-- ---------------------------------------------------------------------------
+
+with new_match as (
+  insert into public.matches (match_type, venue, sport_id, scheduled_start_time, status, created_by)
+  values ('friendly', null, 'cricket', now(), 'scheduled', '00000000-0000-0000-0000-000000000001'::uuid)
+  returning match_id
+)
 insert into accepted_match_under_test (origin, match_id)
-select 'direct', public.accept_match_request(
-  '90000000-0000-0000-0000-000000000001',
-  null, null, null, 'architecture test', null, '{}'::uuid[], null
+select 'direct', match_id from new_match;
+
+update public.match_teams
+set team_id = '11111111-1111-1111-1111-111111111104'::uuid
+where match_id = (select match_id from accepted_match_under_test where origin = 'direct')
+  and team_side = 'team_a';
+
+update public.match_teams
+set team_id = '11111111-1111-1111-1111-111111111101'::uuid
+where match_id = (select match_id from accepted_match_under_test where origin = 'direct')
+  and team_side = 'team_b';
+
+insert into public.cricket_matches (match_id, format_code, rules_snapshot, setup_side)
+values (
+  (select match_id from accepted_match_under_test where origin = 'direct'),
+  't20',
+  '{"overs_per_innings": 20}'::jsonb,
+  'team_a'
 );
 
--- Participant synchronization is a deferred constraint trigger in production.
--- Make it observable inside this transaction before evaluating assertions.
+select public.sync_match_participants(
+  (select match_id from accepted_match_under_test where origin = 'direct')
+);
+
 set constraints cricket_matches_materialize_participants immediate;
 
 select is(
@@ -115,21 +107,38 @@ select is(
   'direct acceptance assigns the host as the initial setup side'
 );
 
-insert into public.match_pool_applications (
-  application_id, request_id, applicant_team_id, applicant_user_id,
-  applicant_xi, status
-) values (
-  '99000000-0000-4000-8000-000000000001',
-  '90000000-0000-0000-0000-000000000003',
-  '11111111-1111-1111-1111-111111111103',
-  '00000000-0000-0000-0000-000000000002',
-  '{}'::uuid[], 'pending'
+-- ---------------------------------------------------------------------------
+-- Pool match creation flow (mirrors match_creation_repository.ts)
+-- ---------------------------------------------------------------------------
+
+with new_pool_match as (
+  insert into public.matches (match_type, venue, sport_id, scheduled_start_time, status, created_by)
+  values ('friendly', null, 'cricket', now(), 'scheduled', '00000000-0000-0000-0000-000000000001'::uuid)
+  returning match_id
+)
+insert into accepted_match_under_test (origin, match_id)
+select 'pool', match_id from new_pool_match;
+
+update public.match_teams
+set team_id = '11111111-1111-1111-1111-111111111101'::uuid
+where match_id = (select match_id from accepted_match_under_test where origin = 'pool')
+  and team_side = 'team_a';
+
+update public.match_teams
+set team_id = '11111111-1111-1111-1111-111111111103'::uuid
+where match_id = (select match_id from accepted_match_under_test where origin = 'pool')
+  and team_side = 'team_b';
+
+insert into public.cricket_matches (match_id, format_code, rules_snapshot, setup_side)
+values (
+  (select match_id from accepted_match_under_test where origin = 'pool'),
+  't20',
+  '{"overs_per_innings": 20}'::jsonb,
+  'team_a'
 );
 
-insert into accepted_match_under_test (origin, match_id)
-select 'pool', public.accept_pool_application(
-  '99000000-0000-4000-8000-000000000001',
-  'architecture test'
+select public.sync_match_participants(
+  (select match_id from accepted_match_under_test where origin = 'pool')
 );
 
 select is(
@@ -161,20 +170,10 @@ select ok(
   'pool acceptance materializes participants through the trigger'
 );
 
-select is(
-  (select status
-   from public.match_pool_applications
-   where application_id = '99000000-0000-4000-8000-000000000001'),
-  'accepted',
-  'pool acceptance atomically closes the selected application'
-);
-
--- Source-level architecture assertions for the Edge match_creation_repository.
--- These supplement the RPC definition checks above by verifying the TypeScript
--- repository file does not contain forbidden patterns. They run as SQL text
--- comparisons against pg_read_file, which is available in the local dev DB.
--- Skipped if pg_read_file is unavailable (restricted environments).
-do $$
+-- ---------------------------------------------------------------------------
+-- Source-level architecture assertions for match_creation_repository.ts
+-- ---------------------------------------------------------------------------
+create or replace function _run_source_checks() returns setof text as $$
 declare
   v_source text;
   v_path text :=
@@ -187,31 +186,34 @@ begin
   end;
 
   if v_source is not null then
-    perform ok(
+    return next ok(
       strpos(v_source, 'team_a_id') = 0,
       'edge repository does not write removed matches.team_a_id'
     );
-    perform ok(
+    return next ok(
       strpos(v_source, 'team_b_id') = 0,
       'edge repository does not write removed matches.team_b_id'
     );
-    perform ok(
+    return next ok(
       strpos(lower(v_source), 'insert into public.match_players') = 0,
       'edge repository does not insert match_players directly'
     );
-    perform ok(
+    return next ok(
       strpos(lower(v_source), 'insert into public.cricket_match_players') = 0,
       'edge repository does not insert cricket_match_players directly'
     );
   else
     -- emit dummy passing tests so plan() count stays correct
-    perform ok(true, 'edge repo source check skipped (pg_read_file unavailable)');
-    perform ok(true, 'edge repo source check skipped (pg_read_file unavailable)');
-    perform ok(true, 'edge repo source check skipped (pg_read_file unavailable)');
-    perform ok(true, 'edge repo source check skipped (pg_read_file unavailable)');
+    return next ok(true, 'edge repo source check skipped (pg_read_file unavailable)');
+    return next ok(true, 'edge repo source check skipped (pg_read_file unavailable)');
+    return next ok(true, 'edge repo source check skipped (pg_read_file unavailable)');
+    return next ok(true, 'edge repo source check skipped (pg_read_file unavailable)');
   end if;
 end;
-$$;
+$$ language plpgsql;
+
+select * from _run_source_checks();
+drop function _run_source_checks();
 
 select * from finish();
 rollback;

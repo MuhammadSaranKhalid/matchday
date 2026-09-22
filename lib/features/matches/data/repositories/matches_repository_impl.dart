@@ -751,12 +751,13 @@ class MatchesRepositoryImpl implements MatchesRepository {
         toTeamXi: toTeamXi,
         toTeamKeeperId: toTeamKeeperId,
       );
-      if (id == null) {
-        return const Left(ServerFailure('Accept returned no match id'));
-      }
       return Right(MatchId(id));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on ConflictException catch (e) {
+      return Left(ConflictFailure(e.message));
+    } on ValidationException catch (e) {
+      return Left(ValidationFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -983,6 +984,10 @@ class MatchesRepositoryImpl implements MatchesRepository {
       return Right(MatchId(matchId));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on ConflictException catch (e) {
+      return Left(ConflictFailure(e.message));
+    } on ValidationException catch (e) {
+      return Left(ValidationFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

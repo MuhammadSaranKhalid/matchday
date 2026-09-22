@@ -55,6 +55,15 @@ class ConflictException implements Exception {
   String toString() => 'ConflictException: $message';
 }
 
+/// Request validation failed at the edge / API boundary (HTTP 422 / 400).
+class ValidationException implements Exception {
+  ValidationException([this.message = 'Validation failed']);
+  final String message;
+
+  @override
+  String toString() => 'ValidationException: $message';
+}
+
 /// An OS permission was refused or the backing service is disabled (e.g. the
 /// user denied location access, or device location services are off).
 class PermissionException implements Exception {

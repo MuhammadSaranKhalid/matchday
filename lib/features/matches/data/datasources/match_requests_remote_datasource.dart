@@ -69,9 +69,10 @@ class MatchRequestsRemoteDataSource {
     }
   }
 
-  /// Receiver accepts a pending request (or sender accepts a counter). Returns
-  /// the new match id materialised by the RPC.
-  Future<String?> acceptMatchChallenge({
+  /// Receiver accepts a pending request (or sender accepts a counter).
+  /// Dispatches to the transactional `match-request-action` Edge command.
+  /// Returns the newly created match id.
+  Future<String> acceptMatchChallenge({
     required String requestId,
     DateTime? scheduledStartTime,
     String? venue,
@@ -81,27 +82,31 @@ class MatchRequestsRemoteDataSource {
     required List<String> toTeamXi,
     String? toTeamKeeperId,
   }) async {
+    final body = <String, dynamic>{
+      'request_id': requestId,
+      if (scheduledStartTime != null)
+        'scheduled_start_time': scheduledStartTime.toUtc().toIso8601String(),
+      if (venue != null) 'venue': venue,
+      if (format != null) 'format': MatchRequestDto.formatToJson(format),
+      if (decisionNote != null) 'decision_note': decisionNote,
+      if (toTeamId != null) 'to_team_id': toTeamId,
+      'to_team_xi': toTeamXi,
+      if (toTeamKeeperId != null) 'to_team_keeper_id': toTeamKeeperId,
+    };
     try {
-      final result = await _supabase.rpc<dynamic>(
-        'accept_match_request',
-        params: {
-          'p_request_id': requestId,
-          if (scheduledStartTime != null)
-            'p_scheduled_start_time':
-                scheduledStartTime.toUtc().toIso8601String(),
-          if (venue != null) 'p_venue': venue,
-          if (format != null) 'p_format': MatchRequestDto.formatToJson(format),
-          if (decisionNote != null) 'p_decision_note': decisionNote,
-          if (toTeamId != null) 'p_to_team_id': toTeamId,
-          'p_to_team_xi': toTeamXi,
-          if (toTeamKeeperId != null) 'p_to_team_keeper_id': toTeamKeeperId,
-        },
+      final res = await _supabase.functions.invoke(
+        'match-request-action',
+        body: {'action': 'accept_challenge', 'body': body},
       );
-      if (result is String) return result;
-      if (result is List && result.isNotEmpty) return result.first.toString();
-      return null;
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
+      final data = res.data;
+      if (data is Map &&
+          data['match_id'] is String &&
+          (data['match_id'] as String).isNotEmpty) {
+        return data['match_id'] as String;
+      }
+      throw ServerException('match-request-action returned no match_id');
+    } on FunctionException catch (e) {
+      throw _functionException(e, fallbackMessage: 'accept_challenge failed');
     }
   }
 
@@ -255,17 +260,27 @@ class MatchRequestsRemoteDataSource {
     required String applicationId,
     String? decisionNote,
   }) async {
+    final body = <String, dynamic>{
+      'application_id': applicationId,
+      if (decisionNote != null) 'decision_note': decisionNote,
+    };
     try {
-      final matchId = await _supabase.rpc<String>(
-        'accept_pool_application',
-        params: {
-          'p_application_id': applicationId,
-          if (decisionNote != null) 'p_decision_note': decisionNote,
-        },
+      final res = await _supabase.functions.invoke(
+        'match-request-action',
+        body: {'action': 'accept_pool_application', 'body': body},
       );
-      return matchId;
-    } on PostgrestException catch (e) {
-      throw _rpcException(e);
+      final data = res.data;
+      if (data is Map &&
+          data['match_id'] is String &&
+          (data['match_id'] as String).isNotEmpty) {
+        return data['match_id'] as String;
+      }
+      throw ServerException('match-request-action returned no match_id');
+    } on FunctionException catch (e) {
+      throw _functionException(
+        e,
+        fallbackMessage: 'accept_pool_application failed',
+      );
     }
   }
 
@@ -297,7 +312,10 @@ class MatchRequestsRemoteDataSource {
   /// Translate edge function failures into typed exceptions. The TS handler
   /// always returns `{ ok:false, error:{ code, message } }` on failure with
   /// an appropriate HTTP status (see `send-match-request/index.ts`).
-  Exception _functionException(FunctionException e) {
+  Exception _functionException(
+    FunctionException e, {
+    String fallbackMessage = 'match request action failed',
+  }) {
     if (e is FunctionsFetchException) {
       return NetworkException(
         e.reasonPhrase ?? 'No connection to match request service',
@@ -318,15 +336,15 @@ class MatchRequestsRemoteDataSource {
       case 401:
       case 403:
         return UnauthorizedException(
-          msg ?? 'Not allowed to send this challenge',
+          msg ?? 'Not allowed to perform this match action',
         );
       case 409:
         return ConflictException(msg ?? 'A pending request already exists');
       case 422:
-        return ServerException(msg ?? 'Validation failed', statusCode: 422);
+        return ValidationException(msg ?? 'Validation failed');
       default:
         return ServerException(
-          msg ?? 'send-match-request failed',
+          msg ?? fallbackMessage,
           statusCode: e.status,
         );
     }

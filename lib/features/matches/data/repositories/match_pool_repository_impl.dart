@@ -1,4 +1,5 @@
 import 'package:fpdart/fpdart.dart';
+import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/match.dart';
@@ -120,8 +121,16 @@ class MatchPoolRepositoryImpl implements MatchPoolRepository {
         decisionNote: decisionNote,
       );
       return Right(MatchId(matchId));
-    } on Exception catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ConflictException catch (e) {
+      return Left(ConflictFailure(e.message));
+    } on ValidationException catch (e) {
+      return Left(ValidationFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
     }
   }
 

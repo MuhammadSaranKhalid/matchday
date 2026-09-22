@@ -34,11 +34,9 @@ export class MatchTeamRepository {
     return teamId;
   }
 
-  // Propagate a completed knockout winner into future bracket slots.
-  //
-  // Changing the canonical slot is only half the job: the target fixture also
-  // needs a fresh participant snapshot so its lineup/start UI is immediately
-  // usable. All of this remains inside the same command transaction.
+  // Propagate a completed knockout winner by resolving the canonical slot.
+  // The match_teams trigger is the sole owner of participant materialization;
+  // it snapshots the registered tournament squad inside this transaction.
   async advanceWinner(
     tx: Tx,
     sourceMatchId: string,
@@ -84,13 +82,6 @@ export class MatchTeamRepository {
       }
 
       await tx`
-        delete from public.match_players
-        where match_id =
-                ${target.match_id}::uuid
-          and team_side = ${side}
-      `;
-
-      await tx`
         update public.match_teams
         set team_id =
               ${winnerTeamId}::uuid
@@ -98,13 +89,6 @@ export class MatchTeamRepository {
                 ${target.match_id}::uuid
           and team_side = ${side}
       `;
-
-      await this.materializeSide(
-        tx,
-        target.match_id as string,
-        side,
-        winnerTeamId,
-      );
     }
   }
 
@@ -146,13 +130,6 @@ export class MatchTeamRepository {
       }
 
       await tx`
-        delete from public.match_players
-        where match_id =
-                ${target.match_id}::uuid
-          and team_side = ${side}
-      `;
-
-      await tx`
         update public.match_teams
         set team_id = null
         where match_id =
@@ -160,86 +137,5 @@ export class MatchTeamRepository {
           and team_side = ${side}
       `;
     }
-  }
-
-  // Direct-SQL participant materialization for a resolved bracket slot.
-  // Tournament registration squad wins when present; otherwise active team
-  // squad members are snapshotted. Cricket role flags are copied from the team
-  // authority model, but future Cricket behavior remains in Edge commands.
-  private async materializeSide(
-    tx: Tx,
-    matchId: string,
-    side: TeamSide,
-    teamId: string,
-  ): Promise<void> {
-    await tx`
-      insert into public.match_players (
-        match_id,
-        team_side,
-        user_id,
-        unclaimed_id,
-        display_name,
-        jersey_number
-      )
-      select
-        ${matchId}::uuid,
-        ${side},
-        tm.user_id,
-        tm.unclaimed_id,
-        coalesce(
-          pr.display_name,
-          up.display_name,
-          'Player'
-        ),
-        tm.jersey_number
-      from public.team_members tm
-      join public.matches m
-        on m.match_id = ${matchId}::uuid
-      left join public.tournament_teams tt
-        on tt.tournament_id = m.tournament_id
-       and tt.team_id = ${teamId}::uuid
-       and tt.status = 'approved'
-      left join public.profiles pr
-        on pr.user_id = tm.user_id
-      left join public.unclaimed_players up
-        on up.unclaimed_id = tm.unclaimed_id
-      where tm.team_id = ${teamId}::uuid
-        and tm.status = 'active'
-        and tm.in_squad = true
-        and (
-          m.tournament_id is null
-          or coalesce(cardinality(tt.squad), 0) = 0
-          or tm.user_id = any(tt.squad)
-          or tm.unclaimed_id = any(tt.squad)
-        )
-    `;
-
-    await tx`
-      insert into public.cricket_match_players (
-        match_player_id,
-        match_id,
-        is_captain,
-        is_vice_captain,
-        is_wicket_keeper
-      )
-      select
-        mp.match_player_id,
-        mp.match_id,
-        coalesce(
-          mp.user_id =
-            public._team_current_captain(
-              ${teamId}::uuid
-            ),
-          false
-        ),
-        false,
-        false
-      from public.match_players mp
-      join public.matches m
-        on m.match_id = mp.match_id
-      where mp.match_id = ${matchId}::uuid
-        and mp.team_side = ${side}
-        and m.sport_id = 'cricket'
-    `;
   }
 }

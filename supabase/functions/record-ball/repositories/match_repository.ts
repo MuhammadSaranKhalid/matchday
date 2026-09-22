@@ -523,8 +523,13 @@ export class MatchRepository {
     }
   }
 
-  // Tournament bracket propagation uses canonical match_teams and immediately
-  // materializes the winning team into the future fixture's participant rows.
+  // Tournament bracket propagation changes only the canonical team slot.
+  //
+  // The database trigger on match_teams owns participant synchronization. It
+  // reads the registered tournament squad, preserves provenance, and creates
+  // the Cricket extension rows in the same transaction. Keeping manual INSERT
+  // statements here previously gave two implementations ownership of the same
+  // invariant and made completion vulnerable to uniqueness conflicts.
   // deno-lint-ignore no-explicit-any
   private async advanceWinner(
     tx: any,
@@ -579,14 +584,6 @@ export class MatchRepository {
       }
 
       await tx`
-        delete from public.match_players
-        where match_id =
-                ${target.match_id}::uuid
-          and team_side =
-                ${target.target_side}
-      `;
-
-      await tx`
         update public.match_teams
         set team_id =
               ${winnerTeamId}::uuid
@@ -594,84 +591,6 @@ export class MatchRepository {
                 ${target.match_id}::uuid
           and team_side =
                 ${target.target_side}
-      `;
-
-      await tx`
-        insert into public.match_players (
-          match_id,
-          team_side,
-          user_id,
-          unclaimed_id,
-          display_name,
-          jersey_number
-        )
-        select
-          ${target.match_id}::uuid,
-          ${target.target_side},
-          tm.user_id,
-          tm.unclaimed_id,
-          coalesce(
-            pr.display_name,
-            up.display_name,
-            'Player'
-          ),
-          tm.jersey_number
-        from public.team_members tm
-        join public.matches m
-          on m.match_id =
-             ${target.match_id}::uuid
-        left join public.tournament_teams tt
-          on tt.tournament_id = m.tournament_id
-         and tt.team_id =
-             ${winnerTeamId}::uuid
-         and tt.status = 'approved'
-        left join public.profiles pr
-          on pr.user_id = tm.user_id
-        left join public.unclaimed_players up
-          on up.unclaimed_id = tm.unclaimed_id
-        where tm.team_id =
-                ${winnerTeamId}::uuid
-          and tm.status = 'active'
-          and tm.in_squad = true
-          and (
-            m.tournament_id is null
-            or coalesce(
-                 cardinality(tt.squad),
-                 0
-               ) = 0
-            or tm.user_id = any(tt.squad)
-            or tm.unclaimed_id = any(tt.squad)
-          )
-      `;
-
-      await tx`
-        insert into public.cricket_match_players (
-          match_player_id,
-          match_id,
-          is_captain,
-          is_vice_captain,
-          is_wicket_keeper
-        )
-        select
-          mp.match_player_id,
-          mp.match_id,
-          coalesce(
-            mp.user_id =
-              public._team_current_captain(
-                ${winnerTeamId}::uuid
-              ),
-            false
-          ),
-          false,
-          false
-        from public.match_players mp
-        join public.matches m
-          on m.match_id = mp.match_id
-        where mp.match_id =
-                ${target.match_id}::uuid
-          and mp.team_side =
-                ${target.target_side}
-          and m.sport_id = 'cricket'
       `;
     }
   }

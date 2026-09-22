@@ -1281,12 +1281,18 @@ Resolving only the future team is insufficient.
 
 The future fixture also needs its participant snapshot so Cricket lineup/start flows work immediately.
 
-Advancement therefore materializes the resolved side into:
+Advancement therefore updates only the future `match_teams.team_id`. The
+`match_teams_sync_participants` database trigger is the sole owner that then
+materializes the resolved side into:
 
 ```text
 match_players
 cricket_match_players
 ```
+
+Neither `record-ball` nor `cricket-match-action` may manually insert these
+rows. Two materializers can race, violate uniqueness, or disagree about
+whether tournament registration or the mutable team roster is authoritative.
 
 The future fixture must never reach this state:
 
@@ -1312,10 +1318,10 @@ super-over reopening
 If the old winner was already propagated downstream, changing the result may require:
 
 ```text
-clear downstream team slot
-delete stale participant snapshot
+clear downstream match_teams slot
+let the canonical trigger remove the stale automatic snapshot
 resolve the new winning team
-materialize the new participant snapshot
+let the canonical trigger materialize the new participant snapshot
 ```
 
 Do not update only the source result and leave future fixtures stale.
@@ -1333,8 +1339,8 @@ flowchart TD
     C --> D[team_a/team_b slots exist]
     D --> E[Assign teams to match_teams]
     E --> F[Create cricket_matches]
-    F --> G[Snapshot match_players]
-    G --> H[Create cricket_match_players]
+    F --> G[Deferred canonical participant trigger]
+    G --> H[Snapshot match_players + cricket_match_players]
     H --> I[Mark request/application accepted]
 ```
 
@@ -1347,6 +1353,11 @@ match_teams
 ```
 
 There is one physical source of truth: `match_teams`.
+
+The acceptance RPCs must not manually insert participant rows. Creating the
+Cricket extension activates the same deferred synchronization trigger used by
+all other match origins, so direct challenges, pool applications, tournament
+fixtures, and winner advancement share one participant invariant.
 
 ---
 

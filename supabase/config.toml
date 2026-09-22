@@ -418,6 +418,15 @@ verify_jwt = false
 enabled = true
 verify_jwt = false
 
+# Authenticated command boundary for match request acceptance.
+# Handles accept_challenge and accept_pool_application in one Postgres
+# transaction. JWT verification is handled in-function via authenticateRequest;
+# the Supabase gateway verify_jwt is therefore off so the function can return
+# typed 401/403 responses instead of a gateway 401.
+[functions.match-request-action]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 55327

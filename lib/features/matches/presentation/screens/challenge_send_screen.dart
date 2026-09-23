@@ -12,7 +12,6 @@ import '../providers/matches_providers.dart';
 import '../widgets/challenge/step_format.dart';
 import '../widgets/challenge/step_review.dart';
 import '../widgets/challenge/step_when_where.dart';
-import '../widgets/wizard/step_open_or_direct.dart';
 import '../widgets/wizard/wizard_kit.dart';
 
 /// Sender side of the challenge handshake. 6 steps on one screen, matching
@@ -335,24 +334,22 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
             child: Text('Pick a team to issue the challenge as.'),
           );
         }
-        return StepOpenOrDirect(
-          isOpen: _isOpenChallenge,
-          onSelect:
-              (bool open) => setState(() {
-                _isOpenChallenge = open;
-                if (open) _opponent = null;
-              }),
-          // The design draws only the fork, because its Open card is selected.
-          // Direct has to name a team somewhere and the flow is six steps
-          // either way, so the picker unfolds under the card that asked for it
-          // rather than becoming a seventh step.
-          directContent: _OpponentPicker(
-            query: _opponentSearch,
-            selected: _opponent,
-            fromTeamId: TeamId(fromId),
-            onSearch: (q) => setState(() => _opponentSearch = q),
-            onPick: (t) => setState(() => _opponent = t),
-          ),
+        return ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          children: [
+            const WizardHeading(
+              'Who are you challenging?',
+              sub: 'Search for the team you want to play against.',
+            ),
+            const SizedBox(height: 18),
+            _OpponentPicker(
+              query: _opponentSearch,
+              selected: _opponent,
+              fromTeamId: TeamId(fromId),
+              onSearch: (q) => setState(() => _opponentSearch = q),
+              onPick: (t) => setState(() => _opponent = t),
+            ),
+          ],
         );
       case _Step.format:
         return StepFormat(
@@ -803,8 +800,8 @@ class _OpponentPicker extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final all =
-        ref.watch(discoverableTeamsProvider(query)).value ?? const <Team>[];
+    final allAsync = ref.watch(discoverableTeamsProvider(query));
+    final all = allAsync.value ?? const <Team>[];
     final q = query.trim().toLowerCase();
     final visible =
         all
@@ -843,7 +840,21 @@ class _OpponentPicker extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 12),
-        if (visible.isEmpty)
+        if (allAsync.isLoading && all.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: CkColors.ink,
+                ),
+              ),
+            ),
+          )
+        else if (visible.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Text(

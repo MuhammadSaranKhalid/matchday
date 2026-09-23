@@ -56,12 +56,15 @@ void main() {
     expect(find.text('Match format'), findsOneWidget);
   });
 
-  testWidgets('the generic entry still asks the question', (tester) async {
+  testWidgets('the generic entry goes directly to opponent search', (tester) async {
     await pump(tester, openOnly: false);
 
-    expect(find.text('How should teams find this match?'), findsOneWidget);
-    expect(find.text('Open challenge'), findsOneWidget);
-    expect(find.text('Direct challenge'), findsOneWidget);
+    expect(find.text('How should teams find this match?'), findsNothing);
+    expect(find.text('Open challenge'), findsNothing);
+    expect(find.text('Direct challenge'), findsNothing);
+    expect(find.text('Who are you challenging?'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('Search teams'), findsOneWidget);
     expect(find.text('STEP 1 / 4'), findsOneWidget);
   });
 

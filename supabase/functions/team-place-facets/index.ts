@@ -60,27 +60,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  try {
-    const rows = await sql`
-      select
-        location->>'city'                            as city,
-        avg((location->>'lat')::float8)              as lat,
-        avg((location->>'lng')::float8)              as lng,
-        count(*)::int                                as team_count
-      from public.teams
-      where status = 'active'
-        and privacy = 'public'
-        and location ? 'city'
-        and (${countryCode}::text is null or location->>'country_code' = ${countryCode})
-      group by location->>'city'
-      order by team_count desc
-      limit ${HARD_LIMIT}`;
-    return json(200, { facets: rows });
-  } catch (e) {
-    console.error("team-place-facets failed:", e);
-    return json(500, {
-      ok: false,
-      error: { code: "query_failed", message: String(e) },
-    });
-  }
+  // In V1, teams do not store location coordinates or cities.
+  // Location facets are deferred to V2.
+  return json(200, { facets: [] });
 });

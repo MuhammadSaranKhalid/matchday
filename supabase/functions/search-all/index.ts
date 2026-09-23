@@ -199,7 +199,7 @@ function searchTeams(sql: any, q: string, limit: number) {
       t.logo_url,
       t.logo_monogram,
       t.team_colors,
-      t.location,
+      null::jsonb as location,
       t.is_verified,
       t.founded_year,
       t.team_type::text as team_type,

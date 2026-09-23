@@ -138,7 +138,7 @@ abstract class MatchesRepository {
   });
 
   /// Receiver accepts a pending request, OR sender accepts a counter.
-  /// Returns the new match id materialised by `accept_match_request`.
+  /// Returns the new match id materialised by match request acceptance.
   Future<Either<Failure, MatchId>> acceptMatchChallenge({
     required MatchRequestId requestId,
     DateTime? scheduledStartTime,

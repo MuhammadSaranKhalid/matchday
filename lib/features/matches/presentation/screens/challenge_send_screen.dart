@@ -96,8 +96,8 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   /// and make every late change a re-post.
   ///
   /// The server already expects this — `send_match_request` defaults
-  /// `from_team_xi` to empty, and `accept_match_request` then materialises the
-  /// full active roster (migration 20260529142241), which the lineup screen
+  /// `from_team_xi` to empty, and acceptance then materialises the
+  /// full active roster, which the lineup screen
   /// narrows on the day. Tournament fixtures are a different matter: their
   /// squads are locked to the registration list, and they are not created
   /// through this wizard.

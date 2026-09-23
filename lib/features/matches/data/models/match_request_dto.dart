@@ -49,6 +49,7 @@ abstract class MatchRequestDto with _$MatchRequestDto {
     MatchFormat? format(Map<String, dynamic>? m) {
       if (m == null) return null;
       return MatchFormat(
+        formatCode: m['format_code'] as String? ?? m['format_preset'] as String?,
         oversPerInnings:
             (m['overs_per_innings'] as num?)?.toInt() ??
             (m['overs'] as num?)?.toInt() ??
@@ -101,6 +102,7 @@ abstract class MatchRequestDto with _$MatchRequestDto {
 
   /// Inverse: serialise a [MatchFormat] into the jsonb shape the RPCs expect.
   static Map<String, dynamic> formatToJson(MatchFormat f) => {
+    if (f.formatCode != null) 'format_code': f.formatCode,
     'overs_per_innings': f.oversPerInnings,
     'players_per_team': f.playersPerTeam,
     'ball_type': f.ballType.wire,

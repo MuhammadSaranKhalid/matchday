@@ -281,12 +281,15 @@ class MatchFormat extends Equatable {
     required this.playersPerTeam,
     required this.ballType,
     required this.maxOversPerBowler,
+    this.formatCode,
     this.ballsPerOver = 6,
     this.inningsPerSide = 1,
     this.wicketsToAllOut,
     this.endChangeBalls,
   });
 
+  /// Canonical preset identifier, e.g. 't20', 't10', 'quick_6', 'custom'.
+  final String? formatCode;
   final int oversPerInnings; // 0 = unlimited (Test / first-class)
   final int playersPerTeam;
   final MatchBallType ballType;
@@ -305,8 +308,33 @@ class MatchFormat extends Equatable {
   /// Hundred uses 10.
   final int? endChangeBalls;
 
+  MatchFormat copyWith({
+    String? formatCode,
+    int? oversPerInnings,
+    int? playersPerTeam,
+    MatchBallType? ballType,
+    int? maxOversPerBowler,
+    int? ballsPerOver,
+    int? inningsPerSide,
+    int? wicketsToAllOut,
+    int? endChangeBalls,
+  }) {
+    return MatchFormat(
+      formatCode: formatCode ?? this.formatCode,
+      oversPerInnings: oversPerInnings ?? this.oversPerInnings,
+      playersPerTeam: playersPerTeam ?? this.playersPerTeam,
+      ballType: ballType ?? this.ballType,
+      maxOversPerBowler: maxOversPerBowler ?? this.maxOversPerBowler,
+      ballsPerOver: ballsPerOver ?? this.ballsPerOver,
+      inningsPerSide: inningsPerSide ?? this.inningsPerSide,
+      wicketsToAllOut: wicketsToAllOut ?? this.wicketsToAllOut,
+      endChangeBalls: endChangeBalls ?? this.endChangeBalls,
+    );
+  }
+
   @override
   List<Object?> get props => [
+    formatCode,
     oversPerInnings,
     playersPerTeam,
     ballType,

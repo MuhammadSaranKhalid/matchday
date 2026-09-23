@@ -7,6 +7,7 @@ import '../../../teams/domain/entities/team.dart';
 import '../../../teams/domain/entities/team_relationship.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../../teams/presentation/providers/team_membership_providers.dart';
+import '../../domain/entities/format_preset.dart';
 import '../../domain/entities/match.dart';
 import '../providers/matches_providers.dart';
 import '../widgets/challenge/step_format.dart';
@@ -61,17 +62,87 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
   bool _isOpenChallenge = false;
   String _opponentSearch = '';
 
-  // Format — the three questions artboard 07 asks, plus the engine defaults
-  // that ride along unchanged.
-  int _overs = 20;
-  int _playersPerSide = 11;
-  MatchBallType _ball = MatchBallType.tape;
-  // Engine knobs the design does not expose. They ride along at their
-  // defaults so the format the challenge ships is still complete.
-  final int _maxOversPerBowler = 4;
-  final int _ballsPerOver = 6;
-  final int _inningsPerSide = 1;
-  final int? _endChangeBalls = null;
+  // Format — preset-first selection, playing conditions, and engine rules.
+  FormatPreset? _selectedPreset;
+  MatchFormat _format = const MatchFormat(
+    formatCode: 't20',
+    oversPerInnings: 20,
+    playersPerTeam: 11,
+    ballType: MatchBallType.tape,
+    maxOversPerBowler: 4,
+    ballsPerOver: 6,
+    inningsPerSide: 1,
+  );
+  bool _formatCustomized = false;
+
+  void _selectPreset(FormatPreset preset) {
+    setState(() {
+      _selectedPreset = preset;
+      _formatCustomized = false;
+      _format = preset.format.copyWith(
+        formatCode: preset.id,
+        ballType: _format.ballType,
+        playersPerTeam: _format.playersPerTeam,
+        maxOversPerBowler: preset.format.maxOversPerBowler > 0
+            ? preset.format.maxOversPerBowler
+            : FormatPreset.defaultBowlerLimit(preset.format.oversPerInnings),
+      );
+    });
+  }
+
+  void _selectCustom() {
+    setState(() {
+      _selectedPreset = null;
+      _formatCustomized = true;
+      _format = _format.copyWith(
+        formatCode: 'custom',
+      );
+    });
+  }
+
+  void _onBall(MatchBallType ball) {
+    setState(() {
+      _format = _format.copyWith(ballType: ball);
+    });
+  }
+
+  void _onPlayers(int count) {
+    setState(() {
+      _format = _format.copyWith(playersPerTeam: count);
+    });
+  }
+
+  void _onCustomizeFormat({
+    int? overs,
+    int? maxBowler,
+    int? ballsPerOver,
+    int? wickets,
+  }) {
+    setState(() {
+      final newOvers = overs ?? _format.oversPerInnings;
+      final newBowler = maxBowler ??
+          (overs != null
+              ? FormatPreset.defaultBowlerLimit(newOvers)
+              : _format.maxOversPerBowler);
+
+      final isDifferent = _selectedPreset == null ||
+          newOvers != _selectedPreset!.format.oversPerInnings ||
+          newBowler != _selectedPreset!.format.maxOversPerBowler;
+
+      if (isDifferent) {
+        _selectedPreset = null;
+        _formatCustomized = true;
+      }
+
+      _format = _format.copyWith(
+        formatCode: isDifferent ? 'custom' : _selectedPreset?.id,
+        oversPerInnings: newOvers,
+        maxOversPerBowler: newBowler,
+        ballsPerOver: ballsPerOver ?? _format.ballsPerOver,
+        wicketsToAllOut: wickets ?? _format.wicketsToAllOut,
+      );
+    });
+  }
 
   // When & where — day + time as separate state, combined for send.
   DateTime? _pickedDay;
@@ -180,7 +251,9 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
         // Open needs nothing further; Direct has to name its opponent.
         return _isOpenChallenge || _opponent != null;
       case _Step.format:
-        return _overs > 0 && _playersPerSide >= 5 && _playersPerSide <= 15;
+        return _format.oversPerInnings > 0 &&
+            _format.playersPerTeam >= 5 &&
+            _format.playersPerTeam <= 15;
       case _Step.whenWhere:
         // The venue is explicitly optional (artboard 08), and Flexible stands
         // in for a time nobody has agreed yet — so a day is all this step
@@ -215,7 +288,7 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
               busy: _busy,
               hint:
                   _step == _Step.format
-                      ? 'Both captains can change format up to 12h before the toss.'
+                      ? 'You can customize the selected format before sending the challenge.'
                       : null,
               onPressed: _advance,
             ),
@@ -277,20 +350,12 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           toTeamId: _isOpenChallenge ? null : opp?.id,
           proposedStartTime: start,
           proposedVenue: _venueCtrl.text.trim(),
-          proposedFormat: MatchFormat(
-            oversPerInnings: _overs,
-            playersPerTeam: _playersPerSide,
-            ballType: _ball,
-            maxOversPerBowler: _maxOversPerBowler,
-            ballsPerOver: _ballsPerOver,
-            inningsPerSide: _inningsPerSide,
-            endChangeBalls: _endChangeBalls,
-          ),
+          proposedFormat: _format,
           message:
               _messageCtrl.text.trim().isEmpty
                   ? null
                   : _messageCtrl.text.trim(),
-          playersPerSide: _playersPerSide,
+          playersPerSide: _format.playersPerTeam,
           // Empty by design: the accept RPC fills the match with the full
           // active roster, and the lineup screen picks the XI at the ground.
           fromTeamXi: const [],
@@ -352,13 +417,18 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           ],
         );
       case _Step.format:
+        final presets = ref.watch(formatPresetsProvider).value ?? const [];
         return StepFormat(
-          overs: _overs,
-          ball: _ball,
-          playersPerSide: _playersPerSide,
-          onOvers: (v) => setState(() => _overs = v),
-          onBall: (b) => setState(() => _ball = b),
-          onPlayers: (n) => setState(() => _playersPerSide = n),
+          presets: presets,
+          selectedPreset: _selectedPreset ??
+              presets.where((p) => p.id == (_format.formatCode ?? 't20')).firstOrNull,
+          format: _format,
+          isCustom: _formatCustomized,
+          onSelectPreset: _selectPreset,
+          onSelectCustom: _selectCustom,
+          onBall: _onBall,
+          onPlayers: _onPlayers,
+          onCustomizeFormat: _onCustomizeFormat,
         );
       case _Step.whenWhere:
         return StepWhenWhere(
@@ -376,6 +446,16 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           onFlexible: (v) => setState(() => _flexible = v),
         );
       case _Step.review:
+        final title = formatTitle(
+          preset: _selectedPreset,
+          isCustom: _formatCustomized,
+          overs: _format.oversPerInnings,
+        );
+        final spec = formatSpecLine(
+          overs: _format.oversPerInnings,
+          ball: _format.ballType,
+          playersPerSide: _format.playersPerTeam,
+        );
         return _ReviewStepHost(
           fromTeam: _fromTeam,
           fromTeamId: _resolvedFromTeamId,
@@ -389,11 +469,7 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
                       ? 'Not set'
                       : clockLabel(_minutesFromHhmm(_pickedTime)!)),
           venue: _venueCtrl.text.trim(),
-          formatLine: formatSpecLine(
-            overs: _overs,
-            ball: _ball,
-            playersPerSide: _playersPerSide,
-          ),
+          formatLine: '$title · $spec',
           noteController: _messageCtrl,
           onEdit: (s) => setState(() => _step = s),
         );

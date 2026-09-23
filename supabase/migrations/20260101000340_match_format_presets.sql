@@ -125,10 +125,19 @@ insert into public.match_format_presets
   (id, label, sort_order, config, is_active, is_system, default_scoring_mode)
 values
   (
-    't20',
-    'T20',
-    1,
-    '{"players_per_team": 11, "overs_per_innings": 20, "max_overs_per_bowler": 4}'::jsonb,
+    'quick_6',
+    '6 Over',
+    10,
+    '{"players_per_team": 8, "overs_per_innings": 6, "max_overs_per_bowler": 2, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    true,
+    true,
+    'live_ball_by_ball'
+  ),
+  (
+    'quick_8',
+    '8 Over',
+    20,
+    '{"players_per_team": 8, "overs_per_innings": 8, "max_overs_per_bowler": 2, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
     true,
     true,
     'live_ball_by_ball'
@@ -136,63 +145,109 @@ values
   (
     't10',
     'T10',
-    2,
-    '{"players_per_team": 11, "overs_per_innings": 10, "max_overs_per_bowler": 2}'::jsonb,
+    30,
+    '{"players_per_team": 11, "overs_per_innings": 10, "max_overs_per_bowler": 2, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
     true,
     true,
     'live_ball_by_ball'
   ),
   (
+    't20',
+    'T20',
+    40,
+    '{"players_per_team": 11, "overs_per_innings": 20, "max_overs_per_bowler": 4, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    true,
+    true,
+    'live_ball_by_ball'
+  ),
+  (
+    'over_30',
+    '30 Over',
+    50,
+    '{"players_per_team": 11, "overs_per_innings": 30, "max_overs_per_bowler": 6, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    true,
+    true,
+    'live_ball_by_ball'
+  ),
+  (
+    'over_40',
+    '40 Over',
+    60,
+    '{"players_per_team": 11, "overs_per_innings": 40, "max_overs_per_bowler": 8, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    true,
+    true,
+    'live_ball_by_ball'
+  ),
+  (
+    'over_45',
+    '45 Over',
+    70,
+    '{"players_per_team": 11, "overs_per_innings": 45, "max_overs_per_bowler": 9, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    true,
+    true,
+    'live_ball_by_ball'
+  ),
+  (
+    'over_50',
+    '50 Over',
+    80,
+    '{"players_per_team": 11, "overs_per_innings": 50, "max_overs_per_bowler": 10, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    true,
+    true,
+    'live_ball_by_ball'
+  ),
+  -- Deactivated variants for V1 (equipment/unsupported engine rules)
+  (
     'odi',
     'ODI',
-    3,
+    90,
     '{"players_per_team": 11, "overs_per_innings": 50, "max_overs_per_bowler": 10}'::jsonb,
-    true,
+    false,
     true,
     'live_ball_by_ball'
   ),
   (
     'list_a',
     'List A',
-    4,
+    91,
     '{"players_per_team": 11, "overs_per_innings": 50, "max_overs_per_bowler": 10}'::jsonb,
-    true,
+    false,
     true,
     'live_ball_by_ball'
   ),
   (
     'hundred',
     'The Hundred',
-    5,
+    92,
     '{"balls_per_over": 5, "end_change_balls": 10, "players_per_team": 11, "overs_per_innings": 20, "max_overs_per_bowler": 4}'::jsonb,
-    true,
+    false,
     true,
     'live_ball_by_ball'
   ),
   (
     'super8',
     '8-a-side',
-    6,
+    93,
     '{"players_per_team": 8, "overs_per_innings": 20, "max_overs_per_bowler": 4}'::jsonb,
-    true,
+    false,
     true,
     'live_ball_by_ball'
   ),
   (
     'tape',
     'Tape-ball',
-    7,
+    94,
     '{"ball_type": "tape", "players_per_team": 11, "overs_per_innings": 20, "max_overs_per_bowler": 4}'::jsonb,
-    true,
+    false,
     true,
     'live_ball_by_ball'
   ),
   (
     'box',
     'Box cricket',
-    8,
+    95,
     '{"players_per_team": 8, "overs_per_innings": 6, "max_overs_per_bowler": 2}'::jsonb,
-    true,
+    false,
     true,
     'post_match_scorecard'
   )

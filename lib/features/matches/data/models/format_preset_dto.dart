@@ -35,6 +35,7 @@ abstract class FormatPresetDto with _$FormatPresetDto {
       defaultScoringMode ?? config['default_scoring_mode']?.toString(),
     ),
     format: MatchFormat(
+      formatCode: id,
       oversPerInnings: (config['overs_per_innings'] as num?)?.toInt() ?? 0,
       playersPerTeam: (config['players_per_team'] as num?)?.toInt() ?? 11,
       ballType: MatchBallType.fromWire(config['ball_type'] as String?),

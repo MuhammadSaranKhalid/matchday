@@ -91,7 +91,7 @@ final class MatchStartLineupProvider
   }
 }
 
-String _$matchStartLineupHash() => r'ed61ecc470b240e09ef83c0f202f0bc1a05da88a';
+String _$matchStartLineupHash() => r'51963cf2b9ac51cf8a29d83d8835f48b07ab7ccb';
 
 /// The batting side's XI as a tappable candidate list, in batting order as
 /// materialised in `match_players`.
@@ -131,4 +131,96 @@ final class MatchStartLineupFamily extends $Family
 
   @override
   String toString() => r'matchStartLineupProvider';
+}
+
+/// The fielding side's XI as a candidate list for the opening bowler slot.
+
+@ProviderFor(matchStartBowlingLineup)
+final matchStartBowlingLineupProvider = MatchStartBowlingLineupFamily._();
+
+/// The fielding side's XI as a candidate list for the opening bowler slot.
+
+final class MatchStartBowlingLineupProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<MatchStartLineupCandidate>>,
+          List<MatchStartLineupCandidate>,
+          FutureOr<List<MatchStartLineupCandidate>>
+        >
+    with
+        $FutureModifier<List<MatchStartLineupCandidate>>,
+        $FutureProvider<List<MatchStartLineupCandidate>> {
+  /// The fielding side's XI as a candidate list for the opening bowler slot.
+  MatchStartBowlingLineupProvider._({
+    required MatchStartBowlingLineupFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'matchStartBowlingLineupProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$matchStartBowlingLineupHash();
+
+  @override
+  String toString() {
+    return r'matchStartBowlingLineupProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<MatchStartLineupCandidate>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<MatchStartLineupCandidate>> create(Ref ref) {
+    final argument = this.argument as String;
+    return matchStartBowlingLineup(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MatchStartBowlingLineupProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$matchStartBowlingLineupHash() =>
+    r'18b8c6df6097b8b9ebd5f9a3c0557c124292f68e';
+
+/// The fielding side's XI as a candidate list for the opening bowler slot.
+
+final class MatchStartBowlingLineupFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          FutureOr<List<MatchStartLineupCandidate>>,
+          String
+        > {
+  MatchStartBowlingLineupFamily._()
+    : super(
+        retry: null,
+        name: r'matchStartBowlingLineupProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The fielding side's XI as a candidate list for the opening bowler slot.
+
+  MatchStartBowlingLineupProvider call(String matchId) =>
+      MatchStartBowlingLineupProvider._(argument: matchId, from: this);
+
+  @override
+  String toString() => r'matchStartBowlingLineupProvider';
 }

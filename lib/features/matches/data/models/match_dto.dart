@@ -24,6 +24,7 @@ abstract class MatchDto with _$MatchDto {
     @JsonKey(name: 'team_b_captain') String? teamBCaptain,
     @JsonKey(name: 'setup_team_id') String? setupTeamId,
     required Map<String, dynamic> format,
+    @JsonKey(name: 'format_code') String? formatCode,
     String? venue,
     @JsonKey(name: 'scheduled_start_time') String? scheduledStartTime,
     @JsonKey(name: 'actual_start_time') String? actualStartTime,
@@ -62,7 +63,9 @@ abstract class MatchDto with _$MatchDto {
     teamACaptain: teamACaptain,
     teamBCaptain: teamBCaptain,
     setupTeamId: setupTeamId == null ? null : TeamId(setupTeamId!),
+    formatCode: formatCode ?? format['format_code'] as String?,
     format: MatchFormat(
+      formatCode: formatCode ?? format['format_code'] as String?,
       oversPerInnings: (format['overs_per_innings'] as num?)?.toInt() ?? 0,
       playersPerTeam: (format['players_per_team'] as num?)?.toInt() ?? 11,
       ballType: MatchBallType.fromWire(format['ball_type'] as String?),

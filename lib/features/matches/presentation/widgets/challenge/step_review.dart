@@ -16,6 +16,8 @@ class StepReview extends StatelessWidget {
   const StepReview({
     super.key,
     required this.team,
+    this.opponentName,
+    this.onEditOpponent,
     required this.formatLine,
     required this.whenLine,
     required this.whereLine,
@@ -28,6 +30,8 @@ class StepReview extends StatelessWidget {
   });
 
   final Team? team;
+  final String? opponentName;
+  final VoidCallback? onEditOpponent;
   final String formatLine;
   final String whenLine;
   final String whereLine;
@@ -96,11 +100,18 @@ class StepReview extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: Column(
             children: [
+              if (opponentName != null)
+                _Row(
+                  label: 'Opponent',
+                  value: opponentName!,
+                  onEdit: onEditOpponent ?? () {},
+                  first: true,
+                ),
               _Row(
                 label: 'Format',
                 value: formatLine,
                 onEdit: onEditFormat,
-                first: true,
+                first: opponentName == null,
               ),
               _Row(label: 'When', value: whenLine, onEdit: onEditWhen),
               _Row(label: 'Where', value: whereLine, onEdit: onEditWhere),
@@ -110,7 +121,9 @@ class StepReview extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        const WizardFieldLabel('Note to applicants'),
+        WizardFieldLabel(
+          opponentName != null ? 'Note to opponent' : 'Note to applicants',
+        ),
         const SizedBox(height: 9),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
@@ -129,7 +142,10 @@ class StepReview extends StatelessWidget {
               color: CkColors.ink2,
             ).copyWith(fontStyle: FontStyle.italic),
             decoration: bareInput(
-              hintText: 'Anything applicants should know? (optional)',
+              hintText:
+                  opponentName != null
+                      ? 'Anything they should know? (optional)'
+                      : 'Anything applicants should know? (optional)',
               hintStyle: CkType.body(
                 fontSize: 13,
                 height: 1.5,
@@ -155,13 +171,20 @@ class StepReview extends StatelessWidget {
                     height: 1.5,
                     color: CkColors.muted,
                   ),
-                  children: [
-                    const TextSpan(text: 'Live on the board for '),
-                    TextSpan(text: '48 hours', style: _strong),
-                    const TextSpan(text: '. Share code works for '),
-                    TextSpan(text: '24 hours', style: _strong),
-                    const TextSpan(text: '.'),
-                  ],
+                  children:
+                      opponentName != null
+                          ? [
+                            const TextSpan(text: 'Opponent will be notified. Code expires in '),
+                            TextSpan(text: '24 hours', style: _strong),
+                            const TextSpan(text: '.'),
+                          ]
+                          : [
+                            const TextSpan(text: 'Live on the board for '),
+                            TextSpan(text: '48 hours', style: _strong),
+                            const TextSpan(text: '. Share code works for '),
+                            TextSpan(text: '24 hours', style: _strong),
+                            const TextSpan(text: '.'),
+                          ],
                 ),
               ),
             ),

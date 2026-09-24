@@ -97,9 +97,9 @@ void main() {
         ProviderScope(
           overrides: [
             teamProvider('team-host')
-                .overrideWith((ref) => Stream.value(team('team-host', 'Lahore Lions'))),
+                .overrideWith((ref) => team('team-host', 'Lahore Lions')),
             teamProvider('team-app').overrideWith(
-              (ref) => Stream.value(team('team-app', 'Gulberg Giants', verified: true)),
+              (ref) => team('team-app', 'Gulberg Giants', verified: true),
             ),
           ],
           child: MaterialApp(

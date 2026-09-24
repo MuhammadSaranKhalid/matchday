@@ -72,30 +72,20 @@ create table public.match_challenges (
   -- Proposed terms (sender side).
   proposed_start_time        timestamptz,
   proposed_venue             text,
+  proposed_format_code       text not null default 't20',
   proposed_format            jsonb not null default '{}'::jsonb,
   message                    text check (message is null or length(message) <= 500),
   -- Players-per-side as a typed column so the roster gate compares an integer
   -- rather than parsing jsonb. GENERATED from proposed_format rather than
-  -- stored separately: it used to be an independent column that could disagree
-  -- with the blob it was supposed to mirror (20260604120100 found them
-  -- diverging and made it a projection; folded inline 2026-09-06).
+  -- stored separately.
   players_per_side           smallint generated always as (
     (proposed_format ->> 'players_per_team')::smallint
   ) stored,
-  -- Sender's pencilled XI (user_ids). Length should equal players_per_side
-  -- by match-day; smaller is allowed at send-time.
-  from_team_xi               uuid[] not null default '{}'::uuid[],
-  from_team_keeper_id        uuid
-    references public.profiles (user_id)
-    on delete set null,
   -- Counter-proposal columns (receiver-side, when status flips to countered).
   countered_start_time       timestamptz,
   countered_venue            text,
+  countered_format_code      text,
   countered_format           jsonb,
-  countered_players_per_side integer check (
-    countered_players_per_side is null
-    or countered_players_per_side between 5 and 15
-  ),
   status                     public.match_request_status not null default 'pending',
   -- Decision metadata (set on accept / decline / cancel / counter / expire).
   decided_by                 uuid
@@ -406,10 +396,8 @@ create or replace function public.send_match_request(
   p_proposed_start_time timestamptz default null,
   p_proposed_venue text default null,
   p_proposed_format jsonb default '{}'::jsonb,
-  p_message text default null,
-  p_players_per_side integer default 11,
-  p_from_team_xi uuid[] default '{}'::uuid[],
-  p_from_team_keeper_id uuid default null
+  p_proposed_format_code text default 't20',
+  p_message text default null
 )
 returns uuid
 language plpgsql
@@ -420,7 +408,7 @@ declare
   v_request_id uuid;
   v_code text;
   v_attempts integer := 0;
-  v_pps integer := coalesce(p_players_per_side, 11);
+  v_format_code text := coalesce(p_proposed_format_code, (p_proposed_format->>'format_code'), 't20');
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated' using errcode = '42501';
@@ -432,20 +420,6 @@ begin
     raise exception 'Only managers of the requesting team can send a match request'
       using errcode = '42501';
   end if;
-  if v_pps < 5 or v_pps > 15 then
-    raise exception 'players_per_side must be between 5 and 15' using errcode = '22023';
-  end if;
-  if
-    p_from_team_xi is not null
-    and array_length(p_from_team_xi, 1) is not null
-    and array_length(p_from_team_xi, 1) > v_pps
-  then
-    raise exception 'from_team_xi has more players than players_per_side'
-      using errcode = '22023';
-  end if;
-  -- Every pencilled player must actually be on the sending team.
-  perform
-    public._validate_team_xi(p_from_team_id, p_from_team_xi);
   -- Block duplicates only when targeted — open requests can stack (manager
   -- might want multiple parallel codes if they mistype or change ground).
   if
@@ -474,11 +448,9 @@ begin
           requested_by,
           proposed_start_time,
           proposed_venue,
+          proposed_format_code,
           proposed_format,
           message,
-          players_per_side,
-          from_team_xi,
-          from_team_keeper_id,
           share_code,
           code_expires_at,
           proposal_expires_at
@@ -490,11 +462,9 @@ begin
           auth.uid(),
           p_proposed_start_time,
           p_proposed_venue,
+          v_format_code,
           coalesce(p_proposed_format, '{}'::jsonb),
           p_message,
-          v_pps,
-          coalesce(p_from_team_xi, '{}'::uuid[]),
-          p_from_team_keeper_id,
           v_code,
           now() + interval '24 hours', -- share code lifetime
           now() + interval '48 hours' -- proposal lifetime
@@ -521,9 +491,7 @@ on function public.send_match_request(
   text,
   jsonb,
   text,
-  integer,
-  uuid[],
-  uuid
+  text
 )
 from public;
 
@@ -535,9 +503,7 @@ on function public.send_match_request(
   text,
   jsonb,
   text,
-  integer,
-  uuid[],
-  uuid
+  text
 )
 to authenticated;
 
@@ -821,7 +787,7 @@ create or replace function public.counter_match_request(
   p_countered_start_time timestamptz default null,
   p_countered_venue text default null,
   p_countered_format jsonb default null,
-  p_countered_players_per_side integer default null,
+  p_countered_format_code text default null,
   p_decision_note text default null
 )
 returns void
@@ -832,6 +798,7 @@ as $$
 declare
   v_req public.match_challenges%rowtype;
   v_updated integer;
+  v_format_code text;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated'
@@ -862,14 +829,17 @@ begin
     raise exception 'Only managers of the receiving team can counter'
       using errcode = '42501';
   end if;
-  if p_countered_players_per_side is not null and (p_countered_players_per_side < 5 or p_countered_players_per_side > 15) then
-    raise exception 'players_per_side must be between 5 and 15'
-      using errcode = '22023';
-  end if;
-  if p_countered_start_time is null and p_countered_venue is null and p_countered_format is null and p_countered_players_per_side is null then
+  if p_countered_start_time is null and p_countered_venue is null and p_countered_format is null and p_countered_format_code is null then
     raise exception 'A counter must change at least one field'
       using errcode = '22023';
   end if;
+
+  v_format_code := coalesce(
+    p_countered_format_code,
+    (p_countered_format->>'format_code'),
+    case when p_countered_format is not null then v_req.proposed_format_code else null end
+  );
+
   -- Race guard: only transition if we still observe 'pending'. A concurrent
   -- accept_match_request that's already moved the row to 'accepted' will
   -- cause this UPDATE to match zero rows and we abort cleanly.
@@ -882,8 +852,8 @@ begin
     decision_note = p_decision_note,
     countered_start_time = p_countered_start_time,
     countered_venue = p_countered_venue,
+    countered_format_code = v_format_code,
     countered_format = p_countered_format,
-    countered_players_per_side = p_countered_players_per_side,
     -- Counter timer is restarted from THIS moment, not from the
     -- original send. The countered party gets a fresh 24h to decide.
     counter_expires_at = now() + interval '24 hours'
@@ -899,11 +869,11 @@ end;
 $$;
 
 revoke all
-on function public.counter_match_request(uuid, timestamptz, text, jsonb, integer, text)
+on function public.counter_match_request(uuid, timestamptz, text, jsonb, text, text)
 from public;
 
 grant execute
-on function public.counter_match_request(uuid, timestamptz, text, jsonb, integer, text)
+on function public.counter_match_request(uuid, timestamptz, text, jsonb, text, text)
 to authenticated;
 
 -- decline_match_request — structured reason + free-text note. Handles both

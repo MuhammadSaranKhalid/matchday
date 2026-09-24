@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$FormatPresetDto {
 
- String get id; String get label; Map<String, dynamic> get config;@JsonKey(name: 'default_scoring_mode') String? get defaultScoringMode;
+ String get id; String get label; Map<String, dynamic> get config;
 /// Create a copy of FormatPresetDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $FormatPresetDtoCopyWith<FormatPresetDto> get copyWith => _$FormatPresetDtoCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is FormatPresetDto&&(identical(other.id, id) || other.id == id)&&(identical(other.label, label) || other.label == label)&&const DeepCollectionEquality().equals(other.config, config)&&(identical(other.defaultScoringMode, defaultScoringMode) || other.defaultScoringMode == defaultScoringMode));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FormatPresetDto&&(identical(other.id, id) || other.id == id)&&(identical(other.label, label) || other.label == label)&&const DeepCollectionEquality().equals(other.config, config));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,label,const DeepCollectionEquality().hash(config),defaultScoringMode);
+int get hashCode => Object.hash(runtimeType,id,label,const DeepCollectionEquality().hash(config));
 
 @override
 String toString() {
-  return 'FormatPresetDto(id: $id, label: $label, config: $config, defaultScoringMode: $defaultScoringMode)';
+  return 'FormatPresetDto(id: $id, label: $label, config: $config)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $FormatPresetDtoCopyWith<$Res>  {
   factory $FormatPresetDtoCopyWith(FormatPresetDto value, $Res Function(FormatPresetDto) _then) = _$FormatPresetDtoCopyWithImpl;
 @useResult
 $Res call({
- String id, String label, Map<String, dynamic> config,@JsonKey(name: 'default_scoring_mode') String? defaultScoringMode
+ String id, String label, Map<String, dynamic> config
 });
 
 
@@ -65,13 +65,12 @@ class _$FormatPresetDtoCopyWithImpl<$Res>
 
 /// Create a copy of FormatPresetDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? label = null,Object? config = null,Object? defaultScoringMode = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? label = null,Object? config = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
 as String,config: null == config ? _self.config : config // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>,defaultScoringMode: freezed == defaultScoringMode ? _self.defaultScoringMode : defaultScoringMode // ignore: cast_nullable_to_non_nullable
-as String?,
+as Map<String, dynamic>,
   ));
 }
 
@@ -156,10 +155,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String label,  Map<String, dynamic> config, @JsonKey(name: 'default_scoring_mode')  String? defaultScoringMode)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String label,  Map<String, dynamic> config)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _FormatPresetDto() when $default != null:
-return $default(_that.id,_that.label,_that.config,_that.defaultScoringMode);case _:
+return $default(_that.id,_that.label,_that.config);case _:
   return orElse();
 
 }
@@ -177,10 +176,10 @@ return $default(_that.id,_that.label,_that.config,_that.defaultScoringMode);case
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String label,  Map<String, dynamic> config, @JsonKey(name: 'default_scoring_mode')  String? defaultScoringMode)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String label,  Map<String, dynamic> config)  $default,) {final _that = this;
 switch (_that) {
 case _FormatPresetDto():
-return $default(_that.id,_that.label,_that.config,_that.defaultScoringMode);case _:
+return $default(_that.id,_that.label,_that.config);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -197,10 +196,10 @@ return $default(_that.id,_that.label,_that.config,_that.defaultScoringMode);case
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String label,  Map<String, dynamic> config, @JsonKey(name: 'default_scoring_mode')  String? defaultScoringMode)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String label,  Map<String, dynamic> config)?  $default,) {final _that = this;
 switch (_that) {
 case _FormatPresetDto() when $default != null:
-return $default(_that.id,_that.label,_that.config,_that.defaultScoringMode);case _:
+return $default(_that.id,_that.label,_that.config);case _:
   return null;
 
 }
@@ -212,7 +211,7 @@ return $default(_that.id,_that.label,_that.config,_that.defaultScoringMode);case
 @JsonSerializable()
 
 class _FormatPresetDto extends FormatPresetDto {
-  const _FormatPresetDto({required this.id, required this.label, required final  Map<String, dynamic> config, @JsonKey(name: 'default_scoring_mode') this.defaultScoringMode}): _config = config,super._();
+  const _FormatPresetDto({required this.id, required this.label, required final  Map<String, dynamic> config}): _config = config,super._();
   factory _FormatPresetDto.fromJson(Map<String, dynamic> json) => _$FormatPresetDtoFromJson(json);
 
 @override final  String id;
@@ -224,7 +223,6 @@ class _FormatPresetDto extends FormatPresetDto {
   return EqualUnmodifiableMapView(_config);
 }
 
-@override@JsonKey(name: 'default_scoring_mode') final  String? defaultScoringMode;
 
 /// Create a copy of FormatPresetDto
 /// with the given fields replaced by the non-null parameter values.
@@ -239,16 +237,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FormatPresetDto&&(identical(other.id, id) || other.id == id)&&(identical(other.label, label) || other.label == label)&&const DeepCollectionEquality().equals(other._config, _config)&&(identical(other.defaultScoringMode, defaultScoringMode) || other.defaultScoringMode == defaultScoringMode));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FormatPresetDto&&(identical(other.id, id) || other.id == id)&&(identical(other.label, label) || other.label == label)&&const DeepCollectionEquality().equals(other._config, _config));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,label,const DeepCollectionEquality().hash(_config),defaultScoringMode);
+int get hashCode => Object.hash(runtimeType,id,label,const DeepCollectionEquality().hash(_config));
 
 @override
 String toString() {
-  return 'FormatPresetDto(id: $id, label: $label, config: $config, defaultScoringMode: $defaultScoringMode)';
+  return 'FormatPresetDto(id: $id, label: $label, config: $config)';
 }
 
 
@@ -259,7 +257,7 @@ abstract mixin class _$FormatPresetDtoCopyWith<$Res> implements $FormatPresetDto
   factory _$FormatPresetDtoCopyWith(_FormatPresetDto value, $Res Function(_FormatPresetDto) _then) = __$FormatPresetDtoCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String label, Map<String, dynamic> config,@JsonKey(name: 'default_scoring_mode') String? defaultScoringMode
+ String id, String label, Map<String, dynamic> config
 });
 
 
@@ -276,13 +274,12 @@ class __$FormatPresetDtoCopyWithImpl<$Res>
 
 /// Create a copy of FormatPresetDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? label = null,Object? config = null,Object? defaultScoringMode = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? label = null,Object? config = null,}) {
   return _then(_FormatPresetDto(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
 as String,config: null == config ? _self._config : config // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>,defaultScoringMode: freezed == defaultScoringMode ? _self.defaultScoringMode : defaultScoringMode // ignore: cast_nullable_to_non_nullable
-as String?,
+as Map<String, dynamic>,
   ));
 }
 

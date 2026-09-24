@@ -12,62 +12,112 @@ class MatchStartWaitingCard extends StatelessWidget {
     required this.eyebrow,
     required this.title,
     required this.body,
+    this.statusNote = 'Connected via Match Day Live Relay • Syncs automatically',
   });
 
   final String eyebrow;
   final String title;
   final String body;
+  final String statusNote;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 28),
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
       decoration: BoxDecoration(
-        color: CkColors.paper,
-        border: Border.all(color: CkColors.hairline, width: 1.5),
-        borderRadius: BorderRadius.circular(16),
+        color: CkColors.surface,
+        border: Border.all(color: const Color(0xFFE8E3DA), width: 1.5),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 52,
+            height: 52,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: CkColors.paper2,
-              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFFF8EFE1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE8D9C0)),
             ),
             child: const MatchStartPulseDot(),
           ),
-          const SizedBox(height: 12),
-          Text(
-            eyebrow,
-            style: CkType.mono(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.1,
-              color: CkColors.amber,
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8EFE1),
+              borderRadius: BorderRadius.circular(100),
+            ),
+            child: Text(
+              eyebrow.toUpperCase(),
+              style: CkType.mono(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+                color: const Color(0xFF8A6132),
+              ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
           Text(
             title,
             textAlign: TextAlign.center,
             style: CkType.display(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.02,
+              color: const Color(0xFF24231F),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             body,
             textAlign: TextAlign.center,
             style: CkType.body(
-              fontSize: 12,
-              color: CkColors.muted,
-              height: 1.45,
+              fontSize: 13,
+              color: const Color(0xFF7C776F),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5EA),
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(color: const Color(0xFFC7E6CB)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF4E7D58),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  statusNote,
+                  style: CkType.mono(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF4E7D58),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

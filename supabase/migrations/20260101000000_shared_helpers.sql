@@ -536,17 +536,6 @@ exception
 end
 $$;
 
-do $$
-begin
-  create type public.scoring_mode as enum(
-    'live_ball_by_ball',
-    'post_match_scorecard'
-);
-exception
-  when duplicate_object then
-    null;
-end
-$$;
 
 -- Note 'bye' and 'leg_bye' ARE legal deliveries (they count towards the over);
 -- only 'wide' and 'no_ball' are re-bowled. match_deliveries states that as a

@@ -867,7 +867,7 @@ begin
   --    a. Incoming Match Challenge from Karachi Kings to Lahore Lions
   insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
-    proposed_start_time, proposed_venue, proposed_format,
+    proposed_start_time, proposed_venue, proposed_format_code, proposed_format,
     share_code, message, status,
     proposal_expires_at, created_at, updated_at
   )
@@ -878,7 +878,8 @@ begin
     v_bilal_uid,
     now() + interval '3 days',
     'Gaddafi Stadium, Lahore',
-    '{"overs": 20, "ball_type": "leather", "pitch_type": "turf", "match_type": "limited_overs", "players_per_team": 11}'::jsonb,
+    't20',
+    '{"overs_per_innings": 20, "ball_type": "leather", "pitch_type": "turf", "match_type": "limited_overs", "players_per_team": 11, "balls_per_over": 6, "max_overs_per_bowler": 4}'::jsonb,
     '582914',
     'Super Weekend 20-over challenge! We have booked the main turf ground. Let us know if you accept.',
     'pending',
@@ -891,8 +892,8 @@ begin
   --    b. Countered Match Challenge from Rawalpindi Rams to Lahore Lions
   insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
-    proposed_start_time, proposed_venue, proposed_format,
-    countered_start_time, countered_venue, countered_players_per_side,
+    proposed_start_time, proposed_venue, proposed_format_code, proposed_format,
+    countered_start_time, countered_venue, countered_format_code, countered_format,
     share_code, message, status,
     decided_by, decided_at, decision_note,
     proposal_expires_at, counter_expires_at, created_at, updated_at
@@ -904,10 +905,12 @@ begin
     v_hassan_uid,
     now() + interval '5 days',
     'Rawalpindi Cricket Stadium',
-    '{"overs": 15, "ball_type": "tape_ball", "match_type": "limited_overs", "players_per_team": 11}'::jsonb,
+    'custom',
+    '{"overs_per_innings": 15, "ball_type": "tape", "match_type": "limited_overs", "players_per_team": 11, "balls_per_over": 6, "max_overs_per_bowler": 3}'::jsonb,
     now() + interval '5 days 2 hours',
     'LCCA Ground, Lahore',
-    11,
+    'custom',
+    '{"overs_per_innings": 15, "ball_type": "tape", "match_type": "limited_overs", "players_per_team": 11, "balls_per_over": 6, "max_overs_per_bowler": 3}'::jsonb,
     '418902',
     'Tape ball night match challenge under lights.',
     'countered',
@@ -924,7 +927,7 @@ begin
   --    c. Outgoing Open Challenge by Lahore Lions (with share code)
   insert into public.match_challenges (
     request_id, from_team_id, to_team_id, requested_by,
-    proposed_start_time, proposed_venue, proposed_format,
+    proposed_start_time, proposed_venue, proposed_format_code, proposed_format,
     share_code, message, status,
     proposal_expires_at, code_expires_at, created_at, updated_at
   )
@@ -935,7 +938,8 @@ begin
     v_saran_uid,
     now() + interval '2 days',
     'Model Town Club Ground, Lahore',
-    '{"overs": 20, "ball_type": "leather", "match_type": "limited_overs", "players_per_team": 11}'::jsonb,
+    't20',
+    '{"overs_per_innings": 20, "ball_type": "leather", "match_type": "limited_overs", "players_per_team": 11, "balls_per_over": 6, "max_overs_per_bowler": 4}'::jsonb,
     '729401',
     'Open weekend friendly! Any Lahore team up for a 20-over leather ball match, enter share code 729401 to accept.',
     'pending',

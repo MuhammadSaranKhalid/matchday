@@ -14,6 +14,7 @@ class Match extends Equatable {
     required this.teamBId,
     required this.format,
     required this.status,
+    this.formatCode,
     this.matchType = MatchType.friendly,
     required this.createdBy,
     required this.createdAt,
@@ -44,6 +45,9 @@ class Match extends Equatable {
   final TeamId teamBId;
   final MatchFormat format;
   final MatchStatus status;
+
+  /// Preset format code if created from a known preset (e.g. 't20', 'quick_6').
+  final String? formatCode;
 
   /// Tournament / friendly / practice. Drives the label in the scoring top
   /// bar and, later, which rules apply.
@@ -132,6 +136,7 @@ class Match extends Equatable {
     TeamId? teamBId,
     MatchFormat? format,
     MatchStatus? status,
+    String? formatCode,
     MatchType? matchType,
     String? createdBy,
     DateTime? createdAt,
@@ -155,6 +160,7 @@ class Match extends Equatable {
     teamBId: teamBId ?? this.teamBId,
     format: format ?? this.format,
     status: status ?? this.status,
+    formatCode: formatCode ?? this.formatCode,
     matchType: matchType ?? this.matchType,
     createdBy: createdBy ?? this.createdBy,
     createdAt: createdAt ?? this.createdAt,
@@ -181,6 +187,7 @@ class Match extends Equatable {
     teamBId,
     setupTeamId,
     status,
+    formatCode,
     scheduledStartTime,
     tossWonBy,
     tossDecision,

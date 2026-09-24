@@ -18,6 +18,7 @@ class MatchRequest extends Equatable {
     this.toTeamId,
     this.proposedStartTime,
     this.proposedVenue,
+    this.proposedFormatCode,
     this.proposedFormat,
     this.message,
     this.playersPerSide = 11,
@@ -25,6 +26,7 @@ class MatchRequest extends Equatable {
     this.fromTeamKeeperId,
     this.counteredStartTime,
     this.counteredVenue,
+    this.counteredFormatCode,
     this.counteredFormat,
     this.counteredPlayersPerSide,
     this.decidedBy,
@@ -48,6 +50,7 @@ class MatchRequest extends Equatable {
   // Proposed terms (sender side).
   final DateTime? proposedStartTime;
   final String? proposedVenue;
+  final String? proposedFormatCode;
   final MatchFormat? proposedFormat;
 
   /// Optional message attached at send time. Max 500 chars (server-side
@@ -61,6 +64,7 @@ class MatchRequest extends Equatable {
   // Counter-proposal terms (receiver side, set when status is `countered`).
   final DateTime? counteredStartTime;
   final String? counteredVenue;
+  final String? counteredFormatCode;
   final MatchFormat? counteredFormat;
   final int? counteredPlayersPerSide;
 
@@ -92,8 +96,13 @@ class MatchRequest extends Equatable {
   /// materialises the match with `coalesce(countered_*, proposed_*)`.
   DateTime? get effectiveStartTime => counteredStartTime ?? proposedStartTime;
   String? get effectiveVenue => counteredVenue ?? proposedVenue;
+  String? get effectiveFormatCode =>
+      counteredFormatCode ?? proposedFormatCode ?? effectiveFormat?.formatCode;
   MatchFormat? get effectiveFormat => counteredFormat ?? proposedFormat;
-  int get effectivePlayersPerSide => counteredPlayersPerSide ?? playersPerSide;
+  int get effectivePlayersPerSide =>
+      counteredPlayersPerSide ??
+      effectiveFormat?.playersPerTeam ??
+      playersPerSide;
 
   /// True when the request is still actionable — can be accepted, declined,
   /// countered or cancelled.
@@ -102,7 +111,7 @@ class MatchRequest extends Equatable {
       status == MatchRequestStatus.countered;
 
   @override
-  List<Object?> get props => [id, status, updatedAt];
+  List<Object?> get props => [id, status, updatedAt, proposedFormatCode, counteredFormatCode];
 }
 
 class MatchRequestId extends Equatable {

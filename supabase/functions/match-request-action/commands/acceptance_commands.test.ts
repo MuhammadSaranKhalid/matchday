@@ -64,14 +64,14 @@ class FakeChallengeDependencies implements AcceptChallengeDependencies {
       fromTeamId: opts.fromTeamId ?? ids.fromTeam,
       toTeamId: opts.toTeamId !== undefined ? opts.toTeamId : ids.toTeam,
       status: opts.status,
+      proposedFormatCode: "t20",
       proposedFormat: { overs_per_innings: 20 },
       proposedStartTime: null,
       proposedVenue: null,
+      counteredFormatCode: null,
       counteredFormat: null,
       counteredStartTime: null,
       counteredVenue: null,
-      fromTeamXi: [],
-      fromTeamKeeperId: null,
       requestedBy: ids.sender,
     };
   }
@@ -87,8 +87,6 @@ class FakeChallengeDependencies implements AcceptChallengeDependencies {
   async isTeamManager(_tx: unknown, teamId: string): Promise<boolean> {
     return teamId === this.authorizedTeamId;
   }
-
-  async validateTeamXi(_tx: unknown, _teamId: string, _xi: string[]): Promise<void> {}
 
   async validateTeamCaptain(_tx: unknown, teamId: string): Promise<void> {
     // always valid in tests
@@ -142,8 +140,6 @@ class FakePoolDependencies implements AcceptPoolApplicationDependencies {
       applicationId: ids.application,
       requestId: ids.request,
       applicantTeamId: ids.toTeam,
-      applicantXi: [],
-      applicantKeeperId: null,
       status: "pending",
     };
   }
@@ -159,7 +155,7 @@ class FakePoolDependencies implements AcceptPoolApplicationDependencies {
   async lockChallengeForApp(
     _tx: unknown,
     _requestId: string,
-  ): Promise<{ requestId: string; fromTeamId: string; status: string; proposedFormat: Record<string, unknown>; proposedStartTime: string | null; proposedVenue: string | null; fromTeamXi: string[]; fromTeamKeeperId: string | null }> {
+  ): Promise<{ requestId: string; fromTeamId: string; status: string; proposedFormatCode: string; proposedFormat: Record<string, unknown>; proposedStartTime: string | null; proposedVenue: string | null }> {
     if (this.challengeStatus !== "pending") {
       const { conflict } = await import("../domain/errors.ts");
       conflict(`Open challenge is no longer active (status: ${this.challengeStatus})`);
@@ -168,11 +164,10 @@ class FakePoolDependencies implements AcceptPoolApplicationDependencies {
       requestId: ids.request,
       fromTeamId: this.hostTeamId,
       status: this.challengeStatus,
+      proposedFormatCode: "t20",
       proposedFormat: { overs_per_innings: 20 },
       proposedStartTime: null,
       proposedVenue: null,
-      fromTeamXi: [],
-      fromTeamKeeperId: null,
     };
   }
 
@@ -227,13 +222,8 @@ function ctxPool(input: AcceptPoolApplicationInput): AcceptPoolApplicationContex
 
 const baseChallenge: AcceptChallengeInput = {
   requestId: ids.request,
-  scheduledStartTime: null,
-  venue: null,
-  format: null,
   decisionNote: null,
   toTeamId: null,
-  toTeamXi: [],
-  toTeamKeeperId: null,
 };
 
 const basePool: AcceptPoolApplicationInput = {

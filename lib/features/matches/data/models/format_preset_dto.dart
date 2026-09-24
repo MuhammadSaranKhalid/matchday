@@ -20,7 +20,6 @@ abstract class FormatPresetDto with _$FormatPresetDto {
     required String id,
     required String label,
     required Map<String, dynamic> config,
-    @JsonKey(name: 'default_scoring_mode') String? defaultScoringMode,
   }) = _FormatPresetDto;
 
   const FormatPresetDto._();
@@ -31,9 +30,6 @@ abstract class FormatPresetDto with _$FormatPresetDto {
   FormatPreset toEntity() => FormatPreset(
     id: id,
     label: label,
-    defaultScoringMode: ScoringMode.fromWire(
-      defaultScoringMode ?? config['default_scoring_mode']?.toString(),
-    ),
     format: MatchFormat(
       formatCode: id,
       oversPerInnings: (config['overs_per_innings'] as num?)?.toInt() ?? 0,

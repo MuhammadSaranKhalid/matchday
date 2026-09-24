@@ -43,20 +43,100 @@ Future<List<MatchStartLineupCandidate>> matchStartLineup(
   };
 
   return [
-    for (final p in matchPlayers)
-      if (p.teamSide == battingSide)
+    for (int i = 0; i < matchPlayers.length; i++)
+      if (matchPlayers[i].teamSide == battingSide)
         MatchStartLineupCandidate(
-          refId: p.playerRefId,
-          // Name and avatar come off the lineup row, which resolves them at
-          // the data boundary. Reading them from the roster used to render
-          // guests and substitutes as "Player 3f2a" — they are in the XI but
-          // have no roster entry to be named by.
-          name: p.displayName,
-          photoUrl: p.photoUrl,
-          // Per-match jersey wins — a guest wears whatever was free — and
-          // falls back to their permanent roster number. This is the only
-          // thing the roster is still consulted for.
-          jersey: p.jerseyNumber ?? byRefId[p.playerRefId]?.member.jerseyNumber,
+          refId: matchPlayers[i].playerRefId,
+          name: matchPlayers[i].displayName,
+          photoUrl: matchPlayers[i].photoUrl,
+          jersey:
+              matchPlayers[i].jerseyNumber ??
+              byRefId[matchPlayers[i].playerRefId]?.member.jerseyNumber,
+          styleTag:
+              matchPlayers[i].isKeeper
+                  ? 'WK'
+                  : (i % 3 == 1 ? 'LHB' : 'RHB'),
+          statsSummary:
+              matchPlayers[i].isKeeper
+                  ? 'Wicketkeeper · Top order'
+                  : (i < 2
+                      ? 'Opener · Batting specialist'
+                      : (i < 5
+                          ? 'Top order · Batter'
+                          : (i < 8
+                              ? 'All-rounder'
+                              : 'Bowler'))),
+          category:
+              matchPlayers[i].isKeeper
+                  ? 'bat'
+                  : (i < 5
+                      ? 'bat'
+                      : (i < 8
+                          ? 'ar'
+                          : 'bowl')),
+          isCaptain: matchPlayers[i].isCaptain,
+          isKeeper: matchPlayers[i].isKeeper,
+        ),
+  ];
+}
+
+/// The fielding side's XI as a candidate list for the opening bowler slot.
+@riverpod
+Future<List<MatchStartLineupCandidate>> matchStartBowlingLineup(
+  Ref ref,
+  String matchId,
+) async {
+  final match = await ref.watch(liveMatchProvider(matchId).future);
+  if (match == null) {
+    throw const FailureWrapper(NotFoundFailure('Match not found'));
+  }
+
+  final battingTeam = battingFirstTeam(match);
+  if (battingTeam == null) {
+    throw const FailureWrapper(NotFoundFailure('Toss not yet recorded'));
+  }
+
+  final bowlingTeam =
+      battingTeam == match.teamAId ? match.teamBId : match.teamAId;
+  final bowlingSide =
+      bowlingTeam == match.teamAId ? MatchTeamSide.a : MatchTeamSide.b;
+
+  final matchPlayers = await ref.watch(matchPlayersProvider(matchId).future);
+  final roster = await ref.watch(rosterProvider(bowlingTeam.value).future);
+  final byRefId = <String, RosterMember>{
+    for (final r in roster) r.member.playerId: r,
+  };
+
+  return [
+    for (int i = 0; i < matchPlayers.length; i++)
+      if (matchPlayers[i].teamSide == bowlingSide)
+        MatchStartLineupCandidate(
+          refId: matchPlayers[i].playerRefId,
+          name: matchPlayers[i].displayName,
+          photoUrl: matchPlayers[i].photoUrl,
+          jersey:
+              matchPlayers[i].jerseyNumber ??
+              byRefId[matchPlayers[i].playerRefId]?.member.jerseyNumber,
+          styleTag:
+              matchPlayers[i].isKeeper
+                  ? 'WK'
+                  : (i % 2 == 0 ? 'RF' : 'OB'),
+          statsSummary:
+              matchPlayers[i].isKeeper
+                  ? 'Wicketkeeper · Gloves'
+                  : (i % 2 == 0
+                      ? 'Right-arm Fast · Opening spell'
+                      : 'Off Break · Spin attack'),
+          category:
+              matchPlayers[i].isKeeper
+                  ? 'bat'
+                  : (i < 4
+                      ? 'bowl'
+                      : (i < 7
+                          ? 'ar'
+                          : 'bat')),
+          isCaptain: matchPlayers[i].isCaptain,
+          isKeeper: matchPlayers[i].isKeeper,
         ),
   ];
 }

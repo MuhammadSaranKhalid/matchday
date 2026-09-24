@@ -34,10 +34,12 @@ class MatchStartState extends Equatable {
     this.captainOf,
     this.lockedStriker,
     this.lockedNonStriker,
+    this.lockedBowler,
     this.pendingTossWinner,
     this.pendingDecision,
     this.pendingStriker,
     this.pendingNonStriker,
+    this.pendingBowler,
     this.isBusy = false,
   });
 
@@ -69,6 +71,7 @@ class MatchStartState extends Equatable {
 
   final String? lockedStriker;
   final String? lockedNonStriker;
+  final String? lockedBowler;
 
   /// Local toss form state. Winner and decision are submitted together.
   final TeamId? pendingTossWinner;
@@ -76,6 +79,7 @@ class MatchStartState extends Equatable {
 
   final String? pendingStriker;
   final String? pendingNonStriker;
+  final String? pendingBowler;
 
   final bool isBusy;
 
@@ -130,6 +134,8 @@ class MatchStartState extends Equatable {
 
   String? get nonStriker => pendingNonStriker ?? lockedNonStriker;
 
+  String? get bowler => pendingBowler ?? lockedBowler;
+
   bool get isLineupReady =>
       striker != null && nonStriker != null && striker != nonStriker;
 
@@ -143,10 +149,12 @@ class MatchStartState extends Equatable {
     TeamId? bowlingTeamId,
     String? lockedStriker,
     String? lockedNonStriker,
+    String? lockedBowler,
     TeamId? Function()? pendingTossWinner,
     TossDecision? Function()? pendingDecision,
     String? Function()? pendingStriker,
     String? Function()? pendingNonStriker,
+    String? Function()? pendingBowler,
     bool? isBusy,
   }) {
     return MatchStartState(
@@ -160,6 +168,7 @@ class MatchStartState extends Equatable {
       bowlingTeamId: bowlingTeamId ?? this.bowlingTeamId,
       lockedStriker: lockedStriker ?? this.lockedStriker,
       lockedNonStriker: lockedNonStriker ?? this.lockedNonStriker,
+      lockedBowler: lockedBowler ?? this.lockedBowler,
       pendingTossWinner:
           pendingTossWinner != null
               ? pendingTossWinner()
@@ -172,6 +181,8 @@ class MatchStartState extends Equatable {
           pendingNonStriker != null
               ? pendingNonStriker()
               : this.pendingNonStriker,
+      pendingBowler:
+          pendingBowler != null ? pendingBowler() : this.pendingBowler,
       isBusy: isBusy ?? this.isBusy,
     );
   }
@@ -187,10 +198,12 @@ class MatchStartState extends Equatable {
     bowlingTeamId,
     lockedStriker,
     lockedNonStriker,
+    lockedBowler,
     pendingTossWinner,
     pendingDecision,
     pendingStriker,
     pendingNonStriker,
+    pendingBowler,
     isBusy,
   ];
 }

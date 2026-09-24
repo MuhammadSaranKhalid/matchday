@@ -3,12 +3,9 @@
 -- =============================================================================
 
 -- 0340 · match_format_presets
--- System match-format catalog and its compatibility view.
--- Spec: docs/matches-schema-architecture.md
--- This is reference data used by the format picker. Its final schema lives
--- here with its eight system presets, indexes, RLS and compatibility view.
--- The superseded preset_id/rules_config shape and late conditional rebuild
--- were consolidated into this declaration.
+-- System match-format catalog.
+-- Spec: docs/database/CRICKET_FORMATS.md
+-- This is reference data used by the format picker.
 
 -- -----------------------------------------------------------------------------
 -- Tables and constraints
@@ -28,21 +25,8 @@ create table public.match_format_presets (
   created_by           uuid
     references public.profiles (user_id)
     on delete set null,
-  default_scoring_mode public.scoring_mode not null default 'live_ball_by_ball',
   created_at           timestamptz not null default now()
 );
-
--- -----------------------------------------------------------------------------
--- Views
--- -----------------------------------------------------------------------------
-
--- The compatibility view follows the table's RLS policy.
-create or replace view public.format_presets
-with (security_invoker = on)
-as
-  select
-    *
-  from public.match_format_presets;
 
 -- -----------------------------------------------------------------------------
 -- Enable row-level security
@@ -69,8 +53,6 @@ create policy "match_format_presets_read_all"
 -- -----------------------------------------------------------------------------
 
 grant select on public.match_format_presets to anon, authenticated;
-
-grant select on public.format_presets to anon, authenticated;
 
 -- -----------------------------------------------------------------------------
 -- Dependency-ordered operations
@@ -118,138 +100,85 @@ create trigger match_format_presets_sport_immutable
 -- Data changes
 -- -----------------------------------------------------------------------------
 
--- The system catalog.
--- `config` is the same open jsonb the match aggregate uses, so a key absent
--- here means "take the engine default" rather than "zero".
+-- Delete discontinued / unsupported catalog rows
+delete from public.match_format_presets
+where id in ('odi', 'list_a', 'hundred', 'super8', 'tape', 'box');
+
+-- Final V1 limited-overs system catalog:
 insert into public.match_format_presets
-  (id, label, sort_order, config, is_active, is_system, default_scoring_mode)
+  (id, label, sort_order, config, is_active, is_system)
 values
   (
-    'quick_6',
-    '6 Over',
+    't20',
+    'T20',
     10,
-    '{"players_per_team": 8, "overs_per_innings": 6, "max_overs_per_bowler": 2, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    '{"overs_per_innings": 20, "players_per_team": 11, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 4}'::jsonb,
     true,
-    true,
-    'live_ball_by_ball'
-  ),
-  (
-    'quick_8',
-    '8 Over',
-    20,
-    '{"players_per_team": 8, "overs_per_innings": 8, "max_overs_per_bowler": 2, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
-    true,
-    true,
-    'live_ball_by_ball'
+    true
   ),
   (
     't10',
     'T10',
-    30,
-    '{"players_per_team": 11, "overs_per_innings": 10, "max_overs_per_bowler": 2, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    20,
+    '{"overs_per_innings": 10, "players_per_team": 11, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 2}'::jsonb,
     true,
-    true,
-    'live_ball_by_ball'
+    true
   ),
   (
-    't20',
-    'T20',
+    'quick_6',
+    '6 Over',
+    30,
+    '{"overs_per_innings": 6, "players_per_team": 8, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 2}'::jsonb,
+    true,
+    true
+  ),
+  (
+    'quick_8',
+    '8 Over',
     40,
-    '{"players_per_team": 11, "overs_per_innings": 20, "max_overs_per_bowler": 4, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    '{"overs_per_innings": 8, "players_per_team": 8, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 2}'::jsonb,
     true,
-    true,
-    'live_ball_by_ball'
+    true
   ),
   (
     'over_30',
     '30 Over',
     50,
-    '{"players_per_team": 11, "overs_per_innings": 30, "max_overs_per_bowler": 6, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    '{"overs_per_innings": 30, "players_per_team": 11, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 6}'::jsonb,
     true,
-    true,
-    'live_ball_by_ball'
+    true
   ),
   (
     'over_40',
     '40 Over',
     60,
-    '{"players_per_team": 11, "overs_per_innings": 40, "max_overs_per_bowler": 8, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    '{"overs_per_innings": 40, "players_per_team": 11, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 8}'::jsonb,
     true,
-    true,
-    'live_ball_by_ball'
+    true
   ),
   (
     'over_45',
     '45 Over',
     70,
-    '{"players_per_team": 11, "overs_per_innings": 45, "max_overs_per_bowler": 9, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    '{"overs_per_innings": 45, "players_per_team": 11, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 9}'::jsonb,
     true,
-    true,
-    'live_ball_by_ball'
+    true
   ),
   (
     'over_50',
     '50 Over',
     80,
-    '{"players_per_team": 11, "overs_per_innings": 50, "max_overs_per_bowler": 10, "balls_per_over": 6, "innings_per_side": 1}'::jsonb,
+    '{"overs_per_innings": 50, "players_per_team": 11, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 10}'::jsonb,
     true,
-    true,
-    'live_ball_by_ball'
+    true
   ),
-  -- Deactivated variants for V1 (equipment/unsupported engine rules)
   (
-    'odi',
-    'ODI',
+    'custom',
+    'Custom',
     90,
-    '{"players_per_team": 11, "overs_per_innings": 50, "max_overs_per_bowler": 10}'::jsonb,
-    false,
+    '{"overs_per_innings": 12, "players_per_team": 11, "balls_per_over": 6, "innings_per_side": 1, "max_overs_per_bowler": 3}'::jsonb,
     true,
-    'live_ball_by_ball'
-  ),
-  (
-    'list_a',
-    'List A',
-    91,
-    '{"players_per_team": 11, "overs_per_innings": 50, "max_overs_per_bowler": 10}'::jsonb,
-    false,
-    true,
-    'live_ball_by_ball'
-  ),
-  (
-    'hundred',
-    'The Hundred',
-    92,
-    '{"balls_per_over": 5, "end_change_balls": 10, "players_per_team": 11, "overs_per_innings": 20, "max_overs_per_bowler": 4}'::jsonb,
-    false,
-    true,
-    'live_ball_by_ball'
-  ),
-  (
-    'super8',
-    '8-a-side',
-    93,
-    '{"players_per_team": 8, "overs_per_innings": 20, "max_overs_per_bowler": 4}'::jsonb,
-    false,
-    true,
-    'live_ball_by_ball'
-  ),
-  (
-    'tape',
-    'Tape-ball',
-    94,
-    '{"ball_type": "tape", "players_per_team": 11, "overs_per_innings": 20, "max_overs_per_bowler": 4}'::jsonb,
-    false,
-    true,
-    'live_ball_by_ball'
-  ),
-  (
-    'box',
-    'Box cricket',
-    95,
-    '{"players_per_team": 8, "overs_per_innings": 6, "max_overs_per_bowler": 2}'::jsonb,
-    false,
-    true,
-    'post_match_scorecard'
+    true
   )
 on conflict (id) do update
   set
@@ -257,15 +186,14 @@ on conflict (id) do update
     sort_order = excluded.sort_order,
     config = excluded.config,
     is_active = excluded.is_active,
-    is_system = excluded.is_system,
-    default_scoring_mode = excluded.default_scoring_mode;
+    is_system = excluded.is_system;
 
 -- -----------------------------------------------------------------------------
 -- Indexes
 -- -----------------------------------------------------------------------------
 
 -- The picker reads active presets in display order.
-create index idx_match_format_presets_active_order
+create index if not exists idx_match_format_presets_active_order
   on public.match_format_presets (
     sport_id,
     sort_order
@@ -273,7 +201,7 @@ create index idx_match_format_presets_active_order
   where is_active;
 
 -- Index the profile FK for account deletion and joins (Supabase advisor 0001).
-create index idx_match_format_presets_created_by
+create index if not exists idx_match_format_presets_created_by
   on public.match_format_presets (
     created_by
   );

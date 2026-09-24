@@ -12,10 +12,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/theme/circk_theme.dart';
+import '../../domain/entities/match.dart';
 import '../controllers/match_detail_controller.dart';
 import '../controllers/match_room_controller.dart';
 import '../providers/match_detail_provider.dart';
 import '../providers/my_matches_providers.dart';
+import 'match_start_screen.dart';
 import '../state/match_room_state.dart';
 import '../widgets/match_detail/pv_v2_match_detail.dart';
 import '../widgets/match_room/match_room_body.dart';
@@ -46,9 +48,16 @@ class MatchDetailScreen extends ConsumerWidget {
     });
     final roomAsync = ref.watch(matchRoomControllerProvider(matchId));
     if (roomAsync.hasValue) {
+      final room = roomAsync.value!;
+      final startPhase = room.snapshot.match.startPhase;
+      if (startPhase == MatchStartPhase.toss ||
+          startPhase == MatchStartPhase.lineup ||
+          startPhase == MatchStartPhase.ready) {
+        return MatchStartScreen(matchId: matchId);
+      }
       return Scaffold(
         backgroundColor: CkColors.paper,
-        body: MatchRoomBody(matchId: matchId, state: roomAsync.value!),
+        body: MatchRoomBody(matchId: matchId, state: room),
       );
     }
     if (roomAsync.isLoading) {

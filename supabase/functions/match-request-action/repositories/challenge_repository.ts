@@ -12,14 +12,14 @@ export interface ChallengeRow {
   fromTeamId: string;
   toTeamId: string | null;
   status: "pending" | "countered" | "accepted" | "declined" | "cancelled" | "expired";
+  proposedFormatCode: string;
   proposedFormat: Record<string, unknown>;
   proposedStartTime: string | null;
   proposedVenue: string | null;
+  counteredFormatCode: string | null;
   counteredFormat: Record<string, unknown> | null;
   counteredStartTime: string | null;
   counteredVenue: string | null;
-  fromTeamXi: string[];
-  fromTeamKeeperId: string | null;
   requestedBy: string | null;
 }
 
@@ -27,8 +27,6 @@ export interface ApplicationRow {
   applicationId: string;
   requestId: string;
   applicantTeamId: string;
-  applicantXi: string[];
-  applicantKeeperId: string | null;
   status: "pending" | "accepted" | "rejected" | "withdrawn";
 }
 
@@ -36,30 +34,29 @@ export interface LockedChallengeForPool {
   requestId: string;
   fromTeamId: string;
   status: string;
+  proposedFormatCode: string;
   proposedFormat: Record<string, unknown>;
   proposedStartTime: string | null;
   proposedVenue: string | null;
-  fromTeamXi: string[];
-  fromTeamKeeperId: string | null;
 }
 
 export class ChallengeRepository {
   async lockChallenge(tx: Tx, requestId: string): Promise<ChallengeRow> {
     const rows = await tx`
       select
-        request_id           as "requestId",
-        from_team_id         as "fromTeamId",
-        to_team_id           as "toTeamId",
+        request_id             as "requestId",
+        from_team_id           as "fromTeamId",
+        to_team_id             as "toTeamId",
         status,
+        proposed_format_code   as "proposedFormatCode",
         coalesce(proposed_format, '{}')::jsonb  as "proposedFormat",
-        proposed_start_time  as "proposedStartTime",
-        proposed_venue       as "proposedVenue",
-        countered_format     as "counteredFormat",
-        countered_start_time as "counteredStartTime",
-        countered_venue      as "counteredVenue",
-        coalesce(from_team_xi, '{}')::uuid[]    as "fromTeamXi",
-        from_team_keeper_id  as "fromTeamKeeperId",
-        requested_by         as "requestedBy"
+        proposed_start_time    as "proposedStartTime",
+        proposed_venue         as "proposedVenue",
+        countered_format_code  as "counteredFormatCode",
+        countered_format       as "counteredFormat",
+        countered_start_time   as "counteredStartTime",
+        countered_venue        as "counteredVenue",
+        requested_by           as "requestedBy"
       from public.match_challenges
       where request_id = ${requestId}::uuid
       for update
@@ -76,8 +73,6 @@ export class ChallengeRepository {
         application_id    as "applicationId",
         request_id        as "requestId",
         applicant_team_id as "applicantTeamId",
-        coalesce(applicant_xi, '{}')::uuid[] as "applicantXi",
-        applicant_keeper_id as "applicantKeeperId",
         status
       from public.match_pool_applications
       where application_id = ${applicationId}::uuid
@@ -95,14 +90,13 @@ export class ChallengeRepository {
   ): Promise<LockedChallengeForPool> {
     const rows = await tx`
       select
-        request_id          as "requestId",
-        from_team_id        as "fromTeamId",
+        request_id            as "requestId",
+        from_team_id          as "fromTeamId",
         status,
+        proposed_format_code  as "proposedFormatCode",
         coalesce(proposed_format, '{}')::jsonb as "proposedFormat",
-        proposed_start_time as "proposedStartTime",
-        proposed_venue      as "proposedVenue",
-        coalesce(from_team_xi, '{}')::uuid[]   as "fromTeamXi",
-        from_team_keeper_id as "fromTeamKeeperId"
+        proposed_start_time   as "proposedStartTime",
+        proposed_venue        as "proposedVenue"
       from public.match_challenges
       where request_id = ${requestId}::uuid
       for update

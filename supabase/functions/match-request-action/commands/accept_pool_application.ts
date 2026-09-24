@@ -1,7 +1,7 @@
 // accept_pool_application command.
 //
 // Flow: lock application → lock parent challenge → authorize host manager →
-//        validate rosters → create aggregate → accept application →
+//        validate captains → create aggregate → accept application →
 //        reject competitors → guarded close of parent challenge.
 //
 // Locking order: application first, then challenge. Consistent locking order
@@ -41,7 +41,6 @@ export interface AcceptPoolApplicationDependencies {
     requestId: string,
   ): Promise<LockedChallengeForPool>;
   isTeamManager(tx: Tx, teamId: string): Promise<boolean>;
-  validateTeamXi(tx: Tx, teamId: string, xi: string[]): Promise<void>;
   validateTeamCaptain(tx: Tx, teamId: string): Promise<void>;
   createFriendlyCricketMatch(tx: Tx, input: CreateMatchInput): Promise<string>;
   acceptApplication(
@@ -77,7 +76,6 @@ const defaultDeps: AcceptPoolApplicationDependencies = {
   lockChallengeForApp: (tx, requestId) =>
     challengeRepo.lockChallengeForApp(tx, requestId),
   isTeamManager: (tx, teamId) => teamRepo.isTeamManager(tx, teamId),
-  validateTeamXi: (tx, teamId, xi) => teamRepo.validateTeamXi(tx, teamId, xi),
   validateTeamCaptain: (tx, teamId) => teamRepo.validateTeamCaptain(tx, teamId),
   createFriendlyCricketMatch: (tx, input) =>
     matchRepo.createFriendlyCricketMatch(tx, input),
@@ -110,25 +108,18 @@ export async function acceptPoolApplication(
     forbidden("Only managers of the host team can accept pool applications");
   }
 
-  // ── 4. Validate both rosters ──────────────────────────────────────────────
-  await deps.validateTeamXi(tx, req.fromTeamId, req.fromTeamXi);
-  await deps.validateTeamXi(tx, app.applicantTeamId, app.applicantXi);
+  // ── 4. Validate captains on both teams ───────────────────────────────────
   await deps.validateTeamCaptain(tx, req.fromTeamId);
   await deps.validateTeamCaptain(tx, app.applicantTeamId);
 
   // ── 5. Create the normalised match aggregate ──────────────────────────────
-  const normalizedFormat = MatchCreationRepository.normalizeFormat(
-    req.proposedFormat,
-  );
-
   const matchId = await deps.createFriendlyCricketMatch(tx, {
     venue: req.proposedVenue,
     scheduledStartTime: req.proposedStartTime,
-    format: normalizedFormat,
+    formatCode: req.proposedFormatCode,
+    rules: req.proposedFormat,
     teamAId: req.fromTeamId,
     teamBId: app.applicantTeamId,
-    teamAKeeperId: req.fromTeamKeeperId,
-    teamBKeeperId: app.applicantKeeperId,
     actorId,
   });
 

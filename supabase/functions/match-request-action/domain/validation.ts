@@ -148,32 +148,13 @@ export function parseAcceptChallenge(
   body: Record<string, unknown>,
 ): AcceptChallengeInput {
   const requestId = reqUuid(body, "request_id");
-  const scheduledStartTime = optTimestamp(body, "scheduled_start_time");
-  const venue = optStr(body, "venue");
-  const format = optObject(body, "format");
   const decisionNote = optStr(body, "decision_note");
   const toTeamId = optUuid(body, "to_team_id");
-  const toTeamXi = optUuidArray(body, "to_team_xi");
-  const toTeamKeeperId = optUuid(body, "to_team_keeper_id");
-
-  // If a non-empty XI is provided, the keeper (if specified) must be in it.
-  if (
-    toTeamKeeperId != null &&
-    toTeamXi.length > 0 &&
-    !toTeamXi.includes(toTeamKeeperId)
-  ) {
-    badRequest("Wicket-keeper must be part of the picked XI");
-  }
 
   return {
     requestId,
-    scheduledStartTime,
-    venue,
-    format,
     decisionNote,
     toTeamId,
-    toTeamXi,
-    toTeamKeeperId,
   };
 }
 

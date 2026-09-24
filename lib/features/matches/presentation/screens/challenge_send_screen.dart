@@ -350,14 +350,14 @@ class _ChallengeSendScreenState extends ConsumerState<ChallengeSendScreen> {
           toTeamId: _isOpenChallenge ? null : opp?.id,
           proposedStartTime: start,
           proposedVenue: _venueCtrl.text.trim(),
+          proposedFormatCode: _selectedPreset?.id ??
+              (_formatCustomized ? 'custom' : _format.formatCode ?? 't20'),
           proposedFormat: _format,
           message:
               _messageCtrl.text.trim().isEmpty
                   ? null
                   : _messageCtrl.text.trim(),
           playersPerSide: _format.playersPerTeam,
-          // Empty by design: the accept RPC fills the match with the full
-          // active roster, and the lineup screen picks the XI at the ground.
           fromTeamXi: const [],
           fromTeamKeeperId: null,
         );
@@ -519,7 +519,9 @@ class _ReviewStepHost extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return StepReview(
-      team: isOpen ? fromTeam : (opponent ?? fromTeam),
+      team: fromTeam,
+      opponentName: isOpen ? null : opponent?.name,
+      onEditOpponent: isOpen ? null : () => onEdit(_Step.opponent),
       formatLine: formatLine,
       whenLine: day == null ? 'Not set' : '${_dayLabel(day!)} · $timeLabel',
       whereLine: venue.isEmpty ? 'To be agreed' : venue,

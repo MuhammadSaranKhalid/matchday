@@ -16,13 +16,8 @@ export interface RequestEnvelope {
 
 export interface AcceptChallengeInput {
   requestId: string;
-  scheduledStartTime: string | null;
-  venue: string | null;
-  format: Record<string, unknown> | null;
   decisionNote: string | null;
   toTeamId: string | null;
-  toTeamXi: string[];
-  toTeamKeeperId: string | null;
 }
 
 export interface AcceptPoolApplicationInput {

@@ -19,8 +19,6 @@ create table if not exists public.match_pool_applications (
   applicant_user_id   uuid not null
     references public.profiles (user_id)
     on delete cascade,
-  applicant_xi        uuid[] default '{}'::uuid[],
-  applicant_keeper_id uuid,
   message             text,
   status              text not null default 'pending' check (
     status in ('pending', 'accepted', 'rejected', 'withdrawn')
@@ -91,8 +89,6 @@ create policy "match_pool_apps_select"
 create or replace function public.apply_to_match_pool(
   p_request_id uuid,
   p_applicant_team_id uuid,
-  p_applicant_xi uuid[] default '{}'::uuid[],
-  p_applicant_keeper_id uuid default null,
   p_message text default null
 )
 returns uuid
@@ -137,9 +133,6 @@ begin
     raise exception 'A team cannot apply to its own open challenge'
       using errcode = '23514';
   end if;
-  -- Validate applicant squad members
-  perform
-    public._validate_team_xi(p_applicant_team_id, p_applicant_xi);
   -- Check if team has already applied and is pending
   if exists (
     select
@@ -153,8 +146,8 @@ begin
   raise exception 'Your team has already applied to this open challenge'
     using errcode = '23505';
 end if;
-insert into public.match_pool_applications(request_id, applicant_team_id, applicant_user_id, applicant_xi, applicant_keeper_id, message, status)
-  values (p_request_id, p_applicant_team_id, auth.uid(), coalesce(p_applicant_xi, '{}'::uuid[]), p_applicant_keeper_id, p_message, 'pending')
+insert into public.match_pool_applications(request_id, applicant_team_id, applicant_user_id, message, status)
+  values (p_request_id, p_applicant_team_id, auth.uid(), p_message, 'pending')
 returning
   application_id
 into
@@ -172,11 +165,11 @@ end;
 $$;
 
 revoke all
-on function public.apply_to_match_pool(uuid, uuid, uuid[], uuid, text)
+on function public.apply_to_match_pool(uuid, uuid, text)
 from public;
 
 grant execute
-on function public.apply_to_match_pool(uuid, uuid, uuid[], uuid, text)
+on function public.apply_to_match_pool(uuid, uuid, text)
 to authenticated;
 
 -- RPC: accept_pool_application

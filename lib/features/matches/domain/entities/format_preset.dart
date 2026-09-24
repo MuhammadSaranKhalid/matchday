@@ -13,48 +13,93 @@ class FormatPreset extends Equatable {
     required this.id,
     required this.label,
     required this.format,
-    this.defaultScoringMode = ScoringMode.liveBallByBall,
   });
 
   final String id;
   final String label;
   final MatchFormat format;
-  final ScoringMode defaultScoringMode;
 
-  /// True for the primary 2×2 grid cards: T10, T20, 50 Over.
-  bool get isFeatured => id == 't10' || id == 't20' || id == 'over_50';
+  /// True for the primary quick/frequent presets: T20, T10, 6 Over, 8 Over.
+  bool get isFeatured =>
+      id == 't20' || id == 't10' || id == 'quick_6' || id == 'quick_8';
 
   /// Human-friendly brief summary, e.g. "20 overs".
   String get shortDescription =>
       format.oversPerInnings > 0 ? '${format.oversPerInnings} overs' : label;
 
   /// Coherent maximum overs per bowler derived from total innings overs.
-  static int defaultBowlerLimit(int overs) {
+  static int defaultBowlerLimit(int overs) =>
+      CricketFormatSelection.suggestedBowlerLimit(overs);
+
+  @override
+  List<Object?> get props => [id, label, format];
+}
+
+/// Pure Dart representation of format selection + match rules + playing conditions.
+class CricketFormatSelection extends Equatable {
+  const CricketFormatSelection({
+    required this.formatCode,
+    required this.overs,
+    this.ballsPerOver = 6,
+    this.ballType = MatchBallType.tape,
+    this.playersPerSide = 11,
+    required this.maxOversPerBowler,
+    this.inningsPerSide = 1,
+  });
+
+  final String formatCode;
+  final int overs;
+  final int ballsPerOver;
+  final MatchBallType ballType;
+  final int playersPerSide;
+  final int maxOversPerBowler;
+  final int inningsPerSide;
+
+  /// Suggested bowler limit based on total overs:
+  /// Standard limited-overs cricket uses 1/5 of total overs:
+  /// `(overs / 5).ceil().clamp(1, overs)`.
+  static int suggestedBowlerLimit(int overs) {
     if (overs <= 0) return 0;
-    if (overs <= 6) return 2;
-    if (overs <= 8) return 2;
-    if (overs <= 10) return 2;
-    if (overs <= 20) return 4;
-    if (overs <= 30) return 6;
-    if (overs <= 40) return 8;
-    if (overs <= 45) return 9;
-    if (overs <= 50) return 10;
     return (overs / 5).ceil().clamp(1, overs);
   }
 
+  /// Converts this selection into an engine-facing [MatchFormat].
+  MatchFormat toMatchFormat() => MatchFormat(
+    formatCode: formatCode,
+    oversPerInnings: overs,
+    playersPerTeam: playersPerSide,
+    ballType: ballType,
+    maxOversPerBowler: maxOversPerBowler,
+    ballsPerOver: ballsPerOver,
+    inningsPerSide: inningsPerSide,
+  );
+
+  CricketFormatSelection copyWith({
+    String? formatCode,
+    int? overs,
+    int? ballsPerOver,
+    MatchBallType? ballType,
+    int? playersPerSide,
+    int? maxOversPerBowler,
+    int? inningsPerSide,
+  }) => CricketFormatSelection(
+    formatCode: formatCode ?? this.formatCode,
+    overs: overs ?? this.overs,
+    ballsPerOver: ballsPerOver ?? this.ballsPerOver,
+    ballType: ballType ?? this.ballType,
+    playersPerSide: playersPerSide ?? this.playersPerSide,
+    maxOversPerBowler: maxOversPerBowler ?? this.maxOversPerBowler,
+    inningsPerSide: inningsPerSide ?? this.inningsPerSide,
+  );
+
   @override
-  List<Object?> get props => [id, label, format, defaultScoringMode];
-}
-
-/// How a format is meant to be scored. Mirrors the deployed `scoring_mode` enum.
-enum ScoringMode {
-  liveBallByBall('live_ball_by_ball'),
-  postMatchScorecard('post_match_scorecard');
-
-  const ScoringMode(this.wire);
-  final String wire;
-
-  static ScoringMode fromWire(String? w) =>
-      values.where((m) => m.wire == w).firstOrNull ??
-      ScoringMode.liveBallByBall;
+  List<Object?> get props => [
+    formatCode,
+    overs,
+    ballsPerOver,
+    ballType,
+    playersPerSide,
+    maxOversPerBowler,
+    inningsPerSide,
+  ];
 }

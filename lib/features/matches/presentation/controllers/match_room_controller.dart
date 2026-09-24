@@ -202,7 +202,8 @@ class MatchRoomController extends _$MatchRoomController {
   }
 
   MatchRoomNavigation? _navigationFor(MatchStatus status) => switch (status) {
-    MatchStatus.live => MatchRoomNavigation.scoring,
+    MatchStatus.live ||
+    MatchStatus.inningsBreak => MatchRoomNavigation.scoring,
     MatchStatus.completed ||
     MatchStatus.cancelled => MatchRoomNavigation.result,
     _ => null,

@@ -35,10 +35,11 @@ class MatchRequestsRemoteDataSource {
     String? toTeamId,
     DateTime? proposedStartTime,
     String? proposedVenue,
+    String? proposedFormatCode,
     MatchFormat? proposedFormat,
     String? message,
-    required int playersPerSide,
-    required List<String> fromTeamXi,
+    int playersPerSide = 11,
+    List<String> fromTeamXi = const [],
     String? fromTeamKeeperId,
   }) async {
     final body = <String, dynamic>{
@@ -47,12 +48,12 @@ class MatchRequestsRemoteDataSource {
       if (proposedStartTime != null)
         'p_proposed_start_time': proposedStartTime.toUtc().toIso8601String(),
       if (proposedVenue != null) 'p_proposed_venue': proposedVenue,
+      if (proposedFormatCode != null)
+        'p_proposed_format_code': proposedFormatCode,
       if (proposedFormat != null)
         'p_proposed_format': MatchRequestDto.formatToJson(proposedFormat),
       if (message != null) 'p_message': message,
       'p_players_per_side': playersPerSide,
-      'p_from_team_xi': fromTeamXi,
-      if (fromTeamKeeperId != null) 'p_from_team_keeper_id': fromTeamKeeperId,
     };
     try {
       final res = await _supabase.functions.invoke(
@@ -74,24 +75,18 @@ class MatchRequestsRemoteDataSource {
   /// Returns the newly created match id.
   Future<String> acceptMatchChallenge({
     required String requestId,
+    String? decisionNote,
+    String? toTeamId,
     DateTime? scheduledStartTime,
     String? venue,
     MatchFormat? format,
-    String? decisionNote,
-    String? toTeamId,
-    required List<String> toTeamXi,
+    List<String> toTeamXi = const [],
     String? toTeamKeeperId,
   }) async {
     final body = <String, dynamic>{
       'request_id': requestId,
-      if (scheduledStartTime != null)
-        'scheduled_start_time': scheduledStartTime.toUtc().toIso8601String(),
-      if (venue != null) 'venue': venue,
-      if (format != null) 'format': MatchRequestDto.formatToJson(format),
       if (decisionNote != null) 'decision_note': decisionNote,
       if (toTeamId != null) 'to_team_id': toTeamId,
-      'to_team_xi': toTeamXi,
-      if (toTeamKeeperId != null) 'to_team_keeper_id': toTeamKeeperId,
     };
     try {
       final res = await _supabase.functions.invoke(
@@ -114,6 +109,7 @@ class MatchRequestsRemoteDataSource {
     required String requestId,
     DateTime? counteredStartTime,
     String? counteredVenue,
+    String? counteredFormatCode,
     MatchFormat? counteredFormat,
     int? counteredPlayersPerSide,
     String? decisionNote,
@@ -127,10 +123,10 @@ class MatchRequestsRemoteDataSource {
             'p_countered_start_time':
                 counteredStartTime.toUtc().toIso8601String(),
           if (counteredVenue != null) 'p_countered_venue': counteredVenue,
+          if (counteredFormatCode != null)
+            'p_countered_format_code': counteredFormatCode,
           if (counteredFormat != null)
             'p_countered_format': MatchRequestDto.formatToJson(counteredFormat),
-          if (counteredPlayersPerSide != null)
-            'p_countered_players_per_side': counteredPlayersPerSide,
           if (decisionNote != null) 'p_decision_note': decisionNote,
         },
       );
@@ -229,9 +225,6 @@ class MatchRequestsRemoteDataSource {
         params: {
           'p_request_id': requestId,
           'p_applicant_team_id': applicantTeamId,
-          'p_applicant_xi': applicantXi,
-          if (applicantKeeperId != null)
-            'p_applicant_keeper_id': applicantKeeperId,
           if (message != null) 'p_message': message,
         },
       );

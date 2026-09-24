@@ -4,12 +4,15 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/ck_button.dart';
+import '../../domain/entities/match.dart';
 import '../../domain/entities/match_request.dart';
 import '../providers/matches_providers.dart';
+import '../utils/format_display.dart';
+import '../widgets/format/cricket_format_draft.dart';
+import '../widgets/format/cricket_format_editor.dart';
 
 /// Receiver counter screen. The 0600 RPC `counter_match_request` is the only
-/// path; v1 supports counter on date/time + venue (format counter is rare
-/// and adds keyboard friction — leave for v2).
+/// path; supports counter on date/time, venue, and cricket format.
 class ChallengeCounterScreen extends ConsumerStatefulWidget {
   const ChallengeCounterScreen({super.key, required this.requestId});
   final String requestId;
@@ -22,6 +25,7 @@ class ChallengeCounterScreen extends ConsumerStatefulWidget {
 class _ChallengeCounterScreenState
     extends ConsumerState<ChallengeCounterScreen> {
   DateTime? _newStart;
+  CricketFormatDraft? _counteredDraft;
   final _venueCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   bool _busy = false;
@@ -58,17 +62,26 @@ class _ChallengeCounterScreenState
   Widget _body(MatchRequest req) {
     final origStart = req.proposedStartTime;
     final origVenue = req.proposedVenue;
+    final origFormat = req.effectiveFormat;
+    final origFormatSummary = origFormat == null
+        ? '—'
+        : formatSummary(origFormat, formatCode: req.effectiveFormatCode);
+
     final changedStart = _newStart != null && _newStart != origStart;
     final changedVenue =
         _venueCtrl.text.trim().isNotEmpty &&
         _venueCtrl.text.trim() != (origVenue ?? '');
-    final canSubmit = (changedStart || changedVenue) && !_busy;
+    final changedFormat = _counteredDraft != null;
+    final canSubmit =
+        (changedStart || changedVenue || changedFormat) && !_busy;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Header(
-          changeCount: (changedStart ? 1 : 0) + (changedVenue ? 1 : 0),
+          changeCount: (changedStart ? 1 : 0) +
+              (changedVenue ? 1 : 0) +
+              (changedFormat ? 1 : 0),
           onBack:
               () =>
                   context.canPop()
@@ -85,7 +98,19 @@ class _ChallengeCounterScreenState
                 value: _newStart == null ? null : _human(_newStart!),
                 onTap: _pickStart,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
+              _DiffRow(
+                label: 'Format',
+                original: origFormatSummary,
+                value: _counteredDraft == null
+                    ? null
+                    : formatSummary(
+                        _counteredDraft!.toMatchFormat(),
+                        formatCode: _counteredDraft!.formatCode,
+                      ),
+                onTap: () => _pickFormat(req),
+              ),
+              const SizedBox(height: 12),
               const _SectionLabel('New venue (optional)'),
               TextField(
                 controller: _venueCtrl,
@@ -172,13 +197,100 @@ class _ChallengeCounterScreenState
     });
   }
 
+  Future<void> _pickFormat(MatchRequest req) async {
+    final baseFormat = req.effectiveFormat ??
+        const MatchFormat(
+          formatCode: 't20',
+          oversPerInnings: 20,
+          playersPerTeam: 11,
+          ballType: MatchBallType.tape,
+          maxOversPerBowler: 4,
+        );
+    var currentDraft = _counteredDraft ??
+        CricketFormatDraft.fromFormat(
+          baseFormat,
+          formatCode: req.effectiveFormatCode,
+        );
+
+    final presets = ref.read(formatPresetsProvider).value ?? const [];
+
+    final result = await showModalBottomSheet<CricketFormatDraft>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (ctx, scrollController) => StatefulBuilder(
+          builder: (ctx, setModalState) => Container(
+            decoration: const BoxDecoration(
+              color: CkColors.paper,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Counter Format',
+                        style: CkType.display(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: CkColors.ink,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(currentDraft),
+                        child: Text(
+                          'Done',
+                          style: CkType.display(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: CkColors.ink,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: CkColors.line),
+                Expanded(
+                  child: CricketFormatEditor(
+                    draft: currentDraft,
+                    presets: presets,
+                    onChanged: (updated) {
+                      setModalState(() {
+                        currentDraft = updated;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _counteredDraft = result;
+      });
+    }
+  }
+
   Future<void> _submit(MatchRequest req) async {
     setState(() => _busy = true);
     final result = await ref
         .read(matchesRepositoryProvider)
         .counterMatchChallenge(
           requestId: MatchRequestId(widget.requestId),
-          counteredFormat: null,
+          counteredFormat: _counteredDraft?.toMatchFormat(),
+          counteredFormatCode: _counteredDraft?.formatCode,
           counteredVenue:
               _venueCtrl.text.trim().isEmpty ? null : _venueCtrl.text.trim(),
           counteredStartTime: _newStart,

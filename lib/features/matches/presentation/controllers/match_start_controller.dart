@@ -73,11 +73,13 @@ class MatchStartController extends _$MatchStartController {
 
       lockedStriker: lineup.playerRefIdOf(innings?.strikerId?.value),
       lockedNonStriker: lineup.playerRefIdOf(innings?.nonStrikerId?.value),
+      lockedBowler: lineup.playerRefIdOf(innings?.bowlerId?.value),
 
       pendingTossWinner: previous?.pendingTossWinner,
       pendingDecision: previous?.pendingDecision,
       pendingStriker: previous?.pendingStriker,
       pendingNonStriker: previous?.pendingNonStriker,
+      pendingBowler: previous?.pendingBowler,
 
       isBusy: previous?.isBusy ?? false,
     );
@@ -175,7 +177,42 @@ class MatchStartController extends _$MatchStartController {
     );
   }
 
-  // ── Openers ──────────────────────────────────────────────────────────────
+  // ── Openers & Strategic Lineup ───────────────────────────────────────────
+
+  void pickStriker(String refId) {
+    _update((s) {
+      final nonStriker = s.nonStriker == refId ? null : s.nonStriker;
+      return s.copyWith(
+        pendingStriker: () => refId,
+        pendingNonStriker: () => nonStriker,
+      );
+    });
+  }
+
+  void pickNonStriker(String refId) {
+    _update((s) {
+      final striker = s.striker == refId ? null : s.striker;
+      return s.copyWith(
+        pendingStriker: () => striker,
+        pendingNonStriker: () => refId,
+      );
+    });
+  }
+
+  void pickBowler(String refId) {
+    _update((s) => s.copyWith(pendingBowler: () => refId));
+  }
+
+  void swapBatters() {
+    _update((s) {
+      final str = s.striker;
+      final nonStr = s.nonStriker;
+      return s.copyWith(
+        pendingStriker: () => nonStr,
+        pendingNonStriker: () => str,
+      );
+    });
+  }
 
   void tapOpener(String refId) {
     _update((s) {

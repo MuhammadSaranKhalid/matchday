@@ -8,6 +8,7 @@ import '../../../teams/domain/entities/team_relationship.dart';
 import '../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../../teams/presentation/providers/teams_providers.dart';
 import '../../domain/entities/match.dart';
+import '../utils/format_display.dart';
 import '../widgets/match_detail/pv_v2_data.dart';
 import '../widgets/match_detail/pv_v2_map.dart';
 import 'matches_providers.dart';
@@ -445,14 +446,9 @@ String _formatCode(Match match) {
     return 'Tournament';
   }
 
-  final overs = match.format.oversPerInnings;
-  if (overs == 20) {
-    return 'T20';
-  }
-
-  if (overs > 0) {
-    return '${overs}O';
-  }
-
-  return 'Cricket';
+  return formatTitle(
+    formatCode: match.formatCode ?? match.format.formatCode,
+    isCustom: (match.formatCode ?? match.format.formatCode) == 'custom',
+    overs: match.format.oversPerInnings,
+  );
 }

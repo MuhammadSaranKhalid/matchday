@@ -685,6 +685,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
     TeamId? toTeamId,
     DateTime? proposedStartTime,
     String? proposedVenue,
+    String? proposedFormatCode,
     MatchFormat? proposedFormat,
     String? message,
     int playersPerSide = 11,
@@ -711,6 +712,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
         toTeamId: toTeamId?.value,
         proposedStartTime: proposedStartTime,
         proposedVenue: proposedVenue,
+        proposedFormatCode: proposedFormatCode ?? proposedFormat?.formatCode,
         proposedFormat: proposedFormat,
         message: trimmedMessage,
         playersPerSide: playersPerSide,
@@ -770,6 +772,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
     required MatchRequestId requestId,
     DateTime? counteredStartTime,
     String? counteredVenue,
+    String? counteredFormatCode,
     MatchFormat? counteredFormat,
     int? counteredPlayersPerSide,
     String? decisionNote,
@@ -777,6 +780,7 @@ class MatchesRepositoryImpl implements MatchesRepository {
     final changesAny =
         counteredStartTime != null ||
         (counteredVenue != null && counteredVenue.trim().isNotEmpty) ||
+        (counteredFormatCode != null && counteredFormatCode.trim().isNotEmpty) ||
         counteredFormat != null ||
         counteredPlayersPerSide != null;
     if (!changesAny) {
@@ -796,6 +800,8 @@ class MatchesRepositoryImpl implements MatchesRepository {
         requestId: requestId.value,
         counteredStartTime: counteredStartTime,
         counteredVenue: counteredVenue,
+        counteredFormatCode:
+            counteredFormatCode ?? counteredFormat?.formatCode,
         counteredFormat: counteredFormat,
         counteredPlayersPerSide: counteredPlayersPerSide,
         decisionNote: trimmedNote,

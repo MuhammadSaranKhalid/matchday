@@ -11,7 +11,6 @@ _FormatPresetDto _$FormatPresetDtoFromJson(Map<String, dynamic> json) =>
       id: json['id'] as String,
       label: json['label'] as String,
       config: json['config'] as Map<String, dynamic>,
-      defaultScoringMode: json['default_scoring_mode'] as String?,
     );
 
 Map<String, dynamic> _$FormatPresetDtoToJson(_FormatPresetDto instance) =>
@@ -19,5 +18,4 @@ Map<String, dynamic> _$FormatPresetDtoToJson(_FormatPresetDto instance) =>
       'id': instance.id,
       'label': instance.label,
       'config': instance.config,
-      'default_scoring_mode': instance.defaultScoringMode,
     };

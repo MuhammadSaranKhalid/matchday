@@ -13,6 +13,11 @@ class MatchStartLineupCandidate extends Equatable {
     required this.name,
     this.photoUrl,
     this.jersey,
+    this.styleTag = 'RHB',
+    this.statsSummary = 'Top order · In squad',
+    this.category = 'bat',
+    this.isCaptain = false,
+    this.isKeeper = false,
   });
 
   /// The player ref id — what the controller stores as the picked opener.
@@ -25,6 +30,28 @@ class MatchStartLineupCandidate extends Equatable {
 
   final int? jersey;
 
+  /// Cricket style tag (e.g. 'RHB', 'LHB', 'RF', 'OB').
+  final String styleTag;
+
+  /// Contextual stats or role summary (e.g. 'Innings avg: 41.2 · SR 148').
+  final String statsSummary;
+
+  /// Roster filter category: 'all', 'bat', 'ar', 'bowl'.
+  final String category;
+
+  final bool isCaptain;
+  final bool isKeeper;
+
   @override
-  List<Object?> get props => [refId, name, photoUrl, jersey];
+  List<Object?> get props => [
+    refId,
+    name,
+    photoUrl,
+    jersey,
+    styleTag,
+    statsSummary,
+    category,
+    isCaptain,
+    isKeeper,
+  ];
 }

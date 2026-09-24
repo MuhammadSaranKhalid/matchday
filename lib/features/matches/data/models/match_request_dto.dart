@@ -17,6 +17,7 @@ abstract class MatchRequestDto with _$MatchRequestDto {
     @JsonKey(name: 'requested_by') required String requestedBy,
     @JsonKey(name: 'proposed_start_time') String? proposedStartTime,
     @JsonKey(name: 'proposed_venue') String? proposedVenue,
+    @JsonKey(name: 'proposed_format_code') String? proposedFormatCode,
     @JsonKey(name: 'proposed_format') Map<String, dynamic>? proposedFormat,
     String? message,
     @JsonKey(name: 'players_per_side') @Default(11) int playersPerSide,
@@ -24,6 +25,7 @@ abstract class MatchRequestDto with _$MatchRequestDto {
     @JsonKey(name: 'from_team_keeper_id') String? fromTeamKeeperId,
     @JsonKey(name: 'countered_start_time') String? counteredStartTime,
     @JsonKey(name: 'countered_venue') String? counteredVenue,
+    @JsonKey(name: 'countered_format_code') String? counteredFormatCode,
     @JsonKey(name: 'countered_format') Map<String, dynamic>? counteredFormat,
     @JsonKey(name: 'countered_players_per_side') int? counteredPlayersPerSide,
     @Default('pending') String status,
@@ -73,6 +75,8 @@ abstract class MatchRequestDto with _$MatchRequestDto {
       requestedBy: requestedBy,
       proposedStartTime: parse(proposedStartTime),
       proposedVenue: proposedVenue,
+      proposedFormatCode:
+          proposedFormatCode ?? proposedFormat?['format_code'] as String?,
       proposedFormat: format(proposedFormat),
       message: message,
       playersPerSide: playersPerSide,
@@ -80,6 +84,8 @@ abstract class MatchRequestDto with _$MatchRequestDto {
       fromTeamKeeperId: fromTeamKeeperId,
       counteredStartTime: parse(counteredStartTime),
       counteredVenue: counteredVenue,
+      counteredFormatCode:
+          counteredFormatCode ?? counteredFormat?['format_code'] as String?,
       counteredFormat: format(counteredFormat),
       counteredPlayersPerSide: counteredPlayersPerSide,
       status: MatchRequestStatus.fromWire(status),

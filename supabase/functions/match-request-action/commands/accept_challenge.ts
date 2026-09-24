@@ -4,14 +4,11 @@
 //   2. Countered challenge: original sender accepts the counter terms.
 //   3. Open challenge claim: any authorized team manager claims for their team.
 //
-// Order: lock → authorize → derive terms → validate → create aggregate →
+// Order: lock → authorize → derive agreed terms → validate captains → create aggregate →
 //         guarded terminal transition.
 //
-// The three variants are kept explicit. Merging them into condition-heavy SQL
-// would eliminate the test surface that guards each authorization path.
-//
-// NOTE: The handler parses the envelope once. Commands receive typed inputs
-// directly — no re-parsing from ctx.body.
+// INVARIANT: Acceptance materializes the exact agreed terms without overrides.
+// If terms need adjustment, the counter-proposal flow must be used instead.
 
 import {
   badRequest,
@@ -45,7 +42,6 @@ export interface AcceptChallengeContext {
 export interface AcceptChallengeDependencies {
   lockChallenge(tx: Tx, requestId: string): Promise<ChallengeRow>;
   isTeamManager(tx: Tx, teamId: string): Promise<boolean>;
-  validateTeamXi(tx: Tx, teamId: string, xi: string[]): Promise<void>;
   validateTeamCaptain(tx: Tx, teamId: string): Promise<void>;
   createFriendlyCricketMatch(tx: Tx, input: CreateMatchInput): Promise<string>;
   acceptChallenge(
@@ -70,7 +66,6 @@ const matchRepo = new MatchCreationRepository();
 const defaultDeps: AcceptChallengeDependencies = {
   lockChallenge: (tx, id) => challengeRepo.lockChallenge(tx, id),
   isTeamManager: (tx, teamId) => teamRepo.isTeamManager(tx, teamId),
-  validateTeamXi: (tx, teamId, xi) => teamRepo.validateTeamXi(tx, teamId, xi),
   validateTeamCaptain: (tx, teamId) => teamRepo.validateTeamCaptain(tx, teamId),
   createFriendlyCricketMatch: (tx, input) =>
     matchRepo.createFriendlyCricketMatch(tx, input),
@@ -91,8 +86,9 @@ export async function acceptChallenge(
   // ── 1. Lock the challenge row ─────────────────────────────────────────────
   const row = await deps.lockChallenge(tx, input.requestId);
 
-  // ── 2. Authorize and derive effective match terms ─────────────────────────
+  // ── 2. Authorize and derive exact agreed match terms ──────────────────────
   let toTeamId: string;
+  let effectiveFormatCode: string;
   let effectiveFormat: Record<string, unknown>;
   let effectiveStartTime: string | null;
   let effectiveVenue: string | null;
@@ -103,12 +99,10 @@ export async function acceptChallenge(
       forbidden("Only the original sender can accept countered terms");
     }
     toTeamId = row.toTeamId!;
-    effectiveFormat = input.format ??
-      row.counteredFormat ??
-      row.proposedFormat ??
-      {};
-    effectiveStartTime = input.scheduledStartTime ?? row.counteredStartTime ?? row.proposedStartTime;
-    effectiveVenue = input.venue ?? row.counteredVenue ?? row.proposedVenue;
+    effectiveFormatCode = row.counteredFormatCode ?? row.proposedFormatCode;
+    effectiveFormat = row.counteredFormat ?? row.proposedFormat;
+    effectiveStartTime = row.counteredStartTime ?? row.proposedStartTime;
+    effectiveVenue = row.counteredVenue ?? row.proposedVenue;
 
   } else if (row.toTeamId != null) {
     // Targeted challenge: only the receiving team manager may accept.
@@ -116,9 +110,10 @@ export async function acceptChallenge(
       forbidden("Only managers of the receiving team can accept");
     }
     toTeamId = row.toTeamId;
-    effectiveFormat = input.format ?? row.proposedFormat ?? {};
-    effectiveStartTime = input.scheduledStartTime ?? row.proposedStartTime;
-    effectiveVenue = input.venue ?? row.proposedVenue;
+    effectiveFormatCode = row.proposedFormatCode;
+    effectiveFormat = row.proposedFormat;
+    effectiveStartTime = row.proposedStartTime;
+    effectiveVenue = row.proposedVenue;
 
   } else {
     // Open challenge claim: caller must supply and manage the claiming team.
@@ -132,28 +127,24 @@ export async function acceptChallenge(
       forbidden("You can only claim an open challenge on behalf of a team you manage");
     }
     toTeamId = input.toTeamId;
-    effectiveFormat = input.format ?? row.proposedFormat ?? {};
-    effectiveStartTime = input.scheduledStartTime ?? row.proposedStartTime;
-    effectiveVenue = input.venue ?? row.proposedVenue;
+    effectiveFormatCode = row.proposedFormatCode;
+    effectiveFormat = row.proposedFormat;
+    effectiveStartTime = row.proposedStartTime;
+    effectiveVenue = row.proposedVenue;
   }
 
-  // ── 3. Validate both teams ────────────────────────────────────────────────
-  await deps.validateTeamXi(tx, row.fromTeamId, row.fromTeamXi);
-  await deps.validateTeamXi(tx, toTeamId, input.toTeamXi);
+  // ── 3. Validate captains on both teams ────────────────────────────────────
   await deps.validateTeamCaptain(tx, row.fromTeamId);
   await deps.validateTeamCaptain(tx, toTeamId);
 
   // ── 4. Create the normalised match aggregate ──────────────────────────────
-  const normalizedFormat = MatchCreationRepository.normalizeFormat(effectiveFormat);
-
   const matchId = await deps.createFriendlyCricketMatch(tx, {
     venue: effectiveVenue,
     scheduledStartTime: effectiveStartTime,
-    format: normalizedFormat,
+    formatCode: effectiveFormatCode,
+    rules: effectiveFormat,
     teamAId: row.fromTeamId,
     teamBId: toTeamId,
-    teamAKeeperId: row.fromTeamKeeperId,
-    teamBKeeperId: input.toTeamKeeperId,
     actorId,
   });
 

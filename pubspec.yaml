@@ -121,6 +121,7 @@ flutter:
   assets:
     - assets/notification_icons/v1/
     - assets/notification_icons/LICENSE.tabler
+    - assets/cricket/
 
   # Bundled variable fonts (offline-first: no runtime fetch from
   # fonts.gstatic.com). Each file is a variable font spanning Thin→Black,

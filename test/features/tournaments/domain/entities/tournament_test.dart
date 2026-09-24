@@ -11,7 +11,7 @@ void main() {
         status: TournamentStatus.registration,
         privacy: TournamentPrivacy.public,
         createdBy: 'user-1',
-        organizers: ['user-1', 'user-2'],
+        organizers: const ['user-1', 'user-2'],
         venues: const [TournamentVenue(name: 'Model Town Ground')],
         createdAt: DateTime(2026, 8, 1),
         updatedAt: DateTime(2026, 8, 1),

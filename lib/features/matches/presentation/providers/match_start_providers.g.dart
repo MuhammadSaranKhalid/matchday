@@ -8,45 +8,25 @@ part of 'match_start_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// The batting side's XI as a tappable candidate list, in batting order as
-/// materialised in `match_players`.
-///
-/// Every player in the XI is included, whether or not they appear on the
-/// team's permanent roster. Guests and one-off ringers are materialised into
-/// `match_players` without a `team_members` row, and an inner join here would
-/// make them silently unpickable — a player who is physically opening the
-/// batting but cannot be selected in the app.
+/// The batting side's XI as a tappable candidate list, derived synchronously
+/// from the canonical [MatchRoomSnapshot].
 
 @ProviderFor(matchStartLineup)
 final matchStartLineupProvider = MatchStartLineupFamily._();
 
-/// The batting side's XI as a tappable candidate list, in batting order as
-/// materialised in `match_players`.
-///
-/// Every player in the XI is included, whether or not they appear on the
-/// team's permanent roster. Guests and one-off ringers are materialised into
-/// `match_players` without a `team_members` row, and an inner join here would
-/// make them silently unpickable — a player who is physically opening the
-/// batting but cannot be selected in the app.
+/// The batting side's XI as a tappable candidate list, derived synchronously
+/// from the canonical [MatchRoomSnapshot].
 
 final class MatchStartLineupProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<MatchStartLineupCandidate>>,
           List<MatchStartLineupCandidate>,
-          FutureOr<List<MatchStartLineupCandidate>>
+          List<MatchStartLineupCandidate>,
+          List<MatchStartLineupCandidate>
         >
-    with
-        $FutureModifier<List<MatchStartLineupCandidate>>,
-        $FutureProvider<List<MatchStartLineupCandidate>> {
-  /// The batting side's XI as a tappable candidate list, in batting order as
-  /// materialised in `match_players`.
-  ///
-  /// Every player in the XI is included, whether or not they appear on the
-  /// team's permanent roster. Guests and one-off ringers are materialised into
-  /// `match_players` without a `team_members` row, and an inner join here would
-  /// make them silently unpickable — a player who is physically opening the
-  /// batting but cannot be selected in the app.
+    with $Provider<List<MatchStartLineupCandidate>> {
+  /// The batting side's XI as a tappable candidate list, derived synchronously
+  /// from the canonical [MatchRoomSnapshot].
   MatchStartLineupProvider._({
     required MatchStartLineupFamily super.from,
     required String super.argument,
@@ -70,14 +50,24 @@ final class MatchStartLineupProvider
 
   @$internal
   @override
-  $FutureProviderElement<List<MatchStartLineupCandidate>> $createElement(
+  $ProviderElement<List<MatchStartLineupCandidate>> $createElement(
     $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
+  ) => $ProviderElement(pointer);
 
   @override
-  FutureOr<List<MatchStartLineupCandidate>> create(Ref ref) {
+  List<MatchStartLineupCandidate> create(Ref ref) {
     final argument = this.argument as String;
     return matchStartLineup(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<MatchStartLineupCandidate> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<MatchStartLineupCandidate>>(
+        value,
+      ),
+    );
   }
 
   @override
@@ -91,23 +81,13 @@ final class MatchStartLineupProvider
   }
 }
 
-String _$matchStartLineupHash() => r'51963cf2b9ac51cf8a29d83d8835f48b07ab7ccb';
+String _$matchStartLineupHash() => r'65baed3be8c52d1c378203e3fe3e6dac8893ea7c';
 
-/// The batting side's XI as a tappable candidate list, in batting order as
-/// materialised in `match_players`.
-///
-/// Every player in the XI is included, whether or not they appear on the
-/// team's permanent roster. Guests and one-off ringers are materialised into
-/// `match_players` without a `team_members` row, and an inner join here would
-/// make them silently unpickable — a player who is physically opening the
-/// batting but cannot be selected in the app.
+/// The batting side's XI as a tappable candidate list, derived synchronously
+/// from the canonical [MatchRoomSnapshot].
 
 final class MatchStartLineupFamily extends $Family
-    with
-        $FunctionalFamilyOverride<
-          FutureOr<List<MatchStartLineupCandidate>>,
-          String
-        > {
+    with $FunctionalFamilyOverride<List<MatchStartLineupCandidate>, String> {
   MatchStartLineupFamily._()
     : super(
         retry: null,
@@ -117,14 +97,8 @@ final class MatchStartLineupFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// The batting side's XI as a tappable candidate list, in batting order as
-  /// materialised in `match_players`.
-  ///
-  /// Every player in the XI is included, whether or not they appear on the
-  /// team's permanent roster. Guests and one-off ringers are materialised into
-  /// `match_players` without a `team_members` row, and an inner join here would
-  /// make them silently unpickable — a player who is physically opening the
-  /// batting but cannot be selected in the app.
+  /// The batting side's XI as a tappable candidate list, derived synchronously
+  /// from the canonical [MatchRoomSnapshot].
 
   MatchStartLineupProvider call(String matchId) =>
       MatchStartLineupProvider._(argument: matchId, from: this);
@@ -133,24 +107,25 @@ final class MatchStartLineupFamily extends $Family
   String toString() => r'matchStartLineupProvider';
 }
 
-/// The fielding side's XI as a candidate list for the opening bowler slot.
+/// The fielding side's XI as a candidate list for the opening bowler slot,
+/// derived synchronously from the canonical [MatchRoomSnapshot].
 
 @ProviderFor(matchStartBowlingLineup)
 final matchStartBowlingLineupProvider = MatchStartBowlingLineupFamily._();
 
-/// The fielding side's XI as a candidate list for the opening bowler slot.
+/// The fielding side's XI as a candidate list for the opening bowler slot,
+/// derived synchronously from the canonical [MatchRoomSnapshot].
 
 final class MatchStartBowlingLineupProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<MatchStartLineupCandidate>>,
           List<MatchStartLineupCandidate>,
-          FutureOr<List<MatchStartLineupCandidate>>
+          List<MatchStartLineupCandidate>,
+          List<MatchStartLineupCandidate>
         >
-    with
-        $FutureModifier<List<MatchStartLineupCandidate>>,
-        $FutureProvider<List<MatchStartLineupCandidate>> {
-  /// The fielding side's XI as a candidate list for the opening bowler slot.
+    with $Provider<List<MatchStartLineupCandidate>> {
+  /// The fielding side's XI as a candidate list for the opening bowler slot,
+  /// derived synchronously from the canonical [MatchRoomSnapshot].
   MatchStartBowlingLineupProvider._({
     required MatchStartBowlingLineupFamily super.from,
     required String super.argument,
@@ -174,14 +149,24 @@ final class MatchStartBowlingLineupProvider
 
   @$internal
   @override
-  $FutureProviderElement<List<MatchStartLineupCandidate>> $createElement(
+  $ProviderElement<List<MatchStartLineupCandidate>> $createElement(
     $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
+  ) => $ProviderElement(pointer);
 
   @override
-  FutureOr<List<MatchStartLineupCandidate>> create(Ref ref) {
+  List<MatchStartLineupCandidate> create(Ref ref) {
     final argument = this.argument as String;
     return matchStartBowlingLineup(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<MatchStartLineupCandidate> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<MatchStartLineupCandidate>>(
+        value,
+      ),
+    );
   }
 
   @override
@@ -197,16 +182,13 @@ final class MatchStartBowlingLineupProvider
 }
 
 String _$matchStartBowlingLineupHash() =>
-    r'18b8c6df6097b8b9ebd5f9a3c0557c124292f68e';
+    r'207ba01fcd311bc8d6e5207aa9e35fb6a5a659e7';
 
-/// The fielding side's XI as a candidate list for the opening bowler slot.
+/// The fielding side's XI as a candidate list for the opening bowler slot,
+/// derived synchronously from the canonical [MatchRoomSnapshot].
 
 final class MatchStartBowlingLineupFamily extends $Family
-    with
-        $FunctionalFamilyOverride<
-          FutureOr<List<MatchStartLineupCandidate>>,
-          String
-        > {
+    with $FunctionalFamilyOverride<List<MatchStartLineupCandidate>, String> {
   MatchStartBowlingLineupFamily._()
     : super(
         retry: null,
@@ -216,7 +198,8 @@ final class MatchStartBowlingLineupFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// The fielding side's XI as a candidate list for the opening bowler slot.
+  /// The fielding side's XI as a candidate list for the opening bowler slot,
+  /// derived synchronously from the canonical [MatchRoomSnapshot].
 
   MatchStartBowlingLineupProvider call(String matchId) =>
       MatchStartBowlingLineupProvider._(argument: matchId, from: this);

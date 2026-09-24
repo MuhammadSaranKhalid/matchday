@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:matchday/core/theme/circk_theme.dart';
 import 'package:matchday/features/matches/domain/entities/match.dart';
 import 'package:matchday/features/teams/domain/entities/team.dart';
 import 'package:matchday/features/tournaments/presentation/widgets/tournament_fixture_row.dart';

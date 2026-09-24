@@ -53,7 +53,7 @@ class MatchDetailScreen extends ConsumerWidget {
       if (startPhase == MatchStartPhase.toss ||
           startPhase == MatchStartPhase.lineup ||
           startPhase == MatchStartPhase.ready) {
-        return MatchStartScreen(matchId: matchId);
+        return MatchStartScreen(matchId: matchId, room: room);
       }
       return Scaffold(
         backgroundColor: CkColors.paper,

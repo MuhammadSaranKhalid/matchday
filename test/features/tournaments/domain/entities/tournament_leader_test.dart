@@ -60,7 +60,7 @@ void main() {
   group('caps', () {
     test('the cap is the head of each board', () {
       final boards = TournamentLeaderboards(
-        batting: [
+        batting: const [
           TournamentLeader(
             playerKey: 'u:1',
             displayName: 'Babar Azam',

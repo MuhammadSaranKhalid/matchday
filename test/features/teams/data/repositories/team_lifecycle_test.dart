@@ -90,7 +90,9 @@ void main() {
 
   group('leaveTeam', () {
     test('goes through the RPC with the membership id', () async {
-      when(() => remote.leaveTeam(any())).thenAnswer((_) async {});
+      when(() => remote.leaveTeam(any())).thenAnswer((_) async {
+        return null;
+      });
 
       final result = await repo.leaveTeam(const MembershipId('m1'));
 

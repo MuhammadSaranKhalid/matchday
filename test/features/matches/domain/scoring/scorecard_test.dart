@@ -57,9 +57,9 @@ void main() {
         displayName: e.value,
         profileId: 'u-${e.key}',
       ),
-    MatchPlayer(
-      id: const MatchPlayerId('b1'),
-      matchId: const MatchId('m1'),
+    const MatchPlayer(
+      id: MatchPlayerId('b1'),
+      matchId: MatchId('m1'),
       teamSide: MatchTeamSide.b,
       displayName: 'Kamran Shah',
       profileId: 'u-b1',

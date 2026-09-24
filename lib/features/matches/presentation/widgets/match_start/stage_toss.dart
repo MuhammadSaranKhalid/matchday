@@ -10,7 +10,8 @@ import '../../../../teams/domain/entities/team_member.dart';
 import '../../../../teams/presentation/providers/team_membership_providers.dart';
 import '../../../../teams/presentation/providers/teams_providers.dart';
 import '../../../domain/entities/match.dart';
-import '../../controllers/match_start_controller.dart';
+import '../../controllers/match_room_controller.dart';
+import '../../state/match_room_state.dart';
 import '../../state/match_start_state.dart';
 import 'match_start_atoms.dart';
 
@@ -27,10 +28,12 @@ class MatchStartTossStage extends ConsumerStatefulWidget {
     super.key,
     required this.matchId,
     required this.state,
+    required this.room,
   });
 
   final String matchId;
   final MatchStartState state;
+  final MatchRoomState room;
 
   @override
   ConsumerState<MatchStartTossStage> createState() =>
@@ -38,11 +41,17 @@ class MatchStartTossStage extends ConsumerStatefulWidget {
 }
 
 class _MatchStartTossStageState extends ConsumerState<MatchStartTossStage> {
-  final GlobalKey<MatchStartCoinFlipperState> _coinKey =
-      GlobalKey<MatchStartCoinFlipperState>();
+  TeamId? _pendingWinner;
+  TossDecision? _pendingDecision;
 
-  MatchStartController _controller() =>
-      ref.read(matchStartControllerProvider(widget.matchId).notifier);
+  @override
+  void initState() {
+    super.initState();
+    _pendingWinner =
+        widget.state.pendingTossWinner ?? widget.state.match.tossWonBy;
+    _pendingDecision =
+        widget.state.pendingDecision ?? widget.state.match.tossDecision;
+  }
 
   String _teamInitials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
@@ -102,8 +111,8 @@ class _MatchStartTossStageState extends ConsumerState<MatchStartTossStage> {
       );
     }
 
-    final winner = widget.state.pendingTossWinner;
-    final decision = widget.state.pendingDecision;
+    final winner = _pendingWinner ?? widget.state.pendingTossWinner;
+    final decision = _pendingDecision ?? widget.state.pendingDecision;
     final winnerName =
         winner == match.teamAId
             ? nameA
@@ -117,19 +126,7 @@ class _MatchStartTossStageState extends ConsumerState<MatchStartTossStage> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               // 1. 3D Interactive Coin Toss
-              MatchStartCoinFlipper(
-                key: _coinKey,
-                codeA: codeA,
-                codeB: codeB,
-                winnerSide:
-                    winner == match.teamAId
-                        ? 'A'
-                        : (winner == match.teamBId ? 'B' : null),
-                onOutcomeChanged: (side) {
-                  final pickedTeam = side == 'A' ? match.teamAId : match.teamBId;
-                  _controller().pickTossWinner(pickedTeam);
-                },
-              ),
+              const MatchStartCoinFlipper(),
               const SizedBox(height: 18),
 
               // 2. Step 1: Who won the toss?
@@ -166,11 +163,12 @@ class _MatchStartTossStageState extends ConsumerState<MatchStartTossStage> {
                       initials: codeA,
                       avatarColor: const Color(0xFF1B3D2F),
                       isSelected: winner == match.teamAId,
-                      badgeLabel: winner == match.teamAId ? 'Winner' : 'Opponent',
-                      statusLabel: 'COIN CALL',
+                      badgeLabel: winner == match.teamAId
+                          ? 'Toss Winner'
+                          : (winner == null ? 'Select' : 'Opponent'),
+                      statusLabel: 'TEAM A',
                       onTap: () {
-                        _controller().pickTossWinner(match.teamAId);
-                        _coinKey.currentState?.setSide('A');
+                        setState(() => _pendingWinner = match.teamAId);
                       },
                     ),
                   ),
@@ -182,11 +180,12 @@ class _MatchStartTossStageState extends ConsumerState<MatchStartTossStage> {
                       initials: codeB,
                       avatarColor: const Color(0xFF1E2330),
                       isSelected: winner == match.teamBId,
-                      badgeLabel: winner == match.teamBId ? 'Winner' : 'Opponent',
-                      statusLabel: 'STANDBY',
+                      badgeLabel: winner == match.teamBId
+                          ? 'Toss Winner'
+                          : (winner == null ? 'Select' : 'Opponent'),
+                      statusLabel: 'TEAM B',
                       onTap: () {
-                        _controller().pickTossWinner(match.teamBId);
-                        _coinKey.currentState?.setSide('B');
+                        setState(() => _pendingWinner = match.teamBId);
                       },
                     ),
                   ),
@@ -233,7 +232,7 @@ class _MatchStartTossStageState extends ConsumerState<MatchStartTossStage> {
                       icon: Icons.sports_cricket,
                       isSelected: decision == TossDecision.bat,
                       onTap: () =>
-                          _controller().pickTossDecision(TossDecision.bat),
+                          setState(() => _pendingDecision = TossDecision.bat),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -244,7 +243,7 @@ class _MatchStartTossStageState extends ConsumerState<MatchStartTossStage> {
                       icon: Icons.sports_baseball,
                       isSelected: decision == TossDecision.bowl,
                       onTap: () =>
-                          _controller().pickTossDecision(TossDecision.bowl),
+                          setState(() => _pendingDecision = TossDecision.bowl),
                     ),
                   ),
                 ],
@@ -279,9 +278,18 @@ class _MatchStartTossStageState extends ConsumerState<MatchStartTossStage> {
             height: 52,
             child: ElevatedButton(
               onPressed:
-                  widget.state.isTossReady && !widget.state.isBusy
+                  winner != null &&
+                          decision != null &&
+                          !widget.room.isCommandPending
                       ? () async {
-                        final res = await _controller().submitToss();
+                        final res = await ref
+                            .read(
+                              matchRoomControllerProvider(widget.matchId).notifier,
+                            )
+                            .submitToss(
+                              wonByTeamId: winner.value,
+                              decision: decision,
+                            );
                         if (!context.mounted) return;
                         res.fold(
                           (failure) => ScaffoldMessenger.of(context).showSnackBar(
@@ -343,19 +351,17 @@ class _MatchStartTossStageState extends ConsumerState<MatchStartTossStage> {
 // 3D Coin Flipper Component
 // ─────────────────────────────────────────────────────────────────────────────
 
+enum CoinSide { heads, tails }
+
 class MatchStartCoinFlipper extends StatefulWidget {
   const MatchStartCoinFlipper({
     super.key,
-    required this.codeA,
-    required this.codeB,
-    this.winnerSide,
-    required this.onOutcomeChanged,
+    this.initialSide = CoinSide.heads,
+    this.onOutcomeChanged,
   });
 
-  final String codeA;
-  final String codeB;
-  final String? winnerSide;
-  final ValueChanged<String> onOutcomeChanged;
+  final CoinSide initialSide;
+  final ValueChanged<CoinSide>? onOutcomeChanged;
 
   @override
   State<MatchStartCoinFlipper> createState() => MatchStartCoinFlipperState();
@@ -365,29 +371,20 @@ class MatchStartCoinFlipperState extends State<MatchStartCoinFlipper>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1250),
+    duration: const Duration(milliseconds: 1350),
   );
 
   bool _isFlipping = false;
-  // 'A' represents Heads, 'B' represents Tails
-  String _currentSide = 'A';
+  late CoinSide _currentSide = widget.initialSide;
+  double _startAngle = 0.0;
+  double _targetAngle = 0.0;
+  final math.Random _random = math.Random();
 
   @override
   void initState() {
     super.initState();
-    if (widget.winnerSide != null) {
-      _currentSide = widget.winnerSide!;
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant MatchStartCoinFlipper oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!_isFlipping &&
-        widget.winnerSide != null &&
-        widget.winnerSide != _currentSide) {
-      setState(() => _currentSide = widget.winnerSide!);
-    }
+    _startAngle = widget.initialSide == CoinSide.heads ? 0.0 : math.pi;
+    _targetAngle = _startAngle;
   }
 
   @override
@@ -396,20 +393,25 @@ class MatchStartCoinFlipperState extends State<MatchStartCoinFlipper>
     super.dispose();
   }
 
-  void setSide(String side) {
-    if (!_isFlipping && side != _currentSide) {
-      setState(() => _currentSide = side);
-    }
-  }
-
   Future<void> flip() async {
     if (_isFlipping) return;
 
     HapticFeedback.mediumImpact();
-    setState(() => _isFlipping = true);
 
-    // Alternate outcome or randomize
-    final nextSide = _currentSide == 'A' ? 'B' : 'A';
+    // Independent, truly random 50/50 fair toss
+    final nextSide = _random.nextBool() ? CoinSide.heads : CoinSide.tails;
+    final currentIsHeads = _currentSide == CoinSide.heads;
+    final nextIsHeads = nextSide == CoinSide.heads;
+
+    // Spin 4 full revolutions (8 * pi) + half revolution (pi) if toggling face
+    final deltaAngle =
+        (4 * 2 * math.pi) + (currentIsHeads == nextIsHeads ? 0.0 : math.pi);
+
+    setState(() {
+      _isFlipping = true;
+      _startAngle = _targetAngle % (2 * math.pi);
+      _targetAngle = _startAngle + deltaAngle;
+    });
 
     await _controller.forward(from: 0);
 
@@ -419,22 +421,18 @@ class MatchStartCoinFlipperState extends State<MatchStartCoinFlipper>
         _isFlipping = false;
       });
       HapticFeedback.lightImpact();
-      widget.onOutcomeChanged(nextSide);
+      widget.onOutcomeChanged?.call(nextSide);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isHeads = _currentSide == 'A';
-    final code = isHeads ? widget.codeA : widget.codeB;
-    final outcomeText =
-        _isFlipping
-            ? 'TOSS IN THE AIR...'
-            : 'TOSS OUTCOME: ${isHeads ? 'HEADS' : 'TAILS'} ($code)';
+    final isHeads = _currentSide == CoinSide.heads;
+    final outcomeText = _isFlipping
+        ? 'TOSS IN THE AIR...'
+        : 'TOSS OUTCOME: ${isHeads ? 'HEADS' : 'TAILS'}';
     final helperText =
-        _isFlipping
-            ? 'Flipping high in match arena...'
-            : 'Tap coin to toss';
+        _isFlipping ? 'Flipping high in match arena...' : 'Tap coin to toss';
 
     return Column(
       children: [
@@ -452,10 +450,10 @@ class MatchStartCoinFlipperState extends State<MatchStartCoinFlipper>
                   animation: _controller,
                   builder: (context, child) {
                     final progress = _controller.value;
-                    // Arc flight: 0 at start, 1 at midpoint, 0 at end
                     final arc = math.sin(progress * math.pi);
                     final shadowScale = 1.0 - (arc * 0.45);
-                    final shadowOpacity = (0.35 - (arc * 0.22)).clamp(0.08, 0.4);
+                    final shadowOpacity =
+                        (0.35 - (arc * 0.22)).clamp(0.08, 0.4);
 
                     return Positioned(
                       bottom: 12,
@@ -463,11 +461,13 @@ class MatchStartCoinFlipperState extends State<MatchStartCoinFlipper>
                         width: 110 * shadowScale,
                         height: 18 * shadowScale,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF24231F).withValues(alpha: shadowOpacity),
+                          color: const Color(0xFF24231F)
+                              .withValues(alpha: shadowOpacity),
                           borderRadius: BorderRadius.circular(100),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF24231F).withValues(alpha: shadowOpacity),
+                              color: const Color(0xFF24231F)
+                                  .withValues(alpha: shadowOpacity),
                               blurRadius: 10 + (arc * 10),
                               spreadRadius: 2,
                             ),
@@ -488,11 +488,14 @@ class MatchStartCoinFlipperState extends State<MatchStartCoinFlipper>
                     final translateY = -85.0 * arc;
                     final scale = 1.0 + (arc * 0.22);
 
-                    // Rotations during flight: 5 full flips (5 * 2 * pi)
-                    final spinAngle =
-                        _isFlipping
-                            ? progress * (5 * 2 * math.pi)
-                            : (isHeads ? 0.0 : math.pi);
+                    final curvedProgress = CurvedAnimation(
+                      parent: _controller,
+                      curve: Curves.easeOutCubic,
+                    ).value;
+                    final spinAngle = _isFlipping
+                        ? _startAngle +
+                            (_targetAngle - _startAngle) * curvedProgress
+                        : (isHeads ? 0.0 : math.pi);
 
                     final normalizedAngle = spinAngle % (2 * math.pi);
                     final showFront =
@@ -501,48 +504,50 @@ class MatchStartCoinFlipperState extends State<MatchStartCoinFlipper>
 
                     return Transform(
                       alignment: Alignment.center,
-                      transform:
-                          Matrix4.identity()
-                            ..setEntry(3, 2, 0.0015)
-                            ..translateByDouble(0.0, translateY, 0.0, 1.0)
-                            ..scaleByDouble(scale, scale, 1.0, 1.0)
-                            ..rotateY(spinAngle),
-                      child: Container(
-                        width: 136,
-                        height: 136,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFFEEDC9A),
-                            width: 3,
+                      transform: Matrix4.identity()
+                        ..setEntry(3, 2, 0.0015)
+                        ..translateByDouble(0.0, translateY, 0.0, 1.0)
+                        ..scaleByDouble(scale, scale, 1.0, 1.0)
+                        ..rotateY(spinAngle),
+                      child: Transform.flip(
+                        flipX: !showFront,
+                        child: Container(
+                          width: 136,
+                          height: 136,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFFEEDC9A),
+                              width: 3,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x60A0781E),
+                                blurRadius: 28,
+                                offset: Offset(0, 10),
+                              ),
+                              BoxShadow(
+                                color: Color(0x30000000),
+                                blurRadius: 10,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x60A0781E),
-                              blurRadius: 28,
-                              offset: Offset(0, 10),
-                            ),
-                            BoxShadow(
-                              color: Color(0x30000000),
-                              blurRadius: 10,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: Image.asset(
-                            showFront
-                                ? 'assets/cricket/coin_heads.png'
-                                : 'assets/cricket/coin_tails.png',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: const Color(0xFFD4AF37),
-                              alignment: Alignment.center,
-                              child: Text(
-                                showFront ? 'HEADS' : 'TAILS',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                          child: ClipOval(
+                            child: Image.asset(
+                              showFront
+                                  ? 'assets/cricket/coin_heads.png'
+                                  : 'assets/cricket/coin_tails.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFFD4AF37),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  showFront ? 'HEADS' : 'TAILS',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
@@ -582,10 +587,9 @@ class MatchStartCoinFlipperState extends State<MatchStartCoinFlipper>
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color:
-                        _isFlipping
-                            ? const Color(0xFFE94D3A)
-                            : const Color(0xFFB8860B),
+                    color: _isFlipping
+                        ? const Color(0xFFE94D3A)
+                        : const Color(0xFFB8860B),
                     shape: BoxShape.circle,
                   ),
                 ),

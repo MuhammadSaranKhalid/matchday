@@ -50,8 +50,12 @@ class MatchesRemoteDataSource {
       'is_playing_xi, batting_order, is_captain, is_vice_captain, '
       'is_wicket_keeper, is_substitute'
       '), '
-      'profile:profiles!user_id(display_name, username, profile_photo_url), '
-      'unclaimed:unclaimed_players!unclaimed_id(display_name)';
+      'profile:profiles!match_players_user_id_fkey('
+      'display_name, username, profile_photo_url'
+      '), '
+      'unclaimed:unclaimed_players!match_players_unclaimed_id_fkey('
+      'display_name'
+      ')';
   static const _matchInningsState = 'cricket_match_innings_state';
   static const _balls = 'cricket_match_deliveries';
   static const _matchInnings = 'cricket_match_innings';

@@ -2,6 +2,8 @@ import 'package:equatable/equatable.dart';
 
 import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/match.dart';
+import '../../domain/entities/match_player.dart';
+import 'match_room_state.dart';
 
 /// Display-only relationship on the Match Start screen.
 ///
@@ -42,6 +44,44 @@ class MatchStartState extends Equatable {
     this.pendingBowler,
     this.isBusy = false,
   });
+
+  factory MatchStartState.fromRoom(
+    MatchRoomState room, {
+    String? userId,
+    TeamId? pendingTossWinner,
+    TossDecision? pendingDecision,
+  }) {
+    final match = room.snapshot.match;
+    final batting = battingFirstTeam(match);
+    final bowling = batting == null
+        ? null
+        : (batting == match.teamAId ? match.teamBId : match.teamAId);
+    final lineup = room.snapshot.participants;
+    final innings = room.snapshot.innings;
+
+    return MatchStartState(
+      match: match,
+      viewerRole: viewerRoleOnMatch(match, userId),
+      captainOf: captainSideOf(match, userId),
+      canRecordToss: room.snapshot.capabilities.canRecordToss,
+      canManageBattingSetup: room.snapshot.capabilities.canSetupInnings,
+      battingTeamId: batting,
+      bowlingTeamId: bowling,
+      lockedStriker: lineup.playerRefIdOf(innings?.strikerId?.value),
+      lockedNonStriker: lineup.playerRefIdOf(innings?.nonStrikerId?.value),
+      lockedBowler: lineup.playerRefIdOf(innings?.bowlerId?.value),
+      pendingTossWinner: pendingTossWinner,
+      pendingDecision: pendingDecision,
+      pendingStriker:
+          lineup.playerRefIdOf(room.selectedStrikerId) ?? room.selectedStrikerId,
+      pendingNonStriker:
+          lineup.playerRefIdOf(room.selectedNonStrikerId) ??
+          room.selectedNonStrikerId,
+      pendingBowler:
+          lineup.playerRefIdOf(room.selectedBowlerId) ?? room.selectedBowlerId,
+      isBusy: room.isCommandPending || room.isRefreshing,
+    );
+  }
 
   final Match match;
 

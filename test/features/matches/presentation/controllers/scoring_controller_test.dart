@@ -151,7 +151,9 @@ void main() {
     when(() => repo.syncPendingOps(
           matchId: any(named: 'matchId'),
           inningsNumber: any(named: 'inningsNumber'),
-        )).thenAnswer((_) async {});
+        )).thenAnswer((_) async {
+          return null;
+        });
   });
 
   ProviderContainer makeContainer({

@@ -31,7 +31,7 @@ void main() {
           body: any(named: 'body'),
         ),
       ).thenAnswer(
-        (_) async => FunctionResponse(
+        (_) async => const FunctionResponse(
           status: 200,
           data: {'ok': true, 'match_id': matchId},
         ),
@@ -63,7 +63,7 @@ void main() {
           body: any(named: 'body'),
         ),
       ).thenAnswer(
-        (_) async => FunctionResponse(
+        (_) async => const FunctionResponse(
           status: 200,
           data: {'ok': true},
         ),
@@ -174,7 +174,7 @@ void main() {
           body: any(named: 'body'),
         ),
       ).thenAnswer(
-        (_) async => FunctionResponse(
+        (_) async => const FunctionResponse(
           status: 200,
           data: {'ok': true, 'match_id': matchId},
         ),

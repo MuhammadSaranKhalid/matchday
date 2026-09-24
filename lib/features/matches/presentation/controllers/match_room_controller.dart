@@ -31,7 +31,7 @@ class MatchRoomController extends _$MatchRoomController {
             if (!first.isCompleted) {
               first.complete(_stateForSnapshot(snapshot));
             } else {
-              _adopt(snapshot);
+              _adoptRealtime(snapshot);
             }
           },
           onError: (Object error, StackTrace stackTrace) {
@@ -48,14 +48,54 @@ class MatchRoomController extends _$MatchRoomController {
     return first.future;
   }
 
-  void selectStriker(String? id) =>
-      _update((value) => value.copyWith(selectedStrikerId: () => id));
+  void selectStriker(String? id) => _update((value) {
+    if (id != null && id == value.selectedNonStrikerId) {
+      return value.copyWith(
+        selectedStrikerId: () => id,
+        selectedNonStrikerId: () => null,
+      );
+    }
+    return value.copyWith(selectedStrikerId: () => id);
+  });
 
-  void selectNonStriker(String? id) =>
-      _update((value) => value.copyWith(selectedNonStrikerId: () => id));
+  void selectNonStriker(String? id) => _update((value) {
+    if (id != null && id == value.selectedStrikerId) {
+      return value.copyWith(
+        selectedStrikerId: () => null,
+        selectedNonStrikerId: () => id,
+      );
+    }
+    return value.copyWith(selectedNonStrikerId: () => id);
+  });
 
   void selectBowler(String? id) =>
       _update((value) => value.copyWith(selectedBowlerId: () => id));
+
+  void swapBatters() => _update(
+    (value) => value.copyWith(
+      selectedStrikerId: () => value.selectedNonStrikerId,
+      selectedNonStrikerId: () => value.selectedStrikerId,
+    ),
+  );
+
+  void tapOpener(String id) {
+    _update((current) {
+      final striker = current.selectedStrikerId;
+      final nonStriker = current.selectedNonStrikerId;
+      final (String? nextStriker, String? nextNonStriker) = switch ((
+        striker,
+        nonStriker,
+      )) {
+        (null, _) => (id, nonStriker == id ? null : nonStriker),
+        (_, null) => (striker == id ? null : striker, id),
+        _ => (id, nonStriker == id ? striker : nonStriker),
+      };
+      return current.copyWith(
+        selectedStrikerId: () => nextStriker,
+        selectedNonStrikerId: () => nextNonStriker,
+      );
+    });
+  }
 
   Future<Either<Failure, Unit>> submitToss({
     required String wonByTeamId,
@@ -89,6 +129,11 @@ class MatchRoomController extends _$MatchRoomController {
         current.selectedBowlerId == null) {
       return const Left(
         ValidationFailure('Select striker, non-striker, and bowler'),
+      );
+    }
+    if (current.selectedStrikerId == current.selectedNonStrikerId) {
+      return const Left(
+        ValidationFailure('Striker and non-striker must be different players'),
       );
     }
     return _command(
@@ -127,7 +172,7 @@ class MatchRoomController extends _$MatchRoomController {
         ),
       ),
       (snapshot) {
-        _adopt(snapshot);
+        _adoptCanonical(snapshot);
         _update((value) => value.copyWith(isRefreshing: false));
       },
     );
@@ -154,7 +199,7 @@ class MatchRoomController extends _$MatchRoomController {
         ),
       ),
       (snapshot) {
-        _adopt(snapshot);
+        _adoptCanonical(snapshot);
         _update((value) => value.copyWith(isCommandPending: false));
       },
     );
@@ -170,34 +215,49 @@ class MatchRoomController extends _$MatchRoomController {
     );
   }
 
-  void _adopt(MatchRoomSnapshot snapshot) {
+  MatchRoomState _mergeSnapshot(
+    MatchRoomState current,
+    MatchRoomSnapshot snapshot,
+  ) {
+    final eligible =
+        snapshot.participants.map((player) => player.id.value).toSet();
+    final navigation =
+        current.navigation ?? _navigationFor(snapshot.match.status);
+    final nextStriker = eligible.contains(current.selectedStrikerId)
+        ? current.selectedStrikerId
+        : null;
+    var nextNonStriker = eligible.contains(current.selectedNonStrikerId)
+        ? current.selectedNonStrikerId
+        : null;
+    if (nextStriker != null && nextStriker == nextNonStriker) {
+      nextNonStriker = null;
+    }
+    return current.copyWith(
+      snapshot: snapshot,
+      navigation: () => navigation,
+      navigationRevision: () => navigation == null ? null : snapshot.revision,
+      nonBlockingError: () => null,
+      selectedStrikerId: () => nextStriker,
+      selectedNonStrikerId: () => nextNonStriker,
+      selectedBowlerId:
+          () =>
+              eligible.contains(current.selectedBowlerId)
+                  ? current.selectedBowlerId
+                  : null,
+    );
+  }
+
+  void _adoptRealtime(MatchRoomSnapshot snapshot) {
     _update((current) {
       if (snapshot.revision <= current.snapshot.revision) return current;
-      final eligible =
-          snapshot.participants.map((player) => player.id.value).toSet();
-      final navigation =
-          current.navigation ?? _navigationFor(snapshot.match.status);
-      return current.copyWith(
-        snapshot: snapshot,
-        navigation: () => navigation,
-        navigationRevision: () => navigation == null ? null : snapshot.revision,
-        nonBlockingError: () => null,
-        selectedStrikerId:
-            () =>
-                eligible.contains(current.selectedStrikerId)
-                    ? current.selectedStrikerId
-                    : null,
-        selectedNonStrikerId:
-            () =>
-                eligible.contains(current.selectedNonStrikerId)
-                    ? current.selectedNonStrikerId
-                    : null,
-        selectedBowlerId:
-            () =>
-                eligible.contains(current.selectedBowlerId)
-                    ? current.selectedBowlerId
-                    : null,
-      );
+      return _mergeSnapshot(current, snapshot);
+    });
+  }
+
+  void _adoptCanonical(MatchRoomSnapshot snapshot) {
+    _update((current) {
+      if (snapshot.revision < current.snapshot.revision) return current;
+      return _mergeSnapshot(current, snapshot);
     });
   }
 

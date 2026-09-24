@@ -69,7 +69,7 @@ void main() {
             expect({a, b}, isNot(equals({'t1', 't2'})));
           }
           // Lower number = better seed.
-          final seedOf = (String t) => int.parse(t.substring(1));
+          int seedOf(String t) => int.parse(t.substring(1));
           winner[f.slotId] = seedOf(a) < seedOf(b) ? a : b;
         }
       }

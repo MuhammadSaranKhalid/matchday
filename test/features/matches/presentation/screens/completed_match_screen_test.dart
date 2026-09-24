@@ -56,7 +56,7 @@ void main() {
       InningsCard(
         inningsNumber: number,
         battingTeamSide: side,
-        batting: [
+        batting: const [
           BattingLine(
             playerId: 'p1',
             name: 'Bilal Hussain',
@@ -68,7 +68,7 @@ void main() {
             dismissal: 'c Shahzaib b Danish Raza',
             batted: true,
           ),
-          const BattingLine(
+          BattingLine(
             playerId: 'p2',
             name: 'Abdul Rehman Qureshi',
             runs: 0,
@@ -80,8 +80,8 @@ void main() {
             batted: true,
           ),
         ],
-        bowling: [
-          const BowlingLine(
+        bowling: const [
+          BowlingLine(
             playerId: 'b1',
             name: 'Hamza Sheikh',
             legalBalls: 24,

@@ -1,189 +1,154 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:matchday/features/matches/domain/entities/match.dart';
-import 'package:matchday/features/matches/domain/entities/match_innings_state.dart';
-import 'package:matchday/features/matches/domain/entities/match_player.dart';
+import 'package:matchday/features/matches/data/models/match_room_snapshot_dto.dart';
+import 'package:matchday/features/matches/domain/entities/match_room_snapshot.dart';
+import 'package:matchday/features/matches/presentation/controllers/match_room_controller.dart';
 import 'package:matchday/features/matches/presentation/providers/match_start_providers.dart';
-import 'package:matchday/features/matches/presentation/providers/matches_providers.dart';
-import 'package:matchday/features/teams/domain/entities/roster_member.dart';
-import 'package:matchday/features/teams/domain/entities/team.dart';
-import 'package:matchday/features/teams/domain/entities/team_member.dart';
-import 'package:matchday/features/teams/presentation/providers/teams_providers.dart';
+import 'package:matchday/features/matches/presentation/state/match_room_state.dart';
 
 const _matchId = 'm1';
-const _teamA = TeamId('a');
-const _teamB = TeamId('b');
 
-/// Team A won the toss and chose to bat, so team A bats first.
-Match _match() => Match(
-      id: const MatchId(_matchId),
-      teamAId: _teamA,
-      teamBId: _teamB,
-      format: const MatchFormat(
-        oversPerInnings: 20,
-        playersPerTeam: 11,
-        ballType: MatchBallType.tape,
-        maxOversPerBowler: 4,
-      ),
-      status: MatchStatus.toss,
-      createdBy: 'capA',
-      createdAt: DateTime(2026),
-      teamACaptain: 'capA',
-      teamBCaptain: 'capB',
-      tossWonBy: _teamA,
-      tossDecision: TossDecision.bat,
-      startPhase: MatchStartPhase.lineup,
-    );
-
-Team _team(TeamId id, String name) => Team(
-      id: id,
-      createdBy: 'capA',
-      name: name,
-      type: TeamType.club,
-      privacy: TeamPrivacy.public,
-      createdAt: DateTime(2026),
-      updatedAt: DateTime(2026),
-    );
-
-MatchPlayer _player(
-  String mpId,
-  String refId, {
-  int? jersey,
-  String? name,
-  String? photoUrl,
+MatchRoomSnapshot _room({
+  required List<Map<String, dynamic>> participants,
 }) =>
-    MatchPlayer(
-      id: MatchPlayerId(mpId),
-      matchId: const MatchId(_matchId),
-      teamSide: MatchTeamSide.a,
-      profileId: refId,
-      displayName: name ?? 'Player $refId',
-      photoUrl: photoUrl,
-      jerseyNumber: jersey,
-    );
-
-RosterMember _roster(String refId, String name, {int? jersey}) => RosterMember(
-      member: TeamMember(
-        id: MembershipId('mem-$refId'),
-        teamId: _teamA,
-        playerId: refId,
-        playerType: PlayerType.claimed,
-        roles: {MemberRole.player.wire},
-        addedBy: 'capA',
-        joinedAt: DateTime(2026),
-        updatedAt: DateTime(2026),
-        jerseyNumber: jersey,
-      ),
-      displayName: name,
-    );
+    MatchRoomSnapshotDto.fromJson({
+      'revision': 1,
+      'server_time': '2026-09-24T00:00:00.000Z',
+      'match': {
+        'match_id': _matchId,
+        'team_a_id': 'a',
+        'team_b_id': 'b',
+        'format': <String, dynamic>{},
+        'status': 'toss',
+        'start_phase': 'lineup',
+        'toss_won_by': 'a',
+        'toss_decision': 'bat',
+        'created_at': '2026-09-24T00:00:00.000Z',
+      },
+      'participants': participants,
+      'capabilities': {
+        'can_record_toss': true,
+        'can_setup_innings': true,
+      },
+    }).toEntity();
 
 void main() {
-  ProviderContainer makeContainer({
-    required List<MatchPlayer> lineup,
-    required List<RosterMember> roster,
-    MatchInningsState? innings,
-  }) {
-    final container = ProviderContainer.test(
-      overrides: [
-        liveMatchProvider(_matchId).overrideWith((ref) => Stream.value(_match())),
-        matchPlayersProvider(_matchId).overrideWith((ref) async => lineup),
-        rosterProvider(_teamA.value).overrideWith((ref) => Stream.value(roster)),
-        rosterProvider(_teamB.value)
-            .overrideWith((ref) => Stream.value(const [])),
-        teamProvider(_teamA.value)
-            .overrideWith((ref) => Stream.value(_team(_teamA, 'Kings XI'))),
-        teamProvider(_teamB.value)
-            .overrideWith((ref) => Stream.value(_team(_teamB, 'Eagles'))),
-        liveInningsStateProvider(_matchId, 1)
-            .overrideWith((ref) => Stream.value(innings)),
-      ],
-    );
-    addTearDown(container.dispose);
-    // Hold the provider open. Without a listener the autodispose chain tears
-    // down between `read` calls and the underlying streams never resolve.
-    container.listen(matchStartLineupProvider(_matchId), (_, __) {});
-    return container;
-  }
+  group('matchStartLineup (pure snapshot projection)', () {
+    test('lists the batting side in participants order', () async {
+      final room = _room(participants: [
+        {
+          'match_player_id': 'mp1',
+          'match_id': _matchId,
+          'team_side': 'team_a',
+          'profile_id': 'p1',
+          'display_name': 'Imran',
+          'jersey_number': 7,
+          'is_captain': true,
+        },
+        {
+          'match_player_id': 'mp2',
+          'match_id': _matchId,
+          'team_side': 'team_a',
+          'profile_id': 'p2',
+          'display_name': 'Wasim',
+          'jersey_number': 10,
+        },
+      ]);
 
-  group('matchStartLineup', () {
-    test('lists the batting side in match_players order', () async {
-      final container = makeContainer(
-        lineup: [
-          _player('mp1', 'p1', name: 'Imran'),
-          _player('mp2', 'p2', name: 'Wasim'),
+      final container = ProviderContainer.test(
+        overrides: [
+          matchRoomControllerProvider(_matchId).overrideWith(
+            () => _TestMatchRoomController(MatchRoomState(snapshot: room)),
+          ),
         ],
-        roster: [_roster('p1', 'Imran'), _roster('p2', 'Wasim')],
       );
+      addTearDown(container.dispose);
 
-      final candidates =
-          await container.read(matchStartLineupProvider(_matchId).future);
+      await container.read(matchRoomControllerProvider(_matchId).future);
+      final candidates = container.read(matchStartLineupProvider(_matchId));
 
       expect(candidates.map((c) => c.name), ['Imran', 'Wasim']);
       expect(candidates.map((c) => c.refId), ['p1', 'p2']);
-    });
-
-    test('keeps a guest who is in the XI but not on the roster', () async {
-      // The regression this guards: an inner join dropped guests entirely,
-      // so a player physically opening the batting could not be selected.
-      final container = makeContainer(
-        lineup: [
-          _player('mp1', 'p1'),
-          _player('mp2', 'guest-9'),
-        ],
-        roster: [_roster('p1', 'Imran')],
-      );
-
-      final candidates =
-          await container.read(matchStartLineupProvider(_matchId).future);
-
-      expect(candidates, hasLength(2));
-      expect(candidates.last.refId, 'guest-9');
-      expect(candidates.last.name, isNotEmpty);
-    });
-
-    test('prefers the per-match jersey over the roster number', () async {
-      final container = makeContainer(
-        lineup: [_player('mp1', 'p1', jersey: 7)],
-        roster: [_roster('p1', 'Imran', jersey: 44)],
-      );
-
-      final candidates =
-          await container.read(matchStartLineupProvider(_matchId).future);
-
-      expect(candidates.single.jersey, 7);
-    });
-
-    test('falls back to the roster jersey when the match has none', () async {
-      final container = makeContainer(
-        lineup: [_player('mp1', 'p1')],
-        roster: [_roster('p1', 'Imran', jersey: 44)],
-      );
-
-      final candidates =
-          await container.read(matchStartLineupProvider(_matchId).future);
-
-      expect(candidates.single.jersey, 44);
+      expect(candidates.first.isCaptain, isTrue);
+      expect(candidates.first.jersey, 7);
     });
 
     test('excludes the bowling side', () async {
-      final container = makeContainer(
-        lineup: [
-          _player('mp1', 'p1'),
-          const MatchPlayer(
-            id: MatchPlayerId('mp9'),
-            matchId: MatchId(_matchId),
-            teamSide: MatchTeamSide.b,
-            profileId: 'opp-1',
-            displayName: 'Opponent',
+      final room = _room(participants: [
+        {
+          'match_player_id': 'mp1',
+          'match_id': _matchId,
+          'team_side': 'team_a',
+          'profile_id': 'p1',
+          'display_name': 'Imran',
+        },
+        {
+          'match_player_id': 'mp9',
+          'match_id': _matchId,
+          'team_side': 'team_b',
+          'profile_id': 'opp-1',
+          'display_name': 'Opponent',
+        },
+      ]);
+
+      final container = ProviderContainer.test(
+        overrides: [
+          matchRoomControllerProvider(_matchId).overrideWith(
+            () => _TestMatchRoomController(MatchRoomState(snapshot: room)),
           ),
         ],
-        roster: [_roster('p1', 'Imran')],
       );
+      addTearDown(container.dispose);
 
+      await container.read(matchRoomControllerProvider(_matchId).future);
+      final candidates = container.read(matchStartLineupProvider(_matchId));
+
+      expect(candidates.map((c) => c.refId), ['p1']);
+    });
+
+    test('matchStartBowlingLineup lists the fielding side', () async {
+      final room = _room(participants: [
+        {
+          'match_player_id': 'mp1',
+          'match_id': _matchId,
+          'team_side': 'team_a',
+          'profile_id': 'p1',
+          'display_name': 'Imran',
+        },
+        {
+          'match_player_id': 'mp9',
+          'match_id': _matchId,
+          'team_side': 'team_b',
+          'profile_id': 'opp-1',
+          'display_name': 'Shoaib',
+          'jersey_number': 14,
+        },
+      ]);
+
+      final container = ProviderContainer.test(
+        overrides: [
+          matchRoomControllerProvider(_matchId).overrideWith(
+            () => _TestMatchRoomController(MatchRoomState(snapshot: room)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(matchRoomControllerProvider(_matchId).future);
       final candidates =
-          await container.read(matchStartLineupProvider(_matchId).future);
+          container.read(matchStartBowlingLineupProvider(_matchId));
 
-      expect(candidates.single.refId, 'p1');
+      expect(candidates.map((c) => c.refId), ['opp-1']);
+      expect(candidates.single.name, 'Shoaib');
+      expect(candidates.single.jersey, 14);
     });
   });
+}
+
+class _TestMatchRoomController extends MatchRoomController {
+  _TestMatchRoomController(this._initial);
+  final MatchRoomState _initial;
+
+  @override
+  Future<MatchRoomState> build(String matchId) async => _initial;
 }

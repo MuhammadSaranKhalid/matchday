@@ -109,12 +109,14 @@ class MatchStartWaitingCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  statusNote,
-                  style: CkType.mono(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF4E7D58),
+                Flexible(
+                  child: Text(
+                    statusNote,
+                    style: CkType.mono(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF4E7D58),
+                    ),
                   ),
                 ),
               ],

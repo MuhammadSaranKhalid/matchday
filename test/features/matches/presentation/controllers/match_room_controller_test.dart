@@ -130,11 +130,132 @@ void main() {
     expect(state.selectedNonStrikerId, 'p2');
     expect(state.selectedBowlerId, 'p3');
   });
+
+  test('explicit refresh adopts updated capabilities even at same revision', () async {
+    final initial = _room(2, canRecordToss: false);
+    final updated = _room(2, canRecordToss: true);
+    when(() => repository.getMatchRoom(any()))
+        .thenAnswer((_) async => Right(updated));
+
+    final keepAlive = container.listen(
+      matchRoomControllerProvider('m1'),
+      (_, __) {},
+    );
+    addTearDown(keepAlive.close);
+    final future = container.read(matchRoomControllerProvider('m1').future);
+    rooms.add(initial);
+    await future;
+
+    var state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.snapshot.capabilities.canRecordToss, isFalse);
+
+    await container
+        .read(matchRoomControllerProvider('m1').notifier)
+        .refresh();
+
+    state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.snapshot.capabilities.canRecordToss, isTrue);
+  });
+
+  test('realtime event with same or lower revision is not adopted', () async {
+    final initial = _room(3, canRecordToss: false);
+    final staleRealtime = _room(3, canRecordToss: true);
+
+    final keepAlive = container.listen(
+      matchRoomControllerProvider('m1'),
+      (_, __) {},
+    );
+    addTearDown(keepAlive.close);
+    final future = container.read(matchRoomControllerProvider('m1').future);
+    rooms.add(initial);
+    await future;
+
+    rooms.add(staleRealtime);
+    await _pump();
+
+    final state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.snapshot.capabilities.canRecordToss, isFalse);
+  });
+
+  test('swapBatters swaps striker and non-striker', () async {
+    final initial = _room(1);
+    final keepAlive = container.listen(
+      matchRoomControllerProvider('m1'),
+      (_, __) {},
+    );
+    addTearDown(keepAlive.close);
+    final future = container.read(matchRoomControllerProvider('m1').future);
+    rooms.add(initial);
+    await future;
+
+    final controller =
+        container.read(matchRoomControllerProvider('m1').notifier);
+    controller
+      ..selectStriker('p1')
+      ..selectNonStriker('p2');
+
+    controller.swapBatters();
+    final state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.selectedStrikerId, 'p2');
+    expect(state.selectedNonStrikerId, 'p1');
+  });
+
+  test('selecting player as striker clears non-striker if already occupying that slot', () async {
+    final initial = _room(1);
+    final keepAlive = container.listen(
+      matchRoomControllerProvider('m1'),
+      (_, __) {},
+    );
+    addTearDown(keepAlive.close);
+    final future = container.read(matchRoomControllerProvider('m1').future);
+    rooms.add(initial);
+    await future;
+
+    final controller =
+        container.read(matchRoomControllerProvider('m1').notifier);
+    controller.selectNonStriker('p1');
+    var state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.selectedNonStrikerId, 'p1');
+    expect(state.selectedStrikerId, isNull);
+
+    controller.selectStriker('p1');
+    state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.selectedStrikerId, 'p1');
+    expect(state.selectedNonStrikerId, isNull);
+  });
+
+  test('selecting player as non-striker clears striker if already occupying that slot', () async {
+    final initial = _room(1);
+    final keepAlive = container.listen(
+      matchRoomControllerProvider('m1'),
+      (_, __) {},
+    );
+    addTearDown(keepAlive.close);
+    final future = container.read(matchRoomControllerProvider('m1').future);
+    rooms.add(initial);
+    await future;
+
+    final controller =
+        container.read(matchRoomControllerProvider('m1').notifier);
+    controller.selectStriker('p1');
+    var state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.selectedStrikerId, 'p1');
+    expect(state.selectedNonStrikerId, isNull);
+
+    controller.selectNonStriker('p1');
+    state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.selectedNonStrikerId, 'p1');
+    expect(state.selectedStrikerId, isNull);
+  });
 }
 
 Future<void> _pump() => Future<void>.delayed(const Duration(milliseconds: 10));
 
-MatchRoomSnapshot _room(int revision, {String status = 'scheduled'}) =>
+MatchRoomSnapshot _room(
+  int revision, {
+  String status = 'scheduled',
+  bool canRecordToss = false,
+}) =>
     MatchRoomSnapshotDto.fromJson({
       'revision': revision,
       'server_time': '2026-09-21T00:00:00.000Z',
@@ -156,5 +277,7 @@ MatchRoomSnapshot _room(int revision, {String status = 'scheduled'}) =>
             'display_name': id,
           },
       ],
-      'capabilities': <String, dynamic>{},
+      'capabilities': {
+        'can_record_toss': canRecordToss,
+      },
     }).toEntity();

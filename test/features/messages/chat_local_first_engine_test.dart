@@ -247,7 +247,7 @@ void main() {
       expect(connectionListener, isNotNull);
 
       // Simulate connection recovered: disconnected -> connected
-      final change = ably.ConnectionStateChange(
+      final change = const ably.ConnectionStateChange(
         current: ably.ConnectionState.connected,
         previous: ably.ConnectionState.disconnected,
         event: ably.ConnectionEvent.connected,

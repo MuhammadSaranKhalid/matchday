@@ -47,6 +47,7 @@ void main() {
 
   setUp(() {
     repo = _MockPostsRepository();
+    when(() => repo.discardPendingPost(any())).thenAnswer((_) async {});
     container = ProviderContainer(
       overrides: [
         postsRepositoryProvider.overrideWithValue(repo),

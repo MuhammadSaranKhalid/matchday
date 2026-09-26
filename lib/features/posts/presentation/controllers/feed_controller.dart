@@ -46,6 +46,11 @@ class FeedController extends _$FeedController {
       (f) => throw FailureWrapper(f),
       (posts) {
         _hasMore = posts.length == _pageSize;
+        // Provider-neutral pending post reconciliation (Point 10):
+        // When active posts arrive in the canonical feed, discard the matching pending records.
+        for (final p in posts) {
+          repo.discardPendingPost(p.id.value);
+        }
         return posts;
       },
     );

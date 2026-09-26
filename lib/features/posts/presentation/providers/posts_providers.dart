@@ -27,7 +27,7 @@ Stream<List<PendingPost>> pendingPosts(Ref ref) {
 Future<List<Post>> authorPosts(Ref ref, String authorId) async {
   // Watch synchronously before the await (don't chain watch→await).
   final repo = ref.watch(postsRepositoryProvider);
-  final result = await repo.getAuthorPosts(authorId);
+  final result = await repo.getHomeFeed(mode: 'user', targetId: authorId);
   return result.fold((f) => throw FailureWrapper(f), (p) => p);
 }
 
@@ -35,7 +35,7 @@ Future<List<Post>> authorPosts(Ref ref, String authorId) async {
 @riverpod
 Future<List<Post>> teamPosts(Ref ref, String teamId) async {
   final repo = ref.watch(postsRepositoryProvider);
-  final result = await repo.getTeamPosts(teamId);
+  final result = await repo.getHomeFeed(mode: 'team', targetId: teamId);
   return result.fold((f) => throw FailureWrapper(f), (p) => p);
 }
 
@@ -60,6 +60,6 @@ Future<Post> postDetail(Ref ref, String postId) async {
 @riverpod
 Future<List<Post>> savedPosts(Ref ref) async {
   final repo = ref.watch(postsRepositoryProvider);
-  final result = await repo.getBookmarkedPosts();
+  final result = await repo.getHomeFeed(mode: 'saved');
   return result.fold((f) => throw FailureWrapper(f), (p) => p);
 }

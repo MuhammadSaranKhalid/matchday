@@ -29,7 +29,7 @@
   },
   "functions": [
     {
-      "source": "functions",
+      "source": "services/media/firebase",
       "codebase": "default",
       "ignore": [
         "node_modules",

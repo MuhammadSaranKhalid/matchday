@@ -5,20 +5,25 @@ import 'package:equatable/equatable.dart';
 class MediaVariant extends Equatable {
   const MediaVariant({
     required this.path,
+    String? url,
     required this.width,
     required this.height,
     required this.sizeBytes,
     required this.mimeType,
-  });
+  }) : _url = url;
 
   final String path;
+  final String? _url;
   final int width;
   final int height;
   final int sizeBytes;
   final String mimeType;
 
-  String get url => path;
+  String get url {
+    final u = _url;
+    return (u != null && u.isNotEmpty) ? u : path;
+  }
 
   @override
-  List<Object?> get props => [path, width, height, sizeBytes, mimeType];
+  List<Object?> get props => [path, _url, width, height, sizeBytes, mimeType];
 }

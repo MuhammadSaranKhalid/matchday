@@ -48,7 +48,7 @@ final class ComposerControllerProvider
 }
 
 String _$composerControllerHash() =>
-    r'a5aec12ba51770c41fdbab7ed5558207dd3c7d3b';
+    r'be8f38c0488a36eb9c269cda2fe965ebf6c98b36';
 
 /// Composer draft state: staged (cropped+resized) photos + submit lifecycle.
 /// The text is owned by the screen's TextEditingController and passed to submit.

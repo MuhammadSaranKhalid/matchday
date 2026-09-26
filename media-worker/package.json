@@ -1,0 +1,23 @@
+{
+  "name": "matchday-media-worker",
+  "version": "1.0.0",
+  "description": "Matchday Supabase Queues + Vercel Node 22 media processing worker with Sharp",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
+    "blurhash": "^2.0.5",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@vercel/node": "^5.1.8",
+    "typescript": "^5.7.2",
+    "vercel": "^60.1.3"
+  }
+}

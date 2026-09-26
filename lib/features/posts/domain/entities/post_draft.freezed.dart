@@ -14,9 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ProcessedPhoto {
 
- File get file; String get blurhash; int get width; int get height;/// True while the BlurHash is still being computed in the background — the
-/// composer shows a loading overlay on the thumbnail until it resolves.
- bool get hashPending;
+ File get file; int get width; int get height;
 /// Create a copy of ProcessedPhoto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -27,16 +25,16 @@ $ProcessedPhotoCopyWith<ProcessedPhoto> get copyWith => _$ProcessedPhotoCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProcessedPhoto&&(identical(other.file, file) || other.file == file)&&(identical(other.blurhash, blurhash) || other.blurhash == blurhash)&&(identical(other.width, width) || other.width == width)&&(identical(other.height, height) || other.height == height)&&(identical(other.hashPending, hashPending) || other.hashPending == hashPending));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProcessedPhoto&&(identical(other.file, file) || other.file == file)&&(identical(other.width, width) || other.width == width)&&(identical(other.height, height) || other.height == height));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,file,blurhash,width,height,hashPending);
+int get hashCode => Object.hash(runtimeType,file,width,height);
 
 @override
 String toString() {
-  return 'ProcessedPhoto(file: $file, blurhash: $blurhash, width: $width, height: $height, hashPending: $hashPending)';
+  return 'ProcessedPhoto(file: $file, width: $width, height: $height)';
 }
 
 
@@ -47,7 +45,7 @@ abstract mixin class $ProcessedPhotoCopyWith<$Res>  {
   factory $ProcessedPhotoCopyWith(ProcessedPhoto value, $Res Function(ProcessedPhoto) _then) = _$ProcessedPhotoCopyWithImpl;
 @useResult
 $Res call({
- File file, String blurhash, int width, int height, bool hashPending
+ File file, int width, int height
 });
 
 
@@ -64,14 +62,12 @@ class _$ProcessedPhotoCopyWithImpl<$Res>
 
 /// Create a copy of ProcessedPhoto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? file = null,Object? blurhash = null,Object? width = null,Object? height = null,Object? hashPending = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? file = null,Object? width = null,Object? height = null,}) {
   return _then(_self.copyWith(
 file: null == file ? _self.file : file // ignore: cast_nullable_to_non_nullable
-as File,blurhash: null == blurhash ? _self.blurhash : blurhash // ignore: cast_nullable_to_non_nullable
-as String,width: null == width ? _self.width : width // ignore: cast_nullable_to_non_nullable
+as File,width: null == width ? _self.width : width // ignore: cast_nullable_to_non_nullable
 as int,height: null == height ? _self.height : height // ignore: cast_nullable_to_non_nullable
-as int,hashPending: null == hashPending ? _self.hashPending : hashPending // ignore: cast_nullable_to_non_nullable
-as bool,
+as int,
   ));
 }
 
@@ -156,10 +152,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( File file,  String blurhash,  int width,  int height,  bool hashPending)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( File file,  int width,  int height)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ProcessedPhoto() when $default != null:
-return $default(_that.file,_that.blurhash,_that.width,_that.height,_that.hashPending);case _:
+return $default(_that.file,_that.width,_that.height);case _:
   return orElse();
 
 }
@@ -177,10 +173,10 @@ return $default(_that.file,_that.blurhash,_that.width,_that.height,_that.hashPen
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( File file,  String blurhash,  int width,  int height,  bool hashPending)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( File file,  int width,  int height)  $default,) {final _that = this;
 switch (_that) {
 case _ProcessedPhoto():
-return $default(_that.file,_that.blurhash,_that.width,_that.height,_that.hashPending);case _:
+return $default(_that.file,_that.width,_that.height);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -197,10 +193,10 @@ return $default(_that.file,_that.blurhash,_that.width,_that.height,_that.hashPen
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( File file,  String blurhash,  int width,  int height,  bool hashPending)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( File file,  int width,  int height)?  $default,) {final _that = this;
 switch (_that) {
 case _ProcessedPhoto() when $default != null:
-return $default(_that.file,_that.blurhash,_that.width,_that.height,_that.hashPending);case _:
+return $default(_that.file,_that.width,_that.height);case _:
   return null;
 
 }
@@ -212,16 +208,12 @@ return $default(_that.file,_that.blurhash,_that.width,_that.height,_that.hashPen
 
 
 class _ProcessedPhoto implements ProcessedPhoto {
-  const _ProcessedPhoto({required this.file, required this.blurhash, required this.width, required this.height, this.hashPending = false});
+  const _ProcessedPhoto({required this.file, required this.width, required this.height});
   
 
 @override final  File file;
-@override final  String blurhash;
 @override final  int width;
 @override final  int height;
-/// True while the BlurHash is still being computed in the background — the
-/// composer shows a loading overlay on the thumbnail until it resolves.
-@override@JsonKey() final  bool hashPending;
 
 /// Create a copy of ProcessedPhoto
 /// with the given fields replaced by the non-null parameter values.
@@ -233,16 +225,16 @@ _$ProcessedPhotoCopyWith<_ProcessedPhoto> get copyWith => __$ProcessedPhotoCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProcessedPhoto&&(identical(other.file, file) || other.file == file)&&(identical(other.blurhash, blurhash) || other.blurhash == blurhash)&&(identical(other.width, width) || other.width == width)&&(identical(other.height, height) || other.height == height)&&(identical(other.hashPending, hashPending) || other.hashPending == hashPending));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProcessedPhoto&&(identical(other.file, file) || other.file == file)&&(identical(other.width, width) || other.width == width)&&(identical(other.height, height) || other.height == height));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,file,blurhash,width,height,hashPending);
+int get hashCode => Object.hash(runtimeType,file,width,height);
 
 @override
 String toString() {
-  return 'ProcessedPhoto(file: $file, blurhash: $blurhash, width: $width, height: $height, hashPending: $hashPending)';
+  return 'ProcessedPhoto(file: $file, width: $width, height: $height)';
 }
 
 
@@ -253,7 +245,7 @@ abstract mixin class _$ProcessedPhotoCopyWith<$Res> implements $ProcessedPhotoCo
   factory _$ProcessedPhotoCopyWith(_ProcessedPhoto value, $Res Function(_ProcessedPhoto) _then) = __$ProcessedPhotoCopyWithImpl;
 @override @useResult
 $Res call({
- File file, String blurhash, int width, int height, bool hashPending
+ File file, int width, int height
 });
 
 
@@ -270,14 +262,12 @@ class __$ProcessedPhotoCopyWithImpl<$Res>
 
 /// Create a copy of ProcessedPhoto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? file = null,Object? blurhash = null,Object? width = null,Object? height = null,Object? hashPending = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? file = null,Object? width = null,Object? height = null,}) {
   return _then(_ProcessedPhoto(
 file: null == file ? _self.file : file // ignore: cast_nullable_to_non_nullable
-as File,blurhash: null == blurhash ? _self.blurhash : blurhash // ignore: cast_nullable_to_non_nullable
-as String,width: null == width ? _self.width : width // ignore: cast_nullable_to_non_nullable
+as File,width: null == width ? _self.width : width // ignore: cast_nullable_to_non_nullable
 as int,height: null == height ? _self.height : height // ignore: cast_nullable_to_non_nullable
-as int,hashPending: null == hashPending ? _self.hashPending : hashPending // ignore: cast_nullable_to_non_nullable
-as bool,
+as int,
   ));
 }
 

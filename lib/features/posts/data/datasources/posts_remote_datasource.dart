@@ -4,12 +4,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../models/post_dto.dart';
+import 'media_url_factory.dart';
 
 /// Talks to Supabase for the `posts` table + `post-media-staging` private storage +
 /// consolidated `get_home_feed`, `begin_post_publish`, `set_post_like`, and `set_post_bookmark` RPCs.
 class PostsRemoteDataSource {
-  PostsRemoteDataSource(this._supabase);
+  PostsRemoteDataSource(this._supabase) : urlFactory = MediaUrlFactory(_supabase);
   final SupabaseClient _supabase;
+  final MediaUrlFactory urlFactory;
 
   static const _stagingBucket = 'post-media-staging';
   static const _finalBucket = 'post-media';
@@ -123,7 +125,7 @@ class PostsRemoteDataSource {
     }
   }
 
-  /// Uploads a client-preprocessed JPEG to the private staging bucket.
+  /// Uploads a client-preprocessed JPEG to the private staging bucket (upsert: false).
   Future<void> uploadStagingMedia({
     required String stagingPath,
     required File file,
@@ -135,10 +137,32 @@ class PostsRemoteDataSource {
             file,
             fileOptions: const FileOptions(
               contentType: 'image/jpeg',
-              upsert: true,
+              upsert: false,
             ),
           );
     } on StorageException catch (e) {
+      if (!e.message.toLowerCase().contains('already exists')) {
+        throw ServerException(e.message);
+      }
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  /// Informs Supabase that Flutter safely uploaded the staging source.
+  /// Server verifies existence in storage and enqueues to post_media_feed PGMQ.
+  Future<Map<String, dynamic>> markPostMediaUploaded(String mediaId) async {
+    _requireUid();
+    try {
+      final response = await _supabase.rpc<dynamic>(
+        'mark_post_media_uploaded',
+        params: {'p_media_id': mediaId},
+      );
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      return {'media_id': mediaId, 'status': 'uploaded'};
+    } on PostgrestException catch (e) {
       throw ServerException(e.message);
     } catch (e) {
       throw ServerException(e.toString());
@@ -206,52 +230,4 @@ class PostsRemoteDataSource {
 
   String publicUrl(String path) =>
       _supabase.storage.from(_finalBucket).getPublicUrl(path);
-
-  // ─── Legacy Compatibility Methods ──────────────────────────────────────────
-
-  Future<List<PostDto>> getFeed({
-    int limit = 20,
-    String filter = 'all',
-    DateTime? before,
-  }) =>
-      getHomeFeed(
-        mode: 'home',
-        filter: filter,
-        cursorPublishedAt: before,
-        limit: limit,
-      );
-
-  Future<List<PostDto>> getByAuthor(
-    String authorId, {
-    int limit = 20,
-    DateTime? before,
-  }) =>
-      getHomeFeed(
-        mode: 'user',
-        targetId: authorId,
-        cursorPublishedAt: before,
-        limit: limit,
-      );
-
-  Future<List<PostDto>> getByTeam(
-    String teamId, {
-    int limit = 20,
-    DateTime? before,
-  }) =>
-      getHomeFeed(
-        mode: 'team',
-        targetId: teamId,
-        cursorPublishedAt: before,
-        limit: limit,
-      );
-
-  Future<List<PostDto>> getBookmarked({
-    int limit = 20,
-    DateTime? before,
-  }) =>
-      getHomeFeed(
-        mode: 'saved',
-        cursorPublishedAt: before,
-        limit: limit,
-      );
 }

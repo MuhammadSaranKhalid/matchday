@@ -30,7 +30,6 @@ class ComposerPhotoStrip extends StatelessWidget {
               file: state.photos[i].file,
               onRemove: () => onRemove(i),
               cover: i == 0,
-              loading: state.photos[i].hashPending,
             );
           }
           // Trailing "add more" tile (appears only alongside existing photos,
@@ -60,14 +59,10 @@ class _Thumb extends StatelessWidget {
     required this.file,
     required this.onRemove,
     this.cover = false,
-    this.loading = false,
   });
   final File file;
   final VoidCallback onRemove;
   final bool cover;
-
-  /// Dim + spinner overlay while the BlurHash is still being computed.
-  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -80,23 +75,6 @@ class _Thumb extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             child: Image.file(file, width: 84, height: 84, fit: BoxFit.cover),
           ),
-          if (loading)
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: ColoredBox(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  child: const Center(
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ),
-            ),
           if (cover)
             Positioned(
               left: 4,

@@ -17,12 +17,8 @@ part 'post_draft.freezed.dart';
 abstract class ProcessedPhoto with _$ProcessedPhoto {
   const factory ProcessedPhoto({
     required File file,
-    required String blurhash,
     required int width,
     required int height,
-    /// True while the BlurHash is still being computed in the background — the
-    /// composer shows a loading overlay on the thumbnail until it resolves.
-    @Default(false) bool hashPending,
   }) = _ProcessedPhoto;
 }
 

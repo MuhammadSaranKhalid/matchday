@@ -8,6 +8,7 @@ import '../../../../core/error/failures.dart';
 import '../../domain/entities/pending_post.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_draft.dart';
+import '../../domain/entities/publish_photo.dart';
 import '../../domain/repositories/posts_repository.dart';
 import '../../domain/value_objects/post_text.dart';
 import '../datasources/posts_local_datasource.dart';
@@ -42,7 +43,9 @@ class PostsRepositoryImpl implements PostsRepository {
         cursorPostId: cursorPostId,
         limit: limit,
       );
-      return Right(dtos.map((d) => d.toEntity()).toList());
+      return Right(
+        dtos.map((d) => d.toEntity(urlFactory: _remote.urlFactory)).toList(),
+      );
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
@@ -56,7 +59,7 @@ class PostsRepositoryImpl implements PostsRepository {
   Future<Either<Failure, Post>> getPost(PostId id) async {
     try {
       final dto = await _remote.getPost(id.value);
-      return Right(dto.toEntity());
+      return Right(dto.toEntity(urlFactory: _remote.urlFactory));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -70,22 +73,22 @@ class PostsRepositoryImpl implements PostsRepository {
     required String publisherId,
     required PostKind postKind,
     required PostText text,
-    required List<String> localPhotoPaths,
+    required List<PublishPhoto> photos,
     String? linkedMatchId,
     String? linkedTournamentId,
     String? linkedTeamId,
   }) async {
-    if (localPhotoPaths.length > 4) {
+    if (photos.length > 4) {
       return const Left(ValidationFailure('A post can have at most 4 photos.'));
     }
 
     try {
       final mediaItems = <Map<String, dynamic>>[];
-      for (var i = 0; i < localPhotoPaths.length; i++) {
+      for (var i = 0; i < photos.length; i++) {
         mediaItems.add({
           'position': i,
-          'source_width': 1080,
-          'source_height': 1080,
+          'source_width': photos[i].width,
+          'source_height': photos[i].height,
         });
       }
 
@@ -103,7 +106,7 @@ class PostsRepositoryImpl implements PostsRepository {
           _ => 'standard',
         },
         text: text.value,
-        expectedMediaCount: localPhotoPaths.length,
+        expectedMediaCount: photos.length,
         mediaItems: mediaItems,
         linkedMatchId: linkedMatchId,
         linkedTournamentId: linkedTournamentId,
@@ -116,13 +119,31 @@ class PostsRepositoryImpl implements PostsRepository {
               .toList() ??
           const [];
 
+      final pendingMedia = <PendingMediaItem>[];
+      for (var i = 0; i < serverMedia.length; i++) {
+        final item = serverMedia[i];
+        final position = (item['position'] as num?)?.toInt() ?? i;
+        final mediaId = item['media_id'] as String? ?? '';
+        final stagingPath = item['staging_path'] as String? ?? '';
+        final localPath =
+            position < photos.length ? photos[position].localPath : '';
+
+        pendingMedia.add(PendingMediaItem(
+          mediaId: mediaId,
+          position: position,
+          localPath: localPath,
+          stagingPath: stagingPath,
+          uploaded: false,
+        ));
+      }
+
       // 2. Emit durable local pending post projection
       final pendingPost = PendingPost(
         postId: postId,
         text: text.value,
-        localMediaPaths: localPhotoPaths,
+        media: pendingMedia,
         createdAt: DateTime.now(),
-        status: localPhotoPaths.isEmpty
+        status: photos.isEmpty
             ? PendingPostStatus.publishing
             : PendingPostStatus.uploading,
         progress: 0.0,
@@ -130,8 +151,8 @@ class PostsRepositoryImpl implements PostsRepository {
       await _local.savePendingPost(pendingPost);
 
       // 3. Launch background staging uploads (async / decoupled)
-      if (localPhotoPaths.isNotEmpty) {
-        unawaited(_drainStagingUploads(postId, serverMedia, localPhotoPaths));
+      if (pendingMedia.isNotEmpty) {
+        unawaited(_drainStagingUploads(postId, pendingMedia));
       }
 
       return Right(postId);
@@ -146,39 +167,56 @@ class PostsRepositoryImpl implements PostsRepository {
 
   Future<void> _drainStagingUploads(
     String postId,
-    List<Map<String, dynamic>> serverMedia,
-    List<String> localPhotoPaths,
+    List<PendingMediaItem> items,
   ) async {
     try {
-      final total = localPhotoPaths.length;
-      var uploaded = 0;
+      final total = items.length;
+      var uploadedCount = items.where((m) => m.uploaded).length;
+      final currentItems = List<PendingMediaItem>.from(items);
 
-      for (final mediaMeta in serverMedia) {
-        final position = (mediaMeta['position'] as num?)?.toInt() ?? 0;
-        final stagingPath = mediaMeta['staging_path'] as String?;
+      for (var i = 0; i < currentItems.length; i += 2) {
+        final batch = currentItems.sublist(
+          i,
+          (i + 2 < currentItems.length) ? i + 2 : currentItems.length,
+        );
 
-        if (position < localPhotoPaths.length && stagingPath != null) {
-          final file = File(localPhotoPaths[position]);
-          if (await file.exists()) {
-            await _remote.uploadStagingMedia(
-              stagingPath: stagingPath,
-              file: file,
-            );
-          }
-          uploaded++;
-          final current = await _local.getPendingPosts();
-          final existing = current.where((p) => p.postId == postId).firstOrNull;
-          if (existing != null) {
-            await _local.savePendingPost(
-              existing.copyWith(
-                progress: uploaded / total,
-                status: uploaded == total
-                    ? PendingPostStatus.publishing
-                    : PendingPostStatus.uploading,
-              ),
-            );
-          }
-        }
+        await Future.wait(
+          batch.map((item) async {
+            if (item.uploaded) return;
+
+            final file = File(item.localPath);
+            if (await file.exists() && item.stagingPath.isNotEmpty) {
+              await _remote.uploadStagingMedia(
+                stagingPath: item.stagingPath,
+                file: file,
+              );
+              if (item.mediaId.isNotEmpty) {
+                await _remote.markPostMediaUploaded(item.mediaId);
+              }
+            }
+
+            final idx = currentItems.indexWhere((m) => m.mediaId == item.mediaId);
+            if (idx != -1) {
+              currentItems[idx] = currentItems[idx].copyWith(uploaded: true);
+            }
+            uploadedCount++;
+
+            final current = await _local.getPendingPosts();
+            final existing =
+                current.where((p) => p.postId == postId).firstOrNull;
+            if (existing != null) {
+              await _local.savePendingPost(
+                existing.copyWith(
+                  media: currentItems,
+                  progress: total > 0 ? uploadedCount / total : 1.0,
+                  status: uploadedCount >= total
+                      ? PendingPostStatus.publishing
+                      : PendingPostStatus.uploading,
+                ),
+              );
+            }
+          }),
+        );
       }
     } catch (e) {
       final current = await _local.getPendingPosts();
@@ -244,16 +282,10 @@ class PostsRepositoryImpl implements PostsRepository {
       post.copyWith(status: PendingPostStatus.uploading, errorMessage: null),
     );
 
-    // Re-attempt upload flow
-    if (post.localMediaPaths.isNotEmpty) {
-      final dummyServerMedia = [
-        for (var i = 0; i < post.localMediaPaths.length; i++)
-          {
-            'position': i,
-            'staging_path': '${post.postId}/$i/source.jpg',
-          }
-      ];
-      unawaited(_drainStagingUploads(postId, dummyServerMedia, post.localMediaPaths));
+    // Re-attempt upload flow using the exact server staging contracts
+    final uncompleted = post.media.where((m) => !m.uploaded).toList();
+    if (uncompleted.isNotEmpty) {
+      unawaited(_drainStagingUploads(postId, post.media));
     }
   }
 
@@ -286,15 +318,20 @@ class PostsRepositoryImpl implements PostsRepository {
             ? draft.contextEntityId!
             : currentUid;
 
-        final localPaths =
-            draft.photos.map((ProcessedPhoto p) => p.file.path).toList();
+        final publishPhotos = draft.photos
+            .map((p) => PublishPhoto(
+                  localPath: p.file.path,
+                  width: p.width,
+                  height: p.height,
+                ))
+            .toList();
 
         final publishResult = await beginPublishPost(
           publisherType: publisherType,
           publisherId: publisherId,
           postKind: PostKind.standard,
           text: postText,
-          localPhotoPaths: localPaths,
+          photos: publishPhotos,
           linkedTeamId: draft.authorContext == PostAuthorContext.teamManager
               ? draft.contextEntityId
               : null,
@@ -311,10 +348,10 @@ class PostsRepositoryImpl implements PostsRepository {
             ),
             kind: PostKind.standard,
             text: postText.value,
-            status: localPaths.isEmpty ? PostStatus.active : PostStatus.publishing,
-            expectedMediaCount: localPaths.length,
+            status: publishPhotos.isEmpty ? PostStatus.active : PostStatus.publishing,
+            expectedMediaCount: publishPhotos.length,
             createdAt: DateTime.now(),
-            publishedAt: localPaths.isEmpty ? DateTime.now() : null,
+            publishedAt: publishPhotos.isEmpty ? DateTime.now() : null,
             linkedTeamId: draft.authorContext == PostAuthorContext.teamManager
                 ? draft.contextEntityId
                 : null,
@@ -322,67 +359,5 @@ class PostsRepositoryImpl implements PostsRepository {
         );
       },
     );
-  }
-
-  // ─── Legacy Fallback Implementations ────────────────────────────────────────
-
-  @override
-  Future<Either<Failure, List<Post>>> getFeed({
-    int limit = 20,
-    String filter = 'all',
-    DateTime? before,
-  }) =>
-      getHomeFeed(
-        mode: 'home',
-        filter: filter,
-        cursorPublishedAt: before,
-        limit: limit,
-      );
-
-  @override
-  Future<Either<Failure, List<Post>>> getAuthorPosts(
-    String authorId, {
-    int limit = 20,
-    DateTime? before,
-  }) =>
-      getHomeFeed(
-        mode: 'user',
-        targetId: authorId,
-        cursorPublishedAt: before,
-        limit: limit,
-      );
-
-  @override
-  Future<Either<Failure, List<Post>>> getTeamPosts(
-    String teamId, {
-    int limit = 20,
-    DateTime? before,
-  }) =>
-      getHomeFeed(
-        mode: 'team',
-        targetId: teamId,
-        cursorPublishedAt: before,
-        limit: limit,
-      );
-
-  @override
-  Future<Either<Failure, List<Post>>> getBookmarkedPosts({
-    int limit = 20,
-    DateTime? before,
-  }) =>
-      getHomeFeed(
-        mode: 'saved',
-        cursorPublishedAt: before,
-        limit: limit,
-      );
-
-  @override
-  Future<Either<Failure, bool>> togglePostLike(PostId id) async {
-    return setPostLike(id, liked: true);
-  }
-
-  @override
-  Future<Either<Failure, bool>> toggleBookmark(PostId id) async {
-    return setPostBookmark(id, bookmarked: true);
   }
 }

@@ -68,8 +68,12 @@ class ComposerController extends _$ComposerController {
         return null;
       },
       (post) {
-        // Surface the new post immediately, and let the author's profile & team refetch.
-        ref.read(feedControllerProvider.notifier).prepend(post);
+        // Media posts remain in publishing state while images process and are shown
+        // exclusively via pendingPostsProvider above the feed.
+        // Only active posts (such as text-only posts) should be prepended to the canonical feed.
+        if (post.status == PostStatus.active) {
+          ref.read(feedControllerProvider.notifier).prepend(post);
+        }
         ref.invalidate(authorPostsProvider(post.authorId));
         if (post.contextEntityId != null) {
           ref.invalidate(teamPostsProvider(post.contextEntityId!));

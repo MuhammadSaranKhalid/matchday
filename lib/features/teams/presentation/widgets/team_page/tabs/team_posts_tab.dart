@@ -79,10 +79,10 @@ class TeamPostsTab extends ConsumerWidget {
                       ),
                       onLike: () => ref
                           .read(postsRepositoryProvider)
-                          .togglePostLike(post.id),
+                          .setPostLike(post.id, liked: !post.viewer.isLiked),
                       onBookmark: () => ref
                           .read(postsRepositoryProvider)
-                          .toggleBookmark(post.id),
+                          .setPostBookmark(post.id, bookmarked: !post.viewer.isBookmarked),
                       onAuthorTap: (String username) =>
                           context.push('/u/$username'),
                       onOpenPhoto: (int index) {

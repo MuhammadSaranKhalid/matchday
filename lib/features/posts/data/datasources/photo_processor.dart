@@ -1,15 +1,7 @@
-// On-device photo pipeline for the composer:
-//   pick (gallery) → crop/adjust → resize ≤1080px JPEG  (pickOne, fast)
-//   tiny 32px copy → decode + BlurHash on a background isolate  (blurHashFor)
-// Split in two so the thumbnail can show instantly while the BlurHash computes.
 import 'dart:io';
-import 'dart:isolate';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:blurhash_dart/blurhash_dart.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:image/image.dart' as img;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -22,7 +14,7 @@ class PhotoProcessor implements PhotoPicker {
 
   /// Max stored long-edge (max 2048px JPEG normalized source for staging).
   static const _maxEdge = 2048;
-  static const _quality = 88;
+  static const _quality = 90;
 
   @override
   Future<ProcessedPhoto?> pickOne() async {
@@ -62,8 +54,6 @@ class PhotoProcessor implements PhotoPicker {
     );
     if (cropped == null) return null;
 
-    // uCrop native optimization bug: if the user hits "done" without changing anything,
-    // it sometimes returns a target path but fails to actually write the file to disk.
     final String sourceForCompression = await File(cropped.path).exists() 
         ? cropped.path 
         : picked.path;
@@ -84,45 +74,23 @@ class PhotoProcessor implements PhotoPicker {
         format: CompressFormat.jpeg,
       );
     } catch (_) {
-      // Catch CompressError or any filesystem exception.
       out = null;
     }
 
-    File file;
-    if (out != null && await File(out.path).exists()) {
-      file = File(out.path);
-    } else {
-      // flutter_image_compress natively fails sometimes on specific Android OS variants
-      // but still returns an XFile object. If the file doesn't actually exist on disk,
-      // fallback to using the uncompressed cropped (or picked) image to prevent crashes.
-      file = File(sourceForCompression);
+    // Fail cleanly if canonical JPEG compression failed rather than uploading unknown bytes (Point 4)
+    if (out == null || !await File(out.path).exists()) {
+      return null;
     }
+
+    final file = File(out.path);
     // Dimensions from the header only (no full pure-Dart decode).
     final (width, height) = await _dimensions(file);
 
-    // Return immediately; BlurHash is computed separately via [blurHashFor].
     return ProcessedPhoto(
       file: file,
-      blurhash: '',
       width: width,
       height: height,
-      hashPending: false,
     );
-  }
-
-  @override
-  Future<String> blurHashFor(File file) async {
-    try {
-      final bytes = await file.readAsBytes();
-      // Decode + encode the full (≤1080px) image on a background isolate so the
-      // UI never freezes. Per the Isolate.run docs, hand a top-level function
-      // explicit args (`bytes`) instead of an inline closure, so no enclosing
-      // instance state is implicitly captured/copied across the boundary. Only
-      // the immutable Uint8List goes in and the String hash comes out.
-      return await Isolate.run(() => _encodeBlurHash(bytes));
-    } catch (_) {
-      return '';
-    }
   }
 
   /// Header-only width/height via Flutter's native codec (no full decode).
@@ -139,14 +107,4 @@ class PhotoProcessor implements PhotoPicker {
       return (0, 0);
     }
   }
-}
-
-/// Decode + BlurHash-encode raw image bytes. Top-level (not a closure/instance
-/// method) so `Isolate.run` copies only [bytes] across the boundary — per the
-/// Isolate.run API guidance to pass state as explicit arguments. Runs entirely
-/// inside the spawned isolate; returns '' on failure.
-String _encodeBlurHash(Uint8List bytes) {
-  final image = img.decodeImage(bytes);
-  if (image == null) return '';
-  return BlurHash.encode(image, numCompX: 4, numCompY: 3).hash;
 }

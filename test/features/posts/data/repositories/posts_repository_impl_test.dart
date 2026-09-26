@@ -11,7 +11,7 @@ import 'package:matchday/features/posts/domain/entities/post_draft.dart';
 import 'package:mocktail/mocktail.dart';
 
 ProcessedPhoto _photo() =>
-    ProcessedPhoto(file: File('x.jpg'), blurhash: '', width: 100, height: 100);
+    ProcessedPhoto(file: File('x.jpg'), width: 100, height: 100);
 
 class _MockRemote extends Mock implements PostsRemoteDataSource {}
 class _MockLocal extends Mock implements PostsLocalDataSource {}
@@ -25,7 +25,7 @@ void main() {
     registerFallbackValue(PendingPost(
       postId: 'p1',
       text: 't',
-      localMediaPaths: const [],
+      media: const [],
       status: PendingPostStatus.uploading,
       createdAt: DateTime.now(),
     ));

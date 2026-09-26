@@ -171,10 +171,10 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
                       ),
                       onLike: () => ref
                           .read(postsRepositoryProvider)
-                          .togglePostLike(post.id),
+                          .setPostLike(post.id, liked: !post.viewer.isLiked),
                       onBookmark: () => ref
                           .read(postsRepositoryProvider)
-                          .toggleBookmark(post.id),
+                          .setPostBookmark(post.id, bookmarked: !post.viewer.isBookmarked),
                       onAuthorTap: (String u) => context.push('/u/$u'),
                       onOpenPhoto: (int idx) {
                         Navigator.of(context, rootNavigator: true).push(

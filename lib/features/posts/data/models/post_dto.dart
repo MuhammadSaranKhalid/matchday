@@ -2,6 +2,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_media.dart';
+import '../datasources/media_url_factory.dart';
 import 'post_media_dto.dart';
 
 part 'post_dto.freezed.dart';
@@ -115,7 +116,11 @@ abstract class PostDto with _$PostDto {
   factory PostDto.fromJson(Map<String, dynamic> json) =>
       _$PostDtoFromJson(json);
 
-  Post toEntity({bool? isLikedOverride, bool? isBookmarkedOverride}) {
+  Post toEntity({
+    bool? isLikedOverride,
+    bool? isBookmarkedOverride,
+    MediaUrlFactory? urlFactory,
+  }) {
     final effectiveUserId = createdByUserId ?? authorId ?? '';
 
     // Parse publisher from consolidated projection or legacy author/team joins
@@ -163,7 +168,7 @@ abstract class PostDto with _$PostDto {
       visibility: _parseVisibility(visibility),
       status: _parseStatus(status),
       expectedMediaCount: expectedMediaCount,
-      media: _parseMediaList(),
+      media: _parseMediaList(urlFactory),
       counts: effectiveCounts,
       viewer: effectiveViewer,
       publishedAt:
@@ -175,11 +180,11 @@ abstract class PostDto with _$PostDto {
     );
   }
 
-  List<PostMedia> _parseMediaList() {
+  List<PostMedia> _parseMediaList([MediaUrlFactory? urlFactory]) {
     if (media.isNotEmpty) {
       return media.whereType<Map<String, dynamic>>().map((m) {
         if (m.containsKey('media_id')) {
-          return PostMediaDto.fromJson(m).toEntity();
+          return PostMediaDto.fromJson(m).toEntity(urlFactory);
         }
         // Legacy fallback shape: { url, blurhash, width, height }
         final url = m['url'] as String? ?? '';

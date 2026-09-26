@@ -96,26 +96,57 @@ class PostsLocalDataSourceImpl implements PostsLocalDataSource {
   Map<String, dynamic> _toJson(PendingPost p) => {
         'post_id': p.postId,
         'text': p.text,
-        'local_media_paths': p.localMediaPaths,
+        'media': p.media
+            .map((m) => {
+                  'media_id': m.mediaId,
+                  'position': m.position,
+                  'local_path': m.localPath,
+                  'staging_path': m.stagingPath,
+                  'uploaded': m.uploaded,
+                })
+            .toList(),
         'created_at': p.createdAt.toIso8601String(),
         'status': p.status.name,
         'progress': p.progress,
         'error_message': p.errorMessage,
       };
 
-  PendingPost _fromJson(Map<String, dynamic> json) => PendingPost(
-        postId: json['post_id'] as String,
-        text: json['text'] as String?,
-        localMediaPaths:
-            (json['local_media_paths'] as List?)?.whereType<String>().toList() ??
-                const [],
-        createdAt: DateTime.parse(json['created_at'] as String),
-        status: switch (json['status']) {
-          'publishing' => PendingPostStatus.publishing,
-          'failed' => PendingPostStatus.failed,
-          _ => PendingPostStatus.uploading,
-        },
-        progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
-        errorMessage: json['error_message'] as String?,
-      );
+  PendingPost _fromJson(Map<String, dynamic> json) {
+    final rawMedia = json['media'] as List?;
+    final media = rawMedia != null
+        ? rawMedia
+            .whereType<Map<String, dynamic>>()
+            .map((m) => PendingMediaItem(
+                  mediaId: m['media_id'] as String? ?? '',
+                  position: (m['position'] as num?)?.toInt() ?? 0,
+                  localPath: m['local_path'] as String? ?? '',
+                  stagingPath: m['staging_path'] as String? ?? '',
+                  uploaded: m['uploaded'] as bool? ?? false,
+                ))
+            .toList()
+        : (json['local_media_paths'] as List?)
+                ?.whereType<String>()
+                .map((path) => PendingMediaItem(
+                      mediaId: '',
+                      position: 0,
+                      localPath: path,
+                      stagingPath: '',
+                    ))
+                .toList() ??
+            const <PendingMediaItem>[];
+
+    return PendingPost(
+      postId: json['post_id'] as String,
+      text: json['text'] as String?,
+      media: media,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      status: switch (json['status']) {
+        'publishing' => PendingPostStatus.publishing,
+        'failed' => PendingPostStatus.failed,
+        _ => PendingPostStatus.uploading,
+      },
+      progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
+      errorMessage: json['error_message'] as String?,
+    );
+  }
 }

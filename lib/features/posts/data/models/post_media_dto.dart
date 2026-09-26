@@ -2,6 +2,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../domain/entities/media_variant.dart';
 import '../../domain/entities/post_media.dart';
+import '../datasources/media_url_factory.dart';
 
 part 'post_media_dto.freezed.dart';
 part 'post_media_dto.g.dart';
@@ -21,8 +22,9 @@ abstract class MediaVariantDto with _$MediaVariantDto {
   factory MediaVariantDto.fromJson(Map<String, dynamic> json) =>
       _$MediaVariantDtoFromJson(json);
 
-  MediaVariant toEntity() => MediaVariant(
+  MediaVariant toEntity([MediaUrlFactory? urlFactory]) => MediaVariant(
         path: path,
+        url: urlFactory?.postMedia(path),
         width: width,
         height: height,
         sizeBytes: sizeBytes,
@@ -48,13 +50,13 @@ abstract class PostMediaDto with _$PostMediaDto {
   factory PostMediaDto.fromJson(Map<String, dynamic> json) =>
       _$PostMediaDtoFromJson(json);
 
-  PostMedia toEntity() {
+  PostMedia toEntity([MediaUrlFactory? urlFactory]) {
     final parsedVariants = <int, MediaVariant>{};
     variants.forEach((key, value) {
       final widthKey = int.tryParse(key);
       if (widthKey != null && value is Map<String, dynamic>) {
         parsedVariants[widthKey] =
-            MediaVariantDto.fromJson(value).toEntity();
+            MediaVariantDto.fromJson(value).toEntity(urlFactory);
       }
     });
 

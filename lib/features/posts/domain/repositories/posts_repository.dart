@@ -4,6 +4,7 @@ import '../../../../core/error/failures.dart';
 import '../entities/pending_post.dart';
 import '../entities/post.dart';
 import '../entities/post_draft.dart';
+import '../entities/publish_photo.dart';
 import '../value_objects/post_text.dart';
 
 /// Authoritative Posts repository.
@@ -31,7 +32,7 @@ abstract class PostsRepository {
     required String publisherId,
     required PostKind postKind,
     required PostText text,
-    required List<String> localPhotoPaths,
+    required List<PublishPhoto> photos,
     String? linkedMatchId,
     String? linkedTournamentId,
     String? linkedTeamId,
@@ -55,15 +56,6 @@ abstract class PostsRepository {
   /// Discard a failed pending post and clean up local temporary files.
   Future<void> discardPendingPost(String postId);
 
-  /// Legacy composer submit helper that wraps beginPublishPost.
+  /// Composer submit helper that wraps beginPublishPost.
   Future<Either<Failure, Post>> createPost(PostDraft draft);
-
-  // ─── Legacy Compatibility Methods (preserved during transition) ────────────
-
-  Future<Either<Failure, List<Post>>> getFeed({int limit = 20, String filter = 'all', DateTime? before});
-  Future<Either<Failure, List<Post>>> getAuthorPosts(String authorId, {int limit = 20, DateTime? before});
-  Future<Either<Failure, List<Post>>> getTeamPosts(String teamId, {int limit = 20, DateTime? before});
-  Future<Either<Failure, List<Post>>> getBookmarkedPosts({int limit = 20, DateTime? before});
-  Future<Either<Failure, bool>> togglePostLike(PostId id);
-  Future<Either<Failure, bool>> toggleBookmark(PostId id);
 }

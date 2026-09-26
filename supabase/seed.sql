@@ -570,6 +570,12 @@ declare
   v_faraz uuid := '00000000-0000-0000-0000-000000000003';
   v_hassan uuid := '00000000-0000-0000-0000-000000000004';
   v_adeel uuid := '00000000-0000-0000-0000-000000000005';
+  v_karim uuid := '00000000-0000-0000-0000-000000000006';
+  v_saad uuid := '00000000-0000-0000-0000-000000000007';
+  v_usman uuid := '00000000-0000-0000-0000-000000000008';
+  v_yousaf uuid := '00000000-0000-0000-0000-000000000009';
+  v_zaid uuid := '0000000a-0000-0000-0000-00000000000a';
+
   v_lahore_team uuid := '11111111-1111-1111-1111-111111111101';
   v_karachi_team uuid := '11111111-1111-1111-1111-111111111103';
   v_isb_team uuid := '11111111-1111-1111-1111-111111111102';
@@ -579,86 +585,295 @@ declare
   v_tp3 uuid := '20000000-0000-0000-0000-000000000003';
   v_tp4 uuid := '20000000-0000-0000-0000-000000000004';
   v_tp5 uuid := '20000000-0000-0000-0000-000000000005';
+
+  -- Pinned comment IDs for threaded discussions
+  v_c_tp1_1 uuid := '30000000-0000-0000-0000-000000000001';
+  v_c_tp1_2 uuid := '30000000-0000-0000-0000-000000000002';
+  v_c_tp1_3 uuid := '30000000-0000-0000-0000-000000000003';
+  v_c_tp1_4 uuid := '30000000-0000-0000-0000-000000000004';
+  v_c_tp1_5 uuid := '30000000-0000-0000-0000-000000000005';
+  v_c_tp1_6 uuid := '30000000-0000-0000-0000-000000000006';
+  v_c_tp1_7 uuid := '30000000-0000-0000-0000-000000000007';
+  v_c_tp1_8 uuid := '30000000-0000-0000-0000-000000000008';
+  v_c_tp1_9 uuid := '30000000-0000-0000-0000-000000000009';
+  v_c_tp1_10 uuid := '30000000-0000-0000-0000-000000000010';
+  v_c_tp1_11 uuid := '30000000-0000-0000-0000-000000000011';
+  v_c_tp1_12 uuid := '30000000-0000-0000-0000-000000000012';
+  v_c_tp1_13 uuid := '30000000-0000-0000-0000-000000000013';
+
+  v_c_tp2_1 uuid := '30000000-0000-0000-0000-000000000021';
+  v_c_tp2_2 uuid := '30000000-0000-0000-0000-000000000022';
+  v_c_tp4_1 uuid := '30000000-0000-0000-0000-000000000041';
 begin
   -- 1. Lahore Lions official photo post
-  insert into public.posts (post_id, author_id, author_context, context_entity_id, post_type, text, media_urls, media, created_at)
+  insert into public.posts (
+    post_id, created_by_user_id, author_id, author_context, context_entity_id,
+    publisher_type, publisher_id, post_kind, post_type, text, expected_media_count,
+    status, published_at, created_at
+  )
   values (
     v_tp1,
     v_owner,
-    'team_manager',
-    v_lahore_team,
-    'photo',
-    '🦁 Official squad training ahead of the Super Weekend derby! The boys are looking sharp and ready.',
-    array['https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80', 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80'],
-    '[{"url":"https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80","width":1080,"height":720},{"url":"https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80","width":1080,"height":720}]'::jsonb,
-    now() - interval '2 hours'
-  ) on conflict (post_id) do nothing;
-
-  -- 2. Lahore Lions Matchday Announcement
-  insert into public.posts (post_id, author_id, author_context, context_entity_id, post_type, text, media_urls, media, created_at)
-  values (
-    v_tp2,
     v_owner,
     'team_manager',
     v_lahore_team,
+    'team',
+    v_lahore_team,
+    'standard',
+    'photo',
+    '🦁 Official squad training ahead of the Super Weekend derby! The boys are looking sharp and ready.',
+    2,
+    'active',
+    now() - interval '2 hours',
+    now() - interval '2 hours'
+  ) on conflict (post_id) do nothing;
+
+  insert into public.post_media (
+    media_id, post_id, position, media_type, status,
+    staging_path, final_prefix,
+    source_width, source_height, display_width, display_height, variants
+  )
+  values
+    (gen_random_uuid(), v_tp1, 0, 'image', 'feed_ready', 'seed/tp1/0/source.jpg', 'posts/tp1/0/v1/', 1080, 720, 1080, 720, '{"feed": "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80"}'::jsonb),
+    (gen_random_uuid(), v_tp1, 1, 'image', 'feed_ready', 'seed/tp1/1/source.jpg', 'posts/tp1/1/v1/', 1080, 720, 1080, 720, '{"feed": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80"}'::jsonb)
+  on conflict do nothing;
+
+  -- 2. Lahore Lions Matchday Announcement
+  insert into public.posts (
+    post_id, created_by_user_id, author_id, author_context, context_entity_id,
+    publisher_type, publisher_id, post_kind, post_type, text, expected_media_count,
+    status, published_at, created_at
+  )
+  values (
+    v_tp2,
+    v_owner,
+    v_owner,
+    'team_manager',
+    v_lahore_team,
+    'team',
+    v_lahore_team,
     'match_announcement',
+    'photo',
     '⚡ MATCHDAY ANNOUNCEMENT: Lahore Lions vs Karachi Eagles this Sunday at Gaddafi Stadium Ground 2. Toss at 4:30 PM!',
-    array['https://images.unsplash.com/photo-1589801258579-18e091f4ca26?w=1080&q=80'],
-    '[{"url":"https://images.unsplash.com/photo-1589801258579-18e091f4ca26?w=1080&q=80","width":1080,"height":720}]'::jsonb,
+    1,
+    'active',
+    now() - interval '1 day',
     now() - interval '1 day'
   ) on conflict (post_id) do nothing;
 
+  insert into public.post_media (
+    media_id, post_id, position, media_type, status,
+    staging_path, final_prefix,
+    source_width, source_height, display_width, display_height, variants
+  )
+  values
+    (gen_random_uuid(), v_tp2, 0, 'image', 'feed_ready', 'seed/tp2/0/source.jpg', 'posts/tp2/0/v1/', 1080, 720, 1080, 720, '{"feed": "https://images.unsplash.com/photo-1589801258579-18e091f4ca26?w=1080&q=80"}'::jsonb)
+  on conflict do nothing;
+
   -- 3. Karachi Eagles Team Post
-  insert into public.posts (post_id, author_id, author_context, context_entity_id, post_type, text, media_urls, media, created_at)
+  insert into public.posts (
+    post_id, created_by_user_id, author_id, author_context, context_entity_id,
+    publisher_type, publisher_id, post_kind, post_type, text, expected_media_count,
+    status, published_at, created_at
+  )
   values (
     v_tp3,
     v_bilal,
+    v_bilal,
     'team_manager',
     v_karachi_team,
+    'team',
+    v_karachi_team,
     'recruitment',
+    'photo',
     '🦅 Karachi Eagles are recruiting 2 opening batsmen and an express pacer for the upcoming T20 tournament. DM or drop a comment to try out!',
-    array['https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80'],
-    '[{"url":"https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80","width":1080,"height":720}]'::jsonb,
+    1,
+    'active',
+    now() - interval '3 days',
     now() - interval '3 days'
   ) on conflict (post_id) do nothing;
 
+  insert into public.post_media (
+    media_id, post_id, position, media_type, status,
+    staging_path, final_prefix,
+    source_width, source_height, display_width, display_height, variants
+  )
+  values
+    (gen_random_uuid(), v_tp3, 0, 'image', 'feed_ready', 'seed/tp3/0/source.jpg', 'posts/tp3/0/v1/', 1080, 720, 1080, 720, '{"feed": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80"}'::jsonb)
+  on conflict do nothing;
+
   -- 4. Player Personal Posts
-  insert into public.posts (post_id, author_id, author_context, context_entity_id, post_type, text, media_urls, media, created_at)
+  insert into public.posts (
+    post_id, created_by_user_id, author_id, author_context, context_entity_id,
+    publisher_type, publisher_id, post_kind, post_type, text, expected_media_count,
+    status, published_at, created_at
+  )
   values
     (
       v_tp4,
       v_faraz,
+      v_faraz,
       'personal',
       null,
+      'user',
+      v_faraz,
+      'standard',
       'photo',
       'Solid net session today with the squad. Batting rhythm feeling crisp and timing is right on point!',
-      array['https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80'],
-      '[{"url":"https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80","width":1080,"height":720}]'::jsonb,
+      1,
+      'active',
+      now() - interval '4 hours',
       now() - interval '4 hours'
     ),
     (
       v_tp5,
       v_hassan,
+      v_hassan,
       'personal',
       null,
+      'user',
+      v_hassan,
+      'standard',
       'text',
       'Tape ball under the lights hits different in Lahore 🔥 Great match against Gulberg Strikers tonight!',
-      '{}',
-      '[]'::jsonb,
+      0,
+      'active',
+      now() - interval '6 hours',
       now() - interval '6 hours'
     )
   on conflict (post_id) do nothing;
 
-  -- 5. Threaded Comments on Posts
-  insert into public.comments (comment_id, post_id, author_id, text, created_at)
+  insert into public.post_media (
+    media_id, post_id, position, media_type, status,
+    staging_path, final_prefix,
+    source_width, source_height, display_width, display_height, variants
+  )
   values
-    (gen_random_uuid(), v_tp1, v_bilal, 'Looking sharp boys! Looking forward to the derby 🏆', now() - interval '1 hour'),
-    (gen_random_uuid(), v_tp1, v_faraz, 'Pace attack is fully locked in 🔥', now() - interval '45 minutes'),
-    (gen_random_uuid(), v_tp2, v_adeel, 'InshaAllah big win coming this weekend!', now() - interval '12 hours'),
-    (gen_random_uuid(), v_tp3, v_hassan, 'Sent my stats over DM, would love to join!', now() - interval '2 days')
+    (gen_random_uuid(), v_tp4, 0, 'image', 'feed_ready', 'seed/tp4/0/source.jpg', 'posts/tp4/0/v1/', 1080, 720, 1080, 720, '{"feed": "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80"}'::jsonb)
   on conflict do nothing;
 
-  -- 6. Post Likes
+  -- 5. Threaded Comments on Posts
+  -- 5a. Top-level Comments
+  insert into public.comments (comment_id, post_id, author_id, parent_comment_id, text, mentioned_user_ids, created_at)
+  values
+    -- v_tp1 (Lahore Lions photo post - Saran is author)
+    (v_c_tp1_1, v_tp1, v_bilal, null, 'Looking sharp boys! Looking forward to the derby 🏆', '{}', now() - interval '110 minutes'),
+    (v_c_tp1_2, v_tp1, v_faraz, null, 'Pace attack is fully locked in 🔥', '{}', now() - interval '80 minutes'),
+    (v_c_tp1_3, v_tp1, v_owner, null, 'Captain''s message: Ground 2 pitch has good carry. We want intensity in every drill!', '{}', now() - interval '65 minutes'),
+    (v_c_tp1_4, v_tp1, v_hassan, null, 'Wicket-keeping gloves strapped and ready! Catching drills were spotless 🧤', '{}', now() - interval '50 minutes'),
+    (v_c_tp1_5, v_tp1, v_karim, null, 'Left-arm swing coming your way Karachi Eagles 🎯', '{}', now() - interval '45 minutes'),
+    (v_c_tp1_6, v_tp1, v_saad, null, 'Middle order is prepared for any chase scenario. Let''s go Lions!', '{}', now() - interval '35 minutes'),
+    (v_c_tp1_7, v_tp1, v_adeel, null, 'Pitch looks dry, spin could be decisive in middle overs. @saran what''s the toss call?', array[v_owner], now() - interval '25 minutes'),
+    (v_c_tp1_8, v_tp1, v_usman, null, 'Kit looks clean! Proud to wear the Lahore Lions badge 🦁', '{}', now() - interval '20 minutes'),
+    (v_c_tp1_9, v_tp1, v_zaid, null, 'Switch hits practiced, ready to accelerate whenever needed 💥', '{}', now() - interval '15 minutes'),
+    (v_c_tp1_10, v_tp1, v_yousaf, null, 'Weather forecast is crystal clear for Sunday. Match on!', '{}', now() - interval '12 minutes'),
+    (v_c_tp1_11, v_tp1, v_bilal, null, 'Team dinner tonight after final gym session? @saran', array[v_owner], now() - interval '10 minutes'),
+    (v_c_tp1_12, v_tp1, v_faraz, null, 'Anyone got an extra pair of batting gloves for Sunday?', '{}', now() - interval '8 minutes'),
+    (v_c_tp1_13, v_tp1, v_karim, null, 'Matchday adrenaline is already kicking in!', '{}', now() - interval '5 minutes'),
+
+    -- v_tp2 (Lahore Lions match announcement - Saran is author)
+    (v_c_tp2_1, v_tp2, v_adeel, null, 'InshaAllah big win coming this weekend! Can''t wait to see the crowd.', '{}', now() - interval '12 hours'),
+    (v_c_tp2_2, v_tp2, v_faraz, null, 'Toss at 4:30 PM sharp, everyone be at the ground by 3:00 PM for warmups.', '{}', now() - interval '8 hours'),
+    (gen_random_uuid(), v_tp2, v_hassan, null, 'Warmup schedule confirmed. Let''s get the win!', '{}', now() - interval '6 hours'),
+    (gen_random_uuid(), v_tp2, v_zaid, null, 'Support Lahore Lions! Drop a comment if you are attending 🦁', '{}', now() - interval '4 hours'),
+
+    -- v_tp3 (Karachi Eagles recruitment)
+    (gen_random_uuid(), v_tp3, v_hassan, null, 'Sent my stats over DM, would love to join!', '{}', now() - interval '2 days'),
+    (gen_random_uuid(), v_tp3, v_faraz, null, 'Great initiative, best of luck with the trials.', '{}', now() - interval '1 day'),
+    (gen_random_uuid(), v_tp3, v_usman, null, 'Know a few fast bowlers from our club, sending them the link.', '{}', now() - interval '12 hours'),
+
+    -- v_tp4 (Faraz personal post)
+    (v_c_tp4_1, v_tp4, v_owner, null, 'Solid net session today Faraz! Keep that high elbow on the drive.', '{}', now() - interval '3 hours'),
+    (gen_random_uuid(), v_tp4, v_bilal, null, 'Form is temporary, class is permanent brother 🔥', '{}', now() - interval '2 hours')
+  on conflict do nothing;
+
+  -- 5b. Threaded Replies
+  insert into public.comments (comment_id, post_id, author_id, parent_comment_id, text, mentioned_user_ids, created_at)
+  values
+    -- Replies under v_c_tp1_1 (Bilal - 4 replies)
+    (gen_random_uuid(), v_tp1, v_faraz, v_c_tp1_1, '@bilal 100%! Ready to dominate the powerplay.', '{}', now() - interval '100 minutes'),
+    (gen_random_uuid(), v_tp1, v_karim, v_c_tp1_1, '@bilal Yorker drill paid off today, rhythm is feeling lethal.', '{}', now() - interval '95 minutes'),
+    (gen_random_uuid(), v_tp1, v_owner, v_c_tp1_1, '@bilal Batting order looks solid, let''s stick to the gameplan.', '{}', now() - interval '90 minutes'),
+    (gen_random_uuid(), v_tp1, v_zaid, v_c_tp1_1, '@saran Can''t wait for Sunday brother! Energy is high.', array[v_owner], now() - interval '85 minutes'),
+
+    -- Replies under v_c_tp1_2 (Faraz - 2 replies)
+    (gen_random_uuid(), v_tp1, v_usman, v_c_tp1_2, '@faraz 140+ on the radar in the first spell guaranteed!', '{}', now() - interval '75 minutes'),
+    (gen_random_uuid(), v_tp1, v_karim, v_c_tp1_2, '@faraz Let''s hunt in pairs with the new ball.', '{}', now() - interval '70 minutes'),
+
+    -- Replies under v_c_tp1_3 (Saran - 5 replies from teammates -> triggers 5 social.comment.replied notifications)
+    (gen_random_uuid(), v_tp1, v_hassan, v_c_tp1_3, '@saran Keeper gloves ready, won''t let a single edge slip through skipper.', '{}', now() - interval '60 minutes'),
+    (gen_random_uuid(), v_tp1, v_adeel, v_c_tp1_3, '@saran Off-spin might grip late in the second innings too.', '{}', now() - interval '55 minutes'),
+    (gen_random_uuid(), v_tp1, v_bilal, v_c_tp1_3, '@saran I''ll anchor the top order and see off the swing.', '{}', now() - interval '50 minutes'),
+    (gen_random_uuid(), v_tp1, v_saad, v_c_tp1_3, '@saran Fielding drills were intense today, everyone diving 100%.', '{}', now() - interval '45 minutes'),
+    (gen_random_uuid(), v_tp1, v_yousaf, v_c_tp1_3, '@saran Backing the boys all the way! Big win loading.', '{}', now() - interval '40 minutes'),
+
+    -- Replies under v_c_tp1_4 (Hassan - 2 replies)
+    (gen_random_uuid(), v_tp1, v_adeel, v_c_tp1_4, '@hassan Stumping speed is lightning fast lately.', '{}', now() - interval '35 minutes'),
+    (gen_random_uuid(), v_tp1, v_faraz, v_c_tp1_4, '@hassan Trusting you with every edge behind the stumps!', '{}', now() - interval '33 minutes'),
+
+    -- Replies under v_c_tp1_5 (Karim - 3 replies)
+    (gen_random_uuid(), v_tp1, v_zaid, v_c_tp1_5, '@karim Swing it both ways in the first 3 overs!', '{}', now() - interval '28 minutes'),
+    (gen_random_uuid(), v_tp1, v_usman, v_c_tp1_5, '@karim We bowl them out under 140 easy.', '{}', now() - interval '25 minutes'),
+    (gen_random_uuid(), v_tp1, v_bilal, v_c_tp1_5, '@karim Keep targeting that off-stump channel.', '{}', now() - interval '22 minutes'),
+
+    -- Replies under v_c_tp1_7 (Adeel - 2 replies)
+    (gen_random_uuid(), v_tp1, v_owner, v_c_tp1_7, '@adeel If we win toss, we bat first and put 180+ on the board.', '{}', now() - interval '15 minutes'),
+    (gen_random_uuid(), v_tp1, v_adeel, v_c_tp1_7, '@saran Perfect, defending with our bowling lineup is our strength.', '{}', now() - interval '12 minutes'),
+
+    -- Replies under v_c_tp1_12 (Faraz - 2 replies)
+    (gen_random_uuid(), v_tp1, v_hassan, v_c_tp1_12, '@faraz Got a brand new pair in my kit bag, you can use them.', '{}', now() - interval '3 minutes'),
+    (gen_random_uuid(), v_tp1, v_faraz, v_c_tp1_12, '@hassan Legend! Thanks brother.', '{}', now() - interval '2 minutes'),
+
+    -- Replies under v_c_tp2_1 (Adeel on announcement - 2 replies)
+    (gen_random_uuid(), v_tp2, v_bilal, v_c_tp2_1, '@adeel Gaddafi Ground 2 is going to be packed!', '{}', now() - interval '11 hours'),
+    (gen_random_uuid(), v_tp2, v_owner, v_c_tp2_1, '@adeel Let''s give them a great game to remember.', '{}', now() - interval '10 hours'),
+
+    -- Replies under v_c_tp4_1 (Saran on Faraz post - 2 replies -> triggers social.comment.replied notifications)
+    (gen_random_uuid(), v_tp4, v_faraz, v_c_tp4_1, '@saran Thanks skipper! Working on that backfoot punch as well.', '{}', now() - interval '2 hours'),
+    (gen_random_uuid(), v_tp4, v_hassan, v_c_tp4_1, '@saran His timing was echoing across the whole ground today!', '{}', now() - interval '1 hour')
+  on conflict do nothing;
+
+  -- 6. Comment Likes
+  insert into public.comment_likes (like_id, comment_id, user_id, created_at)
+  values
+    (gen_random_uuid(), v_c_tp1_1, v_faraz, now() - interval '105 minutes'),
+    (gen_random_uuid(), v_c_tp1_1, v_karim, now() - interval '100 minutes'),
+    (gen_random_uuid(), v_c_tp1_1, v_hassan, now() - interval '95 minutes'),
+    (gen_random_uuid(), v_c_tp1_1, v_adeel, now() - interval '90 minutes'),
+    (gen_random_uuid(), v_c_tp1_1, v_owner, now() - interval '80 minutes'),
+
+    (gen_random_uuid(), v_c_tp1_2, v_usman, now() - interval '78 minutes'),
+    (gen_random_uuid(), v_c_tp1_2, v_karim, now() - interval '76 minutes'),
+    (gen_random_uuid(), v_c_tp1_2, v_owner, now() - interval '74 minutes'),
+
+    (gen_random_uuid(), v_c_tp1_3, v_bilal, now() - interval '64 minutes'),
+    (gen_random_uuid(), v_c_tp1_3, v_faraz, now() - interval '63 minutes'),
+    (gen_random_uuid(), v_c_tp1_3, v_hassan, now() - interval '62 minutes'),
+    (gen_random_uuid(), v_c_tp1_3, v_adeel, now() - interval '61 minutes'),
+    (gen_random_uuid(), v_c_tp1_3, v_karim, now() - interval '60 minutes'),
+    (gen_random_uuid(), v_c_tp1_3, v_saad, now() - interval '59 minutes'),
+    (gen_random_uuid(), v_c_tp1_3, v_usman, now() - interval '58 minutes'),
+    (gen_random_uuid(), v_c_tp1_3, v_yousaf, now() - interval '57 minutes'),
+    (gen_random_uuid(), v_c_tp1_3, v_zaid, now() - interval '56 minutes'),
+
+    (gen_random_uuid(), v_c_tp1_4, v_adeel, now() - interval '48 minutes'),
+    (gen_random_uuid(), v_c_tp1_4, v_faraz, now() - interval '46 minutes'),
+
+    (gen_random_uuid(), v_c_tp1_5, v_zaid, now() - interval '40 minutes'),
+    (gen_random_uuid(), v_c_tp1_5, v_usman, now() - interval '38 minutes'),
+
+    (gen_random_uuid(), v_c_tp1_7, v_owner, now() - interval '24 minutes'),
+    (gen_random_uuid(), v_c_tp1_7, v_bilal, now() - interval '22 minutes'),
+
+    (gen_random_uuid(), v_c_tp2_1, v_bilal, now() - interval '11 hours'),
+    (gen_random_uuid(), v_c_tp2_1, v_owner, now() - interval '10 hours'),
+
+    (gen_random_uuid(), v_c_tp4_1, v_faraz, now() - interval '2 hours'),
+    (gen_random_uuid(), v_c_tp4_1, v_hassan, now() - interval '1 hour'),
+    (gen_random_uuid(), v_c_tp4_1, v_bilal, now() - interval '30 minutes')
+  on conflict do nothing;
+
+  -- 7. Post Likes
   insert into public.post_likes (post_id, user_id, created_at)
   values
     (v_tp1, v_bilal, now()),

@@ -176,6 +176,51 @@ $$;
 revoke all on function public.can_publish_as(public.post_publisher_type, uuid, uuid) from public;
 grant execute on function public.can_publish_as(public.post_publisher_type, uuid, uuid) to authenticated, anon;
 
+-- is_post_author — used by comments policies and downstream security checks.
+create or replace function public.is_post_author(
+  p_post_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    exists (
+      select 1
+      from public.posts p
+      where p.post_id = p_post_id
+        and (p.author_id = (select auth.uid()) or p.created_by_user_id = (select auth.uid()))
+    );
+$$;
+
+revoke all on function public.is_post_author(uuid) from public;
+grant execute on function public.is_post_author(uuid) to authenticated;
+
+-- can_act_for_post_context — combines is_team_manager / is_tournament_organizer
+create or replace function public.can_act_for_post_context(
+  p_author_context public.post_author_context,
+  p_entity_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    case p_author_context
+      when 'personal' then true
+      when 'team_manager' then public.is_team_manager(p_entity_id)
+      when 'tournament_organizer' then public.is_tournament_organizer(p_entity_id)
+      else false
+    end;
+$$;
+
+revoke all on function public.can_act_for_post_context(public.post_author_context, uuid) from public;
+grant execute on function public.can_act_for_post_context(public.post_author_context, uuid) to authenticated;
+
 alter table public.posts enable row level security;
 
 create policy "posts_read_active_or_creator"

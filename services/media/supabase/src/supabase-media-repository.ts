@@ -103,11 +103,14 @@ export class SupabaseMediaRepository implements MediaRepository {
   }
 
   async recordJobOutcome(jobId: string, status: 'succeeded' | 'failed', error?: string): Promise<void> {
-    await this.supabase.rpc('record_media_job_outcome', {
+    const { error: rpcError } = await this.supabase.rpc('record_media_job_outcome', {
       p_job_id: jobId,
       p_status: status,
       p_error: error ?? null,
     });
+    if (rpcError) {
+      throw new TransientMediaError(`Failed to record job outcome: ${rpcError.message}`, rpcError);
+    }
   }
 
   async markProcessingFailed(mediaId: string, error: string): Promise<void> {
@@ -125,7 +128,7 @@ export class SupabaseMediaRepository implements MediaRepository {
       .from('post_media')
       .update({
         status: 'optimization_failed',
-        last_processing_error: error,
+        last_optimization_error: error,
       })
       .eq('media_id', mediaId);
   }

@@ -174,7 +174,7 @@ as $$
 $$;
 
 revoke all on function public.can_publish_as(public.post_publisher_type, uuid, uuid) from public;
-grant execute on function public.can_publish_as(public.post_publisher_type, uuid, uuid) to authenticated, anon;
+grant execute on function public.can_publish_as(public.post_publisher_type, uuid, uuid) to authenticated;
 
 -- is_post_author — used by comments policies and downstream security checks.
 create or replace function public.is_post_author(
@@ -310,6 +310,7 @@ create table public.post_media (
   processing_attempts integer not null default 0,
   optimization_attempts integer not null default 0,
   feed_ready_at timestamptz,
+  processing_started_at timestamptz,
   last_processing_error text,
   last_optimization_error text,
   created_at timestamptz not null default now(),
@@ -328,6 +329,7 @@ create index idx_post_media_status
 create or replace function public.touch_post_media_updated_at()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   new.updated_at = now();
@@ -414,7 +416,7 @@ values (
 on conflict (id) do update set
   public = false,
   file_size_limit = 15728640,
-  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp'];
+  allowed_mime_types = array['image/jpeg'];
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -441,18 +443,6 @@ create policy "post_media_staging_owner_select"
   on storage.objects for select
   to authenticated
   using (
-    bucket_id = 'post-media-staging'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  );
-
-create policy "post_media_staging_owner_update"
-  on storage.objects for update
-  to authenticated
-  using (
-    bucket_id = 'post-media-staging'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  )
-  with check (
     bucket_id = 'post-media-staging'
     and (storage.foldername(name))[1] = (select auth.uid())::text
   );
@@ -685,6 +675,239 @@ $$;
 
 revoke all on function public.record_media_job_outcome(uuid, text, text) from public, anon, authenticated;
 grant execute on function public.record_media_job_outcome(uuid, text, text) to service_role;
+
+-- claim_post_media_jobs — reads pending messages from PGMQ and advances job status
+create or replace function public.claim_post_media_jobs(
+  p_stage text,
+  p_qty integer default 1
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, private, pg_temp
+as $$
+declare
+  v_queue text;
+  v_rec record;
+  v_jobs jsonb := '[]'::jsonb;
+  v_job_id uuid;
+begin
+  v_queue := case p_stage
+    when 'feed' then 'post_media_feed'
+    when 'optimize' then 'post_media_optimize'
+    else null
+  end;
+
+  if v_queue is null then
+    raise exception 'Invalid queue stage %', p_stage;
+  end if;
+
+  for v_rec in (
+    select msg_id, read_ct, message
+    from pgmq.read(v_queue, 60, least(greatest(coalesce(p_qty, 1), 1), 10))
+  ) loop
+    begin
+      v_job_id := (v_rec.message->>'jobId')::uuid;
+      if v_job_id is not null then
+        update private.media_processing_jobs
+        set status = 'processing',
+            attempts = attempts + 1,
+            processing_started_at = now(),
+            updated_at = now()
+        where job_id = v_job_id;
+      end if;
+    exception when others then
+      null;
+    end;
+
+    v_jobs := v_jobs || jsonb_build_array(
+      jsonb_build_object(
+        'msg_id', v_rec.msg_id::text,
+        'read_ct', v_rec.read_ct,
+        'message', v_rec.message
+      )
+    );
+  end loop;
+
+  return v_jobs;
+end;
+$$;
+
+revoke all on function public.claim_post_media_jobs(text, integer) from public, anon, authenticated;
+grant execute on function public.claim_post_media_jobs(text, integer) to service_role;
+
+-- finish_post_media_job — archives a completed job in PGMQ
+create or replace function public.finish_post_media_job(
+  p_stage text,
+  p_msg_id bigint
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, private, pg_temp
+as $$
+declare
+  v_queue text;
+begin
+  v_queue := case p_stage
+    when 'feed' then 'post_media_feed'
+    when 'optimize' then 'post_media_optimize'
+    else null
+  end;
+
+  if v_queue is null then
+    raise exception 'Invalid queue stage %', p_stage;
+  end if;
+
+  return pgmq.archive(v_queue, p_msg_id);
+end;
+$$;
+
+revoke all on function public.finish_post_media_job(text, bigint) from public, anon, authenticated;
+grant execute on function public.finish_post_media_job(text, bigint) to service_role;
+
+-- retry_post_media_job — sets visibility timeout for retry with backoff
+create or replace function public.retry_post_media_job(
+  p_stage text,
+  p_msg_id bigint,
+  p_delay_seconds integer default 30
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, private, pg_temp
+as $$
+declare
+  v_queue text;
+begin
+  v_queue := case p_stage
+    when 'feed' then 'post_media_feed'
+    when 'optimize' then 'post_media_optimize'
+    else null
+  end;
+
+  if v_queue is null then
+    raise exception 'Invalid queue stage %', p_stage;
+  end if;
+
+  return pgmq.set_vt(v_queue, p_msg_id, coalesce(p_delay_seconds, 30));
+end;
+$$;
+
+revoke all on function public.retry_post_media_job(text, bigint, integer) from public, anon, authenticated;
+grant execute on function public.retry_post_media_job(text, bigint, integer) to service_role;
+
+-- mark_media_optimized — updates post_media variants upon full pipeline completion
+create or replace function public.mark_media_optimized(
+  p_media_id uuid,
+  p_variants jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, private, pg_temp
+as $$
+declare
+  v_now timestamptz := now();
+begin
+  update public.post_media
+  set
+    status = 'optimized'::public.post_media_status,
+    variants = variants || coalesce(p_variants, '{}'::jsonb),
+    optimized_at = v_now,
+    updated_at = v_now
+  where media_id = p_media_id;
+end;
+$$;
+
+revoke all on function public.mark_media_optimized(uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.mark_media_optimized(uuid, jsonb) to service_role;
+
+-- abandon_post_publish — cancels an unfinished publish attempt and purges rows
+create or replace function public.abandon_post_publish(
+  p_post_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, private, pg_temp
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_status public.post_status;
+begin
+  if v_user_id is null then
+    raise exception 'Unauthorized' using errcode = '401';
+  end if;
+
+  select status into v_status
+  from public.posts
+  where post_id = p_post_id
+    and created_by_user_id = v_user_id;
+
+  if not found then
+    return false;
+  end if;
+
+  if v_status <> 'publishing' then
+    raise exception 'Cannot abandon post with status %', v_status using errcode = '400';
+  end if;
+
+  delete from public.posts
+  where post_id = p_post_id
+    and created_by_user_id = v_user_id;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.abandon_post_publish(uuid) from public;
+grant execute on function public.abandon_post_publish(uuid) to authenticated;
+
+-- recover_stale_media_jobs & recovery cron schedule
+create or replace function private.recover_stale_media_jobs()
+returns void
+language plpgsql
+security definer
+set search_path = private, public, pg_temp
+as $$
+declare
+  v_job record;
+  v_requeued integer := 0;
+begin
+  for v_job in (
+    select job_id
+    from private.media_processing_jobs
+    where (
+      (status in ('pending', 'dispatched') and created_at < now() - interval '2 minutes')
+      or (status = 'processing' and processing_started_at < now() - interval '3 minutes')
+    )
+    and completed_at is null
+    and attempts < 5
+    limit 10
+  ) loop
+    perform private.dispatch_media_job(v_job.job_id);
+    v_requeued := v_requeued + 1;
+  end loop;
+
+  if v_requeued > 0 then
+    perform private.wake_post_media_worker(1);
+  end if;
+end;
+$$;
+
+revoke all on function private.recover_stale_media_jobs() from public, anon, authenticated;
+grant execute on function private.recover_stale_media_jobs() to service_role;
+
+do $$
+begin
+  if exists (select 1 from cron.job where jobname = 'media-worker-recovery') then
+    perform cron.unschedule('media-worker-recovery');
+  end if;
+  perform cron.schedule('media-worker-recovery', '*/2 * * * *', $sql$select private.recover_stale_media_jobs();$sql$);
+exception when others then
+  null;
+end $$;
 
 -- -----------------------------------------------------------------------------
 -- 8. Transactional RPCs: Publishing Lifecycle

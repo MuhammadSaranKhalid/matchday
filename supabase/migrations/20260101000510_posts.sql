@@ -1148,7 +1148,7 @@ begin
           select jsonb_build_object(
             'type', 'tournament',
             'id', tr.tournament_id,
-            'display_name', tr.name,
+            'display_name', tr.tournament_name,
             'username', null,
             'photo_url', tr.logo_url
           )

@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../domain/entities/match_player.dart';
+
+typedef AddPlayerSubmitCallback = Future<void> Function(
+  MatchTeamSide side,
+  String displayName,
+  String idempotencyKey,
+);
 
 class AddMatchPlayerSheet extends StatefulWidget {
   const AddMatchPlayerSheet({
@@ -11,7 +18,7 @@ class AddMatchPlayerSheet extends StatefulWidget {
   });
 
   final MatchTeamSide initialSide;
-  final Future<void> Function(MatchTeamSide side, String displayName) onSubmit;
+  final AddPlayerSubmitCallback onSubmit;
 
   @override
   State<AddMatchPlayerSheet> createState() => _AddMatchPlayerSheetState();
@@ -19,6 +26,7 @@ class AddMatchPlayerSheet extends StatefulWidget {
 
 class _AddMatchPlayerSheetState extends State<AddMatchPlayerSheet> {
   final _name = TextEditingController();
+  late final String _idempotencyKey = const Uuid().v4();
   late MatchTeamSide _side = widget.initialSide;
   bool _busy = false;
 
@@ -81,7 +89,7 @@ class _AddMatchPlayerSheetState extends State<AddMatchPlayerSheet> {
                         final name = _name.text.trim();
                         if (name.isEmpty) return;
                         setState(() => _busy = true);
-                        await widget.onSubmit(_side, name);
+                        await widget.onSubmit(_side, name, _idempotencyKey);
                         if (mounted) setState(() => _busy = false);
                       },
               child: Text(_busy ? 'Adding…' : 'Add to match'),

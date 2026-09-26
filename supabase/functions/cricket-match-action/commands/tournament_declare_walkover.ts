@@ -92,7 +92,7 @@ export async function tournamentDeclareWalkover(
       "Won by walkover",
   };
 
-  await ctx.tx`
+  const revisions = await ctx.tx`
     update public.cricket_matches
     set
       phase = 'complete',
@@ -100,9 +100,11 @@ export async function tournamentDeclareWalkover(
         ${ctx.tx.json(result)},
       result_summary =
         'Won by walkover',
+      state_revision = state_revision + 1,
       updated_at = now()
     where match_id =
             ${ctx.matchId}::uuid
+    returning state_revision
   `;
 
   await ctx.tx`
@@ -123,5 +125,15 @@ export async function tournamentDeclareWalkover(
     winnerSide,
   );
 
-  return {};
+  const revision = Number(revisions[0]?.state_revision ?? 0);
+  return {
+    revision,
+    events: [{
+      eventId: crypto.randomUUID(),
+      matchId: ctx.matchId,
+      revision,
+      eventType: "match_changed",
+      occurredAt: new Date().toISOString(),
+    }],
+  };
 }

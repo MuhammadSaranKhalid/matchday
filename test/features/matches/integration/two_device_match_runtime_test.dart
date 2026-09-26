@@ -61,6 +61,9 @@ void main() {
         () => repository.getMatchRoom(any()),
       ).thenAnswer((_) async => Right(snapshot));
       when(
+        () => repository.watchRealtimeStatus(),
+      ).thenAnswer((_) => const Stream.empty());
+      when(
         () => repository.recordToss(
           id: any(named: 'id'),
           wonBy: any(named: 'wonBy'),
@@ -75,7 +78,7 @@ void main() {
           startPhase: 'lineup',
         );
         publish();
-        return const Right(unit);
+        return Right(snapshot);
       });
       when(
         () => repository.addMatchParticipant(

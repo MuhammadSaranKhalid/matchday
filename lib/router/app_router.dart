@@ -20,7 +20,6 @@ import '../features/profile/presentation/screens/public_profile_screen.dart';
 import '../features/messages/presentation/screens/inbox_screen.dart';
 import '../features/matches/presentation/screens/match_detail_screen.dart';
 import '../features/matches/presentation/screens/my_matches_screen.dart';
-import '../features/shell/presentation/screens/coming_soon_screen.dart';
 import '../features/shell/presentation/screens/menu_screen.dart';
 import '../features/shell/presentation/widgets/app_shell.dart';
 import '../features/shell/presentation/widgets/swipeable_branch_view.dart';
@@ -49,6 +48,8 @@ import '../features/matches/presentation/screens/result_screen.dart';
 import '../features/notifications/presentation/screens/notifications_screen.dart';
 import '../features/posts/domain/entities/post.dart';
 import '../features/posts/presentation/screens/composer_screen.dart';
+import '../features/posts/presentation/screens/post_detail_screen.dart';
+import '../features/posts/presentation/screens/saved_posts_screen.dart';
 import '../features/tournaments/presentation/screens/my_tournaments_screen.dart';
 import '../features/tournaments/presentation/screens/tournament_announce_screen.dart';
 import '../features/tournaments/presentation/screens/tournament_fee_ledger_screen.dart';
@@ -433,7 +434,13 @@ GoRouter appRouter(Ref ref) {
       // Account settings and saved content.
       GoRoute(
         path: '/saved',
-        builder: (_, __) => const ComingSoonScreen(tab: 'Saved'),
+        builder: (_, __) => const SavedPostsScreen(),
+      ),
+      GoRoute(
+        path: '/posts/:postId',
+        builder: (_, state) => PostDetailScreen(
+          postId: state.pathParameters['postId']!,
+        ),
       ),
       GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
       // Legacy redirects for Pavilion and old paths

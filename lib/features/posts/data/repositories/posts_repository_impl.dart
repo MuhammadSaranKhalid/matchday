@@ -1,33 +1,47 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:fpdart/fpdart.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
+import '../../domain/entities/pending_post.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_draft.dart';
 import '../../domain/repositories/posts_repository.dart';
+import '../../domain/value_objects/post_text.dart';
+import '../datasources/posts_local_datasource.dart';
 import '../datasources/posts_remote_datasource.dart';
 
-/// Online-only posts repository. The only place the remote data source's raw
-/// exceptions become [Failure]s.
+/// Concrete PostsRepository implementation.
+/// The only boundary where raw SDK exceptions are caught and transformed into typed Failures.
 class PostsRepositoryImpl implements PostsRepository {
-  PostsRepositoryImpl(this._remote, {Uuid? uuid}) : _uuid = uuid ?? const Uuid();
+  PostsRepositoryImpl(
+    this._remote, {
+    PostsLocalDataSource? local,
+  }) : _local = local ?? PostsLocalDataSourceImpl();
 
   final PostsRemoteDataSource _remote;
-  final Uuid _uuid;
-
-  // Content rules: text OR ≥1 photo; text ≤ 2000 chars; ≤ 4 photos.
-  static const _maxPostChars = 2000;
-  static const _maxPostPhotos = 4;
+  final PostsLocalDataSource _local;
 
   @override
-  Future<Either<Failure, List<Post>>> getFeed({
-    int limit = 20,
+  Future<Either<Failure, List<Post>>> getHomeFeed({
+    String mode = 'home',
     String filter = 'all',
-    DateTime? before,
+    String? targetId,
+    DateTime? cursorPublishedAt,
+    String? cursorPostId,
+    int limit = 20,
   }) async {
     try {
-      final dtos = await _remote.getFeed(limit: limit, filter: filter, before: before);
+      final dtos = await _remote.getHomeFeed(
+        mode: mode,
+        filter: filter,
+        targetId: targetId,
+        cursorPublishedAt: cursorPublishedAt,
+        cursorPostId: cursorPostId,
+        limit: limit,
+      );
       return Right(dtos.map((d) => d.toEntity()).toList());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -39,15 +53,10 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
-  Future<Either<Failure, List<Post>>> getAuthorPosts(
-    String authorId, {
-    int limit = 20,
-    DateTime? before,
-  }) async {
+  Future<Either<Failure, Post>> getPost(PostId id) async {
     try {
-      final dtos =
-          await _remote.getByAuthor(authorId, limit: limit, before: before);
-      return Right(dtos.map((d) => d.toEntity()).toList());
+      final dto = await _remote.getPost(id.value);
+      return Right(dto.toEntity());
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -56,112 +65,132 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
-  Future<Either<Failure, List<Post>>> getTeamPosts(
-    String teamId, {
-    int limit = 20,
-    DateTime? before,
+  Future<Either<Failure, String>> beginPublishPost({
+    required PostPublisherType publisherType,
+    required String publisherId,
+    required PostKind postKind,
+    required PostText text,
+    required List<String> localPhotoPaths,
+    String? linkedMatchId,
+    String? linkedTournamentId,
+    String? linkedTeamId,
   }) async {
-    try {
-      final dtos = await _remote.getByTeam(
-        teamId,
-        limit: limit,
-        before: before,
-      );
-      return Right(dtos.map((d) => d.toEntity()).toList());
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+    if (localPhotoPaths.length > 4) {
+      return const Left(ValidationFailure('A post can have at most 4 photos.'));
     }
-  }
-
-  @override
-  Future<Either<Failure, Post>> createPost(PostDraft draft) async {
-    final text = draft.text?.trim();
-    final hasText = text != null && text.isNotEmpty;
-
-    if (!hasText && !draft.hasPhotos) {
-      return const Left(
-        ValidationFailure('Add some text or a photo to post.'),
-      );
-    }
-    if (text != null && text.length > _maxPostChars) {
-      return const Left(
-        ValidationFailure('Post is too long (max $_maxPostChars characters).'),
-      );
-    }
-    if (draft.photos.length > _maxPostPhotos) {
-      return const Left(
-        ValidationFailure('A post can have at most $_maxPostPhotos photos.'),
-      );
-    }
-
-    // Normalise: stored text is the trimmed form (or null when empty).
-    final normalised = PostDraft(
-      text: hasText ? text : null,
-      photos: draft.photos,
-      authorContext: draft.authorContext,
-      contextEntityId: draft.contextEntityId,
-    );
-    draft = normalised;
 
     try {
-      // Deterministic post id → deterministic media paths → predictable public
-      // URLs, so we can write media_urls/media at INSERT and upload after.
-      final postId = _uuid.v4();
-      final urls = <String>[];
-      final media = <Map<String, dynamic>>[];
-      for (var i = 0; i < draft.photos.length; i++) {
-        final p = draft.photos[i];
-        final url = _remote.publicUrl('$postId/$i.jpg');
-        urls.add(url);
-        media.add({
-          'url': url,
-          'blurhash': p.blurhash,
-          'width': p.width,
-          'height': p.height,
+      final mediaItems = <Map<String, dynamic>>[];
+      for (var i = 0; i < localPhotoPaths.length; i++) {
+        mediaItems.add({
+          'position': i,
+          'source_width': 1080,
+          'source_height': 1080,
         });
       }
 
-      final type = draft.hasPhotos ? PostType.photo : PostType.text;
-      final dto = await _remote.insertPost({
-        'post_id': postId,
-        'author_context': draft.authorContext.wire,
-        if (draft.contextEntityId != null)
-          'context_entity_id': draft.contextEntityId,
-        if (draft.authorContext == PostAuthorContext.teamManager &&
-            draft.contextEntityId != null)
-          'linked_team_id': draft.contextEntityId,
-        'post_type': type.wire,
-        if (draft.text != null) 'text': draft.text,
-        'media_urls': urls,
-        'media': media,
-        'visibility': 'public',
-        'status': 'active',
-      });
+      // 1. Reserve publishing session on Supabase
+      final response = await _remote.beginPostPublish(
+        publisherType: publisherType.name,
+        publisherId: publisherId,
+        postKind: switch (postKind) {
+          PostKind.recruitment => 'recruitment',
+          PostKind.matchAnnouncement => 'match_announcement',
+          PostKind.matchResult => 'match_result',
+          PostKind.tournamentUpdate => 'tournament_update',
+          PostKind.rosterUpdate => 'roster_update',
+          PostKind.milestone => 'milestone',
+          _ => 'standard',
+        },
+        text: text.value,
+        expectedMediaCount: localPhotoPaths.length,
+        mediaItems: mediaItems,
+        linkedMatchId: linkedMatchId,
+        linkedTournamentId: linkedTournamentId,
+        linkedTeamId: linkedTeamId,
+      );
 
-      if (draft.photos.isNotEmpty) {
-        try {
-          await _remote.uploadMedia(
-            postId,
-            draft.photos.map((p) => p.file).toList(),
-          );
-        } catch (_) {
-          // Roll back the orphaned row (best-effort) so the feed never shows a
-          // post whose images failed to upload, then surface the failure.
-          try {
-            await _remote.deletePost(postId);
-          } catch (_) {}
-          rethrow;
-        }
+      final postId = response['post_id'] as String;
+      final serverMedia = (response['media'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [];
+
+      // 2. Emit durable local pending post projection
+      final pendingPost = PendingPost(
+        postId: postId,
+        text: text.value,
+        localMediaPaths: localPhotoPaths,
+        createdAt: DateTime.now(),
+        status: localPhotoPaths.isEmpty
+            ? PendingPostStatus.publishing
+            : PendingPostStatus.uploading,
+        progress: 0.0,
+      );
+      await _local.savePendingPost(pendingPost);
+
+      // 3. Launch background staging uploads (async / decoupled)
+      if (localPhotoPaths.isNotEmpty) {
+        unawaited(_drainStagingUploads(postId, serverMedia, localPhotoPaths));
       }
-      return Right(dto.toEntity());
+
+      return Right(postId);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  Future<void> _drainStagingUploads(
+    String postId,
+    List<Map<String, dynamic>> serverMedia,
+    List<String> localPhotoPaths,
+  ) async {
+    try {
+      final total = localPhotoPaths.length;
+      var uploaded = 0;
+
+      for (final mediaMeta in serverMedia) {
+        final position = (mediaMeta['position'] as num?)?.toInt() ?? 0;
+        final stagingPath = mediaMeta['staging_path'] as String?;
+
+        if (position < localPhotoPaths.length && stagingPath != null) {
+          final file = File(localPhotoPaths[position]);
+          if (await file.exists()) {
+            await _remote.uploadStagingMedia(
+              stagingPath: stagingPath,
+              file: file,
+            );
+          }
+          uploaded++;
+          final current = await _local.getPendingPosts();
+          final existing = current.where((p) => p.postId == postId).firstOrNull;
+          if (existing != null) {
+            await _local.savePendingPost(
+              existing.copyWith(
+                progress: uploaded / total,
+                status: uploaded == total
+                    ? PendingPostStatus.publishing
+                    : PendingPostStatus.uploading,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      final current = await _local.getPendingPosts();
+      final existing = current.where((p) => p.postId == postId).firstOrNull;
+      if (existing != null) {
+        await _local.savePendingPost(
+          existing.copyWith(
+            status: PendingPostStatus.failed,
+            errorMessage: 'Upload failed: $e',
+          ),
+        );
+      }
     }
   }
 
@@ -169,9 +198,8 @@ class PostsRepositoryImpl implements PostsRepository {
   Future<Either<Failure, Unit>> deletePost(PostId id) async {
     try {
       await _remote.deletePost(id.value);
+      await _local.removePendingPost(id.value);
       return const Right(unit);
-    } on UnauthorizedException catch (e) {
-      return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -180,12 +208,10 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> togglePostLike(PostId id) async {
+  Future<Either<Failure, bool>> setPostLike(PostId id, {required bool liked}) async {
     try {
-      final isLiked = await _remote.togglePostLike(id.value);
-      return Right(isLiked);
-    } on UnauthorizedException catch (e) {
-      return Left(AuthFailure(e.message));
+      final result = await _remote.setPostLike(id.value, liked: liked);
+      return Right(result);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -194,34 +220,169 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> toggleBookmark(PostId id) async {
+  Future<Either<Failure, bool>> setPostBookmark(PostId id, {required bool bookmarked}) async {
     try {
-      final isBookmarked = await _remote.toggleBookmark(id.value);
-      return Right(isBookmarked);
-    } on UnauthorizedException catch (e) {
-      return Left(AuthFailure(e.message));
+      final result = await _remote.setPostBookmark(id.value, bookmarked: bookmarked);
+      return Right(result);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }
   }
+
+  @override
+  Stream<List<PendingPost>> watchPendingPosts() => _local.watchPendingPosts();
+
+  @override
+  Future<void> retryPendingPost(String postId) async {
+    final list = await _local.getPendingPosts();
+    final post = list.where((p) => p.postId == postId).firstOrNull;
+    if (post == null) return;
+
+    await _local.savePendingPost(
+      post.copyWith(status: PendingPostStatus.uploading, errorMessage: null),
+    );
+
+    // Re-attempt upload flow
+    if (post.localMediaPaths.isNotEmpty) {
+      final dummyServerMedia = [
+        for (var i = 0; i < post.localMediaPaths.length; i++)
+          {
+            'position': i,
+            'staging_path': '${post.postId}/$i/source.jpg',
+          }
+      ];
+      unawaited(_drainStagingUploads(postId, dummyServerMedia, post.localMediaPaths));
+    }
+  }
+
+  @override
+  Future<void> discardPendingPost(String postId) async {
+    await _local.removePendingPost(postId);
+  }
+
+  @override
+  Future<Either<Failure, Post>> createPost(PostDraft draft) async {
+    final textResult = PostText.create(
+      draft.text ?? '',
+      hasPhotos: draft.photos.isNotEmpty,
+    );
+
+    return textResult.fold(
+      (failure) => Left(failure),
+      (postText) async {
+        final publisherType = draft.authorContext == PostAuthorContext.teamManager
+            ? PostPublisherType.team
+            : PostPublisherType.user;
+
+        final currentUid = _remote.currentUserId;
+        if (currentUid == null) {
+          return const Left(AuthFailure('You must be signed in to post.'));
+        }
+
+        final publisherId = draft.authorContext == PostAuthorContext.teamManager &&
+                draft.contextEntityId != null
+            ? draft.contextEntityId!
+            : currentUid;
+
+        final localPaths =
+            draft.photos.map((ProcessedPhoto p) => p.file.path).toList();
+
+        final publishResult = await beginPublishPost(
+          publisherType: publisherType,
+          publisherId: publisherId,
+          postKind: PostKind.standard,
+          text: postText,
+          localPhotoPaths: localPaths,
+          linkedTeamId: draft.authorContext == PostAuthorContext.teamManager
+              ? draft.contextEntityId
+              : null,
+        );
+
+        return publishResult.map(
+          (postId) => Post(
+            id: PostId(postId),
+            createdByUserId: currentUid,
+            publisher: PostPublisher(
+              id: publisherId,
+              type: publisherType,
+              displayName: publisherType == PostPublisherType.team ? 'Team' : 'User',
+            ),
+            kind: PostKind.standard,
+            text: postText.value,
+            status: localPaths.isEmpty ? PostStatus.active : PostStatus.publishing,
+            expectedMediaCount: localPaths.length,
+            createdAt: DateTime.now(),
+            publishedAt: localPaths.isEmpty ? DateTime.now() : null,
+            linkedTeamId: draft.authorContext == PostAuthorContext.teamManager
+                ? draft.contextEntityId
+                : null,
+          ),
+        );
+      },
+    );
+  }
+
+  // ─── Legacy Fallback Implementations ────────────────────────────────────────
+
+  @override
+  Future<Either<Failure, List<Post>>> getFeed({
+    int limit = 20,
+    String filter = 'all',
+    DateTime? before,
+  }) =>
+      getHomeFeed(
+        mode: 'home',
+        filter: filter,
+        cursorPublishedAt: before,
+        limit: limit,
+      );
+
+  @override
+  Future<Either<Failure, List<Post>>> getAuthorPosts(
+    String authorId, {
+    int limit = 20,
+    DateTime? before,
+  }) =>
+      getHomeFeed(
+        mode: 'user',
+        targetId: authorId,
+        cursorPublishedAt: before,
+        limit: limit,
+      );
+
+  @override
+  Future<Either<Failure, List<Post>>> getTeamPosts(
+    String teamId, {
+    int limit = 20,
+    DateTime? before,
+  }) =>
+      getHomeFeed(
+        mode: 'team',
+        targetId: teamId,
+        cursorPublishedAt: before,
+        limit: limit,
+      );
 
   @override
   Future<Either<Failure, List<Post>>> getBookmarkedPosts({
     int limit = 20,
     DateTime? before,
-  }) async {
-    try {
-      final dtos = await _remote.getBookmarkedPosts(limit: limit, before: before);
-      return Right(dtos.map((d) => d.toEntity()).toList());
-    } on UnauthorizedException catch (e) {
-      return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(UnknownFailure(e.toString()));
-    }
+  }) =>
+      getHomeFeed(
+        mode: 'saved',
+        cursorPublishedAt: before,
+        limit: limit,
+      );
+
+  @override
+  Future<Either<Failure, bool>> togglePostLike(PostId id) async {
+    return setPostLike(id, liked: true);
+  }
+
+  @override
+  Future<Either<Failure, bool>> toggleBookmark(PostId id) async {
+    return setPostBookmark(id, bookmarked: true);
   }
 }
-

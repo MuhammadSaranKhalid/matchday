@@ -1,5 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
@@ -17,28 +15,37 @@ class FeedController extends _$FeedController {
   bool _hasMore = true;
   bool get hasMore => _hasMore;
 
+  bool _isLoadingMore = false;
+  bool get isLoadingMore => _isLoadingMore;
+
   @override
   Future<List<Post>> build() {
     final filter = ref.watch(feedFilterProvider);
-    return _fetch(ref.watch(postsRepositoryProvider), filter: filter, before: null);
+    return _fetch(
+      ref.watch(postsRepositoryProvider),
+      filter: filter,
+      cursorPublishedAt: null,
+      cursorPostId: null,
+    );
   }
 
-  Future<List<Post>> _fetch(PostsRepository repo, {required String filter, DateTime? before}) async {
-    final result = await repo.getFeed(limit: _pageSize, filter: filter, before: before);
+  Future<List<Post>> _fetch(
+    PostsRepository repo, {
+    required String filter,
+    DateTime? cursorPublishedAt,
+    String? cursorPostId,
+  }) async {
+    final result = await repo.getHomeFeed(
+      mode: 'home',
+      filter: filter,
+      cursorPublishedAt: cursorPublishedAt,
+      cursorPostId: cursorPostId,
+      limit: _pageSize,
+    );
     return result.fold(
       (f) => throw FailureWrapper(f),
       (posts) {
         _hasMore = posts.length == _pageSize;
-        
-        // Aggressive Prefetching: Start downloading images for these posts immediately
-        // in the background before the UI ever scrolls to them. This ensures they
-        // are instantly available in the local disk cache.
-        for (final p in posts) {
-          for (final m in p.media) {
-            CachedNetworkImageProvider(m.url).resolve(ImageConfiguration.empty);
-          }
-        }
-        
         return posts;
       },
     );
@@ -46,23 +53,40 @@ class FeedController extends _$FeedController {
 
   Future<void> refresh() async {
     _hasMore = true;
-    state = const AsyncLoading();
+    _isLoadingMore = false;
     final filter = ref.read(feedFilterProvider);
-    state = await AsyncValue.guard(
-      () => _fetch(ref.read(postsRepositoryProvider), filter: filter, before: null),
+    final nextState = await AsyncValue.guard(
+      () => _fetch(
+        ref.read(postsRepositoryProvider),
+        filter: filter,
+        cursorPublishedAt: null,
+        cursorPostId: null,
+      ),
     );
+    if (nextState.hasValue) {
+      state = nextState;
+    }
   }
 
   Future<void> loadMore() async {
     final current = state.value;
-    if (current == null || current.isEmpty || !_hasMore) return;
+    if (current == null || current.isEmpty || !_hasMore || _isLoadingMore) return;
+
+    _isLoadingMore = true;
+    final lastPost = current.last;
     final filter = ref.read(feedFilterProvider);
-    final more = await _fetch(
-      ref.read(postsRepositoryProvider),
-      filter: filter,
-      before: current.last.createdAt,
-    );
-    state = AsyncData([...current, ...more]);
+
+    try {
+      final more = await _fetch(
+        ref.read(postsRepositoryProvider),
+        filter: filter,
+        cursorPublishedAt: lastPost.publishedAt ?? lastPost.createdAt,
+        cursorPostId: lastPost.id.value,
+      );
+      state = AsyncData([...current, ...more]);
+    } finally {
+      _isLoadingMore = false;
+    }
   }
 
   /// Prepend a freshly created post without a round-trip (optimistic insert).
@@ -71,16 +95,18 @@ class FeedController extends _$FeedController {
     state = AsyncData([post, ...current]);
   }
 
-  /// Toggle like state on a post in the feed optimistically.
+  /// Toggle like state on a post in the feed with desired-state RPC.
   Future<void> toggleLike(PostId postId) async {
     final current = state.value;
     if (current == null) return;
 
+    final target = current.firstWhere((p) => p.id == postId, orElse: () => current.first);
+    final targetLiked = !target.isLiked;
+
     final updated = current.map((p) {
       if (p.id == postId) {
-        final newIsLiked = !p.isLiked;
-        final newCount = newIsLiked ? p.likesCount + 1 : (p.likesCount > 0 ? p.likesCount - 1 : 0);
-        return p.copyWith(isLiked: newIsLiked, likesCount: newCount);
+        final newCount = targetLiked ? p.likesCount + 1 : (p.likesCount > 0 ? p.likesCount - 1 : 0);
+        return p.copyWith(isLiked: targetLiked, likesCount: newCount);
       }
       return p;
     }).toList();
@@ -88,7 +114,7 @@ class FeedController extends _$FeedController {
     state = AsyncData(updated);
 
     final repo = ref.read(postsRepositoryProvider);
-    final result = await repo.togglePostLike(postId);
+    final result = await repo.setPostLike(postId, liked: targetLiked);
 
     result.fold(
       (failure) {
@@ -99,14 +125,17 @@ class FeedController extends _$FeedController {
     );
   }
 
-  /// Toggle bookmark state on a post in the feed optimistically.
+  /// Toggle bookmark state on a post in the feed with desired-state RPC.
   Future<void> toggleBookmark(PostId postId) async {
     final current = state.value;
     if (current == null) return;
 
+    final target = current.firstWhere((p) => p.id == postId, orElse: () => current.first);
+    final targetBookmarked = !target.isBookmarked;
+
     final updated = current.map((p) {
       if (p.id == postId) {
-        return p.copyWith(isBookmarked: !p.isBookmarked);
+        return p.copyWith(isBookmarked: targetBookmarked);
       }
       return p;
     }).toList();
@@ -114,7 +143,7 @@ class FeedController extends _$FeedController {
     state = AsyncData(updated);
 
     final repo = ref.read(postsRepositoryProvider);
-    final result = await repo.toggleBookmark(postId);
+    final result = await repo.setPostBookmark(postId, bookmarked: targetBookmarked);
 
     result.fold(
       (failure) {
@@ -133,6 +162,22 @@ class FeedController extends _$FeedController {
     final updated = current.map((p) {
       if (p.id == postId) {
         return p.copyWith(commentsCount: p.commentsCount + 1);
+      }
+      return p;
+    }).toList();
+
+    state = AsyncData(updated);
+  }
+
+  /// Decrement comments count on a post when a comment is deleted or rolls back.
+  void decrementCommentsCount(PostId postId) {
+    final current = state.value;
+    if (current == null) return;
+
+    final updated = current.map((p) {
+      if (p.id == postId) {
+        final count = p.commentsCount > 0 ? p.commentsCount - 1 : 0;
+        return p.copyWith(commentsCount: count);
       }
       return p;
     }).toList();

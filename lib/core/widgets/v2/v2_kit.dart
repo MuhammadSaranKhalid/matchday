@@ -763,7 +763,8 @@ class V2BottomNav extends ConsumerWidget {
 }
 
 /// Per-post action bar — Like · Comment · Share, optional RSVP text, Save.
-class PostActions extends StatefulWidget {
+/// Pure controlled/presentational component (Point 54).
+class PostActions extends StatelessWidget {
   const PostActions({
     super.key,
     required this.likes,
@@ -788,27 +789,6 @@ class PostActions extends StatefulWidget {
   final VoidCallback? onShare;
 
   @override
-  State<PostActions> createState() => _PostActionsState();
-}
-
-class _PostActionsState extends State<PostActions> {
-  late bool _liked = widget.liked;
-  late int _likes = widget.likes;
-  late bool _saved = widget.saved;
-
-  @override
-  void didUpdateWidget(covariant PostActions oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.liked != widget.liked || oldWidget.likes != widget.likes) {
-      _liked = widget.liked;
-      _likes = widget.likes;
-    }
-    if (oldWidget.saved != widget.saved) {
-      _saved = widget.saved;
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     // The JSX nudges the bar out by -4px to align the first icon's internal
     // padding to the edge; Container margins can't be negative, so we just pad
@@ -823,37 +803,31 @@ class _PostActionsState extends State<PostActions> {
         children: [
           _action(
             icon: V2Icons.heart,
-            label: '$_likes',
-            filled: _liked,
-            color: _liked ? CkColors.red : CkColors.ink2,
-            onTap: () {
-              setState(() {
-                _liked = !_liked;
-                _likes += _liked ? 1 : -1;
-              });
-              widget.onLike?.call();
-            },
+            label: '$likes',
+            filled: liked,
+            color: liked ? CkColors.red : CkColors.ink2,
+            onTap: onLike,
           ),
           _action(
             icon: V2Icons.comment,
-            label: '${widget.comments}',
+            label: '$comments',
             color: CkColors.ink2,
-            onTap: widget.onComment,
+            onTap: onComment,
           ),
           _action(
             icon: V2Icons.share,
             label: 'Share',
             color: CkColors.ink2,
-            onTap: widget.onShare ?? () {},
+            onTap: onShare ?? () {},
           ),
           // The RSVP text takes the remaining space and right-aligns next to
           // Save, ellipsizing on narrow screens rather than overflowing.
-          if (widget.rsvp != null)
+          if (rsvp != null)
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(left: 8, right: 6),
                 child: Text(
-                  widget.rsvp!,
+                  rsvp!,
                   textAlign: TextAlign.right,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -866,12 +840,9 @@ class _PostActionsState extends State<PostActions> {
           _action(
             icon: V2Icons.bookmark,
             label: null,
-            filled: _saved,
-            color: _saved ? CkColors.ink : CkColors.ink2,
-            onTap: () {
-              setState(() => _saved = !_saved);
-              widget.onBookmark?.call();
-            },
+            filled: saved,
+            color: saved ? CkColors.ink : CkColors.ink2,
+            onTap: onBookmark,
           ),
         ],
       ),

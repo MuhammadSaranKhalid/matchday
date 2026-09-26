@@ -239,10 +239,11 @@ class _MatchRoomBodyState extends ConsumerState<MatchRoomBody> {
       isScrollControlled: true,
       builder:
           (sheetContext) => AddMatchPlayerSheet(
-            onSubmit: (side, name) async {
+            onSubmit: (side, name, idempotencyKey) async {
               final result = await controller.addParticipant(
                 side: side,
                 displayName: name,
+                idempotencyKey: idempotencyKey,
               );
               if (!sheetContext.mounted) return;
               result.fold(

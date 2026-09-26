@@ -129,7 +129,7 @@ export async function tournamentAbandonMatch(
       ctx.matchId,
     );
 
-    await ctx.tx`
+    const revisions = await ctx.tx`
       update public.cricket_matches
       set
         phase = 'toss',
@@ -143,9 +143,11 @@ export async function tournamentAbandonMatch(
         openers_submitted_by = null,
         openers_submitted_at = null,
         player_of_the_match_id = null,
+        state_revision = state_revision + 1,
         updated_at = now()
       where match_id =
               ${ctx.matchId}::uuid
+      returning state_revision
     `;
 
     await ctx.tx`
@@ -162,7 +164,17 @@ export async function tournamentAbandonMatch(
               ${ctx.matchId}::uuid
     `;
 
-    return {};
+    const revision = Number(revisions[0]?.state_revision ?? 0);
+    return {
+      revision,
+      events: [{
+        eventId: crypto.randomUUID(),
+        matchId: ctx.matchId,
+        revision,
+        eventType: "match_changed",
+        occurredAt: new Date().toISOString(),
+      }],
+    };
   }
 
   const description =
@@ -175,7 +187,7 @@ export async function tournamentAbandonMatch(
     description,
   };
 
-  await ctx.tx`
+  const revisions = await ctx.tx`
     update public.cricket_matches
     set
       phase = 'complete',
@@ -183,9 +195,11 @@ export async function tournamentAbandonMatch(
         ${ctx.tx.json(result)},
       result_summary =
         ${description},
+      state_revision = state_revision + 1,
       updated_at = now()
     where match_id =
             ${ctx.matchId}::uuid
+    returning state_revision
   `;
 
   await ctx.tx`
@@ -199,5 +213,15 @@ export async function tournamentAbandonMatch(
             ${ctx.matchId}::uuid
   `;
 
-  return {};
+  const revision = Number(revisions[0]?.state_revision ?? 0);
+  return {
+    revision,
+    events: [{
+      eventId: crypto.randomUUID(),
+      matchId: ctx.matchId,
+      revision,
+      eventType: "match_changed",
+      occurredAt: new Date().toISOString(),
+    }],
+  };
 }

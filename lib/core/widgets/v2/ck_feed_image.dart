@@ -19,6 +19,7 @@ class CkFeedImage extends StatelessWidget {
   const CkFeedImage({
     super.key,
     required this.url,
+    this.variants,
     this.blurhash = '',
     this.aspectRatio = 1,
     this.fit = BoxFit.cover,
@@ -26,6 +27,7 @@ class CkFeedImage extends StatelessWidget {
   });
 
   final String url;
+  final Map<int, String>? variants;
   final String blurhash;
   final double aspectRatio;
   final BoxFit fit;
@@ -43,8 +45,23 @@ class CkFeedImage extends StatelessWidget {
             ? constraints.maxWidth
             : MediaQuery.sizeOf(context).width;
         final memW = (w * dpr).round().clamp(1, 4096);
+
+        String targetUrl = url;
+        if (variants != null && variants!.isNotEmpty) {
+          final sortedWidths = variants!.keys.toList()..sort();
+          int? selectedWidth;
+          for (final width in sortedWidths) {
+            if (width >= memW) {
+              selectedWidth = width;
+              break;
+            }
+          }
+          selectedWidth ??= sortedWidths.last;
+          targetUrl = variants![selectedWidth] ?? url;
+        }
+
         return CachedNetworkImage(
-          imageUrl: url,
+          imageUrl: targetUrl,
           fit: fit,
           width: double.infinity,
           height: double.infinity,

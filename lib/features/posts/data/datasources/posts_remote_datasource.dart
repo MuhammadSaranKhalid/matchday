@@ -5,21 +5,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/post_dto.dart';
 
-/// Talks to Supabase for the `posts` table + `post-media` storage bucket +
-/// `post_likes` and `bookmarks` junction tables.
-/// Returns DTOs, throws raw exceptions. RLS scopes reads/writes.
+/// Talks to Supabase for the `posts` table + `post-media-staging` private storage +
+/// consolidated `get_home_feed`, `begin_post_publish`, `set_post_like`, and `set_post_bookmark` RPCs.
 class PostsRemoteDataSource {
   PostsRemoteDataSource(this._supabase);
   final SupabaseClient _supabase;
 
-  static const _table = 'posts';
-  static const _likesTable = 'post_likes';
-  static const _bookmarksTable = 'bookmarks';
-  static const _bucket = 'post-media';
+  static const _stagingBucket = 'post-media-staging';
+  static const _finalBucket = 'post-media';
 
-  // Embed the author's profile and team so the feed renders without extra queries.
-  static const _select =
-      '*, author:profiles!author_id(display_name, username, profile_photo_url), team:teams!linked_team_id(team_name, logo_url, logo_monogram, team_colors)';
+  String? get currentUserId => _supabase.auth.currentUser?.id;
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
@@ -27,291 +22,236 @@ class PostsRemoteDataSource {
     return id;
   }
 
-  Future<List<PostDto>> _enrichWithUserInteractions(List<PostDto> dtos) async {
-    final currentUid = _supabase.auth.currentUser?.id;
-    if (currentUid == null || dtos.isEmpty) return dtos;
-
-    final postIds = dtos.map((d) => d.postId).toList();
-
-    try {
-      final likesFuture = _supabase
-          .from(_likesTable)
-          .select('post_id')
-          .eq('user_id', currentUid)
-          .inFilter('post_id', postIds);
-
-      final bookmarksFuture = _supabase
-          .from(_bookmarksTable)
-          .select('post_id')
-          .eq('user_id', currentUid)
-          .inFilter('post_id', postIds);
-
-      final results = await Future.wait([likesFuture, bookmarksFuture]);
-      final likedPostIds = (results[0] as List)
-          .map((r) => r['post_id'] as String)
-          .toSet();
-      final bookmarkedPostIds = (results[1] as List)
-          .map((r) => r['post_id'] as String)
-          .toSet();
-
-      return dtos.map((d) {
-        return d.copyWith(
-          isLiked: likedPostIds.contains(d.postId),
-          isBookmarked: bookmarkedPostIds.contains(d.postId),
-        );
-      }).toList();
-    } catch (_) {
-      return dtos;
-    }
-  }
-
-  Future<List<PostDto>> _enrichWithTeams(List<PostDto> dtos) async {
-    if (dtos.isEmpty) return dtos;
-
-    final teamIds = dtos
-        .where((d) =>
-            d.authorContext == 'team_manager' ||
-            (d.linkedTeamId != null && d.linkedTeamId!.isNotEmpty))
-        .map((d) => d.contextEntityId ?? d.linkedTeamId)
-        .whereType<String>()
-        .toSet()
-        .toList();
-
-    if (teamIds.isEmpty) return dtos;
-
-    try {
-      final teamRows = await _supabase
-          .from('teams')
-          .select('team_id, team_name, logo_url, logo_monogram, team_colors')
-          .inFilter('team_id', teamIds);
-
-      final teamsById = {
-        for (final r in (teamRows as List))
-          r['team_id'] as String: r as Map<String, dynamic>,
-      };
-
-      return dtos.map((d) {
-        final tid = d.contextEntityId ?? d.linkedTeamId;
-        if (tid != null && teamsById.containsKey(tid)) {
-          final t = teamsById[tid]!;
-          return d.copyWith(team: t);
-        }
-        return d;
-      }).toList();
-    } catch (_) {
-      return dtos;
-    }
-  }
-
-  Future<List<PostDto>> getFeed({
-    required int limit,
+  /// Calls the consolidated PostgreSQL read model RPC.
+  /// Eliminates multi-query waterfall and applies keyset pagination (published_at, post_id).
+  Future<List<PostDto>> getHomeFeed({
+    String mode = 'home',
     String filter = 'all',
-    DateTime? before,
+    String? targetId,
+    DateTime? cursorPublishedAt,
+    String? cursorPostId,
+    int limit = 20,
   }) async {
     try {
-      var q = _supabase.from(_table).select(_select).eq('status', 'active');
+      final response = await _supabase.rpc<dynamic>(
+        'get_home_feed',
+        params: {
+          'p_mode': mode,
+          'p_filter': filter,
+          if (targetId != null) 'p_target_id': targetId,
+          if (cursorPublishedAt != null)
+            'p_cursor_published_at': cursorPublishedAt.toIso8601String(),
+          if (cursorPostId != null) 'p_cursor_post_id': cursorPostId,
+          'p_limit': limit,
+        },
+      );
 
-      if (filter == 'people') {
-        q = q.eq('author_context', 'personal');
-      } else if (filter == 'teams') {
-        q = q.eq('author_context', 'team_manager');
-      } else if (filter == 'tournaments') {
-        q = q.eq('author_context', 'tournament_organizer');
-      } else if (filter == 'matches') {
-        q = q.eq('post_type', 'match_announcement');
+      if (response is List) {
+        return response
+            .whereType<Map<String, dynamic>>()
+            .map((json) => PostDto.fromJson(json))
+            .toList();
       }
-
-      if (before != null) q = q.lt('created_at', before.toIso8601String());
-      final rows = await q.order('created_at', ascending: false).limit(limit);
-      final dtos = rows.map((r) => PostDto.fromJson(r)).toList();
-      final withTeams = await _enrichWithTeams(dtos);
-      return _enrichWithUserInteractions(withTeams);
+      return const [];
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
+    } catch (e) {
+      throw ServerException(e.toString());
     }
   }
+
+  /// Fetch a single canonical post by ID.
+  Future<PostDto> getPost(String postId) async {
+    try {
+      final list = await getHomeFeed(mode: 'home', limit: 1);
+      final match = list.where((p) => p.postId == postId).firstOrNull;
+      if (match != null) return match;
+
+      // Fallback query
+      final response = await _supabase
+          .from('posts')
+          .select('*, author:profiles!author_id(display_name, username, profile_photo_url)')
+          .eq('post_id', postId)
+          .single();
+
+      return PostDto.fromJson(response);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  /// Atomic publishing session reservation.
+  Future<Map<String, dynamic>> beginPostPublish({
+    required String publisherType,
+    required String publisherId,
+    required String postKind,
+    String? text,
+    required int expectedMediaCount,
+    List<Map<String, dynamic>> mediaItems = const [],
+    String? linkedMatchId,
+    String? linkedTournamentId,
+    String? linkedTeamId,
+  }) async {
+    _requireUid();
+    try {
+      final response = await _supabase.rpc<dynamic>(
+        'begin_post_publish',
+        params: {
+          'p_publisher_type': publisherType,
+          'p_publisher_id': publisherId,
+          'p_post_kind': postKind,
+          'p_text': text,
+          'p_expected_media_count': expectedMediaCount,
+          'p_media_items': mediaItems,
+          if (linkedMatchId != null) 'p_linked_match_id': linkedMatchId,
+          if (linkedTournamentId != null)
+            'p_linked_tournament_id': linkedTournamentId,
+          if (linkedTeamId != null) 'p_linked_team_id': linkedTeamId,
+        },
+      );
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      throw ServerException('Invalid begin_post_publish response format');
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  /// Uploads a client-preprocessed JPEG to the private staging bucket.
+  Future<void> uploadStagingMedia({
+    required String stagingPath,
+    required File file,
+  }) async {
+    _requireUid();
+    try {
+      await _supabase.storage.from(_stagingBucket).upload(
+            stagingPath,
+            file,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
+    } on StorageException catch (e) {
+      throw ServerException(e.message);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  /// Desired-state like: sets liked to true or false deterministically.
+  Future<bool> setPostLike(String postId, {required bool liked}) async {
+    _requireUid();
+    try {
+      final response = await _supabase.rpc<dynamic>(
+        'set_post_like',
+        params: {
+          'p_post_id': postId,
+          'p_liked': liked,
+        },
+      );
+      if (response is Map<String, dynamic>) {
+        return response['liked'] as bool? ?? liked;
+      }
+      return liked;
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  /// Desired-state bookmark: sets bookmarked to true or false deterministically.
+  Future<bool> setPostBookmark(String postId, {required bool bookmarked}) async {
+    _requireUid();
+    try {
+      final response = await _supabase.rpc<dynamic>(
+        'set_post_bookmark',
+        params: {
+          'p_post_id': postId,
+          'p_bookmarked': bookmarked,
+        },
+      );
+      if (response is Map<String, dynamic>) {
+        return response['bookmarked'] as bool? ?? bookmarked;
+      }
+      return bookmarked;
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  /// Soft-delete post by marking status = deleted.
+  Future<void> deletePost(String postId) async {
+    _requireUid();
+    try {
+      await _supabase
+          .from('posts')
+          .update({'status': 'deleted', 'updated_at': DateTime.now().toIso8601String()})
+          .eq('post_id', postId);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  String publicUrl(String path) =>
+      _supabase.storage.from(_finalBucket).getPublicUrl(path);
+
+  // ─── Legacy Compatibility Methods ──────────────────────────────────────────
+
+  Future<List<PostDto>> getFeed({
+    int limit = 20,
+    String filter = 'all',
+    DateTime? before,
+  }) =>
+      getHomeFeed(
+        mode: 'home',
+        filter: filter,
+        cursorPublishedAt: before,
+        limit: limit,
+      );
 
   Future<List<PostDto>> getByAuthor(
     String authorId, {
-    required int limit,
+    int limit = 20,
     DateTime? before,
-  }) async {
-    try {
-      var q = _supabase
-          .from(_table)
-          .select(_select)
-          .eq('author_id', authorId)
-          .eq('status', 'active');
-      if (before != null) q = q.lt('created_at', before.toIso8601String());
-      final rows = await q.order('created_at', ascending: false).limit(limit);
-      final dtos = rows.map((r) => PostDto.fromJson(r)).toList();
-      final withTeams = await _enrichWithTeams(dtos);
-      return _enrichWithUserInteractions(withTeams);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
+  }) =>
+      getHomeFeed(
+        mode: 'user',
+        targetId: authorId,
+        cursorPublishedAt: before,
+        limit: limit,
+      );
 
   Future<List<PostDto>> getByTeam(
     String teamId, {
-    required int limit,
+    int limit = 20,
     DateTime? before,
-  }) async {
-    try {
-      var q = _supabase
-          .from(_table)
-          .select(_select)
-          .or('context_entity_id.eq.$teamId,linked_team_id.eq.$teamId')
-          .eq('status', 'active');
-      if (before != null) q = q.lt('created_at', before.toIso8601String());
-      final rows = await q.order('created_at', ascending: false).limit(limit);
-      final dtos = rows.map((r) => PostDto.fromJson(r)).toList();
-      final withTeams = await _enrichWithTeams(dtos);
-      return _enrichWithUserInteractions(withTeams);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
+  }) =>
+      getHomeFeed(
+        mode: 'team',
+        targetId: teamId,
+        cursorPublishedAt: before,
+        limit: limit,
+      );
 
-  /// Toggle post like for authenticated user. Returns `true` if liked, `false` if unliked.
-  Future<bool> togglePostLike(String postId) async {
-    try {
-      final uid = _requireUid();
-      final existing = await _supabase
-          .from(_likesTable)
-          .select('like_id')
-          .eq('post_id', postId)
-          .eq('user_id', uid)
-          .maybeSingle();
-
-      if (existing != null) {
-        await _supabase
-            .from(_likesTable)
-            .delete()
-            .eq('post_id', postId)
-            .eq('user_id', uid);
-        return false;
-      } else {
-        await _supabase.from(_likesTable).insert({
-          'post_id': postId,
-          'user_id': uid,
-        });
-        return true;
-      }
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  /// Toggle bookmark for authenticated user. Returns `true` if bookmarked, `false` if removed.
-  Future<bool> toggleBookmark(String postId) async {
-    try {
-      final uid = _requireUid();
-      final existing = await _supabase
-          .from(_bookmarksTable)
-          .select('bookmark_id')
-          .eq('post_id', postId)
-          .eq('user_id', uid)
-          .maybeSingle();
-
-      if (existing != null) {
-        await _supabase
-            .from(_bookmarksTable)
-            .delete()
-            .eq('post_id', postId)
-            .eq('user_id', uid);
-        return false;
-      } else {
-        await _supabase.from(_bookmarksTable).insert({
-          'post_id': postId,
-          'user_id': uid,
-        });
-        return true;
-      }
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  /// Fetch posts bookmarked by the current user.
-  Future<List<PostDto>> getBookmarkedPosts({
-    required int limit,
+  Future<List<PostDto>> getBookmarked({
+    int limit = 20,
     DateTime? before,
-  }) async {
-    try {
-      final uid = _requireUid();
-      var q = _supabase
-          .from(_bookmarksTable)
-          .select('created_at, post:posts!post_id($_select)')
-          .eq('user_id', uid);
-
-      if (before != null) q = q.lt('created_at', before.toIso8601String());
-      final rows = await q.order('created_at', ascending: false).limit(limit);
-
-      final dtos = <PostDto>[];
-      for (final r in rows) {
-        final postMap = r['post'] as Map<String, dynamic>?;
-        if (postMap != null && postMap['status'] == 'active') {
-          dtos.add(
-            PostDto.fromJson(postMap).copyWith(isBookmarked: true),
-          );
-        }
-      }
-      final withTeams = await _enrichWithTeams(dtos);
-      return _enrichWithUserInteractions(withTeams);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  /// Insert the post row FIRST (storage RLS `is_post_author` requires the row
-  /// to exist before media upload). Returns the row with the author embed.
-  Future<PostDto> insertPost(Map<String, dynamic> payload) async {
-    try {
-      final row = await _supabase
-          .from(_table)
-          .insert({...payload, 'author_id': _requireUid()})
-          .select(_select)
-          .single();
-      final dto = PostDto.fromJson(row);
-      final withTeams = await _enrichWithTeams([dto]);
-      return withTeams.first;
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  /// Upload each already-resized JPEG to `post-media/<postId>/<i>.jpg`.
-  Future<void> uploadMedia(String postId, List<File> files) async {
-    try {
-      for (var i = 0; i < files.length; i++) {
-        await _supabase.storage.from(_bucket).upload(
-              '$postId/$i.jpg',
-              files[i],
-              fileOptions: const FileOptions(
-                contentType: 'image/jpeg',
-                upsert: true,
-              ),
-            );
-      }
-    } on StorageException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  /// Public URL for a stored object (the bucket is public).
-  String publicUrl(String path) =>
-      _supabase.storage.from(_bucket).getPublicUrl(path);
-
-  /// Soft-delete (preserve audit trail, per the schema's status posture).
-  Future<void> deletePost(String id) async {
-    try {
-      _requireUid(); // fast explicit failure rather than a silent zero-row RLS no-op
-      await _supabase
-          .from(_table)
-          .update({'status': 'deleted'}).eq('post_id', id);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
+  }) =>
+      getHomeFeed(
+        mode: 'saved',
+        cursorPublishedAt: before,
+        limit: limit,
+      );
 }

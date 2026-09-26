@@ -18,6 +18,7 @@ part 'match_room_controller.g.dart';
 @riverpod
 class MatchRoomController extends _$MatchRoomController {
   StreamSubscription<MatchRoomSnapshot>? _subscription;
+  StreamSubscription<bool>? _connectionSubscription;
 
   MatchesRepository get _repository => ref.read(matchesRepositoryProvider);
 
@@ -44,7 +45,13 @@ class MatchRoomController extends _$MatchRoomController {
             }
           },
         );
-    ref.onDispose(() => _subscription?.cancel());
+    _connectionSubscription = _repository.watchRealtimeStatus().listen((isConnected) {
+      _update((current) => current.copyWith(isRealtimeConnected: isConnected));
+    });
+    ref.onDispose(() {
+      _subscription?.cancel();
+      _connectionSubscription?.cancel();
+    });
     return first.future;
   }
 
@@ -97,29 +104,18 @@ class MatchRoomController extends _$MatchRoomController {
     });
   }
 
-  Future<Either<Failure, Unit>> submitToss({
+  Future<Either<Failure, MatchRoomSnapshot>> submitToss({
     required String wonByTeamId,
     required TossDecision decision,
     String? face,
-  }) async {
-    _update(
-      (value) =>
-          value.copyWith(isCommandPending: true, nonBlockingError: () => null),
-    );
-    final result = await _repository.recordToss(
+  }) => _command(
+    () => _repository.recordToss(
       id: MatchId(matchId),
       wonBy: TeamId(wonByTeamId),
       decision: decision,
       face: face,
-    );
-    await result.fold(
-      (failure) async =>
-          _update((value) => value.copyWith(nonBlockingError: () => failure)),
-      (_) => refresh(),
-    );
-    _update((value) => value.copyWith(isCommandPending: false));
-    return result;
-  }
+    ),
+  );
 
   Future<Either<Failure, MatchRoomSnapshot>> startMatch() async {
     final current = state.value;
@@ -149,12 +145,13 @@ class MatchRoomController extends _$MatchRoomController {
   Future<Either<Failure, MatchRoomSnapshot>> addParticipant({
     required MatchTeamSide side,
     required String displayName,
+    String? idempotencyKey,
   }) => _command(
     () => _repository.addMatchParticipant(
       id: MatchId(matchId),
       side: side,
       displayName: displayName,
-      idempotencyKey: const Uuid().v4(),
+      idempotencyKey: idempotencyKey ?? const Uuid().v4(),
     ),
   );
 
@@ -179,8 +176,7 @@ class MatchRoomController extends _$MatchRoomController {
   }
 
   void consumeNavigation() => _update(
-    (value) =>
-        value.copyWith(navigation: () => null, navigationRevision: () => null),
+    (value) => value.copyWith(navigation: () => null),
   );
 
   Future<Either<Failure, MatchRoomSnapshot>> _command(
@@ -221,8 +217,14 @@ class MatchRoomController extends _$MatchRoomController {
   ) {
     final eligible =
         snapshot.participants.map((player) => player.id.value).toSet();
-    final navigation =
-        current.navigation ?? _navigationFor(snapshot.match.status);
+    final nextNav = _navigationFor(snapshot.match.status);
+    final isNewNav = nextNav != null &&
+        (current.navigationRevision == null ||
+            snapshot.revision > current.navigationRevision!);
+    final navigation = current.navigation ?? (isNewNav ? nextNav : null);
+    final navigationRevision =
+        isNewNav ? snapshot.revision : current.navigationRevision;
+
     final nextStriker = eligible.contains(current.selectedStrikerId)
         ? current.selectedStrikerId
         : null;
@@ -235,7 +237,7 @@ class MatchRoomController extends _$MatchRoomController {
     return current.copyWith(
       snapshot: snapshot,
       navigation: () => navigation,
-      navigationRevision: () => navigation == null ? null : snapshot.revision,
+      navigationRevision: () => navigationRevision,
       nonBlockingError: () => null,
       selectedStrikerId: () => nextStriker,
       selectedNonStrikerId: () => nextNonStriker,
@@ -249,7 +251,7 @@ class MatchRoomController extends _$MatchRoomController {
 
   void _adoptRealtime(MatchRoomSnapshot snapshot) {
     _update((current) {
-      if (snapshot.revision <= current.snapshot.revision) return current;
+      if (snapshot.revision < current.snapshot.revision) return current;
       return _mergeSnapshot(current, snapshot);
     });
   }
@@ -261,13 +263,13 @@ class MatchRoomController extends _$MatchRoomController {
     });
   }
 
-  MatchRoomNavigation? _navigationFor(MatchStatus status) => switch (status) {
-    MatchStatus.live ||
-    MatchStatus.inningsBreak => MatchRoomNavigation.scoring,
-    MatchStatus.completed ||
-    MatchStatus.cancelled => MatchRoomNavigation.result,
-    _ => null,
-  };
+  MatchRoomNavigation? _navigationFor(MatchStatus status) {
+    if (status.isLive) return MatchRoomNavigation.scoring;
+    if (status.isPast || status == MatchStatus.cancelled) {
+      return MatchRoomNavigation.result;
+    }
+    return null;
+  }
 
   void _update(MatchRoomState Function(MatchRoomState) change) {
     final current = state.value;

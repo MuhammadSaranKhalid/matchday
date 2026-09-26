@@ -344,7 +344,12 @@ class PostMediaGrid extends StatelessWidget {
       onTap: () => onOpen(0),
       child: AspectRatio(
         aspectRatio: m.aspectRatio.clamp(0.8, 1.91),
-        child: CkFeedImage(url: m.url, blurhash: m.blurhash, useAspectRatio: false),
+        child: CkFeedImage(
+          url: m.url,
+          variants: m.variantUrls,
+          blurhash: m.blurhash ?? '',
+          useAspectRatio: false,
+        ),
       ),
     );
   }
@@ -353,7 +358,12 @@ class PostMediaGrid extends StatelessWidget {
     final m = media[i];
     return GestureDetector(
       onTap: () => onOpen(i),
-      child: CkFeedImage(url: m.url, blurhash: m.blurhash, useAspectRatio: false),
+      child: CkFeedImage(
+        url: m.url,
+        variants: m.variantUrls,
+        blurhash: m.blurhash ?? '',
+        useAspectRatio: false,
+      ),
     );
   }
 }

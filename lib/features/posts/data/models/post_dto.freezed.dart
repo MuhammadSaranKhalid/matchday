@@ -13,11 +13,823 @@ part of 'post_dto.dart';
 T _$identity<T>(T value) => value;
 
 /// @nodoc
+mixin _$PostPublisherDto {
+
+ String get id; String get type;@JsonKey(name: 'display_name') String get displayName; String? get username;@JsonKey(name: 'photo_url') String? get photoUrl;
+/// Create a copy of PostPublisherDto
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$PostPublisherDtoCopyWith<PostPublisherDto> get copyWith => _$PostPublisherDtoCopyWithImpl<PostPublisherDto>(this as PostPublisherDto, _$identity);
+
+  /// Serializes this PostPublisherDto to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PostPublisherDto&&(identical(other.id, id) || other.id == id)&&(identical(other.type, type) || other.type == type)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.username, username) || other.username == username)&&(identical(other.photoUrl, photoUrl) || other.photoUrl == photoUrl));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,type,displayName,username,photoUrl);
+
+@override
+String toString() {
+  return 'PostPublisherDto(id: $id, type: $type, displayName: $displayName, username: $username, photoUrl: $photoUrl)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $PostPublisherDtoCopyWith<$Res>  {
+  factory $PostPublisherDtoCopyWith(PostPublisherDto value, $Res Function(PostPublisherDto) _then) = _$PostPublisherDtoCopyWithImpl;
+@useResult
+$Res call({
+ String id, String type,@JsonKey(name: 'display_name') String displayName, String? username,@JsonKey(name: 'photo_url') String? photoUrl
+});
+
+
+
+
+}
+/// @nodoc
+class _$PostPublisherDtoCopyWithImpl<$Res>
+    implements $PostPublisherDtoCopyWith<$Res> {
+  _$PostPublisherDtoCopyWithImpl(this._self, this._then);
+
+  final PostPublisherDto _self;
+  final $Res Function(PostPublisherDto) _then;
+
+/// Create a copy of PostPublisherDto
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? type = null,Object? displayName = null,Object? username = freezed,Object? photoUrl = freezed,}) {
+  return _then(_self.copyWith(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
+as String,displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
+as String,username: freezed == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
+as String?,photoUrl: freezed == photoUrl ? _self.photoUrl : photoUrl // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [PostPublisherDto].
+extension PostPublisherDtoPatterns on PostPublisherDto {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _PostPublisherDto value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _PostPublisherDto() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _PostPublisherDto value)  $default,){
+final _that = this;
+switch (_that) {
+case _PostPublisherDto():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _PostPublisherDto value)?  $default,){
+final _that = this;
+switch (_that) {
+case _PostPublisherDto() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String type, @JsonKey(name: 'display_name')  String displayName,  String? username, @JsonKey(name: 'photo_url')  String? photoUrl)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _PostPublisherDto() when $default != null:
+return $default(_that.id,_that.type,_that.displayName,_that.username,_that.photoUrl);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String type, @JsonKey(name: 'display_name')  String displayName,  String? username, @JsonKey(name: 'photo_url')  String? photoUrl)  $default,) {final _that = this;
+switch (_that) {
+case _PostPublisherDto():
+return $default(_that.id,_that.type,_that.displayName,_that.username,_that.photoUrl);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String type, @JsonKey(name: 'display_name')  String displayName,  String? username, @JsonKey(name: 'photo_url')  String? photoUrl)?  $default,) {final _that = this;
+switch (_that) {
+case _PostPublisherDto() when $default != null:
+return $default(_that.id,_that.type,_that.displayName,_that.username,_that.photoUrl);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _PostPublisherDto extends PostPublisherDto {
+  const _PostPublisherDto({required this.id, this.type = 'user', @JsonKey(name: 'display_name') required this.displayName, this.username, @JsonKey(name: 'photo_url') this.photoUrl}): super._();
+  factory _PostPublisherDto.fromJson(Map<String, dynamic> json) => _$PostPublisherDtoFromJson(json);
+
+@override final  String id;
+@override@JsonKey() final  String type;
+@override@JsonKey(name: 'display_name') final  String displayName;
+@override final  String? username;
+@override@JsonKey(name: 'photo_url') final  String? photoUrl;
+
+/// Create a copy of PostPublisherDto
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$PostPublisherDtoCopyWith<_PostPublisherDto> get copyWith => __$PostPublisherDtoCopyWithImpl<_PostPublisherDto>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$PostPublisherDtoToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PostPublisherDto&&(identical(other.id, id) || other.id == id)&&(identical(other.type, type) || other.type == type)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.username, username) || other.username == username)&&(identical(other.photoUrl, photoUrl) || other.photoUrl == photoUrl));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,type,displayName,username,photoUrl);
+
+@override
+String toString() {
+  return 'PostPublisherDto(id: $id, type: $type, displayName: $displayName, username: $username, photoUrl: $photoUrl)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$PostPublisherDtoCopyWith<$Res> implements $PostPublisherDtoCopyWith<$Res> {
+  factory _$PostPublisherDtoCopyWith(_PostPublisherDto value, $Res Function(_PostPublisherDto) _then) = __$PostPublisherDtoCopyWithImpl;
+@override @useResult
+$Res call({
+ String id, String type,@JsonKey(name: 'display_name') String displayName, String? username,@JsonKey(name: 'photo_url') String? photoUrl
+});
+
+
+
+
+}
+/// @nodoc
+class __$PostPublisherDtoCopyWithImpl<$Res>
+    implements _$PostPublisherDtoCopyWith<$Res> {
+  __$PostPublisherDtoCopyWithImpl(this._self, this._then);
+
+  final _PostPublisherDto _self;
+  final $Res Function(_PostPublisherDto) _then;
+
+/// Create a copy of PostPublisherDto
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? type = null,Object? displayName = null,Object? username = freezed,Object? photoUrl = freezed,}) {
+  return _then(_PostPublisherDto(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
+as String,displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
+as String,username: freezed == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
+as String?,photoUrl: freezed == photoUrl ? _self.photoUrl : photoUrl // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$PostCountsDto {
+
+ int get likes; int get comments; int get shares;
+/// Create a copy of PostCountsDto
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$PostCountsDtoCopyWith<PostCountsDto> get copyWith => _$PostCountsDtoCopyWithImpl<PostCountsDto>(this as PostCountsDto, _$identity);
+
+  /// Serializes this PostCountsDto to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PostCountsDto&&(identical(other.likes, likes) || other.likes == likes)&&(identical(other.comments, comments) || other.comments == comments)&&(identical(other.shares, shares) || other.shares == shares));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,likes,comments,shares);
+
+@override
+String toString() {
+  return 'PostCountsDto(likes: $likes, comments: $comments, shares: $shares)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $PostCountsDtoCopyWith<$Res>  {
+  factory $PostCountsDtoCopyWith(PostCountsDto value, $Res Function(PostCountsDto) _then) = _$PostCountsDtoCopyWithImpl;
+@useResult
+$Res call({
+ int likes, int comments, int shares
+});
+
+
+
+
+}
+/// @nodoc
+class _$PostCountsDtoCopyWithImpl<$Res>
+    implements $PostCountsDtoCopyWith<$Res> {
+  _$PostCountsDtoCopyWithImpl(this._self, this._then);
+
+  final PostCountsDto _self;
+  final $Res Function(PostCountsDto) _then;
+
+/// Create a copy of PostCountsDto
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? likes = null,Object? comments = null,Object? shares = null,}) {
+  return _then(_self.copyWith(
+likes: null == likes ? _self.likes : likes // ignore: cast_nullable_to_non_nullable
+as int,comments: null == comments ? _self.comments : comments // ignore: cast_nullable_to_non_nullable
+as int,shares: null == shares ? _self.shares : shares // ignore: cast_nullable_to_non_nullable
+as int,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [PostCountsDto].
+extension PostCountsDtoPatterns on PostCountsDto {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _PostCountsDto value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _PostCountsDto() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _PostCountsDto value)  $default,){
+final _that = this;
+switch (_that) {
+case _PostCountsDto():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _PostCountsDto value)?  $default,){
+final _that = this;
+switch (_that) {
+case _PostCountsDto() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int likes,  int comments,  int shares)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _PostCountsDto() when $default != null:
+return $default(_that.likes,_that.comments,_that.shares);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int likes,  int comments,  int shares)  $default,) {final _that = this;
+switch (_that) {
+case _PostCountsDto():
+return $default(_that.likes,_that.comments,_that.shares);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int likes,  int comments,  int shares)?  $default,) {final _that = this;
+switch (_that) {
+case _PostCountsDto() when $default != null:
+return $default(_that.likes,_that.comments,_that.shares);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _PostCountsDto extends PostCountsDto {
+  const _PostCountsDto({this.likes = 0, this.comments = 0, this.shares = 0}): super._();
+  factory _PostCountsDto.fromJson(Map<String, dynamic> json) => _$PostCountsDtoFromJson(json);
+
+@override@JsonKey() final  int likes;
+@override@JsonKey() final  int comments;
+@override@JsonKey() final  int shares;
+
+/// Create a copy of PostCountsDto
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$PostCountsDtoCopyWith<_PostCountsDto> get copyWith => __$PostCountsDtoCopyWithImpl<_PostCountsDto>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$PostCountsDtoToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PostCountsDto&&(identical(other.likes, likes) || other.likes == likes)&&(identical(other.comments, comments) || other.comments == comments)&&(identical(other.shares, shares) || other.shares == shares));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,likes,comments,shares);
+
+@override
+String toString() {
+  return 'PostCountsDto(likes: $likes, comments: $comments, shares: $shares)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$PostCountsDtoCopyWith<$Res> implements $PostCountsDtoCopyWith<$Res> {
+  factory _$PostCountsDtoCopyWith(_PostCountsDto value, $Res Function(_PostCountsDto) _then) = __$PostCountsDtoCopyWithImpl;
+@override @useResult
+$Res call({
+ int likes, int comments, int shares
+});
+
+
+
+
+}
+/// @nodoc
+class __$PostCountsDtoCopyWithImpl<$Res>
+    implements _$PostCountsDtoCopyWith<$Res> {
+  __$PostCountsDtoCopyWithImpl(this._self, this._then);
+
+  final _PostCountsDto _self;
+  final $Res Function(_PostCountsDto) _then;
+
+/// Create a copy of PostCountsDto
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? likes = null,Object? comments = null,Object? shares = null,}) {
+  return _then(_PostCountsDto(
+likes: null == likes ? _self.likes : likes // ignore: cast_nullable_to_non_nullable
+as int,comments: null == comments ? _self.comments : comments // ignore: cast_nullable_to_non_nullable
+as int,shares: null == shares ? _self.shares : shares // ignore: cast_nullable_to_non_nullable
+as int,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$PostViewerInteractionsDto {
+
+ bool get liked; bool get bookmarked;@JsonKey(name: 'following_publisher') bool get followingPublisher;
+/// Create a copy of PostViewerInteractionsDto
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$PostViewerInteractionsDtoCopyWith<PostViewerInteractionsDto> get copyWith => _$PostViewerInteractionsDtoCopyWithImpl<PostViewerInteractionsDto>(this as PostViewerInteractionsDto, _$identity);
+
+  /// Serializes this PostViewerInteractionsDto to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PostViewerInteractionsDto&&(identical(other.liked, liked) || other.liked == liked)&&(identical(other.bookmarked, bookmarked) || other.bookmarked == bookmarked)&&(identical(other.followingPublisher, followingPublisher) || other.followingPublisher == followingPublisher));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,liked,bookmarked,followingPublisher);
+
+@override
+String toString() {
+  return 'PostViewerInteractionsDto(liked: $liked, bookmarked: $bookmarked, followingPublisher: $followingPublisher)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $PostViewerInteractionsDtoCopyWith<$Res>  {
+  factory $PostViewerInteractionsDtoCopyWith(PostViewerInteractionsDto value, $Res Function(PostViewerInteractionsDto) _then) = _$PostViewerInteractionsDtoCopyWithImpl;
+@useResult
+$Res call({
+ bool liked, bool bookmarked,@JsonKey(name: 'following_publisher') bool followingPublisher
+});
+
+
+
+
+}
+/// @nodoc
+class _$PostViewerInteractionsDtoCopyWithImpl<$Res>
+    implements $PostViewerInteractionsDtoCopyWith<$Res> {
+  _$PostViewerInteractionsDtoCopyWithImpl(this._self, this._then);
+
+  final PostViewerInteractionsDto _self;
+  final $Res Function(PostViewerInteractionsDto) _then;
+
+/// Create a copy of PostViewerInteractionsDto
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? liked = null,Object? bookmarked = null,Object? followingPublisher = null,}) {
+  return _then(_self.copyWith(
+liked: null == liked ? _self.liked : liked // ignore: cast_nullable_to_non_nullable
+as bool,bookmarked: null == bookmarked ? _self.bookmarked : bookmarked // ignore: cast_nullable_to_non_nullable
+as bool,followingPublisher: null == followingPublisher ? _self.followingPublisher : followingPublisher // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [PostViewerInteractionsDto].
+extension PostViewerInteractionsDtoPatterns on PostViewerInteractionsDto {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _PostViewerInteractionsDto value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _PostViewerInteractionsDto() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _PostViewerInteractionsDto value)  $default,){
+final _that = this;
+switch (_that) {
+case _PostViewerInteractionsDto():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _PostViewerInteractionsDto value)?  $default,){
+final _that = this;
+switch (_that) {
+case _PostViewerInteractionsDto() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool liked,  bool bookmarked, @JsonKey(name: 'following_publisher')  bool followingPublisher)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _PostViewerInteractionsDto() when $default != null:
+return $default(_that.liked,_that.bookmarked,_that.followingPublisher);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool liked,  bool bookmarked, @JsonKey(name: 'following_publisher')  bool followingPublisher)  $default,) {final _that = this;
+switch (_that) {
+case _PostViewerInteractionsDto():
+return $default(_that.liked,_that.bookmarked,_that.followingPublisher);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool liked,  bool bookmarked, @JsonKey(name: 'following_publisher')  bool followingPublisher)?  $default,) {final _that = this;
+switch (_that) {
+case _PostViewerInteractionsDto() when $default != null:
+return $default(_that.liked,_that.bookmarked,_that.followingPublisher);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _PostViewerInteractionsDto extends PostViewerInteractionsDto {
+  const _PostViewerInteractionsDto({this.liked = false, this.bookmarked = false, @JsonKey(name: 'following_publisher') this.followingPublisher = false}): super._();
+  factory _PostViewerInteractionsDto.fromJson(Map<String, dynamic> json) => _$PostViewerInteractionsDtoFromJson(json);
+
+@override@JsonKey() final  bool liked;
+@override@JsonKey() final  bool bookmarked;
+@override@JsonKey(name: 'following_publisher') final  bool followingPublisher;
+
+/// Create a copy of PostViewerInteractionsDto
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$PostViewerInteractionsDtoCopyWith<_PostViewerInteractionsDto> get copyWith => __$PostViewerInteractionsDtoCopyWithImpl<_PostViewerInteractionsDto>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$PostViewerInteractionsDtoToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PostViewerInteractionsDto&&(identical(other.liked, liked) || other.liked == liked)&&(identical(other.bookmarked, bookmarked) || other.bookmarked == bookmarked)&&(identical(other.followingPublisher, followingPublisher) || other.followingPublisher == followingPublisher));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,liked,bookmarked,followingPublisher);
+
+@override
+String toString() {
+  return 'PostViewerInteractionsDto(liked: $liked, bookmarked: $bookmarked, followingPublisher: $followingPublisher)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$PostViewerInteractionsDtoCopyWith<$Res> implements $PostViewerInteractionsDtoCopyWith<$Res> {
+  factory _$PostViewerInteractionsDtoCopyWith(_PostViewerInteractionsDto value, $Res Function(_PostViewerInteractionsDto) _then) = __$PostViewerInteractionsDtoCopyWithImpl;
+@override @useResult
+$Res call({
+ bool liked, bool bookmarked,@JsonKey(name: 'following_publisher') bool followingPublisher
+});
+
+
+
+
+}
+/// @nodoc
+class __$PostViewerInteractionsDtoCopyWithImpl<$Res>
+    implements _$PostViewerInteractionsDtoCopyWith<$Res> {
+  __$PostViewerInteractionsDtoCopyWithImpl(this._self, this._then);
+
+  final _PostViewerInteractionsDto _self;
+  final $Res Function(_PostViewerInteractionsDto) _then;
+
+/// Create a copy of PostViewerInteractionsDto
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? liked = null,Object? bookmarked = null,Object? followingPublisher = null,}) {
+  return _then(_PostViewerInteractionsDto(
+liked: null == liked ? _self.liked : liked // ignore: cast_nullable_to_non_nullable
+as bool,bookmarked: null == bookmarked ? _self.bookmarked : bookmarked // ignore: cast_nullable_to_non_nullable
+as bool,followingPublisher: null == followingPublisher ? _self.followingPublisher : followingPublisher // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
 mixin _$PostDto {
 
-@JsonKey(name: 'post_id') String get postId;@JsonKey(name: 'author_id') String get authorId;@JsonKey(name: 'author_context') String get authorContext;@JsonKey(name: 'context_entity_id') String? get contextEntityId;@JsonKey(name: 'post_type') String get postType; String? get text;@JsonKey(name: 'media_urls') List<String> get mediaUrls; List<dynamic> get media;@JsonKey(name: 'linked_match_id') String? get linkedMatchId;@JsonKey(name: 'linked_tournament_id') String? get linkedTournamentId;@JsonKey(name: 'linked_team_id') String? get linkedTeamId;@JsonKey(name: 'linked_player_ids') List<String> get linkedPlayerIds;@JsonKey(name: 'auto_generated') bool get autoGenerated;@JsonKey(name: 'is_pinned') bool get isPinned;@JsonKey(name: 'likes_count') int get likesCount;@JsonKey(name: 'comments_count') int get commentsCount;@JsonKey(name: 'shares_count') int get sharesCount;@JsonKey(name: 'is_liked') bool get isLiked;@JsonKey(name: 'is_bookmarked') bool get isBookmarked; String get status;@JsonKey(name: 'created_at') String get createdAt;@JsonKey(name: 'edited_at') String? get editedAt;@JsonKey(name: 'updated_at') String get updatedAt;// Embedded profiles join (alias `author`).
- Map<String, dynamic>? get author;// Embedded teams join (alias `team`).
- Map<String, dynamic>? get team;
+@JsonKey(name: 'post_id') String get postId;@JsonKey(name: 'created_by_user_id') String? get createdByUserId;@JsonKey(name: 'author_id') String? get authorId; Map<String, dynamic>? get publisher;@JsonKey(name: 'post_kind') String get postKind;@JsonKey(name: 'post_type') String? get postType; String? get text; String get visibility; String get status;@JsonKey(name: 'expected_media_count') int get expectedMediaCount; List<dynamic> get media; Map<String, dynamic>? get counts; Map<String, dynamic>? get viewer;@JsonKey(name: 'published_at') String? get publishedAt;@JsonKey(name: 'created_at') String get createdAt;@JsonKey(name: 'linked_match_id') String? get linkedMatchId;@JsonKey(name: 'linked_tournament_id') String? get linkedTournamentId;@JsonKey(name: 'linked_team_id') String? get linkedTeamId;// Legacy compatibility fields
+@JsonKey(name: 'media_urls') List<String> get mediaUrls; Map<String, dynamic>? get author; Map<String, dynamic>? get team;@JsonKey(name: 'is_liked') bool get isLiked;@JsonKey(name: 'is_bookmarked') bool get isBookmarked;@JsonKey(name: 'likes_count') int get likesCount;@JsonKey(name: 'comments_count') int get commentsCount;@JsonKey(name: 'shares_count') int get sharesCount;
 /// Create a copy of PostDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -30,16 +842,16 @@ $PostDtoCopyWith<PostDto> get copyWith => _$PostDtoCopyWithImpl<PostDto>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PostDto&&(identical(other.postId, postId) || other.postId == postId)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.authorContext, authorContext) || other.authorContext == authorContext)&&(identical(other.contextEntityId, contextEntityId) || other.contextEntityId == contextEntityId)&&(identical(other.postType, postType) || other.postType == postType)&&(identical(other.text, text) || other.text == text)&&const DeepCollectionEquality().equals(other.mediaUrls, mediaUrls)&&const DeepCollectionEquality().equals(other.media, media)&&(identical(other.linkedMatchId, linkedMatchId) || other.linkedMatchId == linkedMatchId)&&(identical(other.linkedTournamentId, linkedTournamentId) || other.linkedTournamentId == linkedTournamentId)&&(identical(other.linkedTeamId, linkedTeamId) || other.linkedTeamId == linkedTeamId)&&const DeepCollectionEquality().equals(other.linkedPlayerIds, linkedPlayerIds)&&(identical(other.autoGenerated, autoGenerated) || other.autoGenerated == autoGenerated)&&(identical(other.isPinned, isPinned) || other.isPinned == isPinned)&&(identical(other.likesCount, likesCount) || other.likesCount == likesCount)&&(identical(other.commentsCount, commentsCount) || other.commentsCount == commentsCount)&&(identical(other.sharesCount, sharesCount) || other.sharesCount == sharesCount)&&(identical(other.isLiked, isLiked) || other.isLiked == isLiked)&&(identical(other.isBookmarked, isBookmarked) || other.isBookmarked == isBookmarked)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.editedAt, editedAt) || other.editedAt == editedAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&const DeepCollectionEquality().equals(other.author, author)&&const DeepCollectionEquality().equals(other.team, team));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PostDto&&(identical(other.postId, postId) || other.postId == postId)&&(identical(other.createdByUserId, createdByUserId) || other.createdByUserId == createdByUserId)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&const DeepCollectionEquality().equals(other.publisher, publisher)&&(identical(other.postKind, postKind) || other.postKind == postKind)&&(identical(other.postType, postType) || other.postType == postType)&&(identical(other.text, text) || other.text == text)&&(identical(other.visibility, visibility) || other.visibility == visibility)&&(identical(other.status, status) || other.status == status)&&(identical(other.expectedMediaCount, expectedMediaCount) || other.expectedMediaCount == expectedMediaCount)&&const DeepCollectionEquality().equals(other.media, media)&&const DeepCollectionEquality().equals(other.counts, counts)&&const DeepCollectionEquality().equals(other.viewer, viewer)&&(identical(other.publishedAt, publishedAt) || other.publishedAt == publishedAt)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.linkedMatchId, linkedMatchId) || other.linkedMatchId == linkedMatchId)&&(identical(other.linkedTournamentId, linkedTournamentId) || other.linkedTournamentId == linkedTournamentId)&&(identical(other.linkedTeamId, linkedTeamId) || other.linkedTeamId == linkedTeamId)&&const DeepCollectionEquality().equals(other.mediaUrls, mediaUrls)&&const DeepCollectionEquality().equals(other.author, author)&&const DeepCollectionEquality().equals(other.team, team)&&(identical(other.isLiked, isLiked) || other.isLiked == isLiked)&&(identical(other.isBookmarked, isBookmarked) || other.isBookmarked == isBookmarked)&&(identical(other.likesCount, likesCount) || other.likesCount == likesCount)&&(identical(other.commentsCount, commentsCount) || other.commentsCount == commentsCount)&&(identical(other.sharesCount, sharesCount) || other.sharesCount == sharesCount));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hashAll([runtimeType,postId,authorId,authorContext,contextEntityId,postType,text,const DeepCollectionEquality().hash(mediaUrls),const DeepCollectionEquality().hash(media),linkedMatchId,linkedTournamentId,linkedTeamId,const DeepCollectionEquality().hash(linkedPlayerIds),autoGenerated,isPinned,likesCount,commentsCount,sharesCount,isLiked,isBookmarked,status,createdAt,editedAt,updatedAt,const DeepCollectionEquality().hash(author),const DeepCollectionEquality().hash(team)]);
+int get hashCode => Object.hashAll([runtimeType,postId,createdByUserId,authorId,const DeepCollectionEquality().hash(publisher),postKind,postType,text,visibility,status,expectedMediaCount,const DeepCollectionEquality().hash(media),const DeepCollectionEquality().hash(counts),const DeepCollectionEquality().hash(viewer),publishedAt,createdAt,linkedMatchId,linkedTournamentId,linkedTeamId,const DeepCollectionEquality().hash(mediaUrls),const DeepCollectionEquality().hash(author),const DeepCollectionEquality().hash(team),isLiked,isBookmarked,likesCount,commentsCount,sharesCount]);
 
 @override
 String toString() {
-  return 'PostDto(postId: $postId, authorId: $authorId, authorContext: $authorContext, contextEntityId: $contextEntityId, postType: $postType, text: $text, mediaUrls: $mediaUrls, media: $media, linkedMatchId: $linkedMatchId, linkedTournamentId: $linkedTournamentId, linkedTeamId: $linkedTeamId, linkedPlayerIds: $linkedPlayerIds, autoGenerated: $autoGenerated, isPinned: $isPinned, likesCount: $likesCount, commentsCount: $commentsCount, sharesCount: $sharesCount, isLiked: $isLiked, isBookmarked: $isBookmarked, status: $status, createdAt: $createdAt, editedAt: $editedAt, updatedAt: $updatedAt, author: $author, team: $team)';
+  return 'PostDto(postId: $postId, createdByUserId: $createdByUserId, authorId: $authorId, publisher: $publisher, postKind: $postKind, postType: $postType, text: $text, visibility: $visibility, status: $status, expectedMediaCount: $expectedMediaCount, media: $media, counts: $counts, viewer: $viewer, publishedAt: $publishedAt, createdAt: $createdAt, linkedMatchId: $linkedMatchId, linkedTournamentId: $linkedTournamentId, linkedTeamId: $linkedTeamId, mediaUrls: $mediaUrls, author: $author, team: $team, isLiked: $isLiked, isBookmarked: $isBookmarked, likesCount: $likesCount, commentsCount: $commentsCount, sharesCount: $sharesCount)';
 }
 
 
@@ -50,7 +862,7 @@ abstract mixin class $PostDtoCopyWith<$Res>  {
   factory $PostDtoCopyWith(PostDto value, $Res Function(PostDto) _then) = _$PostDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'post_id') String postId,@JsonKey(name: 'author_id') String authorId,@JsonKey(name: 'author_context') String authorContext,@JsonKey(name: 'context_entity_id') String? contextEntityId,@JsonKey(name: 'post_type') String postType, String? text,@JsonKey(name: 'media_urls') List<String> mediaUrls, List<dynamic> media,@JsonKey(name: 'linked_match_id') String? linkedMatchId,@JsonKey(name: 'linked_tournament_id') String? linkedTournamentId,@JsonKey(name: 'linked_team_id') String? linkedTeamId,@JsonKey(name: 'linked_player_ids') List<String> linkedPlayerIds,@JsonKey(name: 'auto_generated') bool autoGenerated,@JsonKey(name: 'is_pinned') bool isPinned,@JsonKey(name: 'likes_count') int likesCount,@JsonKey(name: 'comments_count') int commentsCount,@JsonKey(name: 'shares_count') int sharesCount,@JsonKey(name: 'is_liked') bool isLiked,@JsonKey(name: 'is_bookmarked') bool isBookmarked, String status,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'edited_at') String? editedAt,@JsonKey(name: 'updated_at') String updatedAt, Map<String, dynamic>? author, Map<String, dynamic>? team
+@JsonKey(name: 'post_id') String postId,@JsonKey(name: 'created_by_user_id') String? createdByUserId,@JsonKey(name: 'author_id') String? authorId, Map<String, dynamic>? publisher,@JsonKey(name: 'post_kind') String postKind,@JsonKey(name: 'post_type') String? postType, String? text, String visibility, String status,@JsonKey(name: 'expected_media_count') int expectedMediaCount, List<dynamic> media, Map<String, dynamic>? counts, Map<String, dynamic>? viewer,@JsonKey(name: 'published_at') String? publishedAt,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'linked_match_id') String? linkedMatchId,@JsonKey(name: 'linked_tournament_id') String? linkedTournamentId,@JsonKey(name: 'linked_team_id') String? linkedTeamId,@JsonKey(name: 'media_urls') List<String> mediaUrls, Map<String, dynamic>? author, Map<String, dynamic>? team,@JsonKey(name: 'is_liked') bool isLiked,@JsonKey(name: 'is_bookmarked') bool isBookmarked,@JsonKey(name: 'likes_count') int likesCount,@JsonKey(name: 'comments_count') int commentsCount,@JsonKey(name: 'shares_count') int sharesCount
 });
 
 
@@ -67,34 +879,35 @@ class _$PostDtoCopyWithImpl<$Res>
 
 /// Create a copy of PostDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? postId = null,Object? authorId = null,Object? authorContext = null,Object? contextEntityId = freezed,Object? postType = null,Object? text = freezed,Object? mediaUrls = null,Object? media = null,Object? linkedMatchId = freezed,Object? linkedTournamentId = freezed,Object? linkedTeamId = freezed,Object? linkedPlayerIds = null,Object? autoGenerated = null,Object? isPinned = null,Object? likesCount = null,Object? commentsCount = null,Object? sharesCount = null,Object? isLiked = null,Object? isBookmarked = null,Object? status = null,Object? createdAt = null,Object? editedAt = freezed,Object? updatedAt = null,Object? author = freezed,Object? team = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? postId = null,Object? createdByUserId = freezed,Object? authorId = freezed,Object? publisher = freezed,Object? postKind = null,Object? postType = freezed,Object? text = freezed,Object? visibility = null,Object? status = null,Object? expectedMediaCount = null,Object? media = null,Object? counts = freezed,Object? viewer = freezed,Object? publishedAt = freezed,Object? createdAt = null,Object? linkedMatchId = freezed,Object? linkedTournamentId = freezed,Object? linkedTeamId = freezed,Object? mediaUrls = null,Object? author = freezed,Object? team = freezed,Object? isLiked = null,Object? isBookmarked = null,Object? likesCount = null,Object? commentsCount = null,Object? sharesCount = null,}) {
   return _then(_self.copyWith(
 postId: null == postId ? _self.postId : postId // ignore: cast_nullable_to_non_nullable
-as String,authorId: null == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
-as String,authorContext: null == authorContext ? _self.authorContext : authorContext // ignore: cast_nullable_to_non_nullable
-as String,contextEntityId: freezed == contextEntityId ? _self.contextEntityId : contextEntityId // ignore: cast_nullable_to_non_nullable
-as String?,postType: null == postType ? _self.postType : postType // ignore: cast_nullable_to_non_nullable
-as String,text: freezed == text ? _self.text : text // ignore: cast_nullable_to_non_nullable
-as String?,mediaUrls: null == mediaUrls ? _self.mediaUrls : mediaUrls // ignore: cast_nullable_to_non_nullable
-as List<String>,media: null == media ? _self.media : media // ignore: cast_nullable_to_non_nullable
-as List<dynamic>,linkedMatchId: freezed == linkedMatchId ? _self.linkedMatchId : linkedMatchId // ignore: cast_nullable_to_non_nullable
+as String,createdByUserId: freezed == createdByUserId ? _self.createdByUserId : createdByUserId // ignore: cast_nullable_to_non_nullable
+as String?,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
+as String?,publisher: freezed == publisher ? _self.publisher : publisher // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,postKind: null == postKind ? _self.postKind : postKind // ignore: cast_nullable_to_non_nullable
+as String,postType: freezed == postType ? _self.postType : postType // ignore: cast_nullable_to_non_nullable
+as String?,text: freezed == text ? _self.text : text // ignore: cast_nullable_to_non_nullable
+as String?,visibility: null == visibility ? _self.visibility : visibility // ignore: cast_nullable_to_non_nullable
+as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as String,expectedMediaCount: null == expectedMediaCount ? _self.expectedMediaCount : expectedMediaCount // ignore: cast_nullable_to_non_nullable
+as int,media: null == media ? _self.media : media // ignore: cast_nullable_to_non_nullable
+as List<dynamic>,counts: freezed == counts ? _self.counts : counts // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,viewer: freezed == viewer ? _self.viewer : viewer // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,publishedAt: freezed == publishedAt ? _self.publishedAt : publishedAt // ignore: cast_nullable_to_non_nullable
+as String?,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String,linkedMatchId: freezed == linkedMatchId ? _self.linkedMatchId : linkedMatchId // ignore: cast_nullable_to_non_nullable
 as String?,linkedTournamentId: freezed == linkedTournamentId ? _self.linkedTournamentId : linkedTournamentId // ignore: cast_nullable_to_non_nullable
 as String?,linkedTeamId: freezed == linkedTeamId ? _self.linkedTeamId : linkedTeamId // ignore: cast_nullable_to_non_nullable
-as String?,linkedPlayerIds: null == linkedPlayerIds ? _self.linkedPlayerIds : linkedPlayerIds // ignore: cast_nullable_to_non_nullable
-as List<String>,autoGenerated: null == autoGenerated ? _self.autoGenerated : autoGenerated // ignore: cast_nullable_to_non_nullable
-as bool,isPinned: null == isPinned ? _self.isPinned : isPinned // ignore: cast_nullable_to_non_nullable
+as String?,mediaUrls: null == mediaUrls ? _self.mediaUrls : mediaUrls // ignore: cast_nullable_to_non_nullable
+as List<String>,author: freezed == author ? _self.author : author // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,team: freezed == team ? _self.team : team // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,isLiked: null == isLiked ? _self.isLiked : isLiked // ignore: cast_nullable_to_non_nullable
+as bool,isBookmarked: null == isBookmarked ? _self.isBookmarked : isBookmarked // ignore: cast_nullable_to_non_nullable
 as bool,likesCount: null == likesCount ? _self.likesCount : likesCount // ignore: cast_nullable_to_non_nullable
 as int,commentsCount: null == commentsCount ? _self.commentsCount : commentsCount // ignore: cast_nullable_to_non_nullable
 as int,sharesCount: null == sharesCount ? _self.sharesCount : sharesCount // ignore: cast_nullable_to_non_nullable
-as int,isLiked: null == isLiked ? _self.isLiked : isLiked // ignore: cast_nullable_to_non_nullable
-as bool,isBookmarked: null == isBookmarked ? _self.isBookmarked : isBookmarked // ignore: cast_nullable_to_non_nullable
-as bool,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as String,editedAt: freezed == editedAt ? _self.editedAt : editedAt // ignore: cast_nullable_to_non_nullable
-as String?,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
-as String,author: freezed == author ? _self.author : author // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>?,team: freezed == team ? _self.team : team // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>?,
+as int,
   ));
 }
 
@@ -179,10 +992,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'author_id')  String authorId, @JsonKey(name: 'author_context')  String authorContext, @JsonKey(name: 'context_entity_id')  String? contextEntityId, @JsonKey(name: 'post_type')  String postType,  String? text, @JsonKey(name: 'media_urls')  List<String> mediaUrls,  List<dynamic> media, @JsonKey(name: 'linked_match_id')  String? linkedMatchId, @JsonKey(name: 'linked_tournament_id')  String? linkedTournamentId, @JsonKey(name: 'linked_team_id')  String? linkedTeamId, @JsonKey(name: 'linked_player_ids')  List<String> linkedPlayerIds, @JsonKey(name: 'auto_generated')  bool autoGenerated, @JsonKey(name: 'is_pinned')  bool isPinned, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'comments_count')  int commentsCount, @JsonKey(name: 'shares_count')  int sharesCount, @JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'is_bookmarked')  bool isBookmarked,  String status, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'edited_at')  String? editedAt, @JsonKey(name: 'updated_at')  String updatedAt,  Map<String, dynamic>? author,  Map<String, dynamic>? team)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'created_by_user_id')  String? createdByUserId, @JsonKey(name: 'author_id')  String? authorId,  Map<String, dynamic>? publisher, @JsonKey(name: 'post_kind')  String postKind, @JsonKey(name: 'post_type')  String? postType,  String? text,  String visibility,  String status, @JsonKey(name: 'expected_media_count')  int expectedMediaCount,  List<dynamic> media,  Map<String, dynamic>? counts,  Map<String, dynamic>? viewer, @JsonKey(name: 'published_at')  String? publishedAt, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'linked_match_id')  String? linkedMatchId, @JsonKey(name: 'linked_tournament_id')  String? linkedTournamentId, @JsonKey(name: 'linked_team_id')  String? linkedTeamId, @JsonKey(name: 'media_urls')  List<String> mediaUrls,  Map<String, dynamic>? author,  Map<String, dynamic>? team, @JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'is_bookmarked')  bool isBookmarked, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'comments_count')  int commentsCount, @JsonKey(name: 'shares_count')  int sharesCount)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PostDto() when $default != null:
-return $default(_that.postId,_that.authorId,_that.authorContext,_that.contextEntityId,_that.postType,_that.text,_that.mediaUrls,_that.media,_that.linkedMatchId,_that.linkedTournamentId,_that.linkedTeamId,_that.linkedPlayerIds,_that.autoGenerated,_that.isPinned,_that.likesCount,_that.commentsCount,_that.sharesCount,_that.isLiked,_that.isBookmarked,_that.status,_that.createdAt,_that.editedAt,_that.updatedAt,_that.author,_that.team);case _:
+return $default(_that.postId,_that.createdByUserId,_that.authorId,_that.publisher,_that.postKind,_that.postType,_that.text,_that.visibility,_that.status,_that.expectedMediaCount,_that.media,_that.counts,_that.viewer,_that.publishedAt,_that.createdAt,_that.linkedMatchId,_that.linkedTournamentId,_that.linkedTeamId,_that.mediaUrls,_that.author,_that.team,_that.isLiked,_that.isBookmarked,_that.likesCount,_that.commentsCount,_that.sharesCount);case _:
   return orElse();
 
 }
@@ -200,10 +1013,10 @@ return $default(_that.postId,_that.authorId,_that.authorContext,_that.contextEnt
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'author_id')  String authorId, @JsonKey(name: 'author_context')  String authorContext, @JsonKey(name: 'context_entity_id')  String? contextEntityId, @JsonKey(name: 'post_type')  String postType,  String? text, @JsonKey(name: 'media_urls')  List<String> mediaUrls,  List<dynamic> media, @JsonKey(name: 'linked_match_id')  String? linkedMatchId, @JsonKey(name: 'linked_tournament_id')  String? linkedTournamentId, @JsonKey(name: 'linked_team_id')  String? linkedTeamId, @JsonKey(name: 'linked_player_ids')  List<String> linkedPlayerIds, @JsonKey(name: 'auto_generated')  bool autoGenerated, @JsonKey(name: 'is_pinned')  bool isPinned, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'comments_count')  int commentsCount, @JsonKey(name: 'shares_count')  int sharesCount, @JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'is_bookmarked')  bool isBookmarked,  String status, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'edited_at')  String? editedAt, @JsonKey(name: 'updated_at')  String updatedAt,  Map<String, dynamic>? author,  Map<String, dynamic>? team)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'created_by_user_id')  String? createdByUserId, @JsonKey(name: 'author_id')  String? authorId,  Map<String, dynamic>? publisher, @JsonKey(name: 'post_kind')  String postKind, @JsonKey(name: 'post_type')  String? postType,  String? text,  String visibility,  String status, @JsonKey(name: 'expected_media_count')  int expectedMediaCount,  List<dynamic> media,  Map<String, dynamic>? counts,  Map<String, dynamic>? viewer, @JsonKey(name: 'published_at')  String? publishedAt, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'linked_match_id')  String? linkedMatchId, @JsonKey(name: 'linked_tournament_id')  String? linkedTournamentId, @JsonKey(name: 'linked_team_id')  String? linkedTeamId, @JsonKey(name: 'media_urls')  List<String> mediaUrls,  Map<String, dynamic>? author,  Map<String, dynamic>? team, @JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'is_bookmarked')  bool isBookmarked, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'comments_count')  int commentsCount, @JsonKey(name: 'shares_count')  int sharesCount)  $default,) {final _that = this;
 switch (_that) {
 case _PostDto():
-return $default(_that.postId,_that.authorId,_that.authorContext,_that.contextEntityId,_that.postType,_that.text,_that.mediaUrls,_that.media,_that.linkedMatchId,_that.linkedTournamentId,_that.linkedTeamId,_that.linkedPlayerIds,_that.autoGenerated,_that.isPinned,_that.likesCount,_that.commentsCount,_that.sharesCount,_that.isLiked,_that.isBookmarked,_that.status,_that.createdAt,_that.editedAt,_that.updatedAt,_that.author,_that.team);case _:
+return $default(_that.postId,_that.createdByUserId,_that.authorId,_that.publisher,_that.postKind,_that.postType,_that.text,_that.visibility,_that.status,_that.expectedMediaCount,_that.media,_that.counts,_that.viewer,_that.publishedAt,_that.createdAt,_that.linkedMatchId,_that.linkedTournamentId,_that.linkedTeamId,_that.mediaUrls,_that.author,_that.team,_that.isLiked,_that.isBookmarked,_that.likesCount,_that.commentsCount,_that.sharesCount);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -220,10 +1033,10 @@ return $default(_that.postId,_that.authorId,_that.authorContext,_that.contextEnt
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'author_id')  String authorId, @JsonKey(name: 'author_context')  String authorContext, @JsonKey(name: 'context_entity_id')  String? contextEntityId, @JsonKey(name: 'post_type')  String postType,  String? text, @JsonKey(name: 'media_urls')  List<String> mediaUrls,  List<dynamic> media, @JsonKey(name: 'linked_match_id')  String? linkedMatchId, @JsonKey(name: 'linked_tournament_id')  String? linkedTournamentId, @JsonKey(name: 'linked_team_id')  String? linkedTeamId, @JsonKey(name: 'linked_player_ids')  List<String> linkedPlayerIds, @JsonKey(name: 'auto_generated')  bool autoGenerated, @JsonKey(name: 'is_pinned')  bool isPinned, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'comments_count')  int commentsCount, @JsonKey(name: 'shares_count')  int sharesCount, @JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'is_bookmarked')  bool isBookmarked,  String status, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'edited_at')  String? editedAt, @JsonKey(name: 'updated_at')  String updatedAt,  Map<String, dynamic>? author,  Map<String, dynamic>? team)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'created_by_user_id')  String? createdByUserId, @JsonKey(name: 'author_id')  String? authorId,  Map<String, dynamic>? publisher, @JsonKey(name: 'post_kind')  String postKind, @JsonKey(name: 'post_type')  String? postType,  String? text,  String visibility,  String status, @JsonKey(name: 'expected_media_count')  int expectedMediaCount,  List<dynamic> media,  Map<String, dynamic>? counts,  Map<String, dynamic>? viewer, @JsonKey(name: 'published_at')  String? publishedAt, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'linked_match_id')  String? linkedMatchId, @JsonKey(name: 'linked_tournament_id')  String? linkedTournamentId, @JsonKey(name: 'linked_team_id')  String? linkedTeamId, @JsonKey(name: 'media_urls')  List<String> mediaUrls,  Map<String, dynamic>? author,  Map<String, dynamic>? team, @JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'is_bookmarked')  bool isBookmarked, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'comments_count')  int commentsCount, @JsonKey(name: 'shares_count')  int sharesCount)?  $default,) {final _that = this;
 switch (_that) {
 case _PostDto() when $default != null:
-return $default(_that.postId,_that.authorId,_that.authorContext,_that.contextEntityId,_that.postType,_that.text,_that.mediaUrls,_that.media,_that.linkedMatchId,_that.linkedTournamentId,_that.linkedTeamId,_that.linkedPlayerIds,_that.autoGenerated,_that.isPinned,_that.likesCount,_that.commentsCount,_that.sharesCount,_that.isLiked,_that.isBookmarked,_that.status,_that.createdAt,_that.editedAt,_that.updatedAt,_that.author,_that.team);case _:
+return $default(_that.postId,_that.createdByUserId,_that.authorId,_that.publisher,_that.postKind,_that.postType,_that.text,_that.visibility,_that.status,_that.expectedMediaCount,_that.media,_that.counts,_that.viewer,_that.publishedAt,_that.createdAt,_that.linkedMatchId,_that.linkedTournamentId,_that.linkedTeamId,_that.mediaUrls,_that.author,_that.team,_that.isLiked,_that.isBookmarked,_that.likesCount,_that.commentsCount,_that.sharesCount);case _:
   return null;
 
 }
@@ -235,22 +1048,27 @@ return $default(_that.postId,_that.authorId,_that.authorContext,_that.contextEnt
 @JsonSerializable()
 
 class _PostDto extends PostDto {
-  const _PostDto({@JsonKey(name: 'post_id') required this.postId, @JsonKey(name: 'author_id') required this.authorId, @JsonKey(name: 'author_context') this.authorContext = 'personal', @JsonKey(name: 'context_entity_id') this.contextEntityId, @JsonKey(name: 'post_type') required this.postType, this.text, @JsonKey(name: 'media_urls') final  List<String> mediaUrls = const <String>[], final  List<dynamic> media = const <dynamic>[], @JsonKey(name: 'linked_match_id') this.linkedMatchId, @JsonKey(name: 'linked_tournament_id') this.linkedTournamentId, @JsonKey(name: 'linked_team_id') this.linkedTeamId, @JsonKey(name: 'linked_player_ids') final  List<String> linkedPlayerIds = const <String>[], @JsonKey(name: 'auto_generated') this.autoGenerated = false, @JsonKey(name: 'is_pinned') this.isPinned = false, @JsonKey(name: 'likes_count') this.likesCount = 0, @JsonKey(name: 'comments_count') this.commentsCount = 0, @JsonKey(name: 'shares_count') this.sharesCount = 0, @JsonKey(name: 'is_liked') this.isLiked = false, @JsonKey(name: 'is_bookmarked') this.isBookmarked = false, this.status = 'active', @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'edited_at') this.editedAt, @JsonKey(name: 'updated_at') required this.updatedAt, final  Map<String, dynamic>? author, final  Map<String, dynamic>? team}): _mediaUrls = mediaUrls,_media = media,_linkedPlayerIds = linkedPlayerIds,_author = author,_team = team,super._();
+  const _PostDto({@JsonKey(name: 'post_id') required this.postId, @JsonKey(name: 'created_by_user_id') this.createdByUserId, @JsonKey(name: 'author_id') this.authorId, final  Map<String, dynamic>? publisher, @JsonKey(name: 'post_kind') this.postKind = 'standard', @JsonKey(name: 'post_type') this.postType, this.text, this.visibility = 'public', this.status = 'active', @JsonKey(name: 'expected_media_count') this.expectedMediaCount = 0, final  List<dynamic> media = const <dynamic>[], final  Map<String, dynamic>? counts, final  Map<String, dynamic>? viewer, @JsonKey(name: 'published_at') this.publishedAt, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'linked_match_id') this.linkedMatchId, @JsonKey(name: 'linked_tournament_id') this.linkedTournamentId, @JsonKey(name: 'linked_team_id') this.linkedTeamId, @JsonKey(name: 'media_urls') final  List<String> mediaUrls = const <String>[], final  Map<String, dynamic>? author, final  Map<String, dynamic>? team, @JsonKey(name: 'is_liked') this.isLiked = false, @JsonKey(name: 'is_bookmarked') this.isBookmarked = false, @JsonKey(name: 'likes_count') this.likesCount = 0, @JsonKey(name: 'comments_count') this.commentsCount = 0, @JsonKey(name: 'shares_count') this.sharesCount = 0}): _publisher = publisher,_media = media,_counts = counts,_viewer = viewer,_mediaUrls = mediaUrls,_author = author,_team = team,super._();
   factory _PostDto.fromJson(Map<String, dynamic> json) => _$PostDtoFromJson(json);
 
 @override@JsonKey(name: 'post_id') final  String postId;
-@override@JsonKey(name: 'author_id') final  String authorId;
-@override@JsonKey(name: 'author_context') final  String authorContext;
-@override@JsonKey(name: 'context_entity_id') final  String? contextEntityId;
-@override@JsonKey(name: 'post_type') final  String postType;
-@override final  String? text;
- final  List<String> _mediaUrls;
-@override@JsonKey(name: 'media_urls') List<String> get mediaUrls {
-  if (_mediaUrls is EqualUnmodifiableListView) return _mediaUrls;
+@override@JsonKey(name: 'created_by_user_id') final  String? createdByUserId;
+@override@JsonKey(name: 'author_id') final  String? authorId;
+ final  Map<String, dynamic>? _publisher;
+@override Map<String, dynamic>? get publisher {
+  final value = _publisher;
+  if (value == null) return null;
+  if (_publisher is EqualUnmodifiableMapView) return _publisher;
   // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(_mediaUrls);
+  return EqualUnmodifiableMapView(value);
 }
 
+@override@JsonKey(name: 'post_kind') final  String postKind;
+@override@JsonKey(name: 'post_type') final  String? postType;
+@override final  String? text;
+@override@JsonKey() final  String visibility;
+@override@JsonKey() final  String status;
+@override@JsonKey(name: 'expected_media_count') final  int expectedMediaCount;
  final  List<dynamic> _media;
 @override@JsonKey() List<dynamic> get media {
   if (_media is EqualUnmodifiableListView) return _media;
@@ -258,30 +1076,39 @@ class _PostDto extends PostDto {
   return EqualUnmodifiableListView(_media);
 }
 
+ final  Map<String, dynamic>? _counts;
+@override Map<String, dynamic>? get counts {
+  final value = _counts;
+  if (value == null) return null;
+  if (_counts is EqualUnmodifiableMapView) return _counts;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(value);
+}
+
+ final  Map<String, dynamic>? _viewer;
+@override Map<String, dynamic>? get viewer {
+  final value = _viewer;
+  if (value == null) return null;
+  if (_viewer is EqualUnmodifiableMapView) return _viewer;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(value);
+}
+
+@override@JsonKey(name: 'published_at') final  String? publishedAt;
+@override@JsonKey(name: 'created_at') final  String createdAt;
 @override@JsonKey(name: 'linked_match_id') final  String? linkedMatchId;
 @override@JsonKey(name: 'linked_tournament_id') final  String? linkedTournamentId;
 @override@JsonKey(name: 'linked_team_id') final  String? linkedTeamId;
- final  List<String> _linkedPlayerIds;
-@override@JsonKey(name: 'linked_player_ids') List<String> get linkedPlayerIds {
-  if (_linkedPlayerIds is EqualUnmodifiableListView) return _linkedPlayerIds;
+// Legacy compatibility fields
+ final  List<String> _mediaUrls;
+// Legacy compatibility fields
+@override@JsonKey(name: 'media_urls') List<String> get mediaUrls {
+  if (_mediaUrls is EqualUnmodifiableListView) return _mediaUrls;
   // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(_linkedPlayerIds);
+  return EqualUnmodifiableListView(_mediaUrls);
 }
 
-@override@JsonKey(name: 'auto_generated') final  bool autoGenerated;
-@override@JsonKey(name: 'is_pinned') final  bool isPinned;
-@override@JsonKey(name: 'likes_count') final  int likesCount;
-@override@JsonKey(name: 'comments_count') final  int commentsCount;
-@override@JsonKey(name: 'shares_count') final  int sharesCount;
-@override@JsonKey(name: 'is_liked') final  bool isLiked;
-@override@JsonKey(name: 'is_bookmarked') final  bool isBookmarked;
-@override@JsonKey() final  String status;
-@override@JsonKey(name: 'created_at') final  String createdAt;
-@override@JsonKey(name: 'edited_at') final  String? editedAt;
-@override@JsonKey(name: 'updated_at') final  String updatedAt;
-// Embedded profiles join (alias `author`).
  final  Map<String, dynamic>? _author;
-// Embedded profiles join (alias `author`).
 @override Map<String, dynamic>? get author {
   final value = _author;
   if (value == null) return null;
@@ -290,9 +1117,7 @@ class _PostDto extends PostDto {
   return EqualUnmodifiableMapView(value);
 }
 
-// Embedded teams join (alias `team`).
  final  Map<String, dynamic>? _team;
-// Embedded teams join (alias `team`).
 @override Map<String, dynamic>? get team {
   final value = _team;
   if (value == null) return null;
@@ -301,6 +1126,11 @@ class _PostDto extends PostDto {
   return EqualUnmodifiableMapView(value);
 }
 
+@override@JsonKey(name: 'is_liked') final  bool isLiked;
+@override@JsonKey(name: 'is_bookmarked') final  bool isBookmarked;
+@override@JsonKey(name: 'likes_count') final  int likesCount;
+@override@JsonKey(name: 'comments_count') final  int commentsCount;
+@override@JsonKey(name: 'shares_count') final  int sharesCount;
 
 /// Create a copy of PostDto
 /// with the given fields replaced by the non-null parameter values.
@@ -315,16 +1145,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PostDto&&(identical(other.postId, postId) || other.postId == postId)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.authorContext, authorContext) || other.authorContext == authorContext)&&(identical(other.contextEntityId, contextEntityId) || other.contextEntityId == contextEntityId)&&(identical(other.postType, postType) || other.postType == postType)&&(identical(other.text, text) || other.text == text)&&const DeepCollectionEquality().equals(other._mediaUrls, _mediaUrls)&&const DeepCollectionEquality().equals(other._media, _media)&&(identical(other.linkedMatchId, linkedMatchId) || other.linkedMatchId == linkedMatchId)&&(identical(other.linkedTournamentId, linkedTournamentId) || other.linkedTournamentId == linkedTournamentId)&&(identical(other.linkedTeamId, linkedTeamId) || other.linkedTeamId == linkedTeamId)&&const DeepCollectionEquality().equals(other._linkedPlayerIds, _linkedPlayerIds)&&(identical(other.autoGenerated, autoGenerated) || other.autoGenerated == autoGenerated)&&(identical(other.isPinned, isPinned) || other.isPinned == isPinned)&&(identical(other.likesCount, likesCount) || other.likesCount == likesCount)&&(identical(other.commentsCount, commentsCount) || other.commentsCount == commentsCount)&&(identical(other.sharesCount, sharesCount) || other.sharesCount == sharesCount)&&(identical(other.isLiked, isLiked) || other.isLiked == isLiked)&&(identical(other.isBookmarked, isBookmarked) || other.isBookmarked == isBookmarked)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.editedAt, editedAt) || other.editedAt == editedAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&const DeepCollectionEquality().equals(other._author, _author)&&const DeepCollectionEquality().equals(other._team, _team));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PostDto&&(identical(other.postId, postId) || other.postId == postId)&&(identical(other.createdByUserId, createdByUserId) || other.createdByUserId == createdByUserId)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&const DeepCollectionEquality().equals(other._publisher, _publisher)&&(identical(other.postKind, postKind) || other.postKind == postKind)&&(identical(other.postType, postType) || other.postType == postType)&&(identical(other.text, text) || other.text == text)&&(identical(other.visibility, visibility) || other.visibility == visibility)&&(identical(other.status, status) || other.status == status)&&(identical(other.expectedMediaCount, expectedMediaCount) || other.expectedMediaCount == expectedMediaCount)&&const DeepCollectionEquality().equals(other._media, _media)&&const DeepCollectionEquality().equals(other._counts, _counts)&&const DeepCollectionEquality().equals(other._viewer, _viewer)&&(identical(other.publishedAt, publishedAt) || other.publishedAt == publishedAt)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.linkedMatchId, linkedMatchId) || other.linkedMatchId == linkedMatchId)&&(identical(other.linkedTournamentId, linkedTournamentId) || other.linkedTournamentId == linkedTournamentId)&&(identical(other.linkedTeamId, linkedTeamId) || other.linkedTeamId == linkedTeamId)&&const DeepCollectionEquality().equals(other._mediaUrls, _mediaUrls)&&const DeepCollectionEquality().equals(other._author, _author)&&const DeepCollectionEquality().equals(other._team, _team)&&(identical(other.isLiked, isLiked) || other.isLiked == isLiked)&&(identical(other.isBookmarked, isBookmarked) || other.isBookmarked == isBookmarked)&&(identical(other.likesCount, likesCount) || other.likesCount == likesCount)&&(identical(other.commentsCount, commentsCount) || other.commentsCount == commentsCount)&&(identical(other.sharesCount, sharesCount) || other.sharesCount == sharesCount));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hashAll([runtimeType,postId,authorId,authorContext,contextEntityId,postType,text,const DeepCollectionEquality().hash(_mediaUrls),const DeepCollectionEquality().hash(_media),linkedMatchId,linkedTournamentId,linkedTeamId,const DeepCollectionEquality().hash(_linkedPlayerIds),autoGenerated,isPinned,likesCount,commentsCount,sharesCount,isLiked,isBookmarked,status,createdAt,editedAt,updatedAt,const DeepCollectionEquality().hash(_author),const DeepCollectionEquality().hash(_team)]);
+int get hashCode => Object.hashAll([runtimeType,postId,createdByUserId,authorId,const DeepCollectionEquality().hash(_publisher),postKind,postType,text,visibility,status,expectedMediaCount,const DeepCollectionEquality().hash(_media),const DeepCollectionEquality().hash(_counts),const DeepCollectionEquality().hash(_viewer),publishedAt,createdAt,linkedMatchId,linkedTournamentId,linkedTeamId,const DeepCollectionEquality().hash(_mediaUrls),const DeepCollectionEquality().hash(_author),const DeepCollectionEquality().hash(_team),isLiked,isBookmarked,likesCount,commentsCount,sharesCount]);
 
 @override
 String toString() {
-  return 'PostDto(postId: $postId, authorId: $authorId, authorContext: $authorContext, contextEntityId: $contextEntityId, postType: $postType, text: $text, mediaUrls: $mediaUrls, media: $media, linkedMatchId: $linkedMatchId, linkedTournamentId: $linkedTournamentId, linkedTeamId: $linkedTeamId, linkedPlayerIds: $linkedPlayerIds, autoGenerated: $autoGenerated, isPinned: $isPinned, likesCount: $likesCount, commentsCount: $commentsCount, sharesCount: $sharesCount, isLiked: $isLiked, isBookmarked: $isBookmarked, status: $status, createdAt: $createdAt, editedAt: $editedAt, updatedAt: $updatedAt, author: $author, team: $team)';
+  return 'PostDto(postId: $postId, createdByUserId: $createdByUserId, authorId: $authorId, publisher: $publisher, postKind: $postKind, postType: $postType, text: $text, visibility: $visibility, status: $status, expectedMediaCount: $expectedMediaCount, media: $media, counts: $counts, viewer: $viewer, publishedAt: $publishedAt, createdAt: $createdAt, linkedMatchId: $linkedMatchId, linkedTournamentId: $linkedTournamentId, linkedTeamId: $linkedTeamId, mediaUrls: $mediaUrls, author: $author, team: $team, isLiked: $isLiked, isBookmarked: $isBookmarked, likesCount: $likesCount, commentsCount: $commentsCount, sharesCount: $sharesCount)';
 }
 
 
@@ -335,7 +1165,7 @@ abstract mixin class _$PostDtoCopyWith<$Res> implements $PostDtoCopyWith<$Res> {
   factory _$PostDtoCopyWith(_PostDto value, $Res Function(_PostDto) _then) = __$PostDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'post_id') String postId,@JsonKey(name: 'author_id') String authorId,@JsonKey(name: 'author_context') String authorContext,@JsonKey(name: 'context_entity_id') String? contextEntityId,@JsonKey(name: 'post_type') String postType, String? text,@JsonKey(name: 'media_urls') List<String> mediaUrls, List<dynamic> media,@JsonKey(name: 'linked_match_id') String? linkedMatchId,@JsonKey(name: 'linked_tournament_id') String? linkedTournamentId,@JsonKey(name: 'linked_team_id') String? linkedTeamId,@JsonKey(name: 'linked_player_ids') List<String> linkedPlayerIds,@JsonKey(name: 'auto_generated') bool autoGenerated,@JsonKey(name: 'is_pinned') bool isPinned,@JsonKey(name: 'likes_count') int likesCount,@JsonKey(name: 'comments_count') int commentsCount,@JsonKey(name: 'shares_count') int sharesCount,@JsonKey(name: 'is_liked') bool isLiked,@JsonKey(name: 'is_bookmarked') bool isBookmarked, String status,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'edited_at') String? editedAt,@JsonKey(name: 'updated_at') String updatedAt, Map<String, dynamic>? author, Map<String, dynamic>? team
+@JsonKey(name: 'post_id') String postId,@JsonKey(name: 'created_by_user_id') String? createdByUserId,@JsonKey(name: 'author_id') String? authorId, Map<String, dynamic>? publisher,@JsonKey(name: 'post_kind') String postKind,@JsonKey(name: 'post_type') String? postType, String? text, String visibility, String status,@JsonKey(name: 'expected_media_count') int expectedMediaCount, List<dynamic> media, Map<String, dynamic>? counts, Map<String, dynamic>? viewer,@JsonKey(name: 'published_at') String? publishedAt,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'linked_match_id') String? linkedMatchId,@JsonKey(name: 'linked_tournament_id') String? linkedTournamentId,@JsonKey(name: 'linked_team_id') String? linkedTeamId,@JsonKey(name: 'media_urls') List<String> mediaUrls, Map<String, dynamic>? author, Map<String, dynamic>? team,@JsonKey(name: 'is_liked') bool isLiked,@JsonKey(name: 'is_bookmarked') bool isBookmarked,@JsonKey(name: 'likes_count') int likesCount,@JsonKey(name: 'comments_count') int commentsCount,@JsonKey(name: 'shares_count') int sharesCount
 });
 
 
@@ -352,34 +1182,35 @@ class __$PostDtoCopyWithImpl<$Res>
 
 /// Create a copy of PostDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? postId = null,Object? authorId = null,Object? authorContext = null,Object? contextEntityId = freezed,Object? postType = null,Object? text = freezed,Object? mediaUrls = null,Object? media = null,Object? linkedMatchId = freezed,Object? linkedTournamentId = freezed,Object? linkedTeamId = freezed,Object? linkedPlayerIds = null,Object? autoGenerated = null,Object? isPinned = null,Object? likesCount = null,Object? commentsCount = null,Object? sharesCount = null,Object? isLiked = null,Object? isBookmarked = null,Object? status = null,Object? createdAt = null,Object? editedAt = freezed,Object? updatedAt = null,Object? author = freezed,Object? team = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? postId = null,Object? createdByUserId = freezed,Object? authorId = freezed,Object? publisher = freezed,Object? postKind = null,Object? postType = freezed,Object? text = freezed,Object? visibility = null,Object? status = null,Object? expectedMediaCount = null,Object? media = null,Object? counts = freezed,Object? viewer = freezed,Object? publishedAt = freezed,Object? createdAt = null,Object? linkedMatchId = freezed,Object? linkedTournamentId = freezed,Object? linkedTeamId = freezed,Object? mediaUrls = null,Object? author = freezed,Object? team = freezed,Object? isLiked = null,Object? isBookmarked = null,Object? likesCount = null,Object? commentsCount = null,Object? sharesCount = null,}) {
   return _then(_PostDto(
 postId: null == postId ? _self.postId : postId // ignore: cast_nullable_to_non_nullable
-as String,authorId: null == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
-as String,authorContext: null == authorContext ? _self.authorContext : authorContext // ignore: cast_nullable_to_non_nullable
-as String,contextEntityId: freezed == contextEntityId ? _self.contextEntityId : contextEntityId // ignore: cast_nullable_to_non_nullable
-as String?,postType: null == postType ? _self.postType : postType // ignore: cast_nullable_to_non_nullable
-as String,text: freezed == text ? _self.text : text // ignore: cast_nullable_to_non_nullable
-as String?,mediaUrls: null == mediaUrls ? _self._mediaUrls : mediaUrls // ignore: cast_nullable_to_non_nullable
-as List<String>,media: null == media ? _self._media : media // ignore: cast_nullable_to_non_nullable
-as List<dynamic>,linkedMatchId: freezed == linkedMatchId ? _self.linkedMatchId : linkedMatchId // ignore: cast_nullable_to_non_nullable
+as String,createdByUserId: freezed == createdByUserId ? _self.createdByUserId : createdByUserId // ignore: cast_nullable_to_non_nullable
+as String?,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
+as String?,publisher: freezed == publisher ? _self._publisher : publisher // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,postKind: null == postKind ? _self.postKind : postKind // ignore: cast_nullable_to_non_nullable
+as String,postType: freezed == postType ? _self.postType : postType // ignore: cast_nullable_to_non_nullable
+as String?,text: freezed == text ? _self.text : text // ignore: cast_nullable_to_non_nullable
+as String?,visibility: null == visibility ? _self.visibility : visibility // ignore: cast_nullable_to_non_nullable
+as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as String,expectedMediaCount: null == expectedMediaCount ? _self.expectedMediaCount : expectedMediaCount // ignore: cast_nullable_to_non_nullable
+as int,media: null == media ? _self._media : media // ignore: cast_nullable_to_non_nullable
+as List<dynamic>,counts: freezed == counts ? _self._counts : counts // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,viewer: freezed == viewer ? _self._viewer : viewer // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,publishedAt: freezed == publishedAt ? _self.publishedAt : publishedAt // ignore: cast_nullable_to_non_nullable
+as String?,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String,linkedMatchId: freezed == linkedMatchId ? _self.linkedMatchId : linkedMatchId // ignore: cast_nullable_to_non_nullable
 as String?,linkedTournamentId: freezed == linkedTournamentId ? _self.linkedTournamentId : linkedTournamentId // ignore: cast_nullable_to_non_nullable
 as String?,linkedTeamId: freezed == linkedTeamId ? _self.linkedTeamId : linkedTeamId // ignore: cast_nullable_to_non_nullable
-as String?,linkedPlayerIds: null == linkedPlayerIds ? _self._linkedPlayerIds : linkedPlayerIds // ignore: cast_nullable_to_non_nullable
-as List<String>,autoGenerated: null == autoGenerated ? _self.autoGenerated : autoGenerated // ignore: cast_nullable_to_non_nullable
-as bool,isPinned: null == isPinned ? _self.isPinned : isPinned // ignore: cast_nullable_to_non_nullable
+as String?,mediaUrls: null == mediaUrls ? _self._mediaUrls : mediaUrls // ignore: cast_nullable_to_non_nullable
+as List<String>,author: freezed == author ? _self._author : author // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,team: freezed == team ? _self._team : team // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,isLiked: null == isLiked ? _self.isLiked : isLiked // ignore: cast_nullable_to_non_nullable
+as bool,isBookmarked: null == isBookmarked ? _self.isBookmarked : isBookmarked // ignore: cast_nullable_to_non_nullable
 as bool,likesCount: null == likesCount ? _self.likesCount : likesCount // ignore: cast_nullable_to_non_nullable
 as int,commentsCount: null == commentsCount ? _self.commentsCount : commentsCount // ignore: cast_nullable_to_non_nullable
 as int,sharesCount: null == sharesCount ? _self.sharesCount : sharesCount // ignore: cast_nullable_to_non_nullable
-as int,isLiked: null == isLiked ? _self.isLiked : isLiked // ignore: cast_nullable_to_non_nullable
-as bool,isBookmarked: null == isBookmarked ? _self.isBookmarked : isBookmarked // ignore: cast_nullable_to_non_nullable
-as bool,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as String,editedAt: freezed == editedAt ? _self.editedAt : editedAt // ignore: cast_nullable_to_non_nullable
-as String?,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
-as String,author: freezed == author ? _self._author : author // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>?,team: freezed == team ? _self._team : team // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>?,
+as int,
   ));
 }
 

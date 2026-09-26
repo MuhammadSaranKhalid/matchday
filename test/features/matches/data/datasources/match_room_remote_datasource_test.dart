@@ -99,7 +99,7 @@ void main() {
       connections.add(RealtimeConnectionStatus.connected);
       await _pump();
       expect(received, [2]);
-      expect(errors, isEmpty);
+      expect(errors, hasLength(1));
 
       fail = false;
       revision = 3;

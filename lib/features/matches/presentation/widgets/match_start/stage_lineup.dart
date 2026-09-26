@@ -92,12 +92,13 @@ class _MatchStartLineupStageState extends ConsumerState<MatchStartLineupStage> {
         ),
         child: AddMatchPlayerSheet(
           initialSide: side,
-          onSubmit: (chosenSide, displayName) async {
+          onSubmit: (chosenSide, displayName, idempotencyKey) async {
             final res = await ref
                 .read(matchRoomControllerProvider(widget.matchId).notifier)
                 .addParticipant(
                   side: chosenSide,
                   displayName: displayName,
+                  idempotencyKey: idempotencyKey,
                 );
             if (!sheetContext.mounted) return;
             res.fold(

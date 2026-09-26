@@ -49,7 +49,53 @@ final class PostsRepositoryProvider
   }
 }
 
-String _$postsRepositoryHash() => r'0a7e6d1d1f53065625bde61590f37bbb8c474e09';
+String _$postsRepositoryHash() => r'10ca989c9211262ea2b49d1e96df46210a2e7d16';
+
+/// Emits the local pending uploads/posts created on this device.
+
+@ProviderFor(pendingPosts)
+final pendingPostsProvider = PendingPostsProvider._();
+
+/// Emits the local pending uploads/posts created on this device.
+
+final class PendingPostsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<PendingPost>>,
+          List<PendingPost>,
+          Stream<List<PendingPost>>
+        >
+    with
+        $FutureModifier<List<PendingPost>>,
+        $StreamProvider<List<PendingPost>> {
+  /// Emits the local pending uploads/posts created on this device.
+  PendingPostsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'pendingPostsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$pendingPostsHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<List<PendingPost>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<PendingPost>> create(Ref ref) {
+    return pendingPosts(ref);
+  }
+}
+
+String _$pendingPostsHash() => r'b4f9ca5865a398ca2ffecdc5592aeaaabc9983ba';
 
 /// Posts authored by [authorId] (Profile tab / spectator). Throws a
 /// [FailureWrapper] on error so the UI renders it via `AsyncError`.
@@ -278,3 +324,124 @@ abstract class _$FeedFilter extends $Notifier<String> {
     element.handleCreate(ref, build);
   }
 }
+
+/// Single post by [postId] for canonical /posts/:postId screen.
+
+@ProviderFor(postDetail)
+final postDetailProvider = PostDetailFamily._();
+
+/// Single post by [postId] for canonical /posts/:postId screen.
+
+final class PostDetailProvider
+    extends $FunctionalProvider<AsyncValue<Post>, Post, FutureOr<Post>>
+    with $FutureModifier<Post>, $FutureProvider<Post> {
+  /// Single post by [postId] for canonical /posts/:postId screen.
+  PostDetailProvider._({
+    required PostDetailFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'postDetailProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$postDetailHash();
+
+  @override
+  String toString() {
+    return r'postDetailProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<Post> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<Post> create(Ref ref) {
+    final argument = this.argument as String;
+    return postDetail(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is PostDetailProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$postDetailHash() => r'103816d91249546ca86be4d7520a42806a18dc7f';
+
+/// Single post by [postId] for canonical /posts/:postId screen.
+
+final class PostDetailFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<Post>, String> {
+  PostDetailFamily._()
+    : super(
+        retry: null,
+        name: r'postDetailProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Single post by [postId] for canonical /posts/:postId screen.
+
+  PostDetailProvider call(String postId) =>
+      PostDetailProvider._(argument: postId, from: this);
+
+  @override
+  String toString() => r'postDetailProvider';
+}
+
+/// Bookmarked / saved posts.
+
+@ProviderFor(savedPosts)
+final savedPostsProvider = SavedPostsProvider._();
+
+/// Bookmarked / saved posts.
+
+final class SavedPostsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Post>>,
+          List<Post>,
+          FutureOr<List<Post>>
+        >
+    with $FutureModifier<List<Post>>, $FutureProvider<List<Post>> {
+  /// Bookmarked / saved posts.
+  SavedPostsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'savedPostsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$savedPostsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<Post>> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<Post>> create(Ref ref) {
+    return savedPosts(ref);
+  }
+}
+
+String _$savedPostsHash() => r'0def375cb6e8e9308b9cd79643b9f0f1bedb00f6';

@@ -55,6 +55,9 @@ abstract class MatchesRepository {
 
   Stream<MatchRoomSnapshot> watchMatchRoom(MatchId id);
 
+  /// Real-time transport connectivity state (true = connected, false = disconnected/reconnecting).
+  Stream<bool> watchRealtimeStatus();
+
   Future<Either<Failure, MatchRoomSnapshot>> startMatch({
     required MatchId id,
     required String strikerId,
@@ -74,7 +77,7 @@ abstract class MatchesRepository {
   /// The authorized Cricket setup-side member/official records both the winner and the winning
   /// side's verbal bat/bowl choice. The server authorizes this through
   /// `cricket.match.setup`; role names and `created_by` are not authorization.
-  Future<Either<Failure, Unit>> recordToss({
+  Future<Either<Failure, MatchRoomSnapshot>> recordToss({
     required MatchId id,
     required TeamId wonBy,
     required TossDecision decision,

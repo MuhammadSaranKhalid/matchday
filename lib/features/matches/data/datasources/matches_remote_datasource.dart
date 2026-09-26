@@ -217,17 +217,20 @@ class MatchesRemoteDataSource {
     await _matchAction(action, params);
   }
 
-  Future<void> recordToss({
+  Future<MatchRoomSnapshotDto> recordToss({
     required String matchId,
     required String wonBy,
     required String decision,
     String? face,
-  }) => _startRpc('record_toss', {
-    'p_match_id': matchId,
-    'p_won_by': wonBy,
-    'p_decision': decision,
-    if (face != null) 'p_face': face,
-  });
+  }) async {
+    final data = await _matchAction('record_toss', {
+      'p_match_id': matchId,
+      'p_won_by': wonBy,
+      'p_decision': decision,
+      if (face != null) 'p_face': face,
+    });
+    return _roomFromCommand(data);
+  }
 
   Future<bool> canTeamPermission({
     required String teamId,
@@ -329,6 +332,9 @@ class MatchesRemoteDataSource {
     return MatchRoomSnapshotDto.fromJson(Map<String, dynamic>.from(snapshot));
   }
 
+  Stream<bool> get realtimeConnectionChanges => _ablyService.connectionChanges
+      .map((s) => s == RealtimeConnectionStatus.connected);
+
   Stream<MatchRoomSnapshotDto> watchMatchRoom(String matchId) {
     final controller = StreamController<MatchRoomSnapshotDto>();
     final lease = _ablyService.acquireChannel('match:$matchId:state');
@@ -336,7 +342,6 @@ class MatchesRemoteDataSource {
     MatchRoomSnapshotDto? current;
     var refreshing = false;
     var refreshAgain = false;
-    var hasLoaded = false;
     var requestedRevision = 0;
 
     Future<void> refresh() async {
@@ -351,11 +356,10 @@ class MatchesRemoteDataSource {
           final next = await getMatchRoom(matchId);
           if (current == null || next.revision >= current!.revision) {
             current = next;
-            hasLoaded = true;
             if (!controller.isClosed) controller.add(next);
           }
         } catch (error) {
-          if (!hasLoaded && !controller.isClosed) {
+          if (!controller.isClosed) {
             controller.addError(error);
           }
         }

@@ -5,7 +5,9 @@ import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../data/datasources/posts_datasource_providers.dart';
 import '../../data/repositories/comments_repository_impl.dart';
 import '../../domain/entities/comment.dart';
+import '../../domain/entities/post.dart';
 import '../../domain/repositories/comments_repository.dart';
+import 'feed_controller.dart';
 
 part 'comments_controller.g.dart';
 
@@ -75,6 +77,9 @@ class CommentsController extends _$CommentsController {
       (failure) {
         // Rollback on failure
         state = AsyncData(currentList);
+        ref
+            .read(feedControllerProvider.notifier)
+            .decrementCommentsCount(PostId(postId));
       },
       (created) {
         // Replace temp optimistic comment with actual saved comment

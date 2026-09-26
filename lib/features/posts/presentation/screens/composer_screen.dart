@@ -83,8 +83,7 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(composerControllerProvider);
     final canPost = (_text.text.trim().isNotEmpty || state.photos.isNotEmpty) &&
-        !state.busy &&
-        !state.photos.any((p) => p.hashPending);
+        !state.busy;
 
     return Scaffold(
       backgroundColor: CkColors.paper,

@@ -70,7 +70,7 @@ export async function completeCricketMatch(
       description,
   };
 
-  await ctx.tx`
+  const revisions = await ctx.tx`
     update public.cricket_matches
     set
       phase =
@@ -79,10 +79,13 @@ export async function completeCricketMatch(
         ${ctx.tx.json(result)},
       result_summary =
         ${description},
+      state_revision =
+        state_revision + 1,
       updated_at =
         now()
     where match_id =
             ${ctx.matchId}::uuid
+    returning state_revision
   `;
 
   await ctx.tx`
@@ -100,5 +103,15 @@ export async function completeCricketMatch(
             ${ctx.matchId}::uuid
   `;
 
-  return {};
+  const revision = Number(revisions[0]?.state_revision ?? 0);
+  return {
+    revision,
+    events: [{
+      eventId: crypto.randomUUID(),
+      matchId: ctx.matchId,
+      revision,
+      eventType: "match_changed",
+      occurredAt: new Date().toISOString(),
+    }],
+  };
 }

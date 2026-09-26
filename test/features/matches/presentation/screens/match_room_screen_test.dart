@@ -29,6 +29,9 @@ void main() {
     when(
       () => repository.watchMatchRoom(any()),
     ).thenAnswer((_) => rooms.stream);
+    when(
+      () => repository.watchRealtimeStatus(),
+    ).thenAnswer((_) => const Stream.empty());
   });
 
   tearDown(() => rooms.close());

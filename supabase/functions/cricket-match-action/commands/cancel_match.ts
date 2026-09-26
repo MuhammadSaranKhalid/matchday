@@ -109,14 +109,16 @@ export async function cancelMatch(
   //
   // We intentionally keep existing toss/openers audit data instead of deleting
   // it. The match is cancelled, not erased.
-  await ctx.tx`
+  const revisions = await ctx.tx`
     update public.cricket_matches
     set
-      phase        = 'complete',
-      result       = ${ctx.tx.json(result)},
+      phase          = 'complete',
+      result         = ${ctx.tx.json(result)},
       result_summary = ${description},
-      updated_at   = now()
+      state_revision = state_revision + 1,
+      updated_at     = now()
     where match_id = ${ctx.matchId}::uuid
+    returning state_revision
   `;
 
   // Generic sporting-event lifecycle.
@@ -129,5 +131,15 @@ export async function cancelMatch(
     where match_id = ${ctx.matchId}::uuid
   `;
 
-  return {};
+  const revision = Number(revisions[0]?.state_revision ?? 0);
+  return {
+    revision,
+    events: [{
+      eventId: crypto.randomUUID(),
+      matchId: ctx.matchId,
+      revision,
+      eventType: "match_changed",
+      occurredAt: new Date().toISOString(),
+    }],
+  };
 }

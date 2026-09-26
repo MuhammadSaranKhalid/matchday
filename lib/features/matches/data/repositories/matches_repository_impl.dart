@@ -231,6 +231,9 @@ class MatchesRepositoryImpl implements MatchesRepository {
       );
 
   @override
+  Stream<bool> watchRealtimeStatus() => _remote.realtimeConnectionChanges;
+
+  @override
   Future<Either<Failure, MatchRoomSnapshot>> startMatch({
     required MatchId id,
     required String strikerId,
@@ -296,20 +299,20 @@ class MatchesRepositoryImpl implements MatchesRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> recordToss({
+  Future<Either<Failure, MatchRoomSnapshot>> recordToss({
     required MatchId id,
     required TeamId wonBy,
     required TossDecision decision,
     String? face,
   }) async {
     try {
-      await _remote.recordToss(
+      final dto = await _remote.recordToss(
         matchId: id.value,
         wonBy: wonBy.value,
         decision: decision.wire,
         face: face,
       );
-      return const Right(unit);
+      return Right(dto.toEntity());
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {

@@ -1,7 +1,7 @@
 name: matchday
 description: Flutter clean architecture reference with Riverpod 3.x + Supabase + offline support.
 publish_to: "none"
-version: 0.4.8+9
+version: 0.4.9+10
 
 environment:
   sdk: ^3.7.0

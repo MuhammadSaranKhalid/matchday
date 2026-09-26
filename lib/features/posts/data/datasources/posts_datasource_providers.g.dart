@@ -57,6 +57,54 @@ final class PostsRemoteDataSourceProvider
 String _$postsRemoteDataSourceHash() =>
     r'fc2a1ba6b774cbe01bb26a9a77ce890fba04419b';
 
+@ProviderFor(postsLocalDataSource)
+final postsLocalDataSourceProvider = PostsLocalDataSourceProvider._();
+
+final class PostsLocalDataSourceProvider
+    extends
+        $FunctionalProvider<
+          PostsLocalDataSource,
+          PostsLocalDataSource,
+          PostsLocalDataSource
+        >
+    with $Provider<PostsLocalDataSource> {
+  PostsLocalDataSourceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'postsLocalDataSourceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$postsLocalDataSourceHash();
+
+  @$internal
+  @override
+  $ProviderElement<PostsLocalDataSource> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  PostsLocalDataSource create(Ref ref) {
+    return postsLocalDataSource(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PostsLocalDataSource value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PostsLocalDataSource>(value),
+    );
+  }
+}
+
+String _$postsLocalDataSourceHash() =>
+    r'b65a49322cf824988a9e92dcc65e65c99f555221';
+
 @ProviderFor(commentsRemoteDataSource)
 final commentsRemoteDataSourceProvider = CommentsRemoteDataSourceProvider._();
 

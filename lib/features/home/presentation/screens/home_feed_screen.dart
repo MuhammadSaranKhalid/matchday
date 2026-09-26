@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:matchday/core/theme/circk_theme.dart';
+import 'package:matchday/features/posts/presentation/widgets/pending_post_card.dart';
 import 'package:matchday/features/posts/presentation/widgets/post_card.dart';
 import 'package:matchday/core/widgets/v2/v2_kit.dart';
 import 'package:matchday/core/widgets/modals/modals.dart';
@@ -110,40 +111,45 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
 
   Widget _dataList(List<Post> posts) {
     final hasMore = ref.read(feedControllerProvider.notifier).hasMore;
-    // [LiveRail] + posts + [footer]. LiveRail collapses to SizedBox.shrink
-    // while _kShowLiveCards is false so itemCount + indexing stay constant —
-    // re-enabling is a one-line flag flip with no surrounding changes.
+    final pendingPosts = ref.watch(pendingPostsProvider).value ?? const [];
+    final totalCount = 1 + pendingPosts.length + posts.length + 1;
+
     return ListView.builder(
       controller: _scroll,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 12),
-      itemCount: posts.length + 2,
+      itemCount: totalCount,
       itemBuilder: (context, i) {
         if (i == 0) {
           return _kShowLiveCards ? const _LiveRail() : const SizedBox.shrink();
         }
-        if (i == posts.length + 1) {
-          if (posts.isEmpty) return const _EmptyState();
-          return hasMore ? const _Loader() : const _FeedFooter();
+        final pendingIndex = i - 1;
+        if (pendingIndex < pendingPosts.length) {
+          return PendingPostCard(pendingPost: pendingPosts[pendingIndex]);
         }
-        final post = posts[i - 1];
-        return RepaintBoundary(
-          child: FeedPostCard(
-            post: post,
-            onComment: () => showCommentsSheet(
-              context,
-              postId: post.id.value,
-              postAuthorHandle: post.authorUsername != null && post.authorUsername!.isNotEmpty
-                  ? '@${post.authorUsername}'
-                  : post.authorName,
-              onOpenProfile: (username) => widget.onOpenProfile?.call(username),
+        final postIndex = pendingIndex - pendingPosts.length;
+        if (postIndex < posts.length) {
+          final post = posts[postIndex];
+          return RepaintBoundary(
+            child: FeedPostCard(
+              post: post,
+              onComment: () => showCommentsSheet(
+                context,
+                postId: post.id.value,
+                postAuthorHandle: post.authorUsername != null && post.authorUsername!.isNotEmpty
+                    ? '@${post.authorUsername}'
+                    : post.authorName,
+                onOpenProfile: (username) => widget.onOpenProfile?.call(username),
+              ),
+              onLike: () => ref.read(feedControllerProvider.notifier).toggleLike(post.id),
+              onBookmark: () => ref.read(feedControllerProvider.notifier).toggleBookmark(post.id),
+              onAuthorTap: (username) => widget.onOpenProfile?.call(username),
+              onOpenPhoto: (index) => _openPhoto(post.media, index),
             ),
-            onLike: () => ref.read(feedControllerProvider.notifier).toggleLike(post.id),
-            onBookmark: () => ref.read(feedControllerProvider.notifier).toggleBookmark(post.id),
-            onAuthorTap: (username) => widget.onOpenProfile?.call(username),
-            onOpenPhoto: (index) => _openPhoto(post.media, index),
-          ),
-        );
+          );
+        }
+        if (posts.isEmpty && pendingPosts.isEmpty) return const _EmptyState();
+        return hasMore ? const _Loader() : const _FeedFooter();
       },
     );
   }

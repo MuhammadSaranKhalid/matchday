@@ -20,10 +20,9 @@ import '../../domain/repositories/photo_picker.dart';
 class PhotoProcessor implements PhotoPicker {
   const PhotoProcessor();
 
-  /// Max stored long-edge (Instagram-style). Feed decodes smaller; the viewer
-  /// uses this same file.
-  static const _maxEdge = 1080;
-  static const _quality = 75;
+  /// Max stored long-edge (max 2048px JPEG normalized source for staging).
+  static const _maxEdge = 2048;
+  static const _quality = 88;
 
   @override
   Future<ProcessedPhoto?> pickOne() async {
@@ -107,7 +106,7 @@ class PhotoProcessor implements PhotoPicker {
       blurhash: '',
       width: width,
       height: height,
-      hashPending: true,
+      hashPending: false,
     );
   }
 

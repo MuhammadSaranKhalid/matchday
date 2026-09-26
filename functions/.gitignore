@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.runtimeconfig.json
+.env.*
+!.env.example

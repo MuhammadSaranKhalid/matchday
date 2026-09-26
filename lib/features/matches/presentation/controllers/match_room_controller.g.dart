@@ -51,7 +51,7 @@ final class MatchRoomControllerProvider
 }
 
 String _$matchRoomControllerHash() =>
-    r'5032be91e7ebac9c4330daff5021303805e8e6bb';
+    r'0b16a2e34b00865f4fb80bb8309defdf8f387e90';
 
 final class MatchRoomControllerFamily extends $Family
     with

@@ -30,6 +30,9 @@ void main() {
     when(
       () => repository.watchMatchRoom(any()),
     ).thenAnswer((_) => rooms.stream);
+    when(
+      () => repository.watchRealtimeStatus(),
+    ).thenAnswer((_) => const Stream.empty());
     container = ProviderContainer(
       overrides: [matchesRepositoryProvider.overrideWithValue(repository)],
     );
@@ -157,9 +160,10 @@ void main() {
     expect(state.snapshot.capabilities.canRecordToss, isTrue);
   });
 
-  test('realtime event with same or lower revision is not adopted', () async {
+  test('stream snapshot with lower revision is not adopted, but same revision updates capabilities', () async {
     final initial = _room(3, canRecordToss: false);
-    final staleRealtime = _room(3, canRecordToss: true);
+    final staleRealtime = _room(2, canRecordToss: true);
+    final updatedCapabilitiesSameRevision = _room(3, canRecordToss: true);
 
     final keepAlive = container.listen(
       matchRoomControllerProvider('m1'),
@@ -172,9 +176,13 @@ void main() {
 
     rooms.add(staleRealtime);
     await _pump();
-
-    final state = container.read(matchRoomControllerProvider('m1')).value!;
+    var state = container.read(matchRoomControllerProvider('m1')).value!;
     expect(state.snapshot.capabilities.canRecordToss, isFalse);
+
+    rooms.add(updatedCapabilitiesSameRevision);
+    await _pump();
+    state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.snapshot.capabilities.canRecordToss, isTrue);
   });
 
   test('swapBatters swaps striker and non-striker', () async {
@@ -246,6 +254,85 @@ void main() {
     state = container.read(matchRoomControllerProvider('m1')).value!;
     expect(state.selectedNonStrikerId, 'p1');
     expect(state.selectedStrikerId, isNull);
+  });
+
+  test('navigates to scoring for superOver and result for walkover/tied/abandoned', () async {
+    final keepAlive = container.listen(
+      matchRoomControllerProvider('m1'),
+      (_, __) {},
+    );
+    addTearDown(keepAlive.close);
+    final future = container.read(matchRoomControllerProvider('m1').future);
+    rooms.add(_room(1, status: 'super_over'));
+    await future;
+
+    var state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.navigation, MatchRoomNavigation.scoring);
+
+    final controller = container.read(matchRoomControllerProvider('m1').notifier);
+    controller.consumeNavigation();
+
+    rooms.add(_room(2, status: 'walkover'));
+    await _pump();
+    state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.navigation, MatchRoomNavigation.result);
+  });
+
+  test('updates isRealtimeConnected when watchRealtimeStatus emits', () async {
+    final connectionChanges = StreamController<bool>.broadcast();
+    addTearDown(connectionChanges.close);
+    when(
+      () => repository.watchRealtimeStatus(),
+    ).thenAnswer((_) => connectionChanges.stream);
+
+    final keepAlive = container.listen(
+      matchRoomControllerProvider('m1'),
+      (_, __) {},
+    );
+    addTearDown(keepAlive.close);
+    final future = container.read(matchRoomControllerProvider('m1').future);
+    rooms.add(_room(1));
+    await future;
+
+    var state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.isRealtimeConnected, isTrue);
+
+    connectionChanges.add(false);
+    await _pump();
+    state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.isRealtimeConnected, isFalse);
+
+    connectionChanges.add(true);
+    await _pump();
+    state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.isRealtimeConnected, isTrue);
+  });
+
+  test('does not re-trigger navigation on equal-revision snapshot updates', () async {
+    final keepAlive = container.listen(
+      matchRoomControllerProvider('m1'),
+      (_, __) {},
+    );
+    addTearDown(keepAlive.close);
+    final future = container.read(matchRoomControllerProvider('m1').future);
+    rooms.add(_room(1, status: 'live'));
+    await future;
+
+    var state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.navigation, MatchRoomNavigation.scoring);
+
+    final controller = container.read(matchRoomControllerProvider('m1').notifier);
+    controller.consumeNavigation();
+    state = container.read(matchRoomControllerProvider('m1')).value!;
+    expect(state.navigation, isNull);
+
+    // Same revision snapshot arrives (e.g. spectator or capability change)
+    rooms.add(_room(1, status: 'live', canRecordToss: true));
+    await _pump();
+    state = container.read(matchRoomControllerProvider('m1')).value!;
+    // Navigation must remain consumed, not re-triggered
+    expect(state.navigation, isNull);
+    expect(state.snapshot.capabilities.canRecordToss, isTrue);
   });
 }
 

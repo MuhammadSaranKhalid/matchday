@@ -56,7 +56,7 @@ export function db() {
   }
   _sql = postgres(url, {
     prepare: false, // required for Supavisor transaction mode (port 6543)
-    max: 3, // small per-instance pool — avoid pooler connection exhaustion
+    max: 1, // single connection per warm instance — avoid pooler exhaustion
     idle_timeout: 20, // seconds: release idle pooled connections between bursts
     max_lifetime: 60 * 30, // seconds: recycle a connection after ~30 min
     connect_timeout: 10, // seconds: fail fast on a saturated pooler

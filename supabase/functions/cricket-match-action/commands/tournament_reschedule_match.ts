@@ -55,6 +55,15 @@ export async function tournamentRescheduleMatch(
     );
   }
 
+  const revisions = await ctx.tx`
+    update public.cricket_matches
+    set
+      state_revision = state_revision + 1,
+      updated_at = now()
+    where match_id = ${ctx.matchId}::uuid
+    returning state_revision
+  `;
+
   await ctx.tx`
     update public.matches
     set
@@ -69,5 +78,15 @@ export async function tournamentRescheduleMatch(
             ${ctx.matchId}::uuid
   `;
 
-  return {};
+  const revision = Number(revisions[0]?.state_revision ?? 0);
+  return {
+    revision,
+    events: [{
+      eventId: crypto.randomUUID(),
+      matchId: ctx.matchId,
+      revision,
+      eventType: "match_changed",
+      occurredAt: new Date().toISOString(),
+    }],
+  };
 }

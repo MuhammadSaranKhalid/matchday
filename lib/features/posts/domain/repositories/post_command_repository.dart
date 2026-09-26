@@ -7,26 +7,12 @@ import '../entities/post_draft.dart';
 import '../entities/publish_photo.dart';
 import '../value_objects/post_text.dart';
 
-import 'post_command_repository.dart';
-import 'post_read_repository.dart';
-
-/// Authoritative Posts repository combining CQRS read and command capabilities.
-abstract class PostsRepository implements PostReadRepository, PostCommandRepository {
-  /// Consolidated feed read projection supporting legacy 'mode' parameter.
-  @override
-  Future<Either<Failure, List<Post>>> getHomeFeed({
-    String mode = 'home',
-    String filter = 'all',
-    String? targetId,
-    DateTime? cursorPublishedAt,
-    String? cursorPostId,
-    int limit = 20,
-  });
-
-  @override
-  Future<Either<Failure, Post>> getPost(PostId id);
-
-  @override
+/// CQRS Command/Write Model Repository for Posts.
+/// Enforces authorization, validation, transactional outbox reservation, and state mutations.
+abstract class PostCommandRepository {
+  /// Asynchronously begins publishing a post:
+  /// Normalizes local photos, reserves the publishing session on the server via begin_post_publish,
+  /// starts uploading to private staging storage, and emits a durable PendingPost.
   Future<Either<Failure, String>> beginPublishPost({
     required PostPublisherType publisherType,
     required String publisherId,
@@ -38,24 +24,24 @@ abstract class PostsRepository implements PostReadRepository, PostCommandReposit
     String? linkedTeamId,
   });
 
-  @override
+  /// Soft-delete a post the current user/entity authored.
   Future<Either<Failure, Unit>> deletePost(PostId id);
 
-  @override
+  /// Desired-state like: sets liked to true or false deterministically.
   Future<Either<Failure, bool>> setPostLike(PostId id, {required bool liked});
 
-  @override
+  /// Desired-state bookmark: sets bookmarked to true or false deterministically.
   Future<Either<Failure, bool>> setPostBookmark(PostId id, {required bool bookmarked});
 
-  @override
+  /// Realtime stream of creator's locally queued and active publishing posts (outbox).
   Stream<List<PendingPost>> watchPendingPosts();
 
-  @override
+  /// Retry an upload/publishing session for a failed pending post.
   Future<void> retryPendingPost(String postId);
 
-  @override
+  /// Discard a failed pending post and clean up local temporary files.
   Future<void> discardPendingPost(String postId);
 
-  @override
+  /// Composer submit helper that wraps beginPublishPost.
   Future<Either<Failure, Post>> createPost(PostDraft draft);
 }

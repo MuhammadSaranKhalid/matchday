@@ -100,8 +100,6 @@ abstract class PostDto with _$PostDto {
     @JsonKey(name: 'linked_match_id') String? linkedMatchId,
     @JsonKey(name: 'linked_tournament_id') String? linkedTournamentId,
     @JsonKey(name: 'linked_team_id') String? linkedTeamId,
-    // Legacy compatibility fields
-    @JsonKey(name: 'media_urls') @Default(<String>[]) List<String> mediaUrls,
     Map<String, dynamic>? author,
     Map<String, dynamic>? team,
     @JsonKey(name: 'is_liked') @Default(false) bool isLiked,
@@ -200,18 +198,6 @@ abstract class PostDto with _$PostDto {
           blurhash: blurhash,
         );
       }).toList();
-    }
-
-    if (mediaUrls.isNotEmpty) {
-      return mediaUrls
-          .map((u) => PostMedia(
-                mediaId: u,
-                postId: postId,
-                position: 0,
-                width: 1080,
-                height: 1080,
-              ))
-          .toList();
     }
 
     return const [];

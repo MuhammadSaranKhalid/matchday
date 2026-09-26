@@ -9,14 +9,17 @@ part of 'feed_controller.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
+/// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.
 
 @ProviderFor(FeedController)
 final feedControllerProvider = FeedControllerProvider._();
 
 /// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
+/// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.
 final class FeedControllerProvider
     extends $AsyncNotifierProvider<FeedController, List<Post>> {
   /// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
+  /// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.
   FeedControllerProvider._()
     : super(
         from: null,
@@ -36,9 +39,10 @@ final class FeedControllerProvider
   FeedController create() => FeedController();
 }
 
-String _$feedControllerHash() => r'c2c2b84a740da6828df0362499c9b8e974556e20';
+String _$feedControllerHash() => r'137a79bc5417aceeb8f4ac888ed7b0c6cd2815b2';
 
 /// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
+/// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.
 
 abstract class _$FeedController extends $AsyncNotifier<List<Post>> {
   FutureOr<List<Post>> build();

@@ -56,6 +56,58 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
+  Future<Either<Failure, List<Post>>> getProfilePosts({
+    required String publisherId,
+    PostPublisherType publisherType = PostPublisherType.user,
+    DateTime? cursorPublishedAt,
+    String? cursorPostId,
+    int limit = 20,
+  }) async {
+    try {
+      final dtos = await _remote.getProfilePosts(
+        publisherId: publisherId,
+        publisherType: publisherType.name,
+        cursorPublishedAt: cursorPublishedAt,
+        cursorPostId: cursorPostId,
+        limit: limit,
+      );
+      return Right(
+        dtos.map((d) => d.toEntity(urlFactory: _remote.urlFactory)).toList(),
+      );
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Post>>> getSavedPosts({
+    DateTime? cursorSavedAt,
+    String? cursorPostId,
+    int limit = 20,
+  }) async {
+    try {
+      final dtos = await _remote.getSavedPosts(
+        cursorSavedAt: cursorSavedAt,
+        cursorPostId: cursorPostId,
+        limit: limit,
+      );
+      return Right(
+        dtos.map((d) => d.toEntity(urlFactory: _remote.urlFactory)).toList(),
+      );
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, Post>> getPost(PostId id) async {
     try {
       final dto = await _remote.getPost(id.value);

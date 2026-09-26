@@ -73,11 +73,6 @@ _PostDto _$PostDtoFromJson(Map<String, dynamic> json) => _PostDto(
   linkedMatchId: json['linked_match_id'] as String?,
   linkedTournamentId: json['linked_tournament_id'] as String?,
   linkedTeamId: json['linked_team_id'] as String?,
-  mediaUrls:
-      (json['media_urls'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList() ??
-      const <String>[],
   author: json['author'] as Map<String, dynamic>?,
   team: json['team'] as Map<String, dynamic>?,
   isLiked: json['is_liked'] as bool? ?? false,
@@ -106,7 +101,6 @@ Map<String, dynamic> _$PostDtoToJson(_PostDto instance) => <String, dynamic>{
   'linked_match_id': instance.linkedMatchId,
   'linked_tournament_id': instance.linkedTournamentId,
   'linked_team_id': instance.linkedTeamId,
-  'media_urls': instance.mediaUrls,
   'author': instance.author,
   'team': instance.team,
   'is_liked': instance.isLiked,

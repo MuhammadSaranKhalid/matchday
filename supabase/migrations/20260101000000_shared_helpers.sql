@@ -93,6 +93,8 @@ create extension if not exists pg_net with schema extensions;
 --     deliberately none here. The queues themselves are created in 0910.
 create extension if not exists pgmq;
 
+create schema if not exists private;
+
 -- -----------------------------------------------------------------------------
 -- Functions
 -- -----------------------------------------------------------------------------
@@ -670,10 +672,61 @@ $$;
 do $$
 begin
   create type public.post_status as enum(
+    'publishing',
     'active',
     'hidden',
     'deleted',
     'reported'
+);
+exception
+  when duplicate_object then
+    null;
+end
+$$;
+
+do $$
+begin
+  create type public.post_publisher_type as enum(
+    'user',
+    'team',
+    'tournament',
+    'club'
+);
+exception
+  when duplicate_object then
+    null;
+end
+$$;
+
+do $$
+begin
+  create type public.post_kind as enum(
+    'standard',
+    'recruitment',
+    'match_announcement',
+    'match_result',
+    'tournament_update',
+    'roster_update',
+    'milestone'
+);
+exception
+  when duplicate_object then
+    null;
+end
+$$;
+
+do $$
+begin
+  create type public.post_media_status as enum(
+    'awaiting_upload',
+    'uploaded',
+    'processing_feed',
+    'feed_ready',
+    'optimizing',
+    'optimized',
+    'upload_failed',
+    'processing_failed',
+    'optimization_failed'
 );
 exception
   when duplicate_object then

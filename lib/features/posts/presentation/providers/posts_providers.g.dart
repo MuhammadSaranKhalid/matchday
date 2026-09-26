@@ -51,6 +51,112 @@ final class PostsRepositoryProvider
 
 String _$postsRepositoryHash() => r'10ca989c9211262ea2b49d1e96df46210a2e7d16';
 
+/// CQRS Read Repository Provider.
+
+@ProviderFor(postReadRepository)
+final postReadRepositoryProvider = PostReadRepositoryProvider._();
+
+/// CQRS Read Repository Provider.
+
+final class PostReadRepositoryProvider
+    extends
+        $FunctionalProvider<
+          PostReadRepository,
+          PostReadRepository,
+          PostReadRepository
+        >
+    with $Provider<PostReadRepository> {
+  /// CQRS Read Repository Provider.
+  PostReadRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'postReadRepositoryProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$postReadRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<PostReadRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  PostReadRepository create(Ref ref) {
+    return postReadRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PostReadRepository value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PostReadRepository>(value),
+    );
+  }
+}
+
+String _$postReadRepositoryHash() =>
+    r'ac983f3ff3979efaf3c4c65880138e3bb2aac359';
+
+/// CQRS Command Repository Provider.
+
+@ProviderFor(postCommandRepository)
+final postCommandRepositoryProvider = PostCommandRepositoryProvider._();
+
+/// CQRS Command Repository Provider.
+
+final class PostCommandRepositoryProvider
+    extends
+        $FunctionalProvider<
+          PostCommandRepository,
+          PostCommandRepository,
+          PostCommandRepository
+        >
+    with $Provider<PostCommandRepository> {
+  /// CQRS Command Repository Provider.
+  PostCommandRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'postCommandRepositoryProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$postCommandRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<PostCommandRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  PostCommandRepository create(Ref ref) {
+    return postCommandRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PostCommandRepository value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PostCommandRepository>(value),
+    );
+  }
+}
+
+String _$postCommandRepositoryHash() =>
+    r'2825dce7ba33efd321b69df3bb4edab809143844';
+
 /// Emits the local pending uploads/posts created on this device.
 
 @ProviderFor(pendingPosts)
@@ -95,16 +201,16 @@ final class PendingPostsProvider
   }
 }
 
-String _$pendingPostsHash() => r'b4f9ca5865a398ca2ffecdc5592aeaaabc9983ba';
+String _$pendingPostsHash() => r'40e4a10d6c85fa768b8b524e667c7fc87b53f0cb';
 
-/// Posts authored by [authorId] (Profile tab / spectator). Throws a
-/// [FailureWrapper] on error so the UI renders it via `AsyncError`.
+/// Posts authored by [authorId] (Profile tab / spectator).
+/// Populates the L1 PostStore and returns the canonical entities.
 
 @ProviderFor(authorPosts)
 final authorPostsProvider = AuthorPostsFamily._();
 
-/// Posts authored by [authorId] (Profile tab / spectator). Throws a
-/// [FailureWrapper] on error so the UI renders it via `AsyncError`.
+/// Posts authored by [authorId] (Profile tab / spectator).
+/// Populates the L1 PostStore and returns the canonical entities.
 
 final class AuthorPostsProvider
     extends
@@ -114,8 +220,8 @@ final class AuthorPostsProvider
           FutureOr<List<Post>>
         >
     with $FutureModifier<List<Post>>, $FutureProvider<List<Post>> {
-  /// Posts authored by [authorId] (Profile tab / spectator). Throws a
-  /// [FailureWrapper] on error so the UI renders it via `AsyncError`.
+  /// Posts authored by [authorId] (Profile tab / spectator).
+  /// Populates the L1 PostStore and returns the canonical entities.
   AuthorPostsProvider._({
     required AuthorPostsFamily super.from,
     required String super.argument,
@@ -159,10 +265,10 @@ final class AuthorPostsProvider
   }
 }
 
-String _$authorPostsHash() => r'c56a01920231a2c4f5cdb539b41442a3ccb7d402';
+String _$authorPostsHash() => r'65fd2aecf7f237c612cb3f1388817e43efbddcfd';
 
-/// Posts authored by [authorId] (Profile tab / spectator). Throws a
-/// [FailureWrapper] on error so the UI renders it via `AsyncError`.
+/// Posts authored by [authorId] (Profile tab / spectator).
+/// Populates the L1 PostStore and returns the canonical entities.
 
 final class AuthorPostsFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<List<Post>>, String> {
@@ -175,8 +281,8 @@ final class AuthorPostsFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Posts authored by [authorId] (Profile tab / spectator). Throws a
-  /// [FailureWrapper] on error so the UI renders it via `AsyncError`.
+  /// Posts authored by [authorId] (Profile tab / spectator).
+  /// Populates the L1 PostStore and returns the canonical entities.
 
   AuthorPostsProvider call(String authorId) =>
       AuthorPostsProvider._(argument: authorId, from: this);
@@ -244,7 +350,7 @@ final class TeamPostsProvider
   }
 }
 
-String _$teamPostsHash() => r'5b476ca6b4edfeb0fa3f55256f835cc23bb18ef0';
+String _$teamPostsHash() => r'0bc2e020c319450dc7da94e5896336e1fa667f48';
 
 /// Posts authored by or linked to [teamId] (Team Profile Posts tab).
 
@@ -326,16 +432,19 @@ abstract class _$FeedFilter extends $Notifier<String> {
 }
 
 /// Single post by [postId] for canonical /posts/:postId screen.
+/// Checks L1 PostStore first, fetches from server on cache miss.
 
 @ProviderFor(postDetail)
 final postDetailProvider = PostDetailFamily._();
 
 /// Single post by [postId] for canonical /posts/:postId screen.
+/// Checks L1 PostStore first, fetches from server on cache miss.
 
 final class PostDetailProvider
     extends $FunctionalProvider<AsyncValue<Post>, Post, FutureOr<Post>>
     with $FutureModifier<Post>, $FutureProvider<Post> {
   /// Single post by [postId] for canonical /posts/:postId screen.
+  /// Checks L1 PostStore first, fetches from server on cache miss.
   PostDetailProvider._({
     required PostDetailFamily super.from,
     required String super.argument,
@@ -379,9 +488,10 @@ final class PostDetailProvider
   }
 }
 
-String _$postDetailHash() => r'103816d91249546ca86be4d7520a42806a18dc7f';
+String _$postDetailHash() => r'ff8b1abdcb2c2880e24124bc3b0ff384adc77dcc';
 
 /// Single post by [postId] for canonical /posts/:postId screen.
+/// Checks L1 PostStore first, fetches from server on cache miss.
 
 final class PostDetailFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<Post>, String> {
@@ -395,6 +505,7 @@ final class PostDetailFamily extends $Family
       );
 
   /// Single post by [postId] for canonical /posts/:postId screen.
+  /// Checks L1 PostStore first, fetches from server on cache miss.
 
   PostDetailProvider call(String postId) =>
       PostDetailProvider._(argument: postId, from: this);
@@ -444,4 +555,4 @@ final class SavedPostsProvider
   }
 }
 
-String _$savedPostsHash() => r'0def375cb6e8e9308b9cd79643b9f0f1bedb00f6';
+String _$savedPostsHash() => r'08f0ebfbd4f4443b77e06ceb8317db5bb83975a4';

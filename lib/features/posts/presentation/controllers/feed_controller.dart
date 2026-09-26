@@ -2,12 +2,14 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/post.dart';
-import '../../domain/repositories/posts_repository.dart';
+import '../../domain/repositories/post_read_repository.dart';
+import '../providers/post_store_provider.dart';
 import '../providers/posts_providers.dart';
 
 part 'feed_controller.g.dart';
 
 /// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
+/// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.
 @riverpod
 class FeedController extends _$FeedController {
   static const _pageSize = 20;
@@ -22,7 +24,7 @@ class FeedController extends _$FeedController {
   Future<List<Post>> build() {
     final filter = ref.watch(feedFilterProvider);
     return _fetch(
-      ref.watch(postsRepositoryProvider),
+      ref.watch(postReadRepositoryProvider),
       filter: filter,
       cursorPublishedAt: null,
       cursorPostId: null,
@@ -30,13 +32,12 @@ class FeedController extends _$FeedController {
   }
 
   Future<List<Post>> _fetch(
-    PostsRepository repo, {
+    PostReadRepository repo, {
     required String filter,
     DateTime? cursorPublishedAt,
     String? cursorPostId,
   }) async {
     final result = await repo.getHomeFeed(
-      mode: 'home',
       filter: filter,
       cursorPublishedAt: cursorPublishedAt,
       cursorPostId: cursorPostId,
@@ -46,10 +47,14 @@ class FeedController extends _$FeedController {
       (f) => throw FailureWrapper(f),
       (posts) {
         _hasMore = posts.length == _pageSize;
-        // Provider-neutral pending post reconciliation (Point 10):
-        // When active posts arrive in the canonical feed, discard the matching pending records.
+        // Upsert into L1 normalized PostStore
+        ref.read(postStoreProvider.notifier).upsertAll(posts);
+
+        // Provider-neutral pending post reconciliation:
+        // When active posts arrive in the canonical feed, discard matching pending outbox records.
+        final commandRepo = ref.read(postCommandRepositoryProvider);
         for (final p in posts) {
-          repo.discardPendingPost(p.id.value);
+          commandRepo.discardPendingPost(p.id.value);
         }
         return posts;
       },
@@ -62,7 +67,7 @@ class FeedController extends _$FeedController {
     final filter = ref.read(feedFilterProvider);
     final nextState = await AsyncValue.guard(
       () => _fetch(
-        ref.read(postsRepositoryProvider),
+        ref.read(postReadRepositoryProvider),
         filter: filter,
         cursorPublishedAt: null,
         cursorPostId: null,
@@ -83,7 +88,7 @@ class FeedController extends _$FeedController {
 
     try {
       final more = await _fetch(
-        ref.read(postsRepositoryProvider),
+        ref.read(postReadRepositoryProvider),
         filter: filter,
         cursorPublishedAt: lastPost.publishedAt ?? lastPost.createdAt,
         cursorPostId: lastPost.id.value,
@@ -96,34 +101,42 @@ class FeedController extends _$FeedController {
 
   /// Prepend a freshly created post without a round-trip (optimistic insert).
   void prepend(Post post) {
+    ref.read(postStoreProvider.notifier).upsert(post);
     final current = state.value ?? const [];
     state = AsyncData([post, ...current]);
   }
 
   /// Toggle like state on a post in the feed with desired-state RPC.
+  /// Updates the normalized [PostStore] so profile, saved, and detail views sync immediately.
   Future<void> toggleLike(PostId postId) async {
     final current = state.value;
     if (current == null) return;
 
-    final target = current.firstWhere((p) => p.id == postId, orElse: () => current.first);
+    final store = ref.read(postStoreProvider.notifier);
+    final target = store.get(postId) ?? current.firstWhere((p) => p.id == postId, orElse: () => current.first);
     final targetLiked = !target.isLiked;
+    final newCount = targetLiked ? target.likesCount + 1 : (target.likesCount > 0 ? target.likesCount - 1 : 0);
 
+    // 1. Mutate normalized PostStore (updates all observing screens)
+    store.updatePost(postId, (p) => p.copyWith(isLiked: targetLiked, likesCount: newCount));
+
+    // 2. Update local FeedController list
     final updated = current.map((p) {
       if (p.id == postId) {
-        final newCount = targetLiked ? p.likesCount + 1 : (p.likesCount > 0 ? p.likesCount - 1 : 0);
         return p.copyWith(isLiked: targetLiked, likesCount: newCount);
       }
       return p;
     }).toList();
-
     state = AsyncData(updated);
 
-    final repo = ref.read(postsRepositoryProvider);
+    // 3. Dispatch command to backend
+    final repo = ref.read(postCommandRepositoryProvider);
     final result = await repo.setPostLike(postId, liked: targetLiked);
 
     result.fold(
       (failure) {
         // Rollback on failure
+        store.updatePost(postId, (p) => target);
         state = AsyncData(current);
       },
       (_) {},
@@ -131,28 +144,35 @@ class FeedController extends _$FeedController {
   }
 
   /// Toggle bookmark state on a post in the feed with desired-state RPC.
+  /// Updates the normalized [PostStore] so profile, saved, and detail views sync immediately.
   Future<void> toggleBookmark(PostId postId) async {
     final current = state.value;
     if (current == null) return;
 
-    final target = current.firstWhere((p) => p.id == postId, orElse: () => current.first);
+    final store = ref.read(postStoreProvider.notifier);
+    final target = store.get(postId) ?? current.firstWhere((p) => p.id == postId, orElse: () => current.first);
     final targetBookmarked = !target.isBookmarked;
 
+    // 1. Mutate normalized PostStore
+    store.updatePost(postId, (p) => p.copyWith(isBookmarked: targetBookmarked));
+
+    // 2. Update local FeedController list
     final updated = current.map((p) {
       if (p.id == postId) {
         return p.copyWith(isBookmarked: targetBookmarked);
       }
       return p;
     }).toList();
-
     state = AsyncData(updated);
 
-    final repo = ref.read(postsRepositoryProvider);
+    // 3. Dispatch command to backend
+    final repo = ref.read(postCommandRepositoryProvider);
     final result = await repo.setPostBookmark(postId, bookmarked: targetBookmarked);
 
     result.fold(
       (failure) {
         // Rollback on failure
+        store.updatePost(postId, (p) => target);
         state = AsyncData(current);
       },
       (_) {},
@@ -161,6 +181,11 @@ class FeedController extends _$FeedController {
 
   /// Increment comments count on a post when a comment is added.
   void incrementCommentsCount(PostId postId) {
+    ref.read(postStoreProvider.notifier).updatePost(
+          postId,
+          (p) => p.copyWith(commentsCount: p.commentsCount + 1),
+        );
+
     final current = state.value;
     if (current == null) return;
 
@@ -176,6 +201,13 @@ class FeedController extends _$FeedController {
 
   /// Decrement comments count on a post when a comment is deleted or rolls back.
   void decrementCommentsCount(PostId postId) {
+    ref.read(postStoreProvider.notifier).updatePost(
+          postId,
+          (p) => p.copyWith(
+            commentsCount: p.commentsCount > 0 ? p.commentsCount - 1 : 0,
+          ),
+        );
+
     final current = state.value;
     if (current == null) return;
 

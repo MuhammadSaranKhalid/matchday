@@ -62,21 +62,84 @@ class PostsRemoteDataSource {
     }
   }
 
-  /// Fetch a single canonical post by ID.
+  /// Fetch a single canonical post by ID via get_post_detail RPC.
   Future<PostDto> getPost(String postId) async {
     try {
-      final list = await getHomeFeed(mode: 'home', limit: 1);
-      final match = list.where((p) => p.postId == postId).firstOrNull;
-      if (match != null) return match;
+      final response = await _supabase.rpc<dynamic>(
+        'get_post_detail',
+        params: {'p_post_id': postId},
+      );
+      if (response is Map<String, dynamic>) {
+        return PostDto.fromJson(response);
+      }
+      throw ServerException('Post not found');
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
 
-      // Fallback query
-      final response = await _supabase
-          .from('posts')
-          .select('*, author:profiles!author_id(display_name, username, profile_photo_url)')
-          .eq('post_id', postId)
-          .single();
+  /// Keyset-paginated profile posts projection via get_profile_posts RPC.
+  Future<List<PostDto>> getProfilePosts({
+    required String publisherId,
+    String publisherType = 'user',
+    DateTime? cursorPublishedAt,
+    String? cursorPostId,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _supabase.rpc<dynamic>(
+        'get_profile_posts',
+        params: {
+          'p_publisher_id': publisherId,
+          'p_publisher_type': publisherType,
+          if (cursorPublishedAt != null)
+            'p_cursor_published_at': cursorPublishedAt.toIso8601String(),
+          if (cursorPostId != null) 'p_cursor_post_id': cursorPostId,
+          'p_limit': limit,
+        },
+      );
 
-      return PostDto.fromJson(response);
+      if (response is List) {
+        return response
+            .whereType<Map<String, dynamic>>()
+            .map((json) => PostDto.fromJson(json))
+            .toList();
+      }
+      return const [];
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  /// Keyset-paginated saved/bookmarked posts projection for the current viewer via get_saved_posts RPC.
+  Future<List<PostDto>> getSavedPosts({
+    DateTime? cursorSavedAt,
+    String? cursorPostId,
+    int limit = 20,
+  }) async {
+    _requireUid();
+    try {
+      final response = await _supabase.rpc<dynamic>(
+        'get_saved_posts',
+        params: {
+          if (cursorSavedAt != null)
+            'p_cursor_saved_at': cursorSavedAt.toIso8601String(),
+          if (cursorPostId != null) 'p_cursor_post_id': cursorPostId,
+          'p_limit': limit,
+        },
+      );
+
+      if (response is List) {
+        return response
+            .whereType<Map<String, dynamic>>()
+            .map((json) => PostDto.fromJson(json))
+            .toList();
+      }
+      return const [];
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     } catch (e) {

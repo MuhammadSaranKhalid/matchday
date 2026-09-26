@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../../core/widgets/modals/modals.dart';
+import '../../../../posts/presentation/controllers/post_interactions_controller.dart';
 import '../../../../posts/presentation/providers/posts_providers.dart';
 import '../../../../posts/presentation/screens/photo_viewer_screen.dart';
 import '../../../../posts/presentation/widgets/post_card.dart';
@@ -170,11 +171,11 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
                             context.push('/u/$u'),
                       ),
                       onLike: () => ref
-                          .read(postsRepositoryProvider)
-                          .setPostLike(post.id, liked: !post.viewer.isLiked),
+                          .read(postInteractionsControllerProvider.notifier)
+                          .toggleLike(post.id),
                       onBookmark: () => ref
-                          .read(postsRepositoryProvider)
-                          .setPostBookmark(post.id, bookmarked: !post.viewer.isBookmarked),
+                          .read(postInteractionsControllerProvider.notifier)
+                          .toggleBookmark(post.id),
                       onAuthorTap: (String u) => context.push('/u/$u'),
                       onOpenPhoto: (int idx) {
                         Navigator.of(context, rootNavigator: true).push(

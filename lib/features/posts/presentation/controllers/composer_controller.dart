@@ -10,10 +10,9 @@ import 'feed_controller.dart';
 
 part 'composer_controller.g.dart';
 
-
 /// Composer draft state: staged (cropped+resized) photos + submit lifecycle.
-/// The text is owned by the screen's TextEditingController and passed to submit.
-@Riverpod(keepAlive: true)
+/// Autodisposed on modal dismiss to avoid stale partial drafts.
+@riverpod
 class ComposerController extends _$ComposerController {
   @override
   ComposerState build() => const ComposerState();
@@ -22,8 +21,6 @@ class ComposerController extends _$ComposerController {
     if (!state.canAddPhoto || state.busy) return;
     final picker = ref.read(photoPickerProvider);
 
-    // Pick + crop + resize (max 2048px JPEG) — returns fast.
-    // Canonical BlurHash is computed server-side by the Firebase/Sharp pipeline (Point 83).
     final photo = await picker.pickOne();
     if (photo == null || !ref.mounted) return;
     state = state.copyWith(photos: [...state.photos, photo]);
@@ -34,33 +31,25 @@ class ComposerController extends _$ComposerController {
     state = state.copyWith(photos: next);
   }
 
-  void setIdentity({
-    required PostAuthorContext authorContext,
-    String? contextEntityId,
-    String? entityName,
-    String? entityMono,
-  }) {
-    state = state.copyWith(
-      authorContext: authorContext,
-      contextEntityId: contextEntityId,
-      entityName: entityName,
-      entityMono: entityMono,
-    );
+  void setPublisher(PostPublisherSelection publisher) {
+    state = state.copyWith(publisher: publisher);
   }
 
   /// Returns the created post on success (and refreshes feed/profile/team), or null
   /// on failure (with [ComposerState.error] set).
   Future<Post?> submit(String text) async {
     state = state.copyWith(busy: true);
-    final result = await ref.read(postsRepositoryProvider).createPost(
+    final result = await ref.read(postCommandRepositoryProvider).createPost(
           PostDraft(
             text: text,
             photos: state.photos,
-            authorContext: state.authorContext,
-            contextEntityId: state.contextEntityId,
+            publisher: state.publisher,
+            postKind: state.postKind,
+            linkedMatchId: state.linkedMatchId,
+            linkedTournamentId: state.linkedTournamentId,
+            linkedTeamId: state.linkedTeamId,
           ),
         );
-    // Composer closed mid-submit → don't touch disposed state/providers.
     if (!ref.mounted) return null;
     return result.fold(
       (failure) {
@@ -68,15 +57,12 @@ class ComposerController extends _$ComposerController {
         return null;
       },
       (post) {
-        // Media posts remain in publishing state while images process and are shown
-        // exclusively via pendingPostsProvider above the feed.
-        // Only active posts (such as text-only posts) should be prepended to the canonical feed.
         if (post.status == PostStatus.active) {
           ref.read(feedControllerProvider.notifier).prepend(post);
         }
         ref.invalidate(authorPostsProvider(post.authorId));
-        if (post.contextEntityId != null) {
-          ref.invalidate(teamPostsProvider(post.contextEntityId!));
+        if (post.publisher.type == PostPublisherType.team) {
+          ref.invalidate(teamPostsProvider(post.publisher.id));
         }
         state = const ComposerState();
         return post;

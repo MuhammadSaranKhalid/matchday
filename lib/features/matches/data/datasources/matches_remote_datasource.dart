@@ -64,7 +64,7 @@ class MatchesRemoteDataSource {
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
-    if (id == null) throw UnauthorizedException('Must be signed in');
+    if (id == null) throw const UnauthorizedException('Must be signed in');
     return id;
   }
 
@@ -285,7 +285,7 @@ class MatchesRemoteDataSource {
         'get_match_room_snapshot',
         params: {'p_match_id': matchId},
       );
-      if (raw is! Map) throw ServerException('Match room was not found');
+      if (raw is! Map) throw const ServerException('Match room was not found');
       return MatchRoomSnapshotDto.fromJson(Map<String, dynamic>.from(raw));
     } on PostgrestException catch (e) {
       throw _rpcException(e);
@@ -327,7 +327,7 @@ class MatchesRemoteDataSource {
   MatchRoomSnapshotDto _roomFromCommand(Map<String, dynamic> data) {
     final snapshot = data['snapshot'];
     if (snapshot is! Map) {
-      throw ServerException('Match command returned no room snapshot');
+      throw const ServerException('Match command returned no room snapshot');
     }
     return MatchRoomSnapshotDto.fromJson(Map<String, dynamic>.from(snapshot));
   }
@@ -692,7 +692,7 @@ class MatchesRemoteDataSource {
                       : null,
             );
           }
-          throw ServerException('record-ball returned no ball row');
+          throw const ServerException('record-ball returned no ball row');
         } on FunctionException catch (e) {
           throw _functionException(e);
         }
@@ -720,7 +720,7 @@ class MatchesRemoteDataSource {
 
     final match = data['match'];
     if (match is! Map) {
-      throw ServerException('Match completion returned no snapshot');
+      throw const ServerException('Match completion returned no snapshot');
     }
 
     return MatchDto.fromJson(Map<String, dynamic>.from(match));
@@ -892,9 +892,9 @@ class MatchesRemoteDataSource {
   Exception _rpcException(PostgrestException e) {
     switch (e.code) {
       case '28000':
-        return UnauthorizedException('Sign in again to continue.');
+        return const UnauthorizedException('Sign in again to continue.');
       case '42501':
-        return UnauthorizedException(
+        return const UnauthorizedException(
           'Only the captains of these two teams can do this.',
         );
       case '23000':
@@ -974,7 +974,7 @@ class MatchesRemoteDataSource {
         // other failure because no amount of retrying fixes it — this bit us
         // on a fresh project where migrations were pushed but
         // `supabase functions deploy` had never been run.
-        return ServerException(
+        return const ServerException(
           'Scoring is unavailable — the record-ball function is not deployed '
           'on this Supabase project.',
           statusCode: 404,

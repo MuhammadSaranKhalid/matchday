@@ -42,7 +42,7 @@ class FollowsRemoteDataSource {
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
-    if (id == null) throw UnauthorizedException('Must be signed in');
+    if (id == null) throw const UnauthorizedException('Must be signed in');
     return id;
   }
 
@@ -177,7 +177,7 @@ class FollowsRemoteDataSource {
       );
       final rows = res is List ? res : (res is Map ? res['entries'] : null);
       if (rows is! List) {
-        throw ServerException('get_follow_list returned an unexpected payload');
+        throw const ServerException('get_follow_list returned an unexpected payload');
       }
       return rows
           .map(

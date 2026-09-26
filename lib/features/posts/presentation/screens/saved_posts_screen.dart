@@ -5,17 +5,46 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/modals/comments_sheet.dart';
 import '../../domain/entities/post_media.dart';
-import '../providers/posts_providers.dart';
+import '../controllers/saved_posts_controller.dart';
+import '../providers/post_store_provider.dart';
 import '../widgets/post_card.dart';
 import 'photo_viewer_screen.dart';
 
 /// Screen displaying the user's saved/bookmarked posts (/saved).
-class SavedPostsScreen extends ConsumerWidget {
+/// Backed by normalized [SavedPostsController] (membership) and [PostStore] (entities).
+class SavedPostsScreen extends ConsumerStatefulWidget {
   const SavedPostsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final savedAsync = ref.watch(savedPostsProvider);
+  ConsumerState<SavedPostsScreen> createState() => _SavedPostsScreenState();
+}
+
+class _SavedPostsScreenState extends ConsumerState<SavedPostsScreen> {
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 400) {
+      ref.read(savedPostsControllerProvider.notifier).loadMore();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final queryStateAsync = ref.watch(savedPostsControllerProvider);
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -33,9 +62,10 @@ class SavedPostsScreen extends ConsumerWidget {
         ),
         centerTitle: true,
       ),
-      body: savedAsync.when(
-        data: (posts) {
-          if (posts.isEmpty) {
+      body: queryStateAsync.when(
+        data: (state) {
+          final ids = state.ids;
+          if (ids.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(32),
@@ -69,12 +99,25 @@ class SavedPostsScreen extends ConsumerWidget {
 
           return RefreshIndicator(
             color: CkColors.ink,
-            onRefresh: () async => ref.refresh(savedPostsProvider.future),
+            onRefresh: () => ref.read(savedPostsControllerProvider.notifier).refresh(),
             child: ListView.builder(
+              controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: posts.length,
+              itemCount: ids.length + (state.isLoadingMore ? 1 : 0),
               itemBuilder: (context, i) {
-                final post = posts[i];
+                if (i >= ids.length) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: CircularProgressIndicator(strokeWidth: 2, color: CkColors.ink),
+                    ),
+                  );
+                }
+
+                final postId = ids[i];
+                final post = ref.watch(postFromStoreProvider(postId));
+                if (post == null) return const SizedBox.shrink();
+
                 return FeedPostCard(
                   post: post,
                   onComment: () => showCommentsSheet(
@@ -110,7 +153,7 @@ class SavedPostsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 TextButton(
-                  onPressed: () => ref.refresh(savedPostsProvider),
+                  onPressed: () => ref.read(savedPostsControllerProvider.notifier).refresh(),
                   child: const Text('Try Again'),
                 ),
               ],

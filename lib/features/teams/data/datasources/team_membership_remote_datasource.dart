@@ -68,7 +68,7 @@ class TeamMembershipRemoteDataSource {
 
   String _requireUid() {
     final uid = _supabase.auth.currentUser?.id;
-    if (uid == null) throw UnauthorizedException('Must be signed in');
+    if (uid == null) throw const UnauthorizedException('Must be signed in');
     return uid;
   }
 
@@ -85,7 +85,7 @@ class TeamMembershipRemoteDataSource {
 
       return rows.map(_membershipFromRow).toList(growable: false);
     } on TimeoutException {
-      throw ServerException('Team memberships request timed out.');
+      throw const ServerException('Team memberships request timed out.');
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -103,7 +103,7 @@ class TeamMembershipRemoteDataSource {
           .timeout(_readTimeout);
       return rows.map(_membershipFromRow).toList(growable: false);
     } on TimeoutException {
-      throw ServerException('User team memberships request timed out.');
+      throw const ServerException('User team memberships request timed out.');
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -125,7 +125,7 @@ class TeamMembershipRemoteDataSource {
           .timeout(_readTimeout);
       return row == null ? null : _membershipFromRow(row);
     } on TimeoutException {
-      throw ServerException('Team membership request timed out.');
+      throw const ServerException('Team membership request timed out.');
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -134,7 +134,7 @@ class TeamMembershipRemoteDataSource {
   TeamMembershipRecord _membershipFromRow(Map<String, dynamic> row) {
     final teamJson = row['team'];
     if (teamJson is! Map) {
-      throw ServerException('Active membership is missing its team record');
+      throw const ServerException('Active membership is missing its team record');
     }
     return (
       member: TeamMemberDto.fromJson(Map<String, dynamic>.from(row)),
@@ -235,7 +235,7 @@ class TeamMembershipRemoteDataSource {
           ),
       ];
     } on TimeoutException {
-      throw ServerException(
+      throw const ServerException(
         'Roster request timed out. Pull to refresh and try again.',
       );
     } on PostgrestException catch (e) {
@@ -267,7 +267,7 @@ class TeamMembershipRemoteDataSource {
           .maybeSingle()
           .timeout(_readTimeout);
     } on TimeoutException {
-      throw ServerException('Invite request timed out.');
+      throw const ServerException('Invite request timed out.');
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -293,7 +293,7 @@ class TeamMembershipRemoteDataSource {
           .timeout(_readTimeout);
       return List<Map<String, dynamic>>.from(rows);
     } on TimeoutException {
-      throw ServerException('Invitations request timed out.');
+      throw const ServerException('Invitations request timed out.');
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -319,7 +319,7 @@ class TeamMembershipRemoteDataSource {
           .timeout(_readTimeout);
       return List<Map<String, dynamic>>.from(rows);
     } on TimeoutException {
-      throw ServerException('Join requests timed out.');
+      throw const ServerException('Join requests timed out.');
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -359,7 +359,7 @@ class TeamMembershipRemoteDataSource {
           .timeout(_readTimeout);
       return List<Map<String, dynamic>>.from(rows);
     } on TimeoutException {
-      throw ServerException('Claim requests timed out.');
+      throw const ServerException('Claim requests timed out.');
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -380,7 +380,7 @@ class TeamMembershipRemoteDataSource {
           .timeout(_readTimeout);
       return List<Map<String, dynamic>>.from(rows);
     } on TimeoutException {
-      throw ServerException('Player search timed out.');
+      throw const ServerException('Player search timed out.');
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

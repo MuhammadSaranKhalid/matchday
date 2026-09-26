@@ -2,12 +2,14 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failures.dart';
 import '../entities/post.dart';
+import '../entities/post_page.dart';
 
 /// CQRS Query/Read Model Repository for Posts.
 /// Reads use specialized, keyset-paginated read RPCs with zero mutation logic.
 abstract class PostReadRepository {
-  /// Fetches global home feed with keyset pagination (published_at, post_id).
-  Future<Either<Failure, List<Post>>> getHomeFeed({
+  /// Fetches home feed with keyset pagination (published_at, post_id).
+  Future<Either<Failure, PostPage>> getHomeFeed({
+    HomeFeedMode mode = HomeFeedMode.discover,
     String filter = 'all',
     DateTime? cursorPublishedAt,
     String? cursorPostId,
@@ -15,7 +17,7 @@ abstract class PostReadRepository {
   });
 
   /// Fetches a user or team's posts with keyset pagination.
-  Future<Either<Failure, List<Post>>> getProfilePosts({
+  Future<Either<Failure, PostPage>> getProfilePosts({
     required String publisherId,
     PostPublisherType publisherType = PostPublisherType.user,
     DateTime? cursorPublishedAt,
@@ -24,7 +26,7 @@ abstract class PostReadRepository {
   });
 
   /// Fetches bookmarked posts for the current authenticated viewer.
-  Future<Either<Failure, List<Post>>> getSavedPosts({
+  Future<Either<Failure, SavedPostsPage>> getSavedPosts({
     DateTime? cursorSavedAt,
     String? cursorPostId,
     int limit = 20,

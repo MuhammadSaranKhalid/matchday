@@ -20,6 +20,7 @@ This document defines the authoritative system of record for every domain entity
 | **Match Deliveries (Durable)** | PostgreSQL (`match_deliveries`, `match_innings_state`) | HTTPS via `record-ball` Edge Function | Drift WAL | Ledger of facts; scorecard derived client-side; total runs generated |
 | **Live Match Broadcast** | Ably (`match:<id>`) | WebSockets | In-memory Riverpod state | Ephemeral stream for viewers; reconciled from Postgres on reconnect |
 | **Chat Messages** | PostgreSQL (`messages_chats`, `messages_messages`) | Ably (`chat:<id>`) + HTTPS | Drift read-through cache (`messages_*`) | Writes go to Supabase; cache is cold-start instant-paint; wiped on sign-out |
+| **Social Posts & Media** | PostgreSQL (`posts`, `post_media`, `media_processing_jobs`, PGMQ) | HTTPS RPCs + Storage API | In-memory `PostStore` (session) + Outbox (staging uploads) | Server read projections + desired-state RPC commands; media job ledger via PGMQ |
 | **Notifications** | PostgreSQL (`notification_inbox`, PGMQ) | FCM Push + PostgREST | In-memory Riverpod state | Server queue leases jobs; client marks read |
 | **Presence & Typing** | Ably Realtime | WebSockets | In-memory UI state | Ephemeral presence sets; auto-expired on socket disconnect |
 
@@ -58,3 +59,11 @@ Live match scoring has a unique, deliberate division of authority:
 - Active viewer counts for a match, user online status, and typing indicators live in **Ably Realtime**.
 - These values are ephemeral: they are never written to PostgreSQL tables or stored in Drift.
 - When an Ably client disconnects, its presence entry automatically clears.
+
+### 2.5 Social Posts & Media Publishing Pipeline
+- **Canonical Store**: PostgreSQL is the single source of truth for all published posts, engagement counts, viewer interactions, and media metadata.
+- **CQRS Read Projections**: Feeds, profiles, saved posts, and post details are served via dedicated read model RPCs (`get_home_feed`, `get_profile_posts`, `get_saved_posts`, `get_post_detail`).
+- **Normalized Client Session**: In Flutter, `PostStore` acts as the normalized L1 session cache (`Map<PostId, Post>`), while query controllers (`FeedController`, `SavedPostsController`) manage membership lists (`List<PostId>`) and keyset pagination cursors.
+- **Publishing Outbox**: A client-side publishing outbox stages multi-photo uploads to Supabase Storage before queueing the backend media job. Once published, the local record is purged and PostgreSQL becomes canonical. No offline feeds, offline likes, or offline comments exist.
+- **Durable Media Processing**: Media derivative generation (1080p WebP, BlurHash, multi-resolution variants) is orchestrated asynchronously via a PostgreSQL job ledger and PGMQ queues, processed by the Vercel media worker. Direct client mutations to `posts` and `post_media` are revoked.
+

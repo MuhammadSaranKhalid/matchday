@@ -19,7 +19,7 @@ class ProfileRemoteDataSource {
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
     if (id == null) {
-      throw UnauthorizedException('Must be signed in');
+      throw const UnauthorizedException('Must be signed in');
     }
     return id;
   }
@@ -102,14 +102,14 @@ class ProfileRemoteDataSource {
 
       final fresh = await fetchMyProfile();
       if (fresh == null) {
-        throw ServerException('Profile vanished after onboarding');
+        throw const ServerException('Profile vanished after onboarding');
       }
       return fresh;
     } on PostgrestException catch (e) {
       // 23505 = unique_violation: the username got taken between the
       // availability check and this write (a race). Surface a clear message.
       if (e.code == '23505') {
-        throw ServerException('That username was just taken — try another');
+        throw const ServerException('That username was just taken — try another');
       }
       throw ServerException(e.message);
     }
@@ -127,11 +127,11 @@ class ProfileRemoteDataSource {
           .update({...changes, 'last_active_at': DateTime.now().toIso8601String()})
           .eq('user_id', uid);
       final fresh = await fetchMyProfile();
-      if (fresh == null) throw ServerException('Profile not found');
+      if (fresh == null) throw const ServerException('Profile not found');
       return fresh;
     } on PostgrestException catch (e) {
       if (e.code == '23505') {
-        throw ServerException('That username is taken — try another');
+        throw const ServerException('That username is taken — try another');
       }
       throw ServerException(e.message);
     }

@@ -12,9 +12,13 @@ class ComposerAvatar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(composerControllerProvider);
+    final publisher = state.publisher;
 
-    if (state.authorContext == PostAuthorContext.teamManager) {
-      final mono = state.entityMono ?? 'T';
+    if (publisher.type != PostPublisherType.user) {
+      final mono = publisher.monogram ??
+          (publisher.name != null && publisher.name!.isNotEmpty
+              ? publisher.name![0].toUpperCase()
+              : (publisher.type == PostPublisherType.tournament ? 'T' : 'TM'));
       return Container(
         width: 40,
         height: 40,
@@ -35,17 +39,17 @@ class ComposerAvatar extends ConsumerWidget {
     }
 
     final p = ref.watch(myProfileProvider).value;
-    final url = p?.avatarUrl;
+    final url = publisher.photoUrl ?? p?.avatarUrl;
 
     // Determine initials
     String initials = '?';
-    if (p != null && (p.displayName?.isNotEmpty ?? false)) {
-      final words = (p.displayName ?? '').trim().split(RegExp(r'\s+'));
+    final name = publisher.name ?? p?.displayName;
+    if (name != null && name.isNotEmpty) {
+      final words = name.trim().split(RegExp(r'\s+'));
       final letters = words.where((w) => w.isNotEmpty).map((w) => w[0]).join();
-      initials =
-          letters.isEmpty
-              ? '?'
-              : letters.substring(0, letters.length >= 2 ? 2 : 1).toUpperCase();
+      initials = letters.isEmpty
+          ? '?'
+          : letters.substring(0, letters.length >= 2 ? 2 : 1).toUpperCase();
     }
 
     return Container(
@@ -56,14 +60,13 @@ class ComposerAvatar extends ConsumerWidget {
         shape: BoxShape.circle,
       ),
       clipBehavior: Clip.hardEdge,
-      child:
-          url != null && url.isNotEmpty
-              ? Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _initialsWidget(initials),
-              )
-              : _initialsWidget(initials),
+      child: url != null && url.isNotEmpty
+          ? Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _initialsWidget(initials),
+            )
+          : _initialsWidget(initials),
     );
   }
 

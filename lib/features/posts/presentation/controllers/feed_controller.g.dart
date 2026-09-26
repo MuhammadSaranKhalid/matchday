@@ -8,18 +8,18 @@ part of 'feed_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
-/// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.
+/// The Home feed — normalized post ID membership ordering with keyset pagination + pull-to-refresh.
+/// Post entities live in [PostStore] to ensure unified synchronization across all views.
 
 @ProviderFor(FeedController)
 final feedControllerProvider = FeedControllerProvider._();
 
-/// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
-/// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.
+/// The Home feed — normalized post ID membership ordering with keyset pagination + pull-to-refresh.
+/// Post entities live in [PostStore] to ensure unified synchronization across all views.
 final class FeedControllerProvider
-    extends $AsyncNotifierProvider<FeedController, List<Post>> {
-  /// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
-  /// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.
+    extends $AsyncNotifierProvider<FeedController, PostQueryState> {
+  /// The Home feed — normalized post ID membership ordering with keyset pagination + pull-to-refresh.
+  /// Post entities live in [PostStore] to ensure unified synchronization across all views.
   FeedControllerProvider._()
     : super(
         from: null,
@@ -39,22 +39,22 @@ final class FeedControllerProvider
   FeedController create() => FeedController();
 }
 
-String _$feedControllerHash() => r'dabb466688f0a955a66044568f88d0500a769bc5';
+String _$feedControllerHash() => r'f28711d9948ef6114868ecf3a5e13924adb67c24';
 
-/// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
-/// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.
+/// The Home feed — normalized post ID membership ordering with keyset pagination + pull-to-refresh.
+/// Post entities live in [PostStore] to ensure unified synchronization across all views.
 
-abstract class _$FeedController extends $AsyncNotifier<List<Post>> {
-  FutureOr<List<Post>> build();
+abstract class _$FeedController extends $AsyncNotifier<PostQueryState> {
+  FutureOr<PostQueryState> build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<List<Post>>, List<Post>>;
+    final ref = this.ref as $Ref<AsyncValue<PostQueryState>, PostQueryState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AsyncValue<List<Post>>, List<Post>>,
-              AsyncValue<List<Post>>,
+              AnyNotifier<AsyncValue<PostQueryState>, PostQueryState>,
+              AsyncValue<PostQueryState>,
               Object?,
               Object?
             >;

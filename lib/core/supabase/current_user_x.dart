@@ -19,7 +19,7 @@ extension CurrentUserX on SupabaseClient {
   /// no authenticated session.
   String requireUid() {
     final id = auth.currentUser?.id;
-    if (id == null) throw UnauthorizedException('Must be signed in');
+    if (id == null) throw const UnauthorizedException('Must be signed in');
     return id;
   }
 }

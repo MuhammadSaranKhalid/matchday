@@ -14,7 +14,7 @@ In practice, full offline-first synchronization across relational entities (team
 ## Decision
 We decommissioned general offline-first sync and established **Online-Only by Default** as the core architecture. Repositories read and write directly against Supabase via remote data sources.
 
-We allow **exactly two strictly scoped exemptions**:
+We allow **exactly three strictly scoped exemptions**:
 
 ### Exemption 1: `messages` Read-Through Cache (2026-06-07)
 - Backed by Drift tables `messages_chats`, `messages_messages`, `messages_drafts`.
@@ -27,6 +27,16 @@ We allow **exactly two strictly scoped exemptions**:
 - The cricket rules engine lives in pure Dart (`lib/features/matches/domain/scoring/`).
 - Deliveries are appended to a Drift write-ahead log (`ScoringOps`) and drained asynchronously to the `record-ball` Edge Function with client-generated idempotency UUIDs.
 - This applies **strictly to an already-started innings**. Match creation, toss, lineup selection, and completion remain online-only.
+
+### Exemption 3: `posts` Publishing Outbox (2026-09-26)
+- Multi-photo post publishing requires staging file uploads to Supabase Storage before queuing backend media processing.
+- The local publishing outbox persists unfinished uploads to survive process death and app termination.
+- **Strict Boundaries**:
+  - Scoped **strictly to unfinished post uploads** originated on this client.
+  - No offline Home feed mirror.
+  - No offline likes, bookmarks, or comments.
+  - No offline profiles.
+  - No client-side conflict resolution (PostgreSQL is canonical truth upon publishing).
 
 ## Consequences
 ### Positive

@@ -5,7 +5,7 @@ import 'package:matchday/core/error/exceptions.dart';
 import 'package:matchday/core/error/failures.dart';
 import 'package:matchday/features/posts/data/datasources/posts_local_datasource.dart';
 import 'package:matchday/features/posts/data/datasources/posts_remote_datasource.dart';
-import 'package:matchday/features/posts/data/repositories/posts_repository_impl.dart';
+import 'package:matchday/features/posts/data/repositories/post_command_repository_impl.dart';
 import 'package:matchday/features/posts/domain/entities/pending_post.dart';
 import 'package:matchday/features/posts/domain/entities/post_draft.dart';
 import 'package:mocktail/mocktail.dart';
@@ -19,7 +19,7 @@ class _MockLocal extends Mock implements PostsLocalDataSource {}
 void main() {
   late _MockRemote remote;
   late _MockLocal local;
-  late PostsRepositoryImpl repo;
+  late PostCommandRepositoryImpl repo;
 
   setUpAll(() {
     registerFallbackValue(PendingPost(
@@ -35,26 +35,11 @@ void main() {
   setUp(() {
     remote = _MockRemote();
     local = _MockLocal();
-    repo = PostsRepositoryImpl(remote, local: local);
+    repo = PostCommandRepositoryImpl(remote, local: local);
 
     when(() => remote.currentUserId).thenReturn('usr_1');
     when(() => local.savePendingPost(any())).thenAnswer((_) async {});
     when(() => local.removePendingPost(any())).thenAnswer((_) async {});
-  });
-
-  test('getHomeFeed maps ServerException → ServerFailure', () async {
-    when(() => remote.getHomeFeed(
-          mode: any(named: 'mode'),
-          filter: any(named: 'filter'),
-          targetId: any(named: 'targetId'),
-          cursorPublishedAt: any(named: 'cursorPublishedAt'),
-          cursorPostId: any(named: 'cursorPostId'),
-          limit: any(named: 'limit'),
-        )).thenThrow(ServerException('boom'));
-
-    final result = await repo.getHomeFeed();
-    expect(result.isLeft(), isTrue);
-    expect(result.getLeft().toNullable(), isA<ServerFailure>());
   });
 
   test('createPost maps UnauthorizedException → AuthFailure', () async {

@@ -72,7 +72,7 @@ class ExploreRemoteDataSource {
       );
       final data = res.data;
       if (data is! Map<String, dynamic>) {
-        throw ServerException('Unexpected search response shape');
+        throw const ServerException('Unexpected search response shape');
       }
       // The function reports its own failures in-band as {ok:false, error}.
       // A 500 arrives as a FunctionException instead — both are handled.

@@ -41,7 +41,7 @@ class TournamentsRemoteDataSource {
 
   String _requireUid() {
     final uid = _supabase.auth.currentUser?.id;
-    if (uid == null) throw UnauthorizedException('Must be signed in');
+    if (uid == null) throw const UnauthorizedException('Must be signed in');
     return uid;
   }
 

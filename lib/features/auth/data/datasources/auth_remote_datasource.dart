@@ -67,7 +67,7 @@ class AuthRemoteDataSource {
 
       final idToken = account.authentication.idToken;
       if (idToken == null) {
-        throw ServerException('Google did not return an ID token');
+        throw const ServerException('Google did not return an ID token');
       }
 
       await _supabase.auth.signInWithIdToken(
@@ -87,7 +87,7 @@ class AuthRemoteDataSource {
       // (ServerFailure, "something's wrong"). Lumping them together shows
       // "Server error" when the user simply dismissed the sheet.
       if (e.code == GoogleSignInExceptionCode.canceled) {
-        throw UnauthorizedException('Google sign-in was cancelled');
+        throw const UnauthorizedException('Google sign-in was cancelled');
       }
       throw ServerException(
         'Google sign-in is unavailable right now (${e.code.name}: ${e.description ?? "unknown error"}). Try email instead or try again later.',
@@ -135,7 +135,7 @@ class AuthRemoteDataSource {
         body: {'confirmation': 'DELETE'},
       );
       if (response.status != 200) {
-        throw ServerException(
+        throw const ServerException(
           'Account deletion failed. Please retry or contact support.',
         );
       }

@@ -1,0 +1,66 @@
+name: CI Quality Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  flutter-gates:
+    name: Flutter Analysis & Architecture Invariants
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify Domain Package Purity (Gate 3)
+        run: |
+          VIOLATIONS=$(grep -rlE 'package:(flutter|flutter_riverpod|riverpod_annotation|supabase_flutter|supabase|drift|go_router|dio|http)/' lib/features/*/domain 2>/dev/null || true)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "Domain purity violation in:"
+            echo "$VIOLATIONS"
+            exit 1
+          fi
+
+      - name: Static Analysis (Gate 1)
+        run: flutter analyze lib/
+
+      - name: Architecture Invariants Test (Gate 2)
+        run: flutter test test/architecture_test.dart
+
+      - name: Feature Unit Tests
+        run: flutter test test/features/posts/
+
+  media-worker:
+    name: Media Worker Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: media-worker
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: media-worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript Build
+        run: npm run build

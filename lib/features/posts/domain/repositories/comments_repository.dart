@@ -2,11 +2,24 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failures.dart';
 import '../entities/comment.dart';
+import '../entities/comment_like_result.dart';
 
 abstract class CommentsRepository {
-  /// Fetch all comments for a post, structured as a tree of top-level comments
-  /// and their nested replies.
-  Future<Either<Failure, List<Comment>>> getComments(String postId);
+  /// Fetch keyset-paginated top-level comments for a post.
+  Future<Either<Failure, List<Comment>>> getComments(
+    String postId, {
+    DateTime? cursorCreatedAt,
+    String? cursorCommentId,
+    int limit = 20,
+  });
+
+  /// Fetch keyset-paginated replies for a specific parent comment.
+  Future<Either<Failure, List<Comment>>> getCommentReplies(
+    String parentCommentId, {
+    DateTime? cursorCreatedAt,
+    String? cursorCommentId,
+    int limit = 20,
+  });
 
   /// Add a new comment or reply to a post.
   Future<Either<Failure, Comment>> addComment({
@@ -16,9 +29,12 @@ abstract class CommentsRepository {
     List<String> mentionedUserIds = const [],
   });
 
-  /// Soft-delete / delete a comment.
+  /// Delete a comment.
   Future<Either<Failure, Unit>> deleteComment(String commentId);
 
-  /// Toggle like state on a comment. Returns updated isLiked boolean.
-  Future<Either<Failure, bool>> toggleCommentLike(String commentId);
+  /// Desired-state comment like. Sets liked to true or false and returns canonical server state.
+  Future<Either<Failure, CommentLikeResult>> setCommentLike(
+    String commentId, {
+    required bool liked,
+  });
 }

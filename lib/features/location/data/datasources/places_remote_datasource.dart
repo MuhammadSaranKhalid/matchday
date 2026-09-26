@@ -130,7 +130,7 @@ class PlacesRemoteDataSource {
 
   void _requireKey() {
     if (_apiKey.isEmpty) {
-      throw ServerException(
+      throw const ServerException(
         'Missing GOOGLE_PLACES_API_KEY — pass it via --dart-define-from-file=dart_define.json',
       );
     }

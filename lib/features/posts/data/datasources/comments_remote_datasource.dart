@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
+import '../../domain/entities/comment_like_result.dart';
 import '../models/comment_dto.dart';
 
 class CommentsRemoteDataSource {
@@ -8,7 +9,6 @@ class CommentsRemoteDataSource {
   final SupabaseClient _supabase;
 
   static const _table = 'comments';
-  static const _likesTable = 'comment_likes';
 
   // Embed the commenter's profile
   static const _select =
@@ -16,44 +16,62 @@ class CommentsRemoteDataSource {
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
-    if (id == null) throw UnauthorizedException('Must be signed in');
+    if (id == null) throw const UnauthorizedException('Must be signed in');
     return id;
   }
 
-  /// Get all active comments for a post, with user's liked status attached.
-  Future<List<CommentDto>> getComments(String postId) async {
-    try {
-      final rows = await _supabase
-          .from(_table)
-          .select(_select)
-          .eq('post_id', postId)
-          .eq('status', 'active')
-          .order('created_at', ascending: true);
+  /// Get keyset-paginated top-level active comments for a post via get_post_comments RPC.
+  Future<List<CommentDto>> getComments(
+    String postId, {
+    DateTime? cursorCreatedAt,
+    String? cursorCommentId,
+    int limit = 20,
+  }) async {
+    final response = await _supabase.rpc<dynamic>(
+      'get_post_comments',
+      params: {
+        'p_post_id': postId,
+        if (cursorCreatedAt != null)
+          'p_cursor_created_at': cursorCreatedAt.toIso8601String(),
+        if (cursorCommentId != null) 'p_cursor_comment_id': cursorCommentId,
+        'p_limit': limit,
+      },
+    );
 
-      final currentUid = _supabase.auth.currentUser?.id;
-      final likedCommentIds = <String>{};
-
-      if (currentUid != null && rows.isNotEmpty) {
-        final commentIds = rows.map((r) => r['comment_id'] as String).toList();
-        final likesRows = await _supabase
-            .from(_likesTable)
-            .select('comment_id')
-            .eq('user_id', currentUid)
-            .inFilter('comment_id', commentIds);
-
-        for (final r in likesRows) {
-          likedCommentIds.add(r['comment_id'] as String);
-        }
-      }
-
-      return rows.map((r) {
-        final id = r['comment_id'] as String;
-        final dto = CommentDto.fromJson(r);
-        return dto.copyWith(isLiked: likedCommentIds.contains(id));
-      }).toList();
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map((json) => CommentDto.fromJson(json))
+          .toList();
     }
+    return const [];
+  }
+
+  /// Get keyset-paginated replies for a specific parent comment via get_comment_replies RPC.
+  Future<List<CommentDto>> getCommentReplies(
+    String parentCommentId, {
+    DateTime? cursorCreatedAt,
+    String? cursorCommentId,
+    int limit = 20,
+  }) async {
+    final response = await _supabase.rpc<dynamic>(
+      'get_comment_replies',
+      params: {
+        'p_parent_comment_id': parentCommentId,
+        if (cursorCreatedAt != null)
+          'p_cursor_created_at': cursorCreatedAt.toIso8601String(),
+        if (cursorCommentId != null) 'p_cursor_comment_id': cursorCommentId,
+        'p_limit': limit,
+      },
+    );
+
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map((json) => CommentDto.fromJson(json))
+          .toList();
+    }
+    return const [];
   }
 
   /// Insert a comment/reply row.
@@ -63,66 +81,51 @@ class CommentsRemoteDataSource {
     String? parentCommentId,
     List<String> mentionedUserIds = const [],
   }) async {
-    try {
-      final uid = _requireUid();
-      final payload = <String, dynamic>{
-        'post_id': postId,
-        'author_id': uid,
-        'text': text,
-        if (parentCommentId != null) 'parent_comment_id': parentCommentId,
-        if (mentionedUserIds.isNotEmpty) 'mentioned_user_ids': mentionedUserIds,
-      };
+    final uid = _requireUid();
+    final payload = <String, dynamic>{
+      'post_id': postId,
+      'author_id': uid,
+      'text': text,
+      if (parentCommentId != null) 'parent_comment_id': parentCommentId,
+      if (mentionedUserIds.isNotEmpty) 'mentioned_user_ids': mentionedUserIds,
+    };
 
-      final row = await _supabase
-          .from(_table)
-          .insert(payload)
-          .select(_select)
-          .single();
+    final row = await _supabase
+        .from(_table)
+        .insert(payload)
+        .select(_select)
+        .single();
 
-      return CommentDto.fromJson(row);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    return CommentDto.fromJson(row);
   }
 
   /// Delete a comment (either comment author or post author).
   Future<void> deleteComment(String commentId) async {
-    try {
-      _requireUid();
-      await _supabase.from(_table).delete().eq('comment_id', commentId);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    _requireUid();
+    await _supabase.from(_table).delete().eq('comment_id', commentId);
   }
 
-  /// Toggle like state for the current authenticated user on a comment.
-  /// Returns `true` if liked, `false` if unliked.
-  Future<bool> toggleCommentLike(String commentId) async {
-    try {
-      final uid = _requireUid();
-      final existing = await _supabase
-          .from(_likesTable)
-          .select('like_id')
-          .eq('comment_id', commentId)
-          .eq('user_id', uid)
-          .maybeSingle();
+  /// Desired-state comment like RPC.
+  Future<CommentLikeResult> setCommentLike(
+    String commentId, {
+    required bool liked,
+  }) async {
+    _requireUid();
+    final response = await _supabase.rpc<dynamic>(
+      'set_comment_like',
+      params: {
+        'p_comment_id': commentId,
+        'p_liked': liked,
+      },
+    );
 
-      if (existing != null) {
-        await _supabase
-            .from(_likesTable)
-            .delete()
-            .eq('comment_id', commentId)
-            .eq('user_id', uid);
-        return false;
-      } else {
-        await _supabase.from(_likesTable).insert({
-          'comment_id': commentId,
-          'user_id': uid,
-        });
-        return true;
-      }
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
+    if (response is Map<String, dynamic>) {
+      return CommentLikeResult(
+        commentId: commentId,
+        isLiked: response['is_liked'] as bool? ?? liked,
+        likesCount: response['likes_count'] as int? ?? 0,
+      );
     }
+    return CommentLikeResult(commentId: commentId, isLiked: liked, likesCount: 0);
   }
 }

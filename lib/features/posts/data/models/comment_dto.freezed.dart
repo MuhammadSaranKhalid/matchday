@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$CommentDto {
 
-@JsonKey(name: 'comment_id') String get commentId;@JsonKey(name: 'post_id') String get postId;@JsonKey(name: 'author_id') String get authorId;@JsonKey(name: 'parent_comment_id') String? get parentCommentId; String get text;@JsonKey(name: 'mentioned_user_ids') List<String> get mentionedUserIds;@JsonKey(name: 'likes_count') int get likesCount;@JsonKey(name: 'is_liked') bool get isLiked; String get status;@JsonKey(name: 'created_at') String get createdAt;@JsonKey(name: 'edited_at') String? get editedAt; Map<String, dynamic>? get author;
+@JsonKey(name: 'comment_id') String get commentId;@JsonKey(name: 'post_id') String get postId;@JsonKey(name: 'author_id') String get authorId;@JsonKey(name: 'parent_comment_id') String? get parentCommentId; String get text;@JsonKey(name: 'mentioned_user_ids') List<String> get mentionedUserIds;@JsonKey(name: 'likes_count') int get likesCount;@JsonKey(name: 'is_liked') bool get isLiked;@JsonKey(name: 'replies_count') int get repliesCount; String get status;@JsonKey(name: 'created_at') String get createdAt;@JsonKey(name: 'edited_at') String? get editedAt; Map<String, dynamic>? get author;
 /// Create a copy of CommentDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $CommentDtoCopyWith<CommentDto> get copyWith => _$CommentDtoCopyWithImpl<Comment
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommentDto&&(identical(other.commentId, commentId) || other.commentId == commentId)&&(identical(other.postId, postId) || other.postId == postId)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.parentCommentId, parentCommentId) || other.parentCommentId == parentCommentId)&&(identical(other.text, text) || other.text == text)&&const DeepCollectionEquality().equals(other.mentionedUserIds, mentionedUserIds)&&(identical(other.likesCount, likesCount) || other.likesCount == likesCount)&&(identical(other.isLiked, isLiked) || other.isLiked == isLiked)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.editedAt, editedAt) || other.editedAt == editedAt)&&const DeepCollectionEquality().equals(other.author, author));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommentDto&&(identical(other.commentId, commentId) || other.commentId == commentId)&&(identical(other.postId, postId) || other.postId == postId)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.parentCommentId, parentCommentId) || other.parentCommentId == parentCommentId)&&(identical(other.text, text) || other.text == text)&&const DeepCollectionEquality().equals(other.mentionedUserIds, mentionedUserIds)&&(identical(other.likesCount, likesCount) || other.likesCount == likesCount)&&(identical(other.isLiked, isLiked) || other.isLiked == isLiked)&&(identical(other.repliesCount, repliesCount) || other.repliesCount == repliesCount)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.editedAt, editedAt) || other.editedAt == editedAt)&&const DeepCollectionEquality().equals(other.author, author));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,commentId,postId,authorId,parentCommentId,text,const DeepCollectionEquality().hash(mentionedUserIds),likesCount,isLiked,status,createdAt,editedAt,const DeepCollectionEquality().hash(author));
+int get hashCode => Object.hash(runtimeType,commentId,postId,authorId,parentCommentId,text,const DeepCollectionEquality().hash(mentionedUserIds),likesCount,isLiked,repliesCount,status,createdAt,editedAt,const DeepCollectionEquality().hash(author));
 
 @override
 String toString() {
-  return 'CommentDto(commentId: $commentId, postId: $postId, authorId: $authorId, parentCommentId: $parentCommentId, text: $text, mentionedUserIds: $mentionedUserIds, likesCount: $likesCount, isLiked: $isLiked, status: $status, createdAt: $createdAt, editedAt: $editedAt, author: $author)';
+  return 'CommentDto(commentId: $commentId, postId: $postId, authorId: $authorId, parentCommentId: $parentCommentId, text: $text, mentionedUserIds: $mentionedUserIds, likesCount: $likesCount, isLiked: $isLiked, repliesCount: $repliesCount, status: $status, createdAt: $createdAt, editedAt: $editedAt, author: $author)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $CommentDtoCopyWith<$Res>  {
   factory $CommentDtoCopyWith(CommentDto value, $Res Function(CommentDto) _then) = _$CommentDtoCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'comment_id') String commentId,@JsonKey(name: 'post_id') String postId,@JsonKey(name: 'author_id') String authorId,@JsonKey(name: 'parent_comment_id') String? parentCommentId, String text,@JsonKey(name: 'mentioned_user_ids') List<String> mentionedUserIds,@JsonKey(name: 'likes_count') int likesCount,@JsonKey(name: 'is_liked') bool isLiked, String status,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'edited_at') String? editedAt, Map<String, dynamic>? author
+@JsonKey(name: 'comment_id') String commentId,@JsonKey(name: 'post_id') String postId,@JsonKey(name: 'author_id') String authorId,@JsonKey(name: 'parent_comment_id') String? parentCommentId, String text,@JsonKey(name: 'mentioned_user_ids') List<String> mentionedUserIds,@JsonKey(name: 'likes_count') int likesCount,@JsonKey(name: 'is_liked') bool isLiked,@JsonKey(name: 'replies_count') int repliesCount, String status,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'edited_at') String? editedAt, Map<String, dynamic>? author
 });
 
 
@@ -65,7 +65,7 @@ class _$CommentDtoCopyWithImpl<$Res>
 
 /// Create a copy of CommentDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? commentId = null,Object? postId = null,Object? authorId = null,Object? parentCommentId = freezed,Object? text = null,Object? mentionedUserIds = null,Object? likesCount = null,Object? isLiked = null,Object? status = null,Object? createdAt = null,Object? editedAt = freezed,Object? author = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? commentId = null,Object? postId = null,Object? authorId = null,Object? parentCommentId = freezed,Object? text = null,Object? mentionedUserIds = null,Object? likesCount = null,Object? isLiked = null,Object? repliesCount = null,Object? status = null,Object? createdAt = null,Object? editedAt = freezed,Object? author = freezed,}) {
   return _then(_self.copyWith(
 commentId: null == commentId ? _self.commentId : commentId // ignore: cast_nullable_to_non_nullable
 as String,postId: null == postId ? _self.postId : postId // ignore: cast_nullable_to_non_nullable
@@ -75,7 +75,8 @@ as String?,text: null == text ? _self.text : text // ignore: cast_nullable_to_no
 as String,mentionedUserIds: null == mentionedUserIds ? _self.mentionedUserIds : mentionedUserIds // ignore: cast_nullable_to_non_nullable
 as List<String>,likesCount: null == likesCount ? _self.likesCount : likesCount // ignore: cast_nullable_to_non_nullable
 as int,isLiked: null == isLiked ? _self.isLiked : isLiked // ignore: cast_nullable_to_non_nullable
-as bool,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as bool,repliesCount: null == repliesCount ? _self.repliesCount : repliesCount // ignore: cast_nullable_to_non_nullable
+as int,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as String,editedAt: freezed == editedAt ? _self.editedAt : editedAt // ignore: cast_nullable_to_non_nullable
 as String?,author: freezed == author ? _self.author : author // ignore: cast_nullable_to_non_nullable
@@ -164,10 +165,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'comment_id')  String commentId, @JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'author_id')  String authorId, @JsonKey(name: 'parent_comment_id')  String? parentCommentId,  String text, @JsonKey(name: 'mentioned_user_ids')  List<String> mentionedUserIds, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'is_liked')  bool isLiked,  String status, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'edited_at')  String? editedAt,  Map<String, dynamic>? author)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'comment_id')  String commentId, @JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'author_id')  String authorId, @JsonKey(name: 'parent_comment_id')  String? parentCommentId,  String text, @JsonKey(name: 'mentioned_user_ids')  List<String> mentionedUserIds, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'replies_count')  int repliesCount,  String status, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'edited_at')  String? editedAt,  Map<String, dynamic>? author)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CommentDto() when $default != null:
-return $default(_that.commentId,_that.postId,_that.authorId,_that.parentCommentId,_that.text,_that.mentionedUserIds,_that.likesCount,_that.isLiked,_that.status,_that.createdAt,_that.editedAt,_that.author);case _:
+return $default(_that.commentId,_that.postId,_that.authorId,_that.parentCommentId,_that.text,_that.mentionedUserIds,_that.likesCount,_that.isLiked,_that.repliesCount,_that.status,_that.createdAt,_that.editedAt,_that.author);case _:
   return orElse();
 
 }
@@ -185,10 +186,10 @@ return $default(_that.commentId,_that.postId,_that.authorId,_that.parentCommentI
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'comment_id')  String commentId, @JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'author_id')  String authorId, @JsonKey(name: 'parent_comment_id')  String? parentCommentId,  String text, @JsonKey(name: 'mentioned_user_ids')  List<String> mentionedUserIds, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'is_liked')  bool isLiked,  String status, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'edited_at')  String? editedAt,  Map<String, dynamic>? author)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'comment_id')  String commentId, @JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'author_id')  String authorId, @JsonKey(name: 'parent_comment_id')  String? parentCommentId,  String text, @JsonKey(name: 'mentioned_user_ids')  List<String> mentionedUserIds, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'replies_count')  int repliesCount,  String status, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'edited_at')  String? editedAt,  Map<String, dynamic>? author)  $default,) {final _that = this;
 switch (_that) {
 case _CommentDto():
-return $default(_that.commentId,_that.postId,_that.authorId,_that.parentCommentId,_that.text,_that.mentionedUserIds,_that.likesCount,_that.isLiked,_that.status,_that.createdAt,_that.editedAt,_that.author);case _:
+return $default(_that.commentId,_that.postId,_that.authorId,_that.parentCommentId,_that.text,_that.mentionedUserIds,_that.likesCount,_that.isLiked,_that.repliesCount,_that.status,_that.createdAt,_that.editedAt,_that.author);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -205,10 +206,10 @@ return $default(_that.commentId,_that.postId,_that.authorId,_that.parentCommentI
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'comment_id')  String commentId, @JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'author_id')  String authorId, @JsonKey(name: 'parent_comment_id')  String? parentCommentId,  String text, @JsonKey(name: 'mentioned_user_ids')  List<String> mentionedUserIds, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'is_liked')  bool isLiked,  String status, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'edited_at')  String? editedAt,  Map<String, dynamic>? author)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'comment_id')  String commentId, @JsonKey(name: 'post_id')  String postId, @JsonKey(name: 'author_id')  String authorId, @JsonKey(name: 'parent_comment_id')  String? parentCommentId,  String text, @JsonKey(name: 'mentioned_user_ids')  List<String> mentionedUserIds, @JsonKey(name: 'likes_count')  int likesCount, @JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'replies_count')  int repliesCount,  String status, @JsonKey(name: 'created_at')  String createdAt, @JsonKey(name: 'edited_at')  String? editedAt,  Map<String, dynamic>? author)?  $default,) {final _that = this;
 switch (_that) {
 case _CommentDto() when $default != null:
-return $default(_that.commentId,_that.postId,_that.authorId,_that.parentCommentId,_that.text,_that.mentionedUserIds,_that.likesCount,_that.isLiked,_that.status,_that.createdAt,_that.editedAt,_that.author);case _:
+return $default(_that.commentId,_that.postId,_that.authorId,_that.parentCommentId,_that.text,_that.mentionedUserIds,_that.likesCount,_that.isLiked,_that.repliesCount,_that.status,_that.createdAt,_that.editedAt,_that.author);case _:
   return null;
 
 }
@@ -220,7 +221,7 @@ return $default(_that.commentId,_that.postId,_that.authorId,_that.parentCommentI
 @JsonSerializable()
 
 class _CommentDto extends CommentDto {
-  const _CommentDto({@JsonKey(name: 'comment_id') required this.commentId, @JsonKey(name: 'post_id') required this.postId, @JsonKey(name: 'author_id') required this.authorId, @JsonKey(name: 'parent_comment_id') this.parentCommentId, required this.text, @JsonKey(name: 'mentioned_user_ids') final  List<String> mentionedUserIds = const <String>[], @JsonKey(name: 'likes_count') this.likesCount = 0, @JsonKey(name: 'is_liked') this.isLiked = false, this.status = 'active', @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'edited_at') this.editedAt, final  Map<String, dynamic>? author}): _mentionedUserIds = mentionedUserIds,_author = author,super._();
+  const _CommentDto({@JsonKey(name: 'comment_id') required this.commentId, @JsonKey(name: 'post_id') required this.postId, @JsonKey(name: 'author_id') required this.authorId, @JsonKey(name: 'parent_comment_id') this.parentCommentId, required this.text, @JsonKey(name: 'mentioned_user_ids') final  List<String> mentionedUserIds = const <String>[], @JsonKey(name: 'likes_count') this.likesCount = 0, @JsonKey(name: 'is_liked') this.isLiked = false, @JsonKey(name: 'replies_count') this.repliesCount = 0, this.status = 'active', @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'edited_at') this.editedAt, final  Map<String, dynamic>? author}): _mentionedUserIds = mentionedUserIds,_author = author,super._();
   factory _CommentDto.fromJson(Map<String, dynamic> json) => _$CommentDtoFromJson(json);
 
 @override@JsonKey(name: 'comment_id') final  String commentId;
@@ -237,6 +238,7 @@ class _CommentDto extends CommentDto {
 
 @override@JsonKey(name: 'likes_count') final  int likesCount;
 @override@JsonKey(name: 'is_liked') final  bool isLiked;
+@override@JsonKey(name: 'replies_count') final  int repliesCount;
 @override@JsonKey() final  String status;
 @override@JsonKey(name: 'created_at') final  String createdAt;
 @override@JsonKey(name: 'edited_at') final  String? editedAt;
@@ -263,16 +265,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommentDto&&(identical(other.commentId, commentId) || other.commentId == commentId)&&(identical(other.postId, postId) || other.postId == postId)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.parentCommentId, parentCommentId) || other.parentCommentId == parentCommentId)&&(identical(other.text, text) || other.text == text)&&const DeepCollectionEquality().equals(other._mentionedUserIds, _mentionedUserIds)&&(identical(other.likesCount, likesCount) || other.likesCount == likesCount)&&(identical(other.isLiked, isLiked) || other.isLiked == isLiked)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.editedAt, editedAt) || other.editedAt == editedAt)&&const DeepCollectionEquality().equals(other._author, _author));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommentDto&&(identical(other.commentId, commentId) || other.commentId == commentId)&&(identical(other.postId, postId) || other.postId == postId)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.parentCommentId, parentCommentId) || other.parentCommentId == parentCommentId)&&(identical(other.text, text) || other.text == text)&&const DeepCollectionEquality().equals(other._mentionedUserIds, _mentionedUserIds)&&(identical(other.likesCount, likesCount) || other.likesCount == likesCount)&&(identical(other.isLiked, isLiked) || other.isLiked == isLiked)&&(identical(other.repliesCount, repliesCount) || other.repliesCount == repliesCount)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.editedAt, editedAt) || other.editedAt == editedAt)&&const DeepCollectionEquality().equals(other._author, _author));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,commentId,postId,authorId,parentCommentId,text,const DeepCollectionEquality().hash(_mentionedUserIds),likesCount,isLiked,status,createdAt,editedAt,const DeepCollectionEquality().hash(_author));
+int get hashCode => Object.hash(runtimeType,commentId,postId,authorId,parentCommentId,text,const DeepCollectionEquality().hash(_mentionedUserIds),likesCount,isLiked,repliesCount,status,createdAt,editedAt,const DeepCollectionEquality().hash(_author));
 
 @override
 String toString() {
-  return 'CommentDto(commentId: $commentId, postId: $postId, authorId: $authorId, parentCommentId: $parentCommentId, text: $text, mentionedUserIds: $mentionedUserIds, likesCount: $likesCount, isLiked: $isLiked, status: $status, createdAt: $createdAt, editedAt: $editedAt, author: $author)';
+  return 'CommentDto(commentId: $commentId, postId: $postId, authorId: $authorId, parentCommentId: $parentCommentId, text: $text, mentionedUserIds: $mentionedUserIds, likesCount: $likesCount, isLiked: $isLiked, repliesCount: $repliesCount, status: $status, createdAt: $createdAt, editedAt: $editedAt, author: $author)';
 }
 
 
@@ -283,7 +285,7 @@ abstract mixin class _$CommentDtoCopyWith<$Res> implements $CommentDtoCopyWith<$
   factory _$CommentDtoCopyWith(_CommentDto value, $Res Function(_CommentDto) _then) = __$CommentDtoCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'comment_id') String commentId,@JsonKey(name: 'post_id') String postId,@JsonKey(name: 'author_id') String authorId,@JsonKey(name: 'parent_comment_id') String? parentCommentId, String text,@JsonKey(name: 'mentioned_user_ids') List<String> mentionedUserIds,@JsonKey(name: 'likes_count') int likesCount,@JsonKey(name: 'is_liked') bool isLiked, String status,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'edited_at') String? editedAt, Map<String, dynamic>? author
+@JsonKey(name: 'comment_id') String commentId,@JsonKey(name: 'post_id') String postId,@JsonKey(name: 'author_id') String authorId,@JsonKey(name: 'parent_comment_id') String? parentCommentId, String text,@JsonKey(name: 'mentioned_user_ids') List<String> mentionedUserIds,@JsonKey(name: 'likes_count') int likesCount,@JsonKey(name: 'is_liked') bool isLiked,@JsonKey(name: 'replies_count') int repliesCount, String status,@JsonKey(name: 'created_at') String createdAt,@JsonKey(name: 'edited_at') String? editedAt, Map<String, dynamic>? author
 });
 
 
@@ -300,7 +302,7 @@ class __$CommentDtoCopyWithImpl<$Res>
 
 /// Create a copy of CommentDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? commentId = null,Object? postId = null,Object? authorId = null,Object? parentCommentId = freezed,Object? text = null,Object? mentionedUserIds = null,Object? likesCount = null,Object? isLiked = null,Object? status = null,Object? createdAt = null,Object? editedAt = freezed,Object? author = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? commentId = null,Object? postId = null,Object? authorId = null,Object? parentCommentId = freezed,Object? text = null,Object? mentionedUserIds = null,Object? likesCount = null,Object? isLiked = null,Object? repliesCount = null,Object? status = null,Object? createdAt = null,Object? editedAt = freezed,Object? author = freezed,}) {
   return _then(_CommentDto(
 commentId: null == commentId ? _self.commentId : commentId // ignore: cast_nullable_to_non_nullable
 as String,postId: null == postId ? _self.postId : postId // ignore: cast_nullable_to_non_nullable
@@ -310,7 +312,8 @@ as String?,text: null == text ? _self.text : text // ignore: cast_nullable_to_no
 as String,mentionedUserIds: null == mentionedUserIds ? _self._mentionedUserIds : mentionedUserIds // ignore: cast_nullable_to_non_nullable
 as List<String>,likesCount: null == likesCount ? _self.likesCount : likesCount // ignore: cast_nullable_to_non_nullable
 as int,isLiked: null == isLiked ? _self.isLiked : isLiked // ignore: cast_nullable_to_non_nullable
-as bool,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as bool,repliesCount: null == repliesCount ? _self.repliesCount : repliesCount // ignore: cast_nullable_to_non_nullable
+as int,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as String,editedAt: freezed == editedAt ? _self.editedAt : editedAt // ignore: cast_nullable_to_non_nullable
 as String?,author: freezed == author ? _self._author : author // ignore: cast_nullable_to_non_nullable

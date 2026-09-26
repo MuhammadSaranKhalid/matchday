@@ -5,7 +5,7 @@
 library;
 
 class ServerException implements Exception {
-  ServerException(this.message, {this.statusCode});
+  const ServerException(this.message, {this.statusCode});
   final String message;
   final int? statusCode;
 
@@ -19,7 +19,7 @@ class ServerException implements Exception {
 /// this to `NetworkFailure` so the UI can show "no internet" copy rather than
 /// the (incorrect) "server error."
 class NetworkException implements Exception {
-  NetworkException([this.message = 'No internet connection']);
+  const NetworkException([this.message = 'No internet connection']);
   final String message;
 
   @override
@@ -27,7 +27,7 @@ class NetworkException implements Exception {
 }
 
 class CacheException implements Exception {
-  CacheException(this.message);
+  const CacheException(this.message);
   final String message;
 
   @override
@@ -35,12 +35,12 @@ class CacheException implements Exception {
 }
 
 class UnauthorizedException implements Exception {
-  UnauthorizedException([this.message = 'Unauthorized']);
+  const UnauthorizedException([this.message = 'Unauthorized']);
   final String message;
 }
 
 class NotFoundException implements Exception {
-  NotFoundException([this.message = 'Not found']);
+  const NotFoundException([this.message = 'Not found']);
   final String message;
 }
 

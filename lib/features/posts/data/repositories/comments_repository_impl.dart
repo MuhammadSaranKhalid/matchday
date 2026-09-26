@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:fpdart/fpdart.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/comment.dart';
+import '../../domain/entities/comment_like_result.dart';
 import '../../domain/repositories/comments_repository.dart';
 import '../datasources/comments_remote_datasource.dart';
 
@@ -12,34 +16,56 @@ class CommentsRepositoryImpl implements CommentsRepository {
   final CommentsRemoteDataSource _remote;
 
   @override
-  Future<Either<Failure, List<Comment>>> getComments(String postId) async {
+  Future<Either<Failure, List<Comment>>> getComments(
+    String postId, {
+    DateTime? cursorCreatedAt,
+    String? cursorCommentId,
+    int limit = 20,
+  }) async {
     try {
-      final dtos = await _remote.getComments(postId);
-
-      // Separate top-level comments and replies
-      final topLevel = <Comment>[];
-      final repliesByParent = <String, List<Comment>>{};
-
-      for (final dto in dtos) {
-        final comment = dto.toEntity();
-        if (comment.parentCommentId == null) {
-          topLevel.add(comment);
-        } else {
-          repliesByParent.putIfAbsent(comment.parentCommentId!, () => []).add(comment);
-        }
-      }
-
-      // Attach replies to their parent top-level comments
-      final tree = topLevel.map((parent) {
-        final replies = repliesByParent[parent.id] ?? const [];
-        return parent.copyWith(replies: replies);
-      }).toList();
-
-      return Right(tree);
+      final dtos = await _remote.getComments(
+        postId,
+        cursorCreatedAt: cursorCreatedAt,
+        cursorCommentId: cursorCommentId,
+        limit: limit,
+      );
+      return Right(dtos.map((dto) => dto.toEntity()).toList());
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
+    } on PostgrestException catch (e) {
       return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Comment>>> getCommentReplies(
+    String parentCommentId, {
+    DateTime? cursorCreatedAt,
+    String? cursorCommentId,
+    int limit = 20,
+  }) async {
+    try {
+      final dtos = await _remote.getCommentReplies(
+        parentCommentId,
+        cursorCreatedAt: cursorCreatedAt,
+        cursorCommentId: cursorCommentId,
+        limit: limit,
+      );
+      return Right(dtos.map((dto) => dto.toEntity()).toList());
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on PostgrestException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }
@@ -68,10 +94,14 @@ class CommentsRepositoryImpl implements CommentsRepository {
         mentionedUserIds: mentionedUserIds,
       );
       return Right(dto.toEntity());
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
+    } on PostgrestException catch (e) {
       return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }
@@ -82,24 +112,35 @@ class CommentsRepositoryImpl implements CommentsRepository {
     try {
       await _remote.deleteComment(commentId);
       return const Right(unit);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
+    } on PostgrestException catch (e) {
       return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }
   }
 
   @override
-  Future<Either<Failure, bool>> toggleCommentLike(String commentId) async {
+  Future<Either<Failure, CommentLikeResult>> setCommentLike(
+    String commentId, {
+    required bool liked,
+  }) async {
     try {
-      final isLiked = await _remote.toggleCommentLike(commentId);
-      return Right(isLiked);
+      final result = await _remote.setCommentLike(commentId, liked: liked);
+      return Right(result);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
+    } on PostgrestException catch (e) {
       return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }

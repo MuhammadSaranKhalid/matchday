@@ -6,114 +6,131 @@ import '../../domain/repositories/post_read_repository.dart';
 import '../providers/post_store_provider.dart';
 import '../providers/posts_providers.dart';
 import 'post_interactions_controller.dart';
+import 'post_query_state.dart';
 
 part 'feed_controller.g.dart';
 
-/// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
-/// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.
+/// The Home feed — normalized post ID membership ordering with keyset pagination + pull-to-refresh.
+/// Post entities live in [PostStore] to ensure unified synchronization across all views.
 @riverpod
 class FeedController extends _$FeedController {
   static const _pageSize = 20;
 
-  bool _hasMore = true;
-  bool get hasMore => _hasMore;
-
-  bool _isLoadingMore = false;
-  bool get isLoadingMore => _isLoadingMore;
-
   @override
-  Future<List<Post>> build() {
+  Future<PostQueryState> build() async {
     final filter = ref.watch(feedFilterProvider);
-    return _fetch(
-      ref.watch(postReadRepositoryProvider),
+    final repo = ref.watch(postReadRepositoryProvider);
+    return _fetchInitial(repo, filter);
+  }
+
+  Future<PostQueryState> _fetchInitial(PostReadRepository repo, String filter) async {
+    final result = await repo.getHomeFeed(
       filter: filter,
       cursorPublishedAt: null,
       cursorPostId: null,
-    );
-  }
-
-  Future<List<Post>> _fetch(
-    PostReadRepository repo, {
-    required String filter,
-    DateTime? cursorPublishedAt,
-    String? cursorPostId,
-  }) async {
-    final result = await repo.getHomeFeed(
-      filter: filter,
-      cursorPublishedAt: cursorPublishedAt,
-      cursorPostId: cursorPostId,
       limit: _pageSize,
     );
     return result.fold(
       (f) => throw FailureWrapper(f),
-      (posts) {
-        _hasMore = posts.length == _pageSize;
+      (page) {
         // Upsert into L1 normalized PostStore
-        ref.read(postStoreProvider.notifier).upsertAll(posts);
+        ref.read(postStoreProvider.notifier).upsertAll(page.posts);
 
         // Provider-neutral pending post reconciliation:
         // When active posts arrive in the canonical feed, discard matching pending outbox records.
         final commandRepo = ref.read(postCommandRepositoryProvider);
-        for (final p in posts) {
+        for (final p in page.posts) {
           commandRepo.discardPendingPost(p.id.value);
         }
-        return posts;
+
+        return PostQueryState(
+          ids: page.posts.map((p) => p.id).toList(),
+          nextCursorPublishedAt: page.nextCursorPublishedAt,
+          nextCursorPostId: page.nextCursorPostId,
+          hasMore: page.hasMore,
+        );
       },
     );
   }
 
   Future<void> refresh() async {
-    _hasMore = true;
-    _isLoadingMore = false;
     final filter = ref.read(feedFilterProvider);
+    final current = state.value;
+    if (current != null) {
+      state = AsyncData(current.copyWith(isRefreshing: true));
+    }
     final nextState = await AsyncValue.guard(
-      () => _fetch(
-        ref.read(postReadRepositoryProvider),
-        filter: filter,
-        cursorPublishedAt: null,
-        cursorPostId: null,
-      ),
+      () => _fetchInitial(ref.read(postReadRepositoryProvider), filter),
     );
     if (nextState.hasValue) {
       state = nextState;
+    } else if (current != null) {
+      state = AsyncData(current.copyWith(isRefreshing: false));
     }
   }
 
   Future<void> loadMore() async {
     final current = state.value;
-    if (current == null || current.isEmpty || !_hasMore || _isLoadingMore) return;
+    if (current == null || !current.hasMore || current.isLoadingMore) return;
 
-    _isLoadingMore = true;
-    final lastPost = current.last;
+    state = AsyncData(current.copyWith(isLoadingMore: true, loadMoreError: () => null));
     final filter = ref.read(feedFilterProvider);
 
-    try {
-      final more = await _fetch(
-        ref.read(postReadRepositoryProvider),
-        filter: filter,
-        cursorPublishedAt: lastPost.publishedAt ?? lastPost.createdAt,
-        cursorPostId: lastPost.id.value,
-      );
-      state = AsyncData([...current, ...more]);
-    } finally {
-      _isLoadingMore = false;
-    }
+    final result = await ref.read(postReadRepositoryProvider).getHomeFeed(
+      filter: filter,
+      cursorPublishedAt: current.nextCursorPublishedAt,
+      cursorPostId: current.nextCursorPostId,
+      limit: _pageSize,
+    );
+
+    result.fold(
+      (f) {
+        state = AsyncData(current.copyWith(
+          isLoadingMore: false,
+          loadMoreError: () => f,
+        ));
+      },
+      (page) {
+        ref.read(postStoreProvider.notifier).upsertAll(page.posts);
+        final existingIdSet = current.ids.toSet();
+        final newIds = page.posts
+            .map((p) => p.id)
+            .where((id) => !existingIdSet.contains(id))
+            .toList();
+
+        state = AsyncData(current.copyWith(
+          ids: [...current.ids, ...newIds],
+          nextCursorPublishedAt: () => page.nextCursorPublishedAt,
+          nextCursorPostId: () => page.nextCursorPostId,
+          hasMore: page.hasMore,
+          isLoadingMore: false,
+        ));
+      },
+    );
   }
 
   /// Prepend a freshly created post without a round-trip (optimistic insert).
   void prepend(Post post) {
     ref.read(postStoreProvider.notifier).upsert(post);
-    final current = state.value ?? const [];
-    state = AsyncData([post, ...current.where((p) => p.id != post.id)]);
+    final current = state.value ?? const PostQueryState();
+    final updatedIds = [post.id, ...current.ids.where((id) => id != post.id)];
+    state = AsyncData(current.copyWith(ids: updatedIds));
+  }
+
+  /// Remove post ID from membership (e.g. on post delete).
+  void removeId(PostId postId) {
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncData(current.copyWith(
+      ids: current.ids.where((id) => id != postId).toList(),
+    ));
   }
 
   /// Toggle like state on a post in the feed with desired-state RPC.
-  /// Delegates to [PostInteractionsController] for unified optimistic handling and race serialization.
   Future<void> toggleLike(PostId postId) =>
       ref.read(postInteractionsControllerProvider.notifier).toggleLike(postId);
 
   /// Toggle bookmark state on a post in the feed with desired-state RPC.
-  /// Delegates to [PostInteractionsController] for unified optimistic handling and race serialization.
   Future<void> toggleBookmark(PostId postId) =>
       ref.read(postInteractionsControllerProvider.notifier).toggleBookmark(postId);
 
@@ -125,4 +142,3 @@ class FeedController extends _$FeedController {
   void decrementCommentsCount(PostId postId) =>
       ref.read(postInteractionsControllerProvider.notifier).updateCommentsCount(postId, -1);
 }
-

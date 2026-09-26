@@ -14,3 +14,7 @@ AuthRemoteDataSource authRemoteDataSource(Ref ref) =>
 AuthRepository authRepository(Ref ref) =>
     AuthRepositoryImpl(ref.watch(authRemoteDataSourceProvider));
 
+/// Returns the current authenticated user's ID, if signed in.
+@riverpod
+String? currentUserId(Ref ref) =>
+    ref.watch(supabaseClientProvider).auth.currentUser?.id;

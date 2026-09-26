@@ -50,7 +50,7 @@ If a domain file requires an external system, invert the dependency: define an a
 
 The codebase is **online-only by default**. There is no general offline sync, no LWW (Last-Write-Wins), and no global `SyncService`.
 
-### Only Two Scoped Exemptions:
+### Only Three Scoped Exemptions:
 1. **`messages` Read-Through Cache (2026-06-07)**:
    - Drift-backed read-through cache for inbox (`messages_chats`) and message history (`messages_messages`), plus local drafts (`messages_drafts`).
    - Writes go to Supabase first; cache is strictly a cold-start instant-paint optimization.
@@ -59,6 +59,9 @@ The codebase is **online-only by default**. There is no general offline sync, no
    - Ball-by-ball scoring is computed locally on-device by the pure Dart scoring engine (`lib/features/matches/domain/scoring/`).
    - Deliveries append to a drift-backed write-ahead log (`ScoringOps`, `ScoringSnapshots`) and drain asynchronously to Supabase via `record-ball` Edge Function with client-generated idempotency UUIDs.
    - Scoped strictly to scoring an already-started innings.
+3. **`posts` Publishing Outbox (2026-09-26)**:
+   - Client-side outbox for multi-photo post uploads surviving process death and network drops during staging.
+   - Strictly scoped to unfinished local uploads; no offline Home feed mirror, no offline likes/comments.
 
 **Do NOT generalize Drift caching, WALs, or offline queues to any other feature** (teams, tournaments, profiles, social posts, explore). Repositories must read and write directly to Supabase.
 

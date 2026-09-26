@@ -41,17 +41,25 @@ Map<String, dynamic> _$PostCountsDtoToJson(_PostCountsDto instance) =>
 _PostViewerInteractionsDto _$PostViewerInteractionsDtoFromJson(
   Map<String, dynamic> json,
 ) => _PostViewerInteractionsDto(
+  isLiked: json['is_liked'] as bool? ?? false,
   liked: json['liked'] as bool? ?? false,
+  isBookmarked: json['is_bookmarked'] as bool? ?? false,
   bookmarked: json['bookmarked'] as bool? ?? false,
+  isFollowingPublisher: json['is_following_publisher'] as bool? ?? false,
   followingPublisher: json['following_publisher'] as bool? ?? false,
+  bookmarkedAt: json['bookmarked_at'] as String?,
 );
 
 Map<String, dynamic> _$PostViewerInteractionsDtoToJson(
   _PostViewerInteractionsDto instance,
 ) => <String, dynamic>{
+  'is_liked': instance.isLiked,
   'liked': instance.liked,
+  'is_bookmarked': instance.isBookmarked,
   'bookmarked': instance.bookmarked,
+  'is_following_publisher': instance.isFollowingPublisher,
   'following_publisher': instance.followingPublisher,
+  'bookmarked_at': instance.bookmarkedAt,
 };
 
 _PostDto _$PostDtoFromJson(Map<String, dynamic> json) => _PostDto(

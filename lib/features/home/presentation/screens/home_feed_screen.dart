@@ -9,31 +9,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:matchday/core/theme/circk_theme.dart';
 import 'package:matchday/features/posts/presentation/widgets/pending_post_card.dart';
 import 'package:matchday/features/posts/presentation/widgets/post_card.dart';
-import 'package:matchday/core/widgets/v2/v2_kit.dart';
 import 'package:matchday/core/widgets/modals/modals.dart';
-import 'package:matchday/features/posts/domain/entities/post.dart';
-import 'package:matchday/features/matches/presentation/providers/my_matches_providers.dart';
 import 'package:matchday/features/posts/domain/entities/post_media.dart';
 import 'package:matchday/features/posts/presentation/controllers/feed_controller.dart';
+import 'package:matchday/features/posts/presentation/controllers/post_query_state.dart';
+import 'package:matchday/features/posts/presentation/providers/post_store_provider.dart';
 import 'package:matchday/features/posts/presentation/providers/posts_providers.dart';
 import 'package:matchday/core/widgets/v2/ck_shimmer.dart';
 import 'package:matchday/features/posts/presentation/screens/photo_viewer_screen.dart';
 import 'package:matchday/features/posts/presentation/widgets/post_card_skeleton.dart';
+import '../widgets/live_match_rail.dart';
 
 // ─── Temporary visibility flags ──────────────────────────────────────────
 //
-// Both the live-match cards rail and the feed-filter chip row are hidden
-// temporarily — neither has its underlying data/behaviour wired yet, and
-// they were taking up visual space without serving the user. Flip either
-// flag to `true` to re-enable.
+// Both the live-match cards rail and the feed-filter chip row are toggled
+// via flags. The live-match cards rail is currently parked.
 //
 //   • _kShowLiveCards   — ticket #1 (Hide live match cards from home page)
-//   • _kShowFeedFilters — ticket #2 (Hide feed filter chip row from home page)
-//
-// The widget classes (`_LiveRail`, `_LiveCard`, `FeedFilters`) stay defined
-// below so re-enabling is a one-line change. They are referenced from the
-// const-false branches below, which keeps the analyzer's unused-element
-// check happy.
+//   • _kShowFeedFilters — ticket #2 (Show feed filter chip row from home page)
 const bool _kShowLiveCards = false;
 const bool _kShowFeedFilters = true;
 
@@ -90,7 +83,7 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
               child: switch (feed) {
                 AsyncData(:final value) => _dataList(value),
                 AsyncError(:final error) => _scrollable([
-                    if (_kShowLiveCards) const _LiveRail(),
+                    if (_kShowLiveCards) const LiveMatchRail(),
                     _ErrorState(error: error),
                   ]),
                 _ => const FeedShimmerSkeleton(),
@@ -109,10 +102,9 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
         children: children,
       );
 
-  Widget _dataList(List<Post> posts) {
-    final hasMore = ref.read(feedControllerProvider.notifier).hasMore;
+  Widget _dataList(PostQueryState queryState) {
     final pendingPosts = ref.watch(pendingPostsProvider).value ?? const [];
-    final totalCount = 1 + pendingPosts.length + posts.length + 1;
+    final totalCount = 1 + pendingPosts.length + queryState.ids.length + 1;
 
     return ListView.builder(
       controller: _scroll,
@@ -121,15 +113,18 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
       itemCount: totalCount,
       itemBuilder: (context, i) {
         if (i == 0) {
-          return _kShowLiveCards ? const _LiveRail() : const SizedBox.shrink();
+          return _kShowLiveCards ? const LiveMatchRail() : const SizedBox.shrink();
         }
         final pendingIndex = i - 1;
         if (pendingIndex < pendingPosts.length) {
           return PendingPostCard(pendingPost: pendingPosts[pendingIndex]);
         }
         final postIndex = pendingIndex - pendingPosts.length;
-        if (postIndex < posts.length) {
-          final post = posts[postIndex];
+        if (postIndex < queryState.ids.length) {
+          final postId = queryState.ids[postIndex];
+          final post = ref.watch(postFromStoreProvider(postId));
+          if (post == null) return const SizedBox.shrink();
+
           return RepaintBoundary(
             child: FeedPostCard(
               post: post,
@@ -146,8 +141,8 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
             ),
           );
         }
-        if (posts.isEmpty && pendingPosts.isEmpty) return const _EmptyState();
-        return hasMore ? const _Loader() : const _FeedFooter();
+        if (queryState.ids.isEmpty && pendingPosts.isEmpty) return const _EmptyState();
+        return queryState.hasMore ? const _Loader() : const _FeedFooter();
       },
     );
   }
@@ -204,173 +199,6 @@ class FeedFilters extends ConsumerWidget {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-// ─── live-now rail ────────────────────────────────────
-class _LiveRail extends ConsumerWidget {
-  const _LiveRail();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final matchesViewAsync = ref.watch(myMatchesViewProvider);
-    
-    return matchesViewAsync.when(
-      data: (view) {
-        final liveMatches = view.confirmed.where((m) => m.live).toList();
-        if (liveMatches.isEmpty) return const SizedBox.shrink();
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-          child: Container(
-            decoration: BoxDecoration(
-              color: CkColors.ink,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: CkColors.red,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'LIVE NOW · ${liveMatches.length}',
-                      style: CkType.mono(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.10,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'see all →',
-                      style: CkType.body(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.55),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 66,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: liveMatches.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, i) {
-                      final m = liveMatches[i];
-                      return _LiveCard(
-                        aShort: m.homeShort,
-                        aColor: m.homeColor,
-                        bShort: m.awayShort,
-                        bColor: m.awayColor,
-                        aScore: '—', // v1: placeholder
-                        bScore: '—', // v1: placeholder
-                        need: m.tag,
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
-    );
-  }
-}
-
-class _LiveCard extends StatelessWidget {
-  const _LiveCard({
-    required this.aShort,
-    required this.aColor,
-    required this.bShort,
-    required this.bColor,
-    required this.aScore,
-    required this.bScore,
-    required this.need,
-  });
-
-  final String aShort;
-  final Color aColor;
-  final String bShort;
-  final Color bColor;
-  final String aScore;
-  final String bScore;
-  final String need;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 240,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Crest(short: aShort, color: aColor, size: 22, radius: 5),
-              const SizedBox(width: 8),
-              Text(
-                aScore,
-                style: CkType.mono(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0,
-                  color: Colors.white,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                bScore,
-                style: CkType.mono(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0,
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Crest(short: bShort, color: bColor, size: 22, radius: 5),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            need,
-            style: CkType.body(
-              fontSize: 10.5,
-              color: Colors.white.withValues(alpha: 0.65),
-            ),
-          ),
-        ],
       ),
     );
   }

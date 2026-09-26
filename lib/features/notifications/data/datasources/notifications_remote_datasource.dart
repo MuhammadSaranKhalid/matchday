@@ -17,7 +17,7 @@ class NotificationsRemoteDataSource {
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
-    if (id == null) throw UnauthorizedException('Must be signed in');
+    if (id == null) throw const UnauthorizedException('Must be signed in');
     return id;
   }
 
@@ -174,7 +174,7 @@ class NotificationsRemoteDataSource {
             // dropped is strictly worse than showing slightly stale rows.
             if (feed.items.isEmpty) {
               controller.addError(
-                ServerException('Notification connection interrupted'),
+                const ServerException('Notification connection interrupted'),
               );
             }
           }

@@ -1,37 +1,77 @@
-// Computed draft the composer hands the repository to create a post.
-// Pure Dart; `dart:io` is permitted in Domain (Rule 1 allows dart:*).
-//
-// A [ProcessedPhoto] is the output of the photo pipeline: an already
-// cropped + resized (≤1080px WebP) file, plus its BlurHash and dimensions
-// computed on-device. The repository uploads the file and persists the
-// metadata.
 import 'dart:io';
 
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:equatable/equatable.dart';
 
 import 'post.dart';
 
-part 'post_draft.freezed.dart';
+/// Preprocessed photo ready for staging upload.
+class ProcessedPhoto extends Equatable {
+  const ProcessedPhoto({
+    required this.file,
+    required this.width,
+    required this.height,
+  });
 
-@freezed
-abstract class ProcessedPhoto with _$ProcessedPhoto {
-  const factory ProcessedPhoto({
-    required File file,
-    required int width,
-    required int height,
-  }) = _ProcessedPhoto;
+  final File file;
+  final int width;
+  final int height;
+
+  @override
+  List<Object?> get props => [file.path, width, height];
 }
 
-@freezed
-abstract class PostDraft with _$PostDraft {
-  const factory PostDraft({
-    String? text,
-    @Default([]) List<ProcessedPhoto> photos,
-    @Default(PostAuthorContext.personal) PostAuthorContext authorContext,
-    String? contextEntityId,
-  }) = _PostDraft;
+/// Selected publisher identity for a post.
+class PostPublisherSelection extends Equatable {
+  const PostPublisherSelection({
+    required this.type,
+    this.id,
+    this.name,
+    this.photoUrl,
+    this.monogram,
+  });
 
-  const PostDraft._();
+  final PostPublisherType type;
+  final String? id;
+  final String? name;
+  final String? photoUrl;
+  final String? monogram;
+
+  static const user = PostPublisherSelection(type: PostPublisherType.user);
+
+  @override
+  List<Object?> get props => [type, id, name, photoUrl, monogram];
+}
+
+/// Draft post ready for submission. Pure Dart (Domain) — Equatable.
+class PostDraft extends Equatable {
+  const PostDraft({
+    this.text,
+    this.photos = const [],
+    this.publisher = PostPublisherSelection.user,
+    this.postKind = PostKind.standard,
+    this.linkedMatchId,
+    this.linkedTournamentId,
+    this.linkedTeamId,
+  });
+
+  final String? text;
+  final List<ProcessedPhoto> photos;
+  final PostPublisherSelection publisher;
+  final PostKind postKind;
+  final String? linkedMatchId;
+  final String? linkedTournamentId;
+  final String? linkedTeamId;
 
   bool get hasPhotos => photos.isNotEmpty;
+
+  @override
+  List<Object?> get props => [
+        text,
+        photos,
+        publisher,
+        postKind,
+        linkedMatchId,
+        linkedTournamentId,
+        linkedTeamId,
+      ];
 }

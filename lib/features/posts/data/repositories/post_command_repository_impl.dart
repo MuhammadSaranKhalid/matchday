@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
@@ -117,8 +118,14 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
       unawaited(_drainStagingUploads(postId, pendingMedia));
 
       return Right(postId);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on PostgrestException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -203,6 +210,14 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
       await _remote.deletePost(id.value);
       await _local.removePendingPost(id.value);
       return const Right(unit);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on PostgrestException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -215,6 +230,14 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
     try {
       final result = await _remote.setPostLike(id.value, liked: liked);
       return Right(result);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on PostgrestException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -227,6 +250,14 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
     try {
       final result = await _remote.setPostBookmark(id.value, bookmarked: bookmarked);
       return Right(result);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on PostgrestException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -255,6 +286,26 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
 
   @override
   Future<void> discardPendingPost(String postId) async {
+    final list = await _local.getPendingPosts();
+    final post = list.where((p) => p.postId == postId).firstOrNull;
+    try {
+      await _remote.abandonPostPublish(postId);
+    } catch (_) {}
+    if (post != null) {
+      for (final m in post.media) {
+        if (m.stagingPath.isNotEmpty) {
+          try {
+            await _remote.removeStagingMedia(m.stagingPath);
+          } catch (_) {}
+        }
+        if (m.localPath.isNotEmpty) {
+          try {
+            final f = File(m.localPath);
+            if (f.existsSync()) f.deleteSync();
+          } catch (_) {}
+        }
+      }
+    }
     await _local.removePendingPost(postId);
   }
 
@@ -268,19 +319,16 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
     return textResult.fold(
       (failure) => Left(failure),
       (postText) async {
-        final publisherType = draft.authorContext == PostAuthorContext.teamManager
-            ? PostPublisherType.team
-            : PostPublisherType.user;
-
         final currentUid = _remote.currentUserId;
         if (currentUid == null) {
           return const Left(AuthFailure('You must be signed in to post.'));
         }
 
-        final publisherId = draft.authorContext == PostAuthorContext.teamManager &&
-                draft.contextEntityId != null
-            ? draft.contextEntityId!
-            : currentUid;
+        final publisherType = draft.publisher.type;
+        final publisherId =
+            (draft.publisher.id != null && draft.publisher.id!.isNotEmpty)
+                ? draft.publisher.id!
+                : currentUid;
 
         final publishPhotos = draft.photos
             .map((p) => PublishPhoto(
@@ -293,12 +341,13 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
         final publishResult = await beginPublishPost(
           publisherType: publisherType,
           publisherId: publisherId,
-          postKind: PostKind.standard,
+          postKind: draft.postKind,
           text: postText,
           photos: publishPhotos,
-          linkedTeamId: draft.authorContext == PostAuthorContext.teamManager
-              ? draft.contextEntityId
-              : null,
+          linkedMatchId: draft.linkedMatchId,
+          linkedTournamentId: draft.linkedTournamentId,
+          linkedTeamId: draft.linkedTeamId ??
+              (publisherType == PostPublisherType.team ? publisherId : null),
         );
 
         return publishResult.map(
@@ -308,17 +357,21 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
             publisher: PostPublisher(
               id: publisherId,
               type: publisherType,
-              displayName: publisherType == PostPublisherType.team ? 'Team' : 'User',
+              displayName: draft.publisher.name ??
+                  (publisherType == PostPublisherType.team ? 'Team' : 'User'),
+              photoUrl: draft.publisher.photoUrl,
             ),
-            kind: PostKind.standard,
+            kind: draft.postKind,
             text: postText.value,
-            status: publishPhotos.isEmpty ? PostStatus.active : PostStatus.publishing,
+            status:
+                publishPhotos.isEmpty ? PostStatus.active : PostStatus.publishing,
             expectedMediaCount: publishPhotos.length,
             createdAt: DateTime.now(),
             publishedAt: publishPhotos.isEmpty ? DateTime.now() : null,
-            linkedTeamId: draft.authorContext == PostAuthorContext.teamManager
-                ? draft.contextEntityId
-                : null,
+            linkedMatchId: draft.linkedMatchId,
+            linkedTournamentId: draft.linkedTournamentId,
+            linkedTeamId: draft.linkedTeamId ??
+                (publisherType == PostPublisherType.team ? publisherId : null),
           ),
         );
       },

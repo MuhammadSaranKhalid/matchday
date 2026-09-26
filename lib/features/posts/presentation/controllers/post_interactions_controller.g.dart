@@ -8,31 +8,37 @@ part of 'post_interactions_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Single unified controller for post interactions (likes, bookmarks, comments count reconciliation).
+/// Single unified controller for post interactions (likes, bookmarks, comments count reconciliation, deletion).
 ///
 /// Features:
 /// 1. Optimistic updates across all surfaces observing [postStoreProvider].
-/// 2. In-flight race prevention (serializes rapid taps per post).
+/// 2. Intent coalescing: rapid taps (Like -> Unlike -> Like) queue the latest desired intent
+///    so the final server state matches user intent without dropping actions or corrupting counts.
 /// 3. Reconciles canonical server counts using [PostLikeResult].
+/// 4. Synchronizes query membership: unbookmark immediately evicts the post ID from [savedPostsControllerProvider].
 
 @ProviderFor(PostInteractionsController)
 final postInteractionsControllerProvider =
     PostInteractionsControllerProvider._();
 
-/// Single unified controller for post interactions (likes, bookmarks, comments count reconciliation).
+/// Single unified controller for post interactions (likes, bookmarks, comments count reconciliation, deletion).
 ///
 /// Features:
 /// 1. Optimistic updates across all surfaces observing [postStoreProvider].
-/// 2. In-flight race prevention (serializes rapid taps per post).
+/// 2. Intent coalescing: rapid taps (Like -> Unlike -> Like) queue the latest desired intent
+///    so the final server state matches user intent without dropping actions or corrupting counts.
 /// 3. Reconciles canonical server counts using [PostLikeResult].
+/// 4. Synchronizes query membership: unbookmark immediately evicts the post ID from [savedPostsControllerProvider].
 final class PostInteractionsControllerProvider
     extends $NotifierProvider<PostInteractionsController, void> {
-  /// Single unified controller for post interactions (likes, bookmarks, comments count reconciliation).
+  /// Single unified controller for post interactions (likes, bookmarks, comments count reconciliation, deletion).
   ///
   /// Features:
   /// 1. Optimistic updates across all surfaces observing [postStoreProvider].
-  /// 2. In-flight race prevention (serializes rapid taps per post).
+  /// 2. Intent coalescing: rapid taps (Like -> Unlike -> Like) queue the latest desired intent
+  ///    so the final server state matches user intent without dropping actions or corrupting counts.
   /// 3. Reconciles canonical server counts using [PostLikeResult].
+  /// 4. Synchronizes query membership: unbookmark immediately evicts the post ID from [savedPostsControllerProvider].
   PostInteractionsControllerProvider._()
     : super(
         from: null,
@@ -61,14 +67,16 @@ final class PostInteractionsControllerProvider
 }
 
 String _$postInteractionsControllerHash() =>
-    r'16f570ab132bffab6d4dea434c91a92e61786d41';
+    r'41f25d12cd66fd880f5d317618a7e1c7c4e15bc3';
 
-/// Single unified controller for post interactions (likes, bookmarks, comments count reconciliation).
+/// Single unified controller for post interactions (likes, bookmarks, comments count reconciliation, deletion).
 ///
 /// Features:
 /// 1. Optimistic updates across all surfaces observing [postStoreProvider].
-/// 2. In-flight race prevention (serializes rapid taps per post).
+/// 2. Intent coalescing: rapid taps (Like -> Unlike -> Like) queue the latest desired intent
+///    so the final server state matches user intent without dropping actions or corrupting counts.
 /// 3. Reconciles canonical server counts using [PostLikeResult].
+/// 4. Synchronizes query membership: unbookmark immediately evicts the post ID from [savedPostsControllerProvider].
 
 abstract class _$PostInteractionsController extends $Notifier<void> {
   void build();

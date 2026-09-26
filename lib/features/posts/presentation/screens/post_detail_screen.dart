@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/modals/comments_sheet.dart';
 import '../../domain/entities/post_media.dart';
-import '../providers/posts_providers.dart';
+import '../controllers/post_detail_controller.dart';
 import '../widgets/post_card.dart';
 import 'photo_viewer_screen.dart';
 
@@ -20,7 +20,7 @@ class PostDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final postAsync = ref.watch(postDetailProvider(postId));
+    final postAsync = ref.watch(postDetailControllerProvider(postId));
 
     return Scaffold(
       backgroundColor: CkColors.paper,
@@ -41,7 +41,7 @@ class PostDetailScreen extends ConsumerWidget {
       body: postAsync.when(
         data: (post) => RefreshIndicator(
           color: CkColors.ink,
-          onRefresh: () async => ref.refresh(postDetailProvider(postId).future),
+          onRefresh: () => ref.read(postDetailControllerProvider(postId).notifier).refresh(),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
@@ -79,7 +79,7 @@ class PostDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 TextButton(
-                  onPressed: () => ref.refresh(postDetailProvider(postId)),
+                  onPressed: () => ref.read(postDetailControllerProvider(postId).notifier).refresh(),
                   child: const Text('Try Again'),
                 ),
               ],

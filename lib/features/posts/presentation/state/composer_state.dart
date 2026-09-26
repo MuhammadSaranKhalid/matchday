@@ -12,10 +12,11 @@ abstract class ComposerState with _$ComposerState {
     @Default([]) List<ProcessedPhoto> photos,
     @Default(false) bool busy,
     Failure? error,
-    @Default(PostAuthorContext.personal) PostAuthorContext authorContext,
-    String? contextEntityId,
-    String? entityName,
-    String? entityMono,
+    @Default(PostPublisherSelection.user) PostPublisherSelection publisher,
+    @Default(PostKind.standard) PostKind postKind,
+    String? linkedMatchId,
+    String? linkedTournamentId,
+    String? linkedTeamId,
   }) = _ComposerState;
 
   const ComposerState._();

@@ -28,7 +28,6 @@ abstract class PostPublisherDto with _$PostPublisherDto {
         type: switch (type) {
           'team' => PostPublisherType.team,
           'tournament' => PostPublisherType.tournament,
-          'club' => PostPublisherType.club,
           _ => PostPublisherType.user,
         },
         displayName: displayName,
@@ -60,11 +59,17 @@ abstract class PostCountsDto with _$PostCountsDto {
 @freezed
 abstract class PostViewerInteractionsDto with _$PostViewerInteractionsDto {
   const factory PostViewerInteractionsDto({
-    @Default(false) bool liked,
-    @Default(false) bool bookmarked,
+    @JsonKey(name: 'is_liked') @Default(false) bool isLiked,
+    @JsonKey(name: 'liked') @Default(false) bool liked,
+    @JsonKey(name: 'is_bookmarked') @Default(false) bool isBookmarked,
+    @JsonKey(name: 'bookmarked') @Default(false) bool bookmarked,
+    @JsonKey(name: 'is_following_publisher')
+    @Default(false)
+    bool isFollowingPublisher,
     @JsonKey(name: 'following_publisher')
     @Default(false)
     bool followingPublisher,
+    @JsonKey(name: 'bookmarked_at') String? bookmarkedAt,
   }) = _PostViewerInteractionsDto;
 
   const PostViewerInteractionsDto._();
@@ -73,9 +78,11 @@ abstract class PostViewerInteractionsDto with _$PostViewerInteractionsDto {
       _$PostViewerInteractionsDtoFromJson(json);
 
   PostViewerInteractions toEntity() => PostViewerInteractions(
-        isLiked: liked,
-        isBookmarked: bookmarked,
-        isFollowingPublisher: followingPublisher,
+        isLiked: isLiked || liked,
+        isBookmarked: isBookmarked || bookmarked,
+        isFollowingPublisher: isFollowingPublisher || followingPublisher,
+        bookmarkedAt:
+            bookmarkedAt != null ? DateTime.tryParse(bookmarkedAt!) : null,
       );
 }
 

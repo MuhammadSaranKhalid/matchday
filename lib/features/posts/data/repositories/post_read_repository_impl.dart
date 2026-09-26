@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:fpdart/fpdart.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/post.dart';
+import '../../domain/entities/post_page.dart';
 import '../../domain/repositories/post_read_repository.dart';
 import '../datasources/posts_remote_datasource.dart';
 
@@ -14,37 +18,57 @@ class PostReadRepositoryImpl implements PostReadRepository {
   final PostsRemoteDataSource _remote;
 
   @override
-  Future<Either<Failure, List<Post>>> getHomeFeed({
-    String mode = 'home',
+  Future<Either<Failure, PostPage>> getHomeFeed({
+    HomeFeedMode mode = HomeFeedMode.discover,
     String filter = 'all',
-    String? targetId,
     DateTime? cursorPublishedAt,
     String? cursorPostId,
     int limit = 20,
   }) async {
     try {
+      final modeStr = switch (mode) {
+        HomeFeedMode.following => 'following',
+        HomeFeedMode.discover => 'home',
+      };
+
       final dtos = await _remote.getHomeFeed(
-        mode: mode,
+        mode: modeStr,
         filter: filter,
-        targetId: targetId,
         cursorPublishedAt: cursorPublishedAt,
         cursorPostId: cursorPostId,
         limit: limit,
       );
+      final posts = dtos
+          .map((d) => d.toEntity(urlFactory: _remote.urlFactory))
+          .toList();
+      final hasMore = posts.length == limit;
+      final last = posts.isNotEmpty ? posts.last : null;
+
       return Right(
-        dtos.map((d) => d.toEntity(urlFactory: _remote.urlFactory)).toList(),
+        PostPage(
+          posts: posts,
+          nextCursorPublishedAt: last?.publishedAt ?? last?.createdAt,
+          nextCursorPostId: last?.id.value,
+          hasMore: hasMore,
+        ),
       );
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on PostgrestException catch (e) {
+      return Left(ServerFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }
   }
 
   @override
-  Future<Either<Failure, List<Post>>> getProfilePosts({
+  Future<Either<Failure, PostPage>> getProfilePosts({
     required String publisherId,
     PostPublisherType publisherType = PostPublisherType.user,
     DateTime? cursorPublishedAt,
@@ -59,20 +83,37 @@ class PostReadRepositoryImpl implements PostReadRepository {
         cursorPostId: cursorPostId,
         limit: limit,
       );
+      final posts = dtos
+          .map((d) => d.toEntity(urlFactory: _remote.urlFactory))
+          .toList();
+      final hasMore = posts.length == limit;
+      final last = posts.isNotEmpty ? posts.last : null;
+
       return Right(
-        dtos.map((d) => d.toEntity(urlFactory: _remote.urlFactory)).toList(),
+        PostPage(
+          posts: posts,
+          nextCursorPublishedAt: last?.publishedAt ?? last?.createdAt,
+          nextCursorPostId: last?.id.value,
+          hasMore: hasMore,
+        ),
       );
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on PostgrestException catch (e) {
+      return Left(ServerFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }
   }
 
   @override
-  Future<Either<Failure, List<Post>>> getSavedPosts({
+  Future<Either<Failure, SavedPostsPage>> getSavedPosts({
     DateTime? cursorSavedAt,
     String? cursorPostId,
     int limit = 20,
@@ -83,13 +124,30 @@ class PostReadRepositoryImpl implements PostReadRepository {
         cursorPostId: cursorPostId,
         limit: limit,
       );
+      final posts = dtos
+          .map((d) => d.toEntity(urlFactory: _remote.urlFactory))
+          .toList();
+      final hasMore = posts.length == limit;
+      final last = posts.isNotEmpty ? posts.last : null;
+
       return Right(
-        dtos.map((d) => d.toEntity(urlFactory: _remote.urlFactory)).toList(),
+        SavedPostsPage(
+          posts: posts,
+          nextCursorSavedAt: last?.viewer.bookmarkedAt,
+          nextCursorPostId: last?.id.value,
+          hasMore: hasMore,
+        ),
       );
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on PostgrestException catch (e) {
+      return Left(ServerFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }
@@ -100,10 +158,16 @@ class PostReadRepositoryImpl implements PostReadRepository {
     try {
       final dto = await _remote.getPost(id.value);
       return Right(dto.toEntity(urlFactory: _remote.urlFactory));
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
+    } on PostgrestException catch (e) {
+      return Left(ServerFailure(e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
+    } on SocketException catch (e) {
+      return Left(NetworkFailure(e.message));
     } catch (e) {
       return Left(UnknownFailure(e.toString()));
     }

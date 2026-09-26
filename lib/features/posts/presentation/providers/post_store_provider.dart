@@ -43,6 +43,21 @@ class PostStore extends _$PostStore {
     final copy = Map<PostId, Post>.from(state)..remove(id);
     state = copy;
   }
+
+  /// Update all posts matching a predicate (e.g. following a publisher).
+  void updateWhere(bool Function(Post p) predicate, Post Function(Post current) transform) {
+    var changed = false;
+    final copy = Map<PostId, Post>.from(state);
+    for (final entry in state.entries) {
+      if (predicate(entry.value)) {
+        copy[entry.key] = transform(entry.value);
+        changed = true;
+      }
+    }
+    if (changed) {
+      state = copy;
+    }
+  }
 }
 
 /// Selector provider to watch an individual Post reactively from the normalized store.

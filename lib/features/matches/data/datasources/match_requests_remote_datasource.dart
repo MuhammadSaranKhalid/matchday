@@ -64,7 +64,7 @@ class MatchRequestsRemoteDataSource {
       if (data is Map && data['request_id'] is String) {
         return data['request_id'] as String;
       }
-      throw ServerException('send-match-request returned no request_id');
+      throw const ServerException('send-match-request returned no request_id');
     } on FunctionException catch (e) {
       throw _functionException(e);
     }
@@ -99,7 +99,7 @@ class MatchRequestsRemoteDataSource {
           (data['match_id'] as String).isNotEmpty) {
         return data['match_id'] as String;
       }
-      throw ServerException('match-request-action returned no match_id');
+      throw const ServerException('match-request-action returned no match_id');
     } on FunctionException catch (e) {
       throw _functionException(e, fallbackMessage: 'accept_challenge failed');
     }
@@ -268,7 +268,7 @@ class MatchRequestsRemoteDataSource {
           (data['match_id'] as String).isNotEmpty) {
         return data['match_id'] as String;
       }
-      throw ServerException('match-request-action returned no match_id');
+      throw const ServerException('match-request-action returned no match_id');
     } on FunctionException catch (e) {
       throw _functionException(
         e,

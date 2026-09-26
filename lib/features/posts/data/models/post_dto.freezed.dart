@@ -559,7 +559,7 @@ as int,
 /// @nodoc
 mixin _$PostViewerInteractionsDto {
 
- bool get liked; bool get bookmarked;@JsonKey(name: 'following_publisher') bool get followingPublisher;
+@JsonKey(name: 'is_liked') bool get isLiked;@JsonKey(name: 'liked') bool get liked;@JsonKey(name: 'is_bookmarked') bool get isBookmarked;@JsonKey(name: 'bookmarked') bool get bookmarked;@JsonKey(name: 'is_following_publisher') bool get isFollowingPublisher;@JsonKey(name: 'following_publisher') bool get followingPublisher;@JsonKey(name: 'bookmarked_at') String? get bookmarkedAt;
 /// Create a copy of PostViewerInteractionsDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -572,16 +572,16 @@ $PostViewerInteractionsDtoCopyWith<PostViewerInteractionsDto> get copyWith => _$
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PostViewerInteractionsDto&&(identical(other.liked, liked) || other.liked == liked)&&(identical(other.bookmarked, bookmarked) || other.bookmarked == bookmarked)&&(identical(other.followingPublisher, followingPublisher) || other.followingPublisher == followingPublisher));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PostViewerInteractionsDto&&(identical(other.isLiked, isLiked) || other.isLiked == isLiked)&&(identical(other.liked, liked) || other.liked == liked)&&(identical(other.isBookmarked, isBookmarked) || other.isBookmarked == isBookmarked)&&(identical(other.bookmarked, bookmarked) || other.bookmarked == bookmarked)&&(identical(other.isFollowingPublisher, isFollowingPublisher) || other.isFollowingPublisher == isFollowingPublisher)&&(identical(other.followingPublisher, followingPublisher) || other.followingPublisher == followingPublisher)&&(identical(other.bookmarkedAt, bookmarkedAt) || other.bookmarkedAt == bookmarkedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,liked,bookmarked,followingPublisher);
+int get hashCode => Object.hash(runtimeType,isLiked,liked,isBookmarked,bookmarked,isFollowingPublisher,followingPublisher,bookmarkedAt);
 
 @override
 String toString() {
-  return 'PostViewerInteractionsDto(liked: $liked, bookmarked: $bookmarked, followingPublisher: $followingPublisher)';
+  return 'PostViewerInteractionsDto(isLiked: $isLiked, liked: $liked, isBookmarked: $isBookmarked, bookmarked: $bookmarked, isFollowingPublisher: $isFollowingPublisher, followingPublisher: $followingPublisher, bookmarkedAt: $bookmarkedAt)';
 }
 
 
@@ -592,7 +592,7 @@ abstract mixin class $PostViewerInteractionsDtoCopyWith<$Res>  {
   factory $PostViewerInteractionsDtoCopyWith(PostViewerInteractionsDto value, $Res Function(PostViewerInteractionsDto) _then) = _$PostViewerInteractionsDtoCopyWithImpl;
 @useResult
 $Res call({
- bool liked, bool bookmarked,@JsonKey(name: 'following_publisher') bool followingPublisher
+@JsonKey(name: 'is_liked') bool isLiked,@JsonKey(name: 'liked') bool liked,@JsonKey(name: 'is_bookmarked') bool isBookmarked,@JsonKey(name: 'bookmarked') bool bookmarked,@JsonKey(name: 'is_following_publisher') bool isFollowingPublisher,@JsonKey(name: 'following_publisher') bool followingPublisher,@JsonKey(name: 'bookmarked_at') String? bookmarkedAt
 });
 
 
@@ -609,12 +609,16 @@ class _$PostViewerInteractionsDtoCopyWithImpl<$Res>
 
 /// Create a copy of PostViewerInteractionsDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? liked = null,Object? bookmarked = null,Object? followingPublisher = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? isLiked = null,Object? liked = null,Object? isBookmarked = null,Object? bookmarked = null,Object? isFollowingPublisher = null,Object? followingPublisher = null,Object? bookmarkedAt = freezed,}) {
   return _then(_self.copyWith(
-liked: null == liked ? _self.liked : liked // ignore: cast_nullable_to_non_nullable
+isLiked: null == isLiked ? _self.isLiked : isLiked // ignore: cast_nullable_to_non_nullable
+as bool,liked: null == liked ? _self.liked : liked // ignore: cast_nullable_to_non_nullable
+as bool,isBookmarked: null == isBookmarked ? _self.isBookmarked : isBookmarked // ignore: cast_nullable_to_non_nullable
 as bool,bookmarked: null == bookmarked ? _self.bookmarked : bookmarked // ignore: cast_nullable_to_non_nullable
+as bool,isFollowingPublisher: null == isFollowingPublisher ? _self.isFollowingPublisher : isFollowingPublisher // ignore: cast_nullable_to_non_nullable
 as bool,followingPublisher: null == followingPublisher ? _self.followingPublisher : followingPublisher // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,bookmarkedAt: freezed == bookmarkedAt ? _self.bookmarkedAt : bookmarkedAt // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -699,10 +703,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool liked,  bool bookmarked, @JsonKey(name: 'following_publisher')  bool followingPublisher)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'liked')  bool liked, @JsonKey(name: 'is_bookmarked')  bool isBookmarked, @JsonKey(name: 'bookmarked')  bool bookmarked, @JsonKey(name: 'is_following_publisher')  bool isFollowingPublisher, @JsonKey(name: 'following_publisher')  bool followingPublisher, @JsonKey(name: 'bookmarked_at')  String? bookmarkedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PostViewerInteractionsDto() when $default != null:
-return $default(_that.liked,_that.bookmarked,_that.followingPublisher);case _:
+return $default(_that.isLiked,_that.liked,_that.isBookmarked,_that.bookmarked,_that.isFollowingPublisher,_that.followingPublisher,_that.bookmarkedAt);case _:
   return orElse();
 
 }
@@ -720,10 +724,10 @@ return $default(_that.liked,_that.bookmarked,_that.followingPublisher);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool liked,  bool bookmarked, @JsonKey(name: 'following_publisher')  bool followingPublisher)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'liked')  bool liked, @JsonKey(name: 'is_bookmarked')  bool isBookmarked, @JsonKey(name: 'bookmarked')  bool bookmarked, @JsonKey(name: 'is_following_publisher')  bool isFollowingPublisher, @JsonKey(name: 'following_publisher')  bool followingPublisher, @JsonKey(name: 'bookmarked_at')  String? bookmarkedAt)  $default,) {final _that = this;
 switch (_that) {
 case _PostViewerInteractionsDto():
-return $default(_that.liked,_that.bookmarked,_that.followingPublisher);case _:
+return $default(_that.isLiked,_that.liked,_that.isBookmarked,_that.bookmarked,_that.isFollowingPublisher,_that.followingPublisher,_that.bookmarkedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -740,10 +744,10 @@ return $default(_that.liked,_that.bookmarked,_that.followingPublisher);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool liked,  bool bookmarked, @JsonKey(name: 'following_publisher')  bool followingPublisher)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'is_liked')  bool isLiked, @JsonKey(name: 'liked')  bool liked, @JsonKey(name: 'is_bookmarked')  bool isBookmarked, @JsonKey(name: 'bookmarked')  bool bookmarked, @JsonKey(name: 'is_following_publisher')  bool isFollowingPublisher, @JsonKey(name: 'following_publisher')  bool followingPublisher, @JsonKey(name: 'bookmarked_at')  String? bookmarkedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _PostViewerInteractionsDto() when $default != null:
-return $default(_that.liked,_that.bookmarked,_that.followingPublisher);case _:
+return $default(_that.isLiked,_that.liked,_that.isBookmarked,_that.bookmarked,_that.isFollowingPublisher,_that.followingPublisher,_that.bookmarkedAt);case _:
   return null;
 
 }
@@ -755,12 +759,16 @@ return $default(_that.liked,_that.bookmarked,_that.followingPublisher);case _:
 @JsonSerializable()
 
 class _PostViewerInteractionsDto extends PostViewerInteractionsDto {
-  const _PostViewerInteractionsDto({this.liked = false, this.bookmarked = false, @JsonKey(name: 'following_publisher') this.followingPublisher = false}): super._();
+  const _PostViewerInteractionsDto({@JsonKey(name: 'is_liked') this.isLiked = false, @JsonKey(name: 'liked') this.liked = false, @JsonKey(name: 'is_bookmarked') this.isBookmarked = false, @JsonKey(name: 'bookmarked') this.bookmarked = false, @JsonKey(name: 'is_following_publisher') this.isFollowingPublisher = false, @JsonKey(name: 'following_publisher') this.followingPublisher = false, @JsonKey(name: 'bookmarked_at') this.bookmarkedAt}): super._();
   factory _PostViewerInteractionsDto.fromJson(Map<String, dynamic> json) => _$PostViewerInteractionsDtoFromJson(json);
 
-@override@JsonKey() final  bool liked;
-@override@JsonKey() final  bool bookmarked;
+@override@JsonKey(name: 'is_liked') final  bool isLiked;
+@override@JsonKey(name: 'liked') final  bool liked;
+@override@JsonKey(name: 'is_bookmarked') final  bool isBookmarked;
+@override@JsonKey(name: 'bookmarked') final  bool bookmarked;
+@override@JsonKey(name: 'is_following_publisher') final  bool isFollowingPublisher;
 @override@JsonKey(name: 'following_publisher') final  bool followingPublisher;
+@override@JsonKey(name: 'bookmarked_at') final  String? bookmarkedAt;
 
 /// Create a copy of PostViewerInteractionsDto
 /// with the given fields replaced by the non-null parameter values.
@@ -775,16 +783,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PostViewerInteractionsDto&&(identical(other.liked, liked) || other.liked == liked)&&(identical(other.bookmarked, bookmarked) || other.bookmarked == bookmarked)&&(identical(other.followingPublisher, followingPublisher) || other.followingPublisher == followingPublisher));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PostViewerInteractionsDto&&(identical(other.isLiked, isLiked) || other.isLiked == isLiked)&&(identical(other.liked, liked) || other.liked == liked)&&(identical(other.isBookmarked, isBookmarked) || other.isBookmarked == isBookmarked)&&(identical(other.bookmarked, bookmarked) || other.bookmarked == bookmarked)&&(identical(other.isFollowingPublisher, isFollowingPublisher) || other.isFollowingPublisher == isFollowingPublisher)&&(identical(other.followingPublisher, followingPublisher) || other.followingPublisher == followingPublisher)&&(identical(other.bookmarkedAt, bookmarkedAt) || other.bookmarkedAt == bookmarkedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,liked,bookmarked,followingPublisher);
+int get hashCode => Object.hash(runtimeType,isLiked,liked,isBookmarked,bookmarked,isFollowingPublisher,followingPublisher,bookmarkedAt);
 
 @override
 String toString() {
-  return 'PostViewerInteractionsDto(liked: $liked, bookmarked: $bookmarked, followingPublisher: $followingPublisher)';
+  return 'PostViewerInteractionsDto(isLiked: $isLiked, liked: $liked, isBookmarked: $isBookmarked, bookmarked: $bookmarked, isFollowingPublisher: $isFollowingPublisher, followingPublisher: $followingPublisher, bookmarkedAt: $bookmarkedAt)';
 }
 
 
@@ -795,7 +803,7 @@ abstract mixin class _$PostViewerInteractionsDtoCopyWith<$Res> implements $PostV
   factory _$PostViewerInteractionsDtoCopyWith(_PostViewerInteractionsDto value, $Res Function(_PostViewerInteractionsDto) _then) = __$PostViewerInteractionsDtoCopyWithImpl;
 @override @useResult
 $Res call({
- bool liked, bool bookmarked,@JsonKey(name: 'following_publisher') bool followingPublisher
+@JsonKey(name: 'is_liked') bool isLiked,@JsonKey(name: 'liked') bool liked,@JsonKey(name: 'is_bookmarked') bool isBookmarked,@JsonKey(name: 'bookmarked') bool bookmarked,@JsonKey(name: 'is_following_publisher') bool isFollowingPublisher,@JsonKey(name: 'following_publisher') bool followingPublisher,@JsonKey(name: 'bookmarked_at') String? bookmarkedAt
 });
 
 
@@ -812,12 +820,16 @@ class __$PostViewerInteractionsDtoCopyWithImpl<$Res>
 
 /// Create a copy of PostViewerInteractionsDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? liked = null,Object? bookmarked = null,Object? followingPublisher = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? isLiked = null,Object? liked = null,Object? isBookmarked = null,Object? bookmarked = null,Object? isFollowingPublisher = null,Object? followingPublisher = null,Object? bookmarkedAt = freezed,}) {
   return _then(_PostViewerInteractionsDto(
-liked: null == liked ? _self.liked : liked // ignore: cast_nullable_to_non_nullable
+isLiked: null == isLiked ? _self.isLiked : isLiked // ignore: cast_nullable_to_non_nullable
+as bool,liked: null == liked ? _self.liked : liked // ignore: cast_nullable_to_non_nullable
+as bool,isBookmarked: null == isBookmarked ? _self.isBookmarked : isBookmarked // ignore: cast_nullable_to_non_nullable
 as bool,bookmarked: null == bookmarked ? _self.bookmarked : bookmarked // ignore: cast_nullable_to_non_nullable
+as bool,isFollowingPublisher: null == isFollowingPublisher ? _self.isFollowingPublisher : isFollowingPublisher // ignore: cast_nullable_to_non_nullable
 as bool,followingPublisher: null == followingPublisher ? _self.followingPublisher : followingPublisher // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,bookmarkedAt: freezed == bookmarkedAt ? _self.bookmarkedAt : bookmarkedAt // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 

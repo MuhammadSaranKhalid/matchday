@@ -2,23 +2,17 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../data/datasources/posts_datasource_providers.dart';
+import '../../data/repositories/comments_repository_impl.dart';
 import '../../data/repositories/post_command_repository_impl.dart';
 import '../../data/repositories/post_read_repository_impl.dart';
-import '../../data/repositories/posts_repository_impl.dart';
 import '../../domain/entities/pending_post.dart';
 import '../../domain/entities/post.dart';
+import '../../domain/repositories/comments_repository.dart';
 import '../../domain/repositories/post_command_repository.dart';
 import '../../domain/repositories/post_read_repository.dart';
-import '../../domain/repositories/posts_repository.dart';
 import 'post_store_provider.dart';
 
 part 'posts_providers.g.dart';
-
-@Riverpod(keepAlive: true)
-PostsRepository postsRepository(Ref ref) => PostsRepositoryImpl(
-      ref.watch(postsRemoteDataSourceProvider),
-      local: ref.watch(postsLocalDataSourceProvider),
-    );
 
 /// CQRS Read Repository Provider.
 @Riverpod(keepAlive: true)
@@ -31,6 +25,12 @@ PostReadRepository postReadRepository(Ref ref) => PostReadRepositoryImpl(
 PostCommandRepository postCommandRepository(Ref ref) => PostCommandRepositoryImpl(
       ref.watch(postsRemoteDataSourceProvider),
       local: ref.watch(postsLocalDataSourceProvider),
+    );
+
+/// Comments Repository Provider.
+@Riverpod(keepAlive: true)
+CommentsRepository commentsRepository(Ref ref) => CommentsRepositoryImpl(
+      ref.watch(commentsRemoteDataSourceProvider),
     );
 
 /// Emits the local pending uploads/posts created on this device.
@@ -50,9 +50,9 @@ Future<List<Post>> authorPosts(Ref ref, String authorId) async {
   );
   return result.fold(
     (f) => throw FailureWrapper(f),
-    (posts) {
-      ref.read(postStoreProvider.notifier).upsertAll(posts);
-      return posts;
+    (page) {
+      ref.read(postStoreProvider.notifier).upsertAll(page.posts);
+      return page.posts;
     },
   );
 }
@@ -67,9 +67,9 @@ Future<List<Post>> teamPosts(Ref ref, String teamId) async {
   );
   return result.fold(
     (f) => throw FailureWrapper(f),
-    (posts) {
-      ref.read(postStoreProvider.notifier).upsertAll(posts);
-      return posts;
+    (page) {
+      ref.read(postStoreProvider.notifier).upsertAll(page.posts);
+      return page.posts;
     },
   );
 }
@@ -118,9 +118,9 @@ Future<List<Post>> savedPosts(Ref ref) async {
   final result = await repo.getSavedPosts();
   return result.fold(
     (f) => throw FailureWrapper(f),
-    (posts) {
-      ref.read(postStoreProvider.notifier).upsertAll(posts);
-      return posts;
+    (page) {
+      ref.read(postStoreProvider.notifier).upsertAll(page.posts);
+      return page.posts;
     },
   );
 }

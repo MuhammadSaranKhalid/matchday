@@ -9,54 +9,6 @@ part of 'comments_controller.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(commentsRepository)
-final commentsRepositoryProvider = CommentsRepositoryProvider._();
-
-final class CommentsRepositoryProvider
-    extends
-        $FunctionalProvider<
-          CommentsRepository,
-          CommentsRepository,
-          CommentsRepository
-        >
-    with $Provider<CommentsRepository> {
-  CommentsRepositoryProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'commentsRepositoryProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$commentsRepositoryHash();
-
-  @$internal
-  @override
-  $ProviderElement<CommentsRepository> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  CommentsRepository create(Ref ref) {
-    return commentsRepository(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(CommentsRepository value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<CommentsRepository>(value),
-    );
-  }
-}
-
-String _$commentsRepositoryHash() =>
-    r'6034bd4bbc35a6e8eb43d4d0cf631749ca14d189';
-
 @ProviderFor(CommentsController)
 final commentsControllerProvider = CommentsControllerFamily._();
 
@@ -99,7 +51,7 @@ final class CommentsControllerProvider
 }
 
 String _$commentsControllerHash() =>
-    r'd39b8173edac9ade2db5ab36bd5bf822f2f77e4d';
+    r'eed3c5d42d01a372d3a71897377f4682efc25da2';
 
 final class CommentsControllerFamily extends $Family
     with

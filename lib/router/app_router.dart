@@ -47,6 +47,7 @@ import '../features/matches/presentation/screens/scorecard_screen.dart';
 import '../features/matches/presentation/screens/result_screen.dart';
 import '../features/notifications/presentation/screens/notifications_screen.dart';
 import '../features/posts/domain/entities/post.dart';
+import '../features/posts/domain/entities/post_draft.dart';
 import '../features/posts/presentation/screens/composer_screen.dart';
 import '../features/posts/presentation/screens/post_detail_screen.dart';
 import '../features/posts/presentation/screens/saved_posts_screen.dart';
@@ -661,15 +662,23 @@ GoRouter appRouter(Ref ref) {
           final teamId = state.uri.queryParameters['teamId'];
           final teamName = state.uri.queryParameters['teamName'];
           final teamMono = state.uri.queryParameters['teamMono'];
-          return ComposerScreen(
-            initialAuthorContext:
-                teamId != null
-                    ? PostAuthorContext.teamManager
-                    : PostAuthorContext.personal,
-            initialEntityId: teamId,
-            initialEntityName: teamName,
-            initialEntityMono: teamMono,
-          );
+          final tournamentId = state.uri.queryParameters['tournamentId'];
+          final tournamentName = state.uri.queryParameters['tournamentName'];
+          final publisher = teamId != null
+              ? PostPublisherSelection(
+                  type: PostPublisherType.team,
+                  id: teamId,
+                  name: teamName,
+                  monogram: teamMono,
+                )
+              : (tournamentId != null
+                  ? PostPublisherSelection(
+                      type: PostPublisherType.tournament,
+                      id: tournamentId,
+                      name: tournamentName,
+                    )
+                  : PostPublisherSelection.user);
+          return ComposerScreen(initialPublisher: publisher);
         },
       ),
     ],

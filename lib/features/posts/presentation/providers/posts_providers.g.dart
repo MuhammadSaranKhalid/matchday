@@ -8,49 +8,6 @@ part of 'posts_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-
-@ProviderFor(postsRepository)
-final postsRepositoryProvider = PostsRepositoryProvider._();
-
-final class PostsRepositoryProvider
-    extends
-        $FunctionalProvider<PostsRepository, PostsRepository, PostsRepository>
-    with $Provider<PostsRepository> {
-  PostsRepositoryProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'postsRepositoryProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$postsRepositoryHash();
-
-  @$internal
-  @override
-  $ProviderElement<PostsRepository> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  PostsRepository create(Ref ref) {
-    return postsRepository(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(PostsRepository value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<PostsRepository>(value),
-    );
-  }
-}
-
-String _$postsRepositoryHash() => r'10ca989c9211262ea2b49d1e96df46210a2e7d16';
-
 /// CQRS Read Repository Provider.
 
 @ProviderFor(postReadRepository)
@@ -156,6 +113,59 @@ final class PostCommandRepositoryProvider
 
 String _$postCommandRepositoryHash() =>
     r'a9b80650d36ee348e6c87463afb50defda469007';
+
+/// Comments Repository Provider.
+
+@ProviderFor(commentsRepository)
+final commentsRepositoryProvider = CommentsRepositoryProvider._();
+
+/// Comments Repository Provider.
+
+final class CommentsRepositoryProvider
+    extends
+        $FunctionalProvider<
+          CommentsRepository,
+          CommentsRepository,
+          CommentsRepository
+        >
+    with $Provider<CommentsRepository> {
+  /// Comments Repository Provider.
+  CommentsRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'commentsRepositoryProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$commentsRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<CommentsRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  CommentsRepository create(Ref ref) {
+    return commentsRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CommentsRepository value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CommentsRepository>(value),
+    );
+  }
+}
+
+String _$commentsRepositoryHash() =>
+    r'6034bd4bbc35a6e8eb43d4d0cf631749ca14d189';
 
 /// Emits the local pending uploads/posts created on this device.
 
@@ -265,7 +275,7 @@ final class AuthorPostsProvider
   }
 }
 
-String _$authorPostsHash() => r'65fd2aecf7f237c612cb3f1388817e43efbddcfd';
+String _$authorPostsHash() => r'38d89ce834785a0fcb0437473ce49235c8feeef5';
 
 /// Posts authored by [authorId] (Profile tab / spectator).
 /// Populates the L1 PostStore and returns the canonical entities.
@@ -350,7 +360,7 @@ final class TeamPostsProvider
   }
 }
 
-String _$teamPostsHash() => r'0bc2e020c319450dc7da94e5896336e1fa667f48';
+String _$teamPostsHash() => r'aef85332bbfcb533609ed88faf8d99c7cfdc436c';
 
 /// Posts authored by or linked to [teamId] (Team Profile Posts tab).
 
@@ -560,4 +570,4 @@ final class SavedPostsProvider
   }
 }
 
-String _$savedPostsHash() => r'08f0ebfbd4f4443b77e06ceb8317db5bb83975a4';
+String _$savedPostsHash() => r'4eaae771dd31dba9e52863b59e85aaa6f33e0e09';

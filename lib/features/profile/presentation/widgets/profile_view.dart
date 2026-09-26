@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/utils/app_links.dart';
 import '../../../../core/widgets/v2/ck_shimmer.dart';
 import '../../../../core/widgets/v2/v2_kit.dart';
 import '../../../../core/widgets/modals/modals.dart';
@@ -1318,7 +1319,7 @@ Future<void> _shareProfile(
   required String handle,
 }) {
   final slug = handle.startsWith('@') ? handle.substring(1) : handle;
-  final link = 'https://joinmatchday.com/u/$slug';
+  final link = AppLinks.profile(slug);
   final box = originContext.findRenderObject() as RenderBox?;
   final origin =
       (box != null && box.hasSize)

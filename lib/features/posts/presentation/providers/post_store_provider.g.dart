@@ -50,7 +50,7 @@ final class PostStoreProvider
   }
 }
 
-String _$postStoreHash() => r'1271941be303421e857403635afb091f9e8954fc';
+String _$postStoreHash() => r'f4da1e6873ed37e357375bed483e39b36aaf836b';
 
 /// L1 Session-level normalized Post cache: `Map<PostId, Post>`.
 /// All queries (Home Feed, Profile Posts, Saved Posts, Post Detail) point into this store.

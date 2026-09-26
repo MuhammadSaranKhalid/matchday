@@ -40,7 +40,7 @@ class TeamsRemoteDataSource {
 
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
-    if (id == null) throw UnauthorizedException('Must be signed in');
+    if (id == null) throw const UnauthorizedException('Must be signed in');
     return id;
   }
 
@@ -231,7 +231,7 @@ class TeamsRemoteDataSource {
       );
       final data = res.data;
       if (data is! Map || data['results'] is! List) {
-        throw ServerException('Unexpected search-teams payload');
+        throw const ServerException('Unexpected search-teams payload');
       }
       return (data['results'] as List)
           .cast<Map<String, dynamic>>()
@@ -273,7 +273,7 @@ class TeamsRemoteDataSource {
       );
       final data = res.data;
       if (data is! Map || data['facets'] is! List) {
-        throw ServerException('Unexpected team-place-facets payload');
+        throw const ServerException('Unexpected team-place-facets payload');
       }
       return (data['facets'] as List)
           .cast<Map<String, dynamic>>()

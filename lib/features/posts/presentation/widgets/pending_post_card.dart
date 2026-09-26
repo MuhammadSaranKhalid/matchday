@@ -66,7 +66,7 @@ class PendingPostCard extends ConsumerWidget {
               if (isFailed) ...[
                 TextButton(
                   onPressed: () => ref
-                      .read(postsRepositoryProvider)
+                      .read(postCommandRepositoryProvider)
                       .retryPendingPost(pendingPost.postId),
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
@@ -83,7 +83,7 @@ class PendingPostCard extends ConsumerWidget {
                 ),
                 TextButton(
                   onPressed: () => ref
-                      .read(postsRepositoryProvider)
+                      .read(postCommandRepositoryProvider)
                       .discardPendingPost(pendingPost.postId),
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,

@@ -77,12 +77,6 @@ class TeamPostsTab extends ConsumerWidget {
                         onOpenProfile: (String username) =>
                             context.push('/u/$username'),
                       ),
-                      onLike: () => ref
-                          .read(postsRepositoryProvider)
-                          .setPostLike(post.id, liked: !post.viewer.isLiked),
-                      onBookmark: () => ref
-                          .read(postsRepositoryProvider)
-                          .setPostBookmark(post.id, bookmarked: !post.viewer.isBookmarked),
                       onAuthorTap: (String username) =>
                           context.push('/u/$username'),
                       onOpenPhoto: (int index) {

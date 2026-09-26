@@ -7,7 +7,7 @@ import '../../data/repositories/comments_repository_impl.dart';
 import '../../domain/entities/comment.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/repositories/comments_repository.dart';
-import 'feed_controller.dart';
+import 'post_interactions_controller.dart';
 
 part 'comments_controller.g.dart';
 
@@ -78,8 +78,8 @@ class CommentsController extends _$CommentsController {
         // Rollback on failure
         state = AsyncData(currentList);
         ref
-            .read(feedControllerProvider.notifier)
-            .decrementCommentsCount(PostId(postId));
+            .read(postInteractionsControllerProvider.notifier)
+            .updateCommentsCount(PostId(postId), -1);
       },
       (created) {
         // Replace temp optimistic comment with actual saved comment
@@ -149,6 +149,9 @@ class CommentsController extends _$CommentsController {
         .toList();
 
     state = AsyncData(updated);
+    ref
+        .read(postInteractionsControllerProvider.notifier)
+        .updateCommentsCount(PostId(postId), -1);
 
     final repo = ref.read(commentsRepositoryProvider);
     final result = await repo.deleteComment(commentId);
@@ -156,6 +159,9 @@ class CommentsController extends _$CommentsController {
     result.fold(
       (failure) {
         state = AsyncData(currentList);
+        ref
+            .read(postInteractionsControllerProvider.notifier)
+            .updateCommentsCount(PostId(postId), 1);
       },
       (_) {},
     );

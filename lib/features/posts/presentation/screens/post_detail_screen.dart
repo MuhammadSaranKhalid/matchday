@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/circk_theme.dart';
 import '../../../../core/widgets/modals/comments_sheet.dart';
@@ -57,26 +56,6 @@ class PostDetailScreen extends ConsumerWidget {
                       : post.authorName,
                   onOpenProfile: (username) => context.push('/u/$username'),
                 ),
-                onLike: () async {
-                  await ref
-                      .read(postsRepositoryProvider)
-                      .setPostLike(post.id, liked: !post.isLiked);
-                  ref.invalidate(postDetailProvider(postId));
-                },
-                onBookmark: () async {
-                  await ref
-                      .read(postsRepositoryProvider)
-                      .setPostBookmark(post.id, bookmarked: !post.isBookmarked);
-                  ref.invalidate(postDetailProvider(postId));
-                },
-                onShare: () {
-                  SharePlus.instance.share(
-                    ShareParams(
-                      text:
-                          'Check out this post on Matchday: https://matchday.cricket/posts/${post.id.value}',
-                    ),
-                  );
-                },
                 onAuthorTap: (username) => context.push('/u/$username'),
                 onOpenPhoto: (index) => _openPhoto(context, post.media, index),
               ),

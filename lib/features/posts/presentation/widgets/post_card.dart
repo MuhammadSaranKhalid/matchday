@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../../core/supabase/supabase_client_provider.dart';
@@ -13,6 +14,8 @@ import '../../domain/entities/post.dart';
 import '../../../safety/presentation/widgets/safety_menu.dart';
 import '../../../safety/presentation/providers/safety_providers.dart';
 import '../../domain/entities/post_media.dart';
+import '../controllers/post_interactions_controller.dart';
+import '../providers/post_store_provider.dart';
 
 class FeedPostCard extends ConsumerWidget {
   const FeedPostCard({
@@ -44,10 +47,8 @@ class FeedPostCard extends ConsumerWidget {
   final bool showAuthor;
 
   /// A team author is a crest, not a square tile: artwork inset on a paper
-  /// disc, against the player author's full-bleed photo circle below. That
-  /// silhouette difference is what tells a reader whether the byline is a
-  /// club or a person.
-  Widget _teamCrest() => TeamCrest(
+  /// disc, against the player author's full-bleed photo circle below.
+  Widget _teamCrest(Post post) => TeamCrest(
         name: post.displayName,
         logoUrl: post.displayPhotoUrl,
         monogram: post.displayMonogram,
@@ -56,8 +57,29 @@ class FeedPostCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final effectivePost = ref.watch(postFromStoreProvider(post.id)) ?? post;
+
     final blocked = ref.watch(blockedAccountsProvider).value ?? [];
-    if (blocked.any((u) => u.id == post.authorId)) return const SizedBox.shrink();
+    if (blocked.any((u) => u.id == effectivePost.authorId)) return const SizedBox.shrink();
+
+    final onLikeAction = onLike ??
+        () => ref
+            .read(postInteractionsControllerProvider.notifier)
+            .toggleLike(effectivePost.id, fallback: effectivePost);
+    final onBookmarkAction = onBookmark ??
+        () => ref
+            .read(postInteractionsControllerProvider.notifier)
+            .toggleBookmark(effectivePost.id, fallback: effectivePost);
+    final onShareAction = onShare ??
+        () {
+          SharePlus.instance.share(
+            ShareParams(
+              text:
+                  'Check out this post on Matchday: https://gomatchday.app/posts/${effectivePost.id.value}',
+            ),
+          );
+        };
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: const BoxDecoration(
@@ -67,27 +89,36 @@ class FeedPostCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!showAuthor) Align(alignment: Alignment.centerRight, child: SafetyMenu(userId: post.authorId, kind: 'post', targetId: post.id.value, onShare: onShare)),
+          if (!showAuthor)
+            Align(
+              alignment: Alignment.centerRight,
+              child: SafetyMenu(
+                userId: effectivePost.authorId,
+                kind: 'post',
+                targetId: effectivePost.id.value,
+                onShare: onShareAction,
+              ),
+            ),
           if (showAuthor) ...[
-            _header(context, ref),
+            _header(context, ref, effectivePost, onShareAction),
             const SizedBox(height: 10),
           ],
-          if ((post.text ?? '').isNotEmpty) ...[
-            _ExpandablePostText(text: post.text!),
+          if ((effectivePost.text ?? '').isNotEmpty) ...[
+            _ExpandablePostText(text: effectivePost.text!),
             const SizedBox(height: 10),
           ],
-          if (post.hasMedia) ...[
-            PostMediaGrid(media: post.media, onOpen: onOpenPhoto),
+          if (effectivePost.hasMedia) ...[
+            PostMediaGrid(media: effectivePost.media, onOpen: onOpenPhoto),
             const SizedBox(height: 4),
           ],
           PostActions(
-            likes: post.likesCount,
-            comments: post.commentsCount,
-            liked: post.isLiked,
-            saved: post.isBookmarked,
-            onLike: onLike,
-            onBookmark: onBookmark,
-            onShare: onShare,
+            likes: effectivePost.likesCount,
+            comments: effectivePost.commentsCount,
+            liked: effectivePost.isLiked,
+            saved: effectivePost.isBookmarked,
+            onLike: onLikeAction,
+            onBookmark: onBookmarkAction,
+            onShare: onShareAction,
             onComment: onComment,
           ),
         ],
@@ -95,24 +126,35 @@ class FeedPostCard extends ConsumerWidget {
     );
   }
 
-  Widget _header(BuildContext context, WidgetRef ref) {
+  Widget _header(
+    BuildContext context,
+    WidgetRef ref,
+    Post post,
+    VoidCallback onShareAction,
+  ) {
     final time = timeago.format(post.createdAt, locale: 'en_short');
-    final isTeam = post.authorContext == PostAuthorContext.teamManager;
+    final isTeam = post.isTeamPublisher;
     final currentUserId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
 
-    final targetType = isTeam ? 'team' : 'user';
-    final targetId = isTeam ? (post.linkedTeamId ?? post.contextEntityId) : post.authorId;
-    final isSelf = targetId != null && (targetId == currentUserId || post.authorId == currentUserId);
+    final targetType = switch (post.publisher.type) {
+      PostPublisherType.team => 'team',
+      _ => 'user',
+    };
+    final targetId = isTeam
+        ? (post.linkedTeamId ?? post.contextEntityId ?? post.publisher.id)
+        : post.publisher.id;
+    final isSelf = targetId.isNotEmpty &&
+        (targetId == currentUserId || post.authorId == currentUserId);
 
-    final isFollowingAsync = (targetId != null && !isSelf)
+    final isFollowingAsync = (targetId.isNotEmpty && !isSelf)
         ? ref.watch(followToggleProvider(targetType, targetId))
         : null;
-    final isFollowing = isFollowingAsync?.value ?? false;
+    final isFollowing = isFollowingAsync?.value ?? post.isFollowing;
 
     void onNavigate() {
       if (isTeam) {
-        final teamId = post.linkedTeamId ?? post.contextEntityId;
-        if (teamId != null && teamId.isNotEmpty) {
+        final teamId = post.linkedTeamId ?? post.contextEntityId ?? post.publisher.id;
+        if (teamId.isNotEmpty) {
           context.push('/teams/$teamId');
           return;
         }
@@ -128,7 +170,7 @@ class FeedPostCard extends ConsumerWidget {
           behavior: HitTestBehavior.opaque,
           onTap: onNavigate,
           child: isTeam
-              ? _teamCrest()
+              ? _teamCrest(post)
               : Avatar(
                   mono: post.authorMonogram,
                   imageUrl: post.displayPhotoUrl,
@@ -222,7 +264,7 @@ class FeedPostCard extends ConsumerWidget {
         ),
 
         // Follow Button
-        if (targetId != null && !isSelf) ...[
+        if (targetId.isNotEmpty && !isSelf) ...[
           const SizedBox(width: 8),
           _FeedFollowButton(
             isFollowing: isFollowing,
@@ -232,7 +274,12 @@ class FeedPostCard extends ConsumerWidget {
           ),
         ],
 
-        SafetyMenu(userId: post.authorId, kind: 'post', targetId: post.id.value, onShare: onShare),
+        SafetyMenu(
+          userId: post.authorId,
+          kind: 'post',
+          targetId: post.id.value,
+          onShare: onShareAction,
+        ),
       ],
     );
   }

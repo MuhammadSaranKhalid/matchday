@@ -39,7 +39,7 @@ final class FeedControllerProvider
   FeedController create() => FeedController();
 }
 
-String _$feedControllerHash() => r'137a79bc5417aceeb8f4ac888ed7b0c6cd2815b2';
+String _$feedControllerHash() => r'dabb466688f0a955a66044568f88d0500a769bc5';
 
 /// The Home feed — newest active posts with keyset pagination + pull-to-refresh.
 /// Integrates with the L1 normalized [PostStore] to keep post interactions synchronized across all screens.

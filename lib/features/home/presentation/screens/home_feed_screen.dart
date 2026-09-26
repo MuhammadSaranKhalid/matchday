@@ -141,8 +141,6 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
                     : post.authorName,
                 onOpenProfile: (username) => widget.onOpenProfile?.call(username),
               ),
-              onLike: () => ref.read(feedControllerProvider.notifier).toggleLike(post.id),
-              onBookmark: () => ref.read(feedControllerProvider.notifier).toggleBookmark(post.id),
               onAuthorTap: (username) => widget.onOpenProfile?.call(username),
               onOpenPhoto: (index) => _openPhoto(post.media, index),
             ),

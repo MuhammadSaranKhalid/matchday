@@ -366,12 +366,6 @@ class ProfileView extends ConsumerWidget {
                                 : post.authorName,
                             onOpenProfile: (username) => context.push('/u/$username'),
                           ),
-                          onLike: () => ref
-                              .read(postsRepositoryProvider)
-                              .setPostLike(post.id, liked: !post.viewer.isLiked),
-                          onBookmark: () => ref
-                              .read(postsRepositoryProvider)
-                              .setPostBookmark(post.id, bookmarked: !post.viewer.isBookmarked),
                           onOpenPhoto:
                               (int idx) => Navigator.of(
                                 context,

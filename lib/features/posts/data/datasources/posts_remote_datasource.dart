@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
+import '../../domain/entities/post_like_result.dart';
 import '../models/post_dto.dart';
 import 'media_url_factory.dart';
 
@@ -233,25 +234,22 @@ class PostsRemoteDataSource {
   }
 
   /// Desired-state like: sets liked to true or false deterministically.
-  Future<bool> setPostLike(String postId, {required bool liked}) async {
+  Future<PostLikeResult> setPostLike(String postId, {required bool liked}) async {
     _requireUid();
-    try {
-      final response = await _supabase.rpc<dynamic>(
-        'set_post_like',
-        params: {
-          'p_post_id': postId,
-          'p_liked': liked,
-        },
+    final response = await _supabase.rpc<dynamic>(
+      'set_post_like',
+      params: {
+        'p_post_id': postId,
+        'p_liked': liked,
+      },
+    );
+    if (response is Map<String, dynamic>) {
+      return PostLikeResult(
+        isLiked: response['liked'] as bool? ?? liked,
+        likesCount: response['likes_count'] as int? ?? 0,
       );
-      if (response is Map<String, dynamic>) {
-        return response['liked'] as bool? ?? liked;
-      }
-      return liked;
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    } catch (e) {
-      throw ServerException(e.toString());
     }
+    return PostLikeResult(isLiked: liked, likesCount: 0);
   }
 
   /// Desired-state bookmark: sets bookmarked to true or false deterministically.

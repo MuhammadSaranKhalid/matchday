@@ -2,6 +2,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../data/datasources/posts_datasource_providers.dart';
+import '../../data/repositories/post_command_repository_impl.dart';
+import '../../data/repositories/post_read_repository_impl.dart';
 import '../../data/repositories/posts_repository_impl.dart';
 import '../../domain/entities/pending_post.dart';
 import '../../domain/entities/post.dart';
@@ -20,11 +22,16 @@ PostsRepository postsRepository(Ref ref) => PostsRepositoryImpl(
 
 /// CQRS Read Repository Provider.
 @Riverpod(keepAlive: true)
-PostReadRepository postReadRepository(Ref ref) => ref.watch(postsRepositoryProvider);
+PostReadRepository postReadRepository(Ref ref) => PostReadRepositoryImpl(
+      ref.watch(postsRemoteDataSourceProvider),
+    );
 
 /// CQRS Command Repository Provider.
 @Riverpod(keepAlive: true)
-PostCommandRepository postCommandRepository(Ref ref) => ref.watch(postsRepositoryProvider);
+PostCommandRepository postCommandRepository(Ref ref) => PostCommandRepositoryImpl(
+      ref.watch(postsRemoteDataSourceProvider),
+      local: ref.watch(postsLocalDataSourceProvider),
+    );
 
 /// Emits the local pending uploads/posts created on this device.
 @riverpod
@@ -77,21 +84,31 @@ class FeedFilter extends _$FeedFilter {
 }
 
 /// Single post by [postId] for canonical /posts/:postId screen.
-/// Checks L1 PostStore first, fetches from server on cache miss.
+/// Implements stale-while-revalidate: returns cached Post from PostStore if present,
+/// and revalidates in the background if needed.
 @riverpod
 Future<Post> postDetail(Ref ref, String postId) async {
-  final cached = ref.read(postStoreProvider)[PostId(postId)];
-  if (cached != null) return cached;
+  final id = PostId(postId);
+  final cached = ref.read(postStoreProvider)[id];
 
   final repo = ref.watch(postReadRepositoryProvider);
-  final result = await repo.getPost(PostId(postId));
-  return result.fold(
-    (f) => throw FailureWrapper(f),
-    (post) {
-      ref.read(postStoreProvider.notifier).upsert(post);
-      return post;
-    },
-  );
+  final future = repo.getPost(id).then((result) {
+    return result.fold(
+      (f) => throw FailureWrapper(f),
+      (post) {
+        ref.read(postStoreProvider.notifier).upsert(post);
+        return post;
+      },
+    );
+  });
+
+  if (cached != null) {
+    // Background revalidation without blocking initial paint
+    future.ignore();
+    return cached;
+  }
+
+  return future;
 }
 
 /// Bookmarked / saved posts.

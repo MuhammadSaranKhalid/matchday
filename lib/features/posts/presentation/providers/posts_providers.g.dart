@@ -102,7 +102,7 @@ final class PostReadRepositoryProvider
 }
 
 String _$postReadRepositoryHash() =>
-    r'ac983f3ff3979efaf3c4c65880138e3bb2aac359';
+    r'48013226b5eb3d365c00f78e2e7e5e460ce1bdcb';
 
 /// CQRS Command Repository Provider.
 
@@ -155,7 +155,7 @@ final class PostCommandRepositoryProvider
 }
 
 String _$postCommandRepositoryHash() =>
-    r'2825dce7ba33efd321b69df3bb4edab809143844';
+    r'a9b80650d36ee348e6c87463afb50defda469007';
 
 /// Emits the local pending uploads/posts created on this device.
 
@@ -432,19 +432,22 @@ abstract class _$FeedFilter extends $Notifier<String> {
 }
 
 /// Single post by [postId] for canonical /posts/:postId screen.
-/// Checks L1 PostStore first, fetches from server on cache miss.
+/// Implements stale-while-revalidate: returns cached Post from PostStore if present,
+/// and revalidates in the background if needed.
 
 @ProviderFor(postDetail)
 final postDetailProvider = PostDetailFamily._();
 
 /// Single post by [postId] for canonical /posts/:postId screen.
-/// Checks L1 PostStore first, fetches from server on cache miss.
+/// Implements stale-while-revalidate: returns cached Post from PostStore if present,
+/// and revalidates in the background if needed.
 
 final class PostDetailProvider
     extends $FunctionalProvider<AsyncValue<Post>, Post, FutureOr<Post>>
     with $FutureModifier<Post>, $FutureProvider<Post> {
   /// Single post by [postId] for canonical /posts/:postId screen.
-  /// Checks L1 PostStore first, fetches from server on cache miss.
+  /// Implements stale-while-revalidate: returns cached Post from PostStore if present,
+  /// and revalidates in the background if needed.
   PostDetailProvider._({
     required PostDetailFamily super.from,
     required String super.argument,
@@ -488,10 +491,11 @@ final class PostDetailProvider
   }
 }
 
-String _$postDetailHash() => r'ff8b1abdcb2c2880e24124bc3b0ff384adc77dcc';
+String _$postDetailHash() => r'800262651f160d548bcc309137c23b076bacf208';
 
 /// Single post by [postId] for canonical /posts/:postId screen.
-/// Checks L1 PostStore first, fetches from server on cache miss.
+/// Implements stale-while-revalidate: returns cached Post from PostStore if present,
+/// and revalidates in the background if needed.
 
 final class PostDetailFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<Post>, String> {
@@ -505,7 +509,8 @@ final class PostDetailFamily extends $Family
       );
 
   /// Single post by [postId] for canonical /posts/:postId screen.
-  /// Checks L1 PostStore first, fetches from server on cache miss.
+  /// Implements stale-while-revalidate: returns cached Post from PostStore if present,
+  /// and revalidates in the background if needed.
 
   PostDetailProvider call(String postId) =>
       PostDetailProvider._(argument: postId, from: this);

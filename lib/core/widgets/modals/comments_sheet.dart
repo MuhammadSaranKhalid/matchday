@@ -8,7 +8,7 @@ import '../../../features/safety/presentation/widgets/safety_menu.dart';
 import '../../../features/safety/presentation/providers/safety_providers.dart';
 import '../../../features/posts/domain/entities/post.dart';
 import '../../../features/posts/presentation/controllers/comments_controller.dart';
-import '../../../features/posts/presentation/controllers/feed_controller.dart';
+import '../../../features/posts/presentation/controllers/post_interactions_controller.dart';
 import '../../../features/profile/presentation/providers/profile_providers.dart';
 import '../../theme/circk_theme.dart';
 import '../v2/v2_kit.dart';
@@ -94,10 +94,10 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
         _expandedParentIds.add(parentId);
       }
 
-      // Increment feed post count optimistically
+      // Increment post comments count optimistically in PostStore
       ref
-          .read(feedControllerProvider.notifier)
-          .incrementCommentsCount(PostId(pid));
+          .read(postInteractionsControllerProvider.notifier)
+          .updateCommentsCount(PostId(pid), 1);
     }
 
     setState(() {

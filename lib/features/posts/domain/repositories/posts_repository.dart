@@ -4,6 +4,7 @@ import '../../../../core/error/failures.dart';
 import '../entities/pending_post.dart';
 import '../entities/post.dart';
 import '../entities/post_draft.dart';
+import '../entities/post_like_result.dart';
 import '../entities/publish_photo.dart';
 import '../value_objects/post_text.dart';
 
@@ -42,7 +43,7 @@ abstract class PostsRepository implements PostReadRepository, PostCommandReposit
   Future<Either<Failure, Unit>> deletePost(PostId id);
 
   @override
-  Future<Either<Failure, bool>> setPostLike(PostId id, {required bool liked});
+  Future<Either<Failure, PostLikeResult>> setPostLike(PostId id, {required bool liked});
 
   @override
   Future<Either<Failure, bool>> setPostBookmark(PostId id, {required bool bookmarked});

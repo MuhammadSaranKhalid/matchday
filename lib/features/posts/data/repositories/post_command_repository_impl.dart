@@ -10,115 +10,21 @@ import '../../domain/entities/post.dart';
 import '../../domain/entities/post_draft.dart';
 import '../../domain/entities/post_like_result.dart';
 import '../../domain/entities/publish_photo.dart';
-import '../../domain/repositories/posts_repository.dart';
+import '../../domain/repositories/post_command_repository.dart';
 import '../../domain/value_objects/post_text.dart';
 import '../datasources/posts_local_datasource.dart';
 import '../datasources/posts_remote_datasource.dart';
 
-/// Concrete PostsRepository implementation.
-/// The only boundary where raw SDK exceptions are caught and transformed into typed Failures.
-class PostsRepositoryImpl implements PostsRepository {
-  PostsRepositoryImpl(
+/// CQRS Command/Write Repository Implementation.
+/// Exclusively handles publishing outbox, mutations, state toggles, and deletion.
+class PostCommandRepositoryImpl implements PostCommandRepository {
+  PostCommandRepositoryImpl(
     this._remote, {
     PostsLocalDataSource? local,
   }) : _local = local ?? PostsLocalDataSourceImpl();
 
   final PostsRemoteDataSource _remote;
   final PostsLocalDataSource _local;
-
-  @override
-  Future<Either<Failure, List<Post>>> getHomeFeed({
-    String mode = 'home',
-    String filter = 'all',
-    String? targetId,
-    DateTime? cursorPublishedAt,
-    String? cursorPostId,
-    int limit = 20,
-  }) async {
-    try {
-      final dtos = await _remote.getHomeFeed(
-        mode: mode,
-        filter: filter,
-        targetId: targetId,
-        cursorPublishedAt: cursorPublishedAt,
-        cursorPostId: cursorPostId,
-        limit: limit,
-      );
-      return Right(
-        dtos.map((d) => d.toEntity(urlFactory: _remote.urlFactory)).toList(),
-      );
-    } on UnauthorizedException catch (e) {
-      return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(UnknownFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<Post>>> getProfilePosts({
-    required String publisherId,
-    PostPublisherType publisherType = PostPublisherType.user,
-    DateTime? cursorPublishedAt,
-    String? cursorPostId,
-    int limit = 20,
-  }) async {
-    try {
-      final dtos = await _remote.getProfilePosts(
-        publisherId: publisherId,
-        publisherType: publisherType.name,
-        cursorPublishedAt: cursorPublishedAt,
-        cursorPostId: cursorPostId,
-        limit: limit,
-      );
-      return Right(
-        dtos.map((d) => d.toEntity(urlFactory: _remote.urlFactory)).toList(),
-      );
-    } on UnauthorizedException catch (e) {
-      return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(UnknownFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<Post>>> getSavedPosts({
-    DateTime? cursorSavedAt,
-    String? cursorPostId,
-    int limit = 20,
-  }) async {
-    try {
-      final dtos = await _remote.getSavedPosts(
-        cursorSavedAt: cursorSavedAt,
-        cursorPostId: cursorPostId,
-        limit: limit,
-      );
-      return Right(
-        dtos.map((d) => d.toEntity(urlFactory: _remote.urlFactory)).toList(),
-      );
-    } on UnauthorizedException catch (e) {
-      return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(UnknownFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, Post>> getPost(PostId id) async {
-    try {
-      final dto = await _remote.getPost(id.value);
-      return Right(dto.toEntity(urlFactory: _remote.urlFactory));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(UnknownFailure(e.toString()));
-    }
-  }
 
   @override
   Future<Either<Failure, String>> beginPublishPost({
@@ -167,6 +73,12 @@ class PostsRepositoryImpl implements PostsRepository {
       );
 
       final postId = response['post_id'] as String;
+
+      // 2. Text-only posts are immediately active on server; do not enter outbox
+      if (photos.isEmpty) {
+        return Right(postId);
+      }
+
       final serverMedia = (response['media'] as List?)
               ?.whereType<Map<String, dynamic>>()
               .toList() ??
@@ -190,23 +102,19 @@ class PostsRepositoryImpl implements PostsRepository {
         ));
       }
 
-      // 2. Emit durable local pending post projection
+      // 3. Emit durable local pending post projection for media posts
       final pendingPost = PendingPost(
         postId: postId,
         text: text.value,
         media: pendingMedia,
         createdAt: DateTime.now(),
-        status: photos.isEmpty
-            ? PendingPostStatus.publishing
-            : PendingPostStatus.uploading,
+        status: PendingPostStatus.uploading,
         progress: 0.0,
       );
       await _local.savePendingPost(pendingPost);
 
-      // 3. Launch background staging uploads (async / decoupled)
-      if (pendingMedia.isNotEmpty) {
-        unawaited(_drainStagingUploads(postId, pendingMedia));
-      }
+      // 4. Launch background staging uploads
+      unawaited(_drainStagingUploads(postId, pendingMedia));
 
       return Right(postId);
     } on UnauthorizedException catch (e) {
@@ -238,7 +146,11 @@ class PostsRepositoryImpl implements PostsRepository {
             if (item.uploaded) return;
 
             final file = File(item.localPath);
-            if (await file.exists() && item.stagingPath.isNotEmpty) {
+            if (!await file.exists()) {
+              throw FileSystemException('Source file missing at ${item.localPath}');
+            }
+
+            if (item.stagingPath.isNotEmpty) {
               await _remote.uploadStagingMedia(
                 stagingPath: item.stagingPath,
                 file: file,
@@ -335,7 +247,6 @@ class PostsRepositoryImpl implements PostsRepository {
       post.copyWith(status: PendingPostStatus.uploading, errorMessage: null),
     );
 
-    // Re-attempt upload flow using the exact server staging contracts
     final uncompleted = post.media.where((m) => !m.uploaded).toList();
     if (uncompleted.isNotEmpty) {
       unawaited(_drainStagingUploads(postId, post.media));

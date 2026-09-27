@@ -23,6 +23,11 @@ export async function executeMediaJob(
   }
 }
 
+function getVariantPath(finalPrefix: string, variantKey: string | number): string {
+  const cleanPrefix = finalPrefix.endsWith('/') ? finalPrefix.slice(0, -1) : finalPrefix;
+  return `${cleanPrefix}/${variantKey}.webp`;
+}
+
 async function processFeedJob(
   job: MediaProcessingJob,
   deps: MediaDependencies,
@@ -46,7 +51,7 @@ async function processFeedJob(
   const result = await createFeedReady(sourceBuffer);
 
   // 3. Upload immutable 1080 asset
-  const targetPath = `${media.finalPrefix}1080.webp`;
+  const targetPath = getVariantPath(media.finalPrefix, 1080);
   await deps.storage.uploadFinal(targetPath, result.variant1080.buffer);
 
   // 4. Mark feed ready & activate post
@@ -94,7 +99,7 @@ async function processOptimizeJob(
   const updatedVariants: Record<string, any> = { ...(media.variants || {}) };
 
   for (const [key, v] of Object.entries(result.variants)) {
-    const variantPath = `${media.finalPrefix}${key}.webp`;
+    const variantPath = getVariantPath(media.finalPrefix, key);
     await deps.storage.uploadFinal(variantPath, v.buffer);
 
     updatedVariants[key] = {

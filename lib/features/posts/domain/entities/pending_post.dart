@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'post.dart';
+
 enum PendingPostStatus {
   uploading,
   publishing,
@@ -61,6 +63,8 @@ class PendingPost extends Equatable {
     this.status = PendingPostStatus.uploading,
     this.progress = 0.0,
     this.errorMessage,
+    this.idempotencyKey,
+    this.optimisticPost,
   });
 
   final String postId;
@@ -70,9 +74,8 @@ class PendingPost extends Equatable {
   final PendingPostStatus status;
   final double progress;
   final String? errorMessage;
-
-  /// Convenience getter for backward compatibility with UI components.
-  List<String> get localMediaPaths => media.map((m) => m.localPath).toList();
+  final String? idempotencyKey;
+  final Post? optimisticPost;
 
   PendingPost copyWith({
     String? postId,
@@ -82,6 +85,8 @@ class PendingPost extends Equatable {
     PendingPostStatus? status,
     double? progress,
     String? errorMessage,
+    String? idempotencyKey,
+    Post? optimisticPost,
   }) =>
       PendingPost(
         postId: postId ?? this.postId,
@@ -91,6 +96,8 @@ class PendingPost extends Equatable {
         status: status ?? this.status,
         progress: progress ?? this.progress,
         errorMessage: errorMessage ?? this.errorMessage,
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        optimisticPost: optimisticPost ?? this.optimisticPost,
       );
 
   @override
@@ -102,5 +109,7 @@ class PendingPost extends Equatable {
         status,
         progress,
         errorMessage,
+        idempotencyKey,
+        optimisticPost,
       ];
 }

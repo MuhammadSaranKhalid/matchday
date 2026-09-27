@@ -473,7 +473,7 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
               );
             }).toList();
 
-            return Post(
+            final post = Post(
               id: PostId(postId),
               createdByUserId: currentUid,
               publisher: PostPublisher(
@@ -481,6 +481,7 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
                 type: publisherType,
                 displayName: draft.publisher.name ??
                     (publisherType == PostPublisherType.team ? 'Team' : 'User'),
+                username: draft.publisher.username,
                 photoUrl: draft.publisher.photoUrl,
               ),
               kind: draft.postKind,
@@ -496,6 +497,17 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
               linkedTeamId: draft.linkedTeamId ??
                   (publisherType == PostPublisherType.team ? publisherId : null),
             );
+
+            if (publishPhotos.isNotEmpty) {
+              unawaited(_local.getPendingPosts().then((posts) {
+                final match = posts.where((p) => p.postId == postId).firstOrNull;
+                if (match != null) {
+                  _local.savePendingPost(match.copyWith(optimisticPost: post));
+                }
+              }));
+            }
+
+            return post;
           },
         );
       },

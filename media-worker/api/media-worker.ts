@@ -35,12 +35,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(202).json({ busy: true, message: 'All worker slots occupied' });
   }
 
-  const deadline = Date.now() + 48_000; // 48s execution window (well under 60s maxDuration)
+  const startTime = Date.now();
+  const feedDeadline = startTime + 33_000; // Stop claiming feed jobs after 33s
+  const optimizeDeadline = startTime + 23_000; // Stop claiming heavy optimize jobs after 23s
   let feedProcessed = 0;
   let optimized = 0;
 
   try {
-    while (Date.now() < deadline) {
+    while (Date.now() < feedDeadline) {
       // Priority 1: Check high-priority feed queue (max 2 concurrent images)
       const feedJobs = await claimJobs('feed', 2);
 
@@ -50,13 +52,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         continue;
       }
 
-      // Priority 2: Check low-priority background optimization queue (1 job)
-      const optimizeJobs = await claimJobs('optimize', 1);
+      // Priority 2: Check low-priority background optimization queue (1 job) only if within budget
+      if (Date.now() < optimizeDeadline) {
+        const optimizeJobs = await claimJobs('optimize', 1);
 
-      if (optimizeJobs.length > 0) {
-        await processOptimizeJob(optimizeJobs[0]);
-        optimized++;
-        continue;
+        if (optimizeJobs.length > 0) {
+          await processOptimizeJob(optimizeJobs[0]);
+          optimized++;
+          continue;
+        }
       }
 
       // Both queues are empty -> break and finish

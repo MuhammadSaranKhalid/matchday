@@ -4,6 +4,8 @@ import '../../../../core/error/failures.dart';
 import '../entities/comment.dart';
 import '../entities/comment_like_result.dart';
 
+import '../entities/comment_deletion_result.dart';
+
 abstract class CommentsRepository {
   /// Fetch keyset-paginated top-level comments for a post.
   Future<Either<Failure, List<Comment>>> getComments(
@@ -29,8 +31,8 @@ abstract class CommentsRepository {
     List<String> mentionedUserIds = const [],
   });
 
-  /// Delete a comment.
-  Future<Either<Failure, Unit>> deleteComment(String commentId);
+  /// Delete a comment and reconcile authoritative comment counts.
+  Future<Either<Failure, CommentDeletionResult>> deleteComment(String commentId);
 
   /// Desired-state comment like. Sets liked to true or false and returns canonical server state.
   Future<Either<Failure, CommentLikeResult>> setCommentLike(

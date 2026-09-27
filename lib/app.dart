@@ -7,6 +7,7 @@ import 'core/supabase/supabase_auth_state_provider.dart';
 import 'core/theme/circk_theme.dart';
 import 'features/messages/presentation/providers/messages_providers.dart';
 import 'features/notifications/presentation/controllers/push_registrar.dart';
+import 'features/posts/presentation/controllers/post_publishing_coordinator.dart';
 import 'router/app_router.dart';
 
 class MatchdayApp extends ConsumerWidget {
@@ -45,6 +46,9 @@ class MatchdayApp extends ConsumerWidget {
 
     // Activate the universal application-scoped chat local-first engine (Spec §8)
     ref.watch(chatLocalFirstEngineProvider);
+
+    // Activate the universal application-scoped post publishing coordinator
+    ref.watch(postPublishingCoordinatorProvider);
 
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(

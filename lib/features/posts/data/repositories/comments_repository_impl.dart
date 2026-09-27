@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/comment.dart';
+import '../../domain/entities/comment_deletion_result.dart';
 import '../../domain/entities/comment_like_result.dart';
 import '../../domain/repositories/comments_repository.dart';
 import '../datasources/comments_remote_datasource.dart';
@@ -108,10 +109,10 @@ class CommentsRepositoryImpl implements CommentsRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> deleteComment(String commentId) async {
+  Future<Either<Failure, CommentDeletionResult>> deleteComment(String commentId) async {
     try {
-      await _remote.deleteComment(commentId);
-      return const Right(unit);
+      final result = await _remote.deleteComment(commentId);
+      return Right(result);
     } on AuthException catch (e) {
       return Left(AuthFailure(e.message));
     } on UnauthorizedException catch (e) {

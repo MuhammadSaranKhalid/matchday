@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:matchday/core/error/failures.dart';
 import 'package:matchday/features/posts/domain/entities/comment.dart';
+import 'package:matchday/features/posts/domain/entities/comment_deletion_result.dart';
 import 'package:matchday/features/posts/domain/entities/comment_like_result.dart';
 import 'package:matchday/features/posts/domain/entities/post.dart';
 import 'package:matchday/features/posts/domain/repositories/comments_repository.dart';
@@ -95,9 +96,17 @@ void main() {
     expect(reply.isLiked, isTrue);
   });
 
-  test('deleteComment on reply decrements parent repliesCount', () async {
-    when(() => commentsRepo.deleteComment('r1'))
-        .thenAnswer((_) async => const Right(unit));
+  test('deleteComment on reply decrements parent repliesCount and updates PostStore', () async {
+    when(() => commentsRepo.deleteComment('r1')).thenAnswer(
+      (_) async => const Right(
+        CommentDeletionResult(
+          deleted: true,
+          deletedCount: 1,
+          postId: 'p1',
+          remainingCommentsCount: 4,
+        ),
+      ),
+    );
 
     final controller = container.read(commentsControllerProvider('p1').notifier);
     await container.read(commentsControllerProvider('p1').future);
@@ -109,6 +118,7 @@ void main() {
 
     expect(parent.replies, isEmpty);
     expect(parent.repliesCount, equals(0)); // Decremented from 1
+    expect(container.read(postStoreProvider)[const PostId('p1')]?.commentsCount, equals(4));
   });
 
   test('addComment failure rolls back comment and decrements post comments count', () async {

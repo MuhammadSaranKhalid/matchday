@@ -36,13 +36,6 @@ class FeedController extends _$FeedController {
         // Upsert into L1 normalized PostStore
         ref.read(postStoreProvider.notifier).upsertAll(page.posts);
 
-        // Provider-neutral pending post reconciliation:
-        // When active posts arrive in the canonical feed, acknowledge them locally to clean up outbox records.
-        final commandRepo = ref.read(postCommandRepositoryProvider);
-        for (final p in page.posts) {
-          commandRepo.acknowledgePublishedLocally(p.id.value);
-        }
-
         return PostQueryState(
           ids: page.posts.map((p) => p.id).toList(),
           nextCursorPublishedAt: page.nextCursorPublishedAt,

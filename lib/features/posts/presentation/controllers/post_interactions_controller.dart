@@ -5,6 +5,7 @@ import '../../domain/entities/post_like_result.dart';
 import '../providers/post_store_provider.dart';
 import '../providers/posts_providers.dart';
 import 'feed_controller.dart';
+import 'publisher_posts_controller.dart';
 import 'saved_posts_controller.dart';
 
 part 'post_interactions_controller.g.dart';
@@ -138,9 +139,11 @@ class PostInteractionsController extends _$PostInteractionsController {
     );
 
     // 2. Query membership synchronization:
-    // If unbookmarking, immediately remove from saved posts query membership
+    // Ensure membership invariant: desired bookmark true => ensure membership, false => ensure absence
     if (!desiredState) {
       ref.read(savedPostsControllerProvider.notifier).removeId(postId);
+    } else {
+      ref.read(savedPostsControllerProvider.notifier).restoreId(postId);
     }
 
     if (_inFlightBookmarks.contains(postId)) return;
@@ -171,6 +174,8 @@ class PostInteractionsController extends _$PostInteractionsController {
               // Roll back query membership eviction if unbookmark failed
               if (!target) {
                 ref.read(savedPostsControllerProvider.notifier).restoreId(postId);
+              } else {
+                ref.read(savedPostsControllerProvider.notifier).removeId(postId);
               }
             }
           },
@@ -181,6 +186,11 @@ class PostInteractionsController extends _$PostInteractionsController {
                 postId,
                 (p) => p.copyWith(isBookmarked: isBookmarked),
               );
+              if (isBookmarked) {
+                ref.read(savedPostsControllerProvider.notifier).restoreId(postId);
+              } else {
+                ref.read(savedPostsControllerProvider.notifier).removeId(postId);
+              }
             }
           },
         );
@@ -194,11 +204,23 @@ class PostInteractionsController extends _$PostInteractionsController {
   /// Delete post: removes from PostStore and all query memberships.
   Future<void> deletePost(PostId postId) async {
     final repo = ref.read(postCommandRepositoryProvider);
+    final existingPost = ref.read(postStoreProvider)[postId];
     final result = await repo.deletePost(postId);
 
     result.fold(
       (failure) => null,
       (_) {
+        // Evict from publisher query membership if present
+        if (existingPost != null) {
+          ref
+              .read(
+                publisherPostsControllerProvider(
+                  publisherType: existingPost.publisher.type,
+                  publisherId: existingPost.publisher.id,
+                ).notifier,
+              )
+              .removeId(postId);
+        }
         // Evict from PostStore
         ref.read(postStoreProvider.notifier).remove(postId);
         // Evict from query memberships
@@ -214,6 +236,16 @@ class PostInteractionsController extends _$PostInteractionsController {
       postId,
       (p) => p.copyWith(
         commentsCount: (p.commentsCount + delta).clamp(0, 999999),
+      ),
+    );
+  }
+
+  /// Sets the authoritative comments count in the normalized L1 store across all views.
+  void setCommentsCount(PostId postId, int count) {
+    ref.read(postStoreProvider.notifier).updatePost(
+      postId,
+      (p) => p.copyWith(
+        commentsCount: count.clamp(0, 999999),
       ),
     );
   }

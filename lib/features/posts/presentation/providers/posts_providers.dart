@@ -5,12 +5,9 @@ import '../../data/repositories/comments_repository_impl.dart';
 import '../../data/repositories/post_command_repository_impl.dart';
 import '../../data/repositories/post_read_repository_impl.dart';
 import '../../domain/entities/pending_post.dart';
-import '../../domain/entities/post.dart';
 import '../../domain/repositories/comments_repository.dart';
 import '../../domain/repositories/post_command_repository.dart';
 import '../../domain/repositories/post_read_repository.dart';
-import '../controllers/publisher_posts_controller.dart';
-import 'post_store_provider.dart';
 
 part 'posts_providers.g.dart';
 
@@ -48,42 +45,6 @@ PendingPost? failedPendingPost(Ref ref, String postId) {
       .firstOrNull;
 }
 
-/// Startup coordinator that automatically recovers in-flight pending posts.
-@riverpod
-Future<void> publishRecoveryCoordinator(Ref ref) async {
-  final currentUid = ref.watch(postsRemoteDataSourceProvider).currentUserId;
-  if (currentUid != null) {
-    await ref.read(postCommandRepositoryProvider).recoverPendingPosts();
-  }
-}
-
-/// Posts authored by [authorId] (Profile tab / spectator).
-/// Delegated to [publisherPostsControllerProvider] and returns live reactive projections from [PostStore].
-@riverpod
-Future<List<Post>> authorPosts(Ref ref, String authorId) async {
-  final queryState = await ref.watch(
-    publisherPostsControllerProvider(
-      publisherType: PostPublisherType.user,
-      publisherId: authorId,
-    ).future,
-  );
-  final store = ref.watch(postStoreProvider);
-  return queryState.ids.map((id) => store[id]).whereType<Post>().toList();
-}
-
-/// Posts authored by or linked to [teamId] (Team Profile Posts tab).
-/// Delegated to [publisherPostsControllerProvider] and returns live reactive projections from [PostStore].
-@riverpod
-Future<List<Post>> teamPosts(Ref ref, String teamId) async {
-  final queryState = await ref.watch(
-    publisherPostsControllerProvider(
-      publisherType: PostPublisherType.team,
-      publisherId: teamId,
-    ).future,
-  );
-  final store = ref.watch(postStoreProvider);
-  return queryState.ids.map((id) => store[id]).whereType<Post>().toList();
-}
 
 /// The currently selected feed filter ('all', 'people', 'teams', 'tournaments', 'matches').
 @riverpod

@@ -26,6 +26,7 @@ class PostPublisherSelection extends Equatable {
     required this.type,
     this.id,
     this.name,
+    this.username,
     this.photoUrl,
     this.monogram,
   });
@@ -33,13 +34,14 @@ class PostPublisherSelection extends Equatable {
   final PostPublisherType type;
   final String? id;
   final String? name;
+  final String? username;
   final String? photoUrl;
   final String? monogram;
 
   static const user = PostPublisherSelection(type: PostPublisherType.user);
 
   @override
-  List<Object?> get props => [type, id, name, photoUrl, monogram];
+  List<Object?> get props => [type, id, name, username, photoUrl, monogram];
 }
 
 /// Draft post ready for submission. Pure Dart (Domain) — Equatable.

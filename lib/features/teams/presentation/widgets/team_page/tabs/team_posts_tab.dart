@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../../../core/theme/circk_theme.dart';
 import '../../../../../../core/widgets/modals/modals.dart';
-import '../../../../../posts/presentation/providers/posts_providers.dart';
+import '../../../../../posts/domain/entities/post.dart';
+import '../../../../../posts/presentation/controllers/publisher_posts_controller.dart';
+import '../../../../../posts/presentation/providers/post_store_provider.dart';
 import '../../../../../posts/presentation/screens/photo_viewer_screen.dart';
 import '../../../../../posts/presentation/widgets/post_card.dart';
 import '../../../../../posts/presentation/widgets/post_card_skeleton.dart';
@@ -15,15 +17,27 @@ class TeamPostsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final postsAsync = ref.watch(teamPostsProvider(teamId));
+    final publisherController = publisherPostsControllerProvider(
+      publisherType: PostPublisherType.team,
+      publisherId: teamId,
+    );
+    final queryStateAsync = ref.watch(publisherController);
+    final store = ref.watch(postStoreProvider);
+    final teamPosts = queryStateAsync.value != null
+        ? queryStateAsync.value!.ids
+            .map((id) => store[id])
+            .whereType<Post>()
+            .toList()
+        : const <Post>[];
+
     return RefreshIndicator(
       color: CkColors.ink,
-      onRefresh: () async => ref.refresh(teamPostsProvider(teamId).future),
+      onRefresh: () async => ref.refresh(publisherController.future),
       child: ListView(
         padding: const EdgeInsets.only(top: 12, bottom: 32),
         children: [
-          switch (postsAsync) {
-            AsyncData(:final value) when value.isEmpty => Padding(
+          switch (queryStateAsync) {
+            AsyncData() when teamPosts.isEmpty => Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
                 child: Center(
                   child: Column(
@@ -62,9 +76,9 @@ class TeamPostsTab extends ConsumerWidget {
                   ),
                 ),
               ),
-            AsyncData(:final value) => Column(
+            AsyncData() => Column(
                 children: [
-                  for (final post in value)
+                  for (final post in teamPosts)
                     FeedPostCard(
                       post: post,
                       onComment: () => showCommentsSheet(

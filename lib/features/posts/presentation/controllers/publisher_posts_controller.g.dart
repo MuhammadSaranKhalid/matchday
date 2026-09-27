@@ -59,7 +59,7 @@ final class PublisherPostsControllerProvider
 }
 
 String _$publisherPostsControllerHash() =>
-    r'4baf5cac5240482f1e4186490871638ba8bfd72f';
+    r'f596cc46ed542e7ddfa6b428ca232035306d1e71';
 
 /// Keyset-paginated controller for publisher-specific posts (User, Team, Tournament).
 /// Query membership lives here; normalized post state lives in [PostStore].

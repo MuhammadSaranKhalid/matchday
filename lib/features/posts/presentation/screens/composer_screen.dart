@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_draft.dart';
@@ -36,7 +37,18 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        ref.read(composerControllerProvider.notifier).setPublisher(widget.initialPublisher);
+        final profile = ref.read(myProfileProvider).value;
+        final initial = (widget.initialPublisher.type == PostPublisherType.user &&
+                widget.initialPublisher.name == null)
+            ? PostPublisherSelection(
+                type: PostPublisherType.user,
+                id: profile?.userId.value,
+                name: profile?.displayName,
+                username: profile?.username,
+                photoUrl: profile?.avatarUrl,
+              )
+            : widget.initialPublisher;
+        ref.read(composerControllerProvider.notifier).setPublisher(initial);
       }
     });
   }

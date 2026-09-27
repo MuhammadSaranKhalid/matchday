@@ -67,7 +67,7 @@ final class PostInteractionsControllerProvider
 }
 
 String _$postInteractionsControllerHash() =>
-    r'dd6d08beb89e87b9355930c2bcbb0254494580ce';
+    r'2dd8122c10b7e6e9fbe73e10c02b55fde299300c';
 
 /// Single unified controller for post interactions (likes, bookmarks, comments count reconciliation, deletion).
 ///

@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
+import '../../domain/entities/comment_deletion_result.dart';
 import '../../domain/entities/comment_like_result.dart';
 import '../models/comment_dto.dart';
 
@@ -94,12 +95,22 @@ class CommentsRemoteDataSource {
   }
 
   /// Delete a comment via delete_comment command RPC (either comment author or post author).
-  Future<void> deleteComment(String commentId) async {
+  Future<CommentDeletionResult> deleteComment(String commentId) async {
     _requireUid();
-    await _supabase.rpc<dynamic>(
+    final response = await _supabase.rpc<dynamic>(
       'delete_comment',
       params: {'p_comment_id': commentId},
     );
+
+    if (response is Map<String, dynamic>) {
+      return CommentDeletionResult(
+        deleted: response['deleted'] as bool? ?? true,
+        deletedCount: response['deleted_count'] as int? ?? 1,
+        postId: response['post_id'] as String?,
+        remainingCommentsCount: response['comments_count'] as int?,
+      );
+    }
+    return const CommentDeletionResult(deleted: true, deletedCount: 1);
   }
 
   /// Desired-state comment like RPC.

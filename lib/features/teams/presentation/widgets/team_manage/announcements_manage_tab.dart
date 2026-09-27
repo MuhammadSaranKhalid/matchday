@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../../core/theme/circk_theme.dart';
 import '../../../../../core/widgets/modals/modals.dart';
+import '../../../../posts/domain/entities/post.dart';
 import '../../../../posts/presentation/controllers/post_interactions_controller.dart';
-import '../../../../posts/presentation/providers/posts_providers.dart';
+import '../../../../posts/presentation/controllers/publisher_posts_controller.dart';
+import '../../../../posts/presentation/providers/post_store_provider.dart';
 import '../../../../posts/presentation/screens/photo_viewer_screen.dart';
 import '../../../../posts/presentation/widgets/post_card.dart';
 import '../../../../posts/presentation/widgets/post_card_skeleton.dart';
@@ -17,12 +19,23 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final postsAsync = ref.watch(teamPostsProvider(team.id.value));
+    final publisherController = publisherPostsControllerProvider(
+      publisherType: PostPublisherType.team,
+      publisherId: team.id.value,
+    );
+    final queryStateAsync = ref.watch(publisherController);
+    final store = ref.watch(postStoreProvider);
+    final teamPosts = queryStateAsync.value != null
+        ? queryStateAsync.value!.ids
+            .map((id) => store[id])
+            .whereType<Post>()
+            .toList()
+        : const <Post>[];
 
     return RefreshIndicator(
       color: CkColors.ink,
       onRefresh: () async =>
-          ref.refresh(teamPostsProvider(team.id.value).future),
+          ref.refresh(publisherController.future),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
         children: [
@@ -124,8 +137,8 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 10),
-          switch (postsAsync) {
-            AsyncData(:final value) when value.isEmpty => Container(
+          switch (queryStateAsync) {
+            AsyncData() when teamPosts.isEmpty => Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
                 alignment: Alignment.center,
@@ -154,9 +167,9 @@ class TeamAnnouncementsManageTab extends ConsumerWidget {
                   ],
                 ),
               ),
-            AsyncData(:final value) => Column(
+            AsyncData() => Column(
                 children: [
-                  for (final post in value)
+                  for (final post in teamPosts)
                     FeedPostCard(
                       post: post,
                       onComment: () => showCommentsSheet(

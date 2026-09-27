@@ -266,9 +266,27 @@ class CommentsController extends _$CommentsController {
     );
   }
 
-  /// Delete a comment.
+  /// Delete a comment with optimistic update and authoritative server count reconciliation.
   Future<void> deleteComment(String commentId) async {
     final currentList = state.value ?? [];
+
+    Comment? target;
+    for (final c in currentList) {
+      if (c.id == commentId) {
+        target = c;
+        break;
+      }
+      for (final r in c.replies) {
+        if (r.id == commentId) {
+          target = r;
+          break;
+        }
+      }
+    }
+
+    final estimatedDelta = target != null
+        ? (target.parentCommentId == null ? 1 + target.repliesCount : 1)
+        : 1;
 
     final updated = currentList
         .where((c) => c.id != commentId)
@@ -287,7 +305,7 @@ class CommentsController extends _$CommentsController {
     state = AsyncData(updated);
     ref
         .read(postInteractionsControllerProvider.notifier)
-        .updateCommentsCount(PostId(postId), -1);
+        .updateCommentsCount(PostId(postId), -estimatedDelta);
 
     final repo = ref.read(commentsRepositoryProvider);
     final result = await repo.deleteComment(commentId);
@@ -297,9 +315,18 @@ class CommentsController extends _$CommentsController {
         state = AsyncData(currentList);
         ref
             .read(postInteractionsControllerProvider.notifier)
-            .updateCommentsCount(PostId(postId), 1);
+            .updateCommentsCount(PostId(postId), estimatedDelta);
       },
-      (_) {},
+      (deletionResult) {
+        if (deletionResult.remainingCommentsCount != null) {
+          ref
+              .read(postInteractionsControllerProvider.notifier)
+              .setCommentsCount(
+                PostId(postId),
+                deletionResult.remainingCommentsCount!,
+              );
+        }
+      },
     );
   }
 }

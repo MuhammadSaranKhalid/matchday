@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../data/datasources/posts_datasource_providers.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_draft.dart';
@@ -8,6 +9,7 @@ import '../providers/posts_providers.dart';
 import '../state/composer_state.dart';
 export '../state/composer_state.dart';
 import 'feed_controller.dart';
+import 'publisher_posts_controller.dart';
 
 part 'composer_controller.g.dart';
 
@@ -40,11 +42,25 @@ class ComposerController extends _$ComposerController {
   /// on failure (with [ComposerState.error] set).
   Future<Post?> submit(String text) async {
     state = state.copyWith(busy: true);
+
+    final profile = ref.read(myProfileProvider).value;
+    final currentPublisher = state.publisher;
+    final resolvedPublisher = (currentPublisher.type == PostPublisherType.user &&
+            (currentPublisher.name == null || currentPublisher.name!.isEmpty))
+        ? PostPublisherSelection(
+            type: PostPublisherType.user,
+            id: profile?.userId.value,
+            name: profile?.displayName,
+            username: profile?.username,
+            photoUrl: profile?.avatarUrl,
+          )
+        : currentPublisher;
+
     final result = await ref.read(postCommandRepositoryProvider).createPost(
           PostDraft(
             text: text,
             photos: state.photos,
-            publisher: state.publisher,
+            publisher: resolvedPublisher,
             postKind: state.postKind,
             linkedMatchId: state.linkedMatchId,
             linkedTournamentId: state.linkedTournamentId,
@@ -60,10 +76,14 @@ class ComposerController extends _$ComposerController {
       (post) {
         ref.read(postStoreProvider.notifier).upsert(post);
         ref.read(feedControllerProvider.notifier).prepend(post);
-        ref.invalidate(authorPostsProvider(post.createdByUserId));
-        if (post.publisher.type == PostPublisherType.team) {
-          ref.invalidate(teamPostsProvider(post.publisher.id));
-        }
+        ref
+            .read(
+              publisherPostsControllerProvider(
+                publisherType: post.publisher.type,
+                publisherId: post.publisher.id,
+              ).notifier,
+            )
+            .prepend(post);
         state = const ComposerState();
         return post;
       },

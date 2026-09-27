@@ -14,7 +14,9 @@ import '../../../follows/presentation/controllers/follow_toggle_controller.dart'
 import '../../../follows/presentation/providers/follows_providers.dart';
 import '../../../follows/presentation/screens/followers_list_screen.dart';
 import '../../../messages/presentation/providers/messages_providers.dart';
-import '../../../posts/presentation/providers/posts_providers.dart';
+import '../../../posts/domain/entities/post.dart';
+import '../../../posts/presentation/controllers/publisher_posts_controller.dart';
+import '../../../posts/presentation/providers/post_store_provider.dart';
 import '../../../posts/presentation/screens/composer_screen.dart';
 import '../../../posts/presentation/screens/photo_viewer_screen.dart';
 import '../../../posts/presentation/widgets/post_card.dart';
@@ -37,7 +39,19 @@ class ProfileView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final postsAsync = ref.watch(authorPostsProvider(profile.userId.value));
+    final publisherQueryAsync = ref.watch(
+      publisherPostsControllerProvider(
+        publisherType: PostPublisherType.user,
+        publisherId: profile.userId.value,
+      ),
+    );
+    final store = ref.watch(postStoreProvider);
+    final profilePosts = publisherQueryAsync.value != null
+        ? publisherQueryAsync.value!.ids
+            .map((id) => store[id])
+            .whereType<Post>()
+            .toList()
+        : const <Post>[];
 
     final cricketProfileAsync = ref.watch(
       cricketPlayerProfileProvider(profile.userId.value),
@@ -293,7 +307,7 @@ class ProfileView extends ConsumerWidget {
                               children: [
                                 const TextSpan(text: 'POSTS'),
                                 TextSpan(
-                                  text: ' · ${postsAsync.value?.length ?? 0}',
+                                  text: ' · ${profilePosts.length}',
                                   style: CkType.body(
                                     fontSize: 11,
                                     color: CkColors.muted,
@@ -336,8 +350,8 @@ class ProfileView extends ConsumerWidget {
                   ),
 
                   // ── Posts List / Empty / Skeleton ──
-                  switch (postsAsync) {
-                    AsyncData(:final value) when value.isEmpty =>
+                  switch (publisherQueryAsync) {
+                    AsyncData() when profilePosts.isEmpty =>
                       const SliverToBoxAdapter(
                         child: Padding(
                           padding: EdgeInsets.all(32),
@@ -352,10 +366,10 @@ class ProfileView extends ConsumerWidget {
                           ),
                         ),
                       ),
-                    AsyncData(:final value) => SliverList.builder(
-                      itemCount: value.length,
+                    AsyncData() => SliverList.builder(
+                      itemCount: profilePosts.length,
                       itemBuilder: (context, i) {
-                        final post = value[i];
+                        final post = profilePosts[i];
                         return FeedPostCard(
                           post: post,
                           showAuthor: true,

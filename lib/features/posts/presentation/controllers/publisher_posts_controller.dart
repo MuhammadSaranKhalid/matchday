@@ -102,6 +102,14 @@ class PublisherPostsController extends _$PublisherPostsController {
     );
   }
 
+  /// Prepend a newly published post to the top of the publisher's feed.
+  void prepend(Post post) {
+    ref.read(postStoreProvider.notifier).upsert(post);
+    final current = state.value ?? const PostQueryState();
+    final updatedIds = [post.id, ...current.ids.where((id) => id != post.id)];
+    state = AsyncData(current.copyWith(ids: updatedIds));
+  }
+
   void removeId(PostId postId) {
     final current = state.value;
     if (current == null) return;

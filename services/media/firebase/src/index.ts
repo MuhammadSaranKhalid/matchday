@@ -119,7 +119,11 @@ export const processMediaFeedReady = onTaskDispatched<ProcessMediaTaskPayload>(
         width,
         height,
         sizeBytes: feedBuffer.length,
+        size_bytes: feedBuffer.length,
+        bytes: feedBuffer.length,
         mimeType: "image/webp",
+        mime_type: "image/webp",
+        mime: "image/webp",
       },
     };
 
@@ -222,7 +226,11 @@ export const processMediaOptimize = onTaskDispatched<ProcessMediaTaskPayload>(
           width: v.width,
           height: v.height,
           sizeBytes: v.sizeBytes,
+          size_bytes: v.sizeBytes,
+          bytes: v.sizeBytes,
           mimeType: "image/webp",
+          mime_type: "image/webp",
+          mime: "image/webp",
         };
       }
     }

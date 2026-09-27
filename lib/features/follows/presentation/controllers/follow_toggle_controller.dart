@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../auth/domain/entities/user.dart';
+import '../../../posts/presentation/providers/post_store_provider.dart';
 import '../../../teams/domain/entities/team.dart';
 import '../../domain/entities/follow.dart';
 import '../providers/follows_providers.dart';
@@ -32,10 +33,10 @@ class FollowToggle extends _$FollowToggle {
   /// Toggle the follow state for the current target optimistically.
   ///
   /// 1. Read current state.
-  /// 2. Flip state optimistically.
+  /// 2. Flip state optimistically and sync PostStore.
   /// 3. Call repo follow/unfollow.
   /// 4a. On success: keep optimistic state, invalidate the [isFollowing] cache.
-  /// 4b. On failure: revert to previous state, set AsyncError.
+  /// 4b. On failure: revert optimistic state and PostStore, set AsyncError.
   Future<void> toggle() async {
     final previous = state;
     final currentValue = state.value;
@@ -43,6 +44,14 @@ class FollowToggle extends _$FollowToggle {
 
     final optimistic = !currentValue;
     state = AsyncData(optimistic);
+
+    // Keep PostStore projections in sync across all active post cards
+    ref.read(postStoreProvider.notifier).updateWhere(
+          (p) => p.publisher.id == targetId,
+          (p) => p.copyWith(
+            viewer: p.viewer.copyWith(isFollowingPublisher: optimistic),
+          ),
+        );
 
     final repo = ref.read(followsRepositoryProvider);
     final target = _targetFromWire(targetTypeWire, targetId);
@@ -53,6 +62,14 @@ class FollowToggle extends _$FollowToggle {
 
     result.fold(
       (failure) {
+        // Revert PostStore projection rollback on failure
+        ref.read(postStoreProvider.notifier).updateWhere(
+              (p) => p.publisher.id == targetId,
+              (p) => p.copyWith(
+                viewer: p.viewer.copyWith(isFollowingPublisher: !optimistic),
+              ),
+            );
+
         // Revert optimistic flip and surface the error.
         state = AsyncError(failure, StackTrace.current);
         // Restore the previous known-good state after a short delay so the

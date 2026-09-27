@@ -7,7 +7,11 @@ export interface VariantMetadata {
   width: number;
   height: number;
   sizeBytes: number;
+  size_bytes?: number;
+  bytes?: number;
   mimeType: string;
+  mime_type?: string;
+  mime?: string;
 }
 
 export type VariantMap = Record<string, VariantMetadata>;

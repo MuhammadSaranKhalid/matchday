@@ -59,7 +59,8 @@ void main() {
   setUp(() {
     readRepo = _MockPostReadRepository();
     commandRepo = _MockPostCommandRepository();
-    when(() => commandRepo.discardPendingPost(any())).thenAnswer((_) async => right(unit));
+    when(() => commandRepo.discardPendingPost(any())).thenAnswer((_) async {});
+    when(() => commandRepo.acknowledgePublishedLocally(any())).thenAnswer((_) async {});
     container = ProviderContainer(
       overrides: [
         postReadRepositoryProvider.overrideWithValue(readRepo),

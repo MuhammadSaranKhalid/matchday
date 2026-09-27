@@ -89,7 +89,7 @@ final class FollowToggleProvider
   }
 }
 
-String _$followToggleHash() => r'ce99872c6c0284740e0a4215b319728cf6295555';
+String _$followToggleHash() => r'ebe3ebec8a4c8407971a8c69b781832dd862665b';
 
 /// Manages the follow/unfollow toggle for a single target.
 ///

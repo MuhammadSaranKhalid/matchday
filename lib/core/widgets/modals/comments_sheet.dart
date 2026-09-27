@@ -6,9 +6,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../../features/posts/domain/entities/comment.dart';
 import '../../../features/safety/presentation/widgets/safety_menu.dart';
 import '../../../features/safety/presentation/providers/safety_providers.dart';
-import '../../../features/posts/domain/entities/post.dart';
 import '../../../features/posts/presentation/controllers/comments_controller.dart';
-import '../../../features/posts/presentation/controllers/post_interactions_controller.dart';
 import '../../../features/profile/presentation/providers/profile_providers.dart';
 import '../../theme/circk_theme.dart';
 import '../v2/v2_kit.dart';
@@ -61,7 +59,25 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
   static const List<String> _kQuickEmojis = ['❤️', '🔥', '🏏', '👏', '🙌', '😍', '😂', '💪'];
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        widget.postId != null) {
+      ref
+          .read(commentsControllerProvider(widget.postId!).notifier)
+          .loadMoreComments();
+    }
+  }
+
+  @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _controller.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
@@ -93,11 +109,6 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
       if (parentId != null) {
         _expandedParentIds.add(parentId);
       }
-
-      // Increment post comments count optimistically in PostStore
-      ref
-          .read(postInteractionsControllerProvider.notifier)
-          .updateCommentsCount(PostId(pid), 1);
     }
 
     setState(() {
@@ -158,6 +169,11 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
         _expandedParentIds.remove(parentId);
       } else {
         _expandedParentIds.add(parentId);
+        if (widget.postId != null) {
+          ref
+              .read(commentsControllerProvider(widget.postId!).notifier)
+              .loadReplies(parentId);
+        }
       }
     });
   }
@@ -304,7 +320,7 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                                   ),
 
                                   // Replies Accordion
-                                  if (parent.replies.isNotEmpty) ...[
+                                  if (parent.repliesCount > 0) ...[
                                     if (!isExpanded)
                                       Padding(
                                         padding: const EdgeInsets.fromLTRB(58, 2, 16, 10),
@@ -320,7 +336,7 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                                               ),
                                               const SizedBox(width: 10),
                                               Text(
-                                                'View ${parent.replies.length} more ${parent.replies.length == 1 ? 'reply' : 'replies'}',
+                                                'View ${parent.repliesCount} ${parent.repliesCount == 1 ? 'reply' : 'replies'}',
                                                 style: const TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w600,
@@ -332,24 +348,57 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                                         ),
                                       )
                                     else ...[
-                                      for (final reply in parent.replies)
-                                        _InstagramCommentRow(
-                                          comment: reply,
-                                          isMe: reply.authorId == myUid,
-                                          isReply: true,
-                                          onOpenProfile: widget.onOpenProfile,
-                                          onReply: () => _onReply(
-                                            comment: reply,
-                                            parentId: parent.id,
+                                      if (parent.replies.isEmpty)
+                                        const Padding(
+                                          padding: EdgeInsets.fromLTRB(58, 8, 16, 8),
+                                          child: SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
                                           ),
-                                          onLikeToggle: () {
-                                            if (widget.postId != null) {
-                                              ref
-                                                  .read(commentsControllerProvider(widget.postId!).notifier)
-                                                  .toggleCommentLike(reply.id);
-                                            }
-                                          },
-                                        ),
+                                        )
+                                      else ...[
+                                        for (final reply in parent.replies)
+                                          _InstagramCommentRow(
+                                            comment: reply,
+                                            isMe: reply.authorId == myUid,
+                                            isReply: true,
+                                            onOpenProfile: widget.onOpenProfile,
+                                            onReply: () => _onReply(
+                                              comment: reply,
+                                              parentId: parent.id,
+                                            ),
+                                            onLikeToggle: () {
+                                              if (widget.postId != null) {
+                                                ref
+                                                    .read(commentsControllerProvider(widget.postId!).notifier)
+                                                    .toggleCommentLike(reply.id);
+                                              }
+                                            },
+                                          ),
+                                        if (parent.repliesCount > parent.replies.length)
+                                          Padding(
+                                            padding: const EdgeInsets.fromLTRB(58, 2, 16, 8),
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                if (widget.postId != null) {
+                                                  ref
+                                                      .read(commentsControllerProvider(widget.postId!).notifier)
+                                                      .loadMoreReplies(parent.id);
+                                                }
+                                              },
+                                              behavior: HitTestBehavior.opaque,
+                                              child: const Text(
+                                                'View more replies',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: CkColors.muted,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                       Padding(
                                         padding: const EdgeInsets.fromLTRB(58, 4, 16, 10),
                                         child: GestureDetector(

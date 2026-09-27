@@ -58,6 +58,8 @@ export class SupabaseMediaRepository implements MediaRepository {
       height: number;
       bytes: number;
       mime: string;
+      size_bytes?: number;
+      mime_type?: string;
     };
   }): Promise<void> {
     const { error } = await this.supabase.rpc('mark_media_feed_ready', {

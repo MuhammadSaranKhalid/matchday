@@ -7,12 +7,16 @@ class PublishPhoto extends Equatable {
     required this.localPath,
     required this.width,
     required this.height,
+    this.fileSize = 0,
+    this.mimeType = 'image/jpeg',
   });
 
   final String localPath;
   final int width;
   final int height;
+  final int fileSize;
+  final String mimeType;
 
   @override
-  List<Object?> get props => [localPath, width, height];
+  List<Object?> get props => [localPath, width, height, fileSize, mimeType];
 }

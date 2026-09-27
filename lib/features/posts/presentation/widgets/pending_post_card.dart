@@ -55,6 +55,7 @@ class PendingPostCard extends ConsumerWidget {
                     PendingPostStatus.uploading => 'Uploading media...',
                     PendingPostStatus.publishing => 'Publishing post...',
                     PendingPostStatus.failed => pendingPost.errorMessage ?? 'Upload failed',
+                    PendingPostStatus.cancelRequested => 'Cancelling publish...',
                   },
                   style: CkType.mono(
                     fontSize: 11,

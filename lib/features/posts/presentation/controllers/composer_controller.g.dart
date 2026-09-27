@@ -48,7 +48,7 @@ final class ComposerControllerProvider
 }
 
 String _$composerControllerHash() =>
-    r'2634254af5be9c8462c02852c361dc40378be01e';
+    r'65e82a8c27d456cb9eeef6e0c39440889a04d5b9';
 
 /// Composer draft state: staged (cropped+resized) photos + submit lifecycle.
 /// Autodisposed on modal dismiss to avoid stale partial drafts.

@@ -37,10 +37,10 @@ class FeedController extends _$FeedController {
         ref.read(postStoreProvider.notifier).upsertAll(page.posts);
 
         // Provider-neutral pending post reconciliation:
-        // When active posts arrive in the canonical feed, discard matching pending outbox records.
+        // When active posts arrive in the canonical feed, acknowledge them locally to clean up outbox records.
         final commandRepo = ref.read(postCommandRepositoryProvider);
         for (final p in page.posts) {
-          commandRepo.discardPendingPost(p.id.value);
+          commandRepo.acknowledgePublishedLocally(p.id.value);
         }
 
         return PostQueryState(

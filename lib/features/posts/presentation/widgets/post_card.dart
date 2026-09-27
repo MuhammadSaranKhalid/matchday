@@ -15,8 +15,10 @@ import '../../domain/entities/post.dart';
 import '../../../safety/presentation/widgets/safety_menu.dart';
 import '../../../safety/presentation/providers/safety_providers.dart';
 import '../../domain/entities/post_media.dart';
+import '../controllers/feed_controller.dart';
 import '../controllers/post_interactions_controller.dart';
 import '../providers/post_store_provider.dart';
+import '../providers/posts_providers.dart';
 
 class FeedPostCard extends ConsumerWidget {
   const FeedPostCard({
@@ -61,7 +63,9 @@ class FeedPostCard extends ConsumerWidget {
     final effectivePost = ref.watch(postFromStoreProvider(post.id)) ?? post;
 
     final blocked = ref.watch(blockedAccountsProvider).value ?? [];
-    if (blocked.any((u) => u.id == effectivePost.authorId)) return const SizedBox.shrink();
+    if (blocked.any((u) => u.id == effectivePost.createdByUserId || u.id == effectivePost.publisher.id)) {
+      return const SizedBox.shrink();
+    }
 
     final onLikeAction = onLike ??
         () => ref
@@ -94,7 +98,7 @@ class FeedPostCard extends ConsumerWidget {
             Align(
               alignment: Alignment.centerRight,
               child: SafetyMenu(
-                userId: effectivePost.authorId,
+                userId: effectivePost.createdByUserId,
                 kind: 'post',
                 targetId: effectivePost.id.value,
                 onShare: onShareAction,
@@ -110,6 +114,19 @@ class FeedPostCard extends ConsumerWidget {
           ],
           if (effectivePost.hasMedia) ...[
             PostMediaGrid(media: effectivePost.media, onOpen: onOpenPhoto),
+            const SizedBox(height: 4),
+          ],
+          if (ref.watch(failedPendingPostProvider(effectivePost.id.value)) != null) ...[
+            const SizedBox(height: 8),
+            _PublishFailedStrip(
+              errorMessage: ref.watch(failedPendingPostProvider(effectivePost.id.value))?.errorMessage,
+              onRetry: () => ref.read(postCommandRepositoryProvider).retryPendingPost(effectivePost.id.value),
+              onDiscard: () {
+                ref.read(postCommandRepositoryProvider).discardPendingPost(effectivePost.id.value);
+                ref.read(postStoreProvider.notifier).remove(effectivePost.id);
+                ref.read(feedControllerProvider.notifier).removeId(effectivePost.id);
+              },
+            ),
             const SizedBox(height: 4),
           ],
           PostActions(
@@ -257,19 +274,15 @@ class FeedPostCard extends ConsumerWidget {
           _FeedFollowButton(
             isFollowing: isFollowing,
             onTap: () {
-              ref.read(followToggleProvider(targetType, targetId).notifier).toggle();
-              ref.read(postStoreProvider.notifier).updateWhere(
-                    (p) => p.publisher.id == targetId,
-                    (p) => p.copyWith(
-                      viewer: p.viewer.copyWith(isFollowingPublisher: !isFollowing),
-                    ),
-                  );
+              ref
+                  .read(followToggleProvider(targetType, targetId).notifier)
+                  .toggle();
             },
           ),
         ],
 
         SafetyMenu(
-          userId: post.authorId,
+          userId: post.createdByUserId,
           kind: 'post',
           targetId: post.id.value,
           onShare: onShareAction,
@@ -457,6 +470,83 @@ class _ExpandablePostTextState extends State<_ExpandablePostText> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PublishFailedStrip extends StatelessWidget {
+  const _PublishFailedStrip({
+    required this.onRetry,
+    required this.onDiscard,
+    this.errorMessage,
+  });
+
+  final VoidCallback onRetry;
+  final VoidCallback onDiscard;
+  final String? errorMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: CkColors.redSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: CkColors.redBorder),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            size: 16,
+            color: CkColors.redInk,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              errorMessage?.isNotEmpty == true
+                  ? "Couldn't finish posting: $errorMessage"
+                  : "Couldn't finish posting",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: CkType.body(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: CkColors.redInk,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onRetry,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Text(
+                'Retry',
+                style: CkType.display(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: CkColors.redInk,
+                ).copyWith(decoration: TextDecoration.underline),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onDiscard,
+            child: const Padding(
+              padding: EdgeInsets.all(2),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: CkColors.muted,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

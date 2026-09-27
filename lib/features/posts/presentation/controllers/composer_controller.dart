@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../data/datasources/posts_datasource_providers.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_draft.dart';
+import '../providers/post_store_provider.dart';
 import '../providers/posts_providers.dart';
 import '../state/composer_state.dart';
 export '../state/composer_state.dart';
@@ -57,10 +58,9 @@ class ComposerController extends _$ComposerController {
         return null;
       },
       (post) {
-        if (post.status == PostStatus.active) {
-          ref.read(feedControllerProvider.notifier).prepend(post);
-        }
-        ref.invalidate(authorPostsProvider(post.authorId));
+        ref.read(postStoreProvider.notifier).upsert(post);
+        ref.read(feedControllerProvider.notifier).prepend(post);
+        ref.invalidate(authorPostsProvider(post.createdByUserId));
         if (post.publisher.type == PostPublisherType.team) {
           ref.invalidate(teamPostsProvider(post.publisher.id));
         }

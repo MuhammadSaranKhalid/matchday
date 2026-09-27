@@ -143,6 +143,8 @@ class PostsLocalDataSourceImpl implements PostsLocalDataSource {
       status: switch (json['status']) {
         'publishing' => PendingPostStatus.publishing,
         'failed' => PendingPostStatus.failed,
+        'cancelRequested' || 'cancel_requested' =>
+          PendingPostStatus.cancelRequested,
         _ => PendingPostStatus.uploading,
       },
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,

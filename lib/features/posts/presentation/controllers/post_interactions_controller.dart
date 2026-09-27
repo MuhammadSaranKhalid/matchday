@@ -168,6 +168,10 @@ class PostInteractionsController extends _$PostInteractionsController {
                 postId,
                 (p) => p.copyWith(isBookmarked: !target),
               );
+              // Roll back query membership eviction if unbookmark failed
+              if (!target) {
+                ref.read(savedPostsControllerProvider.notifier).restoreId(postId);
+              }
             }
           },
           (isBookmarked) {

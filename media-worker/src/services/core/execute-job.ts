@@ -62,7 +62,9 @@ async function processFeedJob(
       width: result.variant1080.width,
       height: result.variant1080.height,
       bytes: result.variant1080.bytes,
+      size_bytes: result.variant1080.bytes,
       mime: result.variant1080.mime,
+      mime_type: result.variant1080.mime,
     },
   });
 }
@@ -100,7 +102,9 @@ async function processOptimizeJob(
       width: v.width,
       height: v.height,
       bytes: v.bytes,
+      size_bytes: v.bytes,
       mime: v.mime,
+      mime_type: v.mime,
     };
   }
 

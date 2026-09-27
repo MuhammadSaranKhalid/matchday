@@ -19,8 +19,23 @@ abstract class MediaVariantDto with _$MediaVariantDto {
 
   const MediaVariantDto._();
 
-  factory MediaVariantDto.fromJson(Map<String, dynamic> json) =>
-      _$MediaVariantDtoFromJson(json);
+  factory MediaVariantDto.fromJson(Map<String, dynamic> json) {
+    final size = json['size_bytes'] ??
+        json['bytes'] ??
+        json['sizeBytes'] ??
+        0;
+    final mime = json['mime_type'] ??
+        json['mime'] ??
+        json['mimeType'] ??
+        'image/webp';
+    return MediaVariantDto(
+      path: json['path'] as String? ?? '',
+      width: (json['width'] as num?)?.toInt() ?? 0,
+      height: (json['height'] as num?)?.toInt() ?? 0,
+      sizeBytes: (size as num?)?.toInt() ?? 0,
+      mimeType: mime as String? ?? 'image/webp',
+    );
+  }
 
   MediaVariant toEntity([MediaUrlFactory? urlFactory]) => MediaVariant(
         path: path,

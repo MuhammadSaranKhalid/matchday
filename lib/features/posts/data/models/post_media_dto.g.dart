@@ -6,24 +6,6 @@ part of 'post_media_dto.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_MediaVariantDto _$MediaVariantDtoFromJson(Map<String, dynamic> json) =>
-    _MediaVariantDto(
-      path: json['path'] as String,
-      width: (json['width'] as num).toInt(),
-      height: (json['height'] as num).toInt(),
-      sizeBytes: (json['size_bytes'] as num?)?.toInt() ?? 0,
-      mimeType: json['mime_type'] as String? ?? 'image/webp',
-    );
-
-Map<String, dynamic> _$MediaVariantDtoToJson(_MediaVariantDto instance) =>
-    <String, dynamic>{
-      'path': instance.path,
-      'width': instance.width,
-      'height': instance.height,
-      'size_bytes': instance.sizeBytes,
-      'mime_type': instance.mimeType,
-    };
-
 _PostMediaDto _$PostMediaDtoFromJson(Map<String, dynamic> json) =>
     _PostMediaDto(
       mediaId: json['media_id'] as String,

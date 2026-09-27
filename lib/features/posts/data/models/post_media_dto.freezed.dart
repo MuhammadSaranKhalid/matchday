@@ -11,7 +11,6 @@ part of 'post_media_dto.dart';
 
 // dart format off
 T _$identity<T>(T value) => value;
-
 /// @nodoc
 mixin _$MediaVariantDto {
 
@@ -22,8 +21,6 @@ mixin _$MediaVariantDto {
 @pragma('vm:prefer-inline')
 $MediaVariantDtoCopyWith<MediaVariantDto> get copyWith => _$MediaVariantDtoCopyWithImpl<MediaVariantDto>(this as MediaVariantDto, _$identity);
 
-  /// Serializes this MediaVariantDto to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
@@ -31,7 +28,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is MediaVariantDto&&(identical(other.path, path) || other.path == path)&&(identical(other.width, width) || other.width == width)&&(identical(other.height, height) || other.height == height)&&(identical(other.sizeBytes, sizeBytes) || other.sizeBytes == sizeBytes)&&(identical(other.mimeType, mimeType) || other.mimeType == mimeType));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,path,width,height,sizeBytes,mimeType);
 
@@ -210,11 +207,11 @@ return $default(_that.path,_that.width,_that.height,_that.sizeBytes,_that.mimeTy
 }
 
 /// @nodoc
-@JsonSerializable()
+
 
 class _MediaVariantDto extends MediaVariantDto {
   const _MediaVariantDto({required this.path, required this.width, required this.height, @JsonKey(name: 'size_bytes') this.sizeBytes = 0, @JsonKey(name: 'mime_type') this.mimeType = 'image/webp'}): super._();
-  factory _MediaVariantDto.fromJson(Map<String, dynamic> json) => _$MediaVariantDtoFromJson(json);
+  
 
 @override final  String path;
 @override final  int width;
@@ -228,17 +225,14 @@ class _MediaVariantDto extends MediaVariantDto {
 @pragma('vm:prefer-inline')
 _$MediaVariantDtoCopyWith<_MediaVariantDto> get copyWith => __$MediaVariantDtoCopyWithImpl<_MediaVariantDto>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$MediaVariantDtoToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _MediaVariantDto&&(identical(other.path, path) || other.path == path)&&(identical(other.width, width) || other.width == width)&&(identical(other.height, height) || other.height == height)&&(identical(other.sizeBytes, sizeBytes) || other.sizeBytes == sizeBytes)&&(identical(other.mimeType, mimeType) || other.mimeType == mimeType));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,path,width,height,sizeBytes,mimeType);
 

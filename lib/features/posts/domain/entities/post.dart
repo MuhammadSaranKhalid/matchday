@@ -165,6 +165,7 @@ class Post extends Equatable {
   bool get isActive => status == PostStatus.active;
 
   // Convenience getters for UI components
+  @Deprecated('Use createdByUserId for actor or publisher.id for entity identity')
   String get authorId => createdByUserId;
   String get displayName => publisher.displayName;
   String? get displayPhotoUrl => publisher.photoUrl;

@@ -26,6 +26,8 @@ export interface MediaRepository {
       height: number;
       bytes: number;
       mime: string;
+      size_bytes?: number;
+      mime_type?: string;
     };
   }): Promise<void>;
   setOptimizing(mediaId: string, attempts: number): Promise<void>;

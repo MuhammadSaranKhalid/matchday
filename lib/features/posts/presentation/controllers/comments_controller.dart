@@ -17,7 +17,55 @@ class CommentsController extends _$CommentsController {
     final result = await repo.getComments(postId);
     return result.fold(
       (f) => throw FailureWrapper(f),
-      (comments) => comments,
+      (comments) {
+        if (comments.length < 20) {
+          _hasMore = false;
+        }
+        return comments;
+      },
+    );
+  }
+
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+  bool get hasMore => _hasMore;
+  bool get isLoadingMore => _isLoadingMore;
+
+  /// Loads the next page of top-level comments using keyset cursor pagination.
+  Future<void> loadMoreComments() async {
+    final currentList = state.value;
+    if (currentList == null || currentList.isEmpty || !_hasMore || _isLoadingMore) {
+      return;
+    }
+
+    _isLoadingMore = true;
+    final last = currentList.last;
+    final repo = ref.read(commentsRepositoryProvider);
+    final result = await repo.getComments(
+      postId,
+      cursorCreatedAt: last.createdAt,
+      cursorCommentId: last.id,
+      limit: 20,
+    );
+
+    result.fold(
+      (f) {
+        _isLoadingMore = false;
+      },
+      (newComments) {
+        _isLoadingMore = false;
+        if (newComments.isEmpty) {
+          _hasMore = false;
+          return;
+        }
+        if (newComments.length < 20) {
+          _hasMore = false;
+        }
+        final existingIds = currentList.map((c) => c.id).toSet();
+        final filtered =
+            newComments.where((c) => !existingIds.contains(c.id)).toList();
+        state = AsyncData([...currentList, ...filtered]);
+      },
     );
   }
 
@@ -32,6 +80,43 @@ class CommentsController extends _$CommentsController {
         state = AsyncData(currentList.map((c) {
           if (c.id == parentCommentId) {
             return c.copyWith(replies: replies);
+          }
+          return c;
+        }).toList());
+      },
+    );
+  }
+
+  /// Loads additional replies beyond the initial page for a thread.
+  Future<void> loadMoreReplies(String parentCommentId) async {
+    final currentList = state.value;
+    if (currentList == null) return;
+    final parent = currentList.where((c) => c.id == parentCommentId).firstOrNull;
+    if (parent == null || parent.replies.isEmpty) {
+      return loadReplies(parentCommentId);
+    }
+
+    final lastReply = parent.replies.last;
+    final repo = ref.read(commentsRepositoryProvider);
+    final result = await repo.getCommentReplies(
+      parentCommentId,
+      cursorCreatedAt: lastReply.createdAt,
+      cursorCommentId: lastReply.id,
+      limit: 20,
+    );
+
+    result.fold(
+      (f) => null,
+      (newReplies) {
+        if (newReplies.isEmpty) return;
+        final existingReplyIds = parent.replies.map((r) => r.id).toSet();
+        final filtered =
+            newReplies.where((r) => !existingReplyIds.contains(r.id)).toList();
+        if (filtered.isEmpty) return;
+
+        state = AsyncData((state.value ?? currentList).map((c) {
+          if (c.id == parentCommentId) {
+            return c.copyWith(replies: [...c.replies, ...filtered]);
           }
           return c;
         }).toList());
@@ -80,6 +165,11 @@ class CommentsController extends _$CommentsController {
       }).toList());
     }
 
+    // Encapsulate post comment count increment inside controller
+    ref
+        .read(postInteractionsControllerProvider.notifier)
+        .updateCommentsCount(PostId(postId), 1);
+
     final repo = ref.read(commentsRepositoryProvider);
     final result = await repo.addComment(
       postId: postId,
@@ -120,20 +210,25 @@ class CommentsController extends _$CommentsController {
   Future<void> toggleCommentLike(String commentId) async {
     final currentList = state.value ?? [];
 
-    bool currentIsLiked = false;
+    Comment? target;
     for (final c in currentList) {
       if (c.id == commentId) {
-        currentIsLiked = c.isLiked;
+        target = c;
         break;
       }
       for (final r in c.replies) {
         if (r.id == commentId) {
-          currentIsLiked = r.isLiked;
+          target = r;
           break;
         }
       }
     }
-    final desiredLiked = !currentIsLiked;
+    if (target == null) return;
+
+    final desiredLiked = !target.isLiked;
+    final newCount = desiredLiked
+        ? target.likesCount + 1
+        : (target.likesCount > 0 ? target.likesCount - 1 : 0);
 
     Comment updateComment(Comment c, bool liked, int count) {
       if (c.id == commentId) {
@@ -148,13 +243,10 @@ class CommentsController extends _$CommentsController {
       return c.copyWith(replies: newReplies);
     }
 
-    // Optimistic flip
-    state = AsyncData(currentList.map((c) {
-      final newCount = desiredLiked
-          ? c.likesCount + 1
-          : (c.likesCount > 0 ? c.likesCount - 1 : 0);
-      return updateComment(c, desiredLiked, newCount);
-    }).toList());
+    // Optimistic flip using target's own count
+    state = AsyncData(
+      currentList.map((c) => updateComment(c, desiredLiked, newCount)).toList(),
+    );
 
     final repo = ref.read(commentsRepositoryProvider);
     final result = await repo.setCommentLike(commentId, liked: desiredLiked);
@@ -180,9 +272,16 @@ class CommentsController extends _$CommentsController {
 
     final updated = currentList
         .where((c) => c.id != commentId)
-        .map((c) => c.copyWith(
+        .map((c) {
+          final isReply = c.replies.any((r) => r.id == commentId);
+          if (isReply) {
+            return c.copyWith(
               replies: c.replies.where((r) => r.id != commentId).toList(),
-            ))
+              repliesCount: c.repliesCount > 0 ? c.repliesCount - 1 : 0,
+            );
+          }
+          return c;
+        })
         .toList();
 
     state = AsyncData(updated);

@@ -7,30 +7,36 @@ import '../providers/post_store_provider.dart';
 import '../providers/posts_providers.dart';
 import 'post_query_state.dart';
 
-part 'saved_posts_controller.g.dart';
+part 'publisher_posts_controller.g.dart';
 
-/// Normalized controller for the Saved / Bookmarked Posts query.
-/// Owns membership list of [PostId]s and keyset cursors.
-/// Post entities live in [PostStore].
+/// Keyset-paginated controller for publisher-specific posts (User, Team, Tournament).
+/// Query membership lives here; normalized post state lives in [PostStore].
 @riverpod
-class SavedPostsController extends _$SavedPostsController {
+class PublisherPostsController extends _$PublisherPostsController {
   static const _pageSize = 20;
 
   @override
-  Future<PostQueryState> build() async {
+  Future<PostQueryState> build({
+    required PostPublisherType publisherType,
+    required String publisherId,
+  }) async {
     final repo = ref.watch(postReadRepositoryProvider);
     return _fetchInitial(repo);
   }
 
   Future<PostQueryState> _fetchInitial(PostReadRepository repo) async {
-    final result = await repo.getSavedPosts(limit: _pageSize);
+    final result = await repo.getProfilePosts(
+      publisherType: publisherType,
+      publisherId: publisherId,
+      limit: _pageSize,
+    );
     return result.fold(
       (f) => throw FailureWrapper(f),
       (page) {
         ref.read(postStoreProvider.notifier).upsertAll(page.posts);
         return PostQueryState(
           ids: page.posts.map((p) => p.id).toList(),
-          nextCursorSavedAt: page.nextCursorSavedAt,
+          nextCursorPublishedAt: page.nextCursorPublishedAt,
           nextCursorPostId: page.nextCursorPostId,
           hasMore: page.hasMore,
         );
@@ -57,10 +63,15 @@ class SavedPostsController extends _$SavedPostsController {
     final current = state.value;
     if (current == null || !current.hasMore || current.isLoadingMore) return;
 
-    state = AsyncData(current.copyWith(isLoadingMore: true, loadMoreError: () => null));
+    state = AsyncData(current.copyWith(
+      isLoadingMore: true,
+      loadMoreError: () => null,
+    ));
 
-    final result = await ref.read(postReadRepositoryProvider).getSavedPosts(
-      cursorSavedAt: current.nextCursorSavedAt,
+    final result = await ref.read(postReadRepositoryProvider).getProfilePosts(
+      publisherType: publisherType,
+      publisherId: publisherId,
+      cursorPublishedAt: current.nextCursorPublishedAt,
       cursorPostId: current.nextCursorPostId,
       limit: _pageSize,
     );
@@ -82,7 +93,7 @@ class SavedPostsController extends _$SavedPostsController {
 
         state = AsyncData(current.copyWith(
           ids: [...current.ids, ...newIds],
-          nextCursorSavedAt: () => page.nextCursorSavedAt,
+          nextCursorPublishedAt: () => page.nextCursorPublishedAt,
           nextCursorPostId: () => page.nextCursorPostId,
           hasMore: page.hasMore,
           isLoadingMore: false,
@@ -91,23 +102,11 @@ class SavedPostsController extends _$SavedPostsController {
     );
   }
 
-  /// Remove post ID from membership (e.g. on unbookmark or delete).
   void removeId(PostId postId) {
     final current = state.value;
     if (current == null) return;
     state = AsyncData(current.copyWith(
       ids: current.ids.where((id) => id != postId).toList(),
     ));
-  }
-
-  /// Restore post ID to membership (e.g. on unbookmark rollback).
-  void restoreId(PostId postId) {
-    final current = state.value;
-    if (current == null) return;
-    if (!current.ids.contains(postId)) {
-      state = AsyncData(current.copyWith(
-        ids: [postId, ...current.ids],
-      ));
-    }
   }
 }

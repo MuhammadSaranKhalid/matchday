@@ -125,14 +125,16 @@ class PostsRemoteDataSource {
     return const [];
   }
 
-  /// Atomic publishing session reservation.
+  /// Atomic publishing session reservation with idempotency support.
   Future<Map<String, dynamic>> beginPostPublish({
     required String publisherType,
     required String publisherId,
     required String postKind,
     String? text,
     required int expectedMediaCount,
-    List<Map<String, dynamic>> mediaItems = const [],
+    String visibility = 'public',
+    String? idempotencyKey,
+    List<Map<String, dynamic>> mediaManifest = const [],
     String? linkedMatchId,
     String? linkedTournamentId,
     String? linkedTeamId,
@@ -146,7 +148,9 @@ class PostsRemoteDataSource {
         'p_post_kind': postKind,
         'p_text': text,
         'p_expected_media_count': expectedMediaCount,
-        'p_media_items': mediaItems,
+        'p_visibility': visibility,
+        if (idempotencyKey != null) 'p_idempotency_key': idempotencyKey,
+        'p_media_manifest': mediaManifest,
         if (linkedMatchId != null) 'p_linked_match_id': linkedMatchId,
         if (linkedTournamentId != null)
           'p_linked_tournament_id': linkedTournamentId,

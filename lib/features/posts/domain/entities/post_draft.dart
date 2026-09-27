@@ -1,23 +1,23 @@
-import 'dart:io';
-
 import 'package:equatable/equatable.dart';
 
 import 'post.dart';
 
-/// Preprocessed photo ready for staging upload.
+/// Preprocessed photo ready for staging upload. Pure Dart (Domain).
 class ProcessedPhoto extends Equatable {
   const ProcessedPhoto({
-    required this.file,
+    required this.filePath,
     required this.width,
     required this.height,
+    this.fileSize = 0,
   });
 
-  final File file;
+  final String filePath;
   final int width;
   final int height;
+  final int fileSize;
 
   @override
-  List<Object?> get props => [file.path, width, height];
+  List<Object?> get props => [filePath, width, height, fileSize];
 }
 
 /// Selected publisher identity for a post.

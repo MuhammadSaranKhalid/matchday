@@ -9,6 +9,8 @@
 //   fix.
 // - BlurHash placeholder → "blur → sharp" fade instead of a grey box; falls
 //   back to a neutral colour when absent.
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blurhash/flutter_blurhash.dart';
@@ -58,6 +60,19 @@ class CkFeedImage extends StatelessWidget {
           }
           selectedWidth ??= sortedWidths.last;
           targetUrl = variants![selectedWidth] ?? url;
+        }
+
+        if (targetUrl.startsWith('/') || targetUrl.startsWith('file://')) {
+          final filePath = targetUrl.startsWith('file://')
+              ? targetUrl.replaceFirst('file://', '')
+              : targetUrl;
+          return Image.file(
+            File(filePath),
+            fit: fit,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (_, __, ___) => _error(),
+          );
         }
 
         return CachedNetworkImage(

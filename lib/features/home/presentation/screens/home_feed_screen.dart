@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:matchday/core/theme/circk_theme.dart';
-import 'package:matchday/features/posts/presentation/widgets/pending_post_card.dart';
 import 'package:matchday/features/posts/presentation/widgets/post_card.dart';
 import 'package:matchday/core/widgets/modals/modals.dart';
 import 'package:matchday/features/posts/domain/entities/post_media.dart';
@@ -103,8 +102,7 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
       );
 
   Widget _dataList(PostQueryState queryState) {
-    final pendingPosts = ref.watch(pendingPostsProvider).value ?? const [];
-    final totalCount = 1 + pendingPosts.length + queryState.ids.length + 1;
+    final totalCount = 1 + queryState.ids.length + 1;
 
     return ListView.builder(
       controller: _scroll,
@@ -115,11 +113,7 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
         if (i == 0) {
           return _kShowLiveCards ? const LiveMatchRail() : const SizedBox.shrink();
         }
-        final pendingIndex = i - 1;
-        if (pendingIndex < pendingPosts.length) {
-          return PendingPostCard(pendingPost: pendingPosts[pendingIndex]);
-        }
-        final postIndex = pendingIndex - pendingPosts.length;
+        final postIndex = i - 1;
         if (postIndex < queryState.ids.length) {
           final postId = queryState.ids[postIndex];
           final post = ref.watch(postFromStoreProvider(postId));
@@ -141,7 +135,7 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
             ),
           );
         }
-        if (queryState.ids.isEmpty && pendingPosts.isEmpty) return const _EmptyState();
+        if (queryState.ids.isEmpty) return const _EmptyState();
         return queryState.hasMore ? const _Loader() : const _FeedFooter();
       },
     );

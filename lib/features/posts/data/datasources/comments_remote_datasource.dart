@@ -8,12 +8,6 @@ class CommentsRemoteDataSource {
   CommentsRemoteDataSource(this._supabase);
   final SupabaseClient _supabase;
 
-  static const _table = 'comments';
-
-  // Embed the commenter's profile
-  static const _select =
-      '*, author:profiles!author_id(display_name, username, profile_photo_url)';
-
   String _requireUid() {
     final id = _supabase.auth.currentUser?.id;
     if (id == null) throw const UnauthorizedException('Must be signed in');
@@ -74,35 +68,38 @@ class CommentsRemoteDataSource {
     return const [];
   }
 
-  /// Insert a comment/reply row.
+  /// Insert a comment/reply row via create_comment command RPC.
   Future<CommentDto> insertComment({
     required String postId,
     required String text,
     String? parentCommentId,
     List<String> mentionedUserIds = const [],
   }) async {
-    final uid = _requireUid();
-    final payload = <String, dynamic>{
-      'post_id': postId,
-      'author_id': uid,
-      'text': text,
-      if (parentCommentId != null) 'parent_comment_id': parentCommentId,
-      if (mentionedUserIds.isNotEmpty) 'mentioned_user_ids': mentionedUserIds,
-    };
+    _requireUid();
+    final response = await _supabase.rpc<dynamic>(
+      'create_comment',
+      params: {
+        'p_post_id': postId,
+        'p_text': text,
+        if (parentCommentId != null) 'p_parent_comment_id': parentCommentId,
+        if (mentionedUserIds.isNotEmpty)
+          'p_mentioned_user_ids': mentionedUserIds,
+      },
+    );
 
-    final row = await _supabase
-        .from(_table)
-        .insert(payload)
-        .select(_select)
-        .single();
-
-    return CommentDto.fromJson(row);
+    if (response is Map<String, dynamic>) {
+      return CommentDto.fromJson(response);
+    }
+    throw const ServerException('Failed to create comment');
   }
 
-  /// Delete a comment (either comment author or post author).
+  /// Delete a comment via delete_comment command RPC (either comment author or post author).
   Future<void> deleteComment(String commentId) async {
     _requireUid();
-    await _supabase.from(_table).delete().eq('comment_id', commentId);
+    await _supabase.rpc<dynamic>(
+      'delete_comment',
+      params: {'p_comment_id': commentId},
+    );
   }
 
   /// Desired-state comment like RPC.

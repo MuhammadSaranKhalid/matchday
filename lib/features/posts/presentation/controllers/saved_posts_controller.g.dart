@@ -43,7 +43,7 @@ final class SavedPostsControllerProvider
 }
 
 String _$savedPostsControllerHash() =>
-    r'ab2b35b355d12c72f0bcb1b251eb48642f95b042';
+    r'3fcb3f91c48debb0e81cf1a259fa2c99d9c670fe';
 
 /// Normalized controller for the Saved / Bookmarked Posts query.
 /// Owns membership list of [PostId]s and keyset cursors.

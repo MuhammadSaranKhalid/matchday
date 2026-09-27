@@ -11,7 +11,7 @@ import 'package:matchday/features/posts/domain/entities/post_draft.dart';
 import 'package:mocktail/mocktail.dart';
 
 ProcessedPhoto _photo() =>
-    ProcessedPhoto(file: File('x.jpg'), width: 100, height: 100);
+    const ProcessedPhoto(filePath: 'x.jpg', width: 100, height: 100, fileSize: 1024);
 
 class _MockRemote extends Mock implements PostsRemoteDataSource {}
 class _MockLocal extends Mock implements PostsLocalDataSource {}
@@ -49,7 +49,9 @@ void main() {
           postKind: any(named: 'postKind'),
           text: any(named: 'text'),
           expectedMediaCount: any(named: 'expectedMediaCount'),
-          mediaItems: any(named: 'mediaItems'),
+          visibility: any(named: 'visibility'),
+          idempotencyKey: any(named: 'idempotencyKey'),
+          mediaManifest: any(named: 'mediaManifest'),
         )).thenThrow(UnauthorizedException('nope'));
 
     final result = await repo.createPost(const PostDraft(text: 'hi'));
@@ -96,5 +98,85 @@ void main() {
           text: any(named: 'text'),
           expectedMediaCount: any(named: 'expectedMediaCount'),
         ));
+  });
+
+  test('acknowledgePublishedLocally removes pending post without calling abandonPostPublish', () async {
+    when(() => local.getPendingPosts()).thenAnswer((_) async => [
+          PendingPost(
+            postId: 'p1',
+            text: 'text',
+            media: const [],
+            status: PendingPostStatus.uploading,
+            createdAt: DateTime.now(),
+          ),
+        ]);
+    when(() => local.removePendingPost('p1')).thenAnswer((_) async {});
+
+    await repo.acknowledgePublishedLocally('p1');
+
+    verify(() => local.removePendingPost('p1')).called(1);
+    verifyNever(() => remote.abandonPostPublish(any()));
+  });
+
+  test('discardPendingPost calls abandonPostPublish on remote and removes from local', () async {
+    when(() => local.getPendingPosts()).thenAnswer((_) async => [
+          PendingPost(
+            postId: 'p1',
+            text: 'text',
+            media: const [],
+            status: PendingPostStatus.failed,
+            createdAt: DateTime.now(),
+          ),
+        ]);
+    when(() => remote.abandonPostPublish('p1')).thenAnswer((_) async {});
+    when(() => local.removePendingPost('p1')).thenAnswer((_) async {});
+
+    await repo.discardPendingPost('p1');
+
+    verify(() => remote.abandonPostPublish('p1')).called(1);
+    verify(() => local.removePendingPost('p1')).called(1);
+  });
+
+  test('discardPendingPost while offline marks cancelRequested and retains local record', () async {
+    when(() => local.getPendingPosts()).thenAnswer((_) async => [
+          PendingPost(
+            postId: 'p_offline',
+            text: 'text',
+            media: const [],
+            status: PendingPostStatus.uploading,
+            createdAt: DateTime.now(),
+          ),
+        ]);
+    when(() => remote.abandonPostPublish('p_offline'))
+        .thenThrow(const SocketException('No internet'));
+
+    await repo.discardPendingPost('p_offline');
+
+    // Should have saved with cancelRequested
+    verify(() => local.savePendingPost(any(
+          that: predicate<PendingPost>(
+              (p) => p.status == PendingPostStatus.cancelRequested),
+        ))).called(1);
+    // Should NOT have removed the local record because remote failed
+    verifyNever(() => local.removePendingPost('p_offline'));
+  });
+
+  test('recoverPendingPosts retries cancellation for cancelRequested posts', () async {
+    when(() => local.getPendingPosts()).thenAnswer((_) async => [
+          PendingPost(
+            postId: 'p_cancel',
+            text: 'text',
+            media: const [],
+            status: PendingPostStatus.cancelRequested,
+            createdAt: DateTime.now(),
+          ),
+        ]);
+    when(() => remote.abandonPostPublish('p_cancel')).thenAnswer((_) async {});
+    when(() => local.removePendingPost('p_cancel')).thenAnswer((_) async {});
+
+    await repo.recoverPendingPosts();
+
+    verify(() => remote.abandonPostPublish('p_cancel')).called(1);
+    verify(() => local.removePendingPost('p_cancel')).called(1);
   });
 }

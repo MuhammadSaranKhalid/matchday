@@ -85,11 +85,13 @@ class PhotoProcessor implements PhotoPicker {
     final file = File(out.path);
     // Dimensions from the header only (no full pure-Dart decode).
     final (width, height) = await _dimensions(file);
+    final fileSize = await file.length();
 
     return ProcessedPhoto(
-      file: file,
+      filePath: out.path,
       width: width,
       height: height,
+      fileSize: fileSize,
     );
   }
 

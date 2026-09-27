@@ -1,6 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../core/error/failures.dart';
 import '../../data/datasources/posts_datasource_providers.dart';
 import '../../data/repositories/comments_repository_impl.dart';
 import '../../data/repositories/post_command_repository_impl.dart';
@@ -10,6 +9,7 @@ import '../../domain/entities/post.dart';
 import '../../domain/repositories/comments_repository.dart';
 import '../../domain/repositories/post_command_repository.dart';
 import '../../domain/repositories/post_read_repository.dart';
+import '../controllers/publisher_posts_controller.dart';
 import 'post_store_provider.dart';
 
 part 'posts_providers.g.dart';
@@ -39,39 +39,50 @@ Stream<List<PendingPost>> pendingPosts(Ref ref) {
   return ref.watch(postCommandRepositoryProvider).watchPendingPosts();
 }
 
+/// Returns a failed outbox post if matching [postId] is currently in terminal failure.
+@riverpod
+PendingPost? failedPendingPost(Ref ref, String postId) {
+  final pendingList = ref.watch(pendingPostsProvider).value ?? const [];
+  return pendingList
+      .where((p) => p.postId == postId && p.status == PendingPostStatus.failed)
+      .firstOrNull;
+}
+
+/// Startup coordinator that automatically recovers in-flight pending posts.
+@riverpod
+Future<void> publishRecoveryCoordinator(Ref ref) async {
+  final currentUid = ref.watch(postsRemoteDataSourceProvider).currentUserId;
+  if (currentUid != null) {
+    await ref.read(postCommandRepositoryProvider).recoverPendingPosts();
+  }
+}
+
 /// Posts authored by [authorId] (Profile tab / spectator).
-/// Populates the L1 PostStore and returns the canonical entities.
+/// Delegated to [publisherPostsControllerProvider] and returns live reactive projections from [PostStore].
 @riverpod
 Future<List<Post>> authorPosts(Ref ref, String authorId) async {
-  final repo = ref.watch(postReadRepositoryProvider);
-  final result = await repo.getProfilePosts(
-    publisherId: authorId,
-    publisherType: PostPublisherType.user,
+  final queryState = await ref.watch(
+    publisherPostsControllerProvider(
+      publisherType: PostPublisherType.user,
+      publisherId: authorId,
+    ).future,
   );
-  return result.fold(
-    (f) => throw FailureWrapper(f),
-    (page) {
-      ref.read(postStoreProvider.notifier).upsertAll(page.posts);
-      return page.posts;
-    },
-  );
+  final store = ref.watch(postStoreProvider);
+  return queryState.ids.map((id) => store[id]).whereType<Post>().toList();
 }
 
 /// Posts authored by or linked to [teamId] (Team Profile Posts tab).
+/// Delegated to [publisherPostsControllerProvider] and returns live reactive projections from [PostStore].
 @riverpod
 Future<List<Post>> teamPosts(Ref ref, String teamId) async {
-  final repo = ref.watch(postReadRepositoryProvider);
-  final result = await repo.getProfilePosts(
-    publisherId: teamId,
-    publisherType: PostPublisherType.team,
+  final queryState = await ref.watch(
+    publisherPostsControllerProvider(
+      publisherType: PostPublisherType.team,
+      publisherId: teamId,
+    ).future,
   );
-  return result.fold(
-    (f) => throw FailureWrapper(f),
-    (page) {
-      ref.read(postStoreProvider.notifier).upsertAll(page.posts);
-      return page.posts;
-    },
-  );
+  final store = ref.watch(postStoreProvider);
+  return queryState.ids.map((id) => store[id]).whereType<Post>().toList();
 }
 
 /// The currently selected feed filter ('all', 'people', 'teams', 'tournaments', 'matches').
@@ -83,44 +94,3 @@ class FeedFilter extends _$FeedFilter {
   void setFilter(String filter) => state = filter;
 }
 
-/// Single post by [postId] for canonical /posts/:postId screen.
-/// Implements stale-while-revalidate: returns cached Post from PostStore if present,
-/// and revalidates in the background if needed.
-@riverpod
-Future<Post> postDetail(Ref ref, String postId) async {
-  final id = PostId(postId);
-  final cached = ref.read(postStoreProvider)[id];
-
-  final repo = ref.watch(postReadRepositoryProvider);
-  final future = repo.getPost(id).then((result) {
-    return result.fold(
-      (f) => throw FailureWrapper(f),
-      (post) {
-        ref.read(postStoreProvider.notifier).upsert(post);
-        return post;
-      },
-    );
-  });
-
-  if (cached != null) {
-    // Background revalidation without blocking initial paint
-    future.ignore();
-    return cached;
-  }
-
-  return future;
-}
-
-/// Bookmarked / saved posts.
-@riverpod
-Future<List<Post>> savedPosts(Ref ref) async {
-  final repo = ref.watch(postReadRepositoryProvider);
-  final result = await repo.getSavedPosts();
-  return result.fold(
-    (f) => throw FailureWrapper(f),
-    (page) {
-      ref.read(postStoreProvider.notifier).upsertAll(page.posts);
-      return page.posts;
-    },
-  );
-}

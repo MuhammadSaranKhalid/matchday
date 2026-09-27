@@ -4,6 +4,7 @@ enum PendingPostStatus {
   uploading,
   publishing,
   failed,
+  cancelRequested,
 }
 
 /// A specific media asset attached to a pending post, persisting the exact

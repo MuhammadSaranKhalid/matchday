@@ -27,7 +27,7 @@ class ComposerPhotoStrip extends StatelessWidget {
         itemBuilder: (context, i) {
           if (i < state.photos.length) {
             return _Thumb(
-              file: state.photos[i].file,
+              file: File(state.photos[i].filePath),
               onRemove: () => onRemove(i),
               cover: i == 0,
             );

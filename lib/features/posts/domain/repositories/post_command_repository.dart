@@ -43,6 +43,15 @@ abstract class PostCommandRepository {
   /// Discard a failed pending post and clean up local temporary files.
   Future<void> discardPendingPost(String postId);
 
+  /// Acknowledges that a post is confirmed published and active,
+  /// cleaning up local outbox records and cached temporary files
+  /// without triggering server-side abandon commands.
+  Future<void> acknowledgePublishedLocally(String postId);
+
+  /// Scans local outbox on startup, resumes in-flight staging uploads,
+  /// and reconciles already-published posts with server state.
+  Future<void> recoverPendingPosts();
+
   /// Composer submit helper that wraps beginPublishPost.
   Future<Either<Failure, Post>> createPost(PostDraft draft);
 }

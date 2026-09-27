@@ -3,13 +3,16 @@ import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
+import '../../domain/entities/media_variant.dart';
 import '../../domain/entities/pending_post.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/entities/post_draft.dart';
 import '../../domain/entities/post_like_result.dart';
+import '../../domain/entities/post_media.dart';
 import '../../domain/entities/publish_photo.dart';
 import '../../domain/repositories/post_command_repository.dart';
 import '../../domain/value_objects/post_text.dart';
@@ -43,14 +46,18 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
     }
 
     try {
-      final mediaItems = <Map<String, dynamic>>[];
+      final mediaManifest = <Map<String, dynamic>>[];
       for (var i = 0; i < photos.length; i++) {
-        mediaItems.add({
+        mediaManifest.add({
           'position': i,
-          'source_width': photos[i].width,
-          'source_height': photos[i].height,
+          'width': photos[i].width,
+          'height': photos[i].height,
+          'bytes': photos[i].fileSize,
+          'mime': photos[i].mimeType,
         });
       }
+
+      final idempotencyKey = (const Uuid()).v4();
 
       // 1. Reserve publishing session on Supabase
       final response = await _remote.beginPostPublish(
@@ -67,7 +74,9 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
         },
         text: text.value,
         expectedMediaCount: photos.length,
-        mediaItems: mediaItems,
+        visibility: 'public',
+        idempotencyKey: idempotencyKey,
+        mediaManifest: mediaManifest,
         linkedMatchId: linkedMatchId,
         linkedTournamentId: linkedTournamentId,
         linkedTeamId: linkedTeamId,
@@ -274,13 +283,30 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
     final post = list.where((p) => p.postId == postId).firstOrNull;
     if (post == null) return;
 
-    await _local.savePendingPost(
-      post.copyWith(status: PendingPostStatus.uploading, errorMessage: null),
-    );
-
     final uncompleted = post.media.where((m) => !m.uploaded).toList();
     if (uncompleted.isNotEmpty) {
+      await _local.savePendingPost(
+        post.copyWith(status: PendingPostStatus.uploading, errorMessage: null),
+      );
       unawaited(_drainStagingUploads(postId, post.media));
+    } else {
+      // All media were already uploaded, but backend processing stalled or failed
+      await _local.savePendingPost(
+        post.copyWith(status: PendingPostStatus.publishing, errorMessage: null),
+      );
+      try {
+        final dto = await _remote.getPost(postId);
+        if (dto.status == 'active') {
+          await acknowledgePublishedLocally(postId);
+        }
+      } catch (e) {
+        await _local.savePendingPost(
+          post.copyWith(
+            status: PendingPostStatus.failed,
+            errorMessage: 'Server processing check failed: $e',
+          ),
+        );
+      }
     }
   }
 
@@ -288,16 +314,43 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
   Future<void> discardPendingPost(String postId) async {
     final list = await _local.getPendingPosts();
     final post = list.where((p) => p.postId == postId).firstOrNull;
+    if (post != null) {
+      // Mark cancelRequested locally first so failed network requests don't publish later
+      await _local.savePendingPost(
+        post.copyWith(status: PendingPostStatus.cancelRequested),
+      );
+    }
+
     try {
       await _remote.abandonPostPublish(postId);
-    } catch (_) {}
+      // Cancellation confirmed by server (or already gone)
+      if (post != null) {
+        for (final m in post.media) {
+          if (m.stagingPath.isNotEmpty) {
+            try {
+              await _remote.removeStagingMedia(m.stagingPath);
+            } catch (_) {}
+          }
+          if (m.localPath.isNotEmpty) {
+            try {
+              final f = File(m.localPath);
+              if (f.existsSync()) f.deleteSync();
+            } catch (_) {}
+          }
+        }
+      }
+      await _local.removePendingPost(postId);
+    } catch (_) {
+      // Offline/network failure: keep cancelRequested durable so recovery retries it
+    }
+  }
+
+  @override
+  Future<void> acknowledgePublishedLocally(String postId) async {
+    final list = await _local.getPendingPosts();
+    final post = list.where((p) => p.postId == postId).firstOrNull;
     if (post != null) {
       for (final m in post.media) {
-        if (m.stagingPath.isNotEmpty) {
-          try {
-            await _remote.removeStagingMedia(m.stagingPath);
-          } catch (_) {}
-        }
         if (m.localPath.isNotEmpty) {
           try {
             final f = File(m.localPath);
@@ -305,8 +358,52 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
           } catch (_) {}
         }
       }
+      await _local.removePendingPost(postId);
     }
-    await _local.removePendingPost(postId);
+  }
+
+  @override
+  Future<void> recoverPendingPosts() async {
+    final list = await _local.getPendingPosts();
+    for (final post in list) {
+      if (post.status == PendingPostStatus.cancelRequested) {
+        // Retry pending cancellation
+        try {
+          await _remote.abandonPostPublish(post.postId);
+          for (final m in post.media) {
+            if (m.stagingPath.isNotEmpty) {
+              try {
+                await _remote.removeStagingMedia(m.stagingPath);
+              } catch (_) {}
+            }
+            if (m.localPath.isNotEmpty) {
+              try {
+                final f = File(m.localPath);
+                if (f.existsSync()) f.deleteSync();
+              } catch (_) {}
+            }
+          }
+          await _local.removePendingPost(post.postId);
+        } catch (_) {}
+        continue;
+      }
+
+      if (post.status == PendingPostStatus.failed) {
+        continue;
+      }
+
+      final uncompleted = post.media.where((m) => !m.uploaded).toList();
+      if (uncompleted.isNotEmpty) {
+        unawaited(_drainStagingUploads(post.postId, post.media));
+      } else {
+        try {
+          final dto = await _remote.getPost(post.postId);
+          if (dto.status == 'active') {
+            await acknowledgePublishedLocally(post.postId);
+          }
+        } catch (_) {}
+      }
+    }
   }
 
   @override
@@ -332,9 +429,10 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
 
         final publishPhotos = draft.photos
             .map((p) => PublishPhoto(
-                  localPath: p.file.path,
+                  localPath: p.filePath,
                   width: p.width,
                   height: p.height,
+                  fileSize: p.fileSize,
                 ))
             .toList();
 
@@ -351,28 +449,54 @@ class PostCommandRepositoryImpl implements PostCommandRepository {
         );
 
         return publishResult.map(
-          (postId) => Post(
-            id: PostId(postId),
-            createdByUserId: currentUid,
-            publisher: PostPublisher(
-              id: publisherId,
-              type: publisherType,
-              displayName: draft.publisher.name ??
-                  (publisherType == PostPublisherType.team ? 'Team' : 'User'),
-              photoUrl: draft.publisher.photoUrl,
-            ),
-            kind: draft.postKind,
-            text: postText.value,
-            status:
-                publishPhotos.isEmpty ? PostStatus.active : PostStatus.publishing,
-            expectedMediaCount: publishPhotos.length,
-            createdAt: DateTime.now(),
-            publishedAt: publishPhotos.isEmpty ? DateTime.now() : null,
-            linkedMatchId: draft.linkedMatchId,
-            linkedTournamentId: draft.linkedTournamentId,
-            linkedTeamId: draft.linkedTeamId ??
-                (publisherType == PostPublisherType.team ? publisherId : null),
-          ),
+          (postId) {
+            final optimisticMedia = draft.photos.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final p = entry.value;
+              return PostMedia(
+                mediaId: 'local_$idx',
+                postId: postId,
+                position: idx,
+                width: p.width,
+                height: p.height,
+                status: PostMediaStatus.awaitingUpload,
+                variants: {
+                  1080: MediaVariant(
+                    path: p.filePath,
+                    url: p.filePath,
+                    width: p.width,
+                    height: p.height,
+                    sizeBytes: p.fileSize,
+                    mimeType: 'image/jpeg',
+                  ),
+                },
+              );
+            }).toList();
+
+            return Post(
+              id: PostId(postId),
+              createdByUserId: currentUid,
+              publisher: PostPublisher(
+                id: publisherId,
+                type: publisherType,
+                displayName: draft.publisher.name ??
+                    (publisherType == PostPublisherType.team ? 'Team' : 'User'),
+                photoUrl: draft.publisher.photoUrl,
+              ),
+              kind: draft.postKind,
+              text: postText.value,
+              status:
+                  publishPhotos.isEmpty ? PostStatus.active : PostStatus.publishing,
+              expectedMediaCount: publishPhotos.length,
+              media: optimisticMedia,
+              createdAt: DateTime.now(),
+              publishedAt: publishPhotos.isEmpty ? DateTime.now() : null,
+              linkedMatchId: draft.linkedMatchId,
+              linkedTournamentId: draft.linkedTournamentId,
+              linkedTeamId: draft.linkedTeamId ??
+                  (publisherType == PostPublisherType.team ? publisherId : null),
+            );
+          },
         );
       },
     );

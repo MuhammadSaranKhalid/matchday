@@ -39,7 +39,7 @@ final class FeedControllerProvider
   FeedController create() => FeedController();
 }
 
-String _$feedControllerHash() => r'f28711d9948ef6114868ecf3a5e13924adb67c24';
+String _$feedControllerHash() => r'3192d21b5f99e9724071e435554989f0b46a4401';
 
 /// The Home feed — normalized post ID membership ordering with keyset pagination + pull-to-refresh.
 /// Post entities live in [PostStore] to ensure unified synchronization across all views.

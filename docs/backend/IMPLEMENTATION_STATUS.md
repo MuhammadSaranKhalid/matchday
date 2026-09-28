@@ -4,58 +4,14 @@ Last updated: 2026-09-28.
 
 ## Current gate
 
-Phase 0 — audit: complete, awaiting review. Phase 1 has not started.
-
-## Completed in Phase 0
-
-- Inspected Git state, repository instructions, Flutter/package versions, CI, and the existing Node media worker.
-- Inspected all first-party chat domain, DTO, repository, remote/local data source, local-first engine, sync, outbox, catch-up, receipt, realtime, provider, screen, and test files.
-- Inspected Ably client/auth integration and chat database broadcast triggers.
-- Inspected chat tables, constraints, indexes, RLS policies, capability functions, lifecycle RPCs, change ledger, receipt model, storage policies, and domain-sync triggers.
-- Inspected FCM client handling, chat push preparation/delivery, device token schema, notification preferences/mutes, and general notification queue APIs.
-- Inspected Supabase Auth initialization and session/token usage.
-- Documented current architecture, target mapping, protocol, queues/outbox, deployment, risks, affected files, and confirmed target tree.
-
-## Reusable assets
-
-- Mature PostgreSQL chat schema and authorization model.
-- Existing RPC behavior and `list_my_chats()` projection.
-- Global server ordering via `messages.message_seq`.
-- Durable mutation recovery via `chat_changes.change_seq`.
-- High-water-mark receipts on `channel_members`.
-- Flutter Drift projections and transactional cursor advancement.
-- Client UUID message identity and account-scoped local outgoing operations.
-- Existing notification preferences, channel mutes, blocks, device-token invalidation, and FCM payload routing.
-- Current tests are useful characterization baselines.
-
-## Legacy or migration-only assets
-
-- Ably client/service, auth Edge Function, and PostgreSQL-to-Ably triggers remain required until cutover.
-- `pg_net` chat push dispatch remains required until notification-worker parity.
-- `private.chat_sync_events` is not sufficient as the target outbox and should not become a second source of truth.
-- The standalone media worker remains independent until a later explicit consolidation decision.
-
-## Blockers before Phase 1
-
-- Human review/approval of the Phase 0 audit and proposed in-repository architecture.
-- Confirm whether the Nest workspace should live at repository root as documented. This is recommended because migrations and Flutter contracts must evolve atomically.
-- Verify current NestJS 12/Node active-LTS compatibility and package versions from official sources at Phase 1 start; Phase 0 intentionally installed nothing.
-
-## Risks requiring characterization
-
-- Flutter-to-RPC parameter mismatches for group creation and message editing.
-- Duplicate retry reconciliation for `send_channel_message`.
-- Dual publication/push while Ably and Nest coexist.
-- Preservation of RLS/capability semantics when a server database connection is introduced.
-- Pending DM request rules, blocks, membership periods, media upload ordering, and optimistic rollback.
-- Server-side active-thread suppression does not yet exist.
+Phase 1 — backend foundation: complete and verified. Phase 2 has not started and remains gated on review of this report.
 
 ## Phase status
 
 | Phase | Status |
 |---|---|
-| 0 Audit | Complete; review gate |
-| 1 Backend foundation | Not started |
+| 0 Audit | Complete |
+| 1 Backend foundation | Complete; review gate |
 | 2 Infrastructure | Not started |
 | 3 Chat read model | Not started |
 | 4 Chat write model | Not started |
@@ -67,44 +23,94 @@ Phase 0 — audit: complete, awaiting review. Phase 1 has not started.
 | 10 Load test | Not started |
 | 11 Cutover | Not started |
 
-## Phase 0 change report
+## Phase 1 delivered
+
+- Root NestJS 12 workspace on Node 24 with separate API and worker applications, strict TypeScript/ESM, pinned pnpm, Vitest, and oxlint.
+- Validated, immutable, fail-fast environment configuration with production-safe defaults and CORS validation.
+- AsyncLocalStorage execution context with normalized request/correlation IDs.
+- Structured Pino logging with sensitive-field redaction and request correlation.
+- Stable application/HTTP error envelopes that do not expose production internals.
+- Versioned `/api/v1` business surface with Helmet, body limits, CORS, validation, throttling, graceful shutdown, and development-only Swagger.
+- Unversioned `/health/live` and `/health/ready` probes with explicit startup and shutdown readiness transitions.
+- Non-HTTP worker bootstrap with buffered logging, tested lifecycle ownership, and graceful shutdown.
+- Multi-stage, non-root Node 24 API/worker images plus local Compose services and private Redis for later phases.
+- Backend CI gates for frozen install, lint, architecture tests, unit tests, e2e tests, and both application builds.
+- Dependency-direction architecture tests preventing domain/framework coupling and cross-project leakage.
+
+No chat feature, PostgreSQL client, Redis client, queue processor, WebSocket gateway, Supabase service integration, or Flutter migration was introduced in Phase 1.
+
+## Change report
 
 Files added:
 
-- `docs/backend/ARCHITECTURE.md`
-- `docs/backend/CHAT_MIGRATION.md`
-- `docs/backend/REALTIME_PROTOCOL.md`
-- `docs/backend/QUEUE_ARCHITECTURE.md`
-- `docs/backend/DEPLOYMENT.md`
-- `docs/backend/IMPLEMENTATION_STATUS.md`
+- Workspace/tooling: `.dockerignore`, `.nvmrc`, `Dockerfile`, `docker-compose.yml`, `nest-cli.json`, `oxlint.json`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.build.json`, `tsconfig.json`, `vitest.config.ts`.
+- API: `apps/api/src/api.module.ts`, `apps/api/src/bootstrap/api-bootstrap.ts`, `apps/api/src/main.ts`, `apps/api/tsconfig.app.json`.
+- Worker: `apps/worker/src/main.ts`, `apps/worker/src/worker-lifecycle.service.ts`, `apps/worker/src/worker.module.ts`, `apps/worker/tsconfig.app.json`.
+- Platform library: all files under `libs/platform/src/config`, `libs/platform/src/context`, `libs/platform/src/errors`, `libs/platform/src/health`, and `libs/platform/src/logging`.
+- Shared kernel: `libs/shared-kernel/src/contracts/error-response.ts`, `libs/shared-kernel/src/identifiers/correlation-id.ts`.
+- Tests: `test/architecture/backend-dependencies.spec.ts`, `test/architecture/container-foundation.spec.ts`, both files under `test/e2e`, all six backend unit-spec files under `test/unit/platform` and `test/unit/worker`.
+- Documentation: `docs/backend/ARCHITECTURE.md`, `docs/backend/CHAT_MIGRATION.md`, `docs/backend/DEPLOYMENT.md`, `docs/backend/QUEUE_ARCHITECTURE.md`, `docs/backend/REALTIME_PROTOCOL.md`, and `docs/superpowers/plans/2026-09-28-backend-foundation.md`.
 
-Files changed: none outside the added audit documents.
+Files changed:
+
+- `.gitignore` — backend build/editor artifacts.
+- `.github/workflows/ci.yml` — additive backend gate; existing Flutter and media-worker jobs retained.
+- `docs/backend/IMPLEMENTATION_STATUS.md` — this evidence report.
 
 Files deleted: none.
 
-Database changes: none.
+Database changes: none. No migration, function, trigger, policy, table, index, or seed changed.
 
-Production code changes: none.
+Flutter production changes: none.
 
-## Verification commands
+## Verification evidence
 
-Phase 0 documentation verification:
-
-```sh
-git diff --check
-git status --short
-Review `docs/backend` for unresolved markers and incomplete sections.
-```
-
-Phase 1 must add and run backend install, build, lint, unit, and architecture-test commands. Existing Flutter gates remain:
+Complete backend gate on 2026-09-28:
 
 ```sh
-flutter analyze lib/
-flutter test test/architecture_test.dart
+corepack pnpm install --frozen-lockfile  # passed; lockfile unchanged
+corepack pnpm lint                       # passed; zero diagnostics
+corepack pnpm test                       # passed; 6 files, 29 tests
+corepack pnpm test:architecture          # passed; 2 files, 7 tests
+corepack pnpm test:e2e                   # passed; 2 files, 10 tests
+corepack pnpm build                      # passed; API and worker compiled
+docker compose config                    # passed
 ```
 
-They are not required to prove a documentation-only audit, but the repository's pre-existing dirty changes mean Phase 1 should record a clean baseline before scaffolding.
+Container verification:
 
-## Next phase
+```sh
+docker build --target api -t matchday-api:phase1 .
+docker build --target worker -t matchday-worker:phase1 .
+docker compose up -d --build api worker
+curl --fail http://localhost:3000/health/live
+docker compose exec -T api id -u
+docker compose exec -T worker id -u
+docker compose stop api worker
+```
 
-After approval only: Phase 1 creates the Nest 12 workspace, API/worker shells, platform config/logging/health, Docker foundation, CI, Vitest, oxlint, strict TypeScript/ESM, and architecture tests. It must not implement chat.
+Both images built. API liveness returned HTTP 200. API and worker ran as UID 1000. Both remained running until signalled and stopped in under one second, within the 15-second grace period. Compose resources created for the smoke test were removed afterward; no volumes were deleted.
+
+Repository compatibility gates:
+
+```sh
+flutter analyze lib/                     # passed; no issues
+flutter test test/architecture_test.dart # passed; 6 tests
+grep domain-package purity gate          # passed; no violating paths
+```
+
+The original Phase 1 baseline architecture suite also passed before backend scaffolding (6 tests), so the foundation preserved the existing Flutter dependency rules.
+
+## Remaining risks and explicit deferrals
+
+- Health readiness is intentionally process-local. PostgreSQL and Redis dependency indicators belong to Phase 2.
+- The worker uses one inert lifecycle-owned interval until Phase 2 queue consumers provide active handles; shutdown clears it.
+- TypeScript compilation preserves the shared source tree beneath each application output. Runtime commands are verified against those emitted paths; switching to a bundler will require updating them.
+- Container bases use the Node 24 major tag. Production release hardening should pin an approved digest.
+- No database connection, RLS-preserving server access strategy, Redis connection, BullMQ topology, or secret-provider wiring exists yet.
+- Ably, `pg_net` push delivery, existing Flutter chat synchronization, and the standalone media worker remain unchanged.
+- The Phase 0 characterization risks remain: RPC parameter compatibility, retry reconciliation, dual publication, pending-DM/block semantics, membership periods, media ordering, optimistic rollback, and active-thread notification suppression.
+
+## Next gated phase
+
+Phase 2 is the next candidate: PostgreSQL/Supabase server connectivity, Redis/BullMQ foundation, dependency-aware readiness, secret handling, and infrastructure tests. It must begin only after Phase 1 review approval. Chat read/write behavior remains out of scope until the later gated phases documented in `CHAT_MIGRATION.md`.

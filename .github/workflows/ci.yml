@@ -7,6 +7,51 @@ on:
     branches: [main]
 
 jobs:
+  backend-gates:
+    name: Backend Foundation Gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pinned pnpm
+        run: corepack enable
+
+      - name: Locate pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+
+      - name: Install backend dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Lint backend
+        run: corepack pnpm lint
+
+      - name: Verify backend architecture
+        run: corepack pnpm test:architecture
+
+      - name: Run backend unit tests
+        run: corepack pnpm test
+
+      - name: Run backend end-to-end tests
+        run: corepack pnpm test:e2e
+
+      - name: Build API and worker
+        run: corepack pnpm build
+
   flutter-gates:
     name: Flutter Analysis & Architecture Invariants
     runs-on: ubuntu-latest

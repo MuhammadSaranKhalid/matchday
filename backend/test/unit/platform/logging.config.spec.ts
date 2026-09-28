@@ -19,6 +19,23 @@ const configuration: PlatformConfiguration = {
   trustProxyHops: 0,
   swaggerEnabled: false,
   production: false,
+  database: {
+    url: 'postgresql://localhost/test', poolMax: 10, connectionTimeoutMs: 5_000,
+    idleTimeoutMs: 30_000, statementTimeoutMs: 10_000, sslMode: 'disable',
+  },
+  redis: {
+    url: 'redis://localhost', connectionTimeoutMs: 5_000, commandTimeoutMs: 2_000,
+    maxRetriesPerRequest: 3, namespace: 'matchday',
+  },
+  auth: {
+    supabaseUrl: 'http://localhost:54321', issuer: 'http://localhost:54321/auth/v1',
+    audience: 'authenticated', mode: 'jwks', verificationTimeoutMs: 3_000,
+    jwksCacheMaxAgeMs: 600_000, jwksCooldownMs: 30_000,
+  },
+  queue: {
+    attempts: 5, backoffDelayMs: 1_000, removeOnCompleteCount: 1_000,
+    removeOnFailCount: 5_000,
+  },
 };
 
 describe('buildPinoOptions', () => {
@@ -71,6 +88,14 @@ describe('buildPinoOptions', () => {
       password: 'password-secret',
       supabaseSecret: 'supabase-secret',
       fcmToken: 'fcm-secret',
+      databaseUrl: 'postgresql://user:database-secret@localhost/database',
+      redisUrl: 'redis://default:redis-secret@localhost',
+      SUPABASE_PUBLISHABLE_KEY: 'publishable-secret',
+      nested: {
+        accessToken: 'access-token-secret',
+        refresh_token: 'refresh-token-secret',
+        apiKey: 'api-key-secret',
+      },
     });
 
     const serialized = lines[0] ?? '';
@@ -80,5 +105,11 @@ describe('buildPinoOptions', () => {
     expect(serialized).not.toContain('password-secret');
     expect(serialized).not.toContain('supabase-secret');
     expect(serialized).not.toContain('fcm-secret');
+    expect(serialized).not.toContain('database-secret');
+    expect(serialized).not.toContain('redis-secret');
+    expect(serialized).not.toContain('publishable-secret');
+    expect(serialized).not.toContain('access-token-secret');
+    expect(serialized).not.toContain('refresh-token-secret');
+    expect(serialized).not.toContain('api-key-secret');
   });
 });

@@ -58,7 +58,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
     PORT: positiveInteger(3000).pipe(z.number().max(65_535)),
     LOG_LEVEL: logLevelSchema.default('info'),
     CORS_ORIGINS: z.string().default('http://localhost:3000'),
-    BODY_LIMIT: z.string().regex(/^\d+(?:kb|mb)$/i).default('1mb'),
+    BODY_LIMIT: z.string().regex(/^\d+(?:b|kb|mb)$/i).default('1mb'),
     THROTTLE_TTL_MS: positiveInteger(60_000),
     THROTTLE_LIMIT: positiveInteger(100),
     SWAGGER_ENABLED: booleanValue(!production),

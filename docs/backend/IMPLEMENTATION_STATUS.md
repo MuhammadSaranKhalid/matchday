@@ -43,12 +43,12 @@ No chat feature, PostgreSQL client, Redis client, queue processor, WebSocket gat
 
 Files added:
 
-- Workspace/tooling: `.dockerignore`, `.nvmrc`, `Dockerfile`, `docker-compose.yml`, `nest-cli.json`, `oxlint.json`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.build.json`, `tsconfig.json`, `vitest.config.ts`.
-- API: `apps/api/src/api.module.ts`, `apps/api/src/bootstrap/api-bootstrap.ts`, `apps/api/src/main.ts`, `apps/api/tsconfig.app.json`.
-- Worker: `apps/worker/src/main.ts`, `apps/worker/src/worker-lifecycle.service.ts`, `apps/worker/src/worker.module.ts`, `apps/worker/tsconfig.app.json`.
-- Platform library: all files under `libs/platform/src/config`, `libs/platform/src/context`, `libs/platform/src/errors`, `libs/platform/src/health`, and `libs/platform/src/logging`.
-- Shared kernel: `libs/shared-kernel/src/contracts/error-response.ts`, `libs/shared-kernel/src/identifiers/correlation-id.ts`.
-- Tests: `test/architecture/backend-dependencies.spec.ts`, `test/architecture/container-foundation.spec.ts`, both files under `test/e2e`, all six backend unit-spec files under `test/unit/platform` and `test/unit/worker`.
+- Workspace/tooling: `backend/.dockerignore`, `backend/.nvmrc`, `backend/Dockerfile`, `backend/docker-compose.yml`, `backend/nest-cli.json`, `backend/oxlint.json`, `backend/package.json`, `backend/pnpm-lock.yaml`, `backend/pnpm-workspace.yaml`, `backend/tsconfig.build.json`, `backend/tsconfig.json`, `backend/vitest.config.ts`.
+- API: `backend/apps/api/src/api.module.ts`, `backend/apps/api/src/bootstrap/api-bootstrap.ts`, `backend/apps/api/src/main.ts`, `backend/apps/api/tsconfig.app.json`.
+- Worker: `backend/apps/worker/src/main.ts`, `backend/apps/worker/src/worker-lifecycle.service.ts`, `backend/apps/worker/src/worker.module.ts`, `backend/apps/worker/tsconfig.app.json`.
+- Platform library: all files under `backend/libs/platform/src/config`, `backend/libs/platform/src/context`, `backend/libs/platform/src/errors`, `backend/libs/platform/src/health`, and `backend/libs/platform/src/logging`.
+- Shared kernel: `backend/libs/shared-kernel/src/contracts/error-response.ts`, `backend/libs/shared-kernel/src/identifiers/correlation-id.ts`.
+- Tests: `backend/test/architecture/backend-dependencies.spec.ts`, `backend/test/architecture/container-foundation.spec.ts`, both files under `backend/test/e2e`, all six backend unit-spec files under `backend/test/unit/platform` and `backend/test/unit/worker`.
 - Documentation: `docs/backend/ARCHITECTURE.md`, `docs/backend/CHAT_MIGRATION.md`, `docs/backend/DEPLOYMENT.md`, `docs/backend/QUEUE_ARCHITECTURE.md`, `docs/backend/REALTIME_PROTOCOL.md`, and `docs/superpowers/plans/2026-09-28-backend-foundation.md`.
 
 Files changed:
@@ -68,6 +68,7 @@ Flutter production changes: none.
 Complete backend gate on 2026-09-28:
 
 ```sh
+cd backend
 corepack pnpm install --frozen-lockfile  # passed; lockfile unchanged
 corepack pnpm lint                       # passed; zero diagnostics
 corepack pnpm test                       # passed; 6 files, 32 tests
@@ -80,6 +81,7 @@ docker compose config                    # passed
 Container verification:
 
 ```sh
+cd backend
 docker build --target api -t matchday-api:phase1 .
 docker build --target worker -t matchday-worker:phase1 .
 docker compose up -d --build api worker
@@ -94,6 +96,7 @@ Both images built. API liveness returned HTTP 200. API and worker ran as UID 100
 Repository compatibility gates:
 
 ```sh
+cd app
 flutter analyze lib/                     # passed; no issues
 flutter test test/architecture_test.dart # passed; 6 tests
 grep domain-package purity gate          # passed; no violating paths

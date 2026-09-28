@@ -22,6 +22,10 @@ describe('production container foundation', () => {
     expect(dockerfile).toMatch(/USER node/g);
     expect(dockerfile).toContain('apps/api/src/main.js');
     expect(dockerfile).toContain('apps/worker/src/main.js');
+    expect(dockerfile).not.toMatch(/COPY[^\n]*\.\.\//);
+    expect(dockerfile).not.toMatch(
+      /COPY(?: --\S+)*\s+(?:\.\.\/)*(?:app|supabase|website|media-worker)(?:\/|\s)/,
+    );
   });
 
   it('runs both services with bounded graceful shutdown and a private Redis', () => {
@@ -37,5 +41,7 @@ describe('production container foundation', () => {
     const redisBlock = compose.split(/\n  redis:\n/, 2)[1] ?? '';
     expect(redisBlock).not.toMatch(/^\s{4}ports:/m);
     expect(compose).not.toMatch(/^\s{2}(postgres|supabase):/m);
+    expect(compose.match(/context: \./g)).toHaveLength(2);
+    expect(compose).not.toMatch(/context: \.\./);
   });
 });

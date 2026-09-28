@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
@@ -60,6 +60,23 @@ function moduleSpecifiers(contents: string, path = 'fixture.ts'): string[] {
 
 function targetsLayer(specifier: string, layer: string): boolean {
   return new RegExp(`(^|/)${layer}(?:/|\\.|$)`).test(specifier.replaceAll('\\\\', '/'));
+}
+
+function targetsSiblingProject(sourcePath: string, specifier: string): boolean {
+  if (!specifier.startsWith('.') && !isAbsolute(specifier)) return false;
+
+  const resolvedImport = resolve(dirname(sourcePath), specifier);
+  const repositoryRoot = resolve(process.cwd(), '..');
+  const forbiddenRoots = [
+    join(repositoryRoot, 'app'),
+    join(repositoryRoot, 'website'),
+    join(repositoryRoot, 'media-worker'),
+    join(repositoryRoot, 'supabase', 'functions'),
+  ];
+
+  return forbiddenRoots.some(
+    (root) => resolvedImport === root || resolvedImport.startsWith(`${root}${sep}`),
+  );
 }
 
 describe('backend dependency direction', () => {
@@ -150,19 +167,29 @@ describe('backend dependency direction', () => {
     expect(violations).toEqual([]);
   });
 
-  it('does not import Flutter, website, or legacy media-worker code', () => {
+  it('does not import app, website, media-worker, or Supabase Function code', () => {
     const violations = sourceFiles().flatMap((path) =>
       importsIn(path)
-        .filter(
-          (specifier) =>
-            specifier.includes('/lib/') ||
-            specifier.includes('website/') ||
-            specifier.includes('media-worker/'),
-        )
+        .filter((specifier) => targetsSiblingProject(path, specifier))
         .map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`),
     );
 
     expect(violations).toEqual([]);
+  });
+
+  it('recognizes relative imports that escape into sibling projects', () => {
+    const sourcePath = join(repositoryRoot, 'apps', 'api', 'src', 'fixture.ts');
+
+    expect(targetsSiblingProject(sourcePath, '../../../../app/lib/main.dart')).toBe(true);
+    expect(targetsSiblingProject(sourcePath, '../../../../website/src/index.ts')).toBe(true);
+    expect(targetsSiblingProject(sourcePath, '../../../../media-worker/src/index.ts')).toBe(true);
+    expect(
+      targetsSiblingProject(
+        sourcePath,
+        '../../../../supabase/functions/_shared/example.ts',
+      ),
+    ).toBe(true);
+    expect(targetsSiblingProject(sourcePath, '../../../libs/platform/src/index.ts')).toBe(false);
   });
 
   it('defines API and worker projects in the Nest workspace', () => {

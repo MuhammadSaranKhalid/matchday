@@ -50,10 +50,10 @@ Client-generated `message_id` currently acts as the idempotency key. The primary
 ## Proposed bounded contexts
 
 ```text
-apps/
+backend/apps/
   api/src/{main.ts,api.module.ts,bootstrap/}
   worker/src/{main.ts,worker.module.ts}
-libs/
+backend/libs/
   chat/src/
     domain/{entities,value-objects,events,errors,policies}/
     application/{commands,queries,ports,services}/
@@ -63,11 +63,11 @@ libs/
   notifications/src/{application,infrastructure,processors}/
   platform/src/{auth,config,database,redis,queue,realtime,health,logging,observability}/
   shared-kernel/src/{identifiers,pagination,errors,contracts}/
-test/{architecture,integration,e2e,load}/
+backend/test/{architecture,integration,e2e,load}/
 supabase/migrations/
 ```
 
-Keep `website/`, `media-worker/`, Flutter `lib/`, and Supabase functions in place during migration. Phase 0 does not decide whether the existing media worker is later folded into `apps/worker`; that requires a dedicated parity plan.
+Keep `website/`, `media-worker/`, Flutter `app/lib/`, and Supabase functions as independent project boundaries during migration. Phase 0 does not decide whether the existing media worker is later folded into `backend/apps/worker`; that requires a dedicated parity plan.
 
 ## Dependency and runtime rules
 

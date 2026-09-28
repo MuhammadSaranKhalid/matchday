@@ -125,6 +125,18 @@ describe('backend dependency direction', () => {
     expect(violations).toEqual([]);
   });
 
+  it('keeps the PostgreSQL driver inside platform database infrastructure', () => {
+    const violations = sourceFiles()
+      .filter((path) => !path.includes(join('libs', 'platform', 'src', 'database')))
+      .flatMap((path) =>
+        importsIn(path)
+          .filter((specifier) => specifier === 'pg' || specifier.startsWith('pg/'))
+          .map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`),
+      );
+
+    expect(violations).toEqual([]);
+  });
+
   it('detects exports, dynamic imports, and root-level forbidden layers', () => {
     const specifiers = moduleSpecifiers(`
       export { adapter } from '../infrastructure.js';

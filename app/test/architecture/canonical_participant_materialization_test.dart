@@ -4,8 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final repositoryPaths = [
-    'supabase/functions/record-ball/repositories/match_repository.ts',
-    'supabase/functions/cricket-match-action/repositories/match_team_repository.ts',
+    '../supabase/functions/record-ball/repositories/match_repository.ts',
+    '../supabase/functions/cricket-match-action/repositories/match_team_repository.ts',
   ];
 
   for (final path in repositoryPaths) {

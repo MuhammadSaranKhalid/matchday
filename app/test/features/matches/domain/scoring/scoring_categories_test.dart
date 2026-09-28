@@ -39,7 +39,7 @@ void main() {
       // If the vectors grow a category this set does not know about, the
       // coverage report would silently under-count — it would report full
       // coverage while a whole rule area had never been exercised.
-      final file = File('supabase/functions/_shared/scoring/vectors.json');
+      final file = File('../supabase/functions/_shared/scoring/vectors.json');
       final suite = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
       final inSpec = (suite['vectors'] as List)
           .map((v) => (v as Map<String, dynamic>)['category'] as String)
@@ -55,7 +55,7 @@ void main() {
     test('every declared category is reachable from the spec', () {
       // The other direction: a category nobody can ever observe would block
       // the soak forever.
-      final file = File('supabase/functions/_shared/scoring/vectors.json');
+      final file = File('../supabase/functions/_shared/scoring/vectors.json');
       final suite = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
       final inSpec = (suite['vectors'] as List)
           .map((v) => (v as Map<String, dynamic>)['category'] as String)

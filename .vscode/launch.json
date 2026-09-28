@@ -5,6 +5,7 @@
       "name": "matchday (debug)",
       "type": "dart",
       "request": "launch",
+      "cwd": "${workspaceFolder}/app",
       "program": "lib/main.dart",
       "toolArgs": ["--dart-define-from-file", "config/dev.json"]
     },
@@ -12,6 +13,7 @@
       "name": "matchday (profile)",
       "type": "dart",
       "request": "launch",
+      "cwd": "${workspaceFolder}/app",
       "program": "lib/main.dart",
       "flutterMode": "profile",
       "toolArgs": ["--dart-define-from-file", "config/dev.json"]
@@ -20,6 +22,7 @@
       "name": "matchday (release)",
       "type": "dart",
       "request": "launch",
+      "cwd": "${workspaceFolder}/app",
       "program": "lib/main.dart",
       "flutterMode": "release",
       "toolArgs": ["--dart-define-from-file", "config/dev.json"]

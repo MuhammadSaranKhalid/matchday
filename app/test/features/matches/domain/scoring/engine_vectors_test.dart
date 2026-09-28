@@ -19,7 +19,7 @@ import 'package:matchday/features/matches/domain/entities/ball.dart';
 import 'package:matchday/features/matches/domain/scoring/scoring_engine.dart';
 import 'package:matchday/features/matches/domain/scoring/scoring_types.dart';
 
-const _vectorPath = 'supabase/functions/_shared/scoring/vectors.json';
+const _vectorPath = '../supabase/functions/_shared/scoring/vectors.json';
 
 Map<String, dynamic> _merge(Map<String, dynamic> base, Object? override) => {
       ...base,

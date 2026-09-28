@@ -15,8 +15,8 @@
     "test": "vitest run test/unit",
     "test:architecture": "vitest run test/architecture",
     "test:e2e": "vitest run test/e2e",
-    "start:api": "node dist/apps/api/main.js",
-    "start:worker": "node dist/apps/worker/main.js"
+    "start:api": "node dist/apps/api/apps/api/src/main.js",
+    "start:worker": "node dist/apps/worker/apps/worker/src/main.js"
   },
   "dependencies": {
     "@nestjs/common": "12.1.0",

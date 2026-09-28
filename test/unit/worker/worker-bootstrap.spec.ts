@@ -35,13 +35,17 @@ describe('bootstrapWorker', () => {
 
 describe('WorkerLifecycleService', () => {
   it('marks the worker ready after initialization and stopping before shutdown', () => {
+    vi.useFakeTimers();
     const readiness = new ReadinessService();
     const lifecycle = new WorkerLifecycleService(readiness);
 
     lifecycle.onApplicationBootstrap();
     expect(readiness.isReady()).toBe(true);
+    expect(vi.getTimerCount()).toBe(1);
 
     lifecycle.beforeApplicationShutdown('SIGTERM');
     expect(readiness.isReady()).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
   });
 });

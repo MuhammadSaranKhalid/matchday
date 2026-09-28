@@ -1,0 +1,42 @@
+services:
+  api:
+    build:
+      context: .
+      target: api
+    init: true
+    stop_grace_period: 15s
+    environment: &app-environment
+      NODE_ENV: production
+      APP_NAME: matchday
+      LOG_LEVEL: info
+      CORS_ORIGINS: http://localhost:3000
+      SWAGGER_ENABLED: "false"
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://localhost:3000/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+
+  worker:
+    build:
+      context: .
+      target: worker
+    init: true
+    stop_grace_period: 15s
+    environment: *app-environment
+
+  redis:
+    image: redis:8.2-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

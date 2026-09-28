@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { QueryExecutor, TransactionPrincipal, TransactionWork } from './database.types.js';
+import type { AuthenticatedPrincipal } from '../auth/authenticated-principal.js';
+import type { QueryExecutor, TransactionWork } from './database.types.js';
 
 interface ClientProvider {
   connect(): Promise<QueryExecutor & { release(): void }>;
@@ -9,7 +10,7 @@ interface ClientProvider {
 export class DatabaseExecutorService {
   constructor(private readonly pool: ClientProvider) {}
 
-  withUserTransaction<T>(principal: TransactionPrincipal, work: TransactionWork<T>): Promise<T> {
+  withUserTransaction<T>(principal: AuthenticatedPrincipal, work: TransactionWork<T>): Promise<T> {
     return this.transaction(async (database) => {
       await database.query("select set_config('role', $1, true)", [principal.role]);
       await database.query("select set_config('request.jwt.claims', $1, true)", [

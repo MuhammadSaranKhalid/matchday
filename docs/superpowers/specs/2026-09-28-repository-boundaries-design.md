@@ -1,6 +1,6 @@
 # Matchday Repository Boundaries Design
 
-**Status:** Approved conversational design; awaiting written-spec review  
+**Status:** Implemented and verified
 **Date:** 2026-09-28  
 **Branch:** `backend`
 
@@ -8,7 +8,7 @@
 
 Make the Matchday repository express its real product boundaries. The Flutter client and Nest backend currently share the repository root, which makes ownership, commands, CI, and tooling ambiguous. The target layout gives the Flutter app, backend platform, and Supabase project explicit homes while preserving the independently owned website and media worker.
 
-This restructuring must not change application behavior, database behavior, deployed services, or secrets. Phase 2 infrastructure begins only after the new layout is committed and every compatibility gate passes.
+This restructuring did not change application behavior, database behavior, deployed services, or secrets. The layout and compatibility gates were completed on 2026-09-28; Phase 2 infrastructure remains a separate, unstarted gated design.
 
 ## Target layout
 

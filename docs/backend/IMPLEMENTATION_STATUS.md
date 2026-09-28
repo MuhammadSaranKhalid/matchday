@@ -4,7 +4,7 @@ Last updated: 2026-09-28.
 
 ## Current gate
 
-Phase 1 — backend foundation: complete and verified. Phase 2 has not started and remains gated on review of this report.
+Phase 1 — backend foundation: complete and verified. The repository-boundary migration is also complete and verified. Phase 2 has not started and remains gated on a separate design review.
 
 ## Phase status
 
@@ -25,7 +25,7 @@ Phase 1 — backend foundation: complete and verified. Phase 2 has not started a
 
 ## Phase 1 delivered
 
-- Root NestJS 12 workspace on Node 24 with separate API and worker applications, strict TypeScript/ESM, pinned pnpm, Vitest, and oxlint.
+- NestJS 12 workspace under `backend/` on Node 24 with separate API and worker applications, strict TypeScript/ESM, pinned pnpm, Vitest, and oxlint.
 - Validated, immutable, fail-fast environment configuration with production-safe defaults, CORS validation, and bounded trusted-proxy hops.
 - AsyncLocalStorage execution context with normalized request/correlation IDs.
 - Structured Pino logging covering parser failures and unknown routes, with sensitive-field redaction, query-string omission, and request correlation.
@@ -65,14 +65,14 @@ Flutter production changes: none.
 
 ## Verification evidence
 
-Complete backend gate on 2026-09-28:
+Complete backend gate after the repository move on 2026-09-28:
 
 ```sh
 cd backend
 corepack pnpm install --frozen-lockfile  # passed; lockfile unchanged
 corepack pnpm lint                       # passed; zero diagnostics
 corepack pnpm test                       # passed; 6 files, 32 tests
-corepack pnpm test:architecture          # passed; 2 files, 8 tests
+corepack pnpm test:architecture          # passed; 2 files, 9 tests
 corepack pnpm test:e2e                   # passed; 2 files, 12 tests
 corepack pnpm build                      # passed; API/worker compiled and runtime imports verified
 docker compose config                    # passed
@@ -104,6 +104,51 @@ grep domain-package purity gate          # passed; no violating paths
 
 The original Phase 1 baseline architecture suite also passed before backend scaffolding (6 tests), so the foundation preserved the existing Flutter dependency rules.
 
+## Repository boundary migration
+
+The repository now has explicit project roots:
+
+```text
+app/           Flutter client, tests, platforms, assets, and client tooling
+backend/       Nest API/worker workspace, tests, manifests, and containers
+supabase/      authoritative migrations, Edge Functions, seeds, and CLI config
+website/       independent static/Next-compatible website project
+media-worker/  independent media-processing service
+```
+
+The root owns documentation, CI, and cross-project scripts only. `website/` and `media-worker/` were not folded into the backend, and Supabase was neither copied nor moved.
+
+Final compatibility evidence on 2026-09-28:
+
+```sh
+bash scripts/verify_repository_boundaries.sh                         # passed
+
+cd app
+flutter pub get                                                      # passed
+flutter analyze lib/                                                 # no issues
+flutter test test/architecture_test.dart                             # 6 passed
+bash scripts/check_domain_purity.sh                                  # passed
+flutter test test/supabase/migration_layout_test.dart                # 3 passed
+flutter test test/features/posts/                                    # 32 passed
+
+cd ../backend
+corepack pnpm install --frozen-lockfile                              # passed
+corepack pnpm lint                                                    # passed
+corepack pnpm test                                                    # 32 passed
+corepack pnpm test:architecture                                       # 9 passed
+corepack pnpm test:e2e                                                # 12 passed
+corepack pnpm build                                                   # API/worker build and imports passed
+docker compose config                                                 # passed
+docker compose build api worker                                      # passed
+docker compose up -d api worker                                      # passed
+```
+
+The container smoke returned HTTP 200 from `/health/live`, both runtime users were UID 1000, and both processes stopped in 0.273 seconds before `docker compose down` removed only this Compose project's containers and network. The website's dependency-free `npm run build` passed. The media worker's `npm ci && npm run build` passed; its existing Node 22 engine requirement and npm audit findings remain unchanged. Supabase CLI 2.109.1 found the root `supabase/config.toml` through `--workdir .`; no Supabase service was started, reset, linked, pushed, or otherwise mutated.
+
+No migration, Edge Function, database object, deployed service, secret, Flutter behavior, or backend behavior changed. Generated Flutter, Node, Docker, website, and Supabase outputs remain untracked.
+
+Remaining path risks are limited to historical documents that intentionally preserve old command evidence and external tooling that assumes the former root package locations. The structural gate and CI now reject reintroduction of root Flutter/Nest sources. The website has no lockfile because it currently has no dependencies; adding dependencies must include a lockfile before changing its build to `npm ci`.
+
 ## Remaining risks and explicit deferrals
 
 - Health readiness is intentionally process-local. PostgreSQL and Redis dependency indicators belong to Phase 2.
@@ -117,4 +162,4 @@ The original Phase 1 baseline architecture suite also passed before backend scaf
 
 ## Next gated phase
 
-Phase 2 is the next candidate: PostgreSQL/Supabase server connectivity, Redis/BullMQ foundation, dependency-aware readiness, secret handling, and infrastructure tests. It must begin only after Phase 1 review approval. Chat read/write behavior remains out of scope until the later gated phases documented in `CHAT_MIGRATION.md`.
+Phase 2 is the next candidate: PostgreSQL/Supabase server connectivity, Redis/BullMQ foundation, dependency-aware readiness, secret handling, and infrastructure tests. It remains unstarted and requires its own approved design before implementation. Chat read/write behavior remains out of scope until the later gated phases documented in `CHAT_MIGRATION.md`.

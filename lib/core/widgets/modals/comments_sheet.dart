@@ -178,6 +178,34 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
     });
   }
 
+  Future<void> _confirmDeleteComment(String commentId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete comment?'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: CkColors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted && widget.postId != null) {
+      ref
+          .read(commentsControllerProvider(widget.postId!).notifier)
+          .deleteComment(commentId);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenH = MediaQuery.of(context).size.height;
@@ -310,6 +338,7 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                                       comment: parent,
                                       parentId: parent.id,
                                     ),
+                                    onDelete: () => _confirmDeleteComment(parent.id),
                                     onLikeToggle: () {
                                       if (widget.postId != null) {
                                         ref
@@ -368,6 +397,7 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                                               comment: reply,
                                               parentId: parent.id,
                                             ),
+                                            onDelete: () => _confirmDeleteComment(reply.id),
                                             onLikeToggle: () {
                                               if (widget.postId != null) {
                                                 ref
@@ -604,6 +634,7 @@ class _InstagramCommentRow extends ConsumerWidget {
     required this.isReply,
     required this.onReply,
     required this.onLikeToggle,
+    this.onDelete,
     this.onOpenProfile,
   });
 
@@ -612,6 +643,7 @@ class _InstagramCommentRow extends ConsumerWidget {
   final bool isReply;
   final VoidCallback onReply;
   final VoidCallback onLikeToggle;
+  final VoidCallback? onDelete;
   final ValueChanged<String>? onOpenProfile;
 
   void _navigateToProfile(BuildContext context, String rawHandle) {
@@ -746,7 +778,6 @@ class _InstagramCommentRow extends ConsumerWidget {
                 ),
                 const SizedBox(height: 3),
 
-                if (!isMe) Align(alignment: Alignment.centerRight, child: SafetyMenu(userId: comment.authorId, kind: 'comment', targetId: comment.id)),
                 // Comment body text
                 RichText(
                   text: TextSpan(
@@ -760,18 +791,52 @@ class _InstagramCommentRow extends ConsumerWidget {
                 ),
                 const SizedBox(height: 5),
 
-                // Action row: Reply
-                GestureDetector(
-                  onTap: onReply,
-                  behavior: HitTestBehavior.opaque,
-                  child: const Text(
-                    'Reply',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: CkColors.muted,
+                // Action row: Reply + options
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: onReply,
+                      behavior: HitTestBehavior.opaque,
+                      child: const Text(
+                        'Reply',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: CkColors.muted,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (isMe) ...[
+                      const SizedBox(width: 14),
+                      GestureDetector(
+                        onTap: onDelete,
+                        behavior: HitTestBehavior.opaque,
+                        child: const Text(
+                          'Delete',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: CkColors.muted,
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      const SizedBox(width: 10),
+                      SafetyMenu(
+                        userId: comment.authorId,
+                        kind: 'comment',
+                        targetId: comment.id,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Icon(
+                            Icons.more_horiz,
+                            size: 14,
+                            color: CkColors.muted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

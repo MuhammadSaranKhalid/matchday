@@ -4,18 +4,31 @@ import '../../../../core/supabase/supabase_client_provider.dart';
 import '../providers/safety_providers.dart';
 
 class SafetyMenu extends ConsumerWidget {
-  const SafetyMenu({super.key, required this.userId, required this.kind, required this.targetId, this.onShare});
+  const SafetyMenu({
+    super.key,
+    required this.userId,
+    required this.kind,
+    required this.targetId,
+    this.onShare,
+    this.child,
+    this.icon,
+  });
+
   final String userId;
   final String kind;
   final String targetId;
   final VoidCallback? onShare;
+  final Widget? child;
+  final Widget? icon;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final self = ref.watch(supabaseClientProvider).auth.currentUser?.id == userId;
     final blocked = ref.watch(blockedAccountsProvider).value?.any((u) => u.id == userId) ?? false;
     return PopupMenuButton<String>(
       tooltip: 'Safety and options',
-      icon: const Icon(Icons.more_horiz),
+      icon: child == null ? (icon ?? const Icon(Icons.more_horiz)) : null,
+      child: child,
       itemBuilder: (_) => [
         if (onShare != null) const PopupMenuItem(value: 'share', child: Text('Share')),
         if (!self) PopupMenuItem(value: 'report', child: Text('Report $kind')),

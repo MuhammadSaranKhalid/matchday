@@ -1,7 +1,7 @@
 import { Injectable, type NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 
-import { normalizeCorrelationId } from '../../../shared-kernel/src/identifiers/correlation-id.js';
+import { normalizeCorrelationId } from '@shared-kernel/identifiers/correlation-id.js';
 import { ExecutionContextService } from './execution-context.service.js';
 
 @Injectable()

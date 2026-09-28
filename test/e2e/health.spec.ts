@@ -16,6 +16,7 @@ const configuration: PlatformConfiguration = {
   corsOrigins: ['http://localhost:3000'],
   bodyLimit: '1mb',
   throttle: { ttlMs: 60_000, limit: 100 },
+  trustProxyHops: 0,
   swaggerEnabled: false,
   production: false,
 };

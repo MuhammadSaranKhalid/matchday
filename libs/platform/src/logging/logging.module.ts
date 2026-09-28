@@ -21,13 +21,12 @@ import { buildPinoOptions } from './logging.config.js';
         return {
           pinoHttp: {
             ...options,
-            autoLogging: true,
-            customProps: () => context.get(),
+            autoLogging: false,
             serializers: {
               req: (request: { id?: string; method?: string; url?: string }) => ({
                 id: request.id,
                 method: request.method,
-                url: request.url,
+                url: request.url?.split('?', 1)[0],
               }),
               res: (response: { statusCode?: number }) => ({
                 statusCode: response.statusCode,

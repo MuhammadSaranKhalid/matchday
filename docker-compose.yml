@@ -9,6 +9,7 @@ services:
       NODE_ENV: production
       APP_NAME: matchday
       LOG_LEVEL: info
+      TRUST_PROXY_HOPS: "1"
       CORS_ORIGINS: http://localhost:3000
       SWAGGER_ENABLED: "false"
     ports:

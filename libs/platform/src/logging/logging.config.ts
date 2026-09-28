@@ -35,6 +35,11 @@ export function buildPinoOptions(
   };
 }
 
+export function sanitizeRequestUrl(rawUrl: string | undefined): string | undefined {
+  if (rawUrl === undefined) return undefined;
+  return rawUrl.split('?', 1)[0];
+}
+
 function pinoTime(): string {
   return `,"time":"${new Date().toISOString()}"`;
 }

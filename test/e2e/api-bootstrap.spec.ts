@@ -38,6 +38,7 @@ const baseConfiguration: PlatformConfiguration = {
   corsOrigins: ['https://allowed.example'],
   bodyLimit: '100b',
   throttle: { ttlMs: 60_000, limit: 2 },
+  trustProxyHops: 1,
   swaggerEnabled: true,
   production: false,
 };
@@ -53,6 +54,7 @@ describe('API bootstrap', () => {
     process.env.BODY_LIMIT = '100b';
     process.env.THROTTLE_TTL_MS = '60000';
     process.env.THROTTLE_LIMIT = '2';
+    process.env.TRUST_PROXY_HOPS = '1';
     process.env.SWAGGER_ENABLED = 'true';
 
     const module = await Test.createTestingModule({
@@ -107,6 +109,40 @@ describe('API bootstrap', () => {
       .send({ name: 'a'.repeat(256) })
       .expect(413);
     expect(response.body).toMatchObject({ code: 'PAYLOAD_TOO_LARGE', status: 413 });
+    expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+    expect(response.headers['x-correlation-id']).toMatch(/^[0-9a-f-]{36}$/);
+    expect(response.body.correlationId).toBe(response.headers['x-correlation-id']);
+  });
+
+  it('correlates malformed JSON before parser errors are handled', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/probe')
+      .set('content-type', 'application/json')
+      .send('{"name":')
+      .expect(400);
+
+    expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+    expect(response.body.correlationId).toBe(response.headers['x-correlation-id']);
+  });
+
+  it('uses the nearest trusted proxy hop when throttling clients', async () => {
+    const first = await request(app.getHttpServer())
+      .get('/api/v1/probe')
+      .set('x-forwarded-for', '203.0.113.1, 198.51.100.10');
+    const second = await request(app.getHttpServer())
+      .get('/api/v1/probe')
+      .set('x-forwarded-for', '203.0.113.2, 198.51.100.10');
+    const spoofedThird = await request(app.getHttpServer())
+      .get('/api/v1/probe')
+      .set('x-forwarded-for', '203.0.113.3, 198.51.100.10');
+    const differentClient = await request(app.getHttpServer())
+      .get('/api/v1/probe')
+      .set('x-forwarded-for', '203.0.113.3, 198.51.100.11');
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(spoofedThird.status).toBe(429);
+    expect(differentClient.status).toBe(200);
   });
 
   it('returns a stable rate-limit error after the configured allowance', async () => {

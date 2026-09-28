@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { PlatformConfiguration } from '../../../libs/platform/src/config/configuration.js';
 import { ExecutionContextService } from '../../../libs/platform/src/context/execution-context.service.js';
-import { buildPinoOptions } from '../../../libs/platform/src/logging/logging.config.js';
+import {
+  buildPinoOptions,
+  sanitizeRequestUrl,
+} from '../../../libs/platform/src/logging/logging.config.js';
 
 const configuration: PlatformConfiguration = {
   nodeEnvironment: 'test',
@@ -13,11 +16,17 @@ const configuration: PlatformConfiguration = {
   corsOrigins: ['http://localhost:3000'],
   bodyLimit: '1mb',
   throttle: { ttlMs: 60_000, limit: 100 },
+  trustProxyHops: 0,
   swaggerEnabled: false,
   production: false,
 };
 
 describe('buildPinoOptions', () => {
+  it('removes query strings from logged request URLs', () => {
+    expect(sanitizeRequestUrl('/oauth/callback?code=secret&token=also-secret')).toBe(
+      '/oauth/callback',
+    );
+  });
   it('emits JSON with execution context identifiers', () => {
     const context = new ExecutionContextService();
     const lines: string[] = [];

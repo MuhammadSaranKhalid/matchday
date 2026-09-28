@@ -4,7 +4,7 @@ import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 
-import { WorkerModule } from './worker.module.js';
+import { WorkerModule } from '@app/worker/worker.module.js';
 
 export async function bootstrapWorker(): Promise<INestApplicationContext> {
   const app = await NestFactory.createApplicationContext(WorkerModule, {

@@ -12,6 +12,7 @@ export interface Environment {
   readonly BODY_LIMIT: string;
   readonly THROTTLE_TTL_MS: number;
   readonly THROTTLE_LIMIT: number;
+  readonly TRUST_PROXY_HOPS: number;
   readonly SWAGGER_ENABLED: boolean;
 }
 
@@ -61,6 +62,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
     BODY_LIMIT: z.string().regex(/^\d+(?:b|kb|mb)$/i).default('1mb'),
     THROTTLE_TTL_MS: positiveInteger(60_000),
     THROTTLE_LIMIT: positiveInteger(100),
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
     SWAGGER_ENABLED: booleanValue(!production),
   });
 

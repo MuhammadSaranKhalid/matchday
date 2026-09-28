@@ -8,6 +8,7 @@ export interface PlatformConfiguration {
   readonly corsOrigins: readonly string[];
   readonly bodyLimit: string;
   readonly throttle: Readonly<{ ttlMs: number; limit: number }>;
+  readonly trustProxyHops: number;
   readonly swaggerEnabled: boolean;
   readonly production: boolean;
 }
@@ -24,6 +25,7 @@ export function buildConfiguration(environment: Environment): PlatformConfigurat
       ttlMs: environment.THROTTLE_TTL_MS,
       limit: environment.THROTTLE_LIMIT,
     }),
+    trustProxyHops: environment.TRUST_PROXY_HOPS,
     swaggerEnabled: environment.SWAGGER_ENABLED,
     production: environment.NODE_ENV === 'production',
   });

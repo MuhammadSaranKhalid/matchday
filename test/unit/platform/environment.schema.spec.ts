@@ -13,6 +13,7 @@ describe('parseEnvironment', () => {
       BODY_LIMIT: '1mb',
       THROTTLE_TTL_MS: 60_000,
       THROTTLE_LIMIT: 100,
+      TRUST_PROXY_HOPS: 0,
       SWAGGER_ENABLED: true,
     });
   });
@@ -36,6 +37,8 @@ describe('parseEnvironment', () => {
     [{ CORS_ORIGINS: 'not a url' }, 'CORS_ORIGINS'],
     [{ NODE_ENV: 'preview' }, 'NODE_ENV'],
     [{ LOG_LEVEL: 'verbose' }, 'LOG_LEVEL'],
+    [{ TRUST_PROXY_HOPS: '-1' }, 'TRUST_PROXY_HOPS'],
+    [{ TRUST_PROXY_HOPS: 'all' }, 'TRUST_PROXY_HOPS'],
   ])('rejects invalid environment input %o', (input, expectedField) => {
     expect(() => parseEnvironment(input)).toThrow(expectedField);
   });

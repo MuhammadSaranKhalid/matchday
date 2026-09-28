@@ -25,4 +25,3 @@ windows
 *.mov
 Dockerfile*
 docker-compose*.yml
-

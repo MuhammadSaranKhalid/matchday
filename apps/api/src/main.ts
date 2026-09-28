@@ -3,11 +3,11 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 
-import { buildConfiguration } from '../../../libs/platform/src/config/configuration.js';
-import { parseEnvironment } from '../../../libs/platform/src/config/environment.schema.js';
-import { ReadinessService } from '../../../libs/platform/src/health/readiness.service.js';
-import { ApiModule } from './api.module.js';
-import { configureApi } from './bootstrap/api-bootstrap.js';
+import { ApiModule } from '@app/api/api.module.js';
+import { configureApi } from '@app/api/bootstrap/api-bootstrap.js';
+import { buildConfiguration } from '@platform/config/configuration.js';
+import { parseEnvironment } from '@platform/config/environment.schema.js';
+import { ReadinessService } from '@platform/health/readiness.service.js';
 
 export async function bootstrapApi(): Promise<void> {
   const configuration = buildConfiguration(parseEnvironment(process.env));

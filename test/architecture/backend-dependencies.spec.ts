@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
@@ -27,9 +28,38 @@ function sourceFiles(): string[] {
 
 function importsIn(path: string): string[] {
   const contents = readFileSync(path, 'utf8');
-  return [...contents.matchAll(/(?:from\s+|import\s*)['"]([^'"]+)['"]/g)]
-    .map((match) => match[1])
-    .filter((value): value is string => value !== undefined);
+  return moduleSpecifiers(contents, path);
+}
+
+function moduleSpecifiers(contents: string, path = 'fixture.ts'): string[] {
+  const source = ts.createSourceFile(path, contents, ts.ScriptTarget.Latest, true);
+  const specifiers: string[] = [];
+
+  function visit(node: ts.Node): void {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier !== undefined &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      specifiers.push(node.moduleSpecifier.text);
+    }
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments.length === 1 &&
+      ts.isStringLiteral(node.arguments[0])
+    ) {
+      specifiers.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(source);
+  return specifiers;
+}
+
+function targetsLayer(specifier: string, layer: string): boolean {
+  return new RegExp(`(^|/)${layer}(?:/|\\.|$)`).test(specifier.replaceAll('\\\\', '/'));
 }
 
 describe('backend dependency direction', () => {
@@ -42,14 +72,20 @@ describe('backend dependency direction', () => {
       'bullmq',
       'socket.io',
       '@supabase/',
-      '/infrastructure/',
-      '/presentation/',
+      'infrastructure',
+      'presentation',
     ];
     const violations = sourceFiles()
       .filter((path) => path.split(sep).includes('domain'))
       .flatMap((path) =>
         importsIn(path)
-          .filter((specifier) => forbidden.some((value) => specifier.includes(value)))
+          .filter((specifier) =>
+            forbidden.some((value) =>
+              ['infrastructure', 'presentation'].includes(value)
+                ? targetsLayer(specifier, value)
+                : specifier.includes(value),
+            ),
+          )
           .map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`),
       );
 
@@ -63,13 +99,28 @@ describe('backend dependency direction', () => {
         importsIn(path)
           .filter(
             (specifier) =>
-              specifier.includes('/infrastructure/') ||
-              specifier.includes('/presentation/'),
+              targetsLayer(specifier, 'infrastructure') ||
+              targetsLayer(specifier, 'presentation'),
           )
           .map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`),
       );
 
     expect(violations).toEqual([]);
+  });
+
+  it('detects exports, dynamic imports, and root-level forbidden layers', () => {
+    const specifiers = moduleSpecifiers(`
+      export { adapter } from '../infrastructure.js';
+      const screen = import('@feature/presentation/screen.js');
+    `);
+
+    expect(specifiers).toEqual([
+      '../infrastructure.js',
+      '@feature/presentation/screen.js',
+    ]);
+    expect(specifiers.every((value) =>
+      targetsLayer(value, 'infrastructure') || targetsLayer(value, 'presentation'),
+    )).toBe(true);
   });
 
   it('does not create application-wide dumping-ground directories', () => {

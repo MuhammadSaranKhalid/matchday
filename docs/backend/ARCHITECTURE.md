@@ -1,6 +1,6 @@
 # Matchday Backend Architecture — Phase 0 Audit
 
-Status: proposed architecture, not implemented. Audit date: 2026-09-28.
+Status: Phase 1 foundation implemented; later bounded contexts remain proposed. Audit date: 2026-09-28.
 
 ## Executive decision
 

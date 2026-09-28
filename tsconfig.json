@@ -20,7 +20,8 @@
     "baseUrl": ".",
     "ignoreDeprecations": "6.0",
     "paths": {
-      "@app/*": ["apps/*/src"],
+      "@app/api/*": ["apps/api/src/*"],
+      "@app/worker/*": ["apps/worker/src/*"],
       "@platform/*": ["libs/platform/src/*"],
       "@shared-kernel/*": ["libs/shared-kernel/src/*"]
     }

@@ -36,4 +36,3 @@ COPY --chown=node:node --from=prod-deps /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/dist/apps/worker ./dist/apps/worker
 USER node
 CMD ["node", "dist/apps/worker/apps/worker/src/main.js"]
-

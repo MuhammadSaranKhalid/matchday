@@ -1,10 +1,10 @@
 # Backend Deployment Evolution
 
-Status: proposed deployment model; no infrastructure created.
+Status: Phase 1 local container foundation implemented; production infrastructure remains proposed.
 
 ## Local development
 
-Docker Compose will eventually run `api`, `worker`, and `redis`. Supabase remains the repository's existing external/local Supabase environment rather than a competing PostgreSQL stack. Configuration validates URLs, pool bounds, JWT issuer/JWKS settings, Redis namespaces, CORS origins, queue settings, and production security flags at startup.
+Docker Compose runs `api`, `worker`, and private `redis` services. Applications do not connect to Redis until Phase 2. Supabase remains the repository's existing external/local Supabase environment rather than a competing PostgreSQL stack. Phase 1 configuration validates process, HTTP, CORS, proxy-trust, and throttling settings; later phases add database, Redis, queue, and auth validation alongside those integrations.
 
 ## Initial production
 
@@ -17,6 +17,8 @@ worker x1
 redis x1 (private network/container only)
 Supabase hosted PostgreSQL/Auth/Storage
 ```
+
+Set `TRUST_PROXY_HOPS` to the exact number of controlled proxy hops (one for this topology). Leaving it at zero ignores forwarded client addresses; trusting more hops than the deployment owns permits spoofing and weakens per-client throttling.
 
 API and worker use multi-stage images, non-root runtime users, production-only artifacts, and graceful SIGTERM. Redis is never exposed publicly. Secrets are injected at deployment and are not baked into images.
 

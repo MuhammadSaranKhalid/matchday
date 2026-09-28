@@ -26,11 +26,11 @@ Phase 1 — backend foundation: complete and verified. Phase 2 has not started a
 ## Phase 1 delivered
 
 - Root NestJS 12 workspace on Node 24 with separate API and worker applications, strict TypeScript/ESM, pinned pnpm, Vitest, and oxlint.
-- Validated, immutable, fail-fast environment configuration with production-safe defaults and CORS validation.
+- Validated, immutable, fail-fast environment configuration with production-safe defaults, CORS validation, and bounded trusted-proxy hops.
 - AsyncLocalStorage execution context with normalized request/correlation IDs.
-- Structured Pino logging with sensitive-field redaction and request correlation.
+- Structured Pino logging covering parser failures and unknown routes, with sensitive-field redaction, query-string omission, and request correlation.
 - Stable application/HTTP error envelopes that do not expose production internals.
-- Versioned `/api/v1` business surface with Helmet, body limits, CORS, validation, throttling, graceful shutdown, and development-only Swagger.
+- Versioned `/api/v1` business surface with Helmet, body limits, CORS, validation, proxy-aware throttling, graceful shutdown, and configurable Swagger that defaults off in production.
 - Unversioned `/health/live` and `/health/ready` probes with explicit startup and shutdown readiness transitions.
 - Non-HTTP worker bootstrap with buffered logging, tested lifecycle ownership, and graceful shutdown.
 - Multi-stage, non-root Node 24 API/worker images plus local Compose services and private Redis for later phases.
@@ -70,10 +70,10 @@ Complete backend gate on 2026-09-28:
 ```sh
 corepack pnpm install --frozen-lockfile  # passed; lockfile unchanged
 corepack pnpm lint                       # passed; zero diagnostics
-corepack pnpm test                       # passed; 6 files, 29 tests
-corepack pnpm test:architecture          # passed; 2 files, 7 tests
-corepack pnpm test:e2e                   # passed; 2 files, 10 tests
-corepack pnpm build                      # passed; API and worker compiled
+corepack pnpm test                       # passed; 6 files, 32 tests
+corepack pnpm test:architecture          # passed; 2 files, 8 tests
+corepack pnpm test:e2e                   # passed; 2 files, 12 tests
+corepack pnpm build                      # passed; API/worker compiled and runtime imports verified
 docker compose config                    # passed
 ```
 
@@ -107,6 +107,7 @@ The original Phase 1 baseline architecture suite also passed before backend scaf
 - The worker uses one inert lifecycle-owned interval until Phase 2 queue consumers provide active handles; shutdown clears it.
 - TypeScript compilation preserves the shared source tree beneath each application output. Runtime commands are verified against those emitted paths; switching to a bundler will require updating them.
 - Container bases use the Node 24 major tag. Production release hardening should pin an approved digest.
+- The bounded `TRUST_PROXY_HOPS` setting must match the controlled production proxy topology; Compose uses one hop.
 - No database connection, RLS-preserving server access strategy, Redis connection, BullMQ topology, or secret-provider wiring exists yet.
 - Ably, `pg_net` push delivery, existing Flutter chat synchronization, and the standalone media worker remain unchanged.
 - The Phase 0 characterization risks remain: RPC parameter compatibility, retry reconciliation, dual publication, pending-DM/block semantics, membership periods, media ordering, optimistic rollback, and active-thread notification suppression.

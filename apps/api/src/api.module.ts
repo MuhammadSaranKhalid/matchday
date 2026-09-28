@@ -5,12 +5,14 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { parseEnvironment } from '../../../libs/platform/src/config/environment.schema.js';
 import { PlatformConfigModule } from '../../../libs/platform/src/config/platform-config.module.js';
 import { RequestContextMiddleware } from '../../../libs/platform/src/context/request-context.middleware.js';
+import { HealthModule } from '../../../libs/platform/src/health/health.module.js';
 import { LoggingModule } from '../../../libs/platform/src/logging/logging.module.js';
 
 @Module({
   imports: [
     PlatformConfigModule,
     LoggingModule,
+    HealthModule,
     ThrottlerModule.forRootAsync({
       useFactory: () => {
         const environment = parseEnvironment(process.env);

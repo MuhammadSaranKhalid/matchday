@@ -36,6 +36,8 @@ This file is the source of truth for how this codebase is structured. Any agent 
 
 The README.md is a human-readable overview of the same architecture. This file (CLAUDE.md) is the agent-readable contract.
 
+Repository boundary: Flutter lives in `app/`, Nest lives in `backend/`, and Supabase, `website/`, and `media-worker/` remain independent top-level projects. Unless a path explicitly starts with one of those top-level names, Flutter paths such as `lib/`, `test/`, `pubspec.yaml`, and `analysis_options.yaml` in this document are package-relative to `app/`. Run Flutter and Dart commands from `app/`; run pnpm, Nest, and backend Docker Compose commands from `backend/`.
+
 ---
 
 ## 1. What this codebase is
@@ -1192,6 +1194,7 @@ At minimum:
 ### Step 10 — Generate code, analyze, run
 
 ```bash
+cd app
 dart run build_runner build --delete-conflicting-outputs
 flutter analyze
 flutter test
@@ -1360,6 +1363,7 @@ Same pattern as the controller test but with `Mock` classes for the data sources
 
 ```bash
 # Initial setup
+cd app
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
 

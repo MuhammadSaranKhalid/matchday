@@ -2,6 +2,8 @@
 
 Companion to `CLAUDE.md` (which defines *what* the architecture is) and `README.md` (which onboards humans). This document covers *how to work within the architecture well* — the disciplines and habits that keep the stack healthy as the codebase grows.
 
+Repository boundary: Flutter package paths (`lib/`, `test/`, `pubspec.yaml`) are relative to `app/`. Run Flutter and Dart commands from `app/`. Backend commands and paths are relative to `backend/`; Supabase, `website/`, and `media-worker/` are separate top-level projects.
+
 Organized by concern: architecture, then each major package, then cross-cutting workflow. Each item is one practice with a brief rationale.
 
 ---

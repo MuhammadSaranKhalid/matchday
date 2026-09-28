@@ -3,6 +3,8 @@
 > **Audience:** an engineer (human or Claude) joining the codebase cold.
 > **Goal:** in one read, know what this app is, how it is wired, what is built, and where to look next.
 > **Last audited from source:** 2026-06-11. Branch: `fix/location-capture-locality`. Main: `main`.
+>
+> **Path convention:** Flutter paths in this handoff are relative to the `app/` package unless explicitly prefixed with another top-level project.
 
 ---
 
@@ -548,22 +550,24 @@ These come up in code review repeatedly. Internalise them before writing anythin
 ## 11. Build + run
 
 ```bash
+# Flutter package root
+cd app
+
 # 1. Install deps
 flutter pub get
 
 # 2. Generate code (must run after any @riverpod / @freezed / @JsonSerializable / drift change)
 dart run build_runner build --delete-conflicting-outputs
 
-# 3. Run (compile-time secrets via --dart-define-from-file)
-cp dart_define.example.json dart_define.json   # then fill in values
-flutter run --dart-define-from-file=dart_define.json
+# 3. Run (publishable per-environment values are in config/)
+flutter run --dart-define-from-file=config/dev.json
 
 # Static analysis + tests
 flutter analyze
 flutter test
 ```
 
-`dart_define.json` (gitignored) supplies:
+The selected `config/*.json` file supplies:
 
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY`
 - `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`

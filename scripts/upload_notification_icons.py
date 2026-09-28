@@ -18,11 +18,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def assets():
     catalogue = (ROOT / 'supabase/migrations/20260101000489_notification_icons.sql').read_text()
-    entries = re.findall(r"\('[a-z_]+', '(v\d+/[a-z0-9-]+\.svg)', 'tabler-outline', '[0-9a-f]+', 'MIT', '([0-9a-f]{64})'\)", catalogue)
+    entries = re.findall(
+        r"\(\s*'[a-z_]+'\s*,\s*'(v\d+/[a-z0-9-]+\.svg)'\s*,\s*"
+        r"'tabler-outline'\s*,\s*'[0-9a-f]+'\s*,\s*'MIT'\s*,\s*"
+        r"'([0-9a-f]{64})'\s*\)",
+        catalogue,
+    )
     if not entries:
         raise ValueError('Missing icon catalogue')
     for path, digest in entries:
-        data = (ROOT / 'assets/notification_icons' / path).read_bytes()
+        data = (ROOT / 'app/assets/notification_icons' / path).read_bytes()
         if len(data) > 32768 or hashlib.sha256(data).hexdigest() != digest:
             raise ValueError(f'Asset does not match its pinned catalogue: {path}')
         svg = ET.fromstring(data)

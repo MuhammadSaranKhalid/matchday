@@ -80,7 +80,7 @@ python3 -m venv /tmp/matchday-sql-format
 /tmp/matchday-sql-format/bin/python scripts/database/format_migrations.py
 /tmp/matchday-sql-format/bin/python scripts/database/format_migrations.py --check
 /tmp/matchday-sql-format/bin/python -m unittest discover -s scripts/database -p 'test_format_migrations.py'
-flutter test test/supabase/migration_layout_test.dart
+(cd app && flutter test test/supabase/migration_layout_test.dart)
 ```
 
 The wrapper uses pinned Prettier and [prettier-plugin-sql-cst](https://github.com/nene/prettier-plugin-sql-cst), configured in `scripts/database/sql-format.json`. Prettier provides structured line wrapping, including PL/pgSQL bodies. The wrapper adds table alignment, section dividers, declaration layout, and tested compatibility handling for PostgreSQL scalar-subquery policies and `unique nulls not distinct` constraints.

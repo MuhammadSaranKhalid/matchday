@@ -7,9 +7,23 @@ on:
     branches: [main]
 
 jobs:
+  repository-boundaries:
+    name: Repository Boundary Contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify repository boundaries
+        run: bash scripts/verify_repository_boundaries.sh
+
   backend-gates:
     name: Backend Foundation Gates
     runs-on: ubuntu-latest
+    needs: repository-boundaries
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,7 +45,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('backend/pnpm-lock.yaml') }}
           restore-keys: ${{ runner.os }}-pnpm-
 
       - name: Install backend dependencies
@@ -55,6 +69,10 @@ jobs:
   flutter-gates:
     name: Flutter Analysis & Architecture Invariants
     runs-on: ubuntu-latest
+    needs: repository-boundaries
+    defaults:
+      run:
+        working-directory: app
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -65,24 +83,23 @@ jobs:
           flutter-version: '3.44.x'
           channel: 'stable'
           cache: true
+          pub-cache: true
+          pub-cache-key: 'flutter-pub-:os:-:channel:-:version:-:arch:-:hash:'
 
       - name: Install dependencies
         run: flutter pub get
 
       - name: Verify Domain Package Purity (Gate 3)
-        run: |
-          VIOLATIONS=$(grep -rlE 'package:(flutter|flutter_riverpod|riverpod_annotation|supabase_flutter|supabase|drift|go_router|dio|http)/' lib/features/*/domain 2>/dev/null || true)
-          if [ -n "$VIOLATIONS" ]; then
-            echo "Domain purity violation in:"
-            echo "$VIOLATIONS"
-            exit 1
-          fi
+        run: bash scripts/check_domain_purity.sh
 
       - name: Static Analysis (Gate 1)
         run: flutter analyze lib/
 
       - name: Architecture Invariants Test (Gate 2)
         run: flutter test test/architecture_test.dart
+
+      - name: Supabase Migration Layout Contract
+        run: flutter test test/supabase/migration_layout_test.dart
 
       - name: Feature Unit Tests
         run: flutter test test/features/posts/

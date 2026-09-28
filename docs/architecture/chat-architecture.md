@@ -2,6 +2,8 @@
 **The Authoritative, Self-Contained System Specification for Production & Local-First Engineering**
 *Document Version: 4.0.0 — Definitive Live-Synchronized Edition (September 2026)*
 
+> Flutter paths in this specification are relative to `app/`. Supabase paths remain relative to the repository root.
+
 ---
 
 ## Executive Overview & Architectural Invariants
@@ -1088,6 +1090,8 @@ The Outbox categorizes errors using stable application string codes rather than 
 ## 6. Verification & Quality Gate Acceptance Tests
 
 ```bash
+cd app
+
 # Gate 1: Static Analysis
 flutter analyze lib/
 # Must pass with 0 errors and 0 warnings.
@@ -1097,8 +1101,7 @@ flutter test test/architecture_test.dart
 # Verifies inward dependencies, domain purity, no use-cases, and acyclic graph.
 
 # Gate 3: Pure Dart Domain Check
-grep -rlE 'package:(flutter|flutter_riverpod|riverpod_annotation|supabase_flutter|supabase|drift|go_router|dio|http)/' lib/features/*/domain
-# Must output 0 matches.
+bash scripts/check_domain_purity.sh
 
 # Gate 4: Feature Unit & Outbox Tests
 flutter test test/features/messages/

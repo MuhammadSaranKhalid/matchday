@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
 
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
@@ -7,12 +9,24 @@ import '../../domain/entities/post_like_result.dart';
 import '../models/post_dto.dart';
 import 'media_url_factory.dart';
 
-/// Talks to Supabase for the `posts` table + `post-media-staging` private storage +
-/// consolidated read projections and write RPCs.
+/// Uses NestJS for post commands and Supabase for read projections plus direct
+/// signed uploads to private Storage.
 class PostsRemoteDataSource {
-  PostsRemoteDataSource(this._supabase)
-      : urlFactory = MediaUrlFactory(_supabase);
+  PostsRemoteDataSource(
+    this._supabase, {
+    this.backendBaseUrl = 'http://127.0.0.1:3000',
+    http.Client? httpClient,
+    String? Function()? accessTokenProvider,
+    Future<void> Function(String, String, File)? signedUpload,
+  }) : _http = httpClient ?? http.Client(),
+       _accessTokenProvider = accessTokenProvider,
+       _signedUpload = signedUpload,
+       urlFactory = MediaUrlFactory(_supabase);
   final SupabaseClient _supabase;
+  final http.Client _http;
+  final String backendBaseUrl;
+  final String? Function()? _accessTokenProvider;
+  final Future<void> Function(String, String, File)? _signedUpload;
   final MediaUrlFactory urlFactory;
 
   static const _stagingBucket = 'post-media-staging';
@@ -125,65 +139,100 @@ class PostsRemoteDataSource {
     return const [];
   }
 
-  /// Atomic publishing session reservation with idempotency support.
-  Future<Map<String, dynamic>> beginPostPublish({
+  /// Creates (or re-opens) an idempotent backend-owned draft and returns fresh
+  /// signed upload tokens for its stable media paths.
+  Future<Map<String, dynamic>> createPostDraft({
+    required String clientCommandId,
     required String publisherType,
     required String publisherId,
     required String postKind,
     String? text,
-    required int expectedMediaCount,
-    String visibility = 'public',
-    String? idempotencyKey,
     List<Map<String, dynamic>> mediaManifest = const [],
     String? linkedMatchId,
     String? linkedTournamentId,
     String? linkedTeamId,
   }) async {
-    _requireUid();
-    final response = await _supabase.rpc<dynamic>(
-      'begin_post_publish',
-      params: {
-        'p_publisher_type': publisherType,
-        'p_publisher_id': publisherId,
-        'p_post_kind': postKind,
-        'p_text': text,
-        'p_expected_media_count': expectedMediaCount,
-        'p_visibility': visibility,
-        if (idempotencyKey != null) 'p_idempotency_key': idempotencyKey,
-        'p_media_manifest': mediaManifest,
-        if (linkedMatchId != null) 'p_linked_match_id': linkedMatchId,
-        if (linkedTournamentId != null)
-          'p_linked_tournament_id': linkedTournamentId,
-        if (linkedTeamId != null) 'p_linked_team_id': linkedTeamId,
+    final response = await _backend(
+      'POST',
+      '/api/v1/posts',
+      body: {
+        'clientCommandId': clientCommandId,
+        'publisherType': publisherType,
+        'publisherId': publisherId,
+        'postKind': postKind,
+        if (text != null) 'text': text,
+        'media': mediaManifest,
       },
     );
-
-    if (response is Map<String, dynamic>) {
-      return response;
-    }
-    throw const ServerException('Invalid begin_post_publish response format');
+    return response;
   }
 
   /// Uploads a client-preprocessed JPEG to the private staging bucket (upsert: false).
-  Future<void> uploadStagingMedia({
+  Future<void> uploadSignedMedia({
     required String stagingPath,
+    required String uploadToken,
     required File file,
   }) async {
-    _requireUid();
-    try {
-      await _supabase.storage.from(_stagingBucket).upload(
-            stagingPath,
-            file,
-            fileOptions: const FileOptions(
-              contentType: 'image/jpeg',
-              upsert: false,
-            ),
-          );
-    } on StorageException catch (e) {
-      if (!e.message.toLowerCase().contains('already exists')) {
-        rethrow;
-      }
+    if (_signedUpload != null) {
+      await _signedUpload(stagingPath, uploadToken, file);
+      return;
     }
+    await _supabase.storage
+        .from(_stagingBucket)
+        .uploadToSignedUrl(
+          stagingPath,
+          uploadToken,
+          file,
+          const FileOptions(contentType: 'image/jpeg', upsert: false),
+        );
+  }
+
+  Future<String> publishPost(String postId) async {
+    final response = await _backend('POST', '/api/v1/posts/$postId/publish');
+    return response['status'] as String? ?? 'processing';
+  }
+
+  Future<String> getPostProcessingStatus(String postId) async {
+    final response = await _backend('GET', '/api/v1/posts/$postId/status');
+    return response['status'] as String? ?? 'processing';
+  }
+
+  Future<Map<String, dynamic>> _backend(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final token =
+        _accessTokenProvider?.call() ??
+        _supabase.auth.currentSession?.accessToken;
+    if (token == null) throw const UnauthorizedException('Must be signed in');
+    final uri = Uri.parse(
+      '${backendBaseUrl.replaceFirst(RegExp(r'/$'), '')}$path',
+    );
+    final headers = <String, String>{
+      'authorization': 'Bearer $token',
+      'content-type': 'application/json',
+    };
+    final response =
+        method == 'GET'
+            ? await _http.get(uri, headers: headers)
+            : await _http.post(
+              uri,
+              headers: headers,
+              body: body == null ? null : jsonEncode(body),
+            );
+    final decoded =
+        response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final message =
+          decoded is Map<String, dynamic>
+              ? decoded['message']?.toString() ?? 'Backend request failed'
+              : 'Backend request failed';
+      if (response.statusCode == 401) throw UnauthorizedException(message);
+      throw ServerException(message);
+    }
+    if (decoded is Map<String, dynamic>) return decoded;
+    throw const ServerException('Invalid backend response format');
   }
 
   /// Deletes a staging image using the Storage API.
@@ -192,29 +241,15 @@ class PostsRemoteDataSource {
     await _supabase.storage.from(_stagingBucket).remove([stagingPath]);
   }
 
-  /// Informs Supabase that Flutter safely uploaded the staging source.
-  /// Server verifies existence in storage and enqueues to post_media_feed PGMQ.
-  Future<Map<String, dynamic>> markPostMediaUploaded(String mediaId) async {
-    _requireUid();
-    final response = await _supabase.rpc<dynamic>(
-      'mark_post_media_uploaded',
-      params: {'p_media_id': mediaId},
-    );
-    if (response is Map<String, dynamic>) {
-      return response;
-    }
-    return {'media_id': mediaId, 'status': 'uploaded'};
-  }
-
   /// Desired-state like: sets liked to true or false deterministically.
-  Future<PostLikeResult> setPostLike(String postId, {required bool liked}) async {
+  Future<PostLikeResult> setPostLike(
+    String postId, {
+    required bool liked,
+  }) async {
     _requireUid();
     final response = await _supabase.rpc<dynamic>(
       'set_post_like',
-      params: {
-        'p_post_id': postId,
-        'p_liked': liked,
-      },
+      params: {'p_post_id': postId, 'p_liked': liked},
     );
     if (response is Map<String, dynamic>) {
       return PostLikeResult(
@@ -226,14 +261,14 @@ class PostsRemoteDataSource {
   }
 
   /// Desired-state bookmark: sets bookmarked to true or false deterministically.
-  Future<bool> setPostBookmark(String postId, {required bool bookmarked}) async {
+  Future<bool> setPostBookmark(
+    String postId, {
+    required bool bookmarked,
+  }) async {
     _requireUid();
     final response = await _supabase.rpc<dynamic>(
       'set_post_bookmark',
-      params: {
-        'p_post_id': postId,
-        'p_bookmarked': bookmarked,
-      },
+      params: {'p_post_id': postId, 'p_bookmarked': bookmarked},
     );
     if (response is Map<String, dynamic>) {
       return response['bookmarked'] as bool? ?? bookmarked;
@@ -244,19 +279,7 @@ class PostsRemoteDataSource {
   /// Soft-deletes a post via server RPC delete_post(p_post_id).
   Future<void> deletePost(String postId) async {
     _requireUid();
-    await _supabase.rpc<dynamic>(
-      'delete_post',
-      params: {'p_post_id': postId},
-    );
-  }
-
-  /// Abandons an unfinished publishing session on the server.
-  Future<void> abandonPostPublish(String postId) async {
-    _requireUid();
-    await _supabase.rpc<dynamic>(
-      'abandon_post_publish',
-      params: {'p_post_id': postId},
-    );
+    await _supabase.rpc<dynamic>('delete_post', params: {'p_post_id': postId});
   }
 
   String publicUrl(String path) =>

@@ -10,7 +10,7 @@ void main() {
       position: 0,
       width: 1080,
       height: 1350,
-      status: PostMediaStatus.optimized,
+      status: PostMediaStatus.ready,
       variants: const {
         360: MediaVariant(
           path: 'posts/p1/m1/v1/360.webp',
@@ -77,7 +77,7 @@ void main() {
         position: 0,
         width: 1080,
         height: 1350,
-        status: PostMediaStatus.feedReady,
+        status: PostMediaStatus.ready,
         variants: const {
           1080: MediaVariant(
             path: 'posts/p1/m2/v1/1080.webp',

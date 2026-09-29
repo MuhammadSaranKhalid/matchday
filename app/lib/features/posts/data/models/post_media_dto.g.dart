@@ -14,7 +14,7 @@ _PostMediaDto _$PostMediaDtoFromJson(Map<String, dynamic> json) =>
       width: (json['width'] as num?)?.toInt() ?? 1080,
       height: (json['height'] as num?)?.toInt() ?? 1080,
       blurhash: json['blurhash'] as String?,
-      status: json['status'] as String? ?? 'feed_ready',
+      status: json['status'] as String? ?? 'ready',
       variants:
           json['variants'] as Map<String, dynamic>? ??
           const <String, dynamic>{},

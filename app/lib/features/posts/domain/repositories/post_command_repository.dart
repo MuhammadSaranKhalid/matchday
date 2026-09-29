@@ -12,8 +12,8 @@ import '../value_objects/post_text.dart';
 /// Enforces authorization, validation, transactional outbox reservation, and state mutations.
 abstract class PostCommandRepository {
   /// Asynchronously begins publishing a post:
-  /// Normalizes local photos, reserves the publishing session on the server via begin_post_publish,
-  /// starts uploading to private staging storage, and emits a durable PendingPost.
+  /// Persists an idempotent command, creates the NestJS-owned draft, uploads
+  /// directly with signed Storage tokens, then issues one publish command.
   Future<Either<Failure, String>> beginPublishPost({
     required PostPublisherType publisherType,
     required String publisherId,
@@ -29,10 +29,16 @@ abstract class PostCommandRepository {
   Future<Either<Failure, Unit>> deletePost(PostId id);
 
   /// Desired-state like: sets liked to true or false deterministically.
-  Future<Either<Failure, PostLikeResult>> setPostLike(PostId id, {required bool liked});
+  Future<Either<Failure, PostLikeResult>> setPostLike(
+    PostId id, {
+    required bool liked,
+  });
 
   /// Desired-state bookmark: sets bookmarked to true or false deterministically.
-  Future<Either<Failure, bool>> setPostBookmark(PostId id, {required bool bookmarked});
+  Future<Either<Failure, bool>> setPostBookmark(
+    PostId id, {
+    required bool bookmarked,
+  });
 
   /// Realtime stream of creator's locally queued and active publishing posts (outbox).
   Stream<List<PendingPost>> watchPendingPosts();

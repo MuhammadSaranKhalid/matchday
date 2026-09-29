@@ -43,5 +43,17 @@ describe('production container foundation', () => {
     expect(compose).not.toMatch(/^\s{2}(postgres|supabase):/m);
     expect(compose.match(/context: \./g)).toHaveLength(2);
     expect(compose).not.toMatch(/context: \.\./);
+    expect(compose.match(/condition: service_healthy/g)).toHaveLength(2);
+    for (const variable of ['DATABASE_URL', 'SUPABASE_URL', 'SUPABASE_AUTH_ISSUER']) {
+      expect(compose).toContain(`${variable}: \${${variable}}`);
+    }
+    expect(compose).not.toContain('matchday_test_password');
+  });
+
+  it('keeps disposable PostgreSQL in the test-only smoke overlay', () => {
+    const overlay = readRequired('test/integration/app-smoke.compose.yml');
+    expect(overlay).toMatch(/^  postgres:/m);
+    expect(overlay).toContain('DATABASE_URL: postgresql://postgres:matchday_test_password@postgres');
+    expect(overlay).toContain('condition: service_healthy');
   });
 });

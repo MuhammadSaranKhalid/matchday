@@ -12,6 +12,18 @@ services:
       TRUST_PROXY_HOPS: "1"
       CORS_ORIGINS: http://localhost:3000
       SWAGGER_ENABLED: "false"
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_SSL_MODE: ${DATABASE_SSL_MODE:-require}
+      REDIS_URL: redis://redis:6379
+      REDIS_NAMESPACE: ${REDIS_NAMESPACE:-matchday}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_AUTH_ISSUER: ${SUPABASE_AUTH_ISSUER}
+      SUPABASE_AUTH_AUDIENCE: ${SUPABASE_AUTH_AUDIENCE:-authenticated}
+      SUPABASE_AUTH_MODE: ${SUPABASE_AUTH_MODE:-jwks}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
+    depends_on:
+      redis:
+        condition: service_healthy
     ports:
       - "3000:3000"
     healthcheck:
@@ -32,6 +44,9 @@ services:
     init: true
     stop_grace_period: 15s
     environment: *app-environment
+    depends_on:
+      redis:
+        condition: service_healthy
 
   redis:
     image: redis:8.2-alpine

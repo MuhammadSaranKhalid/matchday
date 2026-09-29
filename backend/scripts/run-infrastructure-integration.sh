@@ -6,6 +6,7 @@ backend_directory="$(cd "${script_directory}/.." && pwd)"
 compose_file="${backend_directory}/test/integration/docker-compose.yml"
 project_name="matchday-infra-${PPID}-$(date +%s)-${RANDOM}"
 test_target=""
+app_compose_config=false
 
 reserve_loopback_port() {
   node -e "const net = require('node:net'); const server = net.createServer(); server.listen(0, '127.0.0.1', () => { console.log(server.address().port); server.close(); });"
@@ -17,12 +18,25 @@ while (($# > 0)); do
       test_target="${2:?--test requires a filename}"
       shift 2
       ;;
+    --app-compose-config)
+      app_compose_config=true
+      shift
+      ;;
     *)
       echo "Unknown argument: $1" >&2
       exit 2
       ;;
   esac
 done
+
+if [[ "${app_compose_config}" == true ]]; then
+  smoke_compose_file="${backend_directory}/test/integration/app-smoke.compose.yml"
+  DATABASE_URL="postgresql://config-only.invalid/matchday" \
+  SUPABASE_URL="https://config-only.invalid" \
+  SUPABASE_AUTH_ISSUER="https://config-only.invalid/auth/v1" \
+    docker compose -f "${backend_directory}/docker-compose.yml" -f "${smoke_compose_file}" config --quiet
+  exit 0
+fi
 
 cleanup() {
   docker compose -p "${project_name}" -f "${compose_file}" down --remove-orphans >/dev/null 2>&1 || true

@@ -2,20 +2,26 @@ import { Injectable, type BeforeApplicationShutdown } from '@nestjs/common';
 
 @Injectable()
 export class ReadinessService implements BeforeApplicationShutdown {
-  private ready = false;
+  private initialized = false;
+  private queuesInitialized = false;
   private stopping = false;
 
   isReady(): boolean {
-    return this.ready && !this.stopping;
+    return this.initialized && this.queuesInitialized && !this.stopping;
   }
 
   markReady(): void {
-    if (!this.stopping) this.ready = true;
+    if (!this.stopping) this.initialized = true;
+  }
+
+  markQueuesInitialized(): void {
+    if (!this.stopping) this.queuesInitialized = true;
   }
 
   markStopping(): void {
     this.stopping = true;
-    this.ready = false;
+    this.initialized = false;
+    this.queuesInitialized = false;
   }
 
   beforeApplicationShutdown(): void {

@@ -6,12 +6,16 @@ import {
 } from '@nestjs/terminus';
 
 import { ReadinessService } from './readiness.service.js';
+import { PostgresHealthIndicator } from '../database/postgres-health.indicator.js';
+import { RedisHealthIndicator } from '../redis/redis-health.indicator.js';
 
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
     private readonly readiness: ReadinessService,
+    private readonly postgres: PostgresHealthIndicator,
+    private readonly redis: RedisHealthIndicator,
   ) {}
 
   @Get('live')
@@ -25,10 +29,17 @@ export class HealthController {
   ready(): Promise<HealthCheckResult> {
     return this.health.check([
       async () => {
-        if (!this.readiness.isReady()) {
-          return { foundation: { status: 'down' as const } };
-        }
-        return { foundation: { status: 'up' } };
+        const [postgres, redis] = await Promise.all([
+          this.postgres.isHealthy('postgres'),
+          this.redis.isHealthy('redis'),
+        ]);
+        const status = this.readiness.isReady() ? 'up' as const : 'down' as const;
+        return {
+          foundation: { status },
+          queues: { status },
+          ...postgres,
+          ...redis,
+        };
       },
     ]);
   }

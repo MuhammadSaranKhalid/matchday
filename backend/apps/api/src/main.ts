@@ -18,7 +18,9 @@ export async function bootstrapApi(): Promise<void> {
   await configureApi(app, configuration);
   app.useLogger(app.get(Logger));
   await app.listen(configuration.port);
-  app.get(ReadinessService).markReady();
+  const readiness = app.get(ReadinessService);
+  readiness.markQueuesInitialized();
+  readiness.markReady();
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

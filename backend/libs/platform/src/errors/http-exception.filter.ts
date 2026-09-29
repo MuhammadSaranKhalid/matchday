@@ -79,11 +79,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     if (exception instanceof HttpException) {
+      const healthDetails = sanitizedHealthDetails(exception);
       return {
-        code: httpCode(exception.getStatus()),
+        code: healthDetails === undefined
+          ? httpCode(exception.getStatus())
+          : 'DEPENDENCY_UNAVAILABLE',
         message: safeHttpMessage(exception),
         status: exception.getStatus(),
         correlationId,
+        ...(healthDetails === undefined ? {} : { details: healthDetails }),
       };
     }
 
@@ -103,6 +107,24 @@ export class HttpExceptionFilter implements ExceptionFilter {
       correlationId,
     };
   }
+}
+
+function sanitizedHealthDetails(exception: HttpException): Record<string, { status: 'up' | 'down' }> | undefined {
+  if (exception.getStatus() !== HttpStatus.SERVICE_UNAVAILABLE) return undefined;
+  const payload = exception.getResponse();
+  if (typeof payload !== 'object' || payload === null || !('details' in payload)) return undefined;
+  const details = (payload as { details?: unknown }).details;
+  if (typeof details !== 'object' || details === null) return undefined;
+
+  const sanitized: Record<string, { status: 'up' | 'down' }> = {};
+  for (const label of ['foundation', 'postgres', 'redis', 'queues']) {
+    const value = (details as Record<string, unknown>)[label];
+    if (typeof value !== 'object' || value === null || !('status' in value)) continue;
+    sanitized[label] = {
+      status: (value as { status?: unknown }).status === 'up' ? 'up' : 'down',
+    };
+  }
+  return Object.keys(sanitized).length === 0 ? undefined : sanitized;
 }
 
 function isPayloadTooLarge(exception: unknown): boolean {

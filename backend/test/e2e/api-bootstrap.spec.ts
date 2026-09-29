@@ -1,13 +1,15 @@
 import { Body, Controller, Get, Post, Version } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
 import { IsString, MinLength } from 'class-validator';
 import request from 'supertest';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiModule } from '../../apps/api/src/api.module.js';
 import { configureApi } from '../../apps/api/src/bootstrap/api-bootstrap.js';
 import type { PlatformConfiguration } from '../../libs/platform/src/config/configuration.js';
+import { QUEUE_NAMES } from '../../libs/platform/src/queue/queue-names.js';
 
 class ProbeDto {
   @IsString()
@@ -43,6 +45,17 @@ const baseConfiguration: PlatformConfiguration = {
   production: false,
 };
 
+function apiTestModule() {
+  const builder = Test.createTestingModule({
+    imports: [ApiModule],
+    controllers: [ProbeController],
+  });
+  for (const name of QUEUE_NAMES) {
+    builder.overrideProvider(getQueueToken(name)).useValue({ close: vi.fn(), waitUntilReady: vi.fn() });
+  }
+  return builder.compile();
+}
+
 describe('API bootstrap', () => {
   let app: INestApplication;
 
@@ -57,10 +70,7 @@ describe('API bootstrap', () => {
     process.env.TRUST_PROXY_HOPS = '1';
     process.env.SWAGGER_ENABLED = 'true';
 
-    const module = await Test.createTestingModule({
-      imports: [ApiModule],
-      controllers: [ProbeController],
-    }).compile();
+    const module = await apiTestModule();
 
     app = module.createNestApplication({ bodyParser: false });
     await configureApi(app, baseConfiguration);
@@ -171,10 +181,7 @@ describe('API bootstrap', () => {
     await request(app.getHttpServer()).get('/api/docs').expect(200);
     await request(app.getHttpServer()).get('/api/docs-json').expect(200);
 
-    const module = await Test.createTestingModule({
-      imports: [ApiModule],
-      controllers: [ProbeController],
-    }).compile();
+    const module = await apiTestModule();
     const disabledApp = module.createNestApplication({ bodyParser: false });
     await configureApi(disabledApp, { ...baseConfiguration, swaggerEnabled: false });
     await disabledApp.init();

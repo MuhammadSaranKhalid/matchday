@@ -25,6 +25,6 @@ import { PostgresPoolService } from './postgres-pool.service.js';
       useFactory: (database: PostgresPoolService) => new PostgresHealthIndicator(database),
     },
   ],
-  exports: [DatabaseExecutorService, PostgresHealthIndicator],
+  exports: [DatabaseExecutorService, PostgresHealthIndicator, PostgresPoolService],
 })
 export class DatabaseModule {}

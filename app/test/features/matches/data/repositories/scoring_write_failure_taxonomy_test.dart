@@ -93,7 +93,7 @@ void main() {
             nonStrikerId: any(named: 'nonStrikerId'),
             bowlerId: any(named: 'bowlerId'),
             target: any(named: 'target'),
-          )).thenThrow(NetworkException('no route to host'));
+          )).thenThrow(const NetworkException('no route to host'));
 
       final result = await startInningsResult();
 
@@ -112,7 +112,7 @@ void main() {
             nonStrikerId: any(named: 'nonStrikerId'),
             bowlerId: any(named: 'bowlerId'),
             target: any(named: 'target'),
-          )).thenThrow(ServerException('That innings has already started.'));
+          )).thenThrow(const ServerException('That innings has already started.'));
 
       final result = await startInningsResult();
 
@@ -129,7 +129,7 @@ void main() {
             nonStrikerId: any(named: 'nonStrikerId'),
             bowlerId: any(named: 'bowlerId'),
             target: any(named: 'target'),
-          )).thenThrow(ServerException('rule violation'));
+          )).thenThrow(const ServerException('rule violation'));
 
       await startInningsResult();
 
@@ -146,7 +146,7 @@ void main() {
   group('recordBall', () {
     test('a dropped connection keeps the delivery queued for retry', () async {
       when(() => remote.recordBall(any()))
-          .thenThrow(NetworkException('offline'));
+          .thenThrow(const NetworkException('offline'));
 
       final result = await repo.recordBall(draft());
 
@@ -158,7 +158,7 @@ void main() {
 
     test('a refused delivery does not stay queued forever', () async {
       when(() => remote.recordBall(any()))
-          .thenThrow(ServerException('innings is closed'));
+          .thenThrow(const ServerException('innings is closed'));
 
       final result = await repo.recordBall(draft());
 
@@ -186,7 +186,7 @@ void main() {
       when(() => remote.recordBall(any())).thenAnswer((inv) async {
         final params = inv.positionalArguments.first as Map<String, dynamic>;
         if (params['p_idempotency_key'] == 'op-2') {
-          throw ServerException('that delivery breaks a rule');
+          throw const ServerException('that delivery breaks a rule');
         }
         return _StubBallResult();
       });

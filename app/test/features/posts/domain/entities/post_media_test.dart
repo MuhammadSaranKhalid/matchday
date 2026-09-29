@@ -4,14 +4,14 @@ import 'package:matchday/features/posts/domain/entities/post_media.dart';
 
 void main() {
   group('PostMedia Responsive Variant Selection (Points 11, 33, 34)', () {
-    final media = PostMedia(
+    final media = const PostMedia(
       mediaId: 'm1',
       postId: 'p1',
       position: 0,
       width: 1080,
       height: 1350,
       status: PostMediaStatus.optimized,
-      variants: const {
+      variants: {
         360: MediaVariant(
           path: 'posts/p1/m1/v1/360.webp',
           width: 360,
@@ -71,14 +71,14 @@ void main() {
     });
 
     test('falls back upward when lower variant is missing', () {
-      final partialMedia = PostMedia(
+      final partialMedia = const PostMedia(
         mediaId: 'm2',
         postId: 'p1',
         position: 0,
         width: 1080,
         height: 1350,
         status: PostMediaStatus.feedReady,
-        variants: const {
+        variants: {
           1080: MediaVariant(
             path: 'posts/p1/m2/v1/1080.webp',
             width: 1080,

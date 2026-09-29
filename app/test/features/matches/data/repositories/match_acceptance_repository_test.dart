@@ -67,7 +67,7 @@ void main() {
           toTeamXi: any(named: 'toTeamXi'),
           toTeamKeeperId: any(named: 'toTeamKeeperId'),
         ),
-      ).thenThrow(UnauthorizedException('Forbidden'));
+      ).thenThrow(const UnauthorizedException('Forbidden'));
 
       final result = await matchesRepo.acceptMatchChallenge(requestId: reqId);
       expect(result.isLeft(), isTrue);
@@ -141,7 +141,7 @@ void main() {
           toTeamXi: any(named: 'toTeamXi'),
           toTeamKeeperId: any(named: 'toTeamKeeperId'),
         ),
-      ).thenThrow(ServerException('DB error'));
+      ).thenThrow(const ServerException('DB error'));
 
       final result = await matchesRepo.acceptMatchChallenge(requestId: reqId);
       expect(result.isLeft(), isTrue);
@@ -173,7 +173,7 @@ void main() {
           applicationId: appId,
           decisionNote: any(named: 'decisionNote'),
         ),
-      ).thenThrow(UnauthorizedException('Not manager'));
+      ).thenThrow(const UnauthorizedException('Not manager'));
 
       final result = await poolRepo.acceptPoolApplication(applicationId: appId);
       expect(result.isLeft(), isTrue);
@@ -229,7 +229,7 @@ void main() {
           applicationId: appId,
           decisionNote: any(named: 'decisionNote'),
         ),
-      ).thenThrow(ServerException('Failed'));
+      ).thenThrow(const ServerException('Failed'));
 
       final result = await poolRepo.acceptPoolApplication(applicationId: appId);
       expect(result.isLeft(), isTrue);

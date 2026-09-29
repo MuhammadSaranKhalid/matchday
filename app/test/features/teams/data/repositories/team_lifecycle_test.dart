@@ -65,7 +65,7 @@ void main() {
 
     test('a non-manager gets an AuthFailure, not an exception', () async {
       when(() => remote.updateTeam(any(), any()))
-          .thenThrow(UnauthorizedException('Must be signed in'));
+          .thenThrow(const UnauthorizedException('Must be signed in'));
 
       final result = await repo.setTeamStatus(
         teamId: const TeamId('t1'),
@@ -77,7 +77,7 @@ void main() {
 
     test('a server error becomes a ServerFailure', () async {
       when(() => remote.updateTeam(any(), any()))
-          .thenThrow(ServerException('row level security'));
+          .thenThrow(const ServerException('row level security'));
 
       final result = await repo.setTeamStatus(
         teamId: const TeamId('t1'),
@@ -103,7 +103,7 @@ void main() {
     test('translates a refused leave rather than throwing', () async {
       // The RPC raises 42501 when the membership is not the caller's.
       when(() => remote.leaveTeam(any()))
-          .thenThrow(ServerException('Cannot leave a membership that is not yours'));
+          .thenThrow(const ServerException('Cannot leave a membership that is not yours'));
 
       final result = await repo.leaveTeam(const MembershipId('m1'));
 

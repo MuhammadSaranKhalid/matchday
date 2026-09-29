@@ -92,7 +92,7 @@ void main() {
           channel: any(named: 'channel'),
           reference: any(named: 'reference'),
         ),
-      ).thenThrow(ServerException('nope'));
+      ).thenThrow(const ServerException('nope'));
 
       final result = await repo.recordPayment(
         registrationId: 'r1',
@@ -261,7 +261,7 @@ void main() {
 
   test('autoAssignScorers surfaces a permission error as AuthFailure', () async {
     when(() => remote.autoAssignScorers(any()))
-        .thenThrow(UnauthorizedException('not an organiser'));
+        .thenThrow(const UnauthorizedException('not an organiser'));
 
     final result = await repo.autoAssignScorers('t1');
 

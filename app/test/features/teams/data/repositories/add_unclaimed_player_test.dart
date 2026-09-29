@@ -119,7 +119,7 @@ void main() {
           preferredBallTypes: [],
           yearsPlaying: null,
         ),
-      ).thenThrow(UnauthorizedException('Only team staff can add players'));
+      ).thenThrow(const UnauthorizedException('Only team staff can add players'));
 
       final result = await repository.addUnclaimedCricketPlayer(
         teamId: const TeamId('t1'),

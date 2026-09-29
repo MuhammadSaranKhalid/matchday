@@ -73,7 +73,7 @@ void main() {
           rescheduleTo: any(named: 'rescheduleTo'),
           reason: any(named: 'reason'),
         ),
-      ).thenThrow(ServerException('Only tournament organizers can run live ops'));
+      ).thenThrow(const ServerException('Only tournament organizers can run live ops'));
 
       final result = await repo.abandonMatch(
         matchId: 'm1',

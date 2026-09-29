@@ -145,7 +145,7 @@ void main() {
           hasFloodlights: any(named: 'hasFloodlights'),
           notes: any(named: 'notes'),
         ),
-      ).thenThrow(UnauthorizedException('Must be signed in'));
+      ).thenThrow(const UnauthorizedException('Must be signed in'));
 
       final result = await repo.createGround(name: 'Model Town Ground');
       expect(result.getLeft().toNullable(), isA<AuthFailure>());

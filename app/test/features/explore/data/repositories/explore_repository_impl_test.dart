@@ -72,7 +72,7 @@ void main() {
     test('UnauthorizedException becomes AuthFailure', () async {
       when(() => remote.search(any(),
               kind: any(named: 'kind'), limit: any(named: 'limit')))
-          .thenThrow(UnauthorizedException('no session'));
+          .thenThrow(const UnauthorizedException('no session'));
 
       final result = await repo.search('lah');
 
@@ -83,7 +83,7 @@ void main() {
         () async {
       when(() => remote.search(any(),
               kind: any(named: 'kind'), limit: any(named: 'limit')))
-          .thenThrow(ServerException('query_failed'));
+          .thenThrow(const ServerException('query_failed'));
 
       final result = await repo.search('lah');
       final failure = result.getLeft().toNullable();
@@ -114,7 +114,7 @@ void main() {
     });
 
     test('browse translates failures the same way', () async {
-      when(() => remote.browse()).thenThrow(ServerException('down'));
+      when(() => remote.browse()).thenThrow(const ServerException('down'));
 
       final result = await repo.browse();
 

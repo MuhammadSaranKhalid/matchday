@@ -22,7 +22,7 @@ void main() {
           cursorPublishedAt: any(named: 'cursorPublishedAt'),
           cursorPostId: any(named: 'cursorPostId'),
           limit: any(named: 'limit'),
-        )).thenThrow(ServerException('boom'));
+        )).thenThrow(const ServerException('boom'));
 
     final result = await repo.getHomeFeed();
     expect(result.isLeft(), isTrue);

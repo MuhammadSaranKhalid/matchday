@@ -74,7 +74,7 @@ void main() {
         banner: any(named: 'banner'),
         logo: any(named: 'logo'),
       ),
-    ).thenThrow(ServerException('new row violates row-level security policy'));
+    ).thenThrow(const ServerException('new row violates row-level security policy'));
 
     final result = await repo.uploadArtwork(
       tournamentId: 't1',
@@ -91,7 +91,7 @@ void main() {
         banner: any(named: 'banner'),
         logo: any(named: 'logo'),
       ),
-    ).thenThrow(UnauthorizedException('Must be signed in'));
+    ).thenThrow(const UnauthorizedException('Must be signed in'));
 
     final result = await repo.uploadArtwork(
       tournamentId: 't1',

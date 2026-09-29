@@ -52,7 +52,7 @@ void main() {
           visibility: any(named: 'visibility'),
           idempotencyKey: any(named: 'idempotencyKey'),
           mediaManifest: any(named: 'mediaManifest'),
-        )).thenThrow(UnauthorizedException('nope'));
+        )).thenThrow(const UnauthorizedException('nope'));
 
     final result = await repo.createPost(const PostDraft(text: 'hi'));
     expect(result.isLeft(), isTrue);

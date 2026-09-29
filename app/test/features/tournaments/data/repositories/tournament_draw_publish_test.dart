@@ -116,7 +116,7 @@ void main() {
           plan: any(named: 'plan'),
           seedOrder: any(named: 'seedOrder'),
         ),
-      ).thenThrow(ServerException('The draw is already locked'));
+      ).thenThrow(const ServerException('The draw is already locked'));
 
       final result = await repo.generateAndPublishFixtures(
         tournamentId: 't1',

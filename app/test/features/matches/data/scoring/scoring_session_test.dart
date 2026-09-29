@@ -221,7 +221,7 @@ void main() {
       stubReads();
       when(
         () => remote.recordBall(any()),
-      ).thenThrow(NetworkException('offline'));
+      ).thenThrow(const NetworkException('offline'));
 
       final session = await open();
       final result = await session.record(draft());
@@ -245,7 +245,7 @@ void main() {
       stubReads();
       when(
         () => remote.recordBall(any()),
-      ).thenThrow(ServerException('innings is closed'));
+      ).thenThrow(const ServerException('innings is closed'));
 
       final session = await open();
       await session.record(draft());
@@ -275,7 +275,7 @@ void main() {
         stubReads();
         when(
           () => remote.recordBall(any()),
-        ).thenThrow(ServerException('innings is closed'));
+        ).thenThrow(const ServerException('innings is closed'));
 
         final session = await open();
         await session.record(draft());
@@ -300,7 +300,7 @@ void main() {
       when(() => remote.recordBall(any())).thenAnswer((inv) async {
         final params = inv.positionalArguments.first as Map<String, dynamic>;
         if (params['idempotency_key'] == 'op-2') {
-          throw ServerException('that delivery breaks a rule');
+          throw const ServerException('that delivery breaks a rule');
         }
         return _accepted(id: 'server-${params['idempotency_key']}');
       });
@@ -332,7 +332,7 @@ void main() {
       );
       when(
         () => remote.recordBall(any()),
-      ).thenThrow(NetworkException('still offline'));
+      ).thenThrow(const NetworkException('still offline'));
 
       final session = await open();
 
@@ -402,7 +402,7 @@ void main() {
       stubReads();
       when(
         () => remote.recordBall(any()),
-      ).thenThrow(NetworkException('offline'));
+      ).thenThrow(const NetworkException('offline'));
 
       final session = await open();
       await session.record(draft(runs: 4));
@@ -427,7 +427,7 @@ void main() {
       stubReads();
       when(
         () => remote.recordBall(any()),
-      ).thenThrow(NetworkException('offline'));
+      ).thenThrow(const NetworkException('offline'));
 
       final session = await open();
       await session.record(draft(runs: 1));
@@ -489,7 +489,7 @@ void main() {
           bowlerId: any(named: 'bowlerId'),
           target: any(named: 'target'),
         ),
-      ).thenThrow(NetworkException('no route to host'));
+      ).thenThrow(const NetworkException('no route to host'));
 
       final session = await open();
       final result = await session.setTrio(
@@ -522,7 +522,7 @@ void main() {
           bowlerId: any(named: 'bowlerId'),
           target: any(named: 'target'),
         ),
-      ).thenThrow(ServerException('That innings has already started.'));
+      ).thenThrow(const ServerException('That innings has already started.'));
 
       final session = await open();
       final result = await session.setTrio(
@@ -581,7 +581,7 @@ void main() {
         stubReads();
         when(
           () => remote.recordBall(any()),
-        ).thenThrow(NetworkException('offline'));
+        ).thenThrow(const NetworkException('offline'));
         final session = await open();
         await session.record(draft(runs: 4));
         await session.drain();

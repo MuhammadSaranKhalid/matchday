@@ -26,6 +26,7 @@ export interface Environment {
   readonly REDIS_MAX_RETRIES_PER_REQUEST: number;
   readonly REDIS_NAMESPACE: string;
   readonly SUPABASE_URL: string;
+  readonly SUPABASE_SECRET_KEY: string;
   readonly SUPABASE_AUTH_ISSUER: string;
   readonly SUPABASE_AUTH_AUDIENCE: string;
   readonly SUPABASE_AUTH_MODE: 'jwks' | 'remote';
@@ -103,6 +104,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
     REDIS_MAX_RETRIES_PER_REQUEST: positiveInteger(3, 100),
     REDIS_NAMESPACE: z.string().regex(/^[a-z0-9:_-]+$/).default('matchday'),
     SUPABASE_URL: requiredInProduction('http://127.0.0.1:54321'),
+    SUPABASE_SECRET_KEY: requiredInProduction('local-supabase-secret-key'),
     SUPABASE_AUTH_ISSUER: requiredInProduction('http://127.0.0.1:54321/auth/v1'),
     SUPABASE_AUTH_AUDIENCE: z.string().trim().min(1).default('authenticated'),
     SUPABASE_AUTH_MODE: production

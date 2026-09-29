@@ -27,6 +27,7 @@ describe('parseEnvironment', () => {
       REDIS_MAX_RETRIES_PER_REQUEST: 3,
       REDIS_NAMESPACE: 'matchday',
       SUPABASE_URL: 'http://127.0.0.1:54321',
+      SUPABASE_SECRET_KEY: 'local-supabase-secret-key',
       SUPABASE_AUTH_ISSUER: 'http://127.0.0.1:54321/auth/v1',
       SUPABASE_AUTH_AUDIENCE: 'authenticated',
       SUPABASE_AUTH_MODE: 'jwks',
@@ -46,6 +47,7 @@ describe('parseEnvironment', () => {
     DATABASE_URL: 'postgresql://service:secret@database.internal:5432/matchday',
     REDIS_URL: 'rediss://default:secret@redis.internal:6379',
     SUPABASE_URL: 'https://project.supabase.co',
+    SUPABASE_SECRET_KEY: 'production-secret-key',
     SUPABASE_AUTH_ISSUER: 'https://project.supabase.co/auth/v1',
     SUPABASE_AUTH_MODE: 'jwks',
   } as const;
@@ -54,6 +56,7 @@ describe('parseEnvironment', () => {
     'DATABASE_URL',
     'REDIS_URL',
     'SUPABASE_URL',
+    'SUPABASE_SECRET_KEY',
     'SUPABASE_AUTH_ISSUER',
     'SUPABASE_AUTH_MODE',
   ])('requires %s in production', (field) => {

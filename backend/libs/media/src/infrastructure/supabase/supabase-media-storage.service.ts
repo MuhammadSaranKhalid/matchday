@@ -54,7 +54,7 @@ export class SupabaseMediaStorageService implements MediaObjectStorage {
       upsert: false,
     });
 
-    if (error) throw storageFailure('upload_variant_failed');
+    if (error && !isAlreadyStored(error)) throw storageFailure('upload_variant_failed');
   }
 
   async deleteStaging(path: string): Promise<void> {
@@ -67,6 +67,13 @@ function isMissingObject(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
   const candidate = error as { status?: number; statusCode?: string };
   return candidate.status === 404 || candidate.statusCode === '404';
+}
+
+function isAlreadyStored(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const candidate = error as { status?: number; statusCode?: string; message?: string };
+  return candidate.status === 409 || candidate.statusCode === '409' ||
+    candidate.message?.toLowerCase().includes('already exists') === true;
 }
 
 function storageFailure(code: string): Error {

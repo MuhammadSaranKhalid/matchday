@@ -56,8 +56,10 @@ class PostsLocalDataSourceImpl implements PostsLocalDataSource {
   }
 
   void _emit() {
-    _controller.add(_memoryCache.values.toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
+    _controller.add(
+      _memoryCache.values.toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
+    );
   }
 
   /// Atomic file replacement: writes to .tmp, flushes, and renames.
@@ -98,114 +100,142 @@ class PostsLocalDataSourceImpl implements PostsLocalDataSource {
 
   @override
   Future<void> savePendingPost(PendingPost post) => _enqueue(() async {
-        await _ensureLoaded();
-        _memoryCache[post.postId] = post;
-        _emit();
-        await _persist();
-      });
+    await _ensureLoaded();
+    _memoryCache[post.postId] = post;
+    _emit();
+    await _persist();
+  });
 
   @override
   Future<void> removePendingPost(String postId) => _enqueue(() async {
-        await _ensureLoaded();
-        _memoryCache.remove(postId);
-        _emit();
-        await _persist();
-      });
+    await _ensureLoaded();
+    _memoryCache.remove(postId);
+    _emit();
+    await _persist();
+  });
 
   Map<String, dynamic> _toJson(PendingPost p) => {
-        'post_id': p.postId,
-        'text': p.text,
-        'media': p.media
-            .map((m) => {
-                  'media_id': m.mediaId,
-                  'position': m.position,
-                  'local_path': m.localPath,
-                  'staging_path': m.stagingPath,
-                  'uploaded': m.uploaded,
-                })
+    'post_id': p.postId,
+    'text': p.text,
+    'media':
+        p.media
+            .map(
+              (m) => {
+                'media_id': m.mediaId,
+                'position': m.position,
+                'local_path': m.localPath,
+                'staging_path': m.stagingPath,
+                'upload_token': m.uploadToken,
+                'width': m.width,
+                'height': m.height,
+                'bytes': m.bytes,
+                'uploaded': m.uploaded,
+              },
+            )
             .toList(),
-        'created_at': p.createdAt.toIso8601String(),
-        'status': p.status.name,
-        'progress': p.progress,
-        'error_message': p.errorMessage,
-        'idempotency_key': p.idempotencyKey,
-        'optimistic_post':
-            p.optimisticPost != null ? _postToJson(p.optimisticPost!) : null,
-      };
+    'created_at': p.createdAt.toIso8601String(),
+    'status': p.status.name,
+    'progress': p.progress,
+    'error_message': p.errorMessage,
+    'client_command_id': p.clientCommandId,
+    'publisher_type': p.publisherType,
+    'publisher_id': p.publisherId,
+    'post_kind': p.postKind,
+    'optimistic_post':
+        p.optimisticPost != null ? _postToJson(p.optimisticPost!) : null,
+  };
 
   PendingPost _fromJson(Map<String, dynamic> json) {
     final rawMedia = json['media'] as List?;
-    final media = rawMedia != null
-        ? rawMedia
-            .whereType<Map<String, dynamic>>()
-            .map((m) => PendingMediaItem(
-                  mediaId: m['media_id'] as String? ?? '',
-                  position: (m['position'] as num?)?.toInt() ?? 0,
-                  localPath: m['local_path'] as String? ?? '',
-                  stagingPath: m['staging_path'] as String? ?? '',
-                  uploaded: m['uploaded'] as bool? ?? false,
-                ))
-            .toList()
-        : const <PendingMediaItem>[];
+    final media =
+        rawMedia != null
+            ? rawMedia
+                .whereType<Map<String, dynamic>>()
+                .map(
+                  (m) => PendingMediaItem(
+                    mediaId: m['media_id'] as String? ?? '',
+                    position: (m['position'] as num?)?.toInt() ?? 0,
+                    localPath: m['local_path'] as String? ?? '',
+                    stagingPath: m['staging_path'] as String? ?? '',
+                    uploadToken: m['upload_token'] as String?,
+                    width: (m['width'] as num?)?.toInt() ?? 0,
+                    height: (m['height'] as num?)?.toInt() ?? 0,
+                    bytes: (m['bytes'] as num?)?.toInt() ?? 0,
+                    uploaded: m['uploaded'] as bool? ?? false,
+                  ),
+                )
+                .toList()
+            : const <PendingMediaItem>[];
 
     return PendingPost(
       postId: json['post_id'] as String,
+      clientCommandId:
+          json['client_command_id'] as String? ??
+          json['idempotency_key'] as String? ??
+          json['post_id'] as String,
       text: json['text'] as String?,
       media: media,
       createdAt: DateTime.parse(json['created_at'] as String),
       status: switch (json['status']) {
         'publishing' => PendingPostStatus.publishing,
         'failed' => PendingPostStatus.failed,
-        'cancelRequested' || 'cancel_requested' =>
-          PendingPostStatus.cancelRequested,
+        'cancelRequested' ||
+        'cancel_requested' => PendingPostStatus.cancelRequested,
         _ => PendingPostStatus.uploading,
       },
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
       errorMessage: json['error_message'] as String?,
-      idempotencyKey: json['idempotency_key'] as String?,
-      optimisticPost: _postFromJson(json['optimistic_post'] as Map<String, dynamic>?),
+      publisherType: json['publisher_type'] as String? ?? 'user',
+      publisherId: json['publisher_id'] as String? ?? '',
+      postKind: json['post_kind'] as String? ?? 'standard',
+      optimisticPost: _postFromJson(
+        json['optimistic_post'] as Map<String, dynamic>?,
+      ),
     );
   }
 
   Map<String, dynamic> _postToJson(Post p) => {
-        'id': p.id.value,
-        'created_by_user_id': p.createdByUserId,
-        'publisher': {
-          'id': p.publisher.id,
-          'type': p.publisher.type.name,
-          'display_name': p.publisher.displayName,
-          'username': p.publisher.username,
-          'photo_url': p.publisher.photoUrl,
-        },
-        'kind': p.kind.name,
-        'text': p.text,
-        'visibility': p.visibility.name,
-        'status': p.status.name,
-        'expected_media_count': p.expectedMediaCount,
-        'media': p.media
-            .map((m) => {
-                  'media_id': m.mediaId,
-                  'position': m.position,
-                  'width': m.width,
-                  'height': m.height,
-                  'variants': {
-                    for (final v in m.variants.entries)
-                      v.key.toString(): {
-                        'url': v.value.url,
-                        'path': v.value.path,
-                        'width': v.value.width,
-                        'height': v.value.height,
-                        'size_bytes': v.value.sizeBytes,
-                        'mime_type': v.value.mimeType,
-                      }
-                  }
-                })
+    'id': p.id.value,
+    'created_by_user_id': p.createdByUserId,
+    'publisher': {
+      'id': p.publisher.id,
+      'type': p.publisher.type.name,
+      'display_name': p.publisher.displayName,
+      'username': p.publisher.username,
+      'photo_url': p.publisher.photoUrl,
+    },
+    'kind': p.kind.name,
+    'text': p.text,
+    'visibility': p.visibility.name,
+    'status': p.status.name,
+    'expected_media_count': p.expectedMediaCount,
+    'media':
+        p.media
+            .map(
+              (m) => {
+                'media_id': m.mediaId,
+                'position': m.position,
+                'width': m.width,
+                'height': m.height,
+                'variants': {
+                  for (final v in m.variants.entries)
+                    v.key.toString(): {
+                      'url': v.value.url,
+                      'path': v.value.path,
+                      'width': v.value.width,
+                      'height': v.value.height,
+                      'size_bytes': v.value.sizeBytes,
+                      'mime_type': v.value.mimeType,
+                    },
+                },
+              },
+            )
             .toList(),
-        'created_at': p.createdAt.toIso8601String(),
-        'linked_match_id': p.linkedMatchId,
-        'linked_tournament_id': p.linkedTournamentId,
-        'linked_team_id': p.linkedTeamId,
-      };
+    'created_at': p.createdAt.toIso8601String(),
+    'linked_match_id': p.linkedMatchId,
+    'linked_tournament_id': p.linkedTournamentId,
+    'linked_team_id': p.linkedTeamId,
+  };
 
   Post? _postFromJson(Map<String, dynamic>? json) {
     if (json == null) return null;
@@ -223,34 +253,35 @@ class PostsLocalDataSourceImpl implements PostsLocalDataSource {
     );
 
     final rawMedia = json['media'] as List?;
-    final media = rawMedia != null
-        ? rawMedia.whereType<Map<String, dynamic>>().map((m) {
-            final rawVars = m['variants'] as Map<String, dynamic>? ?? {};
-            final variants = <int, MediaVariant>{};
-            for (final entry in rawVars.entries) {
-              final w = int.tryParse(entry.key);
-              final vMap = entry.value as Map<String, dynamic>?;
-              if (w != null && vMap != null) {
-                variants[w] = MediaVariant(
-                  url: vMap['url'] as String? ?? '',
-                  path: vMap['path'] as String? ?? '',
-                  width: (vMap['width'] as num?)?.toInt() ?? 0,
-                  height: (vMap['height'] as num?)?.toInt() ?? 0,
-                  sizeBytes: (vMap['size_bytes'] as num?)?.toInt() ?? 0,
-                  mimeType: vMap['mime_type'] as String? ?? 'image/jpeg',
-                );
+    final media =
+        rawMedia != null
+            ? rawMedia.whereType<Map<String, dynamic>>().map((m) {
+              final rawVars = m['variants'] as Map<String, dynamic>? ?? {};
+              final variants = <int, MediaVariant>{};
+              for (final entry in rawVars.entries) {
+                final w = int.tryParse(entry.key);
+                final vMap = entry.value as Map<String, dynamic>?;
+                if (w != null && vMap != null) {
+                  variants[w] = MediaVariant(
+                    url: vMap['url'] as String? ?? '',
+                    path: vMap['path'] as String? ?? '',
+                    width: (vMap['width'] as num?)?.toInt() ?? 0,
+                    height: (vMap['height'] as num?)?.toInt() ?? 0,
+                    sizeBytes: (vMap['size_bytes'] as num?)?.toInt() ?? 0,
+                    mimeType: vMap['mime_type'] as String? ?? 'image/jpeg',
+                  );
+                }
               }
-            }
-            return PostMedia(
-              mediaId: m['media_id'] as String? ?? '',
-              postId: json['id'] as String? ?? '',
-              position: (m['position'] as num?)?.toInt() ?? 0,
-              width: (m['width'] as num?)?.toInt() ?? 0,
-              height: (m['height'] as num?)?.toInt() ?? 0,
-              variants: variants,
-            );
-          }).toList()
-        : const <PostMedia>[];
+              return PostMedia(
+                mediaId: m['media_id'] as String? ?? '',
+                postId: json['id'] as String? ?? '',
+                position: (m['position'] as num?)?.toInt() ?? 0,
+                width: (m['width'] as num?)?.toInt() ?? 0,
+                height: (m['height'] as num?)?.toInt() ?? 0,
+                variants: variants,
+              );
+            }).toList()
+            : const <PostMedia>[];
 
     final rawKind = json['kind'] ?? json['post_kind'];
     return Post(
@@ -281,7 +312,9 @@ class PostsLocalDataSourceImpl implements PostsLocalDataSource {
       },
       expectedMediaCount: (json['expected_media_count'] as num?)?.toInt() ?? 0,
       media: media,
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['created_at'] as String? ?? '') ??
+          DateTime.now(),
       linkedMatchId: json['linked_match_id'] as String?,
       linkedTournamentId: json['linked_tournament_id'] as String?,
       linkedTeamId: json['linked_team_id'] as String?,

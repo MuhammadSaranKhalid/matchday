@@ -35,6 +35,11 @@ export interface QueueConfiguration {
   readonly removeOnFailCount: number;
 }
 
+export interface MediaStorageConfiguration {
+  readonly supabaseUrl: string;
+  readonly secretKey: string;
+}
+
 export interface PlatformConfiguration {
   readonly nodeEnvironment: Environment['NODE_ENV'];
   readonly appName: string;
@@ -49,6 +54,7 @@ export interface PlatformConfiguration {
   readonly database: Readonly<DatabaseConfiguration>;
   readonly redis: Readonly<RedisConfiguration>;
   readonly auth: Readonly<AuthConfiguration>;
+  readonly mediaStorage: Readonly<MediaStorageConfiguration>;
   readonly queue: Readonly<QueueConfiguration>;
 }
 
@@ -93,6 +99,10 @@ export function buildConfiguration(environment: Environment): PlatformConfigurat
       verificationTimeoutMs: environment.SUPABASE_AUTH_VERIFICATION_TIMEOUT_MS,
       jwksCacheMaxAgeMs: environment.SUPABASE_JWKS_CACHE_MAX_AGE_MS,
       jwksCooldownMs: environment.SUPABASE_JWKS_COOLDOWN_MS,
+    }),
+    mediaStorage: Object.freeze({
+      supabaseUrl: environment.SUPABASE_URL,
+      secretKey: environment.SUPABASE_SECRET_KEY,
     }),
     queue: Object.freeze({
       attempts: environment.QUEUE_ATTEMPTS,

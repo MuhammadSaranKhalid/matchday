@@ -20,14 +20,9 @@ abstract class MediaVariantDto with _$MediaVariantDto {
   const MediaVariantDto._();
 
   factory MediaVariantDto.fromJson(Map<String, dynamic> json) {
-    final size = json['size_bytes'] ??
-        json['bytes'] ??
-        json['sizeBytes'] ??
-        0;
-    final mime = json['mime_type'] ??
-        json['mime'] ??
-        json['mimeType'] ??
-        'image/webp';
+    final size = json['size_bytes'] ?? json['bytes'] ?? json['sizeBytes'] ?? 0;
+    final mime =
+        json['mime_type'] ?? json['mime'] ?? json['mimeType'] ?? 'image/webp';
     return MediaVariantDto(
       path: json['path'] as String? ?? '',
       width: (json['width'] as num?)?.toInt() ?? 0,
@@ -38,13 +33,13 @@ abstract class MediaVariantDto with _$MediaVariantDto {
   }
 
   MediaVariant toEntity([MediaUrlFactory? urlFactory]) => MediaVariant(
-        path: path,
-        url: urlFactory?.postMedia(path),
-        width: width,
-        height: height,
-        sizeBytes: sizeBytes,
-        mimeType: mimeType,
-      );
+    path: path,
+    url: urlFactory?.postMedia(path),
+    width: width,
+    height: height,
+    sizeBytes: sizeBytes,
+    mimeType: mimeType,
+  );
 }
 
 @freezed
@@ -56,7 +51,7 @@ abstract class PostMediaDto with _$PostMediaDto {
     @Default(1080) int width,
     @Default(1080) int height,
     String? blurhash,
-    @Default('feed_ready') String status,
+    @Default('ready') String status,
     @Default(<String, dynamic>{}) Map<String, dynamic> variants,
   }) = _PostMediaDto;
 
@@ -70,8 +65,9 @@ abstract class PostMediaDto with _$PostMediaDto {
     variants.forEach((key, value) {
       final widthKey = int.tryParse(key);
       if (widthKey != null && value is Map<String, dynamic>) {
-        parsedVariants[widthKey] =
-            MediaVariantDto.fromJson(value).toEntity(urlFactory);
+        parsedVariants[widthKey] = MediaVariantDto.fromJson(
+          value,
+        ).toEntity(urlFactory);
       }
     });
 
@@ -88,15 +84,10 @@ abstract class PostMediaDto with _$PostMediaDto {
   }
 
   static PostMediaStatus _parseStatus(String s) => switch (s) {
-        'awaiting_upload' => PostMediaStatus.awaitingUpload,
-        'uploaded' => PostMediaStatus.uploaded,
-        'processing_feed' => PostMediaStatus.processingFeed,
-        'feed_ready' => PostMediaStatus.feedReady,
-        'optimizing' => PostMediaStatus.optimizing,
-        'optimized' => PostMediaStatus.optimized,
-        'upload_failed' => PostMediaStatus.uploadFailed,
-        'processing_failed' => PostMediaStatus.processingFailed,
-        'optimization_failed' => PostMediaStatus.optimizationFailed,
-        _ => PostMediaStatus.feedReady,
-      };
+    'pending_upload' => PostMediaStatus.pendingUpload,
+    'uploaded' => PostMediaStatus.uploaded,
+    'processing' => PostMediaStatus.processing,
+    'failed' => PostMediaStatus.failed,
+    _ => PostMediaStatus.ready,
+  };
 }

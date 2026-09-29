@@ -2,17 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import 'media_variant.dart';
 
-enum PostMediaStatus {
-  awaitingUpload,
-  uploaded,
-  processingFeed,
-  feedReady,
-  optimizing,
-  optimized,
-  uploadFailed,
-  processingFailed,
-  optimizationFailed,
-}
+enum PostMediaStatus { pendingUpload, uploaded, processing, ready, failed }
 
 /// First-class image media attached to a post.
 /// Pure Dart (Domain).
@@ -24,7 +14,7 @@ class PostMedia extends Equatable {
     required this.width,
     required this.height,
     this.blurhash,
-    this.status = PostMediaStatus.feedReady,
+    this.status = PostMediaStatus.ready,
     this.variants = const {},
   });
 
@@ -37,8 +27,7 @@ class PostMedia extends Equatable {
   final PostMediaStatus status;
   final Map<int, MediaVariant> variants;
 
-  double get aspectRatio =>
-      (width <= 0 || height <= 0) ? 1.0 : width / height;
+  double get aspectRatio => (width <= 0 || height <= 0) ? 1.0 : width / height;
 
   /// High-resolution / fallback URL (preferring 2048, 1080, or largest available variant).
   String get url {
@@ -52,8 +41,8 @@ class PostMedia extends Equatable {
   }
 
   Map<int, String> get variantUrls => {
-        for (final entry in variants.entries) entry.key: entry.value.url,
-      };
+    for (final entry in variants.entries) entry.key: entry.value.url,
+  };
 
   /// Selects the smallest available variant with width >= [requiredPhysicalWidth].
   /// Falls back to the highest available variant if none is large enough, or 1080.
@@ -75,13 +64,13 @@ class PostMedia extends Equatable {
 
   @override
   List<Object?> get props => [
-        mediaId,
-        postId,
-        position,
-        width,
-        height,
-        blurhash,
-        status,
-        variants,
-      ];
+    mediaId,
+    postId,
+    position,
+    width,
+    height,
+    blurhash,
+    status,
+    variants,
+  ];
 }

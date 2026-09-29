@@ -10,17 +10,8 @@ import {
 
 import type { AuthConfiguration } from '../config/configuration.js';
 import type { AuthenticatedPrincipal } from './authenticated-principal.js';
-import type { TokenVerifier } from './token-verifier.js';
-
-type VerificationFailureCode = 'invalid_token' | 'verification_unavailable';
+import { TokenVerificationError, type TokenVerifier } from './token-verifier.js';
 type FetchImplementation = typeof fetch;
-
-export class TokenVerificationError extends Error {
-  constructor(readonly code: VerificationFailureCode) {
-    super(`Access token verification failed: ${code}`);
-    this.name = 'TokenVerificationError';
-  }
-}
 
 @Injectable()
 export class SupabaseTokenVerifierService implements TokenVerifier {

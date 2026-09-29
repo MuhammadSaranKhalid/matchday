@@ -91,7 +91,9 @@ describe('buildPinoOptions', () => {
       databaseUrl: 'postgresql://user:database-secret@localhost/database',
       redisUrl: 'redis://default:redis-secret@localhost',
       SUPABASE_PUBLISHABLE_KEY: 'publishable-secret',
+      uploadToken: 'signed-upload-token-secret',
       nested: {
+        signedUrl: 'https://storage.invalid/upload?token=signed-url-secret',
         accessToken: 'access-token-secret',
         refresh_token: 'refresh-token-secret',
         apiKey: 'api-key-secret',
@@ -108,6 +110,8 @@ describe('buildPinoOptions', () => {
     expect(serialized).not.toContain('database-secret');
     expect(serialized).not.toContain('redis-secret');
     expect(serialized).not.toContain('publishable-secret');
+    expect(serialized).not.toContain('signed-upload-token-secret');
+    expect(serialized).not.toContain('signed-url-secret');
     expect(serialized).not.toContain('access-token-secret');
     expect(serialized).not.toContain('refresh-token-secret');
     expect(serialized).not.toContain('api-key-secret');

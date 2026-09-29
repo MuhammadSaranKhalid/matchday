@@ -4,8 +4,8 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { AuthConfiguration } from '../../../../libs/platform/src/config/configuration.js';
 import {
   SupabaseTokenVerifierService,
-  TokenVerificationError,
 } from '../../../../libs/platform/src/auth/supabase-token-verifier.service.js';
+import { TokenVerificationError } from '../../../../libs/platform/src/auth/token-verifier.js';
 
 const issuer = 'https://project.supabase.co/auth/v1';
 const userId = '7c50bd47-dfaf-4ad0-97d8-10b9b908f7ac';

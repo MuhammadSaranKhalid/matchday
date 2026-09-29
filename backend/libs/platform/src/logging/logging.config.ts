@@ -42,6 +42,12 @@ const redactedPaths = [
   '*.api_key',
   'token',
   '*.token',
+  'uploadToken',
+  '*.uploadToken',
+  'signedUrl',
+  '*.signedUrl',
+  'signedURL',
+  '*.signedURL',
   'key',
   '*.key',
 ];

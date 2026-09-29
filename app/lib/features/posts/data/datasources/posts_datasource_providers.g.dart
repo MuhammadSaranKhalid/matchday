@@ -55,7 +55,7 @@ final class PostsRemoteDataSourceProvider
 }
 
 String _$postsRemoteDataSourceHash() =>
-    r'fc2a1ba6b774cbe01bb26a9a77ce890fba04419b';
+    r'8c54793751a117f2a59ec9388d9f0d586f0da690';
 
 @ProviderFor(postsLocalDataSource)
 final postsLocalDataSourceProvider = PostsLocalDataSourceProvider._();

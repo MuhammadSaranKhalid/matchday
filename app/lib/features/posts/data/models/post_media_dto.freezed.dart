@@ -485,7 +485,7 @@ return $default(_that.mediaId,_that.postId,_that.position,_that.width,_that.heig
 @JsonSerializable()
 
 class _PostMediaDto extends PostMediaDto {
-  const _PostMediaDto({@JsonKey(name: 'media_id') required this.mediaId, @JsonKey(name: 'post_id') this.postId = '', this.position = 0, this.width = 1080, this.height = 1080, this.blurhash, this.status = 'feed_ready', final  Map<String, dynamic> variants = const <String, dynamic>{}}): _variants = variants,super._();
+  const _PostMediaDto({@JsonKey(name: 'media_id') required this.mediaId, @JsonKey(name: 'post_id') this.postId = '', this.position = 0, this.width = 1080, this.height = 1080, this.blurhash, this.status = 'ready', final  Map<String, dynamic> variants = const <String, dynamic>{}}): _variants = variants,super._();
   factory _PostMediaDto.fromJson(Map<String, dynamic> json) => _$PostMediaDtoFromJson(json);
 
 @override@JsonKey(name: 'media_id') final  String mediaId;

@@ -1,5 +1,7 @@
 # Media Processing and Lightsail Implementation Plan
 
+> **Superseded:** This plan targets the rejected ledger/outbox and feed/optimize architecture. Do not execute it. Replace it only after the V1 written specification has been reviewed and approved.
+
 **Goal:** Make BullMQ `media` the production image pipeline on the Nest worker and prepare a verified AWS Lightsail deployment without starting chat work.
 
 **Reference design:** `docs/superpowers/specs/2026-09-29-media-processing-lightsail-design.md`

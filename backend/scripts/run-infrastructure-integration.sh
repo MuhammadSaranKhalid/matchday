@@ -33,6 +33,7 @@ if [[ "${app_compose_config}" == true ]]; then
   smoke_compose_file="${backend_directory}/test/integration/app-smoke.compose.yml"
   DATABASE_URL="postgresql://config-only.invalid/matchday" \
   SUPABASE_URL="https://config-only.invalid" \
+  SUPABASE_SECRET_KEY="config-only-secret" \
   SUPABASE_AUTH_ISSUER="https://config-only.invalid/auth/v1" \
     docker compose -f "${backend_directory}/docker-compose.yml" -f "${smoke_compose_file}" config --quiet
   exit 0

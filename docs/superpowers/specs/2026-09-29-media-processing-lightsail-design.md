@@ -1,6 +1,6 @@
 # Matchday V1 Media Processing on Lightsail
 
-**Status:** Approved in conversation; awaiting written-spec review
+**Status:** Approved after written-spec review; implementation planning pending
 **Date:** 2026-09-29
 **Branch:** `backend`
 
@@ -19,7 +19,8 @@ Chat work remains out of scope until this pipeline is implemented and verified.
 - There is no per-image upload-completed endpoint.
 - `post_media` is the durable business state; V1 adds no `media_processing_jobs` or outbox table.
 - One BullMQ queue named `media` carries one named job, `process-image`.
-- One worker invocation generates every required variant for one image.
+- One worker invocation generates every variant currently required by Matchday's presentation surfaces for one image.
+- A lightweight worker-side reconciler repairs stale `uploaded` and `processing` media without introducing a jobs table.
 - There is no feed/optimize queue split, PGMQ dispatch, `pg_net` wake call, worker-slot protocol, or Next.js/Vercel processing endpoint.
 
 ## System boundary
@@ -58,7 +59,7 @@ Supabase continues to provide Auth, PostgreSQL, and Storage. The Lightsail deplo
 
 ## Create-post command
 
-`POST /posts` is authenticated with the user's Supabase access token. The request contains post metadata and an ordered media manifest of at most four images. It does not contain arbitrary storage paths.
+`POST /posts` is authenticated with the user's Supabase access token. The request contains post metadata and an ordered media manifest of zero to four images. It does not contain arbitrary storage paths.
 
 In one PostgreSQL transaction, NestJS:
 
@@ -107,6 +108,8 @@ PostgreSQL and Redis cannot participate in one atomic transaction in this V1 des
 
 This is a conscious V1 tradeoff: there is no transactional outbox. Redis persistence reduces loss risk, but does not provide the same guarantee as a PostgreSQL job ledger. The state model and API must leave a safe route to retry scheduling.
 
+For a text-only post, where the server-owned manifest contains zero media rows, publish performs no Storage or Redis work. It transitions the owned draft directly to `published` and returns success.
+
 ## Business states
 
 The minimum states are:
@@ -122,6 +125,46 @@ Post media: pending_upload -> uploaded -> processing -> ready
 State transitions are conditional and owner-scoped where invoked from the API. The worker atomically claims an eligible media row before processing. A duplicate job returns successfully when the media is already `ready`; an active non-expired claim is not processed concurrently.
 
 A post becomes `published` atomically only when every ordered media row is `ready`. A terminal media failure keeps the post unpublished and records a safe, machine-readable error suitable for a later retry command.
+
+## Schema simplification
+
+V1 removes the old two-stage media lifecycle instead of carrying compatibility branches into the new API and worker. The effective `post_media` model retains the existing identifiers, ordering, paths, dimensions, variant metadata, pipeline version, processing timestamps, and audit timestamps, while converging on these processing fields:
+
+```text
+media_id
+post_id
+position
+status
+staging_path
+final_prefix
+pipeline_version
+source_width
+source_height
+source_bytes
+source_mime
+display_width
+display_height
+variants
+blurhash
+processing_started_at
+processing_attempts
+last_processing_error
+processed_at
+created_at
+updated_at
+```
+
+The only media states are:
+
+```text
+pending_upload
+uploaded
+processing
+ready
+failed
+```
+
+The migration removes the legacy feed/optimization states and columns, including `processing_feed`, `feed_ready`, `optimizing`, `optimized`, `upload_failed`, `processing_failed`, `optimization_failed`, `optimization_attempts`, `feed_ready_at`, `last_optimization_error`, and `optimized_at`. It also replaces old RPCs, projections, and Flutter mappings that depend on those values. Because Matchday is still in development, the implementation does not add runtime compatibility logic for the discarded lifecycle.
 
 ## Worker processing
 
@@ -141,7 +184,7 @@ For each media ID, the worker:
 10. Deletes the staging object only after durable success.
 11. Removes scratch files in `finally`.
 
-Initial output parity is:
+The current Flutter presentation layer chooses the smallest variant at or above the physical display width, and its domain tests explicitly cover the 360, 540, 720, 1080, and 2048 widths. V1 therefore keeps the following set because it is consumed by current UI behavior, not merely because the legacy worker generated it:
 
 | Object | Transformation | WebP quality |
 |---|---|---:|
@@ -189,6 +232,15 @@ BullMQ owns execution attempts and exponential backoff with jitter.
 - Staging deletion occurs after final uploads and the successful database transition. A cleanup failure creates an orphan, not data loss.
 - Periodic maintenance removes expired drafts, orphaned staging objects, and abandoned scratch directories after a safe retention interval.
 
+### Missing-job recovery
+
+A small `MediaRecoveryService` runs in the worker runtime on a fixed interval, initially about once per minute. It queries bounded batches of:
+
+- `uploaded` media whose `updated_at` is older than the enqueue grace period; and
+- `processing` media whose `processing_started_at` is older than the processing lease.
+
+It conditionally resets stale processing claims where required and re-adds `process-image` using the same deterministic `media-${mediaId}` job ID. Multiple worker replicas may run the check safely because database transitions are conditional and duplicate queue IDs are harmless while present. This service adds no queue, jobs table, or second recovery state machine; `post_media` remains the recovery source.
+
 ## Redis and deployment
 
 Redis runs privately on the Lightsail Docker network with:
@@ -215,7 +267,10 @@ Implementation uses test-driven development and covers:
 - post creation, authorization, ordering, and idempotency;
 - exact server-generated paths and signed upload tokens;
 - publish ownership, object verification, and retry behavior;
+- immediate publication of text-only posts without Redis work;
 - deterministic enqueue and partial enqueue failures;
+- reconciliation of stale uploaded and processing media;
+- migration removal of every legacy feed/optimization state and column;
 - worker claiming, duplicate delivery, retries, and terminal errors;
 - fixture parity for dimensions, orientation, BlurHash, formats, and quality settings;
 - corrupt, oversized, multi-frame, and decompression-risk inputs;

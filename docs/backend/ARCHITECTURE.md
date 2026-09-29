@@ -1,6 +1,6 @@
 # Matchday Backend Architecture — Phase 0 Audit
 
-Status: Phase 1 foundation implemented; later bounded contexts remain proposed. Audit date: 2026-09-28.
+Status: Phase 2 infrastructure implemented; media-processing migration is the next gate. Audit date: 2026-09-28; updated 2026-09-29.
 
 ## Executive decision
 
@@ -13,8 +13,8 @@ This is the lowest-risk path because the current Flutter client and database alr
 - Flutter 0.4.9+10, Dart `^3.7.0`, Flutter `>=3.27.0`.
 - Supabase Flutter 2.17.2, Ably Flutter 1.2.44, Drift 2.31.x, Riverpod 3.3.1.
 - Firebase Messaging 16.7.0 and local notifications 22.3.1.
-- Existing Node media worker uses Node 22, npm, CommonJS, Supabase PGMQ RPCs, and Vercel. It is not a reusable Nest foundation, though its job contracts, retry outcomes, and storage adapters are useful migration inputs.
-- CI currently validates Flutter architecture and builds the media worker. No Nest, pnpm, Vitest, oxlint, Docker Compose, or backend architecture gates exist.
+- Existing Node media worker uses Node 22, npm, Supabase PGMQ RPCs, and Vercel. Its Sharp job contracts, retry outcomes, and storage adapters are migration inputs; the Vercel HTTP runtime is not part of the target.
+- CI validates Flutter, the legacy media-worker build, and the Nest backend's lint, unit, architecture, e2e, disposable-infrastructure integration, and build gates.
 - The working tree was dirty before this audit. Existing tournament, comments, and safety changes were not modified.
 
 ## Existing chat architecture
@@ -67,7 +67,7 @@ backend/test/{architecture,integration,e2e,load}/
 supabase/migrations/
 ```
 
-Keep `website/`, `media-worker/`, Flutter `app/lib/`, and Supabase functions as independent project boundaries during migration. Phase 0 does not decide whether the existing media worker is later folded into `backend/apps/worker`; that requires a dedicated parity plan.
+Keep `website/`, `media-worker/`, Flutter `app/lib/`, and Supabase functions as independent project boundaries during migration. The approved next gate migrates media processing into `backend/apps/worker`; the legacy project remains isolated until parity permits its removal.
 
 ## Dependency and runtime rules
 

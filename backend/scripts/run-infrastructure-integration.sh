@@ -69,5 +69,5 @@ if [[ -n "${test_target}" ]]; then
   fi
   corepack pnpm vitest run "${test_path}"
 else
-  corepack pnpm vitest run test/integration
+  corepack pnpm vitest run test/integration --maxWorkers=1 --no-file-parallelism
 fi

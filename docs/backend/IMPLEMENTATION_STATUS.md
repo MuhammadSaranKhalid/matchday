@@ -1,10 +1,10 @@
 # Matchday Backend Implementation Status
 
-Last updated: 2026-09-28.
+Last updated: 2026-09-29.
 
 ## Current gate
 
-Phase 1 — backend foundation: complete and verified. The repository-boundary migration is also complete and verified. Phase 2 has not started and remains gated on a separate design review.
+Phase 2 — infrastructure: complete and verified locally. The next gate is the image-processing migration to the Nest worker and AWS Lightsail deployment; chat remains paused until that milestone passes.
 
 ## Phase status
 
@@ -12,16 +12,29 @@ Phase 1 — backend foundation: complete and verified. The repository-boundary m
 |---|---|
 | 0 Audit | Complete |
 | 1 Backend foundation | Complete; review gate |
-| 2 Infrastructure | Not started |
-| 3 Chat read model | Not started |
-| 4 Chat write model | Not started |
-| 5 Realtime | Not started |
-| 6 Presence + typing | Not started |
-| 7 Outbox + queues | Not started |
-| 8 Notifications | Not started |
-| 9 Flutter migration | Not started |
+| 2 Infrastructure | Complete; local verification passed |
+| 3 Media processing + Lightsail | Next gated phase |
+| 4 Chat read model | Not started |
+| 5 Chat write model | Not started |
+| 6 Realtime | Not started |
+| 7 Presence + typing | Not started |
+| 8 Outbox + notifications | Not started |
+| 9 Flutter chat migration | Not started |
 | 10 Load test | Not started |
 | 11 Cutover | Not started |
+
+## Phase 2 delivered
+
+- Singleton PostgreSQL transaction boundary with user/system authorization separation.
+- Supabase access-token verification in explicit JWKS and remote modes.
+- Lifecycle-owned ioredis connections with bounded health checks and deterministic cleanup.
+- BullMQ registration for `notifications`, `media`, and `maintenance`, with bounded exponential retry and retention defaults and no processors yet.
+- PostgreSQL/Redis/queue-aware API readiness and fail-fast worker startup.
+- Ordered worker shutdown: queues, Redis, then PostgreSQL.
+- Disposable PostgreSQL/Redis integration harness and CI integration gate.
+- Production Compose wiring for private Redis and externally supplied Supabase configuration; no production PostgreSQL container.
+
+Phase 2 database changes: none. Deployment changes: none. Flutter, Supabase migrations/functions, website, and the existing standalone media worker were not modified.
 
 ## Phase 1 delivered
 
@@ -64,6 +77,22 @@ Database changes: none. No migration, function, trigger, policy, table, index, o
 Flutter production changes: none.
 
 ## Verification evidence
+
+Phase 2 local gate on 2026-09-29:
+
+```sh
+bash scripts/verify_repository_boundaries.sh             # passed
+cd backend
+corepack pnpm lint                                       # passed; zero diagnostics
+corepack pnpm test                                       # passed; 14 files, 90 tests
+corepack pnpm test:architecture                          # passed; 2 files, 13 tests
+corepack pnpm test:e2e                                   # passed; 2 files, 15 tests
+bash scripts/run-infrastructure-integration.sh            # passed; 5 files, 14 tests
+corepack pnpm build                                      # passed; API/worker imports verified
+bash scripts/run-infrastructure-integration.sh --app-compose-config # passed
+```
+
+The disposable integration project is removed after every run. The separate production Compose Redis service remained healthy and private at `6379/tcp`. No Supabase project, database migration, or deployed service was changed.
 
 Complete backend gate after the repository move on 2026-09-28:
 
@@ -162,4 +191,4 @@ Remaining path risks are limited to historical documents that intentionally pres
 
 ## Next gated phase
 
-Phase 2 is the next candidate: PostgreSQL/Supabase server connectivity, Redis/BullMQ foundation, dependency-aware readiness, secret handling, and infrastructure tests. It remains unstarted and requires its own approved design before implementation. Chat read/write behavior remains out of scope until the later gated phases documented in `CHAT_MIGRATION.md`.
+Image processing is next. The reusable Sharp transformation behavior will move from the standalone Vercel worker into the Nest worker, BullMQ `media` becomes the first active queue, Supabase Storage remains authoritative, and a bounded Lightsail-mounted volume provides temporary processing workspace. The old HTTP-triggered worker is retired only after end-to-end production parity. Chat work begins afterward.

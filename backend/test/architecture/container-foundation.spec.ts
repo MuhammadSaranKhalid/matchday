@@ -11,6 +11,14 @@ function readRequired(path: string): string {
 }
 
 describe('production container foundation', () => {
+  it('runs disposable infrastructure integration tests in backend CI', () => {
+    const workflow = readRequired('../.github/workflows/ci.yml');
+    const architecture = workflow.indexOf('corepack pnpm test:architecture');
+    const integration = workflow.indexOf('bash scripts/run-infrastructure-integration.sh');
+    expect(workflow).toContain("hashFiles('backend/pnpm-lock.yaml')");
+    expect(integration).toBeGreaterThan(architecture);
+  });
+
   it('builds API and worker as separate non-root Node 24 targets', () => {
     const dockerfile = readRequired('Dockerfile');
 

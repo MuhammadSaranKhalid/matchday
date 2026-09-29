@@ -1,14 +1,14 @@
 # Backend Deployment Evolution
 
-Status: Phase 1 local container foundation implemented; production infrastructure remains proposed.
+Status: Phase 2 infrastructure implemented; AWS Lightsail deployment and media processing remain gated.
 
 ## Local development
 
-Docker Compose runs `api`, `worker`, and private `redis` services. Applications do not connect to Redis until Phase 2. Supabase remains the repository's existing external/local Supabase environment rather than a competing PostgreSQL stack. Phase 1 configuration validates process, HTTP, CORS, proxy-trust, and throttling settings; later phases add database, Redis, queue, and auth validation alongside those integrations.
+Docker Compose runs `api`, `worker`, and private `redis` services. API and worker use validated PostgreSQL, Supabase Auth, Redis, and BullMQ configuration. Supabase remains authoritative for PostgreSQL, Auth, and Storage; Compose does not run a competing production PostgreSQL service.
 
 ## Initial production
 
-One DigitalOcean Droplet behind a TLS reverse proxy:
+One AWS Lightsail instance behind a TLS reverse proxy:
 
 ```text
 reverse proxy
@@ -16,11 +16,12 @@ reverse proxy
 worker x1
 redis x1 (private network/container only)
 Supabase hosted PostgreSQL/Auth/Storage
+temporary media-processing volume mounted only into the worker
 ```
 
 Set `TRUST_PROXY_HOPS` to the exact number of controlled proxy hops (one for this topology). Leaving it at zero ignores forwarded client addresses; trusting more hops than the deployment owns permits spoofing and weakens per-client throttling.
 
-API and worker use multi-stage images, non-root runtime users, production-only artifacts, and graceful SIGTERM. Redis is never exposed publicly. Secrets are injected at deployment and are not baked into images.
+API and worker use multi-stage images, non-root runtime users, production-only artifacts, and graceful SIGTERM. Redis is never exposed publicly. Secrets are injected at deployment and are not baked into images. The worker volume is bounded scratch space; Supabase Storage remains the authoritative object store.
 
 ## Horizontal evolution
 
@@ -51,13 +52,11 @@ Socket.IO uses the Redis adapter; presence, typing, rate limits, and active-thre
 
 ## Rollout sequence
 
-1. Deploy API/worker foundation with only health endpoints.
-2. Validate database and Redis readiness without chat traffic.
-3. Enable HTTP reads for internal users and compare with Supabase responses.
-4. Enable writes, realtime, presence/typing, and notifications in separate gates.
-5. Run two-client integration tests and measured load tests on the production-equivalent topology.
-6. Expand cohorts, observe errors/latency/backlog, retain Ably rollback.
-7. Remove Ably secrets, Edge Function, client dependency, and database triggers only after parity and rollback-window approval.
+1. Deploy and verify the API/worker/Redis foundation on Lightsail.
+2. Migrate image processing into the Nest worker and make BullMQ `media` the first active queue.
+3. Verify upload, staging, processing, final Supabase Storage publication, retries, cleanup, and recovery end to end.
+4. Retire the Vercel media-processing HTTP function after production parity is proven.
+5. Begin chat read/write and realtime work only after the media milestone is complete.
 
 ## Capacity claims
 

@@ -1,6 +1,6 @@
 # Matchday Backend Phase 2 Infrastructure Design
 
-**Status:** Draft for written-spec review
+**Status:** Implemented
 **Date:** 2026-09-28
 **Branch:** `backend`
 

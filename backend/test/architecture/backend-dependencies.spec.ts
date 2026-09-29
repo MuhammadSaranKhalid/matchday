@@ -62,6 +62,12 @@ function targetsLayer(specifier: string, layer: string): boolean {
   return new RegExp(`(^|/)${layer}(?:/|\\.|$)`).test(specifier.replaceAll('\\\\', '/'));
 }
 
+function isConcreteInfrastructureImport(specifier: string): boolean {
+  return ['pg', 'ioredis', 'bullmq', '@nestjs/bullmq'].some(
+    (dependency) => specifier === dependency || specifier.startsWith(`${dependency}/`),
+  );
+}
+
 function targetsSiblingProject(sourcePath: string, specifier: string): boolean {
   if (!specifier.startsWith('.') && !isAbsolute(specifier)) return false;
 
@@ -117,12 +123,19 @@ describe('backend dependency direction', () => {
           .filter(
             (specifier) =>
               targetsLayer(specifier, 'infrastructure') ||
-              targetsLayer(specifier, 'presentation'),
+              targetsLayer(specifier, 'presentation') ||
+              isConcreteInfrastructureImport(specifier),
           )
           .map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`),
       );
 
     expect(violations).toEqual([]);
+  });
+
+  it('rejects concrete persistence and queue packages from inner layers', () => {
+    expect(['pg', 'ioredis', 'bullmq', '@nestjs/bullmq'].every(isConcreteInfrastructureImport))
+      .toBe(true);
+    expect(isConcreteInfrastructureImport('@platform/queue/queue-names.js')).toBe(false);
   });
 
   it('keeps the PostgreSQL driver inside platform database infrastructure', () => {

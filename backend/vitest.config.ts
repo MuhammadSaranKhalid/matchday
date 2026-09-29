@@ -6,6 +6,8 @@ export default defineConfig({
     alias: {
       '@app/api': fileURLToPath(new URL('./apps/api/src', import.meta.url)),
       '@app/worker': fileURLToPath(new URL('./apps/worker/src', import.meta.url)),
+      '@modules/posts': fileURLToPath(new URL('./libs/modules/posts/src/index.ts', import.meta.url)),
+      '@modules/media': fileURLToPath(new URL('./libs/modules/media/src/index.ts', import.meta.url)),
       '@platform': fileURLToPath(new URL('./libs/platform/src', import.meta.url)),
       '@shared-kernel': fileURLToPath(new URL('./libs/shared-kernel/src', import.meta.url)),
     },

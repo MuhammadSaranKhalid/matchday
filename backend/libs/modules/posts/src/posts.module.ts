@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import type { Queue } from 'bullmq';
 
 import { MEDIA_OBJECT_STORAGE, type MediaObjectStorage } from '../../media/src/application/ports/media-object-storage.js';
-import { MediaModule } from '../../media/src/media.module.js';
+import { MediaModule } from '@modules/media';
 import { AuthModule } from '../../../platform/src/auth/auth.module.js';
 import { DatabaseExecutorService } from '../../../platform/src/database/database-executor.service.js';
 import { DatabaseModule } from '../../../platform/src/database/database.module.js';

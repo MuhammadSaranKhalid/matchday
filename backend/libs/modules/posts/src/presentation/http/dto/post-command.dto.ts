@@ -13,7 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-import { MEDIA_POLICY } from '../../../media/src/domain/media-policy.js';
+import { MEDIA_POLICY } from '../../../../../../modules/media/src/domain/media-policy.js';
 
 export class PostMediaCommandDto {
   @IsInt()

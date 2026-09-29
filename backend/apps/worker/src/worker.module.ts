@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { ProcessImageService } from '../../../libs/media/src/application/process-image.service.js';
-import { MEDIA_OBJECT_STORAGE, type MediaObjectStorage } from '../../../libs/media/src/application/ports/media-object-storage.js';
-import { PostgresMediaRepository } from '../../../libs/media/src/infrastructure/postgres/postgres-media.repository.js';
-import { ScratchWorkspaceService } from '../../../libs/media/src/infrastructure/scratch/scratch-workspace.service.js';
-import { SharpImageTransformer } from '../../../libs/media/src/infrastructure/sharp/sharp-image-transformer.js';
-import { MediaModule } from '../../../libs/media/src/media.module.js';
+import { ProcessImageService } from '../../../libs/modules/media/src/application/process-image.service.js';
+import { MEDIA_OBJECT_STORAGE, type MediaObjectStorage } from '../../../libs/modules/media/src/application/ports/media-object-storage.js';
+import { PostgresMediaRepository } from '../../../libs/modules/media/src/infrastructure/persistence/postgres-media.repository.js';
+import { ScratchWorkspaceService } from '../../../libs/modules/media/src/infrastructure/scratch/scratch-workspace.service.js';
+import { SharpImageTransformer } from '../../../libs/modules/media/src/infrastructure/image/sharp-image-transformer.js';
+import { MediaModule } from '../../../libs/modules/media/src/media.module.js';
 import { PlatformConfigModule } from '../../../libs/platform/src/config/platform-config.module.js';
 import { AuthModule } from '../../../libs/platform/src/auth/auth.module.js';
 import { DatabaseModule } from '../../../libs/platform/src/database/database.module.js';
@@ -14,8 +14,8 @@ import { QueueModule } from '../../../libs/platform/src/queue/queue.module.js';
 import { RedisModule } from '../../../libs/platform/src/redis/redis.module.js';
 import { HealthModule } from '../../../libs/platform/src/health/health.module.js';
 import { LoggingModule } from '../../../libs/platform/src/logging/logging.module.js';
-import { WorkerLifecycleService } from './worker-lifecycle.service.js';
-import { MediaProcessor } from './media/media.processor.js';
+import { WorkerLifecycleService } from './lifecycle/worker-lifecycle.service.js';
+import { MediaProcessor } from './processors/media.processor.js';
 
 @Module({
   imports: [

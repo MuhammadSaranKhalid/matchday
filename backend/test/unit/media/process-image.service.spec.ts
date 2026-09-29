@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   PermanentMediaProcessingError,
   ProcessImageService,
-} from '../../../libs/media/src/application/process-image.service.js';
-import { PermanentImageError } from '../../../libs/media/src/application/ports/image-transformer.js';
+} from '../../../libs/modules/media/src/application/process-image.service.js';
+import { PermanentImageError } from '../../../libs/modules/media/src/application/ports/image-transformer.js';
 
 const media = {
   mediaId: '40000000-0000-4000-8000-000000000001',

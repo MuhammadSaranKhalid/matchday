@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 
-import { PermanentImageError } from '../../../libs/media/src/application/ports/image-transformer.js';
-import { SharpImageTransformer } from '../../../libs/media/src/infrastructure/sharp/sharp-image-transformer.js';
-import { ScratchWorkspaceService } from '../../../libs/media/src/infrastructure/scratch/scratch-workspace.service.js';
+import { PermanentImageError } from '../../../libs/modules/media/src/application/ports/image-transformer.js';
+import { SharpImageTransformer } from '../../../libs/modules/media/src/infrastructure/image/sharp-image-transformer.js';
+import { ScratchWorkspaceService } from '../../../libs/modules/media/src/infrastructure/scratch/scratch-workspace.service.js';
 
 describe('SharpImageTransformer', () => {
   it('auto-orients and generates all five sequential non-enlarged WebP variants', async () => {

@@ -4,8 +4,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { MEDIA_POLICY } from '../../../libs/media/src/domain/media-policy.js';
-import { SupabaseMediaStorageService } from '../../../libs/media/src/infrastructure/supabase/supabase-media-storage.service.js';
+import { MEDIA_POLICY } from '../../../libs/modules/media/src/domain/media-policy.js';
+import { SupabaseMediaStorageService } from '../../../libs/modules/media/src/infrastructure/storage/supabase-media-storage.service.js';
 
 function storageClient() {
   const bucket = {

@@ -1,5 +1,5 @@
-import type { DatabaseExecutorService } from '../../../../platform/src/database/database-executor.service.js';
-import type { QueryExecutor } from '../../../../platform/src/database/database.types.js';
+import type { DatabaseExecutorService } from '../../../../../platform/src/database/database-executor.service.js';
+import type { QueryExecutor } from '../../../../../platform/src/database/database.types.js';
 import type { TransformedImage } from '../../application/ports/image-transformer.js';
 import type {
   ClaimedMedia,

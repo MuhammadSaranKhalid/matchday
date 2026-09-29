@@ -1,4 +1,4 @@
-import type { AuthenticatedPrincipal } from '../../../platform/src/auth/authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '../../../../platform/src/auth/authenticated-principal.js';
 
 export type PostProcessingStatus = 'processing' | 'published' | 'failed';
 export type PostMediaState = 'pending_upload' | 'uploaded' | 'processing' | 'ready' | 'failed';

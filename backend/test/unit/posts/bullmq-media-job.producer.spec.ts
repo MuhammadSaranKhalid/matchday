@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { BullMqMediaJobProducer } from '../../../libs/posts/src/infrastructure/bullmq-media-job.producer.js';
+import { BullMqMediaJobProducer } from '../../../libs/modules/posts/src/infrastructure/queue/bullmq-media-job.producer.js';
 
 describe('BullMqMediaJobProducer', () => {
   it('adds the exact V1 payload with a deterministic colon-free job ID', async () => {

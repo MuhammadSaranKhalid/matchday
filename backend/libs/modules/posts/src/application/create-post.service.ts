@@ -1,5 +1,5 @@
-import type { AuthenticatedPrincipal } from '../../../platform/src/auth/authenticated-principal.js';
-import { ApplicationError } from '../../../platform/src/errors/application-error.js';
+import type { AuthenticatedPrincipal } from '../../../../platform/src/auth/authenticated-principal.js';
+import { ApplicationError } from '../../../../platform/src/errors/application-error.js';
 import type { MediaObjectStorage } from '../../../media/src/application/ports/media-object-storage.js';
 import type {
   CreatePostCommand,

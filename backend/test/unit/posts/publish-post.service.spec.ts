@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AuthenticatedPrincipal } from '../../../libs/platform/src/auth/authenticated-principal.js';
-import { PublishPostService } from '../../../libs/posts/src/application/publish-post.service.js';
+import { PublishPostService } from '../../../libs/modules/posts/src/application/publish-post.service.js';
 
 const principal: AuthenticatedPrincipal = {
   userId: '10000000-0000-4000-8000-000000000001',

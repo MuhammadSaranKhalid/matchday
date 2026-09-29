@@ -6,7 +6,7 @@ import { parseEnvironment } from '../../../libs/platform/src/config/environment.
 import { PlatformConfigModule } from '../../../libs/platform/src/config/platform-config.module.js';
 import { HealthModule } from '../../../libs/platform/src/health/health.module.js';
 import { LoggingModule } from '../../../libs/platform/src/logging/logging.module.js';
-import { PostsModule } from '../../../libs/posts/src/posts.module.js';
+import { PostsModule } from '../../../libs/modules/posts/src/posts.module.js';
 
 @Module({
   imports: [

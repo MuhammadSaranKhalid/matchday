@@ -15,10 +15,10 @@ import {
   TOKEN_VERIFIER,
   TokenVerificationError,
   type TokenVerifier,
-} from '../../../platform/src/auth/token-verifier.js';
-import { CreatePostService } from '../application/create-post.service.js';
-import { PublishPostService } from '../application/publish-post.service.js';
-import { CreatePostCommandDto } from './post-command.dto.js';
+} from '../../../../../platform/src/auth/token-verifier.js';
+import { CreatePostService } from '../../application/create-post.service.js';
+import { PublishPostService } from '../../application/publish-post.service.js';
+import { CreatePostCommandDto } from './dto/post-command.dto.js';
 
 @Controller('posts')
 export class PostsController {

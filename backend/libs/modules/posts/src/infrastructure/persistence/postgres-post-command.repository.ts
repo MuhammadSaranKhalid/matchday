@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
-import type { AuthenticatedPrincipal } from '../../../platform/src/auth/authenticated-principal.js';
-import { DatabaseExecutorService } from '../../../platform/src/database/database-executor.service.js';
-import { ApplicationError } from '../../../platform/src/errors/application-error.js';
+import type { AuthenticatedPrincipal } from '../../../../../platform/src/auth/authenticated-principal.js';
+import { DatabaseExecutorService } from '../../../../../platform/src/database/database-executor.service.js';
+import { ApplicationError } from '../../../../../platform/src/errors/application-error.js';
 import type {
   CreatePostCommand,
   OwnedPost,
@@ -10,7 +10,7 @@ import type {
   PostProcessingStatus,
   ReservedPost,
   UploadedMediaMetadata,
-} from '../application/post-command.ports.js';
+} from '../../application/post-command.ports.js';
 
 @Injectable()
 export class PostgresPostCommandRepository implements PostCommandRepository {

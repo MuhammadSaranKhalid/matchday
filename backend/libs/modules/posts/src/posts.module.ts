@@ -4,16 +4,16 @@ import type { Queue } from 'bullmq';
 
 import { MEDIA_OBJECT_STORAGE, type MediaObjectStorage } from '../../media/src/application/ports/media-object-storage.js';
 import { MediaModule } from '../../media/src/media.module.js';
-import { AuthModule } from '../../platform/src/auth/auth.module.js';
-import { DatabaseExecutorService } from '../../platform/src/database/database-executor.service.js';
-import { DatabaseModule } from '../../platform/src/database/database.module.js';
-import { QueueModule } from '../../platform/src/queue/queue.module.js';
+import { AuthModule } from '../../../platform/src/auth/auth.module.js';
+import { DatabaseExecutorService } from '../../../platform/src/database/database-executor.service.js';
+import { DatabaseModule } from '../../../platform/src/database/database.module.js';
+import { QueueModule } from '../../../platform/src/queue/queue.module.js';
 import { CreatePostService } from './application/create-post.service.js';
 import type { MediaJobProducer } from './application/post-command.ports.js';
 import { PublishPostService } from './application/publish-post.service.js';
-import { PostsController } from './http/posts.controller.js';
-import { BullMqMediaJobProducer } from './infrastructure/bullmq-media-job.producer.js';
-import { PostgresPostCommandRepository } from './infrastructure/post-command.repository.js';
+import { PostsController } from './presentation/http/posts.controller.js';
+import { BullMqMediaJobProducer } from './infrastructure/queue/bullmq-media-job.producer.js';
+import { PostgresPostCommandRepository } from './infrastructure/persistence/postgres-post-command.repository.js';
 
 const MEDIA_JOB_PRODUCER = Symbol('MediaJobProducer');
 

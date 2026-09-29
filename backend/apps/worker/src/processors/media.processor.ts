@@ -4,7 +4,7 @@ import { UnrecoverableError, type Job } from 'bullmq';
 import {
   PermanentMediaProcessingError,
   ProcessImageService,
-} from '../../../../libs/media/src/application/process-image.service.js';
+} from '../../../libs/modules/media/src/application/process-image.service.js';
 
 interface ProcessImageJob {
   readonly schemaVersion: 1;

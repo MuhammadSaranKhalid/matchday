@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 
 import { describe, expect, it } from 'vitest';
 
-import { ScratchWorkspaceService } from '../../../libs/media/src/infrastructure/scratch/scratch-workspace.service.js';
+import { ScratchWorkspaceService } from '../../../libs/modules/media/src/infrastructure/scratch/scratch-workspace.service.js';
 
 describe('ScratchWorkspaceService', () => {
   it('removes the isolated job directory even when work throws', async () => {

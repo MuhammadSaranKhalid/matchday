@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MEDIA_OUTPUT_CONTRACT } from '../../../libs/media/src/domain/media-output-contract.js';
+import { MEDIA_OUTPUT_CONTRACT } from '../../../libs/modules/media/src/domain/media-output-contract.js';
 
 describe('MEDIA_OUTPUT_CONTRACT', () => {
   it('defines the responsive variants consumed by the Flutter image selector', () => {

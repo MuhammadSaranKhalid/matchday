@@ -1,6 +1,6 @@
 import type { Queue } from 'bullmq';
 
-import type { MediaJobProducer } from '../application/post-command.ports.js';
+import type { MediaJobProducer } from '../../application/post-command.ports.js';
 
 type MediaQueue = Pick<Queue, 'add'>;
 

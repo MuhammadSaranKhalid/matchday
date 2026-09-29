@@ -1,5 +1,6 @@
-import type { TransformedImage } from './image-transformer.js';
+export const MEDIA_REPOSITORY = Symbol('MEDIA_REPOSITORY');
 
+import type { TransformedImage } from './image-transformer.js';
 export interface ClaimedMedia {
   readonly mediaId: string;
   readonly postId: string;

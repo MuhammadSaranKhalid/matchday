@@ -1,3 +1,5 @@
+export const IMAGE_TRANSFORMER = Symbol('IMAGE_TRANSFORMER');
+
 export interface TransformedVariant {
   readonly name: `${number}.webp`;
   readonly path: string;

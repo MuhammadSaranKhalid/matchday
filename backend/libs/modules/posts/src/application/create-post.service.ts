@@ -1,6 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../../platform/src/auth/authenticated-principal.js';
 import { ApplicationError } from '../../../../platform/src/errors/application-error.js';
-import type { MediaObjectStorage } from '../../../media/src/application/ports/media-object-storage.js';
+import type { MediaUploadService } from '@modules/media';
 import type {
   CreatePostCommand,
   PostCommandRepository,
@@ -16,7 +16,7 @@ type SignedPostMedia = Readonly<{
 export class CreatePostService {
   constructor(
     private readonly repository: Pick<PostCommandRepository, 'reserveDraft'>,
-    private readonly storage: Pick<MediaObjectStorage, 'createSignedUpload'>,
+    private readonly mediaUpload: Pick<MediaUploadService, 'createUpload'>,
   ) {}
 
   async execute(principal: AuthenticatedPrincipal, command: CreatePostCommand): Promise<Readonly<{
@@ -42,7 +42,7 @@ export class CreatePostService {
     const draft = await this.repository.reserveDraft(principal, command);
     const ordered = [...draft.media].sort((left, right) => left.position - right.position);
     const media = await Promise.all(ordered.map(async (item) => {
-      const signed = await this.storage.createSignedUpload(item.stagingPath);
+      const signed = await this.mediaUpload.createUpload(item.stagingPath);
       return Object.freeze({
         ...item,
         uploadToken: signed.token,

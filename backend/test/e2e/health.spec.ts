@@ -10,7 +10,7 @@ import type { PlatformConfiguration } from '../../libs/platform/src/config/confi
 import { ReadinessService } from '../../libs/platform/src/health/readiness.service.js';
 import { PostgresHealthIndicator } from '../../libs/platform/src/database/postgres-health.indicator.js';
 import { RedisHealthIndicator } from '../../libs/platform/src/redis/redis-health.indicator.js';
-import { QUEUE_NAMES } from '../../libs/platform/src/queue/queue-names.js';
+import { MEDIA_QUEUE_NAME } from '@modules/media';
 
 const configuration: PlatformConfiguration = {
   nodeEnvironment: 'test',
@@ -42,9 +42,7 @@ describe('health endpoints', () => {
     const builder = Test.createTestingModule({ imports: [ApiModule] })
       .overrideProvider(PostgresHealthIndicator).useValue(postgresHealth)
       .overrideProvider(RedisHealthIndicator).useValue(redisHealth);
-    for (const name of QUEUE_NAMES) {
-      builder.overrideProvider(getQueueToken(name)).useValue({ close: vi.fn(), waitUntilReady: vi.fn() });
-    }
+    builder.overrideProvider(getQueueToken(MEDIA_QUEUE_NAME)).useValue({ close: vi.fn(), waitUntilReady: vi.fn() });
     const module = await builder.compile();
     app = module.createNestApplication({ bodyParser: false });
     await configureApi(app, configuration);

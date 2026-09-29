@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiModule } from '../../apps/api/src/api.module.js';
 import { configureApi } from '../../apps/api/src/bootstrap/api-bootstrap.js';
 import type { PlatformConfiguration } from '../../libs/platform/src/config/configuration.js';
-import { QUEUE_NAMES } from '../../libs/platform/src/queue/queue-names.js';
+import { MEDIA_QUEUE_NAME } from '@modules/media';
 
 class ProbeDto {
   @IsString()
@@ -50,9 +50,7 @@ function apiTestModule() {
     imports: [ApiModule],
     controllers: [ProbeController],
   });
-  for (const name of QUEUE_NAMES) {
-    builder.overrideProvider(getQueueToken(name)).useValue({ close: vi.fn(), waitUntilReady: vi.fn() });
-  }
+    builder.overrideProvider(getQueueToken(MEDIA_QUEUE_NAME)).useValue({ close: vi.fn(), waitUntilReady: vi.fn() });
   return builder.compile();
 }
 

@@ -4,7 +4,7 @@ import { Logger } from 'nestjs-pino';
 import { describe, expect, it, vi } from 'vitest';
 
 import { bootstrapWorker } from '../../../apps/worker/src/main.js';
-import { WorkerLifecycleService } from '../../../apps/worker/src/worker-lifecycle.service.js';
+import { WorkerLifecycleService } from '../../../apps/worker/src/lifecycle/worker-lifecycle.service.js';
 import { WorkerModule } from '../../../apps/worker/src/worker.module.js';
 import { ReadinessService } from '../../../libs/platform/src/health/readiness.service.js';
 
@@ -65,18 +65,14 @@ describe('WorkerLifecycleService', () => {
       waitUntilReady: vi.fn(async () => undefined),
       close: vi.fn(async () => { order.push(name); }),
     });
-    const notifications = queue('notifications');
     const media = queue('media');
-    const maintenance = queue('maintenance');
     const lifecycle = new WorkerLifecycleService(
       readiness,
       postgresHealth as never,
       redisHealth as never,
       redis as never,
       postgres as never,
-      notifications as never,
       media as never,
-      maintenance as never,
     );
 
     await lifecycle.initialize();
@@ -86,7 +82,7 @@ describe('WorkerLifecycleService', () => {
     await lifecycle.beforeApplicationShutdown('SIGTERM');
     expect(readiness.isReady()).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
-    expect(order.slice(-2)).toEqual(['redis', 'postgres']);
+    expect(order).toEqual(['media', 'redis', 'postgres']);
     vi.useRealTimers();
   });
 });

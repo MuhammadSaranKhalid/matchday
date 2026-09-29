@@ -8,7 +8,6 @@ import {
   buildQueueDefaultJobOptions,
   buildQueuePrefix,
 } from './queue-defaults.js';
-import { QUEUE_NAMES } from './queue-names.js';
 
 @Module({
   imports: [
@@ -25,9 +24,6 @@ import { QUEUE_NAMES } from './queue-names.js';
         };
       },
     }),
-    BullModule.registerQueue(
-      ...QUEUE_NAMES.map((name) => ({ name, forceDisconnectOnShutdown: true })),
-    ),
   ],
   providers: [],
   exports: [BullModule],

@@ -45,6 +45,8 @@ export interface UploadedMediaMetadata {
   readonly contentType: string;
 }
 
+export const POST_COMMAND_REPOSITORY = Symbol('POST_COMMAND_REPOSITORY');
+
 export interface PostCommandRepository {
   reserveDraft(principal: AuthenticatedPrincipal, command: CreatePostCommand): Promise<ReservedPost>;
   findOwnedPost(principal: AuthenticatedPrincipal, postId: string): Promise<OwnedPost | null>;
@@ -58,8 +60,4 @@ export interface PostCommandRepository {
     principal: AuthenticatedPrincipal,
     postId: string,
   ): Promise<PostProcessingStatus | null>;
-}
-
-export interface MediaJobProducer {
-  enqueueImage(mediaId: string): Promise<void>;
 }

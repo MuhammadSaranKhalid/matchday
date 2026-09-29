@@ -41,10 +41,10 @@ const draft = {
 describe('CreatePostService', () => {
   it('preserves server-reserved media ordering and adds a token for each exact path', async () => {
     const repository = { reserveDraft: vi.fn().mockResolvedValue(draft) };
-    const storage = {
-      createSignedUpload: vi.fn(async (path: string) => ({ path, token: `token-${path}` })),
+    const mediaUpload = {
+      createUpload: vi.fn(async (path: string) => ({ path, token: `token-${path}` })),
     };
-    const service = new CreatePostService(repository, storage);
+    const service = new CreatePostService(repository, mediaUpload);
 
     const result = await service.execute(principal, command);
 
@@ -59,8 +59,8 @@ describe('CreatePostService', () => {
 
   it('rejects five images before reserving database state', async () => {
     const repository = { reserveDraft: vi.fn() };
-    const storage = { createSignedUpload: vi.fn() };
-    const service = new CreatePostService(repository, storage);
+    const mediaUpload = { createUpload: vi.fn() };
+    const service = new CreatePostService(repository, mediaUpload);
 
     await expect(service.execute(principal, {
       ...command,
@@ -71,8 +71,8 @@ describe('CreatePostService', () => {
 
   it('rejects an empty text-only command before reserving database state', async () => {
     const repository = { reserveDraft: vi.fn() };
-    const storage = { createSignedUpload: vi.fn() };
-    const service = new CreatePostService(repository, storage);
+    const mediaUpload = { createUpload: vi.fn() };
+    const service = new CreatePostService(repository, mediaUpload);
 
     await expect(service.execute(principal, {
       ...command,
@@ -85,13 +85,13 @@ describe('CreatePostService', () => {
   it('reuses stable draft identities but issues fresh tokens on an idempotent retry', async () => {
     const repository = { reserveDraft: vi.fn().mockResolvedValue(draft) };
     let generation = 0;
-    const storage = {
-      createSignedUpload: vi.fn(async (path: string) => ({
+    const mediaUpload = {
+      createUpload: vi.fn(async (path: string) => ({
         path,
         token: `generation-${generation}-${path}`,
       })),
     };
-    const service = new CreatePostService(repository, storage);
+    const service = new CreatePostService(repository, mediaUpload);
 
     generation = 1;
     const first = await service.execute(principal, command);
@@ -109,12 +109,12 @@ describe('CreatePostService', () => {
 
   it('can safely retry token generation without creating another draft identity', async () => {
     const repository = { reserveDraft: vi.fn().mockResolvedValue(draft) };
-    const storage = {
-      createSignedUpload: vi.fn()
+    const mediaUpload = {
+      createUpload: vi.fn()
         .mockRejectedValueOnce(new Error('storage unavailable'))
         .mockImplementation(async (path: string) => ({ path, token: `fresh-${path}` })),
     };
-    const service = new CreatePostService(repository, storage);
+    const service = new CreatePostService(repository, mediaUpload);
 
     await expect(service.execute(principal, command)).rejects.toThrow('storage unavailable');
     await expect(service.execute(principal, command)).resolves.toMatchObject({ postId: draft.postId });

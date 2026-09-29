@@ -1,24 +1,24 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { UnrecoverableError, type Job } from 'bullmq';
-
 import {
+  MEDIA_JOB_NAMES,
+  MEDIA_QUEUE_NAME,
   PermanentMediaProcessingError,
   ProcessImageService,
-} from '../../../libs/modules/media/src/application/process-image.service.js';
+  type ProcessImageJobV1,
+} from '@modules/media';
 
-interface ProcessImageJob {
-  readonly schemaVersion: 1;
-  readonly mediaId: string;
-}
-
-@Processor('media')
+@Processor(MEDIA_QUEUE_NAME)
 export class MediaProcessor extends WorkerHost {
   constructor(private readonly processImage: ProcessImageService) {
     super();
   }
 
-  async process(job: Job<ProcessImageJob>): Promise<void> {
-    if (job.name !== 'process-image' || job.data.schemaVersion !== 1) {
+  async process(job: Job<ProcessImageJobV1>): Promise<void> {
+    if (
+      job.name !== MEDIA_JOB_NAMES.processImage ||
+      job.data.schemaVersion !== 1
+    ) {
       throw new UnrecoverableError('unsupported_media_job');
     }
     try {

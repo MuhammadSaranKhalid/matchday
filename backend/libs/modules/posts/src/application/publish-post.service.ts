@@ -1,9 +1,10 @@
 import type { AuthenticatedPrincipal } from '../../../../platform/src/auth/authenticated-principal.js';
 import { ApplicationError } from '../../../../platform/src/errors/application-error.js';
-import type { MediaObjectStorage } from '../../../media/src/application/ports/media-object-storage.js';
-import { MEDIA_POLICY } from '../../../media/src/domain/media-policy.js';
 import type {
-  MediaJobProducer,
+  MediaProcessingScheduler,
+  MediaUploadService,
+} from '@modules/media';
+import type {
   PostCommandRepository,
   PostProcessingStatus,
   UploadedMediaMetadata,
@@ -12,8 +13,8 @@ import type {
 export class PublishPostService {
   constructor(
     private readonly repository: Omit<PostCommandRepository, 'reserveDraft'>,
-    private readonly storage: Pick<MediaObjectStorage, 'headStaging'>,
-    private readonly producer: MediaJobProducer,
+    private readonly mediaUpload: Pick<MediaUploadService, 'verifyUpload'>,
+    private readonly scheduler: Pick<MediaProcessingScheduler, 'scheduleProcessing'>,
   ) {}
 
   async execute(
@@ -32,28 +33,29 @@ export class PublishPostService {
     const pending = post.media.filter((item) => item.status === 'pending_upload');
     const uploaded: UploadedMediaMetadata[] = [];
     for (const item of pending) {
-      const metadata = await this.storage.headStaging(item.stagingPath);
-      if (metadata === null) {
-        throw invalidMedia('POST_MEDIA_MISSING', 'An expected upload is missing');
+      const result = await this.mediaUpload.verifyUpload(item.stagingPath);
+      switch (result.status) {
+        case 'missing':
+          throw invalidMedia('POST_MEDIA_MISSING', 'An expected upload is missing');
+        case 'too_large':
+          throw invalidMedia('POST_MEDIA_TOO_LARGE', 'An uploaded image exceeds the size limit');
+        case 'invalid_type':
+          throw invalidMedia('POST_MEDIA_INVALID_TYPE', 'An uploaded object is not a JPEG image');
+        case 'valid':
+          uploaded.push({
+            mediaId: item.mediaId,
+            bytes: result.bytes,
+            contentType: result.contentType,
+          });
+          break;
       }
-      if (metadata.bytes > MEDIA_POLICY.source.maxBytes) {
-        throw invalidMedia('POST_MEDIA_TOO_LARGE', 'An uploaded image exceeds the size limit');
-      }
-      if (metadata.contentType !== MEDIA_POLICY.source.mimeType) {
-        throw invalidMedia('POST_MEDIA_INVALID_TYPE', 'An uploaded object is not a JPEG image');
-      }
-      uploaded.push({
-        mediaId: item.mediaId,
-        bytes: metadata.bytes,
-        contentType: metadata.contentType,
-      });
     }
 
     if (uploaded.length > 0) await this.repository.markUploaded(principal, postId, uploaded);
 
     for (const item of post.media) {
       if (item.status !== 'ready' && item.status !== 'failed') {
-        await this.producer.enqueueImage(item.mediaId);
+        await this.scheduler.scheduleProcessing(item.mediaId);
       }
     }
     return Object.freeze({ status: 'processing' });

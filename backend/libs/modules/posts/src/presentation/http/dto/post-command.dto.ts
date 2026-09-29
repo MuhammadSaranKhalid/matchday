@@ -13,26 +13,28 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-import { MEDIA_POLICY } from '../../../../../../modules/media/src/domain/media-policy.js';
+const MAX_IMAGE_LONG_EDGE = 2_048;
+const MAX_IMAGE_BYTES = 15_728_640;
+const SUPPORTED_IMAGE_MIME = 'image/jpeg' as const;
 
 export class PostMediaCommandDto {
   @IsInt()
   @Min(1)
-  @Max(MEDIA_POLICY.source.maxLongEdge)
+  @Max(MAX_IMAGE_LONG_EDGE)
   width!: number;
 
   @IsInt()
   @Min(1)
-  @Max(MEDIA_POLICY.source.maxLongEdge)
+  @Max(MAX_IMAGE_LONG_EDGE)
   height!: number;
 
   @IsInt()
   @Min(1)
-  @Max(MEDIA_POLICY.source.maxBytes)
+  @Max(MAX_IMAGE_BYTES)
   bytes!: number;
 
-  @IsEnum([MEDIA_POLICY.source.mimeType])
-  mimeType!: 'image/jpeg';
+  @IsEnum([SUPPORTED_IMAGE_MIME])
+  mimeType!: typeof SUPPORTED_IMAGE_MIME;
 }
 
 export class CreatePostCommandDto {

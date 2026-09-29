@@ -607,20 +607,16 @@ declare
 begin
   -- 1. Lahore Lions official photo post
   insert into public.posts (
-    post_id, created_by_user_id, author_id, author_context, context_entity_id,
-    publisher_type, publisher_id, post_kind, post_type, text, expected_media_count,
+    post_id, created_by_user_id,
+    publisher_type, publisher_id, post_kind, text, expected_media_count,
     status, published_at, created_at
   )
   values (
     v_tp1,
     v_owner,
-    v_owner,
-    'team_manager',
-    v_lahore_team,
     'team',
     v_lahore_team,
     'standard',
-    'photo',
     '🦁 Official squad training ahead of the Super Weekend derby! The boys are looking sharp and ready.',
     2,
     'active',
@@ -634,26 +630,22 @@ begin
     source_width, source_height, display_width, display_height, variants
   )
   values
-    (gen_random_uuid(), v_tp1, 0, 'image', 'feed_ready', 'seed/tp1/0/source.jpg', 'posts/tp1/0/v1/', 1080, 720, 1080, 720, '{"feed": "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80"}'::jsonb),
-    (gen_random_uuid(), v_tp1, 1, 'image', 'feed_ready', 'seed/tp1/1/source.jpg', 'posts/tp1/1/v1/', 1080, 720, 1080, 720, '{"feed": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80"}'::jsonb)
+    (gen_random_uuid(), v_tp1, 0, 'image', 'ready', 'seed/tp1/0/source.jpg', 'posts/tp1/0/v1/', 1080, 720, 1080, 720, '{"1080":{"path":"https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80","width":1080,"height":720}}'::jsonb),
+    (gen_random_uuid(), v_tp1, 1, 'image', 'ready', 'seed/tp1/1/source.jpg', 'posts/tp1/1/v1/', 1080, 720, 1080, 720, '{"1080":{"path":"https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80","width":1080,"height":720}}'::jsonb)
   on conflict do nothing;
 
   -- 2. Lahore Lions Matchday Announcement
   insert into public.posts (
-    post_id, created_by_user_id, author_id, author_context, context_entity_id,
-    publisher_type, publisher_id, post_kind, post_type, text, expected_media_count,
+    post_id, created_by_user_id,
+    publisher_type, publisher_id, post_kind, text, expected_media_count,
     status, published_at, created_at
   )
   values (
     v_tp2,
     v_owner,
-    v_owner,
-    'team_manager',
-    v_lahore_team,
     'team',
     v_lahore_team,
     'match_announcement',
-    'photo',
     '⚡ MATCHDAY ANNOUNCEMENT: Lahore Lions vs Karachi Eagles this Sunday at Gaddafi Stadium Ground 2. Toss at 4:30 PM!',
     1,
     'active',
@@ -667,25 +659,21 @@ begin
     source_width, source_height, display_width, display_height, variants
   )
   values
-    (gen_random_uuid(), v_tp2, 0, 'image', 'feed_ready', 'seed/tp2/0/source.jpg', 'posts/tp2/0/v1/', 1080, 720, 1080, 720, '{"feed": "https://images.unsplash.com/photo-1589801258579-18e091f4ca26?w=1080&q=80"}'::jsonb)
+    (gen_random_uuid(), v_tp2, 0, 'image', 'ready', 'seed/tp2/0/source.jpg', 'posts/tp2/0/v1/', 1080, 720, 1080, 720, '{"1080":{"path":"https://images.unsplash.com/photo-1589801258579-18e091f4ca26?w=1080&q=80","width":1080,"height":720}}'::jsonb)
   on conflict do nothing;
 
   -- 3. Karachi Eagles Team Post
   insert into public.posts (
-    post_id, created_by_user_id, author_id, author_context, context_entity_id,
-    publisher_type, publisher_id, post_kind, post_type, text, expected_media_count,
+    post_id, created_by_user_id,
+    publisher_type, publisher_id, post_kind, text, expected_media_count,
     status, published_at, created_at
   )
   values (
     v_tp3,
     v_bilal,
-    v_bilal,
-    'team_manager',
-    v_karachi_team,
     'team',
     v_karachi_team,
     'recruitment',
-    'photo',
     '🦅 Karachi Eagles are recruiting 2 opening batsmen and an express pacer for the upcoming T20 tournament. DM or drop a comment to try out!',
     1,
     'active',
@@ -699,26 +687,22 @@ begin
     source_width, source_height, display_width, display_height, variants
   )
   values
-    (gen_random_uuid(), v_tp3, 0, 'image', 'feed_ready', 'seed/tp3/0/source.jpg', 'posts/tp3/0/v1/', 1080, 720, 1080, 720, '{"feed": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80"}'::jsonb)
+    (gen_random_uuid(), v_tp3, 0, 'image', 'ready', 'seed/tp3/0/source.jpg', 'posts/tp3/0/v1/', 1080, 720, 1080, 720, '{"1080":{"path":"https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1080&q=80","width":1080,"height":720}}'::jsonb)
   on conflict do nothing;
 
   -- 4. Player Personal Posts
   insert into public.posts (
-    post_id, created_by_user_id, author_id, author_context, context_entity_id,
-    publisher_type, publisher_id, post_kind, post_type, text, expected_media_count,
+    post_id, created_by_user_id,
+    publisher_type, publisher_id, post_kind, text, expected_media_count,
     status, published_at, created_at
   )
   values
     (
       v_tp4,
       v_faraz,
-      v_faraz,
-      'personal',
-      null,
       'user',
       v_faraz,
       'standard',
-      'photo',
       'Solid net session today with the squad. Batting rhythm feeling crisp and timing is right on point!',
       1,
       'active',
@@ -728,13 +712,9 @@ begin
     (
       v_tp5,
       v_hassan,
-      v_hassan,
-      'personal',
-      null,
       'user',
       v_hassan,
       'standard',
-      'text',
       'Tape ball under the lights hits different in Lahore 🔥 Great match against Gulberg Strikers tonight!',
       0,
       'active',
@@ -749,7 +729,7 @@ begin
     source_width, source_height, display_width, display_height, variants
   )
   values
-    (gen_random_uuid(), v_tp4, 0, 'image', 'feed_ready', 'seed/tp4/0/source.jpg', 'posts/tp4/0/v1/', 1080, 720, 1080, 720, '{"feed": "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80"}'::jsonb)
+    (gen_random_uuid(), v_tp4, 0, 'image', 'ready', 'seed/tp4/0/source.jpg', 'posts/tp4/0/v1/', 1080, 720, 1080, 720, '{"1080":{"path":"https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1080&q=80","width":1080,"height":720}}'::jsonb)
   on conflict do nothing;
 
   -- 5. Threaded Comments on Posts
@@ -1559,4 +1539,3 @@ end $seed_dm$;
 -- -- and messaging layer. Only the auth users remain:
 -- delete from auth.users where email like '%@local.test';
 -- commit;
-

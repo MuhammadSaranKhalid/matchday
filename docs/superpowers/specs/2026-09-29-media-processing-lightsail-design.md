@@ -70,7 +70,7 @@ In one PostgreSQL transaction, NestJS:
 
 After the transaction, NestJS creates a signed upload token for each server-generated path and returns the post ID, ordered media IDs, paths, and tokens. Supabase currently documents signed upload URLs as valid for two hours; V1 treats that duration as provider-defined rather than implementing another expiry model.
 
-The command must be safe against accidental client retries by using the platform's request-idempotency mechanism or a client command ID. A retry must return the existing draft rather than create another post.
+The command uses a client command ID as durable idempotency identity. Flutter persists that ID before the first request and reuses it after process death or network failure. A retry returns the same draft, media IDs, and staging paths rather than creating another post, while issuing fresh signed upload tokens. Signed tokens are temporary credentials and are never the durable identity of pending work.
 
 ## Direct upload contract
 
@@ -110,6 +110,8 @@ This is a conscious V1 tradeoff: there is no transactional outbox. Redis persist
 
 For a text-only post, where the server-owned manifest contains zero media rows, publish performs no Storage or Redis work. It transitions the owned draft directly to `published` and returns success.
 
+The API also exposes an owner-scoped lightweight post-status read returning `processing`, `published`, or `failed`. Flutter uses it only for silent, bounded completion reconciliation after publish acceptance and after app restart. The optimistic post remains normally visible; no processing banner is introduced. Published completion removes local pending files, while failure exposes the existing Retry/Discard behavior.
+
 ## Business states
 
 The minimum states are:
@@ -122,9 +124,9 @@ Post media: pending_upload -> uploaded -> processing -> ready
                                      \-> failed
 ```
 
-State transitions are conditional and owner-scoped where invoked from the API. The worker atomically claims an eligible media row before processing. A duplicate job returns successfully when the media is already `ready`; an active non-expired claim is not processed concurrently.
+State transitions are conditional and owner-scoped where invoked from the API. The worker atomically claims an eligible media row before processing. A duplicate job returns successfully when the media is already `ready`; an active non-expired claim is not processed concurrently. A transient processing failure conditionally releases `processing` back to `uploaded` and records the safe error before BullMQ retries. A permanent failure changes `processing` to `failed`. No retry-specific business state is added.
 
-A post becomes `published` atomically only when every ordered media row is `ready`. A terminal media failure keeps the post unpublished and records a safe, machine-readable error suitable for a later retry command.
+A post becomes `published` atomically only when every ordered media row is `ready`. The ready transition locks the parent post while checking siblings so concurrent completion of the final media cannot miss or duplicate publication. A terminal media failure keeps the post unpublished and records a safe, machine-readable error suitable for a later retry command.
 
 ## Schema simplification
 
@@ -229,6 +231,7 @@ BullMQ owns execution attempts and exponential backoff with jitter.
 - Corrupt input, unsafe dimensions, invalid server state, and unsupported schema/pipeline versions are permanent failures.
 - Permanent failure is recorded in PostgreSQL before the job becomes terminal.
 - Processing remains idempotent across worker crashes and duplicate delivery.
+- A retry safely tolerates immutable variants already uploaded by an earlier partial attempt and completes the remaining durable transition without corrupting outputs.
 - Staging deletion occurs after final uploads and the successful database transition. A cleanup failure creates an orphan, not data loss.
 - Periodic maintenance removes expired drafts, orphaned staging objects, and abandoned scratch directories after a safe retention interval.
 
@@ -249,8 +252,10 @@ Redis runs privately on the Lightsail Docker network with:
 - a persistent Docker volume;
 - `maxmemory-policy noeviction`;
 - no public port;
-- fail-fast producer connection settings;
-- persistent worker reconnection settings.
+- fail-fast API producer settings with bounded `maxRetriesPerRequest` and the offline queue disabled;
+- persistent worker settings with `maxRetriesPerRequest: null` and reconnect behavior suitable for a long-running consumer.
+
+The API and worker receive distinct BullMQ connection configurations; they must not share one undifferentiated connection-options builder.
 
 The worker starts with concurrency one. It uses `/var/lib/matchday-media` as temporary scratch space, checks writability and minimum free space for readiness, and receives a measured 60-120 second graceful-shutdown allowance. Readiness is disabled before new work is stopped and active processing is drained.
 
@@ -285,8 +290,8 @@ Implementation uses test-driven development and covers:
 2. Add the V1 post API, Storage adapter, media state transitions, queue producer, and worker behind deployment controls.
 3. Validate signed uploads and processing end to end in a non-production environment.
 4. Exercise retries, duplicate publish, Redis interruption, worker crash, corrupt input, Storage failure, disk pressure, and SIGTERM.
-5. Route new posts to the NestJS path and observe a defined rollback window.
-6. Remove media PGMQ, `pg_net` wake logic, worker slots, Vault Vercel worker values, and the standalone `media-worker/` only after parity and recovery evidence is recorded.
+5. Route new development traffic to the NestJS path after the verification matrix passes.
+6. Remove the standalone `media-worker/` source/configuration and any remaining media-only Vercel references. The old source may be retained as a fixture reference during development, but it is not maintained as an active fallback after the database pipeline is removed.
 
 ## Explicit exclusions
 

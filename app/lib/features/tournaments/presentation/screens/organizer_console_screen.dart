@@ -729,15 +729,14 @@ class _OrganizerConsoleScreenState
   }
 
   Future<void> _closeRegistrationEarly() async {
-    // TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC (CloseRegistration / LockEntries).
+    // TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC (CloseRegistration).
     // Phase 2 transition: write canonical lifecycle columns; database projects legacy `status`.
     final ok = await ref
         .read(tournamentsControllerProvider.notifier)
         .updateTournament(widget.tournamentId, {
       'registration_state': 'closed',
-      'entry_state': 'locked',
     });
-    _reportIfFailed(ok, 'Registration closed. Generate the draw when ready.');
+    _reportIfFailed(ok, 'Registration closed. Entries remain editable until locked.');
   }
 
   Future<void> _confirmCancel(Tournament tournament) async {

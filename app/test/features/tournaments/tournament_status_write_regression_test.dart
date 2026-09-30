@@ -134,15 +134,26 @@ void main() {
       expect(openRegistration.projectedPublicStatus, equals(TournamentStatus.registration));
     });
 
-    test('Close Registration: registration_state becomes closed, entries locked, projects upcoming status', () {
+    test('Close Registration without locking entries: entry_state remains editable', () {
       final closedRegistration = createTestTournament(
+        publicationState: TournamentPublicationState.published,
+        registrationState: TournamentRegistrationState.closed,
+        entryState: TournamentEntryState.editable,
+      );
+      expect(closedRegistration.registrationState, equals(TournamentRegistrationState.closed));
+      expect(closedRegistration.entryState, equals(TournamentEntryState.editable));
+      expect(closedRegistration.projectedPublicStatus, equals(TournamentStatus.upcoming));
+    });
+
+    test('Explicit Entry Lock: entry_state becomes locked independently of registration closing', () {
+      final locked = createTestTournament(
         publicationState: TournamentPublicationState.published,
         registrationState: TournamentRegistrationState.closed,
         entryState: TournamentEntryState.locked,
       );
-      expect(closedRegistration.registrationState, equals(TournamentRegistrationState.closed));
-      expect(closedRegistration.entryState, equals(TournamentEntryState.locked));
-      expect(closedRegistration.projectedPublicStatus, equals(TournamentStatus.upcoming));
+      expect(locked.registrationState, equals(TournamentRegistrationState.closed));
+      expect(locked.entryState, equals(TournamentEntryState.locked));
+      expect(locked.projectedPublicStatus, equals(TournamentStatus.upcoming));
     });
 
     test('Start Competition: competition_state becomes in_progress and projects live status', () {
@@ -187,6 +198,72 @@ void main() {
       );
       expect(abandoned.terminationState, equals(TournamentTerminationState.abandoned));
       expect(abandoned.projectedPublicStatus, equals(TournamentStatus.abandoned));
+    });
+  });
+
+  group('Phase 2.2 — Lifecycle Operation Semantics & Isolation Guard', () {
+    test('organizer_console_screen _closeRegistrationEarly must NOT lock entries', () {
+      final file = File('lib/features/tournaments/presentation/screens/organizer_console_screen.dart');
+      expect(file.existsSync(), isTrue);
+      final content = file.readAsStringSync();
+
+      // Find _closeRegistrationEarly method body
+      final match = RegExp(r'_closeRegistrationEarly\s*\(\)\s*async\s*\{([\s\S]*?)\}').firstMatch(content);
+      expect(match, isNotNull, reason: '_closeRegistrationEarly method must exist');
+      final body = match!.group(1)!;
+
+      expect(body.contains("'registration_state': 'closed'"), isTrue,
+          reason: 'Must set registration_state to closed');
+      expect(body.contains('entry_state'), isFalse,
+          reason: 'Must NOT mutate entry_state when closing registration');
+    });
+
+    test('tournaments_controller startTournament must NOT silently publish tournament', () {
+      final file = File('lib/features/tournaments/presentation/controllers/tournaments_controller.dart');
+      expect(file.existsSync(), isTrue);
+      final content = file.readAsStringSync();
+
+      // Find startTournament method body
+      final match = RegExp(r'startTournament\s*\([^)]*\)\s*async\s*\{([\s\S]*?)(?:Future<bool>|\n\s*\})').firstMatch(content);
+      expect(match, isNotNull, reason: 'startTournament method must exist');
+      final body = match!.group(1)!;
+
+      expect(body.contains("'competition_state': 'in_progress'"), isTrue,
+          reason: 'Must set competition_state to in_progress');
+      expect(body.contains("'publication_state':") || body.contains('"publication_state":'), isFalse,
+          reason: 'Must NOT silently auto-publish in startTournament');
+    });
+
+    test('tournaments_remote_datasource separates pure publish from composite publishAndOpenRegistration', () {
+      final file = File('lib/features/tournaments/data/datasources/tournaments_remote_datasource.dart');
+      expect(file.existsSync(), isTrue);
+      final content = file.readAsStringSync();
+
+      // Find publishTournament method body
+      final publishMatch = RegExp(r'Future<void>\s+publishTournament\s*\([^)]*\)\s*async\s*\{([\s\S]*?)\n\s*\}').firstMatch(content);
+      expect(publishMatch, isNotNull, reason: 'publishTournament method must exist');
+      final publishBody = publishMatch!.group(1)!;
+
+      expect(publishBody.contains("'publication_state': 'published'"), isTrue);
+      expect(publishBody.contains('registration_state'), isFalse,
+          reason: 'Pure publishTournament must not touch registration_state');
+
+      // Find publishAndOpenRegistration method body
+      final compositeMatch = RegExp(r'Future<void>\s+publishAndOpenRegistration\s*\([^)]*\)\s*async\s*\{([\s\S]*?)\n\s*\}').firstMatch(content);
+      expect(compositeMatch, isNotNull, reason: 'publishAndOpenRegistration method must exist');
+      final compositeBody = compositeMatch!.group(1)!;
+
+      expect(compositeBody.contains("'publication_state': 'published'"), isTrue);
+      expect(compositeBody.contains("'registration_state': 'open'"), isTrue);
+    });
+
+    test('wizard screen calls composite publishAndOpenRegistration', () {
+      final file = File('lib/features/tournaments/presentation/screens/tournament_create_wizard_screen.dart');
+      expect(file.existsSync(), isTrue);
+      final content = file.readAsStringSync();
+
+      expect(content.contains('controller.publishAndOpenRegistration('), isTrue,
+          reason: 'Wizard screen creates and opens registration using explicit composite method');
     });
   });
 }

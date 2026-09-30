@@ -104,6 +104,8 @@ abstract class TournamentsRepository {
 
   Future<Either<Failure, void>> publishTournament(String tournamentId);
 
+  Future<Either<Failure, void>> publishAndOpenRegistration(String tournamentId);
+
   Future<Either<Failure, void>> cancelTournament(String tournamentId, String reason);
 
   // Registrations

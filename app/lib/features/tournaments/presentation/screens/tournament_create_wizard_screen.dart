@@ -466,7 +466,7 @@ class _TournamentCreateWizardScreenState
       return;
     }
 
-    final published = await controller.publishTournament(tournament.id);
+    final published = await controller.publishAndOpenRegistration(tournament.id);
     if (!mounted) return;
     if (!published) {
       _showFailure();

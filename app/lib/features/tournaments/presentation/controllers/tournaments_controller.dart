@@ -107,13 +107,33 @@ class TournamentsController extends _$TournamentsController {
     );
   }
 
+  Future<bool> publishAndOpenRegistration(String tournamentId) async {
+    state = const AsyncLoading();
+    final repo = ref.read(tournamentsRepositoryProvider);
+    final result = await repo.publishAndOpenRegistration(tournamentId);
+    return result.fold(
+      (failure) {
+        _fail(failure);
+        return false;
+      },
+      (_) {
+        _ok();
+        _refresh(() {
+          ref.invalidate(tournamentDetailProvider(tournamentId));
+          ref.invalidate(myTournamentsProvider);
+        });
+        return true;
+      },
+    );
+  }
+
   Future<bool> startTournament(String tournamentId) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
     // TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC (StartCompetition).
     // Phase 2 transition: write canonical lifecycle columns; database projects legacy `status`.
+    // Starting competition requires publication_state = published; DB constraint rejects draft.
     final result = await repo.updateTournament(tournamentId, {
-      'publication_state': 'published',
       'competition_state': 'in_progress',
     });
     return result.fold(

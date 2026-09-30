@@ -284,9 +284,24 @@ class TournamentsRemoteDataSource {
   }
 
   Future<void> publishTournament(String tournamentId) async {
-    // Current transitional action from create wizard:
-    // UI dialog is "Ready to open registrations?" -> publishes and opens registration.
-    // TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC (PublishTournament / OpenRegistration).
+    // Pure publication: transitions publication_state to published.
+    // TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC (PublishTournament).
+    // Phase 2 transition: write canonical lifecycle columns; database projects legacy `status`.
+    try {
+      await _supabase
+          .from(_tournamentsTable)
+          .update({
+            'publication_state': 'published',
+          })
+          .eq('tournament_id', tournamentId);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> publishAndOpenRegistration(String tournamentId) async {
+    // Composite action (wizard flow): publishes and opens registration concurrently.
+    // TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC (PublishAndOpenRegistration).
     // Phase 2 transition: write canonical lifecycle columns; database projects legacy `status`.
     try {
       await _supabase

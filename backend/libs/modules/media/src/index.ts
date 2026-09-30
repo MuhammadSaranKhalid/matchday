@@ -19,6 +19,5 @@ export { MediaProcessor } from './infrastructure/queue/media.processor.js';
 export {
   MEDIA_QUEUE_NAME,
   MEDIA_JOB_NAMES,
-  type ProcessImageJobV1,
-  type ProcessImageJobV2,
+  type ProcessImageJob,
 } from './contracts/media-job.contract.js';

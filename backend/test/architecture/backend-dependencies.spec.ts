@@ -244,10 +244,10 @@ describe('backend dependency direction', () => {
 });
 
 describe('module public API boundaries', () => {
-  const moduleRoots: Array<{ name: string; srcRoot: string }> = [
-    { name: 'posts', srcRoot: join(repositoryRoot, 'libs', 'modules', 'posts', 'src') },
-    { name: 'media', srcRoot: join(repositoryRoot, 'libs', 'modules', 'media', 'src') },
-  ];
+  const modulesDir = join(repositoryRoot, 'libs', 'modules');
+  const moduleRoots: Array<{ name: string; srcRoot: string }> = readdirSync(modulesDir)
+    .filter((entry) => statSync(join(modulesDir, entry)).isDirectory())
+    .map((name) => ({ name, srcRoot: join(modulesDir, name, 'src') }));
 
   for (const { name, srcRoot } of moduleRoots) {
     const moduleDir = join(srcRoot, '..');
@@ -297,7 +297,7 @@ describe('apps boundary — no deep relative imports into libs/modules/', () => 
   });
 });
 
-describe('step 2B — platform wiring and lifecycle invariants', () => {
+describe('platform wiring and lifecycle invariants', () => {
   it('confines process.env access strictly to platform config and test roots', () => {
     const configDir = join(repositoryRoot, 'libs', 'platform', 'src', 'config');
     const violations = sourceFiles()
@@ -307,6 +307,24 @@ describe('step 2B — platform wiring and lifecycle invariants', () => {
         return contents.includes('process.env');
       })
       .map((path) => relative(repositoryRoot, path));
+
+    expect(violations).toEqual([]);
+  });
+
+  it('platform never imports feature modules', () => {
+    const platformRoot = join(repositoryRoot, 'libs', 'platform');
+    const violations = sourceFiles()
+      .filter((path) => path.startsWith(platformRoot))
+      .flatMap((path) => {
+        const imports = importsIn(path);
+        const forbidden = imports.filter(
+          (specifier) =>
+            specifier.includes('/modules/') ||
+            specifier.startsWith('@modules/') ||
+            specifier === '@modules',
+        );
+        return forbidden.map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`);
+      });
 
     expect(violations).toEqual([]);
   });
@@ -378,7 +396,7 @@ describe('step 2B — platform wiring and lifecycle invariants', () => {
   });
 });
 
-describe('step 3B — media execution invariants', () => {
+describe('media execution and module isolation invariants', () => {
   it('PostsModule does not import BullMQ directly', () => {
     const postsModuleRoot = join(repositoryRoot, 'libs', 'modules', 'posts', 'src');
     const violations = sourceFiles()
@@ -395,12 +413,15 @@ describe('step 3B — media execution invariants', () => {
     expect(violations).toEqual([]);
   });
 
-  it('media contracts export ProcessImageJobV2 with generation support', () => {
+  it('media contracts export ProcessImageJob with schemaVersion 1', () => {
     const contractPath = join(repositoryRoot, 'libs', 'modules', 'media', 'src', 'contracts', 'media-job.contract.ts');
     const contents = readFileSync(contractPath, 'utf8');
-    expect(contents).toContain('ProcessImageJobV2');
-    expect(contents).toContain('readonly generation: number;');
-    expect(contents).toContain('readonly schemaVersion: 2;');
+    expect(contents).toContain('ProcessImageJob');
+    expect(contents).toContain('readonly schemaVersion: 1;');
+    expect(contents).toContain('readonly mediaId: string;');
+    expect(contents).not.toContain('ProcessImageJobV2');
+    expect(contents).not.toContain('generation');
   });
 });
+
 

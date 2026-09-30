@@ -5,32 +5,18 @@ import { MediaProcessor } from '../../../libs/modules/media/src/infrastructure/q
 import { PermanentMediaProcessingError } from '../../../libs/modules/media/src/application/process-image.service.js';
 
 describe('MediaProcessor', () => {
-  it('processes V2 image job successfully', async () => {
+  it('processes image job successfully', async () => {
     const processImage = { execute: vi.fn().mockResolvedValue(undefined) };
     const processor = new MediaProcessor(processImage as never);
 
     const job = {
       name: 'process-image',
-      data: { schemaVersion: 2, mediaId: 'media-123', generation: 1 },
+      data: { schemaVersion: 1, mediaId: 'media-123' },
       attemptsMade: 0,
     };
 
     await processor.process(job as never);
     expect(processImage.execute).toHaveBeenCalledWith('media-123', 1, 3);
-  });
-
-  it('processes V1 image job successfully for backward compatibility', async () => {
-    const processImage = { execute: vi.fn().mockResolvedValue(undefined) };
-    const processor = new MediaProcessor(processImage as never);
-
-    const job = {
-      name: 'process-image',
-      data: { schemaVersion: 1, mediaId: 'media-legacy' },
-      attemptsMade: 1,
-    };
-
-    await processor.process(job as never);
-    expect(processImage.execute).toHaveBeenCalledWith('media-legacy', 2, 3);
   });
 
   it('rejects unsupported schema version with UnrecoverableError', async () => {
@@ -39,7 +25,7 @@ describe('MediaProcessor', () => {
 
     const job = {
       name: 'process-image',
-      data: { schemaVersion: 99, mediaId: 'media-123' },
+      data: { schemaVersion: 2, mediaId: 'media-123' },
       attemptsMade: 0,
     };
 
@@ -55,7 +41,7 @@ describe('MediaProcessor', () => {
 
     const job = {
       name: 'process-image',
-      data: { schemaVersion: 2, mediaId: 'media-123', generation: 1 },
+      data: { schemaVersion: 1, mediaId: 'media-123' },
       attemptsMade: 0,
     };
 

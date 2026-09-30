@@ -12,7 +12,7 @@ import { QueueModule } from '../../../platform/src/queue/queue.module.js';
 
 import {
   MEDIA_QUEUE_NAME,
-  type ProcessImageJobV1,
+  type ProcessImageJob,
 } from './contracts/media-job.contract.js';
 import {
   IMAGE_TRANSFORMER,
@@ -92,7 +92,7 @@ import { SupabaseMediaStorageService } from './infrastructure/storage/supabase-m
     {
       provide: MEDIA_JOB_PRODUCER,
       inject: [getQueueToken(MEDIA_QUEUE_NAME)],
-      useFactory: (queue: Queue<ProcessImageJobV1>) => new BullMqMediaJobProducer(queue),
+      useFactory: (queue: Queue<ProcessImageJob>) => new BullMqMediaJobProducer(queue),
     },
 
     // Public application services

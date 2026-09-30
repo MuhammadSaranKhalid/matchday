@@ -99,7 +99,6 @@ export class PostgresPostCommandRepository implements PostCommandRepository {
            set status = 'uploaded',
                source_bytes = $3,
                source_mime = $4,
-               processing_generation = processing_generation + 1,
                updated_at = now()
            where media_id = $1 and post_id = $2 and status = 'pending_upload'`,
           [item.mediaId, postId, item.bytes, item.contentType],

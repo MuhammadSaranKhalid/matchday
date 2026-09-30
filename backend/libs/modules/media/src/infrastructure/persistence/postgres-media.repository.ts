@@ -1,3 +1,5 @@
+import { Injectable } from '@nestjs/common';
+
 import type { DatabaseExecutorService } from '../../../../../platform/src/database/database-executor.service.js';
 import type { QueryExecutor } from '../../../../../platform/src/database/database.types.js';
 import type { TransformedImage } from '../../application/ports/image-transformer.js';
@@ -80,4 +82,3 @@ function parseClaim(value: Record<string, unknown>): ClaimedMedia {
     attempt: Number(value['attempt']),
   });
 }
-import { Injectable } from '@nestjs/common';

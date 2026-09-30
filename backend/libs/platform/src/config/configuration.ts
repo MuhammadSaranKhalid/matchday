@@ -33,7 +33,6 @@ export interface QueueConfiguration {
   readonly backoffDelayMs: number;
   readonly removeOnCompleteCount: number;
   readonly removeOnFailCount: number;
-  readonly mediaWorkerConcurrency: number;
 }
 
 export interface MediaStorageConfiguration {
@@ -110,7 +109,6 @@ export function buildConfiguration(environment: Environment): PlatformConfigurat
       backoffDelayMs: environment.QUEUE_BACKOFF_DELAY_MS,
       removeOnCompleteCount: environment.QUEUE_REMOVE_ON_COMPLETE_COUNT,
       removeOnFailCount: environment.QUEUE_REMOVE_ON_FAIL_COUNT,
-      mediaWorkerConcurrency: environment.MEDIA_WORKER_CONCURRENCY,
     }),
   });
 }

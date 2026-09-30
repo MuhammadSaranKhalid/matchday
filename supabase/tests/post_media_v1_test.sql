@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, private, extensions;
 
-select plan(60);
+select plan(45);
 
 select enum_has_labels(
   'public',
@@ -15,16 +15,9 @@ select hasnt_column('public', 'post_media', 'optimization_attempts');
 select hasnt_column('public', 'post_media', 'feed_ready_at');
 select hasnt_column('public', 'post_media', 'last_optimization_error');
 select hasnt_column('public', 'post_media', 'optimized_at');
-select has_column('public', 'post_media', 'processing_generation');
-select has_column('public', 'post_media', 'processing_token');
-select has_table('private', 'media_processing_outbox');
-select has_column('private', 'media_processing_outbox', 'media_id');
-select has_column('private', 'media_processing_outbox', 'generation');
-select has_column('private', 'media_processing_outbox', 'available_at');
-select has_column('private', 'media_processing_outbox', 'lease_owner');
-select has_column('private', 'media_processing_outbox', 'lease_expires_at');
-select has_column('private', 'media_processing_outbox', 'dispatch_attempts');
-select has_column('private', 'media_processing_outbox', 'dispatched_at');
+select hasnt_column('public', 'post_media', 'processing_generation');
+select hasnt_column('public', 'post_media', 'processing_token');
+select hasnt_table('private', 'media_processing_outbox');
 
 select has_function('private', 'claim_post_media_for_processing', array['uuid']);
 select has_function('private', 'release_post_media_for_retry', array['uuid', 'text']);
@@ -34,11 +27,7 @@ select has_function(
   array['uuid', 'integer', 'integer', 'integer', 'integer', 'text', 'jsonb']
 );
 select has_function('private', 'mark_post_media_failed', array['uuid', 'text']);
-select has_function(
-  'private',
-  'recover_stale_post_media',
-  array['timestamp with time zone', 'integer']
-);
+select hasnt_function('private', 'recover_stale_post_media');
 
 select ok(
   not has_function_privilege('authenticated', 'private.claim_post_media_for_processing(uuid)', 'execute'),
@@ -56,10 +45,6 @@ select ok(
   not has_function_privilege('authenticated', 'private.mark_post_media_failed(uuid,text)', 'execute'),
   'authenticated clients cannot fail media jobs'
 );
-select ok(
-  not has_function_privilege('authenticated', 'private.recover_stale_post_media(timestamp with time zone,integer)', 'execute'),
-  'authenticated clients cannot run media recovery'
-);
 
 select ok(
   has_function_privilege('service_role', 'private.claim_post_media_for_processing(uuid)', 'execute'),
@@ -76,10 +61,6 @@ select ok(
 select ok(
   has_function_privilege('service_role', 'private.mark_post_media_failed(uuid,text)', 'execute'),
   'service role can fail media jobs'
-);
-select ok(
-  has_function_privilege('service_role', 'private.recover_stale_post_media(timestamp with time zone,integer)', 'execute'),
-  'service role can run media recovery'
 );
 
 select hasnt_function('public', 'claim_post_media_jobs');
@@ -314,25 +295,6 @@ select is(
   ) ->> 'status'),
   'ready',
   'ready completion is idempotent'
-);
-
-update public.post_media
-set status = 'processing',
-    processing_started_at = now() - interval '20 minutes'
-where media_id = (select id from media_v1_ids where label = 'first');
-
-select results_eq(
-  $$ select * from private.recover_stale_post_media(now() - interval '10 minutes', 10) $$,
-  $$ values ((select id from media_v1_ids where label = 'first')) $$,
-  'stale processing media is returned for deterministic requeue'
-);
-
-select is(
-  (select status::text from public.post_media where media_id = (
-    select id from media_v1_ids where label = 'first'
-  )),
-  'uploaded',
-  'stale recovery releases processing to uploaded'
 );
 
 update public.post_media

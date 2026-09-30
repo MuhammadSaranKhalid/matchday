@@ -5,9 +5,8 @@ services:
       DATABASE_SSL_MODE: disable
       REDIS_URL: redis://redis:6379
       SUPABASE_URL: http://supabase.invalid
-      SUPABASE_AUTH_ISSUER: http://supabase.invalid/auth/v1
-      SUPABASE_AUTH_AUDIENCE: authenticated
-      SUPABASE_AUTH_MODE: jwks
+      SUPABASE_SECRET_KEY: smoke-secret-key
+      SUPABASE_PUBLISHABLE_KEY: smoke-publishable-key
     depends_on:
       postgres:
         condition: service_healthy

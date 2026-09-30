@@ -1,130 +1,244 @@
-import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from 'jose';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  AuthInvalidJwtError,
+  AuthRetryableFetchError,
+  type JwtPayload,
+} from '@supabase/supabase-js';
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 import type { AuthConfiguration } from '../../../../libs/platform/src/config/configuration.js';
 import {
+  type SupabaseClaimsClient,
   SupabaseTokenVerifierService,
 } from '../../../../libs/platform/src/auth/supabase-token-verifier.service.js';
-import { TokenVerificationError } from '../../../../libs/platform/src/auth/token-verifier.js';
 
 const issuer = 'https://project.supabase.co/auth/v1';
 const userId = '7c50bd47-dfaf-4ad0-97d8-10b9b908f7ac';
-let esPrivateKey: KeyLike;
-let esPublicJwk: Record<string, unknown>;
-let rsPrivateKey: KeyLike;
-let rsPublicJwk: Record<string, unknown>;
-
-beforeAll(async () => {
-  const es = await generateKeyPair('ES256');
-  esPrivateKey = es.privateKey;
-  esPublicJwk = { ...(await exportJWK(es.publicKey)), kid: 'es-key', alg: 'ES256' };
-  const rs = await generateKeyPair('RS256');
-  rsPrivateKey = rs.privateKey;
-  rsPublicJwk = { ...(await exportJWK(rs.publicKey)), kid: 'rs-key', alg: 'RS256' };
-});
+const sessionId = '51c521bb-a829-4d6d-a6b7-5aa57e6092c4';
 
 const configuration: AuthConfiguration = {
-  supabaseUrl: 'https://project.supabase.co', issuer, audience: 'authenticated', mode: 'jwks',
-  verificationTimeoutMs: 200, jwksCacheMaxAgeMs: 60_000, jwksCooldownMs: 10,
+  supabaseUrl: 'https://project.supabase.co',
+  publishableKey: 'sb_publishable_test',
+  issuer,
+  audience: 'authenticated',
 };
 
-async function token(
-  key: KeyLike,
-  kid: string,
-  algorithm: 'ES256' | 'RS256',
-  claims: Record<string, unknown> = {},
+function claims(
+  overrides: Partial<JwtPayload> = {},
+): JwtPayload {
+  const now = Math.floor(Date.now() / 1_000);
+  return {
+    iss: issuer,
+    sub: userId,
+    aud: 'authenticated',
+    exp: now + 300,
+    iat: now,
+    role: 'authenticated',
+    aal: 'aal1',
+    session_id: sessionId,
+    app_metadata: {
+      tier: 'pro',
+    },
+    ...overrides,
+  };
+}
+
+function verifiedResult(
+  payload: JwtPayload = claims(),
 ) {
-  const { iss = issuer, aud = 'authenticated', sub = userId, ...payload } = claims;
-  return new SignJWT({ role: 'authenticated', app_metadata: { tier: 'pro' }, session_id: 'session-1', ...payload })
-    .setProtectedHeader({ alg: algorithm, kid })
-    .setIssuer(String(iss)).setAudience(aud as string | string[]).setSubject(String(sub))
-    .setIssuedAt().setExpirationTime('5m').sign(key);
+  return {
+    data: {
+      claims: payload,
+      header: {
+        alg: 'ES256' as const,
+        kid: 'test-key',
+        typ: 'JWT',
+      },
+      signature: new Uint8Array([1, 2, 3]),
+    },
+    error: null,
+  };
 }
 
-function verifier(keys: Record<string, unknown>[]) {
-  const fetchImplementation = vi.fn(async (url: string | URL | Request) => {
-    if (String(url).includes('.well-known/jwks.json')) {
-      return new Response(JSON.stringify({ keys }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }
-    return new Response(JSON.stringify({ message: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'content-type': 'application/json' },
-    });
-  });
-  return { service: new SupabaseTokenVerifierService(configuration, fetchImplementation), fetchImplementation };
+function verifierWith(
+  result: unknown,
+) {
+  const getClaims = vi.fn().mockResolvedValue(result);
+  const client = {
+    auth: {
+      getClaims,
+    },
+  } as unknown as SupabaseClaimsClient;
+
+  return {
+    service: new SupabaseTokenVerifierService(
+      client,
+      configuration,
+    ),
+    getClaims,
+  };
 }
 
-describe('SupabaseTokenVerifierService JWKS mode', () => {
-  it.each([
-    ['ES256', () => esPrivateKey, 'es-key', () => esPublicJwk],
-    ['RS256', () => rsPrivateKey, 'rs-key', () => rsPublicJwk],
-  ] as const)('verifies %s and maps an immutable principal', async (algorithm, privateKey, kid, publicJwk) => {
-    const { service } = verifier([publicJwk()]);
-    const principal = await service.verify(await token(privateKey(), kid, algorithm));
-    expect(principal).toEqual({ userId, role: 'authenticated', sessionId: 'session-1', appMetadata: { tier: 'pro' } });
-    expect(Object.isFrozen(principal)).toBe(true);
-    expect(Object.isFrozen(principal.appMetadata)).toBe(true);
-  });
+describe(
+  'SupabaseTokenVerifierService',
+  () => {
+    it(
+      'verifies through Supabase getClaims and maps an immutable principal',
+      async () => {
+        const {
+          service,
+          getClaims,
+        } = verifierWith(
+          verifiedResult(),
+        );
 
-  it('caches known keys and refreshes when a new kid appears', async () => {
-    let keys = [esPublicJwk];
-    const fetchImplementation = vi.fn(async () => new Response(JSON.stringify({ keys }), { status: 200 }));
-    const service = new SupabaseTokenVerifierService(configuration, fetchImplementation);
-    await service.verify(await token(esPrivateKey, 'es-key', 'ES256'));
-    await service.verify(await token(esPrivateKey, 'es-key', 'ES256'));
-    expect(fetchImplementation).toHaveBeenCalledTimes(1);
-    keys = [esPublicJwk, rsPublicJwk];
-    await service.verify(await token(rsPrivateKey, 'rs-key', 'RS256'));
-    expect(fetchImplementation).toHaveBeenCalledTimes(2);
-  });
+        const principal = await service.verify(
+          'valid-access-token',
+        );
 
-  it.each([
-    ['wrong issuer', () => token(esPrivateKey, 'es-key', 'ES256', { iss: 'https://attacker.invalid' })],
-    ['wrong audience', () => token(esPrivateKey, 'es-key', 'ES256', { aud: 'other' })],
-    ['expired token', async () => new SignJWT({ role: 'authenticated' }).setProtectedHeader({ alg: 'ES256', kid: 'es-key' }).setIssuer(issuer).setAudience('authenticated').setSubject(userId).setExpirationTime(1).sign(esPrivateKey)],
-    ['missing subject', async () => new SignJWT({ role: 'authenticated' }).setProtectedHeader({ alg: 'ES256', kid: 'es-key' }).setIssuer(issuer).setAudience('authenticated').setExpirationTime('5m').sign(esPrivateKey)],
-    ['non-UUID subject', () => token(esPrivateKey, 'es-key', 'ES256', { sub: 'not-a-uuid' })],
-    ['non-authenticated role', () => token(esPrivateKey, 'es-key', 'ES256', { role: 'anon' })],
-  ])('fails closed for %s', async (_case, buildToken) => {
-    const { service } = verifier([esPublicJwk]);
-    await expect(service.verify(await buildToken())).rejects.toMatchObject({ code: 'invalid_token' });
-  });
+        expect(getClaims)
+          .toHaveBeenCalledOnce();
+        expect(getClaims)
+          .toHaveBeenCalledWith(
+            'valid-access-token',
+          );
+        expect(principal).toEqual({
+          userId,
+          role: 'authenticated',
+          sessionId,
+          appMetadata: {
+            tier: 'pro',
+          },
+        });
+        expect(
+          Object.isFrozen(principal),
+        ).toBe(true);
+        expect(
+          Object.isFrozen(
+            principal.appMetadata,
+          ),
+        ).toBe(true);
+      },
+    );
 
-  it('rejects a bad signature and never exposes token or claims', async () => {
-    const untrustedKey = (await generateKeyPair('ES256')).privateKey;
-    const accessToken = await token(untrustedKey, 'es-key', 'ES256', { email: 'private@example.com' });
-    const { service } = verifier([esPublicJwk]);
-    const error = await service.verify(accessToken).catch((caught: unknown) => caught) as TokenVerificationError;
-    expect(error.code).toBe('invalid_token');
-    expect(String(error)).not.toContain(accessToken);
-    expect(String(error)).not.toContain('private@example.com');
-  });
+    it(
+      'maps rejected Supabase JWTs to invalid_token',
+      async () => {
+        const { service } = verifierWith({
+          data: null,
+          error: new AuthInvalidJwtError(
+            'Invalid JWT',
+          ),
+        });
 
-  it('rejects unsupported algorithms before requesting keys', async () => {
-    const unsupported = await new SignJWT({ role: 'authenticated' })
-      .setProtectedHeader({ alg: 'HS256', kid: 'legacy' }).setSubject(userId)
-      .setIssuer(issuer).setAudience('authenticated').setExpirationTime('5m')
-      .sign(new TextEncoder().encode('a-synthetic-secret-that-is-long-enough'));
-    const { service, fetchImplementation } = verifier([esPublicJwk]);
-    await expect(service.verify(unsupported)).rejects.toMatchObject({ code: 'invalid_token' });
-    expect(fetchImplementation).not.toHaveBeenCalled();
-  });
+        await expect(
+          service.verify('bad-token'),
+        ).rejects.toMatchObject({
+          code: 'invalid_token',
+        });
+      },
+    );
 
-  it('rejects unsigned tokens before requesting keys', async () => {
-    const unsigned = 'eyJhbGciOiJub25lIiwia2lkIjoibm9uZSJ9.e30.';
-    const { service, fetchImplementation } = verifier([esPublicJwk]);
-    await expect(service.verify(unsigned)).rejects.toMatchObject({ code: 'invalid_token' });
-    expect(fetchImplementation).not.toHaveBeenCalled();
-  });
+    it(
+      'maps retryable Supabase failures to verification_unavailable',
+      async () => {
+        const { service } = verifierWith({
+          data: null,
+          error: new AuthRetryableFetchError(
+            'network unavailable',
+            0,
+          ),
+        });
 
-  it('fails with an unavailable category when JWKS fetch times out', async () => {
-    const stalledFetch = vi.fn((_url: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
-    }));
-    const service = new SupabaseTokenVerifierService({ ...configuration, verificationTimeoutMs: 10 }, stalledFetch);
-    await expect(service.verify(await token(esPrivateKey, 'timeout-key', 'ES256'))).rejects.toMatchObject({ code: 'verification_unavailable' });
-  });
-});
+        await expect(
+          service.verify('token'),
+        ).rejects.toMatchObject({
+          code: 'verification_unavailable',
+        });
+      },
+    );
+
+    it.each([
+      [
+        'wrong issuer',
+        {
+          iss: 'https://attacker.invalid/auth/v1',
+        },
+      ],
+      [
+        'wrong audience',
+        {
+          aud: 'other',
+        },
+      ],
+      [
+        'expired token',
+        {
+          exp: 1,
+        },
+      ],
+      [
+        'invalid subject',
+        {
+          sub: 'not-a-uuid',
+        },
+      ],
+      [
+        'non-authenticated role',
+        {
+          role: 'anon',
+        },
+      ],
+    ])(
+      'fails closed for %s',
+      async (
+        _case,
+        overrides,
+      ) => {
+        const { service } = verifierWith(
+          verifiedResult(
+            claims(overrides),
+          ),
+        );
+
+        await expect(
+          service.verify('token'),
+        ).rejects.toMatchObject({
+          code: 'invalid_token',
+        });
+      },
+    );
+
+    it(
+      'does not convert unexpected programming failures into authentication failures',
+      async () => {
+        const failure = new Error(
+          'unexpected failure',
+        );
+        const getClaims = vi.fn().mockRejectedValue(
+          failure,
+        );
+        const client = {
+          auth: {
+            getClaims,
+          },
+        } as unknown as SupabaseClaimsClient;
+
+        const service = new SupabaseTokenVerifierService(
+          client,
+          configuration,
+        );
+
+        await expect(
+          service.verify('token'),
+        ).rejects.toThrow(
+          failure,
+        );
+      },
+    );
+  },
+);

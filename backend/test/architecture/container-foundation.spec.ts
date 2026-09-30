@@ -56,7 +56,7 @@ describe('production container foundation', () => {
       'DATABASE_URL',
       'SUPABASE_URL',
       'SUPABASE_SECRET_KEY',
-      'SUPABASE_AUTH_ISSUER',
+      'SUPABASE_PUBLISHABLE_KEY',
     ]) {
       expect(compose).toContain(`${variable}: \${${variable}}`);
     }

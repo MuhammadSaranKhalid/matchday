@@ -12,23 +12,33 @@ import { TOKEN_VERIFIER } from './token-verifier.js';
     {
       provide: TOKEN_VERIFIER,
       inject: [ConfigService],
-      useFactory: (configuration: ConfigService<PlatformConfiguration, true>) => {
+      useFactory: (
+        configuration: ConfigService<PlatformConfiguration, true>,
+      ) => {
         const auth = configuration.get('auth', { infer: true });
-        const key = auth.publishableKey && auth.publishableKey.trim() !== ''
-          ? auth.publishableKey
-          : 'sb_publishable_verification';
-        const client = createClient(auth.supabaseUrl, key, {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
+        const client = createClient(
+          auth.supabaseUrl,
+          auth.publishableKey,
+          {
+            auth: {
+              autoRefreshToken: false,
+              detectSessionInUrl: false,
+              persistSession: false,
+            },
           },
-        });
-        return new SupabaseTokenVerifierService(client, auth);
+        );
+
+        return new SupabaseTokenVerifierService(
+          client,
+          auth,
+        );
       },
     },
     SupabaseAuthGuard,
   ],
-  exports: [TOKEN_VERIFIER, SupabaseAuthGuard],
+  exports: [
+    TOKEN_VERIFIER,
+    SupabaseAuthGuard,
+  ],
 })
 export class AuthModule {}

@@ -19,13 +19,9 @@ export interface RedisConfiguration {
 
 export interface AuthConfiguration {
   readonly supabaseUrl: string;
+  readonly publishableKey: string;
   readonly issuer: string;
   readonly audience: string;
-  readonly mode: 'jwks' | 'remote';
-  readonly publishableKey?: string;
-  readonly verificationTimeoutMs: number;
-  readonly jwksCacheMaxAgeMs: number;
-  readonly jwksCooldownMs: number;
 }
 
 export interface QueueConfiguration {
@@ -59,6 +55,7 @@ export interface PlatformConfiguration {
 }
 
 export function buildConfiguration(environment: Environment): PlatformConfiguration {
+  const supabaseUrl = environment.SUPABASE_URL.replace(/\/+$/, '');
   return Object.freeze({
     nodeEnvironment: environment.NODE_ENV,
     appName: environment.APP_NAME,
@@ -89,19 +86,13 @@ export function buildConfiguration(environment: Environment): PlatformConfigurat
       namespace: environment.REDIS_NAMESPACE,
     }),
     auth: Object.freeze({
-      supabaseUrl: environment.SUPABASE_URL,
-      issuer: environment.SUPABASE_AUTH_ISSUER,
-      audience: environment.SUPABASE_AUTH_AUDIENCE,
-      mode: environment.SUPABASE_AUTH_MODE,
-      ...(environment.SUPABASE_PUBLISHABLE_KEY === undefined
-        ? {}
-        : { publishableKey: environment.SUPABASE_PUBLISHABLE_KEY }),
-      verificationTimeoutMs: environment.SUPABASE_AUTH_VERIFICATION_TIMEOUT_MS,
-      jwksCacheMaxAgeMs: environment.SUPABASE_JWKS_CACHE_MAX_AGE_MS,
-      jwksCooldownMs: environment.SUPABASE_JWKS_COOLDOWN_MS,
+      supabaseUrl,
+      publishableKey: environment.SUPABASE_PUBLISHABLE_KEY,
+      issuer: `${supabaseUrl}/auth/v1`,
+      audience: 'authenticated',
     }),
     mediaStorage: Object.freeze({
-      supabaseUrl: environment.SUPABASE_URL,
+      supabaseUrl,
       secretKey: environment.SUPABASE_SECRET_KEY,
     }),
     queue: Object.freeze({

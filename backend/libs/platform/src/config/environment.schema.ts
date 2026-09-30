@@ -27,13 +27,7 @@ export interface Environment {
   readonly REDIS_NAMESPACE: string;
   readonly SUPABASE_URL: string;
   readonly SUPABASE_SECRET_KEY: string;
-  readonly SUPABASE_AUTH_ISSUER: string;
-  readonly SUPABASE_AUTH_AUDIENCE: string;
-  readonly SUPABASE_AUTH_MODE: 'jwks' | 'remote';
-  readonly SUPABASE_PUBLISHABLE_KEY?: string;
-  readonly SUPABASE_AUTH_VERIFICATION_TIMEOUT_MS: number;
-  readonly SUPABASE_JWKS_CACHE_MAX_AGE_MS: number;
-  readonly SUPABASE_JWKS_COOLDOWN_MS: number;
+  readonly SUPABASE_PUBLISHABLE_KEY: string;
   readonly QUEUE_ATTEMPTS: number;
   readonly QUEUE_BACKOFF_DELAY_MS: number;
   readonly QUEUE_REMOVE_ON_COMPLETE_COUNT: number;
@@ -105,27 +99,11 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
     REDIS_NAMESPACE: z.string().regex(/^[a-z0-9:_-]+$/).default('matchday'),
     SUPABASE_URL: requiredInProduction('http://127.0.0.1:54321'),
     SUPABASE_SECRET_KEY: requiredInProduction('local-supabase-secret-key'),
-    SUPABASE_AUTH_ISSUER: requiredInProduction('http://127.0.0.1:54321/auth/v1'),
-    SUPABASE_AUTH_AUDIENCE: z.string().trim().min(1).default('authenticated'),
-    SUPABASE_AUTH_MODE: production
-      ? z.enum(['jwks', 'remote'])
-      : z.enum(['jwks', 'remote']).default('jwks'),
-    SUPABASE_PUBLISHABLE_KEY: z.string().trim().min(1).optional(),
-    SUPABASE_AUTH_VERIFICATION_TIMEOUT_MS: positiveInteger(3_000),
-    SUPABASE_JWKS_CACHE_MAX_AGE_MS: positiveInteger(600_000, 86_400_000),
-    SUPABASE_JWKS_COOLDOWN_MS: positiveInteger(30_000),
+    SUPABASE_PUBLISHABLE_KEY: requiredInProduction('local-supabase-publishable-key'),
     QUEUE_ATTEMPTS: positiveInteger(3, 100),
     QUEUE_BACKOFF_DELAY_MS: positiveInteger(1_000),
     QUEUE_REMOVE_ON_COMPLETE_COUNT: positiveInteger(1_000, 100_000),
     QUEUE_REMOVE_ON_FAIL_COUNT: positiveInteger(5_000, 100_000),
-  }).superRefine((environment, context) => {
-    if (environment.SUPABASE_AUTH_MODE === 'remote' && !environment.SUPABASE_PUBLISHABLE_KEY) {
-      context.addIssue({
-        code: 'custom',
-        path: ['SUPABASE_PUBLISHABLE_KEY'],
-        message: 'required for remote authentication',
-      });
-    }
   });
 
   const result = schema.safeParse(input);

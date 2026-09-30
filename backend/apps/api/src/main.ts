@@ -13,6 +13,8 @@ export async function bootstrapApi(): Promise<void> {
   const app = await NestFactory.create(ApiModule, {
     bodyParser: false,
     bufferLogs: true,
+    routeConflictPolicy: { duplicate: 'error', shadow: 'warn' },
+    routeResolutionStrategy: 'specificity',
   });
   await configureApi(app);
   app.useLogger(app.get(Logger));

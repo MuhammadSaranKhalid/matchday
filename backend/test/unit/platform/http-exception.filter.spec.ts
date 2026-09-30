@@ -38,7 +38,13 @@ function capture(
   logger?: { error: (...values: unknown[]) => void },
 ): CapturedResponse {
   const context = new ExecutionContextService();
-  const filter = new HttpExceptionFilter(context, production, logger);
+  const config = {
+    get: () => production,
+  } as unknown as ConfigService<PlatformConfiguration, true>;
+  const filter = new HttpExceptionFilter(context, config);
+  if (logger) {
+    (filter as unknown as { logger: Pick<Logger, 'error'> }).logger = logger;
+  }
   const captured: CapturedResponse = {};
   context.run(
     { requestId: 'request-id', correlationId: 'correlation-id' },

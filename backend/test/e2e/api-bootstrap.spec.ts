@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, Version } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
-import { IsString, MinLength } from 'class-validator';
+import { z } from 'zod';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,11 +11,10 @@ import { configureApi } from '../../apps/api/src/bootstrap/api-bootstrap.js';
 import type { PlatformConfiguration } from '../../libs/platform/src/config/configuration.js';
 import { MEDIA_QUEUE_NAME } from '@modules/media';
 
-class ProbeDto {
-  @IsString()
-  @MinLength(2)
-  name!: string;
-}
+const probeSchema = z.object({
+  name: z.string().min(2),
+}).strict();
+type ProbeDto = z.infer<typeof probeSchema>;
 
 @Controller('probe')
 class ProbeController {
@@ -27,7 +26,7 @@ class ProbeController {
 
   @Post()
   @Version('1')
-  write(@Body() body: ProbeDto): ProbeDto {
+  write(@Body({ schema: probeSchema }) body: ProbeDto): ProbeDto {
     return body;
   }
 }

@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+
+import { HttpExceptionFilter } from '../../../libs/platform/src/errors/http-exception.filter.js';
 
 import type { PlatformConfiguration } from '../../../libs/platform/src/config/configuration.js';
 import { PlatformConfigModule } from '../../../libs/platform/src/config/platform-config.module.js';
@@ -28,6 +30,9 @@ import { PostsModule } from '@modules/posts';
       },
     }),
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
+  ],
 })
 export class ApiModule {}

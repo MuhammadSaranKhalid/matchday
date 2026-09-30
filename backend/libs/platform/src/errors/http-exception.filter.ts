@@ -5,22 +5,31 @@ import {
   type ExceptionFilter,
   HttpException,
   HttpStatus,
+  Injectable,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ThrottlerException } from '@nestjs/throttler';
 import type { Response } from 'express';
 
+import type { PlatformConfiguration } from '../config/configuration.js';
 import type { ErrorResponse } from '../../../shared-kernel/src/contracts/error-response.js';
 import { ExecutionContextService } from '../context/execution-context.service.js';
 import { ApplicationError } from './application-error.js';
 
+@Injectable()
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly production: boolean;
+  private readonly logger: Pick<Logger, 'error'>;
+
   constructor(
     private readonly context: ExecutionContextService,
-    private readonly production: boolean,
-    private readonly logger: Pick<Logger, 'error'> = new Logger(HttpExceptionFilter.name),
-  ) {}
+    private readonly config: ConfigService<PlatformConfiguration, true>,
+  ) {
+    this.production = typeof config?.get === 'function' ? config.get('production', { infer: true }) ?? false : Boolean(config);
+    this.logger = new Logger(HttpExceptionFilter.name);
+  }
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();

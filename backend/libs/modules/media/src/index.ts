@@ -1,5 +1,6 @@
 export { MediaApiModule } from './media-api.module.js';
 export { MediaWorkerModule } from './media-worker.module.js';
+export { MEDIA_POLICY } from './domain/media-policy.js';
 export {
   MediaUploadService,
   type StagedMediaVerification,

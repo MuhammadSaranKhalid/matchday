@@ -16,7 +16,7 @@ describe('MediaProcessor', () => {
     };
 
     await processor.process(job as never);
-    expect(processImage.execute).toHaveBeenCalledWith('media-123', 1);
+    expect(processImage.execute).toHaveBeenCalledWith('media-123', 1, 3);
   });
 
   it('processes V1 image job successfully for backward compatibility', async () => {
@@ -30,7 +30,7 @@ describe('MediaProcessor', () => {
     };
 
     await processor.process(job as never);
-    expect(processImage.execute).toHaveBeenCalledWith('media-legacy', 2);
+    expect(processImage.execute).toHaveBeenCalledWith('media-legacy', 2, 3);
   });
 
   it('rejects unsupported schema version with UnrecoverableError', async () => {

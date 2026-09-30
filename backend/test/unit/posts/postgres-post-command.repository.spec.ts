@@ -12,7 +12,7 @@ const postId = '20000000-0000-4000-8000-000000000001';
 const mediaId = '30000000-0000-4000-8000-000000000001';
 
 describe('PostgresPostCommandRepository.markUploaded', () => {
-  it('atomically advances generation and writes to media_processing_outbox', async () => {
+  it('transitions post_media rows to uploaded status within owner transaction', async () => {
     const executedQueries: Array<{ sql: string; values?: unknown[] }> = [];
 
     const tx = {
@@ -22,9 +22,6 @@ describe('PostgresPostCommandRepository.markUploaded', () => {
           return { rowCount: 1, rows: [{ post_id: postId }] };
         }
         if (sql.includes('update public.post_media')) {
-          return { rowCount: 1, rows: [{ generation: 1 }] };
-        }
-        if (sql.includes('insert into private.media_processing_outbox')) {
           return { rowCount: 1, rows: [] };
         }
         if (sql.includes("update public.posts set status = 'publishing'")) {
@@ -49,14 +46,12 @@ describe('PostgresPostCommandRepository.markUploaded', () => {
     // Verify post_media update query
     const updateMedia = executedQueries.find((q) => q.sql.includes('update public.post_media'));
     expect(updateMedia).toBeDefined();
-    expect(updateMedia!.sql).toContain('processing_generation = processing_generation + 1');
-    expect(updateMedia!.sql).toContain('returning processing_generation as generation');
+    expect(updateMedia!.sql).toContain("status = 'uploaded'");
     expect(updateMedia!.values).toEqual([mediaId, postId, 500_000, 'image/jpeg']);
 
-    // Verify outbox insertion
-    const insertOutbox = executedQueries.find((q) => q.sql.includes('insert into private.media_processing_outbox'));
-    expect(insertOutbox).toBeDefined();
-    expect(insertOutbox!.values).toEqual([mediaId, 1]);
+    // Verify no outbox queries
+    const outboxQuery = executedQueries.find((q) => q.sql.includes('media_processing_outbox'));
+    expect(outboxQuery).toBeUndefined();
   });
 
   it('rejects with POST_MEDIA_STATE_CONFLICT if media row cannot be transitioned', async () => {

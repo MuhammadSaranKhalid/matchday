@@ -38,6 +38,7 @@ export interface Environment {
   readonly QUEUE_BACKOFF_DELAY_MS: number;
   readonly QUEUE_REMOVE_ON_COMPLETE_COUNT: number;
   readonly QUEUE_REMOVE_ON_FAIL_COUNT: number;
+  readonly MEDIA_WORKER_CONCURRENCY: number;
 }
 
 function positiveInteger(defaultValue: number, maximum = 120_000) {
@@ -114,10 +115,11 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
     SUPABASE_AUTH_VERIFICATION_TIMEOUT_MS: positiveInteger(3_000),
     SUPABASE_JWKS_CACHE_MAX_AGE_MS: positiveInteger(600_000, 86_400_000),
     SUPABASE_JWKS_COOLDOWN_MS: positiveInteger(30_000),
-    QUEUE_ATTEMPTS: positiveInteger(5, 100),
+    QUEUE_ATTEMPTS: positiveInteger(3, 100),
     QUEUE_BACKOFF_DELAY_MS: positiveInteger(1_000),
     QUEUE_REMOVE_ON_COMPLETE_COUNT: positiveInteger(1_000, 100_000),
     QUEUE_REMOVE_ON_FAIL_COUNT: positiveInteger(5_000, 100_000),
+    MEDIA_WORKER_CONCURRENCY: positiveInteger(1, 10),
   }).superRefine((environment, context) => {
     if (environment.SUPABASE_AUTH_MODE === 'remote' && !environment.SUPABASE_PUBLISHABLE_KEY) {
       context.addIssue({

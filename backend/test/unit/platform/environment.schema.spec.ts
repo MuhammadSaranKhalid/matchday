@@ -34,10 +34,11 @@ describe('parseEnvironment', () => {
       SUPABASE_AUTH_VERIFICATION_TIMEOUT_MS: 3_000,
       SUPABASE_JWKS_CACHE_MAX_AGE_MS: 600_000,
       SUPABASE_JWKS_COOLDOWN_MS: 30_000,
-      QUEUE_ATTEMPTS: 5,
+      QUEUE_ATTEMPTS: 3,
       QUEUE_BACKOFF_DELAY_MS: 1_000,
       QUEUE_REMOVE_ON_COMPLETE_COUNT: 1_000,
       QUEUE_REMOVE_ON_FAIL_COUNT: 5_000,
+      MEDIA_WORKER_CONCURRENCY: 1,
     });
   });
 
@@ -101,6 +102,7 @@ describe('parseEnvironment', () => {
     'QUEUE_BACKOFF_DELAY_MS',
     'QUEUE_REMOVE_ON_COMPLETE_COUNT',
     'QUEUE_REMOVE_ON_FAIL_COUNT',
+    'MEDIA_WORKER_CONCURRENCY',
   ])('rejects non-positive or unbounded %s', (field) => {
     expect(() => parseEnvironment({ [field]: '0' })).toThrow(field);
     expect(() => parseEnvironment({ [field]: '999999999' })).toThrow(field);

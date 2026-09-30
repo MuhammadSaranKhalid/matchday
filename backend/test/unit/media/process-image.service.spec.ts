@@ -73,4 +73,18 @@ describe('ProcessImageService', () => {
       .rejects.toBeInstanceOf(PermanentMediaProcessingError);
     expect(value.events).toEqual(['download', 'cleanup', 'failed']);
   });
+
+  it('marks media failed when max attempts are exhausted', async () => {
+    const value = fixture();
+    value.transformer.transform.mockRejectedValueOnce(new Error('network_timeout'));
+    await expect(value.service.execute(media.mediaId, 3, 3)).rejects.toThrow('network_timeout');
+    expect(value.events).toEqual(['download', 'cleanup', 'failed']);
+  });
+
+  it('treats staging cleanup failure as best-effort after markReady', async () => {
+    const value = fixture();
+    value.storage.deleteStaging.mockRejectedValueOnce(new Error('s3_delete_error'));
+    await expect(value.service.execute(media.mediaId, 1)).resolves.toBeUndefined();
+    expect(value.repository.markReady).toHaveBeenCalled();
+  });
 });

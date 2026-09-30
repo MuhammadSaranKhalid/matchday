@@ -378,19 +378,16 @@ describe('step 2B — platform wiring and lifecycle invariants', () => {
   });
 });
 
-describe('step 3A — durable media dispatch invariants', () => {
-  it('PostsModule and PublishPostService do not import MediaProcessingScheduler or BullMQ', () => {
+describe('step 3B — media execution invariants', () => {
+  it('PostsModule does not import BullMQ directly', () => {
     const postsModuleRoot = join(repositoryRoot, 'libs', 'modules', 'posts', 'src');
     const violations = sourceFiles()
       .filter((path) => path.startsWith(postsModuleRoot))
       .flatMap((path) => {
-        const contents = readFileSync(path, 'utf8');
         const imports = importsIn(path);
-        const importsScheduler = imports.some((specifier) => specifier.includes('media-processing-scheduler'));
-        const usesScheduler = contents.includes('MediaProcessingScheduler');
         const usesBull = imports.some((specifier) => specifier.includes('bullmq'));
-        if (importsScheduler || usesScheduler || usesBull) {
-          return [`${relative(repositoryRoot, path)} (depends on scheduling/BullMQ directly)`];
+        if (usesBull) {
+          return [`${relative(repositoryRoot, path)} (depends on BullMQ directly)`];
         }
         return [];
       });

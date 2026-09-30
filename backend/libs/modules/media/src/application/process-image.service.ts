@@ -18,7 +18,7 @@ export class ProcessImageService {
     private readonly scratch: ScratchWorkspace,
   ) {}
 
-  async execute(mediaId: string, _attempt: number): Promise<void> {
+  async execute(mediaId: string, attempt: number, maxAttempts = 3): Promise<void> {
     const claim = await this.repository.claim(mediaId);
     if (!claim.claimed || claim.media === undefined) return;
     const media = claim.media;
@@ -42,15 +42,22 @@ export class ProcessImageService {
           }))),
         });
         await this.repository.markReady(mediaId, durable);
-        await this.storage.deleteStaging(media.stagingPath);
+        try {
+          await this.storage.deleteStaging(media.stagingPath);
+        } catch {
+          // Best-effort cleanup; media is already durably ready in PostgreSQL.
+        }
       });
     } catch (error) {
       const message = safeMessage(error);
-      if (error instanceof PermanentImageError) {
+      if (error instanceof PermanentImageError || attempt >= maxAttempts) {
         await this.repository.markFailed(mediaId, message);
-        throw new PermanentMediaProcessingError(message);
+        if (error instanceof PermanentImageError) {
+          throw new PermanentMediaProcessingError(message);
+        }
+      } else {
+        await this.repository.releaseForRetry(mediaId, message);
       }
-      await this.repository.releaseForRetry(mediaId, message);
       throw error;
     }
   }

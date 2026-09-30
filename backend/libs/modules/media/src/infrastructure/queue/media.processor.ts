@@ -13,7 +13,9 @@ import {
 
 type SupportedJob = ProcessImageJobV1 | ProcessImageJobV2;
 
-@Processor(MEDIA_QUEUE_NAME)
+export const MEDIA_WORKER_CONCURRENCY = 1;
+
+@Processor(MEDIA_QUEUE_NAME, { concurrency: MEDIA_WORKER_CONCURRENCY })
 export class MediaProcessor extends WorkerHost {
   constructor(private readonly processImage: ProcessImageService) {
     super();
@@ -27,7 +29,11 @@ export class MediaProcessor extends WorkerHost {
       throw new UnrecoverableError('unsupported_media_job');
     }
     try {
-      await this.processImage.execute(job.data.mediaId, job.attemptsMade + 1);
+      await this.processImage.execute(
+        job.data.mediaId,
+        job.attemptsMade + 1,
+        job.opts?.attempts ?? 3,
+      );
     } catch (error) {
       if (error instanceof PermanentMediaProcessingError) {
         throw new UnrecoverableError(error.message);

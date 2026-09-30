@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   createLocalJWKSet,
   decodeJwt,
@@ -15,6 +15,7 @@ type FetchImplementation = typeof fetch;
 
 @Injectable()
 export class SupabaseTokenVerifierService implements TokenVerifier {
+  private readonly logger = new Logger(SupabaseTokenVerifierService.name);
   private jwks?: { readonly value: JSONWebKeySet; readonly expiresAt: number };
 
   constructor(
@@ -24,10 +25,26 @@ export class SupabaseTokenVerifierService implements TokenVerifier {
 
   async verify(accessToken: string): Promise<AuthenticatedPrincipal> {
     try {
-      return this.configuration.mode === 'jwks'
-        ? await this.verifyWithJwks(accessToken)
-        : await this.verifyRemotely(accessToken);
+      if (this.configuration.mode === 'jwks') {
+        const header = decodeProtectedHeader(accessToken);
+        if (header.alg === 'HS256' && this.configuration.publishableKey !== undefined) {
+          return await this.verifyRemotely(accessToken);
+        }
+        return await this.verifyWithJwks(accessToken);
+      }
+      return await this.verifyRemotely(accessToken);
     } catch (error) {
+      try {
+        const header = decodeProtectedHeader(accessToken);
+        const payload = decodeJwt(accessToken);
+        this.logger.warn(
+          `Token verification failed [mode=${this.configuration.mode}]: ${error instanceof Error ? error.message : String(error)} | ` +
+          `alg=${header.alg}, kid=${header.kid}, iss=${payload.iss} (expected ${this.configuration.issuer}), ` +
+          `aud=${JSON.stringify(payload.aud)} (expected ${this.configuration.audience})`,
+        );
+      } catch (decodeError) {
+        this.logger.warn(`Token verification failed: malformed token (${decodeError})`);
+      }
       if (error instanceof TokenVerificationError) throw error;
       throw new TokenVerificationError('invalid_token');
     }
@@ -124,8 +141,13 @@ export class SupabaseTokenVerifierService implements TokenVerifier {
 
 function validateRegisteredClaims(payload: JWTPayload, configuration: AuthConfiguration): void {
   const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  const normalize = (url?: string) => url?.replace(/\/+$/, '');
+  const issuerMatches =
+    payload.iss === configuration.issuer ||
+    normalize(payload.iss) === normalize(configuration.issuer) ||
+    payload.iss === 'supabase';
   if (
-    payload.iss !== configuration.issuer ||
+    !issuerMatches ||
     !audiences.includes(configuration.audience) ||
     typeof payload.exp !== 'number' ||
     payload.exp <= Math.floor(Date.now() / 1_000)

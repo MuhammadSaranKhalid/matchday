@@ -52,7 +52,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       if (this.production) {
         this.logger.error('Unhandled request exception', safeContext);
       } else {
-        this.logger.error('Unhandled request exception', error.stack, safeContext);
+        this.logger.error(`Unhandled request exception: ${error.message}\n${error.stack ?? ''}`, safeContext);
       }
     }
 

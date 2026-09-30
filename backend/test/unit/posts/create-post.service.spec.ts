@@ -5,7 +5,7 @@ import { CreatePostService } from '../../../libs/modules/posts/src/application/c
 
 const principal: AuthenticatedPrincipal = {
   userId: '10000000-0000-4000-8000-000000000001',
-  role: 'authenticated',
+  sessionId: '50000000-0000-4000-8000-000000000001',
   appMetadata: {},
 };
 

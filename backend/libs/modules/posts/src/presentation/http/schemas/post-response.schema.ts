@@ -1,13 +1,18 @@
 import { z } from 'zod';
 
+const uuidPattern =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const uuidSchema = z.string().regex(uuidPattern, 'Invalid UUID');
+
 export const reservedMediaResponseSchema = z.strictObject({
-  mediaId: z.uuid(),
+  mediaId: uuidSchema,
   position: z.number().int().min(0),
   stagingPath: z.string().min(1),
+  uploadToken: z.string().min(1),
 });
 
 export const createPostResponseSchema = z.strictObject({
-  postId: z.uuid(),
+  postId: uuidSchema,
   status: z.literal('draft'),
   media: z.array(reservedMediaResponseSchema),
 });

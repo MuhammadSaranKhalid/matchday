@@ -1,60 +1,6 @@
 import type { Environment } from './environment.schema.js';
 
-export interface DatabaseConfiguration {
-  readonly url: string;
-  readonly poolMax: number;
-  readonly connectionTimeoutMs: number;
-  readonly idleTimeoutMs: number;
-  readonly statementTimeoutMs: number;
-  readonly sslMode: 'disable' | 'require' | 'verify-full';
-}
-
-export interface RedisConfiguration {
-  readonly url: string;
-  readonly connectionTimeoutMs: number;
-  readonly commandTimeoutMs: number;
-  readonly maxRetriesPerRequest: number;
-  readonly namespace: string;
-}
-
-export interface AuthConfiguration {
-  readonly supabaseUrl: string;
-  readonly publishableKey: string;
-  readonly issuer: string;
-  readonly audience: string;
-}
-
-export interface QueueConfiguration {
-  readonly attempts: number;
-  readonly backoffDelayMs: number;
-  readonly removeOnCompleteCount: number;
-  readonly removeOnFailCount: number;
-}
-
-export interface MediaStorageConfiguration {
-  readonly supabaseUrl: string;
-  readonly secretKey: string;
-}
-
-export interface PlatformConfiguration {
-  readonly nodeEnvironment: Environment['NODE_ENV'];
-  readonly appName: string;
-  readonly port: number;
-  readonly logLevel: Environment['LOG_LEVEL'];
-  readonly corsOrigins: readonly string[];
-  readonly bodyLimit: string;
-  readonly throttle: Readonly<{ ttlMs: number; limit: number }>;
-  readonly trustProxyHops: number;
-  readonly swaggerEnabled: boolean;
-  readonly production: boolean;
-  readonly database: Readonly<DatabaseConfiguration>;
-  readonly redis: Readonly<RedisConfiguration>;
-  readonly auth: Readonly<AuthConfiguration>;
-  readonly mediaStorage: Readonly<MediaStorageConfiguration>;
-  readonly queue: Readonly<QueueConfiguration>;
-}
-
-export function buildConfiguration(environment: Environment): PlatformConfiguration {
+export function buildConfiguration(environment: Environment) {
   const supabaseUrl = environment.SUPABASE_URL.replace(/\/+$/, '');
   return Object.freeze({
     nodeEnvironment: environment.NODE_ENV,
@@ -88,8 +34,6 @@ export function buildConfiguration(environment: Environment): PlatformConfigurat
     auth: Object.freeze({
       supabaseUrl,
       publishableKey: environment.SUPABASE_PUBLISHABLE_KEY,
-      issuer: `${supabaseUrl}/auth/v1`,
-      audience: 'authenticated',
     }),
     mediaStorage: Object.freeze({
       supabaseUrl,
@@ -103,3 +47,10 @@ export function buildConfiguration(environment: Environment): PlatformConfigurat
     }),
   });
 }
+
+export type PlatformConfiguration = ReturnType<typeof buildConfiguration>;
+export type DatabaseConfiguration = PlatformConfiguration['database'];
+export type RedisConfiguration = PlatformConfiguration['redis'];
+export type AuthConfiguration = PlatformConfiguration['auth'];
+export type QueueConfiguration = PlatformConfiguration['queue'];
+export type MediaStorageConfiguration = PlatformConfiguration['mediaStorage'];

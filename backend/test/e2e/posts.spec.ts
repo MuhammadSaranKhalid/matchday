@@ -4,14 +4,14 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
-import { TOKEN_VERIFIER, TokenVerificationError } from '../../libs/platform/src/auth/token-verifier.js';
+import { TokenVerifier, TokenVerificationError } from '../../libs/platform/src/auth/token-verifier.js';
 import { CreatePostService } from '../../libs/modules/posts/src/application/create-post.service.js';
 import { PublishPostService } from '../../libs/modules/posts/src/application/publish-post.service.js';
 import { PostsController } from '../../libs/modules/posts/src/presentation/http/posts.controller.js';
 
 const principal: AuthenticatedPrincipal = {
   userId: '10000000-0000-4000-8000-000000000001',
-  role: 'authenticated',
+  sessionId: '50000000-0000-4000-8000-000000000001',
   appMetadata: {},
 };
 const postId = '30000000-0000-4000-8000-000000000001';
@@ -38,7 +38,7 @@ describe('post commands', () => {
     const module = await Test.createTestingModule({
       controllers: [PostsController],
       providers: [
-        { provide: TOKEN_VERIFIER, useValue: verifier },
+        { provide: TokenVerifier, useValue: verifier },
         { provide: CreatePostService, useValue: create },
         { provide: PublishPostService, useValue: publish },
       ],

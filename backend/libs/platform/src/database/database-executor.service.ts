@@ -12,12 +12,12 @@ export class DatabaseExecutorService {
 
   withUserTransaction<T>(principal: AuthenticatedPrincipal, work: TransactionWork<T>): Promise<T> {
     return this.transaction(async (database) => {
-      await database.query("select set_config('role', $1, true)", [principal.role]);
+      await database.query("select set_config('role', $1, true)", ['authenticated']);
       await database.query("select set_config('request.jwt.claims', $1, true)", [
         JSON.stringify({
           sub: principal.userId,
-          role: principal.role,
-          ...(principal.sessionId === undefined ? {} : { session_id: principal.sessionId }),
+          role: 'authenticated',
+          session_id: principal.sessionId,
           app_metadata: principal.appMetadata,
         }),
       ]);

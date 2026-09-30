@@ -19,7 +19,7 @@ describe('DatabaseExecutorService', () => {
     const { client, calls } = clientFixture();
     const service = new DatabaseExecutorService({ connect: vi.fn(async () => client) });
     const result = await service.withUserTransaction(
-      { userId: '7c50bd47-dfaf-4ad0-97d8-10b9b908f7ac', role: 'authenticated', sessionId: 'session-1', appMetadata: { plan: 'pro' } },
+      { userId: '7c50bd47-dfaf-4ad0-97d8-10b9b908f7ac', sessionId: 'session-1', appMetadata: { plan: 'pro' } },
       async (database) => {
         await database.query('select $1::text', ['work']);
         return 'result';
@@ -46,7 +46,7 @@ describe('DatabaseExecutorService', () => {
     const service = new DatabaseExecutorService({ connect: vi.fn(async () => client) });
 
     await expect(service.withUserTransaction(
-      { userId: '7c50bd47-dfaf-4ad0-97d8-10b9b908f7ac', role: 'authenticated', appMetadata: {} },
+      { userId: '7c50bd47-dfaf-4ad0-97d8-10b9b908f7ac', sessionId: 'session-1', appMetadata: {} },
       async () => { throw new Error('callback failed'); },
     )).rejects.toThrow(failurePoint === 'setup' ? 'setup failed' : 'callback failed');
 

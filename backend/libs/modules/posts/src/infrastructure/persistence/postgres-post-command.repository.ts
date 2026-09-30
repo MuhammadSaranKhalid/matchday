@@ -18,7 +18,6 @@ export class PostgresPostCommandRepository implements PostCommandRepository {
 
   reserveDraft(principal: AuthenticatedPrincipal, command: CreatePostCommand): Promise<ReservedPost> {
     return this.database.withSystemTransaction(async (tx) => {
-      await setPrincipal(tx, principal);
       const existing = await tx.query<{ post_id: string }>(
         'select post_id from public.posts where created_by_user_id = $1 and idempotency_key = $2',
         [principal.userId, command.clientCommandId],
@@ -142,12 +141,6 @@ export class PostgresPostCommandRepository implements PostCommandRepository {
 }
 
 type Executor = Parameters<Parameters<DatabaseExecutorService['withSystemTransaction']>[0]>[0];
-
-async function setPrincipal(tx: Executor, principal: AuthenticatedPrincipal): Promise<void> {
-  await tx.query("select set_config('request.jwt.claims', $1, true)", [
-    JSON.stringify({ sub: principal.userId, role: principal.role, app_metadata: principal.appMetadata }),
-  ]);
-}
 
 async function requireOwner(tx: Executor, userId: string, postId: string): Promise<void> {
   const result = await tx.query('select 1 from public.posts where post_id = $1 and created_by_user_id = $2 for update', [postId, userId]);

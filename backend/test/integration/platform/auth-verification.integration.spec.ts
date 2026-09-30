@@ -99,8 +99,6 @@ function configuration(
   return {
     supabaseUrl: url,
     publishableKey,
-    issuer: `${url}/auth/v1`,
-    audience: 'authenticated',
   };
 }
 
@@ -175,7 +173,7 @@ describe(
         );
         const service =
           new SupabaseTokenVerifierService(
-            client,
+            client.auth,
             configuration(url),
           );
 
@@ -198,7 +196,6 @@ describe(
           principal,
         ).toMatchObject({
           userId,
-          role: 'authenticated',
           sessionId,
         });
       },
@@ -242,7 +239,7 @@ describe(
         );
         const service =
           new SupabaseTokenVerifierService(
-            client,
+            client.auth,
             configuration(url),
           );
 

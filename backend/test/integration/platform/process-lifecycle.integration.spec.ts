@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { bootstrapWorker } from '../../../apps/worker/src/main.js';
-import { ReadinessService } from '../../../libs/platform/src/health/readiness.service.js';
+import { ReadinessService } from '../../../libs/platform/src/lifecycle/readiness.service.js';
 
 const run = promisify(execFile);
 const composeProject = process.env.MATCHDAY_COMPOSE_PROJECT;

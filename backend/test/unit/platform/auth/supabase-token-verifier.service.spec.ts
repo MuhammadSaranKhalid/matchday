@@ -12,7 +12,7 @@ import {
 
 import type { AuthConfiguration } from '../../../../libs/platform/src/config/configuration.js';
 import {
-  type SupabaseClaimsClient,
+  type ClaimsVerifier,
   SupabaseTokenVerifierService,
 } from '../../../../libs/platform/src/auth/supabase-token-verifier.service.js';
 
@@ -23,8 +23,6 @@ const sessionId = '51c521bb-a829-4d6d-a6b7-5aa57e6092c4';
 const configuration: AuthConfiguration = {
   supabaseUrl: 'https://project.supabase.co',
   publishableKey: 'sb_publishable_test',
-  issuer,
-  audience: 'authenticated',
 };
 
 function claims(
@@ -68,15 +66,13 @@ function verifierWith(
   result: unknown,
 ) {
   const getClaims = vi.fn().mockResolvedValue(result);
-  const client = {
-    auth: {
-      getClaims,
-    },
-  } as unknown as SupabaseClaimsClient;
+  const auth = {
+    getClaims,
+  } satisfies ClaimsVerifier;
 
   return {
     service: new SupabaseTokenVerifierService(
-      client,
+      auth,
       configuration,
     ),
     getClaims,
@@ -108,7 +104,6 @@ describe(
           );
         expect(principal).toEqual({
           userId,
-          role: 'authenticated',
           sessionId,
           appMetadata: {
             tier: 'pro',
@@ -176,15 +171,21 @@ describe(
         },
       ],
       [
-        'expired token',
+        'anonymous user',
         {
-          exp: 1,
+          is_anonymous: true,
         },
       ],
       [
         'invalid subject',
         {
           sub: 'not-a-uuid',
+        },
+      ],
+      [
+        'invalid session id',
+        {
+          session_id: 'not-a-uuid',
         },
       ],
       [
@@ -222,14 +223,12 @@ describe(
         const getClaims = vi.fn().mockRejectedValue(
           failure,
         );
-        const client = {
-          auth: {
-            getClaims,
-          },
-        } as unknown as SupabaseClaimsClient;
+        const auth = {
+          getClaims,
+        } satisfies ClaimsVerifier;
 
         const service = new SupabaseTokenVerifierService(
-          client,
+          auth,
           configuration,
         );
 

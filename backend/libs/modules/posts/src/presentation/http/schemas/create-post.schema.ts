@@ -8,13 +8,15 @@ export const postMediaSchema = z.strictObject({
   mimeType: z.literal(MEDIA_POLICY.source.mimeType),
 });
 
+const uuidPattern =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const uuidSchema = z.string().regex(uuidPattern, 'Invalid UUID');
+
 export const createPostSchema = z.strictObject({
-  clientCommandId: z.string().uuid(),
+  clientCommandId: uuidSchema,
   publisherType: z.enum(['user', 'team', 'tournament']),
-  publisherId: z.string().uuid(),
+  publisherId: uuidSchema,
   postKind: z.string().trim().min(1).max(64),
   text: z.string().max(2000).optional(),
   media: z.array(postMediaSchema).max(4),
 });
-
-export type CreatePostDto = z.infer<typeof createPostSchema>;

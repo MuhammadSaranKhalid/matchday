@@ -1,8 +1,8 @@
 import {
   type CanActivate,
   type ExecutionContext,
-  Inject,
   Injectable,
+  Logger,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -10,9 +10,8 @@ import type { Request } from 'express';
 
 import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import {
-  TOKEN_VERIFIER,
   TokenVerificationError,
-  type TokenVerifier,
+  TokenVerifier,
 } from './token-verifier.js';
 
 export interface AuthenticatedRequest extends Request {
@@ -21,8 +20,10 @@ export interface AuthenticatedRequest extends Request {
 
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
+  private readonly logger = new Logger(SupabaseAuthGuard.name);
+
   constructor(
-    @Inject(TOKEN_VERIFIER) private readonly verifier: TokenVerifier,
+    private readonly verifier: TokenVerifier,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -30,6 +31,7 @@ export class SupabaseAuthGuard implements CanActivate {
     const authorization = request.headers['authorization'];
     const match = /^Bearer ([^\s]+)$/i.exec(authorization ?? '');
     if (match?.[1] === undefined) {
+      this.logger.warn(`Authorization header missing or not Bearer: "${authorization}"`);
       throw new UnauthorizedException('Authentication required');
     }
 
@@ -39,6 +41,7 @@ export class SupabaseAuthGuard implements CanActivate {
       return true;
     } catch (error) {
       if (error instanceof TokenVerificationError) {
+        this.logger.warn(`Token verification rejected: code=${error.code}, message=${error.message}`);
         if (error.code === 'verification_unavailable') {
           throw new ServiceUnavailableException('Authentication service unavailable');
         }

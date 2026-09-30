@@ -5,12 +5,12 @@ import { createClient } from '@supabase/supabase-js';
 import type { PlatformConfiguration } from '../config/configuration.js';
 import { SupabaseAuthGuard } from './supabase-auth.guard.js';
 import { SupabaseTokenVerifierService } from './supabase-token-verifier.service.js';
-import { TOKEN_VERIFIER } from './token-verifier.js';
+import { TokenVerifier } from './token-verifier.js';
 
 @Module({
   providers: [
     {
-      provide: TOKEN_VERIFIER,
+      provide: TokenVerifier,
       inject: [ConfigService],
       useFactory: (
         configuration: ConfigService<PlatformConfiguration, true>,
@@ -29,7 +29,7 @@ import { TOKEN_VERIFIER } from './token-verifier.js';
         );
 
         return new SupabaseTokenVerifierService(
-          client,
+          client.auth,
           auth,
         );
       },
@@ -37,7 +37,7 @@ import { TOKEN_VERIFIER } from './token-verifier.js';
     SupabaseAuthGuard,
   ],
   exports: [
-    TOKEN_VERIFIER,
+    TokenVerifier,
     SupabaseAuthGuard,
   ],
 })

@@ -12,9 +12,10 @@ import {
 import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { CurrentPrincipal } from '../../../../../platform/src/auth/current-principal.decorator.js';
 import { SupabaseAuthGuard } from '../../../../../platform/src/auth/supabase-auth.guard.js';
+import type { CreatePostCommand } from '../../application/post-command.ports.js';
 import { CreatePostService } from '../../application/create-post.service.js';
 import { PublishPostService } from '../../application/publish-post.service.js';
-import { type CreatePostDto, createPostSchema } from './schemas/create-post.schema.js';
+import { createPostSchema } from './schemas/create-post.schema.js';
 import {
   createPostResponseSchema,
   postStatusResponseSchema,
@@ -32,7 +33,7 @@ export class PostsController {
   @SerializeOptions({ schema: createPostResponseSchema })
   async create(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
-    @Body({ schema: createPostSchema }) command: CreatePostDto,
+    @Body({ schema: createPostSchema }) command: CreatePostCommand,
   ) {
     return this.createPost.execute(principal, command);
   }

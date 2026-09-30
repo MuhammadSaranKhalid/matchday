@@ -52,7 +52,7 @@ describe('PostgreSQL transaction boundary', () => {
 
   it('keeps verified claims local to the user transaction', async () => {
     const inside = await database.withUserTransaction(
-      { userId: '7c50bd47-dfaf-4ad0-97d8-10b9b908f7ac', role: 'authenticated', sessionId: 'session-1', appMetadata: { tier: 'test' } },
+      { userId: '7c50bd47-dfaf-4ad0-97d8-10b9b908f7ac', sessionId: 'session-1', appMetadata: { tier: 'test' } },
       async (executor) => executor.query<{ claims: string }>("select current_setting('request.jwt.claims', true) as claims"),
     );
     expect(JSON.parse(inside.rows[0]?.claims ?? '{}')).toMatchObject({

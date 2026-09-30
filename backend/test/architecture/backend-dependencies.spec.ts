@@ -428,7 +428,7 @@ describe('platform wiring and lifecycle invariants', () => {
     expect(contents).not.toContain('onApplicationShutdown');
   });
 
-  it('feature controllers do not import TOKEN_VERIFIER or parse Authorization headers manually', () => {
+  it('feature controllers do not import TokenVerifier or parse Authorization headers manually', () => {
     const modulesRoot = join(repositoryRoot, 'libs', 'modules');
     const violations = sourceFiles()
       .filter((path) => path.startsWith(modulesRoot) && path.endsWith('.controller.ts'))

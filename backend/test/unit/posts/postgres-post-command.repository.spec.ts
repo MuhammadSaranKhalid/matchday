@@ -5,11 +5,47 @@ import { PostgresPostCommandRepository } from '../../../libs/modules/posts/src/i
 
 const principal: AuthenticatedPrincipal = {
   userId: '10000000-0000-4000-8000-000000000001',
-  role: 'authenticated',
+  sessionId: '50000000-0000-4000-8000-000000000001',
   appMetadata: {},
 };
 const postId = '20000000-0000-4000-8000-000000000001';
 const mediaId = '30000000-0000-4000-8000-000000000001';
+
+describe('PostgresPostCommandRepository.reserveDraft', () => {
+  it('executes within user transaction with caller principal', async () => {
+    const tx = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('from public.posts where created_by_user_id = $1 and idempotency_key = $2')) {
+          return { rowCount: 1, rows: [{ post_id: postId }] };
+        }
+        if (sql.includes('from public.post_media where post_id = $1 order by position')) {
+          return { rowCount: 0, rows: [] };
+        }
+        return { rowCount: 0, rows: [] };
+      }),
+    };
+
+    const database = {
+      withSystemTransaction: vi.fn(async (work: (t: typeof tx) => Promise<unknown>) => work(tx)),
+    };
+
+    const repository = new PostgresPostCommandRepository(database as never);
+    const result = await repository.reserveDraft(principal, {
+      clientCommandId: '40000000-0000-4000-8000-000000000001',
+      publisherType: 'user',
+      publisherId: principal.userId,
+      postKind: 'standard',
+      media: [],
+    });
+
+    expect(database.withSystemTransaction).toHaveBeenCalledOnce();
+    expect(result).toEqual({
+      postId,
+      status: 'draft',
+      media: [],
+    });
+  });
+});
 
 describe('PostgresPostCommandRepository.markUploaded', () => {
   it('transitions post_media rows to uploaded status within owner transaction', async () => {

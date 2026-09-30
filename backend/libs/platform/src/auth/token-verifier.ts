@@ -1,7 +1,5 @@
 import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 
-export const TOKEN_VERIFIER = Symbol('TokenVerifier');
-
 export type VerificationFailureCode = 'invalid_token' | 'verification_unavailable';
 
 export class TokenVerificationError extends Error {
@@ -11,6 +9,6 @@ export class TokenVerificationError extends Error {
   }
 }
 
-export interface TokenVerifier {
-  verify(accessToken: string): Promise<AuthenticatedPrincipal>;
+export abstract class TokenVerifier {
+  abstract verify(accessToken: string): Promise<AuthenticatedPrincipal>;
 }

@@ -3,37 +3,6 @@ import { z } from 'zod';
 const nodeEnvironmentSchema = z.enum(['development', 'test', 'production']);
 const logLevelSchema = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']);
 
-export interface Environment {
-  readonly NODE_ENV: 'development' | 'test' | 'production';
-  readonly APP_NAME: string;
-  readonly PORT: number;
-  readonly LOG_LEVEL: z.infer<typeof logLevelSchema>;
-  readonly CORS_ORIGINS: readonly string[];
-  readonly BODY_LIMIT: string;
-  readonly THROTTLE_TTL_MS: number;
-  readonly THROTTLE_LIMIT: number;
-  readonly TRUST_PROXY_HOPS: number;
-  readonly SWAGGER_ENABLED: boolean;
-  readonly DATABASE_URL: string;
-  readonly DATABASE_POOL_MAX: number;
-  readonly DATABASE_CONNECTION_TIMEOUT_MS: number;
-  readonly DATABASE_IDLE_TIMEOUT_MS: number;
-  readonly DATABASE_STATEMENT_TIMEOUT_MS: number;
-  readonly DATABASE_SSL_MODE: 'disable' | 'require' | 'verify-full';
-  readonly REDIS_URL: string;
-  readonly REDIS_CONNECTION_TIMEOUT_MS: number;
-  readonly REDIS_COMMAND_TIMEOUT_MS: number;
-  readonly REDIS_MAX_RETRIES_PER_REQUEST: number;
-  readonly REDIS_NAMESPACE: string;
-  readonly SUPABASE_URL: string;
-  readonly SUPABASE_SECRET_KEY: string;
-  readonly SUPABASE_PUBLISHABLE_KEY: string;
-  readonly QUEUE_ATTEMPTS: number;
-  readonly QUEUE_BACKOFF_DELAY_MS: number;
-  readonly QUEUE_REMOVE_ON_COMPLETE_COUNT: number;
-  readonly QUEUE_REMOVE_ON_FAIL_COUNT: number;
-}
-
 function positiveInteger(defaultValue: number, maximum = 120_000) {
   return z.coerce.number().int().positive().max(maximum).default(defaultValue);
 }
@@ -67,7 +36,7 @@ function normalizeOrigins(raw: string, production: boolean): readonly string[] {
   });
 }
 
-export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
+export function parseEnvironment(input: NodeJS.ProcessEnv) {
   const nodeEnvironment = nodeEnvironmentSchema.safeParse(input.NODE_ENV ?? 'development');
   if (!nodeEnvironment.success) throw new Error('Invalid environment: NODE_ENV');
 
@@ -118,3 +87,5 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
     CORS_ORIGINS: Object.freeze(normalizeOrigins(result.data.CORS_ORIGINS, production)),
   });
 }
+
+export type Environment = ReturnType<typeof parseEnvironment>;

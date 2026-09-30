@@ -4,11 +4,14 @@ import {
   MEDIA_JOB_NAMES,
   MEDIA_QUEUE_NAME,
   type ProcessImageJobV1,
+  type ProcessImageJobV2,
 } from '../../contracts/media-job.contract.js';
 import {
   PermanentMediaProcessingError,
   ProcessImageService,
 } from '../../application/process-image.service.js';
+
+type SupportedJob = ProcessImageJobV1 | ProcessImageJobV2;
 
 @Processor(MEDIA_QUEUE_NAME)
 export class MediaProcessor extends WorkerHost {
@@ -16,10 +19,10 @@ export class MediaProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<ProcessImageJobV1>): Promise<void> {
+  async process(job: Job<SupportedJob>): Promise<void> {
     if (
       job.name !== MEDIA_JOB_NAMES.processImage ||
-      job.data.schemaVersion !== 1
+      (job.data.schemaVersion !== 1 && job.data.schemaVersion !== 2)
     ) {
       throw new UnrecoverableError('unsupported_media_job');
     }

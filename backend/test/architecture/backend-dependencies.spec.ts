@@ -378,3 +378,32 @@ describe('step 2B — platform wiring and lifecycle invariants', () => {
   });
 });
 
+describe('step 3A — durable media dispatch invariants', () => {
+  it('PostsModule and PublishPostService do not import MediaProcessingScheduler or BullMQ', () => {
+    const postsModuleRoot = join(repositoryRoot, 'libs', 'modules', 'posts', 'src');
+    const violations = sourceFiles()
+      .filter((path) => path.startsWith(postsModuleRoot))
+      .flatMap((path) => {
+        const contents = readFileSync(path, 'utf8');
+        const imports = importsIn(path);
+        const importsScheduler = imports.some((specifier) => specifier.includes('media-processing-scheduler'));
+        const usesScheduler = contents.includes('MediaProcessingScheduler');
+        const usesBull = imports.some((specifier) => specifier.includes('bullmq'));
+        if (importsScheduler || usesScheduler || usesBull) {
+          return [`${relative(repositoryRoot, path)} (depends on scheduling/BullMQ directly)`];
+        }
+        return [];
+      });
+
+    expect(violations).toEqual([]);
+  });
+
+  it('media contracts export ProcessImageJobV2 with generation support', () => {
+    const contractPath = join(repositoryRoot, 'libs', 'modules', 'media', 'src', 'contracts', 'media-job.contract.ts');
+    const contents = readFileSync(contractPath, 'utf8');
+    expect(contents).toContain('ProcessImageJobV2');
+    expect(contents).toContain('readonly generation: number;');
+    expect(contents).toContain('readonly schemaVersion: 2;');
+  });
+});
+

@@ -94,14 +94,31 @@ export class PostgresPostCommandRepository implements PostCommandRepository {
     return this.database.withSystemTransaction(async (tx) => {
       await requireOwner(tx, principal.userId, postId);
       for (const item of media) {
-        const result = await tx.query(
-          `update public.post_media set status = 'uploaded', source_bytes = $3, source_mime = $4
-           where media_id = $1 and post_id = $2 and status = 'pending_upload'`,
+        const result = await tx.query<{ generation: number }>(
+          `update public.post_media
+           set status = 'uploaded',
+               source_bytes = $3,
+               source_mime = $4,
+               processing_generation = processing_generation + 1,
+               updated_at = now()
+           where media_id = $1 and post_id = $2 and status = 'pending_upload'
+           returning processing_generation as generation`,
           [item.mediaId, postId, item.bytes, item.contentType],
         );
-        if (result.rowCount !== 1) throw new ApplicationError('POST_MEDIA_STATE_CONFLICT', 'Media state changed', 409);
+        if (result.rowCount !== 1) {
+          throw new ApplicationError('POST_MEDIA_STATE_CONFLICT', 'Media state changed', 409);
+        }
+        const generation = result.rows[0]!.generation;
+        await tx.query(
+          `insert into private.media_processing_outbox (media_id, generation)
+           values ($1, $2)`,
+          [item.mediaId, generation],
+        );
       }
-      await tx.query("update public.posts set status = 'publishing' where post_id = $1 and status = 'publishing'", [postId]);
+      await tx.query(
+        "update public.posts set status = 'publishing' where post_id = $1 and status = 'publishing'",
+        [postId],
+      );
     });
   }
 

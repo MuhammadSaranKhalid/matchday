@@ -20,4 +20,5 @@ export {
   MEDIA_QUEUE_NAME,
   MEDIA_JOB_NAMES,
   type ProcessImageJobV1,
+  type ProcessImageJobV2,
 } from './contracts/media-job.contract.js';

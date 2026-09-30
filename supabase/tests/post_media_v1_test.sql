@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, private, extensions;
 
-select plan(50);
+select plan(60);
 
 select enum_has_labels(
   'public',
@@ -15,6 +15,16 @@ select hasnt_column('public', 'post_media', 'optimization_attempts');
 select hasnt_column('public', 'post_media', 'feed_ready_at');
 select hasnt_column('public', 'post_media', 'last_optimization_error');
 select hasnt_column('public', 'post_media', 'optimized_at');
+select has_column('public', 'post_media', 'processing_generation');
+select has_column('public', 'post_media', 'processing_token');
+select has_table('private', 'media_processing_outbox');
+select has_column('private', 'media_processing_outbox', 'media_id');
+select has_column('private', 'media_processing_outbox', 'generation');
+select has_column('private', 'media_processing_outbox', 'available_at');
+select has_column('private', 'media_processing_outbox', 'lease_owner');
+select has_column('private', 'media_processing_outbox', 'lease_expires_at');
+select has_column('private', 'media_processing_outbox', 'dispatch_attempts');
+select has_column('private', 'media_processing_outbox', 'dispatched_at');
 
 select has_function('private', 'claim_post_media_for_processing', array['uuid']);
 select has_function('private', 'release_post_media_for_retry', array['uuid', 'text']);

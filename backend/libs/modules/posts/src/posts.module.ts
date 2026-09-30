@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import {
   MediaModule,
-  MediaProcessingScheduler,
   MediaUploadService,
 } from '@modules/media';
 
@@ -41,13 +40,11 @@ import { PostsController } from './presentation/http/posts.controller.js';
       inject: [
         POST_COMMAND_REPOSITORY,
         MediaUploadService,
-        MediaProcessingScheduler,
       ],
       useFactory: (
         repository: PostCommandRepository,
         mediaUpload: MediaUploadService,
-        scheduler: MediaProcessingScheduler,
-      ) => new PublishPostService(repository, mediaUpload, scheduler),
+      ) => new PublishPostService(repository, mediaUpload),
     },
   ],
 })

@@ -8,7 +8,7 @@ import type { PlatformConfiguration } from '../../../platform/src/config/configu
 import { PlatformConfigModule } from '../../../platform/src/config/platform-config.module.js';
 import { DatabaseModule } from '../../../platform/src/database/database.module.js';
 import { DatabaseExecutorService } from '../../../platform/src/database/database-executor.service.js';
-import { QueueModule } from '../../../platform/src/queue/queue.module.js';
+import { QueueWorkerModule } from '../../../platform/src/queue/queue.module.js';
 
 import {
   MEDIA_QUEUE_NAME,
@@ -45,7 +45,7 @@ import { MediaProcessor } from './presentation/queue/media.processor.js';
   imports: [
     PlatformConfigModule,
     DatabaseModule,
-    QueueModule,
+    QueueWorkerModule,
     BullModule.registerQueue({
       name: MEDIA_QUEUE_NAME,
       forceDisconnectOnShutdown: true,

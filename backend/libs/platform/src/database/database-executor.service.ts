@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { AuthenticatedPrincipal } from '../auth/authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import type { QueryExecutor, TransactionWork } from './database.types.js';
 
 interface ClientProvider {

@@ -20,7 +20,7 @@ export function buildQueuePrefix(configuration: Readonly<RedisConfiguration>): s
   return `${configuration.namespace}:bull`;
 }
 
-export function buildQueueConnectionOptions(
+export function buildQueueProducerConnectionOptions(
   configuration: Readonly<RedisConfiguration>,
 ): ConnectionOptions {
   return {
@@ -35,3 +35,17 @@ export function buildQueueConnectionOptions(
         : Math.min(attempt * 100, configuration.connectionTimeoutMs),
   };
 }
+
+export function buildQueueWorkerConnectionOptions(
+  configuration: Readonly<RedisConfiguration>,
+): ConnectionOptions {
+  return {
+    url: configuration.url,
+    connectTimeout: configuration.connectionTimeoutMs,
+    maxRetriesPerRequest: null,
+    enableOfflineQueue: true,
+    retryStrategy: (attempt) => Math.min(attempt * 100, 3000),
+  };
+}
+
+export const buildQueueConnectionOptions = buildQueueProducerConnectionOptions;

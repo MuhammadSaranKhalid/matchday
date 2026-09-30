@@ -5,6 +5,8 @@ import {
   buildQueueConnectionOptions,
   buildQueueDefaultJobOptions,
   buildQueuePrefix,
+  buildQueueProducerConnectionOptions,
+  buildQueueWorkerConnectionOptions,
 } from '../../../../libs/platform/src/queue/queue-defaults.js';
 
 const queue: QueueConfiguration = {
@@ -34,20 +36,34 @@ describe('queue defaults', () => {
 
   it('uses a namespaced BullMQ prefix without embedding a key prefix in ioredis', () => {
     expect(buildQueuePrefix(redis)).toBe('matchday:test:bull');
-    expect(buildQueueConnectionOptions(redis)).toMatchObject({
+    expect(buildQueueProducerConnectionOptions(redis)).toMatchObject({
       url: redis.url,
       connectTimeout: 800,
       commandTimeout: 600,
       maxRetriesPerRequest: 3,
       enableOfflineQueue: false,
     });
-    expect(buildQueueConnectionOptions(redis)).not.toHaveProperty('keyPrefix');
+    expect(buildQueueProducerConnectionOptions(redis)).not.toHaveProperty('keyPrefix');
+    expect(buildQueueConnectionOptions).toBe(buildQueueProducerConnectionOptions);
   });
 
-  it('bounds connection retry during startup', () => {
-    const options = buildQueueConnectionOptions(redis);
+  it('bounds connection retry for API producers', () => {
+    const options = buildQueueProducerConnectionOptions(redis);
     expect(options.retryStrategy?.(1)).toBe(100);
     expect(options.retryStrategy?.(3)).toBe(300);
     expect(options.retryStrategy?.(4)).toBeNull();
+  });
+
+  it('configures indefinite reconnection with null maxRetriesPerRequest for workers', () => {
+    const workerOptions = buildQueueWorkerConnectionOptions(redis);
+    expect(workerOptions).toMatchObject({
+      url: redis.url,
+      connectTimeout: 800,
+      maxRetriesPerRequest: null,
+      enableOfflineQueue: true,
+    });
+    expect(workerOptions.retryStrategy?.(1)).toBe(100);
+    expect(workerOptions.retryStrategy?.(10)).toBe(1000);
+    expect(workerOptions.retryStrategy?.(50)).toBe(3000);
   });
 });

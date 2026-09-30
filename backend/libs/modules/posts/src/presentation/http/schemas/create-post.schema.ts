@@ -18,4 +18,3 @@ export const createPostSchema = z.strictObject({
 });
 
 export type CreatePostDto = z.infer<typeof createPostSchema>;
-export type CreatePostInput = CreatePostDto;

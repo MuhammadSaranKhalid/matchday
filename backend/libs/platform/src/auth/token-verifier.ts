@@ -1,4 +1,4 @@
-import type { AuthenticatedPrincipal } from './authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 
 export const TOKEN_VERIFIER = Symbol('TokenVerifier');
 

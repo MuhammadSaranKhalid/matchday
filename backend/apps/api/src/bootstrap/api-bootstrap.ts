@@ -1,5 +1,4 @@
 import {
-  type INestApplication,
   RequestMethod,
   StandardSchemaValidationPipe,
   VersioningType,
@@ -7,7 +6,6 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import type { Application } from 'express';
 
 import type { PlatformConfiguration } from '../../../../libs/platform/src/config/configuration.js';
 import { RequestContextMiddleware } from '../../../../libs/platform/src/context/request-context.middleware.js';
@@ -26,9 +24,8 @@ export async function configureApi(
   };
 
   const requestContext = app.get(RequestContextMiddleware);
-  const express = app.getHttpAdapter().getInstance() as Application;
 
-  express.set('trust proxy', config.trustProxyHops);
+  app.set('trust proxy', config.trustProxyHops);
   app.useSecurityHeaders();
   app.use(requestContext.use.bind(requestContext));
   app.useBodyParser('json', { limit: config.bodyLimit });

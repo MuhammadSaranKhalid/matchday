@@ -1,4 +1,5 @@
 import { Controller, Get, VERSION_NEUTRAL } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   HealthCheck,
   HealthCheckService,
@@ -9,6 +10,7 @@ import { ReadinessService } from '../lifecycle/readiness.service.js';
 import { PostgresHealthIndicator } from '../database/postgres-health.indicator.js';
 import { RedisHealthIndicator } from '../redis/redis-health.indicator.js';
 
+@SkipThrottle()
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(

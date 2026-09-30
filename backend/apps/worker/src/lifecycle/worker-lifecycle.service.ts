@@ -2,6 +2,7 @@ import {
   type BeforeApplicationShutdown,
   Inject,
   Injectable,
+  type OnApplicationBootstrap,
 } from '@nestjs/common';
 
 import {
@@ -13,13 +14,17 @@ import { ReadinessService } from '../../../../libs/platform/src/lifecycle/readin
 
 @Injectable()
 export class WorkerLifecycleService
-  implements BeforeApplicationShutdown
+  implements OnApplicationBootstrap, BeforeApplicationShutdown
 {
   constructor(
     private readonly readiness: ReadinessService,
     private readonly postgresHealth: PostgresHealthIndicator,
     @Inject(MEDIA_QUEUE_READINESS) private readonly queueReadiness: MediaQueueReadiness,
   ) {}
+
+  async onApplicationBootstrap(): Promise<void> {
+    await this.initialize();
+  }
 
   async initialize(): Promise<void> {
     try {

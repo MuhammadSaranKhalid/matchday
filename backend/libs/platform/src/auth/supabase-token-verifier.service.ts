@@ -9,7 +9,7 @@ import {
 } from 'jose';
 
 import type { AuthConfiguration } from '../config/configuration.js';
-import type { AuthenticatedPrincipal } from './authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { TokenVerificationError, type TokenVerifier } from './token-verifier.js';
 type FetchImplementation = typeof fetch;
 

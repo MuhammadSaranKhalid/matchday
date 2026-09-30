@@ -1,6 +1,6 @@
 import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
 
-import type { AuthenticatedPrincipal } from './authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import type { AuthenticatedRequest } from './supabase-auth.guard.js';
 
 export const CurrentPrincipal = createParamDecorator(

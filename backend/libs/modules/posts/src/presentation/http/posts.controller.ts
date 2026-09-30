@@ -5,6 +5,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  SerializeOptions,
   UseGuards,
 } from '@nestjs/common';
 
@@ -14,6 +15,10 @@ import { SupabaseAuthGuard } from '../../../../../platform/src/auth/supabase-aut
 import { CreatePostService } from '../../application/create-post.service.js';
 import { PublishPostService } from '../../application/publish-post.service.js';
 import { type CreatePostDto, createPostSchema } from './schemas/create-post.schema.js';
+import {
+  createPostResponseSchema,
+  postStatusResponseSchema,
+} from './schemas/post-response.schema.js';
 
 @UseGuards(SupabaseAuthGuard)
 @Controller('posts')
@@ -24,6 +29,7 @@ export class PostsController {
   ) {}
 
   @Post()
+  @SerializeOptions({ schema: createPostResponseSchema })
   async create(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Body({ schema: createPostSchema }) command: CreatePostDto,
@@ -32,6 +38,7 @@ export class PostsController {
   }
 
   @Post(':postId/publish')
+  @SerializeOptions({ schema: postStatusResponseSchema })
   async publish(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Param('postId', new ParseUUIDPipe()) postId: string,
@@ -40,6 +47,7 @@ export class PostsController {
   }
 
   @Get(':postId/status')
+  @SerializeOptions({ schema: postStatusResponseSchema })
   async status(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Param('postId', new ParseUUIDPipe()) postId: string,
@@ -47,3 +55,4 @@ export class PostsController {
     return this.publishPost.status(principal, postId);
   }
 }
+

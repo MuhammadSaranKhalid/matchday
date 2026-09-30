@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "target": "ES2023",
     "lib": ["ES2023"],
     "declaration": true,
@@ -17,15 +17,15 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "paths": {
-      "@app/api/*": ["apps/api/src/*"],
-      "@app/worker/*": ["apps/worker/src/*"],
-      "@modules/posts": ["libs/modules/posts/src/index.ts"],
-      "@modules/media": ["libs/modules/media/src/index.ts"],
-      "@platform/*": ["libs/platform/src/*"],
-      "@shared-kernel/*": ["libs/shared-kernel/src/*"]
+      "@app/api/*": ["./apps/api/src/*"],
+      "@app/worker/*": ["./apps/worker/src/*"],
+      "@modules/posts": ["./libs/modules/posts/src/index.ts"],
+      "@modules/media": ["./libs/modules/media/src/index.ts"],
+      "@platform/*": ["./libs/platform/src/*"],
+      "@shared-kernel": ["./libs/shared-kernel/src/index.ts"],
+      "@shared-kernel/*": ["./libs/shared-kernel/src/*"]
     }
-  }
+  },
+  "exclude": ["node_modules", "dist"]
 }

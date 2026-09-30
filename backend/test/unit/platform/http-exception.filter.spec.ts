@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ExecutionContextService } from '../../../libs/platform/src/context/execution-context.service.js';
 import { ApplicationError } from '@shared-kernel/errors/application-error.js';
-import { HttpExceptionFilter } from '../../../libs/platform/src/errors/http-exception.filter.js';
+import { HttpExceptionFilter } from '../../../libs/platform/src/http/http-exception.filter.js';
 
 interface CapturedResponse {
   status?: number;

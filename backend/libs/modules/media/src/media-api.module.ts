@@ -6,7 +6,7 @@ import type { Queue } from 'bullmq';
 
 import type { PlatformConfiguration } from '../../../platform/src/config/configuration.js';
 import { PlatformConfigModule } from '../../../platform/src/config/platform-config.module.js';
-import { QueueModule } from '../../../platform/src/queue/queue.module.js';
+import { QueueProducerModule } from '../../../platform/src/queue/queue.module.js';
 
 import {
   MEDIA_QUEUE_NAME,
@@ -28,7 +28,7 @@ import { SupabaseMediaStorageService } from './infrastructure/storage/supabase-m
 @Module({
   imports: [
     PlatformConfigModule,
-    QueueModule,
+    QueueProducerModule,
     BullModule.registerQueue({
       name: MEDIA_QUEUE_NAME,
       forceDisconnectOnShutdown: true,

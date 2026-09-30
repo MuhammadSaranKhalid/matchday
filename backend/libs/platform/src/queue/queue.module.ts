@@ -4,9 +4,10 @@ import { ConfigService } from '@nestjs/config';
 
 import type { PlatformConfiguration } from '../config/configuration.js';
 import {
-  buildQueueConnectionOptions,
   buildQueueDefaultJobOptions,
   buildQueuePrefix,
+  buildQueueProducerConnectionOptions,
+  buildQueueWorkerConnectionOptions,
 } from './queue-defaults.js';
 
 @Module({
@@ -16,7 +17,7 @@ import {
       useFactory: (configuration: ConfigService<PlatformConfiguration, true>) => {
         const redis = configuration.get('redis', { infer: true });
         return {
-          connection: buildQueueConnectionOptions(redis),
+          connection: buildQueueProducerConnectionOptions(redis),
           prefix: buildQueuePrefix(redis),
           defaultJobOptions: buildQueueDefaultJobOptions(
             configuration.get('queue', { infer: true }),
@@ -25,7 +26,28 @@ import {
       },
     }),
   ],
-  providers: [],
   exports: [BullModule],
 })
-export class QueueModule {}
+export class QueueProducerModule {}
+
+@Module({
+  imports: [
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configuration: ConfigService<PlatformConfiguration, true>) => {
+        const redis = configuration.get('redis', { infer: true });
+        return {
+          connection: buildQueueWorkerConnectionOptions(redis),
+          prefix: buildQueuePrefix(redis),
+          defaultJobOptions: buildQueueDefaultJobOptions(
+            configuration.get('queue', { infer: true }),
+          ),
+        };
+      },
+    }),
+  ],
+  exports: [BullModule],
+})
+export class QueueWorkerModule {}
+
+export { QueueProducerModule as QueueModule };

@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 
-import type { AuthenticatedPrincipal } from './authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import {
   TOKEN_VERIFIER,
   TokenVerificationError,

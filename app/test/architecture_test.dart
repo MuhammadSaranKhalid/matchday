@@ -46,13 +46,34 @@ void main() {
       );
     });
 
-    test('domain must not import core widgets/theme (UI leaking inward)', () {
+    test(
+        'domain must not import core widgets/theme/design_system (UI leaking inward)',
+        () {
       shouldNotDependOn(
         filesMatching('features/*/domain/**'),
         union(
           filesMatching('core/widgets/**'),
           filesMatching('core/theme/**'),
+          filesMatching('core/design_system/**'),
         ),
+        graph,
+      );
+    });
+  });
+
+  group('design system boundaries', () {
+    test('design system must not depend on features', () {
+      shouldNotDependOn(
+        filesMatching('core/design_system/**'),
+        filesMatching('features/**'),
+        graph,
+      );
+    });
+
+    test('domain must not depend on design system', () {
+      shouldNotDependOn(
+        filesMatching('features/*/domain/**'),
+        filesMatching('core/design_system/**'),
         graph,
       );
     });
@@ -106,6 +127,57 @@ void main() {
           );
         }
       });
+    });
+  });
+
+  group('tournament lifecycle single-source-of-truth invariants', () {
+    test('tournament production Flutter code must not mutate legacy status column', () {
+      final tournamentsLibDir = Directory('lib/features/tournaments');
+      if (!tournamentsLibDir.existsSync()) return;
+
+      final dartFiles = tournamentsLibDir
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart'));
+
+      final violations = <String>[];
+
+      for (final file in dartFiles) {
+        final content = file.readAsStringSync();
+
+        // 1. Check if updateTournament contains a write to 'status'
+        final updateTournamentMatches =
+            RegExp(r'updateTournament\s*\([^,]+,\s*\{([^}]+)\}', multiLine: true)
+                .allMatches(content);
+        for (final m in updateTournamentMatches) {
+          final mapBody = m.group(1) ?? '';
+          if (mapBody.contains("'status'") || mapBody.contains('"status"')) {
+            violations.add(
+                '${file.path}: Found direct write of legacy "status" column via updateTournament.');
+          }
+        }
+
+        // 2. Check if direct supabase update on tournaments table writes to 'status'
+        if (content.contains('_tournamentsTable') ||
+            content.contains("'tournaments'")) {
+          final updateTableMatches = RegExp(
+                  r"\.from\((_tournamentsTable|'tournaments')\)\s*\.update\(\s*\{([^}]+)\}",
+                  multiLine: true)
+              .allMatches(content);
+          for (final m in updateTableMatches) {
+            final mapBody = m.group(2) ?? '';
+            if (mapBody.contains("'status'") || mapBody.contains('"status"')) {
+              violations.add(
+                  '${file.path}: Found direct write of legacy "status" column to tournaments table.');
+            }
+          }
+        }
+      }
+
+      expect(violations, isEmpty,
+          reason:
+              'Tournaments feature must not write to legacy "status" column. '
+              'Writes must target canonical lifecycle columns. Violations: ${violations.join(', ')}');
     });
   });
 }

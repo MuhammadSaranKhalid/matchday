@@ -221,8 +221,15 @@ class TournamentsRemoteDataSource {
         'tournament_type': params.type.wire,
         'privacy': params.privacy.wire,
         'created_by': uid,
+        'owner_user_id': uid,
         'organizers': [uid],
-        'status': 'draft',
+        // Canonical lifecycle fields (Draft):
+        'publication_state': 'draft',
+        'registration_state': 'not_open',
+        'entry_state': 'editable',
+        'competition_state': 'not_started',
+        'termination_state': 'none',
+        // Note: 'status' is NOT written by Flutter; it is projected by DB trigger.
         'format': params.format,
         'rules': params.rules,
         'venues': params.venues.map((v) => v.toJson()).toList(),
@@ -277,10 +284,17 @@ class TournamentsRemoteDataSource {
   }
 
   Future<void> publishTournament(String tournamentId) async {
+    // Current transitional action from create wizard:
+    // UI dialog is "Ready to open registrations?" -> publishes and opens registration.
+    // TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC (PublishTournament / OpenRegistration).
+    // Phase 2 transition: write canonical lifecycle columns; database projects legacy `status`.
     try {
       await _supabase
           .from(_tournamentsTable)
-          .update({'status': 'registration'})
+          .update({
+            'publication_state': 'published',
+            'registration_state': 'open',
+          })
           .eq('tournament_id', tournamentId);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);

@@ -12,7 +12,14 @@ class TournamentDto {
     required this.venues,
     required this.createdAt,
     required this.updatedAt,
+    this.ownerUserId,
     this.createdBy,
+    this.revision = 1,
+    this.publicationState = 'draft',
+    this.registrationState = 'not_open',
+    this.entryState = 'editable',
+    this.competitionState = 'not_started',
+    this.terminationState = 'none',
     this.bannerImageUrl,
     this.logoUrl,
     this.description,
@@ -34,7 +41,14 @@ class TournamentDto {
   final String tournamentType;
   final String status;
   final String privacy;
+  final String? ownerUserId;
   final String? createdBy;
+  final int revision;
+  final String publicationState;
+  final String registrationState;
+  final String entryState;
+  final String competitionState;
+  final String terminationState;
   final List<String> organizers;
   final List<dynamic> venues;
   final String? bannerImageUrl;
@@ -61,7 +75,14 @@ class TournamentDto {
       tournamentType: json['tournament_type'] as String? ?? 'knockout',
       status: json['status'] as String? ?? 'draft',
       privacy: json['privacy'] as String? ?? 'public',
+      ownerUserId: json['owner_user_id'] as String? ?? json['created_by'] as String?,
       createdBy: json['created_by'] as String?,
+      revision: (json['revision'] as num?)?.toInt() ?? 1,
+      publicationState: json['publication_state'] as String? ?? 'draft',
+      registrationState: json['registration_state'] as String? ?? 'not_open',
+      entryState: json['entry_state'] as String? ?? 'editable',
+      competitionState: json['competition_state'] as String? ?? 'not_started',
+      terminationState: json['termination_state'] as String? ?? 'none',
       organizers: (json['organizers'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -102,7 +123,14 @@ class TournamentDto {
       type: TournamentType.fromWire(tournamentType),
       status: TournamentStatus.fromWire(status),
       privacy: TournamentPrivacy.fromWire(privacy),
+      ownerUserId: ownerUserId,
       createdBy: createdBy,
+      revision: revision,
+      publicationState: TournamentPublicationState.fromWire(publicationState),
+      registrationState: TournamentRegistrationState.fromWire(registrationState),
+      entryState: TournamentEntryState.fromWire(entryState),
+      competitionState: TournamentCompetitionState.fromWire(competitionState),
+      terminationState: TournamentTerminationState.fromWire(terminationState),
       organizers: organizers,
       venues: venueObjects,
       bannerImageUrl: bannerImageUrl,

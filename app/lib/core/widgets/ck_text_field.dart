@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' hide TextInput;
 
-import '../theme/circk_theme.dart';
+import '../design_system/design_system.dart';
 
-/// Circk's standard labelled text input: a clear label above a themed
-/// [TextField], with optional helper / error text below.
+/// Backward compatibility wrapper for [TextInput].
 ///
-/// The field decoration itself comes from [buildCirckTheme]'s
-/// `inputDecorationTheme`; this widget adds the above-field label and the
-/// inline error affordance the designs call for.
+/// Use [TextInput] from `package:matchday/core/design_system/design_system.dart` directly.
+@Deprecated('Use TextInput from package:matchday/core/design_system/design_system.dart')
 class CkTextField extends StatelessWidget {
   const CkTextField({
     super.key,
@@ -49,48 +47,23 @@ class CkTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasError = errorText != null && errorText!.isNotEmpty;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: CkType.body(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: CkColors.ink2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          enabled: enabled,
-          autofocus: autofocus,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          textInputAction: textInputAction,
-          maxLength: maxLength,
-          maxLines: maxLines,
-          inputFormatters: inputFormatters,
-          onChanged: onChanged,
-          onSubmitted: onSubmitted,
-          style: CkType.body(fontSize: 16, color: CkColors.ink),
-          decoration: InputDecoration(
-            hintText: hint,
-            counterText: '',
-            suffixIcon: suffix,
-            errorText: hasError ? errorText : null,
-          ),
-        ),
-        if (!hasError && helperText != null && helperText!.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(
-            helperText!,
-            style: CkType.body(fontSize: 12, color: CkColors.muted),
-          ),
-        ],
-      ],
+    return TextInput(
+      label: label,
+      controller: controller,
+      hint: hint,
+      errorText: errorText,
+      helperText: helperText,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      obscureText: obscureText,
+      autofocus: autofocus,
+      enabled: enabled,
+      maxLength: maxLength,
+      maxLines: maxLines,
+      inputFormatters: inputFormatters,
+      suffix: suffix,
+      onChanged: onChanged,
+      onSubmitted: onSubmitted,
     );
   }
 }

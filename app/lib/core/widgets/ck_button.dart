@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../theme/circk_theme.dart';
+import '../design_system/design_system.dart';
 
-/// The three button shapes used across Circk.
+/// Legacy button variant enum.
 ///
-/// These are thin wrappers over the themed [FilledButton] / [OutlinedButton] /
-/// [TextButton] (styled in [buildCirckTheme]) so call sites read by intent
-/// rather than by Material widget name, and so a busy spinner is handled in
-/// one place.
+/// Prefer [ActionButtonVariant] from `package:matchday/core/design_system/design_system.dart`.
 enum CkButtonVariant { primary, secondary, ghost }
 
+/// Backward compatibility wrapper for [ActionButton].
+///
+/// Use [ActionButton] directly for new code.
+@Deprecated('Use ActionButton from package:matchday/core/design_system/design_system.dart')
 class CkButton extends StatelessWidget {
   const CkButton({
     super.key,
@@ -43,73 +44,25 @@ class CkButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final CkButtonVariant variant;
   final Widget? icon;
-
-  /// When true the button is disabled and shows an inline spinner.
   final bool busy;
-
-  /// When true the button stretches to fill its parent's width.
   final bool expand;
 
   @override
   Widget build(BuildContext context) {
-    final effectiveOnPressed = busy ? null : onPressed;
-    final child = busy
-        ? _Spinner(color: _spinnerColor)
-        : _Label(label: label, icon: icon);
-
-    final Widget button = switch (variant) {
-      CkButtonVariant.primary => FilledButton(
-          onPressed: effectiveOnPressed,
-          child: child,
-        ),
-      CkButtonVariant.secondary => OutlinedButton(
-          onPressed: effectiveOnPressed,
-          child: child,
-        ),
-      CkButtonVariant.ghost => TextButton(
-          onPressed: effectiveOnPressed,
-          child: child,
-        ),
+    final actionVariant = switch (variant) {
+      CkButtonVariant.primary => ActionButtonVariant.primary,
+      CkButtonVariant.secondary => ActionButtonVariant.secondary,
+      CkButtonVariant.ghost => ActionButtonVariant.ghost,
     };
 
-    return expand ? SizedBox(width: double.infinity, child: button) : button;
-  }
-
-  Color get _spinnerColor =>
-      variant == CkButtonVariant.primary ? CkColors.paper : CkColors.ink;
-}
-
-class _Label extends StatelessWidget {
-  const _Label({required this.label, this.icon});
-
-  final String label;
-  final Widget? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    if (icon == null) return Text(label);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        icon!,
-        const SizedBox(width: 8),
-        Text(label),
-      ],
-    );
-  }
-}
-
-class _Spinner extends StatelessWidget {
-  const _Spinner({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 20,
-      width: 20,
-      child: CircularProgressIndicator(strokeWidth: 2.2, color: color),
+    return ActionButton(
+      label: label,
+      onPressed: onPressed,
+      variant: actionVariant,
+      size: ControlSize.large,
+      icon: icon,
+      loading: busy,
+      expand: expand,
     );
   }
 }

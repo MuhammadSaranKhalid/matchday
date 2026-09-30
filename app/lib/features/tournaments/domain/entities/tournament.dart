@@ -35,6 +35,79 @@ enum TournamentStatus {
       values.where((s) => s.wire == wire).firstOrNull ?? TournamentStatus.draft;
 }
 
+/// Canonical publication state.
+enum TournamentPublicationState {
+  draft('draft', 'Draft'),
+  published('published', 'Published');
+
+  const TournamentPublicationState(this.wire, this.label);
+  final String wire;
+  final String label;
+
+  static TournamentPublicationState fromWire(String? wire) =>
+      values.where((s) => s.wire == wire).firstOrNull ??
+      TournamentPublicationState.draft;
+}
+
+/// Canonical registration state.
+enum TournamentRegistrationState {
+  notOpen('not_open', 'Not Open'),
+  open('open', 'Open'),
+  closed('closed', 'Closed');
+
+  const TournamentRegistrationState(this.wire, this.label);
+  final String wire;
+  final String label;
+
+  static TournamentRegistrationState fromWire(String? wire) =>
+      values.where((s) => s.wire == wire).firstOrNull ??
+      TournamentRegistrationState.notOpen;
+}
+
+/// Canonical entry set lock state.
+enum TournamentEntryState {
+  editable('editable', 'Editable'),
+  locked('locked', 'Locked');
+
+  const TournamentEntryState(this.wire, this.label);
+  final String wire;
+  final String label;
+
+  static TournamentEntryState fromWire(String? wire) =>
+      values.where((s) => s.wire == wire).firstOrNull ??
+      TournamentEntryState.editable;
+}
+
+/// Canonical competition execution state.
+enum TournamentCompetitionState {
+  notStarted('not_started', 'Not Started'),
+  inProgress('in_progress', 'In Progress'),
+  completed('completed', 'Completed');
+
+  const TournamentCompetitionState(this.wire, this.label);
+  final String wire;
+  final String label;
+
+  static TournamentCompetitionState fromWire(String? wire) =>
+      values.where((s) => s.wire == wire).firstOrNull ??
+      TournamentCompetitionState.notStarted;
+}
+
+/// Canonical termination state.
+enum TournamentTerminationState {
+  none('none', 'None'),
+  cancelled('cancelled', 'Cancelled'),
+  abandoned('abandoned', 'Abandoned');
+
+  const TournamentTerminationState(this.wire, this.label);
+  final String wire;
+  final String label;
+
+  static TournamentTerminationState fromWire(String? wire) =>
+      values.where((s) => s.wire == wire).firstOrNull ??
+      TournamentTerminationState.none;
+}
+
 /// Tournament privacy setting.
 enum TournamentPrivacy {
   public('public', 'Public'),
@@ -91,7 +164,14 @@ class Tournament {
     required this.venues,
     required this.createdAt,
     required this.updatedAt,
+    this.ownerUserId,
     this.createdBy,
+    this.revision = 1,
+    this.publicationState = TournamentPublicationState.draft,
+    this.registrationState = TournamentRegistrationState.notOpen,
+    this.entryState = TournamentEntryState.editable,
+    this.competitionState = TournamentCompetitionState.notStarted,
+    this.terminationState = TournamentTerminationState.none,
     this.bannerImageUrl,
     this.logoUrl,
     this.description,
@@ -116,7 +196,16 @@ class Tournament {
   final TournamentType type;
   final TournamentStatus status;
   final TournamentPrivacy privacy;
+  /// Canonical authority root for the tournament.
+  final String? ownerUserId;
+  /// Historical creator provenance (who originally inserted the record).
   final String? createdBy;
+  final int revision;
+  final TournamentPublicationState publicationState;
+  final TournamentRegistrationState registrationState;
+  final TournamentEntryState entryState;
+  final TournamentCompetitionState competitionState;
+  final TournamentTerminationState terminationState;
   final List<String> organizers;
   final List<TournamentVenue> venues;
   final String? bannerImageUrl;
@@ -139,8 +228,57 @@ class Tournament {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  String get effectiveOwnerUserId => ownerUserId ?? createdBy ?? '';
+
+  /// Deterministic projection from orthogonal lifecycle states onto legacy status.
+  static TournamentStatus derivePublicStatus({
+    required TournamentPublicationState publicationState,
+    required TournamentRegistrationState registrationState,
+    required TournamentEntryState entryState,
+    required TournamentCompetitionState competitionState,
+    required TournamentTerminationState terminationState,
+  }) {
+    if (terminationState == TournamentTerminationState.cancelled) {
+      return TournamentStatus.cancelled;
+    }
+    if (terminationState == TournamentTerminationState.abandoned) {
+      return TournamentStatus.abandoned;
+    }
+    if (publicationState == TournamentPublicationState.draft) {
+      return TournamentStatus.draft;
+    }
+    if (competitionState == TournamentCompetitionState.completed) {
+      return TournamentStatus.completed;
+    }
+    if (competitionState == TournamentCompetitionState.inProgress) {
+      return TournamentStatus.live;
+    }
+    if (registrationState == TournamentRegistrationState.open) {
+      return TournamentStatus.registration;
+    }
+    return TournamentStatus.upcoming;
+  }
+
+  TournamentStatus get projectedPublicStatus => derivePublicStatus(
+        publicationState: publicationState,
+        registrationState: registrationState,
+        entryState: entryState,
+        competitionState: competitionState,
+        terminationState: terminationState,
+      );
+
+  /// Authority check: answers whether [userId] currently has root owner
+  /// or delegated organizer authority over this tournament.
+  ///
+  /// Provenance ([createdBy]) answers who originated the row and does NOT
+  /// grant present authority once [ownerUserId] is set.
   bool isOrganizedBy(String userId) =>
-      createdBy == userId || organizers.contains(userId);
+      (ownerUserId != null ? ownerUserId == userId : createdBy == userId) ||
+      organizers.contains(userId);
+
+  /// Provenance helper: answers who originated this tournament row.
+  /// Does NOT grant current authorization.
+  bool wasCreatedBy(String userId) => createdBy == userId;
 
   int get maxOvers => (format['max_overs'] as num?)?.toInt() ?? 20;
   String get ballType => (format['ball_type'] as String?) ?? 'Leather (Red)';

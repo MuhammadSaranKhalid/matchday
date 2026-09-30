@@ -690,7 +690,7 @@ class _OrganizerConsoleScreenState
 
   Future<void> _onConsoleMenu(Tournament tournament) async {
     final me = ref.read(supabaseClientProvider).auth.currentUser;
-    final isOwner = me != null && tournament.createdBy == me.id;
+    final isOwner = me != null && tournament.effectiveOwnerUserId == me.id;
     final inRegistration = tournament.status == TournamentStatus.registration;
     final action = await showConsoleMenu(
       context,
@@ -729,10 +729,13 @@ class _OrganizerConsoleScreenState
   }
 
   Future<void> _closeRegistrationEarly() async {
+    // TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC (CloseRegistration / LockEntries).
+    // Phase 2 transition: write canonical lifecycle columns; database projects legacy `status`.
     final ok = await ref
         .read(tournamentsControllerProvider.notifier)
         .updateTournament(widget.tournamentId, {
-      'status': TournamentStatus.upcoming.wire,
+      'registration_state': 'closed',
+      'entry_state': 'locked',
     });
     _reportIfFailed(ok, 'Registration closed. Generate the draw when ready.');
   }

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/database/database_provider.dart';
 import 'core/supabase/supabase_auth_state_provider.dart';
-import 'core/theme/circk_theme.dart';
+import 'core/design_system/design_system.dart';
 import 'features/messages/presentation/providers/messages_providers.dart';
 import 'features/notifications/presentation/controllers/push_registrar.dart';
 import 'features/posts/presentation/controllers/post_publishing_coordinator.dart';
@@ -53,7 +53,7 @@ class MatchdayApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'Matchday',
-      theme: buildCirckTheme(),
+      theme: AppTheme.light,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

@@ -167,7 +167,7 @@ alter table public.tournaments
 create index if not exists tournaments_owner_user_id
   on public.tournaments (owner_user_id);
 
--- Invariant: If tournament is abandoned, publication must be published.
+-- Invariant constraints on orthogonal lifecycle states
 do $$
 begin
   if not exists (
@@ -181,6 +181,42 @@ begin
         (termination_state = 'none')
         or (termination_state = 'cancelled')
         or (termination_state = 'abandoned' and publication_state = 'published')
+      );
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.tournaments'::regclass
+      and conname = 'tournament_publication_competition_consistency'
+  ) then
+    alter table public.tournaments
+      add constraint tournament_publication_competition_consistency
+      check (
+        publication_state = 'published' or competition_state = 'not_started'
+      );
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.tournaments'::regclass
+      and conname = 'tournament_publication_registration_consistency'
+  ) then
+    alter table public.tournaments
+      add constraint tournament_publication_registration_consistency
+      check (
+        publication_state = 'published' or registration_state = 'not_open'
+      );
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.tournaments'::regclass
+      and conname = 'tournament_competition_registration_consistency'
+  ) then
+    alter table public.tournaments
+      add constraint tournament_competition_registration_consistency
+      check (
+        competition_state != 'completed' or registration_state != 'open'
       );
   end if;
 end
@@ -217,18 +253,21 @@ as $$
   end;
 $$;
 
-create or replace function public.sync_tournament_canonical_to_legacy_status()
+create or replace function public.project_tournament_canonical_to_legacy_status()
 returns trigger
 language plpgsql
 set search_path = public, pg_temp
 as $$
 begin
-  -- Ensure owner_user_id default for backward-compatible legacy inserts
+  -- Ensure owner_user_id default if not supplied
   if new.owner_user_id is null then
     new.owner_user_id := coalesce(new.created_by, auth.uid());
   end if;
 
-  -- Canonical fields are authoritative: project to legacy status column
+  -- Option A: Canonical lifecycle fields are strictly authoritative.
+  -- Legacy status is derived deterministically from canonical state.
+  -- Any direct write to `status` is overwritten by the canonical projection.
+  -- There is NO ingestion of legacy status into canonical lifecycle columns.
   new.status := public.derive_tournament_public_status(
     new.publication_state,
     new.registration_state,
@@ -243,10 +282,10 @@ $$;
 
 drop trigger if exists tournaments_sync_status_projection on public.tournaments;
 create trigger tournaments_sync_status_projection
-  before insert or update of publication_state, registration_state, entry_state, competition_state, termination_state
+  before insert or update
   on public.tournaments
   for each row
-  execute function public.sync_tournament_canonical_to_legacy_status();
+  execute function public.project_tournament_canonical_to_legacy_status();
 
 -- -----------------------------------------------------------------------------
 -- 5. Tournament Roles in roles Catalogue
@@ -347,9 +386,9 @@ create table if not exists public.tournament_memberships (
   tournament_id  uuid not null
     references public.tournaments (tournament_id)
     on delete cascade,
-  user_id        uuid not null
+  user_id        uuid
     references public.profiles (user_id)
-    on delete cascade,
+    on delete set null,
   scope          text not null default 'tournament'
     check (scope = 'tournament'),
   role_key       text not null default 'manager',
@@ -372,11 +411,17 @@ create table if not exists public.tournament_memberships (
     check (
       (status = 'removed' and removed_at is not null)
       or (status != 'removed')
+    ),
+  constraint tournament_memberships_active_user_check
+    check (
+      (status != 'active')
+      or (user_id is not null)
     )
 );
 
+drop index if exists public.idx_tournament_memberships_active_unique;
 create unique index if not exists idx_tournament_memberships_active_unique
-  on public.tournament_memberships (tournament_id, user_id, role_key)
+  on public.tournament_memberships (tournament_id, user_id)
   where (status = 'active');
 
 create index if not exists idx_tournament_memberships_lookup
@@ -390,6 +435,32 @@ create trigger tournament_memberships_set_updated_at
   before update on public.tournament_memberships
   for each row
   execute function public.set_updated_at();
+
+-- History preservation on account deletion:
+-- When a user profile is deleted, ON DELETE SET NULL nullifies user_id.
+-- This trigger automatically transitions active membership to 'removed' with timestamp.
+-- The historical membership record is preserved, while the deleted user's direct identity
+-- is intentionally anonymized. Appointment and removal metadata is retained where
+-- privacy and account-deletion rules allow.
+create or replace function public.tournament_memberships_anonymize_on_user_delete()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if new.user_id is null and old.user_id is not null then
+    new.status := 'removed';
+    new.removed_at := coalesce(new.removed_at, now());
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists tournament_memberships_anonymize_on_user_delete_trg on public.tournament_memberships;
+create trigger tournament_memberships_anonymize_on_user_delete_trg
+  before update of user_id on public.tournament_memberships
+  for each row
+  execute function public.tournament_memberships_anonymize_on_user_delete();
 
 -- -----------------------------------------------------------------------------
 -- 10. Backfill Existing organizers into tournament_memberships
@@ -417,7 +488,7 @@ join public.profiles p on p.user_id = u.user_id
 where
   u.user_id is not null
   and u.user_id != t.owner_user_id
-on conflict (tournament_id, user_id, role_key) where (status = 'active')
+on conflict (tournament_id, user_id) where (status = 'active')
 do nothing;
 
 -- -----------------------------------------------------------------------------
@@ -441,6 +512,7 @@ begin
       from public.tournament_memberships
       where tournament_id = v_tournament_id
         and status = 'active'
+        and user_id is not null
     ),
     '{}'::uuid[]
   )
@@ -489,12 +561,19 @@ as $$
         and tm.status = 'active'
         and tm.role_key in ('owner', 'manager')
     )
-    -- 3. Legacy compatibility fallback during migration
-    or exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = p_tournament_id
-        and auth.uid() = any (t.organizers)
+    -- 3. Legacy compatibility fallback ONLY if no normalized memberships exist for this tournament
+    or (
+      not exists (
+        select 1
+        from public.tournament_memberships tm
+        where tm.tournament_id = p_tournament_id
+      )
+      and exists (
+        select 1
+        from public.tournaments t
+        where t.tournament_id = p_tournament_id
+          and auth.uid() = any (t.organizers)
+      )
     );
 $$;
 
@@ -672,8 +751,8 @@ as $$
     );
 $$;
 
-revoke all on function public._user_tournament_can(uuid, uuid, text) from public;
-grant execute on function public._user_tournament_can(uuid, uuid, text) to authenticated;
+revoke all on function public._user_tournament_can(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public._user_tournament_can(uuid, uuid, text) to service_role;
 
 -- -----------------------------------------------------------------------------
 -- 14. Row-Level Security for tournament_memberships & tournaments
@@ -681,7 +760,35 @@ grant execute on function public._user_tournament_can(uuid, uuid, text) to authe
 
 alter table public.tournament_memberships enable row level security;
 
+-- Ensure column nullability and constraints for existing tables during development re-runs
+alter table public.tournament_memberships
+  alter column user_id drop not null;
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.table_constraints
+    where table_name = 'tournament_memberships' and constraint_name = 'tournament_memberships_user_id_fkey'
+  ) then
+    alter table public.tournament_memberships drop constraint tournament_memberships_user_id_fkey;
+    alter table public.tournament_memberships
+      add constraint tournament_memberships_user_id_fkey
+      foreign key (user_id) references public.profiles (user_id) on delete set null;
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.tournament_memberships'::regclass
+      and conname = 'tournament_memberships_active_user_check'
+  ) then
+    alter table public.tournament_memberships
+      add constraint tournament_memberships_active_user_check
+      check ((status != 'active') or (user_id is not null));
+  end if;
+end
+$$;
+
 -- Read policy: Users see their own memberships, or if they are admin of the tournament
+drop policy if exists "tournament_memberships_read" on public.tournament_memberships;
 create policy "tournament_memberships_read"
   on public.tournament_memberships
   for select
@@ -692,6 +799,7 @@ create policy "tournament_memberships_read"
   );
 
 -- Insert policy: Tournament owner or staff manager
+drop policy if exists "tournament_memberships_insert" on public.tournament_memberships;
 create policy "tournament_memberships_insert"
   on public.tournament_memberships
   for insert
@@ -701,6 +809,7 @@ create policy "tournament_memberships_insert"
   );
 
 -- Update policy: Tournament owner or staff manager
+drop policy if exists "tournament_memberships_update" on public.tournament_memberships;
 create policy "tournament_memberships_update"
   on public.tournament_memberships
   for update
@@ -712,7 +821,7 @@ create policy "tournament_memberships_update"
     public.can('tournament', tournament_id, 'tournament.staff.manage')
   );
 
--- Update tournaments policies to recognize owner_user_id explicitly
+-- Update tournaments policies to recognize owner_user_id as canonical authority
 drop policy if exists "tournaments_read_visible" on public.tournaments;
 create policy "tournaments_read_visible"
   on public.tournaments
@@ -721,7 +830,7 @@ create policy "tournaments_read_visible"
   using (
     privacy = 'public'
     or (select auth.uid()) = owner_user_id
-    or (select auth.uid()) = created_by
+    or ((select auth.uid()) = created_by and owner_user_id is null)
     or (select auth.uid()) = any (organizers)
     or public.is_tournament_admin(tournament_id)
   );
@@ -733,13 +842,13 @@ create policy "tournaments_update_organizers"
   to authenticated
   using (
     (select auth.uid()) = owner_user_id
-    or (select auth.uid()) = created_by
+    or ((select auth.uid()) = created_by and owner_user_id is null)
     or (select auth.uid()) = any (organizers)
     or public.is_tournament_organizer(tournament_id)
   )
   with check (
     (select auth.uid()) = owner_user_id
-    or (select auth.uid()) = created_by
+    or ((select auth.uid()) = created_by and owner_user_id is null)
     or (select auth.uid()) = any (organizers)
     or public.is_tournament_organizer(tournament_id)
   );
@@ -751,5 +860,6 @@ create policy "tournaments_delete_creator"
   to authenticated
   using (
     (select auth.uid()) = owner_user_id
-    or (select auth.uid()) = created_by
+    or ((select auth.uid()) = created_by and owner_user_id is null)
   );
+

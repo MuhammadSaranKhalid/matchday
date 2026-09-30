@@ -110,8 +110,11 @@ class TournamentsController extends _$TournamentsController {
   Future<bool> startTournament(String tournamentId) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
+    // TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC (StartCompetition).
+    // Phase 2 transition: write canonical lifecycle columns; database projects legacy `status`.
     final result = await repo.updateTournament(tournamentId, {
-      'status': TournamentStatus.live.wire,
+      'publication_state': 'published',
+      'competition_state': 'in_progress',
     });
     return result.fold(
       (failure) {
@@ -132,8 +135,10 @@ class TournamentsController extends _$TournamentsController {
   Future<bool> completeTournament(String tournamentId) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
+    // TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC (CompleteCompetition).
+    // Phase 2 transition: write canonical lifecycle columns; database projects legacy `status`.
     final result = await repo.updateTournament(tournamentId, {
-      'status': TournamentStatus.completed.wire,
+      'competition_state': 'completed',
     });
     return result.fold(
       (failure) {

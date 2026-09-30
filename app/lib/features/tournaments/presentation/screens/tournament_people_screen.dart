@@ -109,7 +109,7 @@ class _TournamentPeopleScreenState
     final tournament = tournamentAsync.value;
     final isOwner = tournament != null &&
         me != null &&
-        tournament.createdBy == me.id;
+        tournament.effectiveOwnerUserId == me.id;
 
     return Scaffold(
       backgroundColor: CkColors.paper,

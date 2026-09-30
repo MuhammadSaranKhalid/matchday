@@ -8,6 +8,7 @@ export class PostgresHealthIndicator {
   constructor(
     private readonly database: QueryExecutor,
     private readonly healthIndicator = new HealthIndicatorService(),
+    private readonly timeoutMs: number = 5000,
   ) {}
 
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
@@ -20,6 +21,6 @@ export class PostgresHealthIndicator {
           throw new Error('database query failed');
         }
       })
-      .withTimeout(1000);
+      .withTimeout(this.timeoutMs);
   }
 }

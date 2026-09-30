@@ -35,8 +35,8 @@ export class WorkerLifecycleService
       if (postgres.postgres?.status !== 'up') {
         throw new Error('dependency check failed');
       }
-    } catch {
-      throw new Error('Worker infrastructure is unavailable');
+    } catch (error) {
+      throw new Error('Worker infrastructure is unavailable', { cause: error });
     }
     this.readiness.markReady();
   }

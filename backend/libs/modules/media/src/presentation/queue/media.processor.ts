@@ -1,14 +1,15 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { UnrecoverableError, type Job } from 'bullmq';
+
+import {
+  PermanentMediaProcessingError,
+  ProcessImageService,
+} from '../../application/process-image.service.js';
 import {
   MEDIA_JOB_NAMES,
   MEDIA_QUEUE_NAME,
   type ProcessImageJob,
 } from '../../contracts/media-job.contract.js';
-import {
-  PermanentMediaProcessingError,
-  ProcessImageService,
-} from '../../application/process-image.service.js';
 
 // V1: concurrency deliberately fixed at 1. Increase only after Sharp load testing.
 export const MEDIA_WORKER_CONCURRENCY = 1;

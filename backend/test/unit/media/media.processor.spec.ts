@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UnrecoverableError } from 'bullmq';
 
-import { MediaProcessor } from '../../../libs/modules/media/src/infrastructure/queue/media.processor.js';
+import { MediaProcessor } from '../../../libs/modules/media/src/presentation/queue/media.processor.js';
 import { PermanentMediaProcessingError } from '../../../libs/modules/media/src/application/process-image.service.js';
 
 describe('MediaProcessor', () => {

@@ -1,6 +1,6 @@
 import { MEDIA_POLICY } from '../domain/media-policy.js';
 import type {
-  MediaObjectStorage,
+  MediaUploadStorage,
   SignedMediaUpload,
 } from './ports/media-object-storage.js';
 
@@ -15,7 +15,7 @@ export type StagedMediaVerification =
   | { readonly status: 'invalid_type' };
 
 export class MediaUploadService {
-  constructor(private readonly storage: MediaObjectStorage) {}
+  constructor(private readonly storage: MediaUploadStorage) {}
 
   createUpload(path: string): Promise<SignedMediaUpload> {
     return this.storage.createSignedUpload(path);

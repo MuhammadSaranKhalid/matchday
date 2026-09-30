@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import type { MediaObjectStorage } from './ports/media-object-storage.js';
+import type { MediaProcessingStorage } from './ports/media-object-storage.js';
 import {
   type ImageTransformer,
   PermanentImageError,
@@ -13,7 +13,7 @@ export class PermanentMediaProcessingError extends Error {}
 export class ProcessImageService {
   constructor(
     private readonly repository: MediaRepository,
-    private readonly storage: MediaObjectStorage,
+    private readonly storage: MediaProcessingStorage,
     private readonly transformer: ImageTransformer,
     private readonly scratch: ScratchWorkspace,
   ) {}

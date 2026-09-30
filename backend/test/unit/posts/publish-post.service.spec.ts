@@ -39,16 +39,16 @@ function dependencies(overrides: Record<string, unknown> = {}) {
       contentType: 'image/jpeg' as const,
     }),
   };
-  const scheduler = {
-    scheduleProcessing: vi.fn().mockResolvedValue(undefined),
+  const dispatcher = {
+    dispatch: vi.fn().mockResolvedValue(undefined),
   };
-  return { repository, mediaUpload, scheduler };
+  return { repository, mediaUpload, dispatcher };
 }
 
 describe('PublishPostService', () => {
-  it('verifies every expected object, records uploads, and enqueues to scheduler', async () => {
-    const { repository, mediaUpload, scheduler } = dependencies();
-    const service = new PublishPostService(repository, mediaUpload, scheduler);
+  it('verifies every expected object, records uploads, and dispatches to queue', async () => {
+    const { repository, mediaUpload, dispatcher } = dependencies();
+    const service = new PublishPostService(repository, mediaUpload, dispatcher);
 
     await expect(service.execute(principal, postId)).resolves.toEqual({ status: 'processing' });
 
@@ -57,9 +57,9 @@ describe('PublishPostService', () => {
       { mediaId: media[0]!.mediaId, bytes: 600_000, contentType: 'image/jpeg' },
       { mediaId: media[1]!.mediaId, bytes: 600_000, contentType: 'image/jpeg' },
     ]);
-    expect(scheduler.scheduleProcessing).toHaveBeenCalledTimes(2);
-    expect(scheduler.scheduleProcessing).toHaveBeenCalledWith(media[0]!.mediaId);
-    expect(scheduler.scheduleProcessing).toHaveBeenCalledWith(media[1]!.mediaId);
+    expect(dispatcher.dispatch).toHaveBeenCalledTimes(2);
+    expect(dispatcher.dispatch).toHaveBeenCalledWith(media[0]!.mediaId);
+    expect(dispatcher.dispatch).toHaveBeenCalledWith(media[1]!.mediaId);
   });
 
   it.each([
@@ -67,48 +67,48 @@ describe('PublishPostService', () => {
     [{ status: 'too_large' as const }, 'POST_MEDIA_TOO_LARGE'],
     [{ status: 'invalid_type' as const }, 'POST_MEDIA_INVALID_TYPE'],
   ])('rejects invalid staging verification %o', async (verification, code) => {
-    const { repository, mediaUpload, scheduler } = dependencies();
+    const { repository, mediaUpload, dispatcher } = dependencies();
     mediaUpload.verifyUpload.mockResolvedValueOnce(verification);
-    const service = new PublishPostService(repository, mediaUpload, scheduler);
+    const service = new PublishPostService(repository, mediaUpload, dispatcher);
 
     await expect(service.execute(principal, postId)).rejects.toMatchObject({ code, status: 400 });
     expect(repository.markUploaded).not.toHaveBeenCalled();
-    expect(scheduler.scheduleProcessing).not.toHaveBeenCalled();
+    expect(dispatcher.dispatch).not.toHaveBeenCalled();
   });
 
   it('publishes a text-only draft without Storage work', async () => {
-    const { repository, mediaUpload, scheduler } = dependencies({
+    const { repository, mediaUpload, dispatcher } = dependencies({
       findOwnedPost: vi.fn().mockResolvedValue({ postId, status: 'draft', media: [] }),
     });
-    const service = new PublishPostService(repository, mediaUpload, scheduler);
+    const service = new PublishPostService(repository, mediaUpload, dispatcher);
 
     await expect(service.execute(principal, postId)).resolves.toEqual({ status: 'published' });
     expect(repository.publishTextOnly).toHaveBeenCalledWith(principal, postId);
     expect(mediaUpload.verifyUpload).not.toHaveBeenCalled();
     expect(repository.markUploaded).not.toHaveBeenCalled();
-    expect(scheduler.scheduleProcessing).not.toHaveBeenCalled();
+    expect(dispatcher.dispatch).not.toHaveBeenCalled();
   });
 
   it('keeps repeated publish idempotent and avoids duplicate markUploaded when all media is already uploaded', async () => {
     const uploaded = media.map((item) => ({ ...item, status: 'uploaded' as const }));
-    const { repository, mediaUpload, scheduler } = dependencies({
+    const { repository, mediaUpload, dispatcher } = dependencies({
       findOwnedPost: vi.fn().mockResolvedValue({ postId, status: 'processing', media: uploaded }),
     });
-    const service = new PublishPostService(repository, mediaUpload, scheduler);
+    const service = new PublishPostService(repository, mediaUpload, dispatcher);
 
     await expect(service.execute(principal, postId)).resolves.toEqual({ status: 'processing' });
     expect(mediaUpload.verifyUpload).not.toHaveBeenCalled();
     expect(repository.markUploaded).not.toHaveBeenCalled();
-    expect(scheduler.scheduleProcessing).toHaveBeenCalledTimes(2);
-    expect(scheduler.scheduleProcessing).toHaveBeenCalledWith(uploaded[0]!.mediaId);
-    expect(scheduler.scheduleProcessing).toHaveBeenCalledWith(uploaded[1]!.mediaId);
+    expect(dispatcher.dispatch).toHaveBeenCalledTimes(2);
+    expect(dispatcher.dispatch).toHaveBeenCalledWith(uploaded[0]!.mediaId);
+    expect(dispatcher.dispatch).toHaveBeenCalledWith(uploaded[1]!.mediaId);
   });
 
   it('rejects an unknown or foreign draft and maps owner-scoped durable status', async () => {
-    const { repository, mediaUpload, scheduler } = dependencies({
+    const { repository, mediaUpload, dispatcher } = dependencies({
       findOwnedPost: vi.fn().mockResolvedValue(null),
     });
-    const service = new PublishPostService(repository, mediaUpload, scheduler);
+    const service = new PublishPostService(repository, mediaUpload, dispatcher);
 
     await expect(service.execute(principal, postId)).rejects.toMatchObject({
       code: 'POST_NOT_FOUND',

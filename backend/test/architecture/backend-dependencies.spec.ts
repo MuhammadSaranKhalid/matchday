@@ -358,11 +358,13 @@ describe('platform wiring and lifecycle invariants', () => {
     expect(violations).toEqual([]);
   });
 
-  it('MediaModule does not export BullModule', () => {
-    const mediaModulePath = join(repositoryRoot, 'libs', 'modules', 'media', 'src', 'media.module.ts');
-    const contents = readFileSync(mediaModulePath, 'utf8');
-    const exportsMatch = /exports:\s*\[([\s\S]*?)\]/.exec(contents);
-    expect(exportsMatch?.[1]).not.toContain('BullModule');
+  it('MediaApiModule and MediaWorkerModule do not export BullModule', () => {
+    for (const moduleFile of ['media-api.module.ts', 'media-worker.module.ts']) {
+      const modulePath = join(repositoryRoot, 'libs', 'modules', 'media', 'src', moduleFile);
+      const contents = readFileSync(modulePath, 'utf8');
+      const exportsMatch = /exports:\s*\[([\s\S]*?)\]/.exec(contents);
+      expect(exportsMatch?.[1]).not.toContain('BullModule');
+    }
   });
 
   it('WorkerModule does not import HealthModule', () => {

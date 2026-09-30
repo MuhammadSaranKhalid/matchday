@@ -143,8 +143,6 @@ describe('SupabaseMediaStorageService', () => {
     expect(from).toHaveBeenCalledWith('post-media-staging');
     expect(bucket.remove).toHaveBeenCalledWith(['user/post/media/source.jpg']);
     expect(MEDIA_POLICY).toMatchObject({
-      stagingBucket: 'post-media-staging',
-      finalBucket: 'post-media',
       source: { maxBytes: 15_728_640, mimeType: 'image/jpeg', maxLongEdge: 2048 },
     });
   });

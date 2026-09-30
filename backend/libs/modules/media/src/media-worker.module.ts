@@ -12,19 +12,14 @@ import { QueueModule } from '../../../platform/src/queue/queue.module.js';
 
 import {
   MEDIA_QUEUE_NAME,
-  type ProcessImageJob,
 } from './contracts/media-job.contract.js';
 import {
   IMAGE_TRANSFORMER,
   type ImageTransformer,
 } from './application/ports/image-transformer.js';
 import {
-  MEDIA_JOB_PRODUCER,
-  type MediaJobProducer,
-} from './application/ports/media-job.producer.js';
-import {
-  MEDIA_OBJECT_STORAGE,
-  type MediaObjectStorage,
+  MEDIA_PROCESSING_STORAGE,
+  type MediaProcessingStorage,
 } from './application/ports/media-object-storage.js';
 import {
   MEDIA_REPOSITORY,
@@ -38,16 +33,13 @@ import {
   MEDIA_RUNTIME,
 } from './application/ports/media-runtime.js';
 
-import { MediaProcessingScheduler } from './application/media-processing-scheduler.js';
-import { MediaUploadService } from './application/media-upload.service.js';
 import { ProcessImageService } from './application/process-image.service.js';
-import { BullMqMediaRuntimeService } from './infrastructure/queue/bullmq-media-runtime.service.js';
-
 import { SharpImageTransformer } from './infrastructure/image/sharp-image-transformer.js';
 import { PostgresMediaRepository } from './infrastructure/persistence/postgres-media.repository.js';
-import { BullMqMediaJobProducer } from './infrastructure/queue/bullmq-media-job.producer.js';
+import { BullMqMediaRuntimeService } from './infrastructure/queue/bullmq-media-runtime.service.js';
 import { ScratchWorkspaceService } from './infrastructure/scratch/scratch-workspace.service.js';
 import { SupabaseMediaStorageService } from './infrastructure/storage/supabase-media-storage.service.js';
+import { MediaProcessor } from './presentation/queue/media.processor.js';
 
 @Module({
   imports: [
@@ -60,14 +52,13 @@ import { SupabaseMediaStorageService } from './infrastructure/storage/supabase-m
     }),
   ],
   providers: [
-    // Internal infrastructure adapters
     {
       provide: MEDIA_REPOSITORY,
       inject: [DatabaseExecutorService],
       useFactory: (db: DatabaseExecutorService) => new PostgresMediaRepository(db),
     },
     {
-      provide: MEDIA_OBJECT_STORAGE,
+      provide: MEDIA_PROCESSING_STORAGE,
       inject: [ConfigService],
       useFactory: (configuration: ConfigService<PlatformConfiguration, true>) => {
         const storage = configuration.get('mediaStorage', { infer: true });
@@ -90,33 +81,16 @@ import { SupabaseMediaStorageService } from './infrastructure/storage/supabase-m
       useFactory: () => new ScratchWorkspaceService(),
     },
     {
-      provide: MEDIA_JOB_PRODUCER,
-      inject: [getQueueToken(MEDIA_QUEUE_NAME)],
-      useFactory: (queue: Queue<ProcessImageJob>) => new BullMqMediaJobProducer(queue),
-    },
-
-    // Public application services
-    {
-      provide: MediaUploadService,
-      inject: [MEDIA_OBJECT_STORAGE],
-      useFactory: (storage: MediaObjectStorage) => new MediaUploadService(storage),
-    },
-    {
-      provide: MediaProcessingScheduler,
-      inject: [MEDIA_JOB_PRODUCER],
-      useFactory: (producer: MediaJobProducer) => new MediaProcessingScheduler(producer),
-    },
-    {
       provide: ProcessImageService,
       inject: [
         MEDIA_REPOSITORY,
-        MEDIA_OBJECT_STORAGE,
+        MEDIA_PROCESSING_STORAGE,
         IMAGE_TRANSFORMER,
         SCRATCH_WORKSPACE,
       ],
       useFactory: (
         repository: MediaRepository,
-        storage: MediaObjectStorage,
+        storage: MediaProcessingStorage,
         transformer: ImageTransformer,
         scratch: ScratchWorkspace,
       ) => new ProcessImageService(repository, storage, transformer, scratch),
@@ -126,12 +100,10 @@ import { SupabaseMediaStorageService } from './infrastructure/storage/supabase-m
       inject: [getQueueToken(MEDIA_QUEUE_NAME)],
       useFactory: (queue: Queue) => new BullMqMediaRuntimeService(queue),
     },
+    MediaProcessor,
   ],
   exports: [
-    MediaUploadService,
-    MediaProcessingScheduler,
-    ProcessImageService,
     MEDIA_RUNTIME,
   ],
 })
-export class MediaModule {}
+export class MediaWorkerModule {}

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import {
-  MediaModule,
-  MediaProcessingScheduler,
+  MediaApiModule,
+  MediaProcessingDispatcher,
   MediaUploadService,
 } from '@modules/media';
 
@@ -19,7 +19,7 @@ import { PostgresPostCommandRepository } from './infrastructure/persistence/post
 import { PostsController } from './presentation/http/posts.controller.js';
 
 @Module({
-  imports: [AuthModule, DatabaseModule, MediaModule],
+  imports: [AuthModule, DatabaseModule, MediaApiModule],
   controllers: [PostsController],
   providers: [
     {
@@ -41,13 +41,13 @@ import { PostsController } from './presentation/http/posts.controller.js';
       inject: [
         POST_COMMAND_REPOSITORY,
         MediaUploadService,
-        MediaProcessingScheduler,
+        MediaProcessingDispatcher,
       ],
       useFactory: (
         repository: PostCommandRepository,
         mediaUpload: MediaUploadService,
-        scheduler: MediaProcessingScheduler,
-      ) => new PublishPostService(repository, mediaUpload, scheduler),
+        dispatcher: MediaProcessingDispatcher,
+      ) => new PublishPostService(repository, mediaUpload, dispatcher),
     },
   ],
 })

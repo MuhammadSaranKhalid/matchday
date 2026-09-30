@@ -13,8 +13,7 @@ describe('MEDIA_OUTPUT_CONTRACT', () => {
     ]);
   });
 
-  it('requires sequential transforms without enlarging the source', () => {
-    expect(MEDIA_OUTPUT_CONTRACT.execution).toBe('sequential');
+  it('requires WebP transforms without enlarging the source', () => {
     expect(MEDIA_OUTPUT_CONTRACT.withoutEnlargement).toBe(true);
     expect(MEDIA_OUTPUT_CONTRACT.format).toBe('webp');
   });

@@ -10,14 +10,12 @@ export interface MediaOutputVariant {
 
 export interface MediaOutputContract {
   readonly format: 'webp';
-  readonly execution: 'sequential';
   readonly withoutEnlargement: true;
   readonly variants: readonly MediaOutputVariant[];
 }
 
 export const MEDIA_OUTPUT_CONTRACT = {
   format: 'webp',
-  execution: 'sequential',
   withoutEnlargement: true,
   variants: [
     { name: '360.webp', resize: { kind: 'width', pixels: 360 }, quality: 80 },

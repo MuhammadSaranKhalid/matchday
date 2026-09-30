@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { MediaProcessingScheduler } from '../../../libs/modules/media/src/application/media-processing-scheduler.js';
+import { MediaProcessingDispatcher } from '../../../libs/modules/media/src/application/media-processing-dispatcher.js';
 import type { MediaJobProducer } from '../../../libs/modules/media/src/application/ports/media-job.producer.js';
 
-describe('MediaProcessingScheduler', () => {
-  it('delegates scheduleProcessing to producer.enqueueImage', async () => {
+describe('MediaProcessingDispatcher', () => {
+  it('delegates dispatch to producer.enqueueImage', async () => {
     const producer: MediaJobProducer = {
       enqueueImage: vi.fn().mockResolvedValue(undefined),
     };
-    const scheduler = new MediaProcessingScheduler(producer);
+    const dispatcher = new MediaProcessingDispatcher(producer);
 
-    await scheduler.scheduleProcessing('media-id-123');
+    await dispatcher.dispatch('media-id-123');
 
     expect(producer.enqueueImage).toHaveBeenCalledWith('media-id-123');
   });
@@ -20,9 +20,9 @@ describe('MediaProcessingScheduler', () => {
     const producer: MediaJobProducer = {
       enqueueImage: vi.fn().mockRejectedValue(failure),
     };
-    const scheduler = new MediaProcessingScheduler(producer);
+    const dispatcher = new MediaProcessingDispatcher(producer);
 
-    await expect(scheduler.scheduleProcessing('media-id-123')).rejects.toThrow(
+    await expect(dispatcher.dispatch('media-id-123')).rejects.toThrow(
       'queue connection failed',
     );
   });

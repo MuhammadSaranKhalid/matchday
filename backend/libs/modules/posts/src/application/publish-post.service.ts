@@ -1,7 +1,7 @@
 import type { AuthenticatedPrincipal } from '../../../../platform/src/auth/authenticated-principal.js';
 import { ApplicationError } from '../../../../platform/src/errors/application-error.js';
 import type {
-  MediaProcessingScheduler,
+  MediaProcessingDispatcher,
   MediaUploadService,
 } from '@modules/media';
 import type {
@@ -14,7 +14,7 @@ export class PublishPostService {
   constructor(
     private readonly repository: Omit<PostCommandRepository, 'reserveDraft'>,
     private readonly mediaUpload: Pick<MediaUploadService, 'verifyUpload'>,
-    private readonly scheduler: Pick<MediaProcessingScheduler, 'scheduleProcessing'>,
+    private readonly dispatcher: Pick<MediaProcessingDispatcher, 'dispatch'>,
   ) {}
 
   async execute(
@@ -55,7 +55,7 @@ export class PublishPostService {
 
     for (const item of post.media) {
       if (item.status !== 'ready' && item.status !== 'failed') {
-        await this.scheduler.scheduleProcessing(item.mediaId);
+        await this.dispatcher.dispatch(item.mediaId);
       }
     }
 

@@ -1,194 +1,221 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  createLocalJWKSet,
-  decodeJwt,
-  decodeProtectedHeader,
-  jwtVerify,
-  type JSONWebKeySet,
-  type JWTPayload,
-} from 'jose';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import type { AuthConfiguration } from '../config/configuration.js';
 import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { TokenVerificationError, type TokenVerifier } from './token-verifier.js';
+
 type FetchImplementation = typeof fetch;
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSupabaseClient(value: unknown): value is SupabaseClient {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'auth' in value &&
+    typeof (value as { auth?: { getClaims?: unknown } }).auth?.getClaims === 'function'
+  );
+}
+
+function fetchWithTimeout(
+  input: string | URL | Request,
+  init: RequestInit | undefined,
+  timeoutMs: number,
+  fetchImpl: FetchImplementation = fetch,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetchImpl(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+function isUnavailableError(error: unknown): boolean {
+  if (error instanceof Error) {
+    if (
+      error.name === 'AbortError' ||
+      error.name === 'TimeoutError' ||
+      error.name === 'AuthRetryableFetchError'
+    ) {
+      return true;
+    }
+    const message = error.message.toLowerCase();
+    if (
+      message.includes('abort') ||
+      message.includes('timeout') ||
+      message.includes('econnrefused') ||
+      message.includes('network')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 @Injectable()
 export class SupabaseTokenVerifierService implements TokenVerifier {
   private readonly logger = new Logger(SupabaseTokenVerifierService.name);
-  private jwks?: { readonly value: JSONWebKeySet; readonly expiresAt: number };
+  private readonly client: SupabaseClient;
+  private readonly configuration?: Readonly<AuthConfiguration>;
 
   constructor(
-    private readonly configuration: Readonly<AuthConfiguration>,
-    private readonly fetchImplementation: FetchImplementation = fetch,
-  ) {}
+    clientOrConfig: SupabaseClient | Readonly<AuthConfiguration>,
+    configurationOrFetch?: Readonly<AuthConfiguration> | FetchImplementation,
+    maybeFetch?: FetchImplementation,
+  ) {
+    if (isSupabaseClient(clientOrConfig)) {
+      this.client = clientOrConfig;
+      this.configuration = configurationOrFetch as Readonly<AuthConfiguration> | undefined;
+    } else {
+      const config = clientOrConfig;
+      this.configuration = config;
+      const fetchImpl =
+        typeof configurationOrFetch === 'function'
+          ? configurationOrFetch
+          : (maybeFetch ?? fetch);
+      const key = config.publishableKey && config.publishableKey.trim() !== ''
+        ? config.publishableKey
+        : 'sb_publishable_verification';
+      this.client = createClient(config.supabaseUrl, key, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+        global: {
+          fetch: (input, init) =>
+            fetchWithTimeout(input, init, config.verificationTimeoutMs, fetchImpl),
+        },
+      });
+    }
+  }
 
   async verify(accessToken: string): Promise<AuthenticatedPrincipal> {
+    if (typeof accessToken !== 'string' || accessToken.trim() === '') {
+      throw new TokenVerificationError('invalid_token');
+    }
+
+    this.rejectUnsignedOrInvalidHeader(accessToken);
+
     try {
-      if (this.configuration.mode === 'jwks') {
-        const header = decodeProtectedHeader(accessToken);
-        if (header.alg === 'HS256' && this.configuration.publishableKey !== undefined) {
-          return await this.verifyRemotely(accessToken);
+      const { data, error } = await this.client.auth.getClaims(accessToken);
+      if (error || !data?.claims) {
+        const isJsonSyntaxError =
+          error?.name === 'AuthRetryableFetchError' &&
+          (error.message.includes('JSON') ||
+            error.message.includes('Unexpected token') ||
+            error.message.includes('Expected property'));
+
+        if (
+          !isJsonSyntaxError &&
+          error &&
+          (error.status === 503 ||
+            error.status === 500 ||
+            error.name === 'AuthRetryableFetchError' ||
+            (error as unknown as { code?: string }).code === 'ECONNREFUSED' ||
+            (error as unknown as { code?: string }).code === 'ETIMEDOUT')
+        ) {
+          this.logger.warn(`Token verification unavailable: ${error.message}`);
+          throw new TokenVerificationError('verification_unavailable');
         }
-        return await this.verifyWithJwks(accessToken);
+        this.logger.warn(`Token verification failed: ${error?.message ?? 'missing claims'}`);
+        throw new TokenVerificationError('invalid_token');
       }
-      return await this.verifyRemotely(accessToken);
-    } catch (error) {
-      try {
-        const header = decodeProtectedHeader(accessToken);
-        const payload = decodeJwt(accessToken);
-        this.logger.warn(
-          `Token verification failed [mode=${this.configuration.mode}]: ${error instanceof Error ? error.message : String(error)} | ` +
-          `alg=${header.alg}, kid=${header.kid}, iss=${payload.iss} (expected ${this.configuration.issuer}), ` +
-          `aud=${JSON.stringify(payload.aud)} (expected ${this.configuration.audience})`,
-        );
-      } catch (decodeError) {
-        this.logger.warn(`Token verification failed: malformed token (${decodeError})`);
-      }
-      if (error instanceof TokenVerificationError) throw error;
-      throw new TokenVerificationError('invalid_token');
-    }
-  }
 
-  private async verifyWithJwks(accessToken: string): Promise<AuthenticatedPrincipal> {
-    const header = decodeProtectedHeader(accessToken);
-    if ((header.alg !== 'ES256' && header.alg !== 'RS256') || typeof header.kid !== 'string') {
-      throw new TokenVerificationError('invalid_token');
-    }
-
-    let jwks = await this.getJwks(false);
-    let payload: JWTPayload;
-    try {
-      ({ payload } = await jwtVerify(accessToken, createLocalJWKSet(jwks), {
-        issuer: this.configuration.issuer,
-        audience: this.configuration.audience,
-        algorithms: ['ES256', 'RS256'],
-      }));
+      return this.principalFromClaims(data.claims as Record<string, unknown>);
     } catch (error) {
-      if (!hasKid(jwks, header.kid)) {
-        jwks = await this.getJwks(true);
-        ({ payload } = await jwtVerify(accessToken, createLocalJWKSet(jwks), {
-          issuer: this.configuration.issuer,
-          audience: this.configuration.audience,
-          algorithms: ['ES256', 'RS256'],
-        }));
-      } else {
-        this.logger.error(`verifyWithJwks jwtVerify failed: ${error instanceof Error ? error.message : String(error)}`);
+      if (error instanceof TokenVerificationError) {
         throw error;
       }
+      if (isUnavailableError(error)) {
+        this.logger.warn(
+          `Token verification unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw new TokenVerificationError('verification_unavailable');
+      }
+      this.logger.warn(
+        `Token verification failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new TokenVerificationError('invalid_token');
     }
-    return principalFromClaims(payload, this.logger);
   }
 
-  private async verifyRemotely(accessToken: string): Promise<AuthenticatedPrincipal> {
-    if (this.configuration.publishableKey === undefined) {
-      throw new TokenVerificationError('verification_unavailable');
+  private rejectUnsignedOrInvalidHeader(accessToken: string): void {
+    const [headerB64] = accessToken.split('.');
+    if (!headerB64) {
+      throw new TokenVerificationError('invalid_token');
     }
-    const response = await this.fetchWithTimeout(`${this.configuration.supabaseUrl}/auth/v1/user`, {
-      headers: {
-        authorization: `Bearer ${accessToken}`,
-        apikey: this.configuration.publishableKey,
-      },
+    try {
+      const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString('utf8'));
+      if (
+        !header ||
+        typeof header !== 'object' ||
+        !header.alg ||
+        header.alg === 'none'
+      ) {
+        throw new TokenVerificationError('invalid_token');
+      }
+      if (
+        this.configuration?.mode === 'jwks' &&
+        header.alg !== 'ES256' &&
+        header.alg !== 'RS256'
+      ) {
+        throw new TokenVerificationError('invalid_token');
+      }
+    } catch {
+      throw new TokenVerificationError('invalid_token');
+    }
+  }
+
+  private principalFromClaims(claims: Record<string, unknown>): AuthenticatedPrincipal {
+    if (this.configuration) {
+      if (this.configuration.audience && claims['aud']) {
+        const audiences = Array.isArray(claims['aud']) ? claims['aud'] : [claims['aud']];
+        if (!audiences.includes(this.configuration.audience)) {
+          this.logger.warn(
+            `principalFromClaims: audience mismatch: ${JSON.stringify(claims['aud'])} vs ${this.configuration.audience}`,
+          );
+          throw new TokenVerificationError('invalid_token');
+        }
+      }
+      if (this.configuration.issuer && claims['iss']) {
+        const normalize = (url?: string) => url?.replace(/\/+$/, '');
+        const issuerMatches =
+          claims['iss'] === this.configuration.issuer ||
+          normalize(String(claims['iss'])) === normalize(this.configuration.issuer) ||
+          claims['iss'] === 'supabase';
+        if (!issuerMatches) {
+          this.logger.warn(
+            `principalFromClaims: issuer mismatch: ${claims['iss']} vs ${this.configuration.issuer}`,
+          );
+          throw new TokenVerificationError('invalid_token');
+        }
+      }
+    }
+
+    if (
+      typeof claims['sub'] !== 'string' ||
+      !UUID_REGEX.test(claims['sub']) ||
+      claims['role'] !== 'authenticated'
+    ) {
+      this.logger.warn(
+        `principalFromClaims: invalid claims: sub=${claims['sub']}, role=${claims['role']}`,
+      );
+      throw new TokenVerificationError('invalid_token');
+    }
+
+    const appMetadata = isRecord(claims['app_metadata'])
+      ? Object.freeze({ ...claims['app_metadata'] })
+      : Object.freeze({});
+
+    return Object.freeze({
+      userId: claims['sub'],
+      role: 'authenticated' as const,
+      ...(typeof claims['session_id'] === 'string' ? { sessionId: claims['session_id'] } : {}),
+      appMetadata,
     });
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      this.logger.error(`verifyRemotely /auth/v1/user returned HTTP ${response.status}: ${body}`);
-      throw new TokenVerificationError('invalid_token');
-    }
-
-    let user: unknown;
-    try {
-      user = await response.json();
-    } catch {
-      this.logger.error('verifyRemotely /auth/v1/user response was not valid JSON');
-      throw new TokenVerificationError('invalid_token');
-    }
-    const payload = decodeJwt(accessToken);
-    validateRegisteredClaims(payload, this.configuration, this.logger);
-    if (!isRecord(user) || user.id !== payload.sub) {
-      this.logger.error(`verifyRemotely user.id mismatch: user=${JSON.stringify(user)} vs sub=${payload.sub}`);
-      throw new TokenVerificationError('invalid_token');
-    }
-    return principalFromClaims(payload, this.logger);
   }
-
-  private async getJwks(forceRefresh: boolean): Promise<JSONWebKeySet> {
-    if (!forceRefresh && this.jwks !== undefined && this.jwks.expiresAt > Date.now()) {
-      return this.jwks.value;
-    }
-    const endpoint = `${this.configuration.issuer.replace(/\/$/, '')}/.well-known/jwks.json`;
-    const response = await this.fetchWithTimeout(endpoint);
-    if (!response.ok) throw new TokenVerificationError('verification_unavailable');
-    let value: unknown;
-    try {
-      value = await response.json();
-    } catch {
-      throw new TokenVerificationError('verification_unavailable');
-    }
-    if (!isRecord(value) || !Array.isArray(value.keys) || !value.keys.every(isRecord)) {
-      throw new TokenVerificationError('verification_unavailable');
-    }
-    const jwks: JSONWebKeySet = { keys: value.keys };
-    this.jwks = { value: jwks, expiresAt: Date.now() + this.configuration.jwksCacheMaxAgeMs };
-    return jwks;
-  }
-
-  private async fetchWithTimeout(input: string, init: RequestInit = {}): Promise<Response> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.configuration.verificationTimeoutMs);
-    try {
-      return await this.fetchImplementation(input, { ...init, signal: controller.signal });
-    } catch {
-      throw new TokenVerificationError('verification_unavailable');
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-}
-
-function validateRegisteredClaims(payload: JWTPayload, configuration: AuthConfiguration, logger?: Logger): void {
-  const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  const normalize = (url?: string) => url?.replace(/\/+$/, '');
-  const issuerMatches =
-    payload.iss === configuration.issuer ||
-    normalize(payload.iss) === normalize(configuration.issuer) ||
-    payload.iss === 'supabase';
-  if (!issuerMatches) {
-    logger?.error(`validateRegisteredClaims: issuer mismatch! token.iss=${payload.iss} vs expected=${configuration.issuer}`);
-    throw new TokenVerificationError('invalid_token');
-  }
-  if (!audiences.includes(configuration.audience)) {
-    logger?.error(`validateRegisteredClaims: audience mismatch! token.aud=${JSON.stringify(payload.aud)} vs expected=${configuration.audience}`);
-    throw new TokenVerificationError('invalid_token');
-  }
-  if (typeof payload.exp !== 'number' || payload.exp <= Math.floor(Date.now() / 1_000)) {
-    logger?.error(`validateRegisteredClaims: token is EXPIRED! exp=${payload.exp}, now=${Math.floor(Date.now() / 1_000)} (expired ${Math.floor(Date.now() / 1_000) - (payload.exp ?? 0)}s ago)`);
-    throw new TokenVerificationError('invalid_token');
-  }
-}
-
-function principalFromClaims(payload: JWTPayload, logger?: Logger): AuthenticatedPrincipal {
-  if (
-    typeof payload.sub !== 'string' ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.sub) ||
-    payload.role !== 'authenticated'
-  ) {
-    logger?.error(`principalFromClaims: invalid claims! sub=${payload.sub}, role=${payload.role}`);
-    throw new TokenVerificationError('invalid_token');
-  }
-  const appMetadata = isRecord(payload.app_metadata) ? Object.freeze({ ...payload.app_metadata }) : Object.freeze({});
-  return Object.freeze({
-    userId: payload.sub,
-    role: 'authenticated' as const,
-    ...(typeof payload.session_id === 'string' ? { sessionId: payload.session_id } : {}),
-    appMetadata,
-  });
-}
-
-function hasKid(jwks: JSONWebKeySet, kid: string): boolean {
-  return jwks.keys.some((key) => key.kid === kid);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

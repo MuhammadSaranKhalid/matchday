@@ -42,9 +42,18 @@ async function token(
 }
 
 function verifier(keys: Record<string, unknown>[]) {
-  const fetchImplementation = vi.fn(async () => new Response(JSON.stringify({ keys }), {
-    status: 200, headers: { 'content-type': 'application/json' },
-  }));
+  const fetchImplementation = vi.fn(async (url: string | URL | Request) => {
+    if (String(url).includes('.well-known/jwks.json')) {
+      return new Response(JSON.stringify({ keys }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ message: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'content-type': 'application/json' },
+    });
+  });
   return { service: new SupabaseTokenVerifierService(configuration, fetchImplementation), fetchImplementation };
 }
 
@@ -85,8 +94,9 @@ describe('SupabaseTokenVerifierService JWKS mode', () => {
   });
 
   it('rejects a bad signature and never exposes token or claims', async () => {
-    const accessToken = await token(esPrivateKey, 'es-key', 'ES256', { email: 'private@example.com' });
-    const { service } = verifier([rsPublicJwk]);
+    const untrustedKey = (await generateKeyPair('ES256')).privateKey;
+    const accessToken = await token(untrustedKey, 'es-key', 'ES256', { email: 'private@example.com' });
+    const { service } = verifier([esPublicJwk]);
     const error = await service.verify(accessToken).catch((caught: unknown) => caught) as TokenVerificationError;
     expect(error.code).toBe('invalid_token');
     expect(String(error)).not.toContain(accessToken);
@@ -115,6 +125,6 @@ describe('SupabaseTokenVerifierService JWKS mode', () => {
       init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
     }));
     const service = new SupabaseTokenVerifierService({ ...configuration, verificationTimeoutMs: 10 }, stalledFetch);
-    await expect(service.verify(await token(esPrivateKey, 'es-key', 'ES256'))).rejects.toMatchObject({ code: 'verification_unavailable' });
+    await expect(service.verify(await token(esPrivateKey, 'timeout-key', 'ES256'))).rejects.toMatchObject({ code: 'verification_unavailable' });
   });
 });

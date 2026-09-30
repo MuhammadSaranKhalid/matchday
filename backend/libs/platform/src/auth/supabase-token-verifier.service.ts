@@ -73,10 +73,11 @@ export class SupabaseTokenVerifierService implements TokenVerifier {
           algorithms: ['ES256', 'RS256'],
         }));
       } else {
+        this.logger.error(`verifyWithJwks jwtVerify failed: ${error instanceof Error ? error.message : String(error)}`);
         throw error;
       }
     }
-    return principalFromClaims(payload);
+    return principalFromClaims(payload, this.logger);
   }
 
   private async verifyRemotely(accessToken: string): Promise<AuthenticatedPrincipal> {
@@ -89,20 +90,26 @@ export class SupabaseTokenVerifierService implements TokenVerifier {
         apikey: this.configuration.publishableKey,
       },
     });
-    if (!response.ok) throw new TokenVerificationError('invalid_token');
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      this.logger.error(`verifyRemotely /auth/v1/user returned HTTP ${response.status}: ${body}`);
+      throw new TokenVerificationError('invalid_token');
+    }
 
     let user: unknown;
     try {
       user = await response.json();
     } catch {
+      this.logger.error('verifyRemotely /auth/v1/user response was not valid JSON');
       throw new TokenVerificationError('invalid_token');
     }
     const payload = decodeJwt(accessToken);
-    validateRegisteredClaims(payload, this.configuration);
+    validateRegisteredClaims(payload, this.configuration, this.logger);
     if (!isRecord(user) || user.id !== payload.sub) {
+      this.logger.error(`verifyRemotely user.id mismatch: user=${JSON.stringify(user)} vs sub=${payload.sub}`);
       throw new TokenVerificationError('invalid_token');
     }
-    return principalFromClaims(payload);
+    return principalFromClaims(payload, this.logger);
   }
 
   private async getJwks(forceRefresh: boolean): Promise<JSONWebKeySet> {
@@ -139,29 +146,34 @@ export class SupabaseTokenVerifierService implements TokenVerifier {
   }
 }
 
-function validateRegisteredClaims(payload: JWTPayload, configuration: AuthConfiguration): void {
+function validateRegisteredClaims(payload: JWTPayload, configuration: AuthConfiguration, logger?: Logger): void {
   const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
   const normalize = (url?: string) => url?.replace(/\/+$/, '');
   const issuerMatches =
     payload.iss === configuration.issuer ||
     normalize(payload.iss) === normalize(configuration.issuer) ||
     payload.iss === 'supabase';
-  if (
-    !issuerMatches ||
-    !audiences.includes(configuration.audience) ||
-    typeof payload.exp !== 'number' ||
-    payload.exp <= Math.floor(Date.now() / 1_000)
-  ) {
+  if (!issuerMatches) {
+    logger?.error(`validateRegisteredClaims: issuer mismatch! token.iss=${payload.iss} vs expected=${configuration.issuer}`);
+    throw new TokenVerificationError('invalid_token');
+  }
+  if (!audiences.includes(configuration.audience)) {
+    logger?.error(`validateRegisteredClaims: audience mismatch! token.aud=${JSON.stringify(payload.aud)} vs expected=${configuration.audience}`);
+    throw new TokenVerificationError('invalid_token');
+  }
+  if (typeof payload.exp !== 'number' || payload.exp <= Math.floor(Date.now() / 1_000)) {
+    logger?.error(`validateRegisteredClaims: token is EXPIRED! exp=${payload.exp}, now=${Math.floor(Date.now() / 1_000)} (expired ${Math.floor(Date.now() / 1_000) - (payload.exp ?? 0)}s ago)`);
     throw new TokenVerificationError('invalid_token');
   }
 }
 
-function principalFromClaims(payload: JWTPayload): AuthenticatedPrincipal {
+function principalFromClaims(payload: JWTPayload, logger?: Logger): AuthenticatedPrincipal {
   if (
     typeof payload.sub !== 'string' ||
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.sub) ||
     payload.role !== 'authenticated'
   ) {
+    logger?.error(`principalFromClaims: invalid claims! sub=${payload.sub}, role=${payload.role}`);
     throw new TokenVerificationError('invalid_token');
   }
   const appMetadata = isRecord(payload.app_metadata) ? Object.freeze({ ...payload.app_metadata }) : Object.freeze({});

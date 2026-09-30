@@ -60,7 +60,15 @@ void main() {
           postKind: any(named: 'postKind'),
           text: any(named: 'text'),
           mediaManifest: any(named: 'mediaManifest'),
-        )).thenThrow(UnauthorizedException('nope'));
+        ),
+      ).thenAnswer((_) async {
+        persistedBeforeCreate = stored.isNotEmpty;
+        return {
+          'postId': '20000000-0000-4000-8000-000000000001',
+          'media': <Map<String, dynamic>>[],
+        };
+      });
+      when(() => remote.publishPost(any())).thenAnswer((_) async => 'published');
 
       final result = await repository.createPost(
         const PostDraft(text: 'hello'),

@@ -55,6 +55,8 @@ class AppConfig {
     }
     if (backendUrl.contains('127.0.0.1') && !kIsWeb && Platform.isAndroid) {
       backendUrl = backendUrl.replaceAll('127.0.0.1', '10.0.2.2');
+    } else if (backendUrl.contains('localhost') && !kIsWeb && Platform.isAndroid) {
+      backendUrl = backendUrl.replaceAll('localhost', '10.0.2.2');
     }
 
     // Fail fast in development if critical keys are missing

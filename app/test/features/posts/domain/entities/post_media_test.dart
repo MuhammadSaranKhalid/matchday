@@ -10,9 +10,8 @@ void main() {
       position: 0,
       width: 1080,
       height: 1350,
-<<<<<<< HEAD
       status: PostMediaStatus.ready,
-      variants: const {
+      variants: {
         360: MediaVariant(
           path: 'posts/p1/m1/v1/360.webp',
           width: 360,
@@ -79,7 +78,7 @@ void main() {
         width: 1080,
         height: 1350,
         status: PostMediaStatus.ready,
-        variants: const {
+        variants: {
           1080: MediaVariant(
             path: 'posts/p1/m2/v1/1080.webp',
             width: 1080,

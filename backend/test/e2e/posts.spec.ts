@@ -3,8 +3,7 @@ import { StandardSchemaValidationPipe, VersioningType } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import type { AuthenticatedPrincipal } from '../../libs/platform/src/auth/authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { TOKEN_VERIFIER, TokenVerificationError } from '../../libs/platform/src/auth/token-verifier.js';
 import { CreatePostService } from '../../libs/modules/posts/src/application/create-post.service.js';
 import { PublishPostService } from '../../libs/modules/posts/src/application/publish-post.service.js';

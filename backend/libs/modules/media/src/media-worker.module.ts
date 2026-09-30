@@ -30,13 +30,13 @@ import {
   type ScratchWorkspace,
 } from './application/ports/scratch-workspace.js';
 import {
-  MEDIA_RUNTIME,
-} from './application/ports/media-runtime.js';
+  MEDIA_QUEUE_READINESS,
+} from './application/ports/media-queue-readiness.js';
 
 import { ProcessImageService } from './application/process-image.service.js';
 import { SharpImageTransformer } from './infrastructure/image/sharp-image-transformer.js';
 import { PostgresMediaRepository } from './infrastructure/persistence/postgres-media.repository.js';
-import { BullMqMediaRuntimeService } from './infrastructure/queue/bullmq-media-runtime.service.js';
+import { BullMqMediaQueueReadinessService } from './infrastructure/queue/bullmq-media-queue-readiness.service.js';
 import { ScratchWorkspaceService } from './infrastructure/scratch/scratch-workspace.service.js';
 import { SupabaseMediaStorageService } from './infrastructure/storage/supabase-media-storage.service.js';
 import { MediaProcessor } from './presentation/queue/media.processor.js';
@@ -96,14 +96,14 @@ import { MediaProcessor } from './presentation/queue/media.processor.js';
       ) => new ProcessImageService(repository, storage, transformer, scratch),
     },
     {
-      provide: MEDIA_RUNTIME,
+      provide: MEDIA_QUEUE_READINESS,
       inject: [getQueueToken(MEDIA_QUEUE_NAME)],
-      useFactory: (queue: Queue) => new BullMqMediaRuntimeService(queue),
+      useFactory: (queue: Queue) => new BullMqMediaQueueReadinessService(queue),
     },
     MediaProcessor,
   ],
   exports: [
-    MEDIA_RUNTIME,
+    MEDIA_QUEUE_READINESS,
   ],
 })
 export class MediaWorkerModule {}

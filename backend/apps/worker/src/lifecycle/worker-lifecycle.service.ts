@@ -5,12 +5,11 @@ import {
 } from '@nestjs/common';
 
 import {
-  MEDIA_RUNTIME,
-  type MediaRuntime,
+  MEDIA_QUEUE_READINESS,
+  type MediaQueueReadiness,
 } from '@modules/media';
 import { PostgresHealthIndicator } from '../../../../libs/platform/src/database/postgres-health.indicator.js';
 import { ReadinessService } from '../../../../libs/platform/src/lifecycle/readiness.service.js';
-import { RedisHealthIndicator } from '../../../../libs/platform/src/redis/redis-health.indicator.js';
 
 @Injectable()
 export class WorkerLifecycleService
@@ -19,18 +18,16 @@ export class WorkerLifecycleService
   constructor(
     private readonly readiness: ReadinessService,
     private readonly postgresHealth: PostgresHealthIndicator,
-    private readonly redisHealth: RedisHealthIndicator,
-    @Inject(MEDIA_RUNTIME) private readonly mediaRuntime: MediaRuntime,
+    @Inject(MEDIA_QUEUE_READINESS) private readonly queueReadiness: MediaQueueReadiness,
   ) {}
 
   async initialize(): Promise<void> {
     try {
-      const [postgres, redis] = await Promise.all([
+      const [postgres] = await Promise.all([
         this.postgresHealth.isHealthy('postgres'),
-        this.redisHealth.isHealthy('redis'),
-        this.mediaRuntime.waitUntilReady(),
+        this.queueReadiness.waitUntilReady(),
       ]);
-      if (postgres.postgres?.status !== 'up' || redis.redis?.status !== 'up') {
+      if (postgres.postgres?.status !== 'up') {
         throw new Error('dependency check failed');
       }
     } catch {

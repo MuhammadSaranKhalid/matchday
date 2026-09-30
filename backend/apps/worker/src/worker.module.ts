@@ -5,7 +5,6 @@ import { PlatformConfigModule } from '../../../libs/platform/src/config/platform
 import { DatabaseModule } from '../../../libs/platform/src/database/database.module.js';
 import { PlatformLifecycleModule } from '../../../libs/platform/src/lifecycle/platform-lifecycle.module.js';
 import { LoggingModule } from '../../../libs/platform/src/logging/logging.module.js';
-import { RedisModule } from '../../../libs/platform/src/redis/redis.module.js';
 import { WorkerLifecycleService } from './lifecycle/worker-lifecycle.service.js';
 
 @Module({
@@ -13,7 +12,6 @@ import { WorkerLifecycleService } from './lifecycle/worker-lifecycle.service.js'
     PlatformConfigModule,
     LoggingModule,
     DatabaseModule,
-    RedisModule,
     PlatformLifecycleModule,
     MediaWorkerModule,
   ],

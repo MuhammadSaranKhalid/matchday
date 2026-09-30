@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
-import type { AuthenticatedPrincipal } from '../../../../../platform/src/auth/authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { CurrentPrincipal } from '../../../../../platform/src/auth/current-principal.decorator.js';
 import { SupabaseAuthGuard } from '../../../../../platform/src/auth/supabase-auth.guard.js';
 import { CreatePostService } from '../../application/create-post.service.js';

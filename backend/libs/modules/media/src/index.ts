@@ -11,9 +11,9 @@ export {
   ProcessImageService,
 } from './application/process-image.service.js';
 export {
-  MEDIA_RUNTIME,
-  type MediaRuntime,
-} from './application/ports/media-runtime.js';
+  MEDIA_QUEUE_READINESS,
+  type MediaQueueReadiness,
+} from './application/ports/media-queue-readiness.js';
 export {
   MEDIA_QUEUE_NAME,
   MEDIA_JOB_NAMES,

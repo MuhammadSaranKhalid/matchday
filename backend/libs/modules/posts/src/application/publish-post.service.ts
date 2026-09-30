@@ -1,5 +1,5 @@
-import type { AuthenticatedPrincipal } from '../../../../platform/src/auth/authenticated-principal.js';
-import { ApplicationError } from '../../../../platform/src/errors/application-error.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
+import { ApplicationError } from '@shared-kernel/errors/application-error.js';
 import type {
   MediaProcessingDispatcher,
   MediaUploadService,
@@ -73,9 +73,9 @@ export class PublishPostService {
 }
 
 function invalidMedia(code: string, message: string): ApplicationError {
-  return new ApplicationError(code, message, 400);
+  return new ApplicationError(code, message, 'validation');
 }
 
 function notFound(): ApplicationError {
-  return new ApplicationError('POST_NOT_FOUND', 'Post not found', 404);
+  return new ApplicationError('POST_NOT_FOUND', 'Post not found', 'not_found');
 }

@@ -1,5 +1,5 @@
-import type { AuthenticatedPrincipal } from '../../../../platform/src/auth/authenticated-principal.js';
-import { ApplicationError } from '../../../../platform/src/errors/application-error.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
+import { ApplicationError } from '@shared-kernel/errors/application-error.js';
 import type { MediaUploadService } from '@modules/media';
 import type {
   CreatePostCommand,
@@ -28,14 +28,14 @@ export class CreatePostService {
       throw new ApplicationError(
         'POST_MEDIA_LIMIT_EXCEEDED',
         'A post can contain at most four images',
-        400,
+        'validation',
       );
     }
     if (command.media.length === 0 && (command.text === undefined || command.text.trim() === '')) {
       throw new ApplicationError(
         'POST_CONTENT_REQUIRED',
         'A post must contain text or an image',
-        400,
+        'validation',
       );
     }
 

@@ -3,10 +3,10 @@ import { getQueueToken } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 
 import { MEDIA_QUEUE_NAME } from '../../contracts/media-job.contract.js';
-import type { MediaRuntime } from '../../application/ports/media-runtime.js';
+import type { MediaQueueReadiness } from '../../application/ports/media-queue-readiness.js';
 
 @Injectable()
-export class BullMqMediaRuntimeService implements MediaRuntime {
+export class BullMqMediaQueueReadinessService implements MediaQueueReadiness {
   constructor(
     @Inject(getQueueToken(MEDIA_QUEUE_NAME)) private readonly queue: Queue,
   ) {}

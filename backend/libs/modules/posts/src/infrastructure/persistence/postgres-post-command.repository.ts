@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
-import type { AuthenticatedPrincipal } from '../../../../../platform/src/auth/authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { DatabaseExecutorService } from '../../../../../platform/src/database/database-executor.service.js';
-import { ApplicationError } from '../../../../../platform/src/errors/application-error.js';
+import { ApplicationError } from '@shared-kernel/errors/application-error.js';
 import type {
   CreatePostCommand,
   OwnedPost,
@@ -30,7 +30,7 @@ export class PostgresPostCommandRepository implements PostCommandRepository {
           [command.publisherType, command.publisherId, principal.userId],
         );
         if (authorization.rows[0]?.allowed !== true) {
-          throw new ApplicationError('PERMISSION_DENIED', 'Publisher is not authorized', 403);
+          throw new ApplicationError('PERMISSION_DENIED', 'Publisher is not authorized', 'forbidden');
         }
         const created = await tx.query<{ post_id: string }>(
           `insert into public.posts
@@ -104,7 +104,7 @@ export class PostgresPostCommandRepository implements PostCommandRepository {
           [item.mediaId, postId, item.bytes, item.contentType],
         );
         if (result.rowCount !== 1) {
-          throw new ApplicationError('POST_MEDIA_STATE_CONFLICT', 'Media state changed', 409);
+          throw new ApplicationError('POST_MEDIA_STATE_CONFLICT', 'Media state changed', 'conflict');
         }
       }
       await tx.query(
@@ -151,7 +151,7 @@ async function setPrincipal(tx: Executor, principal: AuthenticatedPrincipal): Pr
 
 async function requireOwner(tx: Executor, userId: string, postId: string): Promise<void> {
   const result = await tx.query('select 1 from public.posts where post_id = $1 and created_by_user_id = $2 for update', [postId, userId]);
-  if (result.rowCount !== 1) throw new ApplicationError('POST_NOT_FOUND', 'Post not found', 404);
+  if (result.rowCount !== 1) throw new ApplicationError('POST_NOT_FOUND', 'Post not found', 'not_found');
 }
 
 async function loadReserved(tx: Executor, postId: string): Promise<ReservedPost> {

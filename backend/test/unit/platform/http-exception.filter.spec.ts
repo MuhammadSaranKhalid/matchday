@@ -7,7 +7,7 @@ import { ThrottlerException } from '@nestjs/throttler';
 import { describe, expect, it } from 'vitest';
 
 import { ExecutionContextService } from '../../../libs/platform/src/context/execution-context.service.js';
-import { ApplicationError } from '../../../libs/platform/src/errors/application-error.js';
+import { ApplicationError } from '@shared-kernel/errors/application-error.js';
 import { HttpExceptionFilter } from '../../../libs/platform/src/errors/http-exception.filter.js';
 
 interface CapturedResponse {
@@ -55,7 +55,7 @@ function capture(
 
 describe('HttpExceptionFilter', () => {
   it('maps an application error to its stable envelope', () => {
-    expect(capture(new ApplicationError('CHAT_BLOCKED', 'Blocked', 403))).toEqual({
+    expect(capture(new ApplicationError('CHAT_BLOCKED', 'Blocked', 'forbidden'))).toEqual({
       status: 403,
       body: {
         code: 'CHAT_BLOCKED',

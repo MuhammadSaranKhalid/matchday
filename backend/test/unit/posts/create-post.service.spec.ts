@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { AuthenticatedPrincipal } from '../../../libs/platform/src/auth/authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { CreatePostService } from '../../../libs/modules/posts/src/application/create-post.service.js';
 
 const principal: AuthenticatedPrincipal = {
@@ -65,7 +65,7 @@ describe('CreatePostService', () => {
     await expect(service.execute(principal, {
       ...command,
       media: Array.from({ length: 5 }, () => command.media[0]!),
-    })).rejects.toMatchObject({ code: 'POST_MEDIA_LIMIT_EXCEEDED', status: 400 });
+    })).rejects.toMatchObject({ code: 'POST_MEDIA_LIMIT_EXCEEDED', kind: 'validation' });
     expect(repository.reserveDraft).not.toHaveBeenCalled();
   });
 
@@ -78,7 +78,7 @@ describe('CreatePostService', () => {
       ...command,
       text: '   ',
       media: [],
-    })).rejects.toMatchObject({ code: 'POST_CONTENT_REQUIRED', status: 400 });
+    })).rejects.toMatchObject({ code: 'POST_CONTENT_REQUIRED', kind: 'validation' });
     expect(repository.reserveDraft).not.toHaveBeenCalled();
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { AuthenticatedPrincipal } from '../../../libs/platform/src/auth/authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { PostgresPostCommandRepository } from '../../../libs/modules/posts/src/infrastructure/persistence/postgres-post-command.repository.js';
 
 const principal: AuthenticatedPrincipal = {
@@ -79,7 +79,7 @@ describe('PostgresPostCommandRepository.markUploaded', () => {
       ]),
     ).rejects.toMatchObject({
       code: 'POST_MEDIA_STATE_CONFLICT',
-      status: 409,
+      kind: 'conflict',
     });
   });
 
@@ -105,7 +105,7 @@ describe('PostgresPostCommandRepository.markUploaded', () => {
       ]),
     ).rejects.toMatchObject({
       code: 'POST_NOT_FOUND',
-      status: 404,
+      kind: 'not_found',
     });
   });
 });

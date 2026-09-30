@@ -13,9 +13,20 @@ import { ThrottlerException } from '@nestjs/throttler';
 import type { Response } from 'express';
 
 import type { PlatformConfiguration } from '../config/configuration.js';
-import type { ErrorResponse } from '../../../shared-kernel/src/contracts/error-response.js';
+import {
+  ApplicationError,
+  type ApplicationErrorKind,
+} from '@shared-kernel/errors/application-error.js';
 import { ExecutionContextService } from '../context/execution-context.service.js';
-import { ApplicationError } from './application-error.js';
+import type { ErrorResponse } from '../http/error-response.js';
+
+const APPLICATION_ERROR_STATUS: Record<ApplicationErrorKind, HttpStatus> = {
+  validation: HttpStatus.BAD_REQUEST,
+  not_found: HttpStatus.NOT_FOUND,
+  forbidden: HttpStatus.FORBIDDEN,
+  conflict: HttpStatus.CONFLICT,
+  unavailable: HttpStatus.SERVICE_UNAVAILABLE,
+};
 
 @Injectable()
 @Catch()
@@ -52,10 +63,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const correlationId = this.context.get().correlationId ?? 'unavailable';
 
     if (exception instanceof ApplicationError) {
+      const status = APPLICATION_ERROR_STATUS[exception.kind] ?? HttpStatus.BAD_REQUEST;
       return compact({
         code: exception.code,
         message: exception.message,
-        status: exception.status,
+        status,
         correlationId,
         details: exception.details,
       });
@@ -126,7 +138,7 @@ function sanitizedHealthDetails(exception: HttpException): Record<string, { stat
   if (typeof details !== 'object' || details === null) return undefined;
 
   const sanitized: Record<string, { status: 'up' | 'down' }> = {};
-  for (const label of ['foundation', 'postgres', 'redis', 'queues']) {
+  for (const label of ['foundation', 'postgres', 'redis']) {
     const value = (details as Record<string, unknown>)[label];
     if (typeof value !== 'object' || value === null || !('status' in value)) continue;
     sanitized[label] = {

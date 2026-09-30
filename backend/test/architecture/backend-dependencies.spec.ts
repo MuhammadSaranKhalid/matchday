@@ -132,6 +132,42 @@ describe('backend dependency direction', () => {
     expect(violations).toEqual([]);
   });
 
+  it('keeps application code independent of platform', () => {
+    const violations = sourceFiles()
+      .filter((path) => path.split(sep).includes('application'))
+      .flatMap((path) =>
+        importsIn(path)
+          .filter(
+            (specifier) =>
+              specifier.includes('/platform/') ||
+              specifier.startsWith('@platform/') ||
+              specifier === '@platform',
+          )
+          .map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`),
+      );
+
+    expect(violations).toEqual([]);
+  });
+
+  it('shared-kernel does not import platform or feature modules', () => {
+    const sharedKernelRoot = join(repositoryRoot, 'libs', 'shared-kernel');
+    const violations = sourceFiles()
+      .filter((path) => path.startsWith(sharedKernelRoot))
+      .flatMap((path) => {
+        const imports = importsIn(path);
+        const forbidden = imports.filter(
+          (specifier) =>
+            specifier.includes('/platform/') ||
+            specifier.startsWith('@platform/') ||
+            specifier.includes('/modules/') ||
+            specifier.startsWith('@modules/'),
+        );
+        return forbidden.map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`);
+      });
+
+    expect(violations).toEqual([]);
+  });
+
   it('rejects concrete persistence and queue packages from inner layers', () => {
     expect(['pg', 'ioredis', 'bullmq', '@nestjs/bullmq'].every(isConcreteInfrastructureImport))
       .toBe(true);
@@ -273,6 +309,19 @@ describe('module public API boundaries', () => {
       expect(violations).toEqual([]);
     });
   }
+
+  it('module public API does not export concrete infrastructure or processors', () => {
+    for (const { srcRoot } of moduleRoots) {
+      const indexPath = join(srcRoot, 'index.ts');
+      if (!existsSync(indexPath)) continue;
+      const contents = readFileSync(indexPath, 'utf8');
+      expect(contents).not.toContain('Processor');
+      expect(contents).not.toContain('Postgres');
+      expect(contents).not.toContain('SupabaseMediaStorage');
+      expect(contents).not.toContain('Sharp');
+      expect(contents).not.toContain('BullMq');
+    }
+  });
 });
 
 describe('apps boundary — no deep relative imports into libs/modules/', () => {

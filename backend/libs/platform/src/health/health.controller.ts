@@ -36,7 +36,6 @@ export class HealthController {
         const status = this.readiness.isReady() ? 'up' as const : 'down' as const;
         return {
           foundation: { status },
-          queues: { status },
           ...postgres,
           ...redis,
         };

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { AuthenticatedPrincipal } from '../../../libs/platform/src/auth/authenticated-principal.js';
+import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { PublishPostService } from '../../../libs/modules/posts/src/application/publish-post.service.js';
 
 const principal: AuthenticatedPrincipal = {
@@ -71,7 +71,7 @@ describe('PublishPostService', () => {
     mediaUpload.verifyUpload.mockResolvedValueOnce(verification);
     const service = new PublishPostService(repository, mediaUpload, dispatcher);
 
-    await expect(service.execute(principal, postId)).rejects.toMatchObject({ code, status: 400 });
+    await expect(service.execute(principal, postId)).rejects.toMatchObject({ code, kind: 'validation' });
     expect(repository.markUploaded).not.toHaveBeenCalled();
     expect(dispatcher.dispatch).not.toHaveBeenCalled();
   });
@@ -112,7 +112,7 @@ describe('PublishPostService', () => {
 
     await expect(service.execute(principal, postId)).rejects.toMatchObject({
       code: 'POST_NOT_FOUND',
-      status: 404,
+      kind: 'not_found',
     });
     await expect(service.status(principal, postId)).resolves.toEqual({ status: 'processing' });
   });

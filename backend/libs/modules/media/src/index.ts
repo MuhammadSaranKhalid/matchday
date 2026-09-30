@@ -9,6 +9,14 @@ export {
   ProcessImageService,
 } from './application/process-image.service.js';
 export {
+  BullMqMediaRuntimeService,
+} from './infrastructure/queue/bullmq-media-runtime.service.js';
+export {
+  MEDIA_RUNTIME,
+  type MediaRuntime,
+} from './application/ports/media-runtime.js';
+export { MediaProcessor } from './infrastructure/queue/media.processor.js';
+export {
   MEDIA_QUEUE_NAME,
   MEDIA_JOB_NAMES,
   type ProcessImageJobV1,

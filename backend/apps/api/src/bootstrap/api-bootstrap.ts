@@ -4,47 +4,35 @@ import {
   ValidationPipe,
   VersioningType,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded, type Application } from 'express';
 import helmet from 'helmet';
-import { Logger as PinoLogger } from 'nestjs-pino';
-import { pinoHttp } from 'pino-http';
 
 import type { PlatformConfiguration } from '../../../../libs/platform/src/config/configuration.js';
 import { ExecutionContextService } from '../../../../libs/platform/src/context/execution-context.service.js';
 import { RequestContextMiddleware } from '../../../../libs/platform/src/context/request-context.middleware.js';
 import { HttpExceptionFilter } from '../../../../libs/platform/src/errors/http-exception.filter.js';
-import {
-  buildPinoOptions,
-  sanitizeRequestUrl,
-} from '../../../../libs/platform/src/logging/logging.config.js';
 
 export async function configureApi(
   app: INestApplication,
-  config: PlatformConfiguration,
+  customConfig?: PlatformConfiguration,
 ): Promise<void> {
+  const configService = app.get<ConfigService<PlatformConfiguration, true>>(ConfigService);
+  const config = customConfig ?? {
+    trustProxyHops: configService.get('trustProxyHops', { infer: true }),
+    corsOrigins: configService.get('corsOrigins', { infer: true }),
+    bodyLimit: configService.get('bodyLimit', { infer: true }),
+    production: configService.get('production', { infer: true }),
+    swaggerEnabled: configService.get('swaggerEnabled', { infer: true }),
+  };
+
   const context = app.get(ExecutionContextService);
-  const requestContext = new RequestContextMiddleware(context);
+  const requestContext = app.get(RequestContextMiddleware);
   const express = app.getHttpAdapter().getInstance() as Application;
 
   express.set('trust proxy', config.trustProxyHops);
   app.use(requestContext.use.bind(requestContext));
-  app.use(
-    pinoHttp({
-      ...buildPinoOptions(config, context),
-      serializers: {
-        req: (request: { id?: string; method?: string; url?: string }) => ({
-          id: request.id,
-          method: request.method,
-          url: sanitizeRequestUrl(request.url),
-        }),
-        res: (response: { statusCode?: number }) => ({
-          statusCode: response.statusCode,
-        }),
-      },
-    }),
-  );
-  app.useLogger(app.get(PinoLogger));
   app.enableShutdownHooks();
   app.setGlobalPrefix('api', {
     exclude: [

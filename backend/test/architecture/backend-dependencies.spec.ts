@@ -174,21 +174,28 @@ describe('backend dependency direction', () => {
       'utils',
       'helpers',
     ]);
+    const rootsToCheck = [
+      join(repositoryRoot, 'libs'),
+      join(repositoryRoot, 'libs', 'platform'),
+      join(repositoryRoot, 'libs', 'platform', 'src'),
+      join(repositoryRoot, 'apps', 'api'),
+      join(repositoryRoot, 'apps', 'api', 'src'),
+      join(repositoryRoot, 'apps', 'worker'),
+      join(repositoryRoot, 'apps', 'worker', 'src'),
+    ];
     const violations: string[] = [];
 
-    function visit(path: string): void {
-      if (!existsSync(path)) return;
-      for (const entry of readdirSync(path)) {
-        const entryPath = join(path, entry);
+    for (const root of rootsToCheck) {
+      if (!existsSync(root)) continue;
+      for (const entry of readdirSync(root)) {
+        const entryPath = join(root, entry);
         if (!statSync(entryPath).isDirectory()) continue;
         if (forbiddenNames.has(entry)) {
           violations.push(relative(repositoryRoot, entryPath));
         }
-        visit(entryPath);
       }
     }
 
-    for (const root of backendRoots) visit(join(repositoryRoot, root));
     expect(violations).toEqual([]);
   });
 
@@ -289,3 +296,85 @@ describe('apps boundary — no deep relative imports into libs/modules/', () => 
     expect(violations).toEqual([]);
   });
 });
+
+describe('step 2B — platform wiring and lifecycle invariants', () => {
+  it('confines process.env access strictly to platform config and test roots', () => {
+    const configDir = join(repositoryRoot, 'libs', 'platform', 'src', 'config');
+    const violations = sourceFiles()
+      .filter((path) => !path.startsWith(configDir))
+      .filter((path) => {
+        const contents = readFileSync(path, 'utf8');
+        return contents.includes('process.env');
+      })
+      .map((path) => relative(repositoryRoot, path));
+
+    expect(violations).toEqual([]);
+  });
+
+  it('api-bootstrap does not import pino-http directly', () => {
+    const bootstrapPath = join(repositoryRoot, 'apps', 'api', 'src', 'bootstrap', 'api-bootstrap.ts');
+    const imports = importsIn(bootstrapPath);
+    expect(imports.some((specifier) => specifier === 'pino-http' || specifier.startsWith('pino-http/'))).toBe(false);
+  });
+
+  it('apps/worker does not import BullMQ or access queue tokens directly', () => {
+    const workerRoot = join(repositoryRoot, 'apps', 'worker');
+    const violations = sourceFiles()
+      .filter((path) => path.startsWith(workerRoot))
+      .flatMap((path) => {
+        const contents = readFileSync(path, 'utf8');
+        const imports = importsIn(path);
+        const hasForbiddenImport = imports.some(
+          (specifier) =>
+            specifier === '@nestjs/bullmq' ||
+            specifier === 'bullmq' ||
+            specifier.startsWith('bullmq/'),
+        );
+        const usesQueueToken = contents.includes('getQueueToken');
+        if (hasForbiddenImport || usesQueueToken) {
+          return [`${relative(repositoryRoot, path)} (forbidden BullMQ access)`];
+        }
+        return [];
+      });
+
+    expect(violations).toEqual([]);
+  });
+
+  it('MediaModule does not export BullModule', () => {
+    const mediaModulePath = join(repositoryRoot, 'libs', 'modules', 'media', 'src', 'media.module.ts');
+    const contents = readFileSync(mediaModulePath, 'utf8');
+    const exportsMatch = /exports:\s*\[([\s\S]*?)\]/.exec(contents);
+    expect(exportsMatch?.[1]).not.toContain('BullModule');
+  });
+
+  it('WorkerModule does not import HealthModule', () => {
+    const workerModulePath = join(repositoryRoot, 'apps', 'worker', 'src', 'worker.module.ts');
+    const imports = importsIn(workerModulePath);
+    expect(imports.some((specifier) => specifier.includes('health.module'))).toBe(false);
+  });
+
+  it('WorkerLifecycleService does not manually call onApplicationShutdown', () => {
+    const lifecyclePath = join(repositoryRoot, 'apps', 'worker', 'src', 'lifecycle', 'worker-lifecycle.service.ts');
+    const contents = readFileSync(lifecyclePath, 'utf8');
+    expect(contents).not.toContain('onApplicationShutdown');
+  });
+
+  it('feature controllers do not import TOKEN_VERIFIER or parse Authorization headers manually', () => {
+    const modulesRoot = join(repositoryRoot, 'libs', 'modules');
+    const violations = sourceFiles()
+      .filter((path) => path.startsWith(modulesRoot) && path.endsWith('.controller.ts'))
+      .flatMap((path) => {
+        const contents = readFileSync(path, 'utf8');
+        const imports = importsIn(path);
+        const importsTokenVerifier = imports.some((specifier) => specifier.includes('token-verifier'));
+        const parsesAuth = contents.includes('authorization') || contents.includes('Bearer');
+        if (importsTokenVerifier || parsesAuth) {
+          return [`${relative(repositoryRoot, path)} (manual auth plumbing)`];
+        }
+        return [];
+      });
+
+    expect(violations).toEqual([]);
+  });
+});
+

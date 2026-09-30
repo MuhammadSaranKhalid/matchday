@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { bootstrapWorker } from '../../../apps/worker/src/main.js';
 import { WorkerLifecycleService } from '../../../apps/worker/src/lifecycle/worker-lifecycle.service.js';
 import { WorkerModule } from '../../../apps/worker/src/worker.module.js';
-import { ReadinessService } from '../../../libs/platform/src/health/readiness.service.js';
+import { ReadinessService } from '../../../libs/platform/src/lifecycle/readiness.service.js';
 
 describe('bootstrapWorker', () => {
   it('starts an application context with buffered logging and graceful shutdown', async () => {
@@ -53,36 +53,39 @@ describe('bootstrapWorker', () => {
 });
 
 describe('WorkerLifecycleService', () => {
-  it('checks dependencies, marks ready, and shuts resources down in order', async () => {
-    vi.useFakeTimers();
+  it('checks dependencies, marks ready, and sets stopping on shutdown', async () => {
     const readiness = new ReadinessService();
-    const order: string[] = [];
     const postgresHealth = { isHealthy: vi.fn(async () => ({ postgres: { status: 'up' } })) };
     const redisHealth = { isHealthy: vi.fn(async () => ({ redis: { status: 'up' } })) };
-    const redis = { onApplicationShutdown: vi.fn(async () => { order.push('redis'); }) };
-    const postgres = { onApplicationShutdown: vi.fn(async () => { order.push('postgres'); }) };
-    const queue = (name: string) => ({
-      waitUntilReady: vi.fn(async () => undefined),
-      close: vi.fn(async () => { order.push(name); }),
-    });
-    const media = queue('media');
+    const mediaRuntime = { waitUntilReady: vi.fn(async () => undefined) };
     const lifecycle = new WorkerLifecycleService(
       readiness,
       postgresHealth as never,
       redisHealth as never,
-      redis as never,
-      postgres as never,
-      media as never,
+      mediaRuntime as never,
     );
 
     await lifecycle.initialize();
     expect(readiness.isReady()).toBe(true);
-    expect(vi.getTimerCount()).toBe(1);
+    expect(mediaRuntime.waitUntilReady).toHaveBeenCalledOnce();
 
     await lifecycle.beforeApplicationShutdown('SIGTERM');
     expect(readiness.isReady()).toBe(false);
-    expect(vi.getTimerCount()).toBe(0);
-    expect(order).toEqual(['media', 'redis', 'postgres']);
-    vi.useRealTimers();
+  });
+
+  it('fails initialization when dependencies are down', async () => {
+    const readiness = new ReadinessService();
+    const postgresHealth = { isHealthy: vi.fn(async () => ({ postgres: { status: 'down' } })) };
+    const redisHealth = { isHealthy: vi.fn(async () => ({ redis: { status: 'up' } })) };
+    const mediaRuntime = { waitUntilReady: vi.fn(async () => undefined) };
+    const lifecycle = new WorkerLifecycleService(
+      readiness,
+      postgresHealth as never,
+      redisHealth as never,
+      mediaRuntime as never,
+    );
+
+    await expect(lifecycle.initialize()).rejects.toThrow('Worker infrastructure is unavailable');
+    expect(readiness.isReady()).toBe(false);
   });
 });

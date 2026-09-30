@@ -2,69 +2,48 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
-  Inject,
   Param,
   ParseUUIDPipe,
   Post,
-  ServiceUnavailableException,
-  UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 
-import {
-  TOKEN_VERIFIER,
-  TokenVerificationError,
-  type TokenVerifier,
-} from '../../../../../platform/src/auth/token-verifier.js';
+import type { AuthenticatedPrincipal } from '../../../../../platform/src/auth/authenticated-principal.js';
+import { CurrentPrincipal } from '../../../../../platform/src/auth/current-principal.decorator.js';
+import { SupabaseAuthGuard } from '../../../../../platform/src/auth/supabase-auth.guard.js';
 import { CreatePostService } from '../../application/create-post.service.js';
 import { PublishPostService } from '../../application/publish-post.service.js';
 import { CreatePostCommandDto } from './dto/post-command.dto.js';
 
+@UseGuards(SupabaseAuthGuard)
 @Controller('posts')
 export class PostsController {
   constructor(
-    @Inject(TOKEN_VERIFIER) private readonly verifier: TokenVerifier,
     private readonly createPost: CreatePostService,
     private readonly publishPost: PublishPostService,
   ) {}
 
   @Post()
   async create(
-    @Headers('authorization') authorization: string | undefined,
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Body() command: CreatePostCommandDto,
   ) {
-    return this.createPost.execute(await this.authenticate(authorization), command);
+    return this.createPost.execute(principal, command);
   }
 
   @Post(':postId/publish')
   async publish(
-    @Headers('authorization') authorization: string | undefined,
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Param('postId', new ParseUUIDPipe()) postId: string,
   ) {
-    return this.publishPost.execute(await this.authenticate(authorization), postId);
+    return this.publishPost.execute(principal, postId);
   }
 
   @Get(':postId/status')
   async status(
-    @Headers('authorization') authorization: string | undefined,
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Param('postId', new ParseUUIDPipe()) postId: string,
   ) {
-    return this.publishPost.status(await this.authenticate(authorization), postId);
-  }
-
-  private async authenticate(authorization: string | undefined) {
-    const match = /^Bearer ([^\s]+)$/i.exec(authorization ?? '');
-    if (match?.[1] === undefined) throw new UnauthorizedException('Authentication required');
-    try {
-      return await this.verifier.verify(match[1]);
-    } catch (error) {
-      if (error instanceof TokenVerificationError) {
-        if (error.code === 'verification_unavailable') {
-          throw new ServiceUnavailableException('Authentication service unavailable');
-        }
-        throw new UnauthorizedException('Invalid access token');
-      }
-      throw error;
-    }
+    return this.publishPost.status(principal, postId);
   }
 }

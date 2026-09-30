@@ -34,10 +34,14 @@ import {
   SCRATCH_WORKSPACE,
   type ScratchWorkspace,
 } from './application/ports/scratch-workspace.js';
+import {
+  MEDIA_RUNTIME,
+} from './application/ports/media-runtime.js';
 
 import { MediaProcessingScheduler } from './application/media-processing-scheduler.js';
 import { MediaUploadService } from './application/media-upload.service.js';
 import { ProcessImageService } from './application/process-image.service.js';
+import { BullMqMediaRuntimeService } from './infrastructure/queue/bullmq-media-runtime.service.js';
 
 import { SharpImageTransformer } from './infrastructure/image/sharp-image-transformer.js';
 import { PostgresMediaRepository } from './infrastructure/persistence/postgres-media.repository.js';
@@ -117,12 +121,17 @@ import { SupabaseMediaStorageService } from './infrastructure/storage/supabase-m
         scratch: ScratchWorkspace,
       ) => new ProcessImageService(repository, storage, transformer, scratch),
     },
+    {
+      provide: MEDIA_RUNTIME,
+      inject: [getQueueToken(MEDIA_QUEUE_NAME)],
+      useFactory: (queue: Queue) => new BullMqMediaRuntimeService(queue),
+    },
   ],
   exports: [
     MediaUploadService,
     MediaProcessingScheduler,
     ProcessImageService,
-    BullModule,
+    MEDIA_RUNTIME,
   ],
 })
 export class MediaModule {}

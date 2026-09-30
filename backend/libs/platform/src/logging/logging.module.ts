@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 
-import { buildConfiguration } from '../config/configuration.js';
-import { parseEnvironment } from '../config/environment.schema.js';
+import type { PlatformConfiguration } from '../config/configuration.js';
 import { PlatformConfigModule } from '../config/platform-config.module.js';
 import { ExecutionContextModule } from '../context/execution-context.module.js';
 import { ExecutionContextService } from '../context/execution-context.service.js';
-import { buildPinoOptions } from './logging.config.js';
+import { buildPinoOptions, sanitizeRequestUrl } from './logging.config.js';
 
 @Module({
   imports: [
@@ -14,19 +14,26 @@ import { buildPinoOptions } from './logging.config.js';
     ExecutionContextModule,
     LoggerModule.forRootAsync({
       imports: [ExecutionContextModule],
-      inject: [ExecutionContextService],
-      useFactory: (context: ExecutionContextService) => {
-        const configuration = buildConfiguration(parseEnvironment(process.env));
-        const options = buildPinoOptions(configuration, context);
+      inject: [ConfigService, ExecutionContextService],
+      useFactory: (
+        configService: ConfigService<PlatformConfiguration, true>,
+        context: ExecutionContextService,
+      ) => {
+        const appName = configService.get('appName', { infer: true });
+        const logLevel = configService.get('logLevel', { infer: true });
+        const options = buildPinoOptions(
+          { appName, logLevel } as PlatformConfiguration,
+          context,
+        );
         return {
           pinoHttp: {
             ...options,
-            autoLogging: false,
+            autoLogging: true,
             serializers: {
               req: (request: { id?: string; method?: string; url?: string }) => ({
                 id: request.id,
                 method: request.method,
-                url: request.url?.split('?', 1)[0],
+                url: sanitizeRequestUrl(request.url),
               }),
               res: (response: { statusCode?: number }) => ({
                 statusCode: response.statusCode,

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiModule } from '../../apps/api/src/api.module.js';
 import { configureApi } from '../../apps/api/src/bootstrap/api-bootstrap.js';
 import type { PlatformConfiguration } from '../../libs/platform/src/config/configuration.js';
-import { ReadinessService } from '../../libs/platform/src/health/readiness.service.js';
+import { ReadinessService } from '../../libs/platform/src/lifecycle/readiness.service.js';
 import { PostgresHealthIndicator } from '../../libs/platform/src/database/postgres-health.indicator.js';
 import { RedisHealthIndicator } from '../../libs/platform/src/redis/redis-health.indicator.js';
 import { MEDIA_QUEUE_NAME } from '@modules/media';
@@ -23,6 +23,40 @@ const configuration: PlatformConfiguration = {
   trustProxyHops: 0,
   swaggerEnabled: false,
   production: false,
+  database: {
+    url: 'postgresql://localhost:5432/matchday',
+    poolMax: 10,
+    connectionTimeoutMs: 1000,
+    idleTimeoutMs: 1000,
+    statementTimeoutMs: 1000,
+    sslMode: 'disable',
+  },
+  redis: {
+    url: 'redis://localhost:6379',
+    connectionTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    maxRetriesPerRequest: 1,
+    namespace: 'test',
+  },
+  auth: {
+    supabaseUrl: 'http://localhost:54321',
+    issuer: 'test',
+    audience: 'test',
+    mode: 'remote',
+    verificationTimeoutMs: 1000,
+    jwksCacheMaxAgeMs: 1000,
+    jwksCooldownMs: 1000,
+  },
+  mediaStorage: {
+    supabaseUrl: 'http://localhost:54321',
+    secretKey: 'test',
+  },
+  queue: {
+    attempts: 3,
+    backoffDelayMs: 1000,
+    removeOnCompleteCount: 10,
+    removeOnFailCount: 10,
+  },
 };
 
 describe('health endpoints', () => {
@@ -64,7 +98,6 @@ describe('health endpoints', () => {
   it('reports not ready before initialization completes and ready afterward', async () => {
     await request(app.getHttpServer()).get('/health/ready').expect(503);
     readiness.markReady();
-    readiness.markQueuesInitialized();
     const response = await request(app.getHttpServer()).get('/health/ready').expect(200);
     expect(response.body).toMatchObject({ status: 'ok' });
     expect(JSON.stringify(response.body)).not.toContain('must-not-leak');
@@ -79,7 +112,6 @@ describe('health endpoints', () => {
     ['postgres', postgresHealth, { postgres: { status: 'down' as const } }],
     ['redis', redisHealth, { redis: { status: 'down' as const } }],
   ])('keeps liveness up while %s makes readiness fail', async (label, indicator, result) => {
-    readiness.markQueuesInitialized();
     readiness.markReady();
     indicator.isHealthy.mockResolvedValueOnce(result as never);
 
@@ -90,7 +122,6 @@ describe('health endpoints', () => {
   });
 
   it('removes readiness as soon as shutdown begins', async () => {
-    readiness.markQueuesInitialized();
     readiness.markReady();
     readiness.markStopping();
 

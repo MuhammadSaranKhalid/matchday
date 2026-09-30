@@ -5,7 +5,7 @@ import {
   type HealthCheckResult,
 } from '@nestjs/terminus';
 
-import { ReadinessService } from './readiness.service.js';
+import { ReadinessService } from '../lifecycle/readiness.service.js';
 import { PostgresHealthIndicator } from '../database/postgres-health.indicator.js';
 import { RedisHealthIndicator } from '../redis/redis-health.indicator.js';
 

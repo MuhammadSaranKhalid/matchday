@@ -3,10 +3,12 @@ import { UnrecoverableError, type Job } from 'bullmq';
 import {
   MEDIA_JOB_NAMES,
   MEDIA_QUEUE_NAME,
+  type ProcessImageJobV1,
+} from '../../contracts/media-job.contract.js';
+import {
   PermanentMediaProcessingError,
   ProcessImageService,
-  type ProcessImageJobV1,
-} from '@modules/media';
+} from '../../application/process-image.service.js';
 
 @Processor(MEDIA_QUEUE_NAME)
 export class MediaProcessor extends WorkerHost {

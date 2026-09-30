@@ -1,25 +1,25 @@
 import 'reflect-metadata';
 
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 
 import { ApiModule } from '@app/api/api.module.js';
 import { configureApi } from '@app/api/bootstrap/api-bootstrap.js';
-import { buildConfiguration } from '@platform/config/configuration.js';
-import { parseEnvironment } from '@platform/config/environment.schema.js';
-import { ReadinessService } from '@platform/health/readiness.service.js';
+import type { PlatformConfiguration } from '@platform/config/configuration.js';
+import { ReadinessService } from '@platform/lifecycle/readiness.service.js';
 
 export async function bootstrapApi(): Promise<void> {
-  const configuration = buildConfiguration(parseEnvironment(process.env));
   const app = await NestFactory.create(ApiModule, {
     bodyParser: false,
     bufferLogs: true,
   });
-  await configureApi(app, configuration);
+  await configureApi(app);
   app.useLogger(app.get(Logger));
-  await app.listen(configuration.port);
+  const configService = app.get<ConfigService<PlatformConfiguration, true>>(ConfigService);
+  const port = configService.get('port', { infer: true });
+  await app.listen(port);
   const readiness = app.get(ReadinessService);
-  readiness.markQueuesInitialized();
   readiness.markReady();
 }
 

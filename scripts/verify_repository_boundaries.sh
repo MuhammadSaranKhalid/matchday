@@ -27,7 +27,6 @@ required_paths=(
   backend/test/e2e
   supabase/config.toml
   website/package.json
-  media-worker/package.json
 )
 
 for path in "${required_paths[@]}"; do

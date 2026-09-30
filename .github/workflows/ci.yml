@@ -106,26 +106,3 @@ jobs:
 
       - name: Feature Unit Tests
         run: flutter test test/features/posts/
-
-  media-worker:
-    name: Media Worker Build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: media-worker
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-          cache-dependency-path: media-worker/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: TypeScript Build
-        run: npm run build

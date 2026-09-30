@@ -2,6 +2,7 @@ import 'reflect-metadata';
 
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from 'nestjs-pino';
 
 import { ApiModule } from '@app/api/api.module.js';
@@ -10,7 +11,7 @@ import type { PlatformConfiguration } from '@platform/config/configuration.js';
 import { ReadinessService } from '@platform/lifecycle/readiness.service.js';
 
 export async function bootstrapApi(): Promise<void> {
-  const app = await NestFactory.create(ApiModule, {
+  const app = await NestFactory.create<NestExpressApplication>(ApiModule, {
     bodyParser: false,
     bufferLogs: true,
     routeConflictPolicy: { duplicate: 'error', shadow: 'warn' },

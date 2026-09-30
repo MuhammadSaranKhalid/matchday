@@ -13,7 +13,7 @@ import type { PlatformConfiguration } from '../../../../libs/platform/src/config
 import { RequestContextMiddleware } from '../../../../libs/platform/src/context/request-context.middleware.js';
 
 export async function configureApi(
-  app: INestApplication,
+  app: NestExpressApplication,
   customConfig?: PlatformConfiguration,
 ): Promise<void> {
   const configService = app.get<ConfigService<PlatformConfiguration, true>>(ConfigService);
@@ -27,10 +27,12 @@ export async function configureApi(
 
   const requestContext = app.get(RequestContextMiddleware);
   const express = app.getHttpAdapter().getInstance() as Application;
-  const expressApp = app as unknown as NestExpressApplication;
 
   express.set('trust proxy', config.trustProxyHops);
+  app.useSecurityHeaders();
   app.use(requestContext.use.bind(requestContext));
+  app.useBodyParser('json', { limit: config.bodyLimit });
+  app.useBodyParser('urlencoded', { extended: true, limit: config.bodyLimit });
   app.enableShutdownHooks();
   app.setGlobalPrefix('api', {
     exclude: [
@@ -53,9 +55,6 @@ export async function configureApi(
       callback(null, false);
     },
   });
-  app.useSecurityHeaders();
-  expressApp.useBodyParser('json', { limit: config.bodyLimit });
-  expressApp.useBodyParser('urlencoded', { extended: true, limit: config.bodyLimit });
 
   if (config.swaggerEnabled) {
     const document = SwaggerModule.createDocument(

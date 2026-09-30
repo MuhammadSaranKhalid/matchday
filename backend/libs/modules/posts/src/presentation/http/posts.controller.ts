@@ -12,9 +12,8 @@ import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticat
 import { CurrentPrincipal } from '../../../../../platform/src/auth/current-principal.decorator.js';
 import { SupabaseAuthGuard } from '../../../../../platform/src/auth/supabase-auth.guard.js';
 import { CreatePostService } from '../../application/create-post.service.js';
-import type { CreatePostCommand } from '../../application/post-command.ports.js';
 import { PublishPostService } from '../../application/publish-post.service.js';
-import { createPostSchema } from './schemas/create-post.schema.js';
+import { type CreatePostDto, createPostSchema } from './schemas/create-post.schema.js';
 
 @UseGuards(SupabaseAuthGuard)
 @Controller('posts')
@@ -27,7 +26,7 @@ export class PostsController {
   @Post()
   async create(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
-    @Body({ schema: createPostSchema }) command: CreatePostCommand,
+    @Body({ schema: createPostSchema }) command: CreatePostDto,
   ) {
     return this.createPost.execute(principal, command);
   }

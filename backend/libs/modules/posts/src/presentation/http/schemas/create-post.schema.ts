@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import { MEDIA_POLICY } from '@modules/media';
 
-export const postMediaSchema = z.object({
+export const postMediaSchema = z.strictObject({
   width: z.number().int().min(1).max(MEDIA_POLICY.source.maxLongEdge),
   height: z.number().int().min(1).max(MEDIA_POLICY.source.maxLongEdge),
   bytes: z.number().int().min(1).max(MEDIA_POLICY.source.maxBytes),
   mimeType: z.literal(MEDIA_POLICY.source.mimeType),
 });
 
-export const createPostSchema = z.object({
+export const createPostSchema = z.strictObject({
   clientCommandId: z.string().uuid(),
   publisherType: z.enum(['user', 'team', 'tournament']),
   publisherId: z.string().uuid(),
@@ -17,4 +17,5 @@ export const createPostSchema = z.object({
   media: z.array(postMediaSchema).max(4),
 });
 
-export type CreatePostInput = z.infer<typeof createPostSchema>;
+export type CreatePostDto = z.infer<typeof createPostSchema>;
+export type CreatePostInput = CreatePostDto;

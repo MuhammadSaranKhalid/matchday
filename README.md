@@ -10,10 +10,9 @@ Matchday is a multi-project cricket platform. The repository root coordinates fi
 | `backend/` | NestJS API and background worker | Node 24, pnpm, NestJS |
 | `supabase/` | PostgreSQL migrations and Edge Functions | Supabase CLI, Deno |
 | `website/` | Standalone Next.js website | Node, npm |
-| `media-worker/` | Standalone media-processing service | Node 22, npm |
 | `scripts/`, `docs/`, `.github/` | Cross-project governance | Bash, GitHub Actions |
 
-The website and media worker are not backend packages. Supabase remains the only owner of database migrations and Edge Functions.
+The website is not a backend package. Supabase remains the only owner of database migrations and Edge Functions.
 
 ## Quick start
 
@@ -37,7 +36,7 @@ corepack pnpm build
 docker compose up --build
 ```
 
-The Compose project contains the API, worker, and a private Redis service. It does not start Supabase or either website.
+The Compose project contains the API, worker, and a private Redis service. It does not start Supabase or the website.
 
 ### Supabase
 
@@ -48,14 +47,11 @@ supabase --workdir . db reset
 
 Run Supabase commands from the repository root so the CLI uses `supabase/config.toml`.
 
-### Website and media worker
+### Website
 
 ```sh
 npm --prefix website ci
 npm --prefix website run build
-
-npm --prefix media-worker ci
-npm --prefix media-worker run build
 ```
 
 ## Quality gates

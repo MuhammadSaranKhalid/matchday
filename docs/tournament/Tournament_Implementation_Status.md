@@ -1265,6 +1265,81 @@ Full repository-wide `flutter test` execution result:
 
 `PHASE 2 GATE: PASS`
 
+---
+
+## 19. Phase 2.3 — Cancellation Compatibility Closure
+
+Phase 2.3 resolves the missing cancellation RPC compatibility defect discovered between the Flutter data source and the database schema.
+
+### 19.1 Defect Investigation & Root Cause
+
+1. **Defect:** `tournaments_remote_datasource.dart` invokes `await _supabase.rpc<void>('tournament_cancel', params: {'p_tournament_id': tournamentId, 'p_reason': reason});`. However, neither `public.tournament_cancel` nor `public.cancel_tournament` existed in the migration files, local Postgres, or the remote connected Supabase project.
+2. **Root Cause:**
+   - Git archaeological analysis revealed that `public.tournament_cancel` was originally created on 2026-08-30 in commit `fc7a5d6` (`supabase/migrations/20260830000000_tournament_live_ops.sql`).
+   - Subsequently, in commit `2c841d9` (`chore(db): squash 31 post-base migrations into 20260101* base files`), `20260830000000_tournament_live_ops.sql` was deleted during migration squashing, but the `tournament_cancel` function was inadvertently dropped from the squashed base files while the Flutter calling code remained.
+3. **Classification:** **`PRE-EXISTING DEFECT`** (introduced during squashing in commit `2c841d9`, long prior to Phase 1 baseline or Phase 2).
+
+### 19.2 Tournament Abandonment Investigation
+
+An audit of Tournament abandonment was conducted concurrently:
+- **Match Abandonment:** Exists and functions via `abandonMatch` in `tournaments_controller.dart` calling `cricket-match-action` edge function for single match operations.
+- **Tournament Root Abandonment:** No `abandonTournament` function, RPC, or UI action currently exists in Flutter or Supabase.
+- **Status:** Tournament abandonment (`termination_state = 'abandoned'`) is established in the canonical database enum, constraints, and Dart domain model, but its operational implementation is correctly scheduled for **Phase 9 (Operations & Edge Commands)**. No broken runtime call exists in Flutter for tournament abandonment.
+
+### 19.3 Transitional Cancellation Compatibility Implementation
+
+To ensure current Flutter runtime calls do not fail with runtime RPC errors, a minimal server-side compatibility RPC `public.tournament_cancel` was added to `supabase/migrations/20261001000100_tournament_memberships.sql`:
+- **Authentication:** Enforces `auth.uid() IS NOT NULL` (error `28000`).
+- **Authorization:** Enforces canonical root capability:
+  ```sql
+  IF NOT public.can('tournament', p_tournament_id, 'tournament.cancel') THEN
+    RAISE EXCEPTION 'Unauthorized to cancel tournament' USING errcode = '42501';
+  END IF;
+  ```
+  Permitted ONLY for Tournament Owner (rank 40). Denied to Managers, former creators after ownership transfer, and unrelated users.
+- **Lifecycle Precondition:** Cancellation is allowed only before competition has started (`competition_state = 'not_started'`). Started tournaments must use abandonment (Phase 9).
+- **Idempotency:** If `termination_state = 'cancelled'`, returns cleanly without duplicating side effects.
+- **Canonical Lifecycle Mutation:** Mutates **ONLY** canonical `termination_state = 'cancelled'`. Does NOT mutate `status` directly; trigger `tournaments_sync_status_projection` projects `status = 'cancelled'`. Does not mutate `publication_state`, `registration_state`, `entry_state`, or `competition_state`.
+- **Sporting History Preservation:** Only unplayed fixtures (`status IN ('scheduled', 'live')`) are set to `'cancelled'`. Completed scorecards (`status = 'completed'`) are strictly preserved.
+- **Metadata:** Records cancellation reason, timestamp, and actor in `rules` JSONB (`'cancelled_reason'`, `'cancelled_at'`, `'cancelled_by'`).
+- **Temporary Scope:** Explicitly documented as a transitional compatibility function awaiting Phase 5/9 command pipeline.
+
+### 19.4 Deployment State Report
+
+| Environment | Migration File Present? | Applied to Database? | `tournament_cancel` RPC Present? | Status |
+|---|---|---|---|---|
+| **Repository Code** | Yes (`20261001000100_tournament_memberships.sql`) | N/A | Declared in migration | Synced in Git |
+| **Local PostgreSQL (`supabase_db_crick`)** | Yes | Yes (applied) | Yes | **Verified working** |
+| **Connected Remote Supabase Project** | Pending deployment | Not yet applied | Not yet present | Pending remote migration run |
+
+*Note: Per Matchday governance, local migrations are verified without unauthorized automated deployments to remote environments.*
+
+### 19.5 Verification & Test Results
+
+1. **Direct Database Verification (PostgreSQL):**
+   - Stranger cancellation -> **DENIED** (error `42501`)
+   - Manager cancellation -> **DENIED** (error `42501`)
+   - Former creator after ownership transfer -> **DENIED** (error `42501`)
+   - Owner cancellation -> **ALLOWED**
+   - Canonical axes verified (`term=cancelled, status=cancelled, pub=published, reg=open, entry=editable, comp=not_started`)
+   - Repeated cancellation -> **IDEMPOTENT** (returned cleanly)
+   - Sporting history verified: completed matches remained `completed`, scheduled matches became `cancelled`.
+2. **Automated Unit & Regression Tests:**
+   - `flutter test test/features/tournaments/tournament_status_write_regression_test.dart` -> **PASS (16/16 passed)**
+   - `flutter test test/supabase/migration_layout_test.dart` -> **PASS (3/3 passed)**
+   - `flutter analyze lib/` -> **PASS (0 issues)**
+   - `flutter test test/architecture_test.dart` -> **PASS (9/9 passed)**
+   - `flutter test test/features/tournaments/baseline_safety_characterization_test.dart` -> **PASS (10/10 passed)**
+   - `flutter test test/features/matches/domain/scoring` -> **PASS (76/76 passed)**
+   - Deno Edge Function check & tests -> **PASS (9/9 passed)**
+
+---
+
+### 19.6 Phase 2 Final Verdict
+
+`PHASE 2 GATE: PASS`
+
+
 
 
 

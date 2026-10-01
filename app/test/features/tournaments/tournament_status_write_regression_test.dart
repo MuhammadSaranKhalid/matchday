@@ -266,4 +266,78 @@ void main() {
           reason: 'Wizard screen creates and opens registration using explicit composite method');
     });
   });
+
+  group('Phase 2.3 — Cancellation Compatibility Guard', () {
+    Tournament createTestTournament({
+      TournamentPublicationState publicationState = TournamentPublicationState.published,
+      TournamentRegistrationState registrationState = TournamentRegistrationState.open,
+      TournamentEntryState entryState = TournamentEntryState.editable,
+      TournamentCompetitionState competitionState = TournamentCompetitionState.notStarted,
+      TournamentTerminationState terminationState = TournamentTerminationState.none,
+    }) {
+      return Tournament(
+        id: 't-test',
+        name: 'Cancellation Cup 2026',
+        type: TournamentType.knockout,
+        status: TournamentStatus.upcoming,
+        privacy: TournamentPrivacy.public,
+        publicationState: publicationState,
+        registrationState: registrationState,
+        entryState: entryState,
+        competitionState: competitionState,
+        terminationState: terminationState,
+        organizers: const [],
+        venues: const [],
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+      );
+    }
+
+    test('Cancellation transition sets termination_state = cancelled and projects cancelled status', () {
+      final active = createTestTournament();
+      expect(active.projectedPublicStatus, equals(TournamentStatus.registration));
+
+      final cancelled = createTestTournament(
+        terminationState: TournamentTerminationState.cancelled,
+      );
+      expect(cancelled.terminationState, equals(TournamentTerminationState.cancelled));
+      expect(cancelled.projectedPublicStatus, equals(TournamentStatus.cancelled));
+
+      // Other canonical axes must remain untouched
+      expect(cancelled.publicationState, equals(active.publicationState));
+      expect(cancelled.registrationState, equals(active.registrationState));
+      expect(cancelled.entryState, equals(active.entryState));
+      expect(cancelled.competitionState, equals(active.competitionState));
+    });
+
+    test('tournaments_remote_datasource cancelTournament calls tournament_cancel RPC with exact parameters', () {
+      final file = File('lib/features/tournaments/data/datasources/tournaments_remote_datasource.dart');
+      expect(file.existsSync(), isTrue);
+      final content = file.readAsStringSync();
+
+      expect(content.contains("'tournament_cancel'"), isTrue,
+          reason: 'Must call tournament_cancel RPC');
+      expect(content.contains("'p_tournament_id': tournamentId"), isTrue,
+          reason: 'Must supply p_tournament_id parameter');
+      expect(content.contains("'p_reason': reason"), isTrue,
+          reason: 'Must supply p_reason parameter');
+    });
+
+    test('SQL migration declares tournament_cancel with canonical capability check and lifecycle rules', () {
+      final migrationFile = File('../supabase/migrations/20261001000100_tournament_memberships.sql');
+      expect(migrationFile.existsSync(), isTrue);
+      final sql = migrationFile.readAsStringSync();
+
+      expect(sql.contains('create or replace function public.tournament_cancel('), isTrue,
+          reason: 'Must declare public.tournament_cancel');
+      expect(sql.contains("public.can('tournament', p_tournament_id, 'tournament.cancel')"), isTrue,
+          reason: 'Must authorize via canonical tournament.cancel capability');
+      expect(sql.contains("termination_state = 'cancelled'"), isTrue,
+          reason: 'Must set canonical termination_state to cancelled');
+      expect(sql.contains("v_competition_state != 'not_started'"), isTrue,
+          reason: 'Must reject cancellation once competition has started');
+      expect(sql.contains("status in ('scheduled', 'live')"), isTrue,
+          reason: 'Must preserve completed scorecards and void only scheduled/live fixtures');
+    });
+  });
 }

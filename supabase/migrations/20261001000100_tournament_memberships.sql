@@ -863,3 +863,97 @@ create policy "tournaments_delete_creator"
     or ((select auth.uid()) = created_by and owner_user_id is null)
   );
 
+-- -----------------------------------------------------------------------------
+-- 15. Transitional Tournament Cancellation RPC
+-- TODO(Phase 5/9): Replace temporary RPC with canonical tournament-action CancelTournament command pipeline
+-- -----------------------------------------------------------------------------
+create or replace function public.tournament_cancel(
+  p_tournament_id uuid,
+  p_reason text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_competition_state public.tournament_competition_state;
+  v_termination_state public.tournament_termination_state;
+begin
+  -- 1. Authenticate caller
+  if auth.uid() is null then
+    raise exception 'Not authenticated' using errcode = '28000';
+  end if;
+
+  -- 2. Inspect tournament exists and retrieve current lifecycle states
+  select competition_state, termination_state
+    into v_competition_state, v_termination_state
+    from public.tournaments
+   where tournament_id = p_tournament_id;
+
+  if not found then
+    raise exception 'Tournament not found' using errcode = 'P0002';
+  end if;
+
+  -- 3. Authorize via canonical capability check (tournament.cancel requires Owner root governance)
+  if not public.can('tournament', p_tournament_id, 'tournament.cancel') then
+    raise exception 'Unauthorized to cancel tournament' using errcode = '42501';
+  end if;
+
+  -- 4. Idempotency: if already cancelled, return cleanly without duplicate operations
+  if v_termination_state = 'cancelled' then
+    return;
+  end if;
+
+  -- 5. Lifecycle Precondition: Cancellation is only permitted before competition has started or completed.
+  -- Started tournaments must be abandoned (Phase 9 tournament.abandon), not cancelled.
+  if v_competition_state != 'not_started' then
+    raise exception 'Cannot cancel a tournament once competition has started. Use abandonment instead.'
+      using errcode = '22000';
+  end if;
+
+  -- 6. Validate cancellation reason
+  if p_reason is null or length(btrim(p_reason)) < 10 then
+    raise exception 'Cancelling requires a reason of at least 10 characters'
+      using errcode = '22023';
+  end if;
+
+  -- 7. Void unplayed matches if any fixtures were generated.
+  -- Completed scorecards are deliberately preserved to protect sporting history.
+  update public.matches
+     set status = 'cancelled',
+         updated_at = now()
+   where tournament_id = p_tournament_id
+     and status in ('scheduled', 'live');
+
+  -- 8. Mutate CANONICAL termination_state.
+  -- Do NOT write legacy status directly: trigger tournaments_sync_status_projection
+  -- projects termination_state = 'cancelled' -> status = 'cancelled'.
+  update public.tournaments
+     set termination_state = 'cancelled',
+         rules = coalesce(rules, '{}'::jsonb) || jsonb_build_object(
+           'cancelled_reason', btrim(p_reason),
+           'cancelled_at', now(),
+           'cancelled_by', auth.uid()
+         ),
+         updated_at = now()
+   where tournament_id = p_tournament_id;
+
+  -- 9. Notify participants via tournament_announce if routine exists
+  if exists (
+    select 1 from pg_proc
+     where proname = 'tournament_announce'
+       and pronamespace = 'public'::regnamespace
+  ) then
+    perform public.tournament_announce(
+      p_tournament_id,
+      left('Cancelled: ' || btrim(p_reason), 300)
+    );
+  end if;
+end;
+$$;
+
+revoke all on function public.tournament_cancel(uuid, text) from public;
+grant execute on function public.tournament_cancel(uuid, text) to authenticated;
+
+

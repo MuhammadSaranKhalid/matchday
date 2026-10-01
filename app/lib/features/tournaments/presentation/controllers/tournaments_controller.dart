@@ -292,26 +292,6 @@ class TournamentsController extends _$TournamentsController {
       String tournamentId, String registrationId) =>
       withdrawPendingRegistration(tournamentId, registrationId);
 
-  Future<bool> updatePaymentStatus(
-    String tournamentId,
-    String registrationId,
-    String paymentStatus,
-  ) async {
-    final repo = ref.read(tournamentsRepositoryProvider);
-    final result = await repo.updatePaymentStatus(registrationId, paymentStatus);
-    return result.fold(
-      (failure) {
-        _fail(failure);
-        return false;
-      },
-      (_) {
-        _refresh(() {
-          ref.invalidate(tournamentRegistrationsProvider(tournamentId));
-        });
-        return true;
-      },
-    );
-  }
 
   Future<bool> assignTeamGroup({
     required String tournamentId,

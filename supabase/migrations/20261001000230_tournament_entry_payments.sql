@@ -10,7 +10,7 @@ create table if not exists public.tournament_entry_payments (
   payment_channel text not null,
   payment_reference text,
   notes text,
-  recorded_by uuid not null references public.profiles(user_id) on delete restrict,
+  recorded_by uuid references public.profiles(user_id) on delete set null,
   recorded_at timestamptz not null default now(),
   is_void boolean not null default false,
   voided_at timestamptz,
@@ -70,6 +70,8 @@ begin
 end;
 $$;
 
+revoke all on function public.enforce_tournament_entry_payment_fk() from public;
+
 drop trigger if exists trg_tournament_entry_payments_fk on public.tournament_entry_payments;
 create trigger trg_tournament_entry_payments_fk
   before insert or update of entry_id, tournament_id
@@ -84,44 +86,47 @@ create trigger trg_tournament_entry_payments_set_updated_at
   for each row
   execute function public.set_updated_at();
 
--- RLS Security Policies (Confidential Financial Ledger)
+-- RLS Security Policies (Confidential Append-Only Financial Ledger)
 alter table public.tournament_entry_payments enable row level security;
 
--- Read policy: Tournament Organizers or Team Managers of the paying team ONLY
--- Financial references and payment details are NEVER exposed publicly
+-- Read policy: Tournament Organizers with payment capability OR Team Manager of the paying entry
+-- Confidential: financial records are never public
 drop policy if exists "tournament_entry_payments_read" on public.tournament_entry_payments;
 create policy "tournament_entry_payments_read"
   on public.tournament_entry_payments
   for select
   to authenticated
   using (
-    public.is_tournament_organizer(tournament_id)
+    public.can('tournament', tournament_id, 'tournament.payment.manage')
     or exists (
       select 1 from public.tournament_entries e
        where e.entry_id = tournament_entry_payments.entry_id
-         and public.is_team_manager(e.team_id)
+         and (
+           public.can('team', e.team_id, 'team.tournament.enter')
+           or public.is_team_manager(e.team_id)
+         )
     )
   );
 
--- Insert policy: Tournament Organizers only
+-- Direct mutations via Data API are prohibited; writes occur strictly through audited RPCs
 drop policy if exists "tournament_entry_payments_insert" on public.tournament_entry_payments;
 create policy "tournament_entry_payments_insert"
   on public.tournament_entry_payments
   for insert
   to authenticated
-  with check (
-    public.is_tournament_organizer(tournament_id)
-  );
+  with check (false);
 
--- Update policy: Tournament Organizers only (for voiding)
 drop policy if exists "tournament_entry_payments_update" on public.tournament_entry_payments;
 create policy "tournament_entry_payments_update"
   on public.tournament_entry_payments
   for update
   to authenticated
-  using (
-    public.is_tournament_organizer(tournament_id)
-  )
-  with check (
-    public.is_tournament_organizer(tournament_id)
-  );
+  using (false)
+  with check (false);
+
+drop policy if exists "tournament_entry_payments_delete" on public.tournament_entry_payments;
+create policy "tournament_entry_payments_delete"
+  on public.tournament_entry_payments
+  for delete
+  to authenticated
+  using (false);

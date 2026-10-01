@@ -148,10 +148,6 @@ abstract class TournamentsRepository {
   /// Canonical query for payment ledger history of a tournament entry.
   Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(String entryId);
 
-  Future<Either<Failure, void>> updatePaymentStatus(
-    String registrationId,
-    String paymentStatus,
-  );
 
   Future<Either<Failure, void>> assignTeamGroup({
     required String registrationId,

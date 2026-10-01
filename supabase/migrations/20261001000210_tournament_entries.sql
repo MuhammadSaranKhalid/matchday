@@ -26,8 +26,8 @@ end $$;
 create table if not exists public.tournament_entries (
   entry_id uuid primary key default gen_random_uuid(),
   tournament_id uuid not null references public.tournaments(tournament_id) on delete cascade,
-  team_id uuid not null references public.teams(team_id) on delete cascade,
-  registration_id uuid unique references public.tournament_registrations(registration_id) on delete set null,
+  team_id uuid not null references public.teams(team_id) on delete restrict,
+  registration_id uuid,
   status public.tournament_entry_status not null default 'active',
   entry_source text not null default 'application',
   accepted_by uuid references public.profiles(user_id) on delete set null,
@@ -57,7 +57,18 @@ create table if not exists public.tournament_entries (
   constraint tournament_entries_disqualified_consistency
     check (status != 'disqualified' or disqualified_at is not null),
   constraint tournament_entries_squad_frozen_consistency
-    check (squad_state != 'frozen' or squad_frozen_at is not null)
+    check (squad_state != 'frozen' or squad_frozen_at is not null),
+
+  -- Composite candidate key on Entry identity
+  constraint tournament_entries_identity_unique
+    unique (entry_id, tournament_id, team_id),
+
+  -- Entry <-> Registration consistency invariant (Item 33)
+  -- Guarantees that source Registration belongs to the exact same Tournament and Team.
+  constraint tournament_entries_source_registration_fk
+    foreign key (registration_id, tournament_id, team_id)
+    references public.tournament_registrations (registration_id, tournament_id, team_id)
+    on delete set null
 );
 
 -- Unique constraint: A team cannot have two active entries in the same tournament.
@@ -86,46 +97,41 @@ create trigger trg_tournament_entries_set_updated_at
 -- RLS Security Policies
 alter table public.tournament_entries enable row level security;
 
--- Read policy: Public if tournament is public, or organizers, or team managers
+-- Read policy (Item 20): Tournament staff or Team managers of the participating team ONLY
+-- Public sanitized read-models / projections provide public spectator data
 drop policy if exists "tournament_entries_read" on public.tournament_entries;
 create policy "tournament_entries_read"
   on public.tournament_entries
   for select
-  to anon, authenticated
+  to authenticated
   using (
-    public.is_tournament_organizer(tournament_id)
-    or public.is_team_manager(team_id)
-    or exists (
-      select 1 from public.tournaments t
-       where t.tournament_id = tournament_entries.tournament_id
-         and t.privacy = 'public'::tournament_privacy
-    )
+    public.can('tournament', tournament_id, 'tournament.entries.manage')
+    or public.can('team', team_id, 'team.tournament.enter')
   );
 
--- Insert policy: Tournament organizers or authorized backend transactions
+-- Insert policy (Item 12): Direct Data API insertion is BLOCKED.
+-- Entries are created exclusively through authorized server-side approval / creation commands.
 drop policy if exists "tournament_entries_insert" on public.tournament_entries;
 create policy "tournament_entries_insert"
   on public.tournament_entries
   for insert
   to authenticated
-  with check (
-    public.is_tournament_organizer(tournament_id)
-  );
+  with check (false);
 
--- Update policy: Tournament organizers or Team managers for permitted self-withdrawal
+-- Update policy (Item 13): Direct Data API updates are BLOCKED.
+-- Transitions (e.g. withdrawal, disqualification, squad freeze) occur through authorized transactional RPCs.
 drop policy if exists "tournament_entries_update" on public.tournament_entries;
 create policy "tournament_entries_update"
   on public.tournament_entries
   for update
   to authenticated
-  using (
-    public.is_tournament_organizer(tournament_id)
-    or public.is_team_manager(team_id)
-  )
-  with check (
-    public.is_tournament_organizer(tournament_id)
-    or (
-      public.is_team_manager(team_id)
-      and status = 'withdrawn'::tournament_entry_status
-    )
-  );
+  using (false)
+  with check (false);
+
+-- Delete policy: No hard deletion of accepted tournament entries
+drop policy if exists "tournament_entries_delete" on public.tournament_entries;
+create policy "tournament_entries_delete"
+  on public.tournament_entries
+  for delete
+  to authenticated
+  using (false);

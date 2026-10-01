@@ -63,7 +63,7 @@ class TournamentRegistrationDto {
       registeredAt: json['registered_at'] as String? ??
           DateTime.now().toIso8601String(),
       status: json['status'] as String? ?? 'pending',
-      squad: (json['squad'] as List<dynamic>?)
+      squad: ((json['squad_proposal'] ?? json['squad']) as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],

@@ -375,12 +375,13 @@ class TournamentsRemoteDataSource {
     final uid = _requireUid();
     try {
       // 1. Authoritative canonical write: tournament_registrations
-      // TODO(Phase 5/6): Migrate to tournament-action Edge Function
+      // Squad selection during application is stored as canonical squad_proposal
       final insertData = {
         'tournament_id': tournamentId,
         'team_id': teamId,
         'registered_by': uid,
         'status': 'pending',
+        if (squadPlayerIds.isNotEmpty) 'squad_proposal': squadPlayerIds,
         if (message != null) 'message': message,
       };
 
@@ -398,17 +399,7 @@ class TournamentsRemoteDataSource {
           ''')
           .single();
 
-      final dto = TournamentRegistrationDto.fromJson(response);
-
-      // 2. Compatibility projection for squad array if supplied
-      if (squadPlayerIds.isNotEmpty) {
-        await _supabase
-            .from(_registrationsTable)
-            .update({'squad': squadPlayerIds})
-            .eq('registration_id', dto.registrationId);
-      }
-
-      return dto;
+      return TournamentRegistrationDto.fromJson(response);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -440,36 +431,32 @@ class TournamentsRemoteDataSource {
     }
   }
 
-  /// Withdraws a pending registration application before it is accepted.
-  /// TODO(Phase 5/6): Migrate to tournament-action Edge Function
-  Future<void> withdrawPendingRegistration(String registrationId) async {
+  /// Withdraws a pending registration application before it is accepted via audited RPC.
+  Future<void> withdrawPendingRegistration(String registrationId,
+      {String? reason}) async {
     try {
-      await _supabase
-          .from(_canonicalRegistrationsTable)
-          .update({
-            'status': 'withdrawn',
-            'withdrawn_at': DateTime.now().toIso8601String(),
-          })
-          .eq('registration_id', registrationId)
-          .eq('status', 'pending');
+      await _supabase.rpc<void>(
+        'withdraw_tournament_registration',
+        params: {
+          'p_registration_id': registrationId,
+          if (reason != null) 'p_reason': reason,
+        },
+      );
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
   }
 
-  /// Withdraws an accepted Entry after approval.
-  /// TODO(Phase 5/6): Migrate to tournament-action Edge Function
+  /// Withdraws an accepted Entry after approval via audited RPC.
   Future<void> withdrawEntry(String entryId, {String? reason}) async {
     try {
-      await _supabase
-          .from(_canonicalEntriesTable)
-          .update({
-            'status': 'withdrawn',
-            'withdrawn_at': DateTime.now().toIso8601String(),
-            if (reason != null) 'withdrawal_reason': reason,
-          })
-          .eq('entry_id', entryId)
-          .eq('status', 'active');
+      await _supabase.rpc<void>(
+        'withdraw_tournament_entry',
+        params: {
+          'p_entry_id': entryId,
+          if (reason != null) 'p_reason': reason,
+        },
+      );
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -539,17 +526,6 @@ class TournamentsRemoteDataSource {
     }
   }
 
-  Future<void> updatePaymentStatus(
-      String registrationId, String paymentStatus) async {
-    try {
-      await _supabase
-          .from(_registrationsTable)
-          .update({'payment_status': paymentStatus})
-          .eq('registration_id', registrationId);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
 
   Future<void> assignTeamGroup(String registrationId, String? groupId) async {
     try {

@@ -287,18 +287,6 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
     }
   }
 
-  @override
-  Future<Either<Failure, void>> updatePaymentStatus(
-      String registrationId, String paymentStatus) async {
-    try {
-      await _remote.updatePaymentStatus(registrationId, paymentStatus);
-      return const Right(null);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
 
   @override
   Future<Either<Failure, void>> assignTeamGroup({

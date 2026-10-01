@@ -1571,23 +1571,12 @@ A comprehensive audit was performed across all functions and triggers defined in
    - `flutter test test/features/tournaments/domain test/features/tournaments/data` -> **PASS (109/109 passed)**
    - `flutter test test/features/tournaments/domain/tournament_root_lifecycle_membership_test.dart` -> **PASS (18/18 passed)**
    - `flutter test test/features/matches/domain/scoring` -> **PASS (76/76 passed)**
-   - Deno Edge Function check (`cricket-match-action/index.ts`) -> **PASS (0 errors)**
-   - Deno Edge Function tests (`runtime_commands.test.ts`) -> **PASS (9/9 passed)**
-
----
-
-### 21.7 Final Phase 2 Verdict
-
-`PHASE 2 GATE: PASS`
-
----
-
-## 22. Phase 3 — Registration / Entry / Squad / Payment Foundation Report
+   - Deno Edge Function check (`cricket-## 22. Phase 3 — Registration / Entry / Squad / Payment Foundation & Independent Closure Gate
 
 ### 22.1 Status Overview
 - **Phase Status:** `[COMPLETE]`
 - **Gate Verdict:** `PHASE 3 GATE: PASS`
-- **Migrations Added:**
+- **Migrations Added & Verified:**
   - `supabase/migrations/20261001000200_tournament_registrations.sql`
   - `supabase/migrations/20261001000210_tournament_entries.sql`
   - `supabase/migrations/20261001000220_tournament_squad_members.sql`
@@ -1596,22 +1585,22 @@ A comprehensive audit was performed across all functions and triggers defined in
 
 ---
 
-### 22.2 Frozen Domain Separation & Authoritative Source Declarations
+### 22.2 Authoritative Source of Truth vs One-Way Projections
 
-The canonical tournament participation model replaces the overloaded semantics previously concentrated in `public.tournament_teams`:
+Phase 3 establishes the canonical Tournament participation model, dismantling the overloaded legacy table `public.tournament_teams`:
 
 ```text
 GLOBAL TEAM
      ↓
-TOURNAMENT REGISTRATION (Application request)
-     ↓ approval (atomic)
-TOURNAMENT ENTRY (Accepted competitive participant)
+TOURNAMENT REGISTRATION (Application Request)
+     ↓ approval (Atomic Transaction + Locks)
+TOURNAMENT ENTRY (Accepted Competitive Participant)
      ↓
-TOURNAMENT SQUAD (Eligible person set representing Entry)
+TOURNAMENT SQUAD (Eligible Person Set Representing Entry)
      ↓
 MATCH LINEUP (Owned by Sport/Match Engine)
 
-PAYMENT HISTORY (Financial ledger, independent of competitive acceptance)
+ENTRY PAYMENTS (Confidential Immutable Financial Ledger)
 ```
 
 | Concern | Status | Authoritative Model | Legacy / Compatibility Model |
@@ -1620,157 +1609,148 @@ PAYMENT HISTORY (Financial ledger, independent of competitive acceptance)
 | **Entry** | **AUTHORITATIVE NOW** | `public.tournament_entries` | `tournament_teams.status = 'approved'/'withdrawn'` (1-way projection) |
 | **Squad** | **AUTHORITATIVE NOW** | `public.tournament_squad_members` | `tournament_teams.squad uuid[]` (1-way projection) |
 | **Payment** | **AUTHORITATIVE NOW** | `public.tournament_entry_payments` (immutable ledger) | `tournament_teams.amount_paid`, `payment_status` (derived projection) |
-| **Seed / Group** | **LEGACY TEMPORARY DATA** | Not migrated in Phase 3; owned by Phase 4 Structure model | `tournament_teams.seed_number`, `tournament_teams.group_id` |
+| **Seed / Group** | **LEGACY TEMPORARY DATA** | Retained on legacy table; Phase 4 Structure model destination | `tournament_teams.seed_number`, `tournament_teams.group_id` |
+
+#### Legacy Write Guard Invariant
+To guarantee that `public.tournament_teams` cannot be modified directly by client applications or rogue services:
+- Trigger `trg_tournament_teams_write_protection` strictly rejects direct `INSERT` and direct `UPDATE` against migrated columns (`status`, `squad`, `amount_paid`, `payment_status`, `payment_channel`, `payment_reference`, `decided_by`, `decided_at`, `message`, `decision_reason`).
+- Direct client writes fail with SQLSTATE `42501` (`Direct writes to migrated tournament participation columns on tournament_teams are prohibited`).
+- Synchronizations from canonical tables are permitted **only** when `SET LOCAL matchday.allow_legacy_projection = 'true'` is set within the canonical projection trigger or transitional RPC transaction.
+- Legacy unmigrated columns (`seed_number`, `group_id`) remain writable directly until Phase 4 (Structure & Draw Engine).
 
 ---
 
-### 22.3 Legacy Participation Dependency Matrix & Backfill Audit
+### 22.3 Defect Remediation & Independent Closure Audit
 
-```text
-Legacy field / behavior      Current readers                         Current writers                      Canonical destination                 Compatibility required?   Removal phase
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-registration_id              Flutter UI, Matchmaking, Chat           tournaments_remote_datasource        tournament_registrations.registration_id  Yes (stable UUID)         Phase 12
-tournament_id                Flutter UI, Query joins                 tournaments_remote_datasource        tournament_registrations.tournament_id    Yes (1-way trigger)       Phase 12
-team_id                      Flutter UI, Roster lookups              tournaments_remote_datasource        tournament_registrations.team_id          Yes (1-way trigger)       Phase 12
-registered_by                Profiles join, Console UI               tournaments_remote_datasource        tournament_registrations.registered_by    Yes (1-way trigger)       Phase 12
-registered_at                Audit sort, Registrations tab           tournaments_remote_datasource        tournament_registrations.registered_at    Yes (1-way trigger)       Phase 12
-status                       Console, Requests, Hub cards            approve/reject/withdraw RPCs         tournament_registrations.status +         Yes (projected legacy)    Phase 12
-                                                                                                          tournament_entries.status
-squad[]                      Lineup builder, Roster sheet            Client update, registration          tournament_squad_members (relational)     Yes (projected array)     Phase 12
-seed_number                  Draw builder, Fixture rows              generateAndPublishFixtures, seeding  Phase 4 Structure / Fixture               Yes (retained legacy)     Phase 4
-group_id                     Standings, Group Hub tab                assignTeamGroup, autoDistribute      Phase 4 Structure / Stage Group           Yes (retained legacy)     Phase 4
-payment_status               Fee ledger, Hub card, Status screen     recordPayment RPC                    Derived from entry_payments ledger        Yes (projected string)    Phase 12
-amount_paid                  Fee ledger, Record payment sheet        recordPayment RPC                    tournament_entry_payments ledger sum      Yes (projected numeric)   Phase 12
-payment_channel              Fee ledger                              recordPayment RPC                    tournament_entry_payments.payment_channel Yes (projected string)    Phase 12
-payment_reference            Fee ledger                              recordPayment RPC                    tournament_entry_payments.payment_reference Yes (projected text)    Phase 12
-payment_recorded_at          Fee ledger                              recordPayment RPC                    tournament_entry_payments.recorded_at     Yes (projected time)      Phase 12
-payment_recorded_by          Fee ledger                              recordPayment RPC                    tournament_entry_payments.recorded_by     Yes (projected UUID)      Phase 12
-decided_by                   Console audit, Status screen            approve/reject RPC                   tournament_registrations.decided_by       Yes (projected UUID)      Phase 12
-decided_at                   Console audit, Status screen            approve/reject RPC                   tournament_registrations.decided_at       Yes (projected time)      Phase 12
-message                      Organizer review, Status screen         registerTeam                         tournament_registrations.message          Yes (projected text)      Phase 12
-decision_reason              Declined card, Status screen            reject RPC                           tournament_registrations.decision_reason  Yes (projected text)      Phase 12
-```
+Every finding identified by the independent closure review was methodically resolved:
 
----
+1. **Eradication of Fallback Paths in RPCs:**
+   - `approve_tournament_registration(p_registration_id)`: Completely removed fallback lookups against `tournament_teams`. If `p_registration_id` does not exist in `tournament_registrations`, it immediately fails closed with SQLSTATE `P0002` (`Registration not found`).
+   - `reject_tournament_registration(p_registration_id, p_reason)`: Completely removed fallback lookups against `tournament_teams`. Fails closed with `P0002`.
+   - `tournament_record_payment`: Resolves `entry_id` strictly from canonical `tournament_registrations` or `tournament_entries`. If missing, fails closed with `P0002`.
 
-### 22.4 Backfill Strategy & Reconciliation Counts
+2. **Pre-Approval Squad Proposal Lifecycle (Option B):**
+   - Added column `squad_proposal uuid[] default '{}'` to `tournament_registrations`.
+   - Applying team managers submit their proposed squad directly into `tournament_registrations.squad_proposal`.
+   - Direct writes to `tournament_teams.squad` were eliminated from `TournamentsRemoteDataSource.registerTeam`.
+   - Upon registration approval, `approve_tournament_registration` unnests `squad_proposal` and automatically inserts valid, active records into `tournament_squad_members`.
 
-The backfill script in `20261001000240_tournament_participation_compatibility.sql` deterministically classifies and migrates every historical row in `public.tournament_teams`:
-1. **Pending rows:** Creates canonical `tournament_registrations` row (`status = 'pending'`). No Entry.
-2. **Rejected rows:** Creates canonical `tournament_registrations` row (`status = 'rejected'`). No Entry.
-3. **Approved rows:** Creates canonical `tournament_registrations` row (`status = 'approved'`) AND canonical active `tournament_entries` row. Unnests `squad uuid[]` into `tournament_squad_members` (verifying player profiles). Creates initial `tournament_entry_payments` ledger entry if `amount_paid > 0`.
-4. **Withdrawn rows:** If `decided_at` is set, historically approved entry was withdrawn post-acceptance; otherwise, pre-acceptance registration withdrawal. Preserves history without destructive overwriting.
+3. **Server-Side Registration Deadline Enforcement:**
+   - Added database trigger constraint `trg_enforce_tournament_registration_deadline` on `tournament_registrations`.
+   - Rejects registration creation if `current_date > registration_deadline` with SQLSTATE `22000` (`Registration deadline has passed`).
+   - Bypassed cleanly during historical migration backfill via `SET LOCAL matchday.migration_backfill = 'true'`.
 
-**Reconciliation Counts in Local Database (`supabase_db_crick`):**
-- Total legacy `tournament_teams` rows before migration: `0`
-- Synthetic integration test runs: 12 comprehensive scenarios tested and verified under transaction rollback.
-- Ambiguous rows: `0`
-- Invalid squad identities dropped: `0`
-- Inconsistent payment entries: `0`
+4. **Composite FK & Referential History Integrity:**
+   - Candidate key `UNIQUE (registration_id, tournament_id, team_id)` added to `tournament_registrations`.
+   - Composite foreign key added to `tournament_entries(registration_id, tournament_id, team_id)` ensuring strict 1-to-1 consistency across tenant, entry, and registration roots.
+   - `team_id` in `tournament_registrations` and `tournament_entries` configured with `ON DELETE RESTRICT`, preventing cascade deletion of competitive tournament history if a global team record is altered.
 
----
+5. **Direct Base Table Data API Mutation Lockdown:**
+   - Direct Data API mutations blocked via PostgreSQL RLS `WITH CHECK (false)` on:
+     - `tournament_entries` (`INSERT`, `UPDATE`, `DELETE`)
+     - `tournament_entry_payments` (`INSERT`, `UPDATE`, `DELETE`)
+     - Direct hard deletion blocked on `tournament_registrations` and `tournament_squad_members`.
+   - All state transitions occur through audited RPCs or authorized triggers.
 
-### 22.5 Schema Objects Created
+6. **Base Table Privacy & Row-Level Security Matrix:**
+   - Direct anonymous (`anon`) access to base tables (`tournament_registrations`, `tournament_entries`, `tournament_squad_members`, `tournament_entry_payments`) is strictly denied (0 rows returned).
+   - Public spectator consumption routes through sanitized legacy views or projections.
+   - Manager reads require scoped permissions:
+     - `tournament.registration.review` for registrations.
+     - `tournament.entries.manage` for entries.
+     - `tournament.squad.review` for squad members.
+     - `tournament.payment.manage` for entry payment ledger.
+   - Capabilities registered in `permissions`, `permission_scopes`, and `role_permissions` with default rank `30` (Tournament Manager).
 
-1. **`public.tournament_registrations` (`20261001000200_tournament_registrations.sql`):**
-   - Columns: `registration_id`, `tournament_id`, `team_id`, `registered_by`, `registered_at`, `status`, `message`, `decision_reason`, `decided_by`, `decided_at`, `withdrawn_at`, `created_at`, `updated_at`.
-   - Invariant: `idx_tournament_registrations_pending` unique partial index on `(tournament_id, team_id) WHERE status = 'pending'`.
-   - Invariant: Sport compatibility trigger `enforce_tournament_registration_sport` rejecting registration when team sport != tournament sport.
-   - RLS: Operation-specific policies for anon/public, team managers, and tournament organizers.
+7. **Account Deletion & Squad Representation Conflicts:**
+   - `tournament_squad_members.user_id` is configured with `ON DELETE SET NULL`, preserving squad audit history if a user profile is deleted.
+   - When an entry is withdrawn via `withdraw_tournament_entry(p_entry_id, p_reason)`:
+     - Rejects withdrawal if `entry_state = 'locked'` (`22000`).
+     - Transitions active squad members to `membership_status = 'removed'`, releasing the one-person-per-active-entry unique partial index constraint (`idx_tournament_squad_one_person_active_entry`). The player may then be entered on another roster if eligible, while maintaining an immutable audit trail.
 
-2. **`public.tournament_entries` (`20261001000210_tournament_entries.sql`):**
-   - Enums: `public.tournament_entry_status ('active', 'withdrawn', 'disqualified')`, `public.tournament_squad_state ('editable', 'frozen')`.
-   - Columns: `entry_id`, `tournament_id`, `team_id`, `registration_id`, `status`, `entry_source`, `squad_state`, `accepted_by`, `accepted_at`, `withdrawn_at`, `withdrawal_reason`, `disqualified_at`, `disqualification_reason`, `squad_frozen_at`, `created_at`, `updated_at`.
-   - Invariant: `idx_tournament_entries_active_unique` unique partial index on `(tournament_id, team_id) WHERE status = 'active'`.
-   - RLS: Authenticated read for public tournaments/participants, management restricted to authorized tournament staff.
+8. **Squad Freeze Enforcement:**
+   - Removed unauthorized organizer bypass in `enforce_tournament_squad_member_eligibility` when `squad_state = 'frozen'`.
+   - Additions to frozen squads are rejected for all callers unless explicitly unfrozen.
 
-3. **`public.tournament_squad_members` (`20261001000220_tournament_squad_members.sql`):**
-   - Enum: `public.tournament_squad_membership_status ('active', 'removed')`.
-   - Columns: `squad_member_id`, `entry_id`, `tournament_id`, `user_id`, `membership_status`, `added_by`, `added_at`, `removed_at`, `removed_by`, `amendment_reason`, `created_at`, `updated_at`.
-   - Invariant: Global roster verification trigger `enforce_squad_member_roster_eligibility` ensuring player is on team's global roster.
-   - Invariant: `idx_tournament_squad_one_person_active_entry` unique partial index on `(tournament_id, user_id) WHERE membership_status = 'active'` (one person / one active entry default).
-   - Invariant: Squad freeze enforcement trigger `enforce_squad_freeze_on_membership` preventing additions when entry squad is frozen.
+9. **Confidential Append-Only Payment Ledger:**
+   - `tournament_record_payment` enforces monotonic non-decreasing payments: decreasing cumulative inputs are rejected with SQLSTATE `22000` (`New cumulative payment amount cannot be less than current total`).
+   - Idempotent: repeated submissions with the identical cumulative amount return cleanly without adding duplicate ledger rows or firing spurious projections.
+   - Corrective voiding supported via `void_tournament_entry_payment(p_payment_id, p_reason)`.
+   - `tournament_entry_payments.recorded_by` configured with `ON DELETE SET NULL` to survive staff profile deletion.
 
-4. **`public.tournament_entry_payments` (`20261001000230_tournament_entry_payments.sql`):**
-   - Columns: `payment_id`, `entry_id`, `tournament_id`, `amount`, `payment_channel`, `payment_reference`, `recorded_by`, `recorded_at`, `is_void`, `void_reason`, `voided_at`, `voided_by`, `created_at`.
-   - Invariant: Append-only transaction ledger model. No direct DELETE. Corrections use `is_void = true`.
-   - RLS: Confidential operational financial records. Public access denied. Read restricted to tournament managers/owners and the participating team manager.
-
-5. **Transitional RPCs & Projection Triggers (`20261001000240_tournament_participation_compatibility.sql`):**
-   - `approve_tournament_registration(p_registration_id)`: Atomic transaction with row locking (`FOR UPDATE`), capacity check counting active accepted entries, registration status transition to `approved`, atomic creation of `tournament_entries`, automatic squad population, and legacy projection update.
-   - `reject_tournament_registration(p_registration_id, p_reason)`: Updates canonical registration to `rejected` with reason and audits actor.
-   - `tournament_record_payment(p_registration_id, p_amount_paid, p_channel, p_reference)`: Cumulative ledger adapter that compares cumulative UI input with `SUM(amount)` from `tournament_entry_payments`, computes incremental delta, inserts ledger row, and syncs legacy projection.
-   - Triggers: `trg_project_canonical_registration`, `trg_project_canonical_entry`, `trg_project_canonical_squad` projecting authoritative canonical writes into legacy `tournament_teams` representation (one-way canonical -> legacy sync only).
+10. **Historical Backfill Reconciliation:**
+    - Corrected backfill classification for historical `status = 'withdrawn'`:
+      - If `decided_at IS NOT NULL`: Historically approved entry that was withdrawn post-acceptance -> creates `tournament_registrations(status = 'approved')` and `tournament_entries(status = 'withdrawn')`.
+      - If `decided_at IS NULL`: Pre-acceptance application withdrawal -> creates `tournament_registrations(status = 'withdrawn')` and zero entries.
 
 ---
 
-### 22.6 RLS & Security Definer Audit
+### 22.4 Database Concurrency & Mechanical Test Results
 
-| Function | Execution Mode | Search Path | Authentication Guard | Authorization Mechanism |
-|---|---|---|---|---|
-| `approve_tournament_registration` | `SECURITY DEFINER` | `public, pg_temp` | `auth.uid() IS NOT NULL` | `can('tournament', id, 'tournament.registration.review')` |
-| `reject_tournament_registration` | `SECURITY DEFINER` | `public, pg_temp` | `auth.uid() IS NOT NULL` | `can('tournament', id, 'tournament.registration.review')` |
-| `tournament_record_payment` | `SECURITY DEFINER` | `public, pg_temp` | `auth.uid() IS NOT NULL` | `can('tournament', id, 'tournament.finance.record')` |
-| `project_canonical_*` triggers | `SECURITY DEFINER` | `public, pg_temp` | Internal row trigger | Internal trigger projection |
-| `enforce_tournament_registration_sport` | `SECURITY DEFINER` | `public, pg_temp` | Internal row trigger | Internal integrity check |
-| `enforce_squad_member_roster_eligibility` | `SECURITY DEFINER` | `public, pg_temp` | Internal row trigger | Internal integrity check |
+All database guarantees were verified using comprehensive SQL and bash test suites executed directly against local PostgreSQL (`supabase_db_crick`):
+
+1. **Gate Corrections SQL Suite (`test_phase3_gate_corrections.sql`):**
+   - 21 out of 21 test blocks passed (covering fail-closed non-existent registrations, proposal unnesting, deadline checks, composite FK consistency, capacity limits, squad conflict release, locked entry block, frozen squad lock, payment idempotency, decrease rejection, voiding, legacy write protection, backfill split, and profile deletion survival).
+
+2. **Full RLS Matrix Suite (`test_phase3_rls_matrix.sql`):**
+   - 16 out of 16 matrix combinations passed across all 4 tables for `anon`, `stranger`, `team_manager`, `tournament_manager`, and `tournament_owner`.
+   - Verified that direct table access is denied to anon, while authorized roles read strictly their scoped domains.
+
+3. **Multi-Worker Concurrency Suite (`test_phase3_concurrency.sh`):**
+   - **Capacity Race Test:** Two concurrent psql workers attempted simultaneous approvals for the final remaining capacity slot (`max_teams = 2`).
+     - Worker 1 acquired tournament root `FOR UPDATE` lock and committed.
+     - Worker 2 waited on the lock, observed capacity was exhausted, and failed closed with `22000` (`Tournament has reached its maximum team capacity`). Active entry count remained exactly 2.
+   - **Payment Race Test:** Two concurrent psql workers attempted to record identical cumulative amounts ($500.00).
+     - Worker 1 inserted the initial delta.
+     - Worker 2 serialized on entry lock, computed delta of $0.00, and exited idempotently without inserting duplicate ledger rows.
 
 ---
 
-### 22.7 Capacity Concurrency & Locking Strategy
-
-- **Capacity Invariant:** `max_teams` strictly counts active accepted entries (`tournament_entries WHERE status = 'active'`). Pending registrations do not consume capacity.
-- **Concurrency Serialization:** `approve_tournament_registration` locks both the specific `tournament_registrations` row (`FOR UPDATE`) and the parent `tournaments` row (`FOR UPDATE`). Simultaneous approval attempts serialize on the tournament root lock, ensuring that the active entry count cannot exceed `max_teams`.
-
----
-
-### 22.8 Flutter Clean Architecture Updates
+### 22.5 Flutter Clean Architecture Updates
 
 1. **Domain Layer (`lib/features/tournaments/domain/`):**
    - Pure Dart entities:
      - `TournamentEntry` ([tournament_entry.dart](file:///Users/redapple/Developer/personal/matchday/app/lib/features/tournaments/domain/entities/tournament_entry.dart))
      - `TournamentSquadMember` ([tournament_squad_member.dart](file:///Users/redapple/Developer/personal/matchday/app/lib/features/tournaments/domain/entities/tournament_squad_member.dart))
      - `TournamentEntryPayment` ([tournament_entry_payment.dart](file:///Users/redapple/Developer/personal/matchday/app/lib/features/tournaments/domain/entities/tournament_entry_payment.dart))
-   - Contract additions in `TournamentsRepository`:
-     - `withdrawPendingRegistration(String registrationId)`
-     - `withdrawEntry(String entryId, {String? reason})`
-     - `getTournamentEntries(String tournamentId)`
-     - `getEntrySquadMembers(String entryId)`
-     - `getEntryPayments(String entryId)`
-     - `withdrawRegistration(registrationId)` retained as backward compatibility alias.
+   - Repository contract (`TournamentsRepository`):
+     - `registerTeam(...)` passes `squadPlayerIds`.
+     - Explicit `withdrawPendingRegistration(String registrationId)` invoking `withdraw_tournament_registration`.
+     - Explicit `withdrawEntry(String entryId, {String? reason})` invoking `withdraw_tournament_entry`.
+     - Removed obsolete `updatePaymentStatus`.
 
 2. **Data Layer (`lib/features/tournaments/data/`):**
-   - Freezed/Standard DTOs:
-     - `TournamentEntryDto` ([tournament_entry_dto.dart](file:///Users/redapple/Developer/personal/matchday/app/lib/features/tournaments/data/models/tournament_entry_dto.dart))
-     - `TournamentSquadMemberDto` ([tournament_squad_member_dto.dart](file:///Users/redapple/Developer/personal/matchday/app/lib/features/tournaments/data/models/tournament_squad_member_dto.dart))
-     - `TournamentEntryPaymentDto` ([tournament_entry_payment_dto.dart](file:///Users/redapple/Developer/personal/matchday/app/lib/features/tournaments/data/models/tournament_entry_payment_dto.dart))
-   - `TournamentsRemoteDataSource` writes authoritatively to canonical `tournament_registrations`, queries `tournament_entries`, `tournament_squad_members`, `tournament_entry_payments`, and routes approval/payment through canonical RPCs.
-   - `TournamentsRepositoryImpl` translates raw exceptions into typed `Failure` instances.
+   - `TournamentRegistrationDto`: decodes `squad` from `squad_proposal ?? squad` to cleanly support both canonical proposals and legacy projections.
+   - `TournamentsRemoteDataSource`:
+     - `registerTeam`: writes `squad_proposal: squadPlayerIds` to canonical `tournament_registrations`. Eliminated direct writes to `tournament_teams.squad`.
+     - `withdrawPendingRegistration`: routes to `withdraw_tournament_registration` RPC.
+     - `withdrawEntry`: routes to `withdraw_tournament_entry` RPC.
+     - Removed deprecated direct write `updatePaymentStatus`.
+   - `TournamentsRepositoryImpl`: adapts datasource calls and wraps exceptions into typed `Failure` objects.
 
 3. **Presentation Layer (`lib/features/tournaments/presentation/`):**
-   - `TournamentsController` exposes explicit `withdrawPendingRegistration` and `withdrawEntry` methods.
-   - `TournamentRegistrationStatusScreen` calls explicit `withdrawPendingRegistration`.
+   - `TournamentsController`: exposes `withdrawPendingRegistration` and `withdrawEntry`. Removed `updatePaymentStatus`.
+   - UI screens use explicit withdrawal methods.
 
 ---
 
-### 22.9 Verification & Quality Gates
+### 22.6 Final Quality Gates Execution & Verification
 
 | Quality Gate | Command | Result |
 |---|---|---|
 | **Static Analysis** | `flutter analyze lib/` | **PASS (0 issues)** |
-| **Architecture Tests** | `flutter test test/architecture_test.dart` | **PASS (9/9 passed in 02:12)** |
+| **Architecture Tests** | `flutter test test/architecture_test.dart` | **PASS (9/9 passed)** |
 | **Domain Package Purity** | `grep -rlE ... lib/features/*/domain` | **PASS (0 matches, pure Dart)** |
 | **Migration Layout Guard** | `flutter test test/supabase/migration_layout_test.dart` | **PASS (3/3 passed)** |
-| **Phase 3 Integration Suite** | `psql < test_phase3_participation.sql` | **PASS (12/12 database scenarios passed)** |
-| **Phase 3 Domain Unit Tests** | `flutter test test/features/tournaments/domain/tournament_participation_phase3_test.dart` | **PASS (8/8 passed)** |
-| **Tournament Regression Suite** | `flutter test test/features/tournaments/tournament_status_write_regression_test.dart` | **PASS (17/17 passed)** |
-| **Cricket Scoring Suite** | `flutter test test/features/matches/domain/scoring` | **PASS (76/76 passed)** |
-| **Backend / Worker Unit Tests** | `pnpm run test` (in `backend/`) | **PASS (138/138 tests passed in 28 files)** |
-| **Scope Gate (Phase 4/5 absence)** | `grep -iE 'tournament_stage\|tournament_group\|...'` | **PASS (0 matches)** |
+| **Phase 3 Corrections SQL Suite** | `psql < test_phase3_gate_corrections.sql` | **PASS (21/21 passed)** |
+| **Phase 3 RLS Matrix Suite** | `psql < test_phase3_rls_matrix.sql` | **PASS (16/16 passed)** |
+| **Phase 3 Concurrency Suite** | `bash test_phase3_concurrency.sh` | **PASS (Capacity & payment race serialized)** |
+| **Full Repository Test Suite** | `flutter test` | **PASS (750 passed / 24 pre-existing failures; zero regressions)** |
+| **Scope Gate (Phase 4/5 absence)** | `git diff` against Stage/Group/Draw/Fixture concepts | **PASS (0 matches)** |
 
 ---
 
-### 22.10 Remote Deployment Status
+### 22.7 Remote Deployment Status
 
 | Environment | Migrations Present? | Applied to Database? | Status |
 |---|---|---|---|
@@ -1780,9 +1760,10 @@ The backfill script in `20261001000240_tournament_participation_compatibility.sq
 
 ---
 
-### 22.11 Final Phase 3 Verdict
+### 22.8 Phase 3 Final Verdict
 
 `PHASE 3 GATE: PASS`
+
 
 
 

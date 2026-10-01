@@ -248,11 +248,11 @@ class TournamentsController extends _$TournamentsController {
     );
   }
 
-  Future<bool> withdrawRegistration(
+  Future<bool> withdrawPendingRegistration(
       String tournamentId, String registrationId) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
-    final result = await repo.withdrawRegistration(registrationId);
+    final result = await repo.withdrawPendingRegistration(registrationId);
     return result.fold(
       (failure) {
         _fail(failure);
@@ -267,6 +267,30 @@ class TournamentsController extends _$TournamentsController {
       },
     );
   }
+
+  Future<bool> withdrawEntry(
+      String tournamentId, String entryId, {String? reason}) async {
+    state = const AsyncLoading();
+    final repo = ref.read(tournamentsRepositoryProvider);
+    final result = await repo.withdrawEntry(entryId, reason: reason);
+    return result.fold(
+      (failure) {
+        _fail(failure);
+        return false;
+      },
+      (_) {
+        _ok();
+        _refresh(() {
+          ref.invalidate(tournamentRegistrationsProvider(tournamentId));
+        });
+        return true;
+      },
+    );
+  }
+
+  Future<bool> withdrawRegistration(
+      String tournamentId, String registrationId) =>
+      withdrawPendingRegistration(tournamentId, registrationId);
 
   Future<bool> updatePaymentStatus(
     String tournamentId,

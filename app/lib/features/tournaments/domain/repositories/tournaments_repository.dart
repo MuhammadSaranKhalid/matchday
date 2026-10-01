@@ -10,12 +10,15 @@ import '../entities/scorer_candidate.dart';
 import '../entities/tournament.dart';
 import '../entities/match_official.dart';
 import '../entities/tournament_awards.dart';
+import '../entities/tournament_entry.dart';
+import '../entities/tournament_entry_payment.dart';
 import '../entities/tournament_fee_entry.dart';
 import '../entities/tournament_leader.dart';
 import '../entities/tournament_organizer.dart';
 import '../ops/revised_target.dart';
 import '../entities/tournament_live_match.dart';
 import '../entities/tournament_registration.dart';
+import '../entities/tournament_squad_member.dart';
 import '../entities/tournament_standing.dart';
 
 /// The URLs stored after an artwork upload. Either may be null when only one
@@ -127,7 +130,23 @@ abstract class TournamentsRepository {
     String reason,
   );
 
+  /// Withdraws a pending registration application before it is accepted.
+  Future<Either<Failure, void>> withdrawPendingRegistration(String registrationId);
+
+  /// Withdraws an accepted Entry after approval.
+  Future<Either<Failure, void>> withdrawEntry(String entryId, {String? reason});
+
+  /// Transitional alias for backward compatibility.
   Future<Either<Failure, void>> withdrawRegistration(String registrationId);
+
+  /// Canonical query for accepted entries in a tournament.
+  Future<Either<Failure, List<TournamentEntry>>> getTournamentEntries(String tournamentId);
+
+  /// Canonical query for squad members of a tournament entry.
+  Future<Either<Failure, List<TournamentSquadMember>>> getEntrySquadMembers(String entryId);
+
+  /// Canonical query for payment ledger history of a tournament entry.
+  Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(String entryId);
 
   Future<Either<Failure, void>> updatePaymentStatus(
     String registrationId,

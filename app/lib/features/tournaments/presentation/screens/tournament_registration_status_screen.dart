@@ -72,7 +72,7 @@ class _TournamentRegistrationStatusScreenState
     if (confirmed == true && mounted) {
       final ok = await ref
           .read(tournamentsControllerProvider.notifier)
-          .withdrawRegistration(widget.tournamentId, reg.registrationId);
+          .withdrawPendingRegistration(widget.tournamentId, reg.registrationId);
       if (ok && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Registration withdrawn.')),

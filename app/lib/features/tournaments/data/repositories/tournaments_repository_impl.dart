@@ -11,12 +11,15 @@ import '../../domain/entities/scorer_candidate.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/match_official.dart';
 import '../../domain/entities/tournament_awards.dart';
+import '../../domain/entities/tournament_entry.dart';
+import '../../domain/entities/tournament_entry_payment.dart';
 import '../../domain/entities/tournament_fee_entry.dart';
 import '../../domain/entities/tournament_leader.dart';
 import '../../domain/entities/tournament_organizer.dart';
 import '../../domain/ops/revised_target.dart';
 import '../../domain/entities/tournament_live_match.dart';
 import '../../domain/entities/tournament_registration.dart';
+import '../../domain/entities/tournament_squad_member.dart';
 import '../../domain/entities/tournament_standing.dart';
 import '../../domain/repositories/tournaments_repository.dart';
 import '../datasources/tournaments_remote_datasource.dart';
@@ -214,11 +217,69 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
-  Future<Either<Failure, void>> withdrawRegistration(
+  Future<Either<Failure, void>> withdrawPendingRegistration(
       String registrationId) async {
     try {
-      await _remote.withdrawRegistration(registrationId);
+      await _remote.withdrawPendingRegistration(registrationId);
       return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> withdrawEntry(
+      String entryId, {String? reason}) async {
+    try {
+      await _remote.withdrawEntry(entryId, reason: reason);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> withdrawRegistration(
+      String registrationId) async {
+    return withdrawPendingRegistration(registrationId);
+  }
+
+  @override
+  Future<Either<Failure, List<TournamentEntry>>> getTournamentEntries(
+      String tournamentId) async {
+    try {
+      final dtos = await _remote.getTournamentEntries(tournamentId);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<TournamentSquadMember>>> getEntrySquadMembers(
+      String entryId) async {
+    try {
+      final dtos = await _remote.getEntrySquadMembers(entryId);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(
+      String entryId) async {
+    try {
+      final dtos = await _remote.getEntryPayments(entryId);
+      return Right(dtos.map((d) => d.toEntity()).toList());
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

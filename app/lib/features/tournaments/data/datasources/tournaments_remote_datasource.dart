@@ -18,10 +18,13 @@ import '../models/match_official_dto.dart';
 import '../models/ground_dto.dart';
 import '../models/tournament_dto.dart';
 import '../models/tournament_fee_entry_dto.dart';
-import '../models/tournament_leader_dto.dart';
+import '../models/tournament_entry_dto.dart';
+import '../models/tournament_entry_payment_dto.dart';
 import '../models/tournament_fixture_dto.dart';
+import '../models/tournament_leader_dto.dart';
 import '../models/tournament_live_match_dto.dart';
 import '../models/tournament_registration_dto.dart';
+import '../models/tournament_squad_member_dto.dart';
 import '../models/tournament_standing_dto.dart';
 
 /// Direct PostgREST + Realtime client for Tournaments tables.
@@ -31,6 +34,10 @@ class TournamentsRemoteDataSource {
 
   static const _tournamentsTable = 'tournaments';
   static const _registrationsTable = 'tournament_teams';
+  static const _canonicalRegistrationsTable = 'tournament_registrations';
+  static const _canonicalEntriesTable = 'tournament_entries';
+  static const _canonicalSquadMembersTable = 'tournament_squad_members';
+  static const _canonicalPaymentsTable = 'tournament_entry_payments';
   static const _standingsTable = 'tournament_standings';
   static const _cricketMatchesView = 'cricket_match_details';
   static const _followsTable = 'follows';
@@ -367,17 +374,18 @@ class TournamentsRemoteDataSource {
   }) async {
     final uid = _requireUid();
     try {
+      // 1. Authoritative canonical write: tournament_registrations
+      // TODO(Phase 5/6): Migrate to tournament-action Edge Function
       final insertData = {
         'tournament_id': tournamentId,
         'team_id': teamId,
         'registered_by': uid,
-        'squad': squadPlayerIds,
         'status': 'pending',
         if (message != null) 'message': message,
       };
 
       final response = await _supabase
-          .from(_registrationsTable)
+          .from(_canonicalRegistrationsTable)
           .insert(insertData)
           .select('''
             *,
@@ -390,7 +398,17 @@ class TournamentsRemoteDataSource {
           ''')
           .single();
 
-      return TournamentRegistrationDto.fromJson(response);
+      final dto = TournamentRegistrationDto.fromJson(response);
+
+      // 2. Compatibility projection for squad array if supplied
+      if (squadPlayerIds.isNotEmpty) {
+        await _supabase
+            .from(_registrationsTable)
+            .update({'squad': squadPlayerIds})
+            .eq('registration_id', dto.registrationId);
+      }
+
+      return dto;
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
@@ -422,12 +440,100 @@ class TournamentsRemoteDataSource {
     }
   }
 
-  Future<void> withdrawRegistration(String registrationId) async {
+  /// Withdraws a pending registration application before it is accepted.
+  /// TODO(Phase 5/6): Migrate to tournament-action Edge Function
+  Future<void> withdrawPendingRegistration(String registrationId) async {
     try {
       await _supabase
-          .from(_registrationsTable)
-          .update({'status': 'withdrawn'})
-          .eq('registration_id', registrationId);
+          .from(_canonicalRegistrationsTable)
+          .update({
+            'status': 'withdrawn',
+            'withdrawn_at': DateTime.now().toIso8601String(),
+          })
+          .eq('registration_id', registrationId)
+          .eq('status', 'pending');
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Withdraws an accepted Entry after approval.
+  /// TODO(Phase 5/6): Migrate to tournament-action Edge Function
+  Future<void> withdrawEntry(String entryId, {String? reason}) async {
+    try {
+      await _supabase
+          .from(_canonicalEntriesTable)
+          .update({
+            'status': 'withdrawn',
+            'withdrawn_at': DateTime.now().toIso8601String(),
+            if (reason != null) 'withdrawal_reason': reason,
+          })
+          .eq('entry_id', entryId)
+          .eq('status', 'active');
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Transitional alias for backward compatibility.
+  Future<void> withdrawRegistration(String registrationId) =>
+      withdrawPendingRegistration(registrationId);
+
+  // ─── Canonical Entry / Squad / Payment Queries ─────────────────────────────
+
+  Future<List<TournamentEntryDto>> getTournamentEntries(
+      String tournamentId) async {
+    try {
+      final rows = await _supabase
+          .from(_canonicalEntriesTable)
+          .select('''
+            *,
+            teams (
+              team_name,
+              logo_url
+            )
+          ''')
+          .eq('tournament_id', tournamentId)
+          .order('accepted_at', ascending: true);
+
+      return rows.map(TournamentEntryDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<List<TournamentSquadMemberDto>> getEntrySquadMembers(
+      String entryId) async {
+    try {
+      final rows = await _supabase
+          .from(_canonicalSquadMembersTable)
+          .select('''
+            *,
+            profiles:user_id (
+              display_name,
+              username,
+              avatar_url
+            )
+          ''')
+          .eq('entry_id', entryId)
+          .order('added_at', ascending: true);
+
+      return rows.map(TournamentSquadMemberDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<List<TournamentEntryPaymentDto>> getEntryPayments(
+      String entryId) async {
+    try {
+      final rows = await _supabase
+          .from(_canonicalPaymentsTable)
+          .select('*')
+          .eq('entry_id', entryId)
+          .order('recorded_at', ascending: true);
+
+      return rows.map(TournamentEntryPaymentDto.fromJson).toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

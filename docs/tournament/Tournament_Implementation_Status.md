@@ -1462,7 +1462,121 @@ This guarantees:
 
 ---
 
-### 20.7 Final Phase 2 Verdict
+### 20.7 Phase 2.4 Verdict
+
+`PHASE 2.4 GATE: PASS`
+
+---
+
+## 21. Phase 2.5 — Cancellation Communication Isolation Closure
+
+Phase 2.5 resolves the communication/outbox boundary violation in `public.tournament_cancel` to ensure authoritative competition state is fully decoupled from external delivery channels.
+
+### 21.1 Architectural Invariant: Competition Truth vs Communication Delivery
+
+Per `docs/tournament/Tournament_Architecture_Standard.md`:
+
+```text
+Communication failure must NEVER roll back authoritative competition state.
+```
+
+- **Authoritative Boundary:** The tournament cancellation transaction is responsible exclusively for authoritative domain truth (`termination_state`, unstarted match shell state, cancellation metadata).
+- **Communication Decoupling:** Delivery mechanisms (chat notifications, push broadcasts, announcement feeds, realtime sockets, email) are downstream communication projections. A delivery timeout, notification service outage, or recipient error must never cause a PostgreSQL transaction abort that rolls back canonical tournament cancellation.
+- **Outbox Architecture Boundary:** Final exactly-once and idempotent event delivery belongs strictly to **Phase 11 (Outbox, Events & Realtime Integration)**. No mini-outbox, queue workers, or ad-hoc event buses were prematurely introduced in Phase 2.
+
+### 21.2 Removal of Synchronous `tournament_announce` Invocation
+
+The synchronous call to `public.tournament_announce` was removed from `public.tournament_cancel` in `supabase/migrations/20261001000100_tournament_memberships.sql`:
+
+```sql
+  -- 9. Mutate CANONICAL termination_state.
+  -- Do NOT write legacy status directly: trigger tournaments_sync_status_projection
+  -- projects termination_state = 'cancelled' -> status = 'cancelled'.
+  update public.tournaments
+     set termination_state = 'cancelled',
+         rules = coalesce(rules, '{}'::jsonb) || jsonb_build_object(
+           'cancelled_reason', btrim(p_reason),
+           'cancelled_at', now(),
+           'cancelled_by', auth.uid()
+         ),
+         updated_at = now()
+   where tournament_id = p_tournament_id;
+
+  -- Phase 2.5: Synchronous communication side-effects (e.g. tournament_announce)
+  -- are intentionally removed. Communication failure must NEVER roll back authoritative
+  -- competition/cancellation state. Final outbox/event fanout belongs to Phase 11.
+end;
+$$;
+```
+
+### 21.3 Authoritative Scope vs Deferred Scope
+
+```text
+AUTHORITATIVE NOW (Phase 2):
+- Tournament root row lock (FOR UPDATE)
+- Capability authorization check (tournament.cancel, Owner-only)
+- Competition state precondition (competition_state = 'not_started')
+- Started match guard (blocks on live, completed, abandoned, or started timestamp)
+- Scheduled-only fixture cancellation (actual_start_time IS NULL)
+- Canonical termination_state mutation ('cancelled')
+- Projection trigger synchronization (legacy status = 'cancelled')
+- Audit metadata in rules JSONB
+```
+
+```text
+DEFERRED TO PHASE 11:
+- tournament_outbox_events persistence
+- Semantic domain event dispatch (TournamentCancelledEvent)
+- Asynchronous announcement workers
+- Chat, push, and feed fanout
+- Retry / idempotent consumer delivery
+```
+
+> **Migration Policy:** Tournament cancellation intentionally does not depend on communication delivery during the migration period.
+
+### 21.4 Audit of Other Phase 2 Commands
+
+A comprehensive audit was performed across all functions and triggers defined in `supabase/migrations/20261001000100_tournament_memberships.sql`. No other Phase 2 lifecycle, membership, or governance routines invoke announcement, chat, push, or external notification RPCs. All mutations operate purely on local relational state.
+
+### 21.5 Remote Deployment Status
+
+| Environment | Migration File Present? | Applied to Database? | Phase 2.5 `tournament_cancel` Present? | Status |
+|---|---|---|---|---|
+| **Repository Code** | Yes (`20261001000100_tournament_memberships.sql`) | N/A | Yes (announcement invocation removed) | Synced in Git |
+| **Local PostgreSQL (`supabase_db_crick`)** | Yes | Yes (applied) | Yes | **Verified working** |
+| **Connected Remote Supabase Project** | Pending deployment | Not yet applied | Not yet present | Pending remote migration run |
+
+### 21.6 Verification & Test Results
+
+1. **Direct Database Verification Matrix (PostgreSQL in `supabase_db_crick`):**
+   - **Test A:** Valid pre-start cancellation with scheduled-only matches -> **PASS**
+   - **Test B:** Live match blocks cancellation -> **PASS** (error `22000`)
+   - **Test C:** Completed match blocks cancellation -> **PASS** (error `22000`)
+   - **Test D:** Started timestamp blocks cancellation -> **PASS** (error `22000`)
+   - **Test E:** Owner allowed -> **PASS**
+   - **Test F:** Manager denied -> **PASS** (error `42501`)
+   - **Test G:** Former creator denied -> **PASS** (error `42501`)
+   - **Test H:** Stranger denied -> **PASS** (error `42501`)
+   - **Test I:** Repeat cancellation idempotency -> **PASS**
+   - **Test L:** Communication isolation -> **PASS** (cancellation commits authoritative state independently of communication layer)
+   - **AST Verification:** `has_for_update = true`, `calls_announce = false`
+
+2. **Automated Unit & Quality Gate Suites:**
+   - `flutter test test/features/tournaments/tournament_status_write_regression_test.dart` -> **PASS (17/17 passed)**
+   - `flutter test test/supabase/migration_layout_test.dart` -> **PASS (3/3 passed)**
+   - `flutter analyze lib/` -> **PASS (0 issues)**
+   - `flutter test test/architecture_test.dart` -> **PASS (9/9 passed)**
+   - Domain Purity (`grep -rlE ... lib/features/*/domain`) -> **PASS (0 matches)**
+   - `flutter test test/features/tournaments/baseline_safety_characterization_test.dart` -> **PASS (10/10 passed)**
+   - `flutter test test/features/tournaments/domain test/features/tournaments/data` -> **PASS (109/109 passed)**
+   - `flutter test test/features/tournaments/domain/tournament_root_lifecycle_membership_test.dart` -> **PASS (18/18 passed)**
+   - `flutter test test/features/matches/domain/scoring` -> **PASS (76/76 passed)**
+   - Deno Edge Function check (`cricket-match-action/index.ts`) -> **PASS (0 errors)**
+   - Deno Edge Function tests (`runtime_commands.test.ts`) -> **PASS (9/9 passed)**
+
+---
+
+### 21.7 Final Phase 2 Verdict
 
 `PHASE 2 GATE: PASS`
 

@@ -345,5 +345,22 @@ void main() {
       expect(sql.contains("termination_state = 'cancelled'"), isTrue,
           reason: 'Must set canonical termination_state to cancelled');
     });
+
+    test('SQL migration tournament_cancel does NOT synchronously invoke tournament_announce (Phase 2.5 communication isolation)', () {
+      final migrationFile = File('../supabase/migrations/20261001000100_tournament_memberships.sql');
+      expect(migrationFile.existsSync(), isTrue);
+      final sql = migrationFile.readAsStringSync();
+
+      final cancelFnStart = sql.indexOf('create or replace function public.tournament_cancel(');
+      expect(cancelFnStart, isNonNegative);
+      final cancelFnEnd = sql.indexOf('revoke all on function public.tournament_cancel', cancelFnStart);
+      expect(cancelFnEnd, isNonNegative);
+      final cancelFnBody = sql.substring(cancelFnStart, cancelFnEnd);
+
+      expect(cancelFnBody.contains('tournament_announce('), isFalse,
+          reason: 'Communication failure must NEVER roll back authoritative competition/cancellation state');
+      expect(cancelFnBody.contains('perform public.tournament_announce'), isFalse,
+          reason: 'tournament_cancel must not invoke tournament_announce');
+    });
   });
 }

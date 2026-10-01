@@ -957,17 +957,9 @@ begin
          updated_at = now()
    where tournament_id = p_tournament_id;
 
-  -- 10. Notify participants via tournament_announce if routine exists
-  if exists (
-    select 1 from pg_proc
-     where proname = 'tournament_announce'
-       and pronamespace = 'public'::regnamespace
-  ) then
-    perform public.tournament_announce(
-      p_tournament_id,
-      left('Cancelled: ' || btrim(p_reason), 300)
-    );
-  end if;
+  -- Phase 2.5: Synchronous communication side-effects (e.g. tournament_announce)
+  -- are intentionally removed. Communication failure must NEVER roll back authoritative
+  -- competition/cancellation state. Final outbox/event fanout belongs to Phase 11.
 end;
 $$;
 

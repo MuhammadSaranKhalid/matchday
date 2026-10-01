@@ -79,7 +79,7 @@ class LayoutTokens extends ThemeExtension<LayoutTokens> {
   /// Hero / featured card border radius (default: 20.0).
   final double heroRadius;
 
-  static const light = LayoutTokens(
+  static const standard = LayoutTokens(
     screenGutter: Spacing.md,
     screenBottom: Spacing.xl,
     sectionGap: Spacing.xl,
@@ -98,6 +98,9 @@ class LayoutTokens extends ThemeExtension<LayoutTokens> {
     modalRadius: Radii.modal,
     heroRadius: Radii.hero,
   );
+
+  /// Legacy alias for [standard]. Layout tokens are theme-mode agnostic.
+  static const light = standard;
 
   @override
   LayoutTokens copyWith({

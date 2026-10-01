@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../../foundation/elevation.dart';
+import '../../theme/app_theme.dart';
 
 /// Content density for [Surface] padding.
 enum SurfaceDensity {
@@ -98,13 +99,7 @@ class Surface extends StatelessWidget {
       SurfaceVariant.raised => (
           scheme.surface,
           Border.all(color: scheme.outline.withValues(alpha: 0.5)),
-          const [
-            BoxShadow(
-              color: Color(0x0D000000),
-              offset: Offset(0, 2),
-              blurRadius: 8,
-            ),
-          ],
+          Elevation.raised,
         ),
       SurfaceVariant.accent => (
           status.cream,

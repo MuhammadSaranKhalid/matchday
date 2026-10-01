@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-
 /// Cricket and tabular text tokens exposed through [ThemeData.extensions].
 ///
 /// Material's standard [TextTheme] does not naturally represent cricket-specific
 /// typography such as overs, run rates, tabular timestamps, eyebrows, or large
 /// scoreboard figures.
+///
+/// These tokens define the **typographic shape** only (family, size, weight,
+/// tracking, line-height). Color is intentionally absent — consumers apply
+/// semantic color at the call site via `.copyWith(color: context.colorScheme.*)`.
+/// This separation allows the token set to survive theme changes (dark mode,
+/// high contrast) without modification.
 @immutable
 class TextTokens extends ThemeExtension<TextTokens> {
   const TextTokens({
@@ -32,39 +36,39 @@ class TextTokens extends ThemeExtension<TextTokens> {
   /// Monospace body typography for cricket figures and tabular metadata.
   final TextStyle mono;
 
+  /// Shape-only token set — no theme-bound colors.
+  ///
+  /// The name [light] is kept for API compatibility; it does not imply a
+  /// color-theme variant. Dark-theme support will supply the same shapes
+  /// with colors injected at each call site.
   static const light = TextTokens(
     metadata: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontSize: 10,
       fontWeight: FontWeight.w600,
       letterSpacing: .7,
-      color: Palette.muted,
     ),
     eyebrow: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontSize: 10,
       fontWeight: FontWeight.w700,
       letterSpacing: 1.0,
-      color: Palette.muted,
     ),
     metric: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontSize: 13,
       fontWeight: FontWeight.w700,
-      color: Palette.ink,
     ),
     score: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontSize: 18,
       fontWeight: FontWeight.w700,
-      color: Palette.ink,
     ),
     mono: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontSize: 11,
       fontWeight: FontWeight.w600,
       letterSpacing: 0.14,
-      color: Palette.muted,
     ),
   );
 

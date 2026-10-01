@@ -7,7 +7,7 @@ Welcome to the Matchday Design System. This directory documents the UI architect
 ## Quick Reference & Decision Guide
 
 ### 1. Where should I put a new widget?
-- **Generic UI Primitives & Patterns**: Put them in `lib/core/design_system/` under `primitives/`, `patterns/`, `navigation/`, or `layout/`.
+- **Design System Components & Primitives**: Put them in `lib/core/design_system/` under `components/`, `navigation/`, `layout/`, or `adaptive/`.
 - **Cricket / Social Domain Components**: Put them in their respective feature directory (e.g., `lib/features/matches/presentation/widgets/fixture_card.dart` or `lib/features/tournaments/presentation/widgets/ck_tournament_card.dart`). Domain widgets compose design system surfaces and primitives.
 
 ### 2. Should this component be design-system or feature-specific?

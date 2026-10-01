@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../primitives/action_button.dart';
-import '../theme/app_theme.dart';
+import '../../foundation/palette.dart';
+import '../actions/action_button.dart';
+import '../../theme/app_theme.dart';
 
 /// Launches a standardized confirmation dialog whose button hierarchy encodes
 /// reversibility.

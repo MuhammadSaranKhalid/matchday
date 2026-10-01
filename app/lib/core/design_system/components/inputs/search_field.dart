@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/radii.dart';
-import '../theme/app_theme.dart';
+import '../../foundation/radii.dart';
+import '../../theme/app_theme.dart';
 
 /// Style variants for [SearchField].
 enum SearchFieldVariant {

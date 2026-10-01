@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
+import '../../foundation/palette.dart';
 
 /// Tone styling for avatar initials fallback.
 enum AvatarTone {

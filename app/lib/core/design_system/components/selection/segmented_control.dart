@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/motion.dart';
-import '../foundation/radii.dart';
-import '../theme/app_theme.dart';
+import '../../foundation/motion.dart';
+import '../../foundation/radii.dart';
+import '../../theme/app_theme.dart';
 
 /// An individual option inside a [SegmentedControl].
 class SegmentOption<T> {

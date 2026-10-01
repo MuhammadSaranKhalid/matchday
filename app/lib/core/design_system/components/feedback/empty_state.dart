@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../primitives/action_button.dart';
-import '../theme/app_theme.dart';
+import '../actions/action_button.dart';
+import '../../theme/app_theme.dart';
 
 /// Semantic classification of empty states.
 enum EmptyStateKind {

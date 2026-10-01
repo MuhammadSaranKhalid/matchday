@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
+import '../../foundation/palette.dart';
 
 /// Standardized horizontal divider primitive.
 class AppDivider extends StatelessWidget {

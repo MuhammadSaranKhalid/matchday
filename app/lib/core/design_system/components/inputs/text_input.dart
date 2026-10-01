@@ -113,7 +113,7 @@ class TextInput extends StatelessWidget {
           Text(
             helperText!,
             style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.outline,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ) ??
                 const TextStyle(
                   fontFamily: 'Inter',

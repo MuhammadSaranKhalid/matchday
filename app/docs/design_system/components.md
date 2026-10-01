@@ -2,7 +2,7 @@
 
 ## Core Primitives
 
-Located in `lib/core/design_system/primitives/`.
+Located in `lib/core/design_system/components/`.
 
 ### 1. ActionButton
 Standardized button primitive supporting four intent variants and three standardized control sizes:

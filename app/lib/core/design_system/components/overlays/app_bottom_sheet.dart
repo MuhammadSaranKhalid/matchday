@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/radii.dart';
-import '../theme/app_theme.dart';
+import '../../foundation/radii.dart';
+import '../../theme/app_theme.dart';
 
 /// Launches a standardized Matchday bottom sheet modal.
 Future<T?> showAppBottomSheet<T>(

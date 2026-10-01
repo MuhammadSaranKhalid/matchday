@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../primitives/action_button.dart';
-import '../primitives/action_icon_button.dart';
+import '../components/actions/action_button.dart';
+import '../components/actions/action_icon_button.dart';
 import '../theme/app_theme.dart';
 
 /// Standardized composer navigation header (e.g. Create Post, New Message).

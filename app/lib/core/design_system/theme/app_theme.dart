@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../foundation/borders.dart';
 import '../foundation/palette.dart';
 import 'layout_tokens.dart';
 import 'status_colors.dart';
@@ -12,7 +13,7 @@ extension DesignSystemThemeContext on BuildContext {
   TextTheme get textTheme => Theme.of(this).textTheme;
 
   LayoutTokens get layout =>
-      Theme.of(this).extension<LayoutTokens>() ?? LayoutTokens.light;
+      Theme.of(this).extension<LayoutTokens>() ?? LayoutTokens.standard;
 
   TextTokens get textTokens =>
       Theme.of(this).extension<TextTokens>() ?? TextTokens.light;
@@ -143,7 +144,7 @@ ThemeData buildAppTheme() {
     scaffoldBackgroundColor: Palette.paper,
     textTheme: textTheme,
     extensions: const [
-      LayoutTokens.light,
+      LayoutTokens.standard,
       TextTokens.light,
       StatusColors.light,
     ],
@@ -154,11 +155,11 @@ ThemeData buildAppTheme() {
         foregroundColor: Palette.paper,
         disabledBackgroundColor: Palette.ink.withValues(alpha: 0.35),
         disabledForegroundColor: Palette.paper.withValues(alpha: 0.9),
-        minimumSize: Size(0, LayoutTokens.light.controlLargeHeight),
+        minimumSize: Size(0, LayoutTokens.standard.controlLargeHeight),
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
+          borderRadius: BorderRadius.circular(LayoutTokens.standard.controlRadius),
         ),
         textStyle: const TextStyle(
           fontFamily: 'Inter',
@@ -172,11 +173,11 @@ ThemeData buildAppTheme() {
       style: OutlinedButton.styleFrom(
         backgroundColor: Palette.paper,
         foregroundColor: Palette.ink,
-        minimumSize: Size(0, LayoutTokens.light.controlLargeHeight),
+        minimumSize: Size(0, LayoutTokens.standard.controlLargeHeight),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         side: const BorderSide(color: Palette.line),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
+          borderRadius: BorderRadius.circular(LayoutTokens.standard.controlRadius),
         ),
         textStyle: const TextStyle(
           fontFamily: 'Inter',
@@ -199,24 +200,24 @@ ThemeData buildAppTheme() {
         color: Palette.soft,
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
-        borderSide: const BorderSide(color: Palette.line, width: 1.5),
+        borderRadius: BorderRadius.circular(LayoutTokens.standard.controlRadius),
+        borderSide: const BorderSide(color: Palette.line, width: Borders.standard),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
-        borderSide: const BorderSide(color: Palette.line, width: 1.5),
+        borderRadius: BorderRadius.circular(LayoutTokens.standard.controlRadius),
+        borderSide: const BorderSide(color: Palette.line, width: Borders.standard),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
-        borderSide: const BorderSide(color: Palette.ink, width: 1.5),
+        borderRadius: BorderRadius.circular(LayoutTokens.standard.controlRadius),
+        borderSide: const BorderSide(color: Palette.ink, width: Borders.standard),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
-        borderSide: const BorderSide(color: Palette.red, width: 1.5),
+        borderRadius: BorderRadius.circular(LayoutTokens.standard.controlRadius),
+        borderSide: const BorderSide(color: Palette.red, width: Borders.standard),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
-        borderSide: const BorderSide(color: Palette.red, width: 1.5),
+        borderRadius: BorderRadius.circular(LayoutTokens.standard.controlRadius),
+        borderSide: const BorderSide(color: Palette.red, width: Borders.standard),
       ),
     ),
     snackBarTheme: const SnackBarThemeData(

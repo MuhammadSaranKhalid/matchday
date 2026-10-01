@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Standardized list selection tile with leading icon/avatar, title, subtitle,
 /// and trailing check/radio/chevron affordance.

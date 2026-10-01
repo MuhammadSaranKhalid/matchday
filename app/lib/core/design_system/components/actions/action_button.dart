@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Style variants for [ActionButton].
 enum ActionButtonVariant {
@@ -77,7 +77,6 @@ class ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final layout = context.layout;
     final scheme = context.colorScheme;
-    final status = context.statusColors;
 
     final effectiveOnPressed = loading ? null : onPressed;
     final visualHeight = switch (size) {
@@ -88,7 +87,7 @@ class ActionButton extends StatelessWidget {
 
     final spinnerColor = switch (variant) {
       ActionButtonVariant.primary => scheme.onPrimary,
-      ActionButtonVariant.destructive => status.live,
+      ActionButtonVariant.destructive => scheme.onErrorContainer,
       _ => scheme.onSurface,
     };
 

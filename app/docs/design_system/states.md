@@ -2,7 +2,7 @@
 
 ## State Patterns
 
-Located in `lib/core/design_system/patterns/`.
+Located in `lib/core/design_system/components/feedback/` and `components/overlays/`.
 
 ### 1. EmptyState & StateRegion
 Eliminates ad-hoc positioning hacks (`Spacer()`, `Padding(top: 72)`) by managing vertical viewport space intelligently:

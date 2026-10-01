@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Selectable choice card pattern used in setup wizards and configuration sheets.
 class ChoiceCard extends StatelessWidget {

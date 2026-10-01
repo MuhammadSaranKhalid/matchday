@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../patterns/section_header.dart';
+import './section_header.dart';
 import '../theme/app_theme.dart';
 
 /// Standard structural section layout pattern.

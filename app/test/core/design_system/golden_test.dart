@@ -1,6 +1,31 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matchday/core/design_system/design_system.dart';
+
+/// A golden file comparator that allows a small pixel difference tolerance
+/// (default 3.5%) to accommodate cross-platform font rasterization (CoreText
+/// on macOS vs FreeType on Linux CI runners).
+class TolerantGoldenFileComparator extends LocalFileComparator {
+  TolerantGoldenFileComparator(super.testFile, {this.tolerance = 0.035});
+
+  final double tolerance;
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final ComparisonResult result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      await getGoldenBytes(golden),
+    );
+
+    if (!result.passed && result.diffPercent > tolerance) {
+      final String error = await generateFailureOutput(result, golden, basedir);
+      throw FlutterError(error);
+    }
+    return true;
+  }
+}
 
 Widget _wrap(Widget child, {Size size = const Size(400, 600)}) {
   return MaterialApp(
@@ -20,6 +45,16 @@ Widget _wrap(Widget child, {Size size = const Size(400, 600)}) {
 }
 
 void main() {
+  setUpAll(() {
+    if (goldenFileComparator is LocalFileComparator) {
+      final base = (goldenFileComparator as LocalFileComparator).basedir;
+      goldenFileComparator = TolerantGoldenFileComparator(
+        base.resolve('golden_test.dart'),
+        tolerance: 0.035,
+      );
+    }
+  });
+
   group('Design System Golden Tests', () {
     testWidgets('ActionButton variants and sizes', (tester) async {
       tester.view.physicalSize = const Size(500, 900);

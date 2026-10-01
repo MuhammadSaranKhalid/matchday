@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/spacing.dart';
 import '../primitives/action_button.dart';
+import '../theme/app_theme.dart';
 
 /// Semantic classification of error states.
 enum ErrorStateKind {
@@ -23,32 +22,56 @@ class ErrorState extends StatelessWidget {
     this.icon,
   });
 
+  /// Convenience factory to construct [ErrorState] directly from an [IconData].
+  factory ErrorState.fromIconData({
+    Key? key,
+    required String title,
+    IconData? icon,
+    IconData? iconData,
+    String? description,
+    ErrorStateKind kind = ErrorStateKind.generic,
+    VoidCallback? onRetry,
+    String retryLabel = 'Try again',
+  }) {
+    assert(icon != null || iconData != null, 'Either icon or iconData must be provided');
+    return ErrorState(
+      key: key,
+      title: title,
+      icon: Icon(icon ?? iconData!),
+      description: description,
+      kind: kind,
+      onRetry: onRetry,
+      retryLabel: retryLabel,
+    );
+  }
+
   final String title;
   final String? description;
   final ErrorStateKind kind;
   final VoidCallback? onRetry;
   final String retryLabel;
-  final dynamic icon;
+  final Widget? icon;
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+    final textTheme = context.textTheme;
+
     final defaultIcon = switch (kind) {
       ErrorStateKind.generic => Icons.error_outline,
       ErrorStateKind.offline => Icons.wifi_off_outlined,
       ErrorStateKind.permission => Icons.lock_outline,
     };
 
-    final iconWidget = icon is IconData
-        ? Icon(icon as IconData, size: 28, color: Palette.redInk)
-        : icon is Widget
-            ? (icon as Widget)
-            : Icon(defaultIcon, size: 28, color: Palette.redInk);
+    final iconWidget = icon ?? Icon(defaultIcon, size: 28, color: status.live);
 
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 320),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+          padding: EdgeInsets.symmetric(horizontal: layout.cardPadding),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -57,40 +80,54 @@ class ErrorState extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: Palette.redSurface,
+                  color: status.liveSurface,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Palette.redBorder),
+                  border: Border.all(color: status.liveBorder),
                 ),
                 alignment: Alignment.center,
-                child: iconWidget,
+                child: IconTheme.merge(
+                  data: IconThemeData(size: 28, color: status.live),
+                  child: iconWidget,
+                ),
               ),
-              const SizedBox(height: Spacing.md),
+              SizedBox(height: layout.cardPadding),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontFamily: 'Inter Tight',
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Palette.ink,
-                  letterSpacing: -0.01,
-                ),
+                style: textTheme.titleMedium?.copyWith(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                      letterSpacing: -0.01,
+                    ) ??
+                    TextStyle(
+                      fontFamily: 'Inter Tight',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                      letterSpacing: -0.01,
+                    ),
               ),
               if (description != null && description!.isNotEmpty) ...[
-                const SizedBox(height: Spacing.xs),
+                SizedBox(height: layout.inlineGap),
                 Text(
                   description!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 13.5,
-                    height: 1.45,
-                    color: Palette.muted,
-                  ),
+                  style: textTheme.bodySmall?.copyWith(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: scheme.outline,
+                      ) ??
+                      TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: scheme.outline,
+                      ),
                 ),
               ],
               if (onRetry != null) ...[
-                const SizedBox(height: Spacing.lg),
+                SizedBox(height: layout.sectionGap),
                 ActionButton(
                   label: retryLabel,
                   onPressed: onRetry,

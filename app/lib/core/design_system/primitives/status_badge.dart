@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
 import '../foundation/radii.dart';
+import '../theme/app_theme.dart';
 
 /// Semantic tones for [StatusBadge].
 enum StatusTone {
@@ -37,33 +37,37 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+    final textTokens = context.textTokens;
+
     final effectiveShowDot = showDot ?? (tone == StatusTone.live);
 
     final (bg, fg, border) = switch (tone) {
       StatusTone.neutral => (
-          Palette.paper2,
-          Palette.ink2,
-          Border.all(color: Palette.hairline),
+          status.neutralSurface,
+          status.neutral,
+          Border.all(color: scheme.outlineVariant),
         ),
       StatusTone.ink => (
-          Palette.ink,
-          Palette.paper,
+          scheme.primary,
+          scheme.onPrimary,
           null,
         ),
       StatusTone.live || StatusTone.destructive => (
-          Palette.redSurface,
-          Palette.redInk,
-          Border.all(color: Palette.redBorder),
+          status.liveSurface,
+          status.live,
+          Border.all(color: status.liveBorder),
         ),
       StatusTone.success => (
-          Palette.greenSurface,
-          Palette.greenInk,
-          Border.all(color: Palette.greenBorder),
+          status.successSurface,
+          status.success,
+          Border.all(color: status.successBorder),
         ),
       StatusTone.warning => (
-          Palette.cream,
-          Palette.amberInk,
-          Border.all(color: Palette.creamBorder),
+          status.warningSurface,
+          status.warning,
+          Border.all(color: status.warningBorder),
         ),
     };
 
@@ -97,8 +101,7 @@ class StatusBadge extends StatelessWidget {
           ],
           Text(
             label.toUpperCase(),
-            style: TextStyle(
-              fontFamily: 'JetBrains Mono',
+            style: textTokens.eyebrow.copyWith(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,

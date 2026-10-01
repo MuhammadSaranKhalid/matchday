@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/radii.dart';
-import '../foundation/spacing.dart';
+import '../theme/app_theme.dart';
 
 /// Content density for [Surface] padding.
 enum SurfaceDensity {
@@ -66,35 +64,40 @@ class Surface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveRadius = radius ?? Radii.card;
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+
+    final effectiveRadius = radius ?? layout.cardRadius;
     final borderRadius = BorderRadius.circular(effectiveRadius);
 
     final effectivePadding = padding ??
         switch (density) {
-          SurfaceDensity.compact => const EdgeInsets.all(Spacing.sm),
-          SurfaceDensity.standard => const EdgeInsets.all(Spacing.md),
-          SurfaceDensity.comfortable => const EdgeInsets.all(Spacing.lg),
+          SurfaceDensity.compact => EdgeInsets.all(layout.compactCardPadding),
+          SurfaceDensity.standard => EdgeInsets.all(layout.cardPadding),
+          SurfaceDensity.comfortable =>
+            EdgeInsets.all(layout.comfortableCardPadding),
         };
 
     final (bg, border, shadow) = switch (variant) {
       SurfaceVariant.plain => (
-          Palette.surface,
+          scheme.surface,
           null,
           null,
         ),
       SurfaceVariant.outlined => (
-          Palette.surface,
-          Border.all(color: Palette.line),
+          scheme.surface,
+          Border.all(color: scheme.outline),
           null,
         ),
       SurfaceVariant.subtle => (
-          Palette.paper2,
-          Border.all(color: Palette.hairline),
+          status.neutralSurface,
+          Border.all(color: scheme.outlineVariant),
           null,
         ),
       SurfaceVariant.raised => (
-          Palette.surface,
-          Border.all(color: Palette.line.withValues(alpha: 0.5)),
+          scheme.surface,
+          Border.all(color: scheme.outline.withValues(alpha: 0.5)),
           const [
             BoxShadow(
               color: Color(0x0D000000),
@@ -104,8 +107,8 @@ class Surface extends StatelessWidget {
           ],
         ),
       SurfaceVariant.accent => (
-          Palette.cream,
-          Border.all(color: Palette.creamBorder),
+          status.cream,
+          Border.all(color: status.creamBorder),
           null,
         ),
     };

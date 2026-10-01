@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/radii.dart';
-import '../foundation/spacing.dart';
+import '../theme/app_theme.dart';
 
 /// Standardized list selection tile with leading icon/avatar, title, subtitle,
 /// and trailing check/radio/chevron affordance.
@@ -26,62 +24,89 @@ class SelectionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(Radii.control),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Spacing.sm,
-            vertical: Spacing.xs,
-          ),
-          child: Row(
-            children: [
-              if (leading != null) ...[
-                leading!,
-                const SizedBox(width: Spacing.sm),
-              ],
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 15,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                        color: Palette.ink,
-                      ),
-                    ),
-                    if (subtitle != null && subtitle!.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle!,
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 13,
-                          color: Palette.muted,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
+
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: '$title${subtitle != null ? ', $subtitle' : ''}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(layout.controlRadius),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: layout.minimumTapTarget,
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: layout.compactCardPadding,
+                vertical: layout.inlineGap,
               ),
-              if (trailing != null) ...[
-                const SizedBox(width: Spacing.sm),
-                trailing!,
-              ] else if (selected) ...[
-                const SizedBox(width: Spacing.sm),
-                const Icon(
-                  Icons.check,
-                  size: 20,
-                  color: Palette.ink,
-                ),
-              ],
-            ],
+              child: Row(
+                children: [
+                  if (leading != null) ...[
+                    leading!,
+                    SizedBox(width: layout.compactCardPadding),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          style: textTheme.bodyLarge?.copyWith(
+                                fontSize: 15,
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                color: scheme.onSurface,
+                              ) ??
+                              TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 15,
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                color: scheme.onSurface,
+                              ),
+                        ),
+                        if (subtitle != null && subtitle!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle!,
+                            style: textTheme.bodySmall?.copyWith(
+                                  color: scheme.outline,
+                                ) ??
+                                TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  color: scheme.outline,
+                                ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (trailing != null) ...[
+                    SizedBox(width: layout.compactCardPadding),
+                    trailing!,
+                  ] else if (selected) ...[
+                    SizedBox(width: layout.compactCardPadding),
+                    Icon(
+                      Icons.check,
+                      size: 20,
+                      color: scheme.primary,
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),

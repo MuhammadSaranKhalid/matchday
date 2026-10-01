@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' hide TextInput;
 
-import '../foundation/palette.dart';
-import '../foundation/radii.dart';
-
 /// Standardized text input field with consistent label, error, and helper typography.
 class TextInput extends StatelessWidget {
   const TextInput({
@@ -68,6 +65,7 @@ class TextInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final hasError = errorText != null && errorText!.isNotEmpty;
 
     return Column(
@@ -77,12 +75,15 @@ class TextInput extends StatelessWidget {
         if (label != null && label!.isNotEmpty) ...[
           Text(
             label!,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Palette.ink2,
-            ),
+            style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ) ??
+                const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
           const SizedBox(height: 8),
         ],
@@ -98,55 +99,26 @@ class TextInput extends StatelessWidget {
           inputFormatters: inputFormatters,
           onChanged: onChanged,
           onSubmitted: onSubmitted,
-          style: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 16,
-            color: Palette.ink,
-          ),
+          style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: hint,
             counterText: '',
             prefixIcon: prefix,
             suffixIcon: suffix,
             errorText: hasError ? errorText : null,
-            filled: true,
-            fillColor: Palette.surface,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            hintStyle: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 16,
-              color: Palette.soft,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.control),
-              borderSide: const BorderSide(color: Palette.line, width: 1.5),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.control),
-              borderSide: const BorderSide(color: Palette.line, width: 1.5),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.control),
-              borderSide: const BorderSide(color: Palette.ink, width: 1.5),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.control),
-              borderSide: const BorderSide(color: Palette.red, width: 1.5),
-            ),
           ),
         ),
         if (!hasError && helperText != null && helperText!.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(
             helperText!,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 12,
-              color: Palette.muted,
-            ),
+            style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                ) ??
+                const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                ),
           ),
         ],
       ],

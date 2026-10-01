@@ -9,7 +9,7 @@ WidgetbookComponent buildEmptyStateComponent() {
       WidgetbookUseCase(
         name: 'First Run',
         builder: (context) {
-          return EmptyState(
+          return EmptyState.fromIconData(
             kind: EmptyStateKind.firstRun,
             icon: Icons.sports_cricket,
             title: 'No tournaments yet',
@@ -24,7 +24,7 @@ WidgetbookComponent buildEmptyStateComponent() {
       WidgetbookUseCase(
         name: 'First Run + Two Actions',
         builder: (context) {
-          return EmptyState(
+          return EmptyState.fromIconData(
             kind: EmptyStateKind.firstRun,
             icon: Icons.group_work_outlined,
             title: 'No teams registered',
@@ -77,7 +77,7 @@ WidgetbookComponent buildEmptyStateComponent() {
       WidgetbookUseCase(
         name: 'Long Text',
         builder: (context) {
-          return EmptyState(
+          return EmptyState.fromIconData(
             kind: EmptyStateKind.firstRun,
             icon: Icons.info_outline,
             title: 'No historical statistics available for this selected player profile',

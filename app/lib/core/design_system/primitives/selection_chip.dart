@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
 import '../foundation/radii.dart';
-import '../foundation/sizing.dart';
+import '../theme/app_theme.dart';
 
 /// Standardized interactive filter chip primitive.
 ///
@@ -26,9 +25,13 @@ class SelectionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected ? Palette.ink : Palette.paper;
-    final fg = selected ? Palette.paper : Palette.ink;
-    final border = selected ? null : Border.all(color: Palette.line);
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+
+    final bg = selected ? scheme.primary : scheme.surface;
+    final fg = selected ? scheme.onPrimary : scheme.onSurface;
+    final border = selected ? null : Border.all(color: scheme.outline);
 
     final pillContent = Container(
       height: 36,
@@ -62,8 +65,8 @@ class SelectionChip extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(
                 color: selected
-                    ? Palette.paper.withValues(alpha: 0.2)
-                    : Palette.paper2,
+                    ? scheme.surface.withValues(alpha: 0.2)
+                    : status.neutralSurface,
                 borderRadius: BorderRadius.circular(Radii.pill),
               ),
               child: Text(
@@ -81,18 +84,23 @@ class SelectionChip extends StatelessWidget {
       ),
     );
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(Radii.pill),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            minWidth: Sizing.minimumTapTarget,
-            minHeight: Sizing.minimumTapTarget,
-          ),
-          child: Center(
-            child: pillContent,
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: '$label${count != null ? ', $count' : ''}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(Radii.pill),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: layout.minimumTapTarget,
+              minHeight: layout.minimumTapTarget,
+            ),
+            child: Center(
+              child: pillContent,
+            ),
           ),
         ),
       ),

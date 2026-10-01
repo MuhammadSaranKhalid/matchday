@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/spacing.dart';
 import '../primitives/action_button.dart';
 import '../primitives/action_icon_button.dart';
+import '../theme/app_theme.dart';
 
 /// Standardized composer navigation header (e.g. Create Post, New Message).
 class ComposerHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -29,34 +28,43 @@ class ComposerHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
+
     return Container(
       height: 56.0,
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-      decoration: const BoxDecoration(
-        color: Palette.paper,
-        border: Border(bottom: BorderSide(color: Palette.hairline)),
+      padding: EdgeInsets.symmetric(horizontal: layout.screenGutter),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
       ),
       child: Row(
         children: [
-          ActionIconButton.subtle(
-            icon: Icons.close,
+          ActionIconButton.fromIconData(
+            Icons.close,
+            variant: ActionIconButtonVariant.subtle,
             onPressed: onClose ?? () => Navigator.of(context).maybePop(),
             tooltip: 'Cancel',
           ),
-          const SizedBox(width: Spacing.sm),
+          SizedBox(width: layout.compactCardPadding),
           Expanded(
             child: Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFamily: 'Inter Tight',
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Palette.ink,
-              ),
+              style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ) ??
+                  TextStyle(
+                    fontFamily: 'Inter Tight',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
             ),
           ),
-          const SizedBox(width: Spacing.sm),
+          SizedBox(width: layout.compactCardPadding),
           ActionButton(
             label: actionLabel,
             onPressed: canSubmit && !loading ? onAction : null,

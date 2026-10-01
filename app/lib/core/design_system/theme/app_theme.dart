@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../foundation/palette.dart';
-import '../foundation/radii.dart';
 import 'layout_tokens.dart';
+import 'status_colors.dart';
 import 'text_tokens.dart';
 
-/// Context extension for direct access to Matchday theme and extensions.
+/// Context extension for direct access to Matchday theme and semantic extensions.
 extension DesignSystemThemeContext on BuildContext {
   ThemeData get theme => Theme.of(this);
+  ColorScheme get colorScheme => Theme.of(this).colorScheme;
+  TextTheme get textTheme => Theme.of(this).textTheme;
 
   LayoutTokens get layout {
     final value = Theme.of(this).extension<LayoutTokens>();
@@ -19,6 +21,12 @@ extension DesignSystemThemeContext on BuildContext {
     final value = Theme.of(this).extension<TextTokens>();
     assert(value != null, 'TextTokens missing from ThemeData');
     return value ?? TextTokens.light;
+  }
+
+  StatusColors get statusColors {
+    final value = Theme.of(this).extension<StatusColors>();
+    assert(value != null, 'StatusColors missing from ThemeData');
+    return value ?? StatusColors.light;
   }
 }
 
@@ -126,6 +134,7 @@ ThemeData buildAppTheme() {
     extensions: const [
       LayoutTokens.light,
       TextTokens.light,
+      StatusColors.light,
     ],
     materialTapTargetSize: MaterialTapTargetSize.padded,
     filledButtonTheme: FilledButtonThemeData(
@@ -134,11 +143,11 @@ ThemeData buildAppTheme() {
         foregroundColor: Palette.paper,
         disabledBackgroundColor: Palette.ink.withValues(alpha: 0.35),
         disabledForegroundColor: Palette.paper.withValues(alpha: 0.9),
-        minimumSize: const Size(0, 52),
+        minimumSize: Size(0, LayoutTokens.light.controlLargeHeight),
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
         ),
         textStyle: const TextStyle(
           fontFamily: 'Inter',
@@ -152,11 +161,11 @@ ThemeData buildAppTheme() {
       style: OutlinedButton.styleFrom(
         backgroundColor: Palette.paper,
         foregroundColor: Palette.ink,
-        minimumSize: const Size(0, 52),
+        minimumSize: Size(0, LayoutTokens.light.controlLargeHeight),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         side: const BorderSide(color: Palette.line),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
         ),
         textStyle: const TextStyle(
           fontFamily: 'Inter',
@@ -179,16 +188,24 @@ ThemeData buildAppTheme() {
         color: Palette.soft,
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
         borderSide: const BorderSide(color: Palette.line, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
         borderSide: const BorderSide(color: Palette.line, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
         borderSide: const BorderSide(color: Palette.ink, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
+        borderSide: const BorderSide(color: Palette.red, width: 1.5),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(LayoutTokens.light.controlRadius),
+        borderSide: const BorderSide(color: Palette.red, width: 1.5),
       ),
     ),
     snackBarTheme: const SnackBarThemeData(

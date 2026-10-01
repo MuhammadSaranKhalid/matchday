@@ -885,48 +885,66 @@ begin
     raise exception 'Not authenticated' using errcode = '28000';
   end if;
 
-  -- 2. Inspect tournament exists and retrieve current lifecycle states
+  -- 2. Validate cancellation reason format
+  if p_reason is null or length(btrim(p_reason)) < 10 then
+    raise exception 'Cancelling requires a reason of at least 10 characters'
+      using errcode = '22023';
+  end if;
+
+  -- 3. Inspect tournament exists and acquire row lock for concurrency-safe serialization
   select competition_state, termination_state
     into v_competition_state, v_termination_state
     from public.tournaments
-   where tournament_id = p_tournament_id;
+   where tournament_id = p_tournament_id
+     for update;
 
   if not found then
     raise exception 'Tournament not found' using errcode = 'P0002';
   end if;
 
-  -- 3. Authorize via canonical capability check (tournament.cancel requires Owner root governance)
+  -- 4. Authorize via canonical capability check (tournament.cancel requires Owner root governance)
   if not public.can('tournament', p_tournament_id, 'tournament.cancel') then
     raise exception 'Unauthorized to cancel tournament' using errcode = '42501';
   end if;
 
-  -- 4. Idempotency: if already cancelled, return cleanly without duplicate operations
+  -- 5. Idempotency: if already cancelled, return cleanly without duplicate operations
   if v_termination_state = 'cancelled' then
     return;
   end if;
 
-  -- 5. Lifecycle Precondition: Cancellation is only permitted before competition has started or completed.
+  -- 6. Lifecycle Precondition: Cancellation is only permitted before competition has started or completed.
   -- Started tournaments must be abandoned (Phase 9 tournament.abandon), not cancelled.
   if v_competition_state != 'not_started' then
     raise exception 'Cannot cancel a tournament once competition has started. Use abandonment instead.'
       using errcode = '22000';
   end if;
 
-  -- 6. Validate cancellation reason
-  if p_reason is null or length(btrim(p_reason)) < 10 then
-    raise exception 'Cancelling requires a reason of at least 10 characters'
-      using errcode = '22023';
+  -- 7. Started Match Guard: verify no tournament match has meaningfully started or completed.
+  -- Live matches, completed matches, abandoned matches, or any match with actual_start_time IS NOT NULL
+  -- are authoritative proof that competition has begun, even if tournament competition_state has drifted.
+  if exists (
+    select 1
+      from public.matches
+     where tournament_id = p_tournament_id
+       and (
+         status in ('live', 'completed', 'abandoned')
+         or actual_start_time is not null
+       )
+  ) then
+    raise exception 'Cannot cancel a tournament once matches have started or completed. Tournament abandonment is required.'
+      using errcode = '22000';
   end if;
 
-  -- 7. Void unplayed matches if any fixtures were generated.
-  -- Completed scorecards are deliberately preserved to protect sporting history.
+  -- 8. Cancel only truly unstarted fixtures.
+  -- Live or completed matches are blocked above and never rewritten.
   update public.matches
      set status = 'cancelled',
          updated_at = now()
    where tournament_id = p_tournament_id
-     and status in ('scheduled', 'live');
+     and status = 'scheduled'
+     and actual_start_time is null;
 
-  -- 8. Mutate CANONICAL termination_state.
+  -- 9. Mutate CANONICAL termination_state.
   -- Do NOT write legacy status directly: trigger tournaments_sync_status_projection
   -- projects termination_state = 'cancelled' -> status = 'cancelled'.
   update public.tournaments
@@ -939,7 +957,7 @@ begin
          updated_at = now()
    where tournament_id = p_tournament_id;
 
-  -- 9. Notify participants via tournament_announce if routine exists
+  -- 10. Notify participants via tournament_announce if routine exists
   if exists (
     select 1 from pg_proc
      where proname = 'tournament_announce'

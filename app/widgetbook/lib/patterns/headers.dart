@@ -13,7 +13,7 @@ WidgetbookComponent buildHeadersComponent() {
             title: 'Tournament Details',
             subtitle: 'Champions Trophy 2026',
             action: ActionIconButton(
-              icon: Icons.share,
+              icon: const Icon(Icons.share),
               onPressed: () {},
             ),
           );

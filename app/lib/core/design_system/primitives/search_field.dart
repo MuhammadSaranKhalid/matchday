@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
 import '../foundation/radii.dart';
+import '../theme/app_theme.dart';
 
 /// Style variants for [SearchField].
 enum SearchFieldVariant {
@@ -87,83 +87,83 @@ class _SearchFieldState extends State<SearchField> {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+
     final borderRadius = switch (widget.variant) {
       SearchFieldVariant.pill => BorderRadius.circular(Radii.pill),
-      SearchFieldVariant.prominent => BorderRadius.circular(Radii.card),
-      SearchFieldVariant.standard => BorderRadius.circular(Radii.control),
+      SearchFieldVariant.prominent => BorderRadius.circular(layout.cardRadius),
+      SearchFieldVariant.standard => BorderRadius.circular(layout.controlRadius),
     };
 
     final (fillColor, borderColor) = switch (widget.variant) {
-      SearchFieldVariant.pill => (Palette.paper2, Palette.hairline),
-      SearchFieldVariant.prominent => (Palette.surface, Palette.line),
-      SearchFieldVariant.standard => (Palette.surface, Palette.line),
+      SearchFieldVariant.pill => (status.neutralSurface, scheme.outlineVariant),
+      SearchFieldVariant.prominent => (scheme.surface, scheme.outline),
+      SearchFieldVariant.standard => (scheme.surface, scheme.outline),
     };
 
     return SizedBox(
-      height: 44,
+      height: layout.controlHeight,
       child: TextField(
         controller: _controller,
         autofocus: widget.autofocus,
         onChanged: widget.onChanged,
         onSubmitted: widget.onSubmitted,
         textAlignVertical: TextAlignVertical.center,
-        style: const TextStyle(
-          fontFamily: 'Inter',
-          fontSize: 15,
-          color: Palette.ink,
-        ),
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurface,
+            ),
         decoration: InputDecoration(
           isDense: true,
           hintText: widget.hintText,
-          hintStyle: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 15,
-            color: Palette.soft,
-          ),
+          hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: scheme.outline,
+              ),
           filled: true,
           fillColor: fillColor,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 14,
-            vertical: 10,
+            vertical: 12,
           ),
-          prefixIcon: const Padding(
-            padding: EdgeInsets.only(left: 12, right: 8),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 12, right: 8),
             child: Icon(
               Icons.search,
               size: 20,
-              color: Palette.muted,
+              color: scheme.outline,
             ),
           ),
-          prefixIconConstraints: const BoxConstraints(
-            minWidth: 40,
-            minHeight: 40,
+          prefixIconConstraints: BoxConstraints(
+            minWidth: layout.minimumTapTarget,
+            minHeight: layout.minimumTapTarget,
           ),
           suffixIcon: widget.loading
-              ? const Padding(
-                  padding: EdgeInsets.all(12),
+              ? Padding(
+                  padding: const EdgeInsets.all(14),
                   child: SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Palette.muted,
+                      color: scheme.outline,
                     ),
                   ),
                 )
               : _hasText
                   ? IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.close,
                         size: 18,
-                        color: Palette.muted,
+                        color: scheme.outline,
                       ),
                       onPressed: _handleClear,
-                      splashRadius: 16,
+                      tooltip: 'Clear search',
                     )
                   : null,
-          suffixIconConstraints: const BoxConstraints(
-            minWidth: 40,
-            minHeight: 40,
+          suffixIconConstraints: BoxConstraints(
+            minWidth: layout.minimumTapTarget,
+            minHeight: layout.minimumTapTarget,
           ),
           border: OutlineInputBorder(
             borderRadius: borderRadius,
@@ -175,7 +175,7 @@ class _SearchFieldState extends State<SearchField> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: borderRadius,
-            borderSide: const BorderSide(color: Palette.ink, width: 1.5),
+            borderSide: BorderSide(color: scheme.primary, width: 1.5),
           ),
         ),
       ),

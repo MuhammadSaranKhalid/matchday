@@ -14,19 +14,19 @@ WidgetbookComponent buildIconButtonComponent() {
             child: Row(
               children: [
                 ActionIconButton(
-                  icon: Icons.arrow_back,
+                  icon: const Icon(Icons.arrow_back),
                   tooltip: 'Standard Back',
                   onPressed: () {},
                 ),
                 const SizedBox(width: 16),
                 ActionIconButton.outlined(
-                  icon: Icons.tune,
+                  icon: const Icon(Icons.tune),
                   tooltip: 'Outlined Filters',
                   onPressed: () {},
                 ),
                 const SizedBox(width: 16),
                 ActionIconButton.subtle(
-                  icon: Icons.more_horiz,
+                  icon: const Icon(Icons.more_horiz),
                   tooltip: 'Subtle Options',
                   onPressed: () {},
                 ),

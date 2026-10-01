@@ -91,7 +91,7 @@ void main() {
           theme: AppTheme.light,
           home: Scaffold(
             body: ActionIconButton(
-              icon: Icons.arrow_back,
+              icon: const Icon(Icons.arrow_back),
               onPressed: () {},
             ),
           ),

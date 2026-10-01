@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../foundation/palette.dart';
-import '../foundation/radii.dart';
-import '../foundation/spacing.dart';
 import '../primitives/action_button.dart';
+import '../theme/app_theme.dart';
 
 /// Launches a standardized confirmation dialog whose button hierarchy encodes
 /// reversibility.
@@ -66,18 +65,28 @@ class ConfirmationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bodyStyle = TextStyle(
-      fontFamily: 'Inter',
-      fontSize: 13.5,
-      height: 1.45,
-      color: Palette.ink2,
-    );
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+    final textTheme = context.textTheme;
+
+    final bodyStyle = textTheme.bodySmall?.copyWith(
+          fontSize: 13.5,
+          height: 1.45,
+          color: scheme.onSurfaceVariant,
+        ) ??
+        TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 13.5,
+          height: 1.45,
+          color: scheme.onSurfaceVariant,
+        );
 
     return Dialog(
-      backgroundColor: Palette.paper,
+      backgroundColor: scheme.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 28),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Radii.modal),
+        borderRadius: BorderRadius.circular(layout.modalRadius),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
@@ -89,31 +98,37 @@ class ConfirmationDialog extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: destructive ? Palette.redSurface : Palette.paper2,
+                color: destructive ? status.liveSurface : status.neutralSurface,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: destructive ? Palette.redBorder : Palette.line,
+                  color: destructive ? status.liveBorder : scheme.outline,
                 ),
               ),
               alignment: Alignment.center,
               child: Icon(
                 icon,
                 size: 20,
-                color: destructive ? Palette.redInk : Palette.ink2,
+                color: destructive ? status.live : scheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: Spacing.sm),
+            SizedBox(height: layout.itemGap),
             Text(
               title,
-              style: const TextStyle(
-                fontFamily: 'Inter Tight',
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.02,
-                color: Palette.ink,
-              ),
+              style: textTheme.titleMedium?.copyWith(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.02,
+                    color: scheme.onSurface,
+                  ) ??
+                  TextStyle(
+                    fontFamily: 'Inter Tight',
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.02,
+                    color: scheme.onSurface,
+                  ),
             ),
-            const SizedBox(height: Spacing.xs),
+            SizedBox(height: layout.inlineGap),
             Text.rich(
               TextSpan(
                 style: bodyStyle,
@@ -124,14 +139,14 @@ class ConfirmationDialog extends StatelessWidget {
                       text: emphasis,
                       style: bodyStyle.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: Palette.ink,
+                        color: scheme.onSurface,
                       ),
                     ),
                   if (bodyTail != null) TextSpan(text: bodyTail),
                 ],
               ),
             ),
-            const SizedBox(height: Spacing.lg),
+            SizedBox(height: layout.sectionGap),
             ActionButton(
               label: confirmLabel,
               variant: destructive
@@ -140,7 +155,7 @@ class ConfirmationDialog extends StatelessWidget {
               size: ControlSize.standard,
               onPressed: () => Navigator.of(context).pop(true),
             ),
-            const SizedBox(height: Spacing.xs),
+            SizedBox(height: layout.inlineGap),
             ActionButton.secondary(
               label: cancelLabel,
               size: ControlSize.standard,

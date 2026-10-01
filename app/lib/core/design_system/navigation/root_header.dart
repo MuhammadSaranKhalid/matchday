@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/spacing.dart';
+import '../theme/app_theme.dart';
 
 /// Standardized root navigation header used on top-level tabs (Home, Explore,
 /// Matches, Messages, Profile).
@@ -26,13 +25,17 @@ class RootHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
+
     return Container(
       height: 56.0,
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+      padding: EdgeInsets.symmetric(horizontal: layout.screenGutter),
       decoration: BoxDecoration(
-        color: Palette.paper,
+        color: scheme.surface,
         border: bottomBorder
-            ? const Border(bottom: BorderSide(color: Palette.hairline))
+            ? Border(bottom: BorderSide(color: scheme.outlineVariant))
             : null,
       ),
       child: Row(
@@ -40,19 +43,23 @@ class RootHeader extends StatelessWidget implements PreferredSizeWidget {
         children: [
           if (leading != null) ...[
             leading!,
-            const SizedBox(width: Spacing.sm),
+            SizedBox(width: layout.compactCardPadding),
           ],
           Expanded(
             child: titleWidget ??
                 Text(
                   title ?? '',
-                  style: const TextStyle(
-                    fontFamily: 'Inter Tight',
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Palette.ink,
-                    letterSpacing: -0.02,
-                  ),
+                  style: textTheme.titleLarge?.copyWith(
+                        letterSpacing: -0.02,
+                        color: scheme.onSurface,
+                      ) ??
+                      TextStyle(
+                        fontFamily: 'Inter Tight',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                        letterSpacing: -0.02,
+                      ),
                 ),
           ),
           if (actions != null) ...actions!,

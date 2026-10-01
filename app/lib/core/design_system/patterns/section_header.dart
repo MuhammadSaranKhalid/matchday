@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/spacing.dart';
+import '../theme/app_theme.dart';
 
 /// Standardized section header pattern with optional eyebrow and trailing action.
 class SectionHeader extends StatelessWidget {
@@ -24,20 +23,43 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTokens = context.textTokens;
+    final textTheme = context.textTheme;
+
     final effectiveAction = action ??
         (actionLabel != null && onAction != null
-            ? GestureDetector(
-                onTap: onAction,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Text(
-                    actionLabel!,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Palette.ink,
+            ? Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onAction,
+                  borderRadius: BorderRadius.circular(layout.controlRadius),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: layout.minimumTapTarget,
+                      minHeight: layout.minimumTapTarget,
+                    ),
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          actionLabel!,
+                          style: textTheme.labelLarge?.copyWith(
+                                fontSize: 13,
+                                color: scheme.onSurface,
+                              ) ??
+                              TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.onSurface,
+                              ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -45,7 +67,7 @@ class SectionHeader extends StatelessWidget {
             : null);
 
     return Padding(
-      padding: padding ?? const EdgeInsets.symmetric(vertical: Spacing.xs),
+      padding: padding ?? EdgeInsets.symmetric(vertical: layout.inlineGap),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -57,25 +79,27 @@ class SectionHeader extends StatelessWidget {
                 if (eyebrow != null && eyebrow!.isNotEmpty) ...[
                   Text(
                     eyebrow!.toUpperCase(),
-                    style: const TextStyle(
-                      fontFamily: 'JetBrains Mono',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.0,
-                      color: Palette.muted,
+                    style: textTokens.eyebrow.copyWith(
+                      color: scheme.outline,
                     ),
                   ),
                   const SizedBox(height: 3),
                 ],
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontFamily: 'Inter Tight',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Palette.ink,
-                    letterSpacing: -0.01,
-                  ),
+                  style: textTheme.titleMedium?.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                        letterSpacing: -0.01,
+                      ) ??
+                      TextStyle(
+                        fontFamily: 'Inter Tight',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                        letterSpacing: -0.01,
+                      ),
                 ),
               ],
             ),

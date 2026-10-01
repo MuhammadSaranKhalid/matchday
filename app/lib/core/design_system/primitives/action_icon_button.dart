@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/sizing.dart';
+import '../theme/app_theme.dart';
 
 /// Style variants for [ActionIconButton].
 enum ActionIconButtonVariant {
@@ -40,8 +39,29 @@ class ActionIconButton extends StatelessWidget {
     this.size = 36.0,
   }) : variant = ActionIconButtonVariant.subtle;
 
-  /// The icon to display. Can be [IconData] or any [Widget].
-  final dynamic icon;
+  /// Convenience factory to construct an [ActionIconButton] directly from [IconData].
+  factory ActionIconButton.fromIconData(
+    IconData iconData, {
+    Key? key,
+    VoidCallback? onPressed,
+    ActionIconButtonVariant variant = ActionIconButtonVariant.standard,
+    String? tooltip,
+    double size = 36.0,
+    double iconSize = 20.0,
+    Color? color,
+  }) {
+    return ActionIconButton(
+      key: key,
+      icon: Icon(iconData, size: iconSize, color: color),
+      onPressed: onPressed,
+      variant: variant,
+      tooltip: tooltip,
+      size: size,
+    );
+  }
+
+  /// The icon widget to display. Must be strongly typed [Widget].
+  final Widget icon;
 
   final VoidCallback? onPressed;
   final ActionIconButtonVariant variant;
@@ -52,27 +72,27 @@ class ActionIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+
     final (bg, border, fg) = switch (variant) {
       ActionIconButtonVariant.standard => (
           Colors.transparent,
           null,
-          Palette.ink,
+          scheme.onSurface,
         ),
       ActionIconButtonVariant.outlined => (
-          Palette.paper,
-          Border.all(color: Palette.line),
-          Palette.ink,
+          scheme.surface,
+          Border.all(color: scheme.outline),
+          scheme.onSurface,
         ),
       ActionIconButtonVariant.subtle => (
-          Palette.paper2,
+          status.neutralSurface,
           null,
-          Palette.ink,
+          scheme.onSurface,
         ),
     };
-
-    final iconWidget = icon is IconData
-        ? Icon(icon as IconData, size: 20, color: fg)
-        : (icon as Widget);
 
     final visualContainer = Container(
       width: size,
@@ -83,16 +103,19 @@ class ActionIconButton extends StatelessWidget {
         border: border,
       ),
       alignment: Alignment.center,
-      child: iconWidget,
+      child: IconTheme.merge(
+        data: IconThemeData(color: fg, size: 20),
+        child: icon,
+      ),
     );
 
     return IconButton(
       onPressed: onPressed,
       tooltip: tooltip,
       style: IconButton.styleFrom(
-        minimumSize: const Size(
-          Sizing.minimumTapTarget,
-          Sizing.minimumTapTarget,
+        minimumSize: Size(
+          layout.minimumTapTarget,
+          layout.minimumTapTarget,
         ),
         tapTargetSize: MaterialTapTargetSize.padded,
         padding: EdgeInsets.zero,

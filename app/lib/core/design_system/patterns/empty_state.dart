@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/spacing.dart';
 import '../primitives/action_button.dart';
+import '../theme/app_theme.dart';
 
 /// Semantic classification of empty states.
 enum EmptyStateKind {
@@ -47,15 +46,43 @@ class EmptyState extends StatelessWidget {
     this.secondaryAction,
   });
 
+  /// Convenience factory to construct [EmptyState] directly from an [IconData].
+  factory EmptyState.fromIconData({
+    Key? key,
+    required String title,
+    IconData? icon,
+    IconData? iconData,
+    EmptyStateKind kind = EmptyStateKind.firstRun,
+    String? description,
+    StateAction? primaryAction,
+    StateAction? secondaryAction,
+  }) {
+    assert(icon != null || iconData != null, 'Either icon or iconData must be provided');
+    return EmptyState(
+      key: key,
+      title: title,
+      kind: kind,
+      icon: Icon(icon ?? iconData!),
+      description: description,
+      primaryAction: primaryAction,
+      secondaryAction: secondaryAction,
+    );
+  }
+
   final String title;
   final EmptyStateKind kind;
-  final dynamic icon;
+  final Widget? icon;
   final String? description;
   final StateAction? primaryAction;
   final StateAction? secondaryAction;
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+    final textTheme = context.textTheme;
+
     final (iconSize, iconBoxSize, titleSize, titleWeight, maxContentWidth) =
         switch (kind) {
       EmptyStateKind.firstRun => (
@@ -88,59 +115,69 @@ class EmptyState extends StatelessWidget {
         ),
     };
 
-    final iconWidget = icon is IconData
-        ? Icon(icon as IconData, size: iconSize, color: Palette.muted)
-        : (icon as Widget?);
-
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxContentWidth),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+          padding: EdgeInsets.symmetric(horizontal: layout.cardPadding),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (iconWidget != null) ...[
+              if (icon != null) ...[
                 Container(
                   width: iconBoxSize,
                   height: iconBoxSize,
                   decoration: BoxDecoration(
-                    color: Palette.paper2,
+                    color: status.neutralSurface,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Palette.hairline),
+                    border: Border.all(color: scheme.outlineVariant),
                   ),
                   alignment: Alignment.center,
-                  child: iconWidget,
+                  child: IconTheme.merge(
+                    data: IconThemeData(size: iconSize, color: scheme.outline),
+                    child: icon!,
+                  ),
                 ),
-                const SizedBox(height: Spacing.md),
+                SizedBox(height: layout.cardPadding),
               ],
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Inter Tight',
-                  fontSize: titleSize,
-                  fontWeight: titleWeight,
-                  color: Palette.ink,
-                  letterSpacing: -0.01,
-                ),
+                style: textTheme.titleMedium?.copyWith(
+                      fontSize: titleSize,
+                      fontWeight: titleWeight,
+                      color: scheme.onSurface,
+                      letterSpacing: -0.01,
+                    ) ??
+                    TextStyle(
+                      fontFamily: 'Inter Tight',
+                      fontSize: titleSize,
+                      fontWeight: titleWeight,
+                      color: scheme.onSurface,
+                      letterSpacing: -0.01,
+                    ),
               ),
               if (description != null && description!.isNotEmpty) ...[
-                const SizedBox(height: Spacing.xs),
+                SizedBox(height: layout.inlineGap),
                 Text(
                   description!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 13.5,
-                    height: 1.45,
-                    color: Palette.muted,
-                  ),
+                  style: textTheme.bodySmall?.copyWith(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: scheme.outline,
+                      ) ??
+                      TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: scheme.outline,
+                      ),
                 ),
               ],
               if (primaryAction != null || secondaryAction != null) ...[
-                const SizedBox(height: Spacing.lg),
+                SizedBox(height: layout.sectionGap),
                 if (primaryAction != null)
                   ActionButton(
                     label: primaryAction!.label,
@@ -152,7 +189,7 @@ class EmptyState extends StatelessWidget {
                     expand: false,
                   ),
                 if (secondaryAction != null) ...[
-                  const SizedBox(height: Spacing.xs),
+                  SizedBox(height: layout.inlineGap),
                   ActionButton.ghost(
                     label: secondaryAction!.label,
                     onPressed: secondaryAction!.onPressed,
@@ -198,6 +235,38 @@ class StateRegion extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// A scrollable container for state widgets (empty, error) that ensures
+/// [RefreshIndicator] can activate even when the content does not naturally
+/// exceed the viewport.
+class ScrollableStateRegion extends StatelessWidget {
+  const ScrollableStateRegion({
+    super.key,
+    required this.child,
+    this.padding,
+    this.physics = const AlwaysScrollableScrollPhysics(),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+  final ScrollPhysics physics;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      physics: physics,
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: padding ?? EdgeInsets.zero,
+            child: Center(child: child),
+          ),
+        ),
+      ],
     );
   }
 }

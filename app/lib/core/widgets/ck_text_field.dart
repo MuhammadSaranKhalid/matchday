@@ -47,23 +47,80 @@ class CkTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextInput(
-      label: label,
-      controller: controller,
-      hint: hint,
-      errorText: errorText,
-      helperText: helperText,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
-      obscureText: obscureText,
-      autofocus: autofocus,
-      enabled: enabled,
-      maxLength: maxLength,
-      maxLines: maxLines,
-      inputFormatters: inputFormatters,
-      suffix: suffix,
-      onChanged: onChanged,
-      onSubmitted: onSubmitted,
+    final hasError = errorText != null && errorText!.isNotEmpty;
+    final borderRadius = BorderRadius.circular(12);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Palette.ink2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          autofocus: autofocus,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          maxLength: maxLength,
+          maxLines: maxLines,
+          inputFormatters: inputFormatters,
+          onChanged: onChanged,
+          onSubmitted: onSubmitted,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 16,
+            color: Palette.ink,
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            counterText: '',
+            suffixIcon: suffix,
+            errorText: hasError ? errorText : null,
+            filled: true,
+            fillColor: Palette.surface,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: borderRadius,
+              borderSide: const BorderSide(color: Palette.line, width: 1.5),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: borderRadius,
+              borderSide: const BorderSide(color: Palette.line, width: 1.5),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: borderRadius,
+              borderSide: const BorderSide(color: Palette.ink, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: borderRadius,
+              borderSide: const BorderSide(color: Palette.red, width: 1.5),
+            ),
+          ),
+        ),
+        if (!hasError && helperText != null && helperText!.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            helperText!,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 12,
+              color: Palette.muted,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

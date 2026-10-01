@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/radii.dart';
-import '../foundation/sizing.dart';
+import '../theme/app_theme.dart';
 
 /// Style variants for [ActionButton].
 enum ActionButtonVariant {
@@ -77,24 +75,28 @@ class ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+
     final effectiveOnPressed = loading ? null : onPressed;
     final visualHeight = switch (size) {
-      ControlSize.compact => Sizing.controlCompactHeight,
-      ControlSize.standard => Sizing.controlHeight,
-      ControlSize.large => Sizing.controlLargeHeight,
+      ControlSize.compact => layout.controlCompactHeight,
+      ControlSize.standard => layout.controlHeight,
+      ControlSize.large => layout.controlLargeHeight,
     };
 
     final spinnerColor = switch (variant) {
-      ActionButtonVariant.primary => Palette.paper,
-      ActionButtonVariant.destructive => Palette.redInk,
-      _ => Palette.ink,
+      ActionButtonVariant.primary => scheme.onPrimary,
+      ActionButtonVariant.destructive => status.live,
+      _ => scheme.onSurface,
     };
 
     final content = loading
         ? _ButtonSpinner(color: spinnerColor)
         : _ButtonLabel(label: label, icon: icon, size: size);
 
-    final buttonStyle = _resolveStyle(visualHeight);
+    final buttonStyle = _resolveStyle(context, visualHeight);
 
     Widget button = switch (variant) {
       ActionButtonVariant.primary ||
@@ -123,7 +125,11 @@ class ActionButton extends StatelessWidget {
     return button;
   }
 
-  ButtonStyle _resolveStyle(double visualHeight) {
+  ButtonStyle _resolveStyle(BuildContext context, double visualHeight) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+
     final (fontSize, letterSpacing) = switch (size) {
       ControlSize.compact => (13.0, -0.1),
       ControlSize.standard => (15.0, -0.15),
@@ -137,7 +143,7 @@ class ActionButton extends StatelessWidget {
     };
 
     final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(Radii.control),
+      borderRadius: BorderRadius.circular(layout.controlRadius),
     );
 
     final textStyle = TextStyle(
@@ -148,16 +154,16 @@ class ActionButton extends StatelessWidget {
     );
 
     final minSize = Size(
-      expand ? double.infinity : Sizing.minimumTapTarget,
+      expand ? double.infinity : layout.minimumTapTarget,
       visualHeight,
     );
 
     return switch (variant) {
       ActionButtonVariant.primary => FilledButton.styleFrom(
-          backgroundColor: Palette.ink,
-          foregroundColor: Palette.paper,
-          disabledBackgroundColor: Palette.ink.withValues(alpha: 0.35),
-          disabledForegroundColor: Palette.paper.withValues(alpha: 0.9),
+          backgroundColor: scheme.primary,
+          foregroundColor: scheme.onPrimary,
+          disabledBackgroundColor: scheme.primary.withValues(alpha: 0.35),
+          disabledForegroundColor: scheme.onPrimary.withValues(alpha: 0.9),
           elevation: 0,
           minimumSize: minSize,
           tapTargetSize: MaterialTapTargetSize.padded,
@@ -166,21 +172,21 @@ class ActionButton extends StatelessWidget {
           textStyle: textStyle,
         ),
       ActionButtonVariant.secondary => OutlinedButton.styleFrom(
-          backgroundColor: Palette.paper,
-          foregroundColor: Palette.ink,
-          disabledBackgroundColor: Palette.paper.withValues(alpha: 0.5),
-          disabledForegroundColor: Palette.soft,
+          backgroundColor: scheme.surface,
+          foregroundColor: scheme.onSurface,
+          disabledBackgroundColor: scheme.surface.withValues(alpha: 0.5),
+          disabledForegroundColor: scheme.outline,
           elevation: 0,
           minimumSize: minSize,
           tapTargetSize: MaterialTapTargetSize.padded,
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          side: const BorderSide(color: Palette.line),
+          side: BorderSide(color: scheme.outline),
           shape: shape,
           textStyle: textStyle,
         ),
       ActionButtonVariant.ghost => TextButton.styleFrom(
-          foregroundColor: Palette.ink,
-          disabledForegroundColor: Palette.soft,
+          foregroundColor: scheme.onSurface,
+          disabledForegroundColor: scheme.outline,
           elevation: 0,
           minimumSize: minSize,
           tapTargetSize: MaterialTapTargetSize.padded,
@@ -189,15 +195,15 @@ class ActionButton extends StatelessWidget {
           textStyle: textStyle,
         ),
       ActionButtonVariant.destructive => FilledButton.styleFrom(
-          backgroundColor: Palette.redSurface,
-          foregroundColor: Palette.redInk,
-          disabledBackgroundColor: Palette.redSurface.withValues(alpha: 0.4),
-          disabledForegroundColor: Palette.redInk.withValues(alpha: 0.4),
+          backgroundColor: status.liveSurface,
+          foregroundColor: status.live,
+          disabledBackgroundColor: status.liveSurface.withValues(alpha: 0.4),
+          disabledForegroundColor: status.live.withValues(alpha: 0.4),
           elevation: 0,
           minimumSize: minSize,
           tapTargetSize: MaterialTapTargetSize.padded,
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          side: const BorderSide(color: Palette.redBorder),
+          side: BorderSide(color: status.liveBorder),
           shape: shape,
           textStyle: textStyle,
         ),

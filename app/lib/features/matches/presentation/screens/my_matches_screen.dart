@@ -70,53 +70,58 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
     // First run: tabs are suppressed, exactly as on the Challenges board —
     // two empty tabs is a filing cabinet with no files.
     if (view.confirmed.isEmpty && view.past.isEmpty) {
-      return StateRegion(
-        child: EmptyState(
-          kind: EmptyStateKind.firstRun,
-          icon: Icons.sports_cricket,
-          title: 'No matches yet',
-          description:
-              'Every fixture starts as a challenge: propose a day, a ground '
-              'and a format, and it appears here the moment the other manager '
-              'accepts.',
-          primaryAction: StateAction(
-            label: 'Challenge a team',
-            onPressed: () => context.push('/challenge'),
-          ),
-          secondaryAction: StateAction(
-            label: 'Post to the open pool',
-            onPressed: () => context.push('/matches/send-challenge?mode=open'),
+      return RefreshIndicator.adaptive(
+        onRefresh: () async {
+          ref.invalidate(myMatchesViewProvider);
+          await ref.read(myMatchesViewProvider.future);
+        },
+        child: ScrollableStateRegion(
+          child: EmptyState.fromIconData(
+            kind: EmptyStateKind.firstRun,
+            iconData: Icons.sports_cricket,
+            title: 'No matches yet',
+            description:
+                'Every fixture starts as a challenge: propose a day, a ground '
+                'and a format, and it appears here the moment the other manager '
+                'accepts.',
+            primaryAction: StateAction(
+              label: 'Challenge a team',
+              onPressed: () => context.push('/challenge'),
+            ),
+            secondaryAction: StateAction(
+              label: 'Post to the open pool',
+              onPressed: () => context.push('/matches/send-challenge?mode=open'),
+            ),
           ),
         ),
       );
     }
 
+    final layout = context.layout;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-            Spacing.md,
-            Spacing.sm,
-            Spacing.md,
-            Spacing.xs,
+          padding: EdgeInsets.only(
+            top: layout.itemGap,
+            bottom: layout.inlineGap,
           ),
-          child: Row(
-            children: [
-              SelectionChip(
+          child: SegmentedControl<bool>(
+            value: _confirmedTab,
+            options: [
+              SegmentOption(
+                value: true,
                 label: 'Confirmed',
                 count: view.confirmed.length,
-                selected: _confirmedTab,
-                onPressed: () => setState(() => _confirmedTab = true),
               ),
-              const SizedBox(width: Spacing.xs),
-              SelectionChip(
+              SegmentOption(
+                value: false,
                 label: 'Past',
                 count: view.totalPastCount,
-                selected: !_confirmedTab,
-                onPressed: () => setState(() => _confirmedTab = false),
               ),
             ],
+            onChanged: (val) => setState(() => _confirmedTab = val),
           ),
         ),
         const _ChallengesBanner(),
@@ -134,14 +139,15 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
   }
 
   Widget _confirmedBody(MyMatchesView view) {
+    final layout = context.layout;
     if (view.confirmed.isEmpty) {
       final needs =
           ref.watch(challengesViewProvider).value?.needsYou ??
           const <ChallengeRow>[];
-      return StateRegion(
-        child: EmptyState(
+      return ScrollableStateRegion(
+        child: EmptyState.fromIconData(
           kind: EmptyStateKind.filtered,
-          icon: Icons.calendar_today_outlined,
+          iconData: Icons.calendar_today_outlined,
           title: 'Nothing on the schedule',
           description:
               needs.isEmpty
@@ -155,12 +161,12 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
           secondaryAction:
               needs.isNotEmpty
                   ? StateAction(
-                    label:
-                        needs.length == 1
-                            ? '1 challenge needs you'
-                            : '${needs.length} challenges need you',
-                    onPressed: () => context.push('/my/challenges'),
-                  )
+                      label:
+                          needs.length == 1
+                              ? '1 challenge needs you'
+                              : '${needs.length} challenges need you',
+                      onPressed: () => context.push('/my/challenges'),
+                    )
                   : null,
         ),
       );
@@ -168,19 +174,19 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
     final groups = _groupByDay(view.confirmed, (c) => c.startTime);
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.md,
-        Spacing.sm,
-        Spacing.md,
-        Spacing.xl,
+      padding: EdgeInsets.fromLTRB(
+        layout.screenGutter,
+        layout.itemGap,
+        layout.screenGutter,
+        layout.screenBottom,
       ),
       children: [
         for (final g in groups) ...[
           _DateRule(label: g.label, first: g == groups.first),
-          const SizedBox(height: Spacing.sm),
+          SizedBox(height: layout.itemGap),
           for (final c in g.items) ...[
             FixtureCard(v: c, onTap: () => _openFixture(c)),
-            const SizedBox(height: Spacing.sm),
+            SizedBox(height: layout.itemGap),
           ],
         ],
       ],
@@ -188,11 +194,12 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
   }
 
   Widget _pastBody(MyMatchesView view) {
+    final layout = context.layout;
     if (view.past.isEmpty) {
-      return StateRegion(
-        child: EmptyState(
+      return ScrollableStateRegion(
+        child: EmptyState.fromIconData(
           kind: EmptyStateKind.passive,
-          icon: Icons.history,
+          iconData: Icons.history,
           title: 'No past matches',
           description:
               'Scorecards land here the moment a match finishes — yours and '
@@ -200,9 +207,9 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
           primaryAction:
               view.confirmed.isNotEmpty
                   ? StateAction(
-                    label: 'View confirmed (${view.confirmed.length})',
-                    onPressed: () => setState(() => _confirmedTab = true),
-                  )
+                      label: 'View confirmed (${view.confirmed.length})',
+                      onPressed: () => setState(() => _confirmedTab = true),
+                    )
                   : null,
         ),
       );
@@ -211,11 +218,11 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
     final hidden = view.totalPastCount - view.past.length;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.md,
-        Spacing.sm,
-        Spacing.md,
-        Spacing.xl,
+      padding: EdgeInsets.fromLTRB(
+        layout.screenGutter,
+        layout.itemGap,
+        layout.screenGutter,
+        layout.screenBottom,
       ),
       children: [
         for (final g in groups) ...[
@@ -314,25 +321,30 @@ class _DateRule extends StatelessWidget {
   final bool first;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(top: first ? 0 : 4),
-    child: Row(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontFamily: 'JetBrains Mono',
-            fontSize: 10.5,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.10,
-            color: Palette.ink,
+  Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    final textTokens = context.textTokens;
+    final layout = context.layout;
+
+    return Padding(
+      padding: EdgeInsets.only(top: first ? 0 : 4),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: textTokens.eyebrow.copyWith(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.10,
+              color: scheme.onSurface,
+            ),
           ),
-        ),
-        const SizedBox(width: Spacing.xs),
-        const Expanded(child: Divider(height: 1, color: Palette.line)),
-      ],
-    ),
-  );
+          SizedBox(width: layout.inlineGap),
+          Expanded(child: Divider(height: 1, color: scheme.outline)),
+        ],
+      ),
+    );
+  }
 }
 
 // ─── Urgent Challenges Banner ────────────────────────────────────────────────
@@ -353,21 +365,31 @@ class _ChallengesBanner extends ConsumerWidget {
         .whereType<Duration>()
         .reduce((a, b) => a < b ? a : b);
 
+    final layout = context.layout;
+    final status = context.statusColors;
+    final scheme = context.colorScheme;
+    final textTokens = context.textTokens;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.md, Spacing.xs, Spacing.md, 0),
+      padding: EdgeInsets.fromLTRB(
+        layout.screenGutter,
+        layout.inlineGap,
+        layout.screenGutter,
+        0,
+      ),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => context.push('/my/challenges'),
         child: Container(
           constraints: const BoxConstraints(minHeight: 56),
-          padding: const EdgeInsets.symmetric(
-            horizontal: Spacing.md,
-            vertical: Spacing.sm,
+          padding: EdgeInsets.symmetric(
+            horizontal: layout.cardPadding,
+            vertical: layout.compactCardPadding,
           ),
           decoration: BoxDecoration(
-            color: Palette.cream,
-            borderRadius: BorderRadius.circular(Radii.md),
-            border: Border.all(color: Palette.creamBorder),
+            color: status.cream,
+            borderRadius: BorderRadius.circular(layout.controlRadius),
+            border: Border.all(color: status.creamBorder),
           ),
           child: Row(
             children: [
@@ -380,12 +402,11 @@ class _ChallengesBanner extends ConsumerWidget {
                       needs.length == 1
                           ? '1 CHALLENGE NEEDS YOU'
                           : '${needs.length} CHALLENGES NEED YOU',
-                      style: const TextStyle(
-                        fontFamily: 'JetBrains Mono',
+                      style: textTokens.eyebrow.copyWith(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.09,
-                        color: Palette.ink,
+                        color: scheme.onSurface,
                         height: 1.5,
                       ),
                     ),
@@ -393,26 +414,24 @@ class _ChallengesBanner extends ConsumerWidget {
                       soonest.inHours >= 1
                           ? '${urgent.length} EXPIRES IN ${soonest.inHours}H'
                           : '${urgent.length} EXPIRES IN ${soonest.inMinutes}M',
-                      style: const TextStyle(
-                        fontFamily: 'JetBrains Mono',
+                      style: textTokens.eyebrow.copyWith(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.09,
-                        color: Palette.redInk,
+                        color: status.live,
                         height: 1.5,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: Spacing.sm),
-              const Text(
+              SizedBox(width: layout.compactCardPadding),
+              Text(
                 '→',
-                style: TextStyle(
-                  fontFamily: 'JetBrains Mono',
+                style: textTokens.eyebrow.copyWith(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: Palette.ink,
+                  color: scheme.onSurface,
                 ),
               ),
             ],
@@ -429,24 +448,30 @@ class _Skeleton extends StatelessWidget {
   const _Skeleton();
 
   @override
-  Widget build(BuildContext context) => ListView(
-    physics: const NeverScrollableScrollPhysics(),
-    padding: const EdgeInsets.fromLTRB(
-      Spacing.md,
-      Spacing.sm,
-      Spacing.md,
-      Spacing.xl,
-    ),
-    children: const [
-      ShimmerLoading(child: ShimmerBox(width: 132, height: 10, radius: 4)),
-      SizedBox(height: Spacing.sm),
-      _SkeletonFixture(opacity: 1, live: true),
-      SizedBox(height: Spacing.sm),
-      _SkeletonFixture(opacity: 0.7, live: false),
-      SizedBox(height: Spacing.sm),
-      _SkeletonFixture(opacity: 0.4, live: false),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final layout = context.layout;
+
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
+        layout.screenGutter,
+        layout.itemGap,
+        layout.screenGutter,
+        layout.screenBottom,
+      ),
+      children: [
+        const ShimmerLoading(
+          child: ShimmerBox(width: 132, height: 10, radius: 4),
+        ),
+        SizedBox(height: layout.itemGap),
+        const _SkeletonFixture(opacity: 1, live: true),
+        SizedBox(height: layout.itemGap),
+        const _SkeletonFixture(opacity: 0.7, live: false),
+        SizedBox(height: layout.itemGap),
+        const _SkeletonFixture(opacity: 0.4, live: false),
+      ],
+    );
+  }
 }
 
 class _SkeletonFixture extends StatelessWidget {
@@ -457,15 +482,18 @@ class _SkeletonFixture extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+
     Widget shim(Widget c) => live ? ShimmerLoading(child: c) : c;
     return Opacity(
       opacity: opacity,
       child: Container(
         height: 104,
         decoration: BoxDecoration(
-          color: Palette.surface,
-          borderRadius: BorderRadius.circular(Radii.md),
-          border: Border.all(color: Palette.hairline),
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(layout.controlRadius),
+          border: Border.all(color: scheme.outlineVariant),
         ),
         clipBehavior: Clip.antiAlias,
         child: Row(
@@ -474,23 +502,23 @@ class _SkeletonFixture extends StatelessWidget {
             Container(
               width: 84,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: Palette.paper,
-                border: Border(right: BorderSide(color: Palette.hairline)),
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                border: Border(right: BorderSide(color: scheme.outlineVariant)),
               ),
               child: shim(const ShimmerBox(width: 44, height: 16, radius: 4)),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(Spacing.sm),
+                padding: EdgeInsets.all(layout.compactCardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     shim(const ShimmerBox(width: 150, height: 13, radius: 4)),
-                    const SizedBox(height: Spacing.xs),
+                    SizedBox(height: layout.inlineGap),
                     const ShimmerBox(width: 120, height: 13, radius: 4),
-                    const SizedBox(height: Spacing.xs),
+                    SizedBox(height: layout.inlineGap),
                     const ShimmerBox(width: 170, height: 9, radius: 4),
                   ],
                 ),
@@ -511,36 +539,40 @@ class _SeeAll extends StatelessWidget {
   final int total;
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(top: 2),
-    padding: const EdgeInsets.only(top: Spacing.sm),
-    decoration: const BoxDecoration(
-      border: Border(top: BorderSide(color: Palette.hairline)),
-    ),
-    child: const Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'SEE ALL MATCHES',
-          style: TextStyle(
-            fontFamily: 'JetBrains Mono',
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.09,
-            color: Palette.ink2,
+  Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    final textTokens = context.textTokens;
+    final layout = context.layout;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 2),
+      padding: EdgeInsets.only(top: layout.compactCardPadding),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'SEE ALL $total MATCHES',
+            style: textTokens.eyebrow.copyWith(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.09,
+              color: scheme.onSurfaceVariant,
+            ),
           ),
-        ),
-        SizedBox(width: Spacing.xs),
-        Text(
-          '→',
-          style: TextStyle(
-            fontFamily: 'JetBrains Mono',
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: Palette.muted,
+          SizedBox(width: layout.inlineGap),
+          Text(
+            '→',
+            style: textTokens.eyebrow.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: scheme.outline,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

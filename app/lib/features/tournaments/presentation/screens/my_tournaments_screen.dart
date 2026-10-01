@@ -166,39 +166,33 @@ class _Segmented extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.md,
-        Spacing.sm,
-        Spacing.md,
-        Spacing.xs,
+      padding: EdgeInsets.only(
+        top: layout.itemGap,
+        bottom: layout.inlineGap,
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            SelectionChip(
-              label: 'Organizing',
-              count: organizingCount,
-              selected: relation == _Relation.organizing,
-              onPressed: () => onChanged(_Relation.organizing),
-            ),
-            const SizedBox(width: Spacing.xs),
-            SelectionChip(
-              label: 'Playing',
-              count: playingCount,
-              selected: relation == _Relation.playing,
-              onPressed: () => onChanged(_Relation.playing),
-            ),
-            const SizedBox(width: Spacing.xs),
-            SelectionChip(
-              label: 'Following',
-              count: followingCount,
-              selected: relation == _Relation.following,
-              onPressed: () => onChanged(_Relation.following),
-            ),
-          ],
-        ),
+      child: SegmentedControl<_Relation>(
+        value: relation,
+        options: [
+          SegmentOption(
+            value: _Relation.organizing,
+            label: 'Organizing',
+            count: organizingCount,
+          ),
+          SegmentOption(
+            value: _Relation.playing,
+            label: 'Playing',
+            count: playingCount,
+          ),
+          SegmentOption(
+            value: _Relation.following,
+            label: 'Following',
+            count: followingCount,
+          ),
+        ],
+        onChanged: onChanged,
       ),
     );
   }
@@ -211,15 +205,14 @@ class _Eyebrow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
+    padding: EdgeInsets.symmetric(vertical: context.layout.inlineGap),
     child: Text(
       text.toUpperCase(),
-      style: const TextStyle(
-        fontFamily: 'JetBrains Mono',
+      style: context.textTokens.eyebrow.copyWith(
         fontSize: 10,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.12,
-        color: Palette.muted,
+        color: context.colorScheme.outline,
       ),
     ),
   );
@@ -525,12 +518,17 @@ class _AwaitingBody extends StatelessWidget {
         Text(
           'Squad of ${reg.squad.length} submitted ${_ago(reg.registeredAt)}.'
           '${fee > 0 ? ' The organiser marks the PKR ${money.format(fee)} fee as paid once you hand it over.' : ''}',
-          style: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 11.5,
-            height: 1.5,
-            color: Palette.muted,
-          ),
+          style: context.textTheme.bodySmall?.copyWith(
+                fontSize: 11.5,
+                height: 1.5,
+                color: context.colorScheme.outline,
+              ) ??
+              TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 11.5,
+                height: 1.5,
+                color: context.colorScheme.outline,
+              ),
         ),
       ],
     );
@@ -646,42 +644,56 @@ class _DiscoveryNudge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+    final textTheme = context.textTheme;
+
     return Container(
-      padding: const EdgeInsets.all(Spacing.md),
+      padding: EdgeInsets.all(layout.cardPadding),
       decoration: BoxDecoration(
-        color: Palette.paper2,
-        borderRadius: BorderRadius.circular(Radii.md),
-        border: Border.all(color: Palette.line),
+        color: status.neutralSurface,
+        borderRadius: BorderRadius.circular(layout.controlRadius),
+        border: Border.all(color: scheme.outline),
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'Looking for local cups to join?',
-                  style: TextStyle(
-                    fontFamily: 'Inter Tight',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Palette.ink,
-                  ),
+                  style: textTheme.titleSmall?.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurface,
+                      ) ??
+                      TextStyle(
+                        fontFamily: 'Inter Tight',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurface,
+                      ),
                 ),
-                SizedBox(height: 3),
+                const SizedBox(height: 3),
                 Text(
                   'Find tournaments taking registrations near you.',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 11.5,
-                    color: Palette.muted,
-                  ),
+                  style: textTheme.bodySmall?.copyWith(
+                        fontSize: 11.5,
+                        color: scheme.outline,
+                      ) ??
+                      TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11.5,
+                        color: scheme.outline,
+                      ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: Spacing.sm),
+          SizedBox(width: layout.compactCardPadding),
           ActionButton.secondary(
             label: 'Browse',
             size: ControlSize.compact,
@@ -703,7 +715,7 @@ class _FirstRun extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StateRegion(
-      child: EmptyState(
+      child: EmptyState.fromIconData(
         kind: EmptyStateKind.firstRun,
         icon: Icons.emoji_events_outlined,
         title: 'No tournaments yet',

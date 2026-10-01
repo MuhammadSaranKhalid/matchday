@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/spacing.dart';
 import '../primitives/action_icon_button.dart';
+import '../theme/app_theme.dart';
 
 /// Standardized multi-step wizard header pattern.
 ///
@@ -30,6 +29,11 @@ class WizardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTokens = context.textTokens;
+    final textTheme = context.textTheme;
+
     final hasProgress = currentStep != null && totalSteps != null && totalSteps! > 0;
     final progressFraction = hasProgress
         ? (currentStep! / totalSteps!).clamp(0.0, 1.0)
@@ -43,22 +47,23 @@ class WizardHeader extends StatelessWidget {
           Container(
             height: 3,
             width: double.infinity,
-            color: Palette.hairline,
+            color: scheme.outlineVariant,
             alignment: Alignment.centerLeft,
             child: FractionallySizedBox(
               widthFactor: progressFraction,
-              child: Container(color: Palette.ink),
+              child: Container(color: scheme.primary),
             ),
           ),
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Spacing.md,
-            vertical: Spacing.sm,
+          padding: EdgeInsets.symmetric(
+            horizontal: layout.screenGutter,
+            vertical: layout.itemGap,
           ),
           child: Row(
             children: [
-              ActionIconButton.subtle(
-                icon: Icons.arrow_back,
+              ActionIconButton.fromIconData(
+                Icons.arrow_back,
+                variant: ActionIconButtonVariant.subtle,
                 onPressed: onBack ?? () => Navigator.of(context).maybePop(),
                 tooltip: 'Back',
               ),
@@ -68,7 +73,7 @@ class WizardHeader extends StatelessWidget {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+          padding: EdgeInsets.symmetric(horizontal: layout.screenGutter),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -76,39 +81,46 @@ class WizardHeader extends StatelessWidget {
               if (eyebrow != null && eyebrow!.isNotEmpty) ...[
                 Text(
                   eyebrow!.toUpperCase(),
-                  style: const TextStyle(
-                    fontFamily: 'JetBrains Mono',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.0,
-                    color: Palette.muted,
+                  style: textTokens.eyebrow.copyWith(
+                    color: scheme.outline,
                   ),
                 ),
                 const SizedBox(height: 4),
               ],
               Text(
                 title,
-                style: const TextStyle(
-                  fontFamily: 'Inter Tight',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Palette.ink,
-                  letterSpacing: -0.02,
-                ),
+                style: textTheme.headlineSmall?.copyWith(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                      letterSpacing: -0.02,
+                    ) ??
+                    TextStyle(
+                      fontFamily: 'Inter Tight',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                      letterSpacing: -0.02,
+                    ),
               ),
               if (description != null && description!.isNotEmpty) ...[
-                const SizedBox(height: Spacing.xs),
+                SizedBox(height: layout.inlineGap),
                 Text(
                   description!,
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    height: 1.45,
-                    color: Palette.muted,
-                  ),
+                  style: textTheme.bodyMedium?.copyWith(
+                        fontSize: 14,
+                        height: 1.45,
+                        color: scheme.outline,
+                      ) ??
+                      TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        height: 1.45,
+                        color: scheme.outline,
+                      ),
                 ),
               ],
-              const SizedBox(height: Spacing.md),
+              SizedBox(height: layout.cardPadding),
             ],
           ),
         ),

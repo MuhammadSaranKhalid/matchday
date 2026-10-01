@@ -106,3 +106,13 @@ jobs:
 
       - name: Feature Unit Tests
         run: flutter test test/features/posts/
+
+      - name: Design System Tests (Tokens, Layout, A11y, Drift Rules)
+        run: flutter test test/core/design_system/
+
+      - name: Widgetbook Quality Gate
+        working-directory: app/widgetbook
+        run: |
+          flutter pub get
+          flutter analyze lib/
+          flutter build web --release

@@ -14,6 +14,7 @@ export 'foundation/spacing.dart';
 // Theme & Tokens
 export 'theme/app_theme.dart';
 export 'theme/layout_tokens.dart';
+export 'theme/status_colors.dart';
 export 'theme/text_tokens.dart';
 
 // Primitives
@@ -35,6 +36,7 @@ export 'patterns/empty_state.dart';
 export 'patterns/error_state.dart';
 export 'patterns/loading_state.dart';
 export 'patterns/section_header.dart';
+export 'patterns/segmented_control.dart';
 export 'patterns/selection_tile.dart';
 
 // Navigation

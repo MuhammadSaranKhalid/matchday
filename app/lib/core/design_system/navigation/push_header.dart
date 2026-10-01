@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/spacing.dart';
 import '../primitives/action_icon_button.dart';
+import '../theme/app_theme.dart';
 
 /// Standardized push navigation header.
 ///
@@ -31,25 +30,30 @@ class PushHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
+
     final effectiveActions = actions ?? (action != null ? [action!] : null);
 
     return Container(
       height: 56.0,
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+      padding: EdgeInsets.symmetric(horizontal: layout.screenGutter),
       decoration: BoxDecoration(
-        color: Palette.paper,
+        color: scheme.surface,
         border: bottomBorder
-            ? const Border(bottom: BorderSide(color: Palette.hairline))
+            ? Border(bottom: BorderSide(color: scheme.outlineVariant))
             : null,
       ),
       child: Row(
         children: [
-          ActionIconButton.subtle(
-            icon: Icons.arrow_back,
+          ActionIconButton.fromIconData(
+            Icons.arrow_back,
+            variant: ActionIconButtonVariant.subtle,
             onPressed: onBack ?? () => Navigator.of(context).maybePop(),
             tooltip: 'Back',
           ),
-          const SizedBox(width: Spacing.sm),
+          SizedBox(width: layout.compactCardPadding),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,13 +63,19 @@ class PushHeader extends StatelessWidget implements PreferredSizeWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontFamily: 'Inter Tight',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Palette.ink,
-                    letterSpacing: -0.01,
-                  ),
+                  style: textTheme.titleMedium?.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                        letterSpacing: -0.01,
+                      ) ??
+                      TextStyle(
+                        fontFamily: 'Inter Tight',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                        letterSpacing: -0.01,
+                      ),
                 ),
                 if (subtitle != null && subtitle!.isNotEmpty) ...[
                   const SizedBox(height: 1),
@@ -73,11 +83,15 @@ class PushHeader extends StatelessWidget implements PreferredSizeWidget {
                     subtitle!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      color: Palette.muted,
-                    ),
+                    style: textTheme.bodySmall?.copyWith(
+                          fontSize: 12,
+                          color: scheme.outline,
+                        ) ??
+                        TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: scheme.outline,
+                        ),
                   ),
                 ],
               ],

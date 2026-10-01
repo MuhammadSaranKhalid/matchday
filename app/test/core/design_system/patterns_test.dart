@@ -14,7 +14,7 @@ void main() {
           theme: AppTheme.light,
           home: Scaffold(
             body: StateRegion(
-              child: EmptyState(
+              child: EmptyState.fromIconData(
                 kind: EmptyStateKind.firstRun,
                 icon: Icons.sports_cricket,
                 title: 'No matches yet',
@@ -127,7 +127,7 @@ void main() {
                 return ActionButton(
                   label: 'Open Sheet',
                   onPressed: () {
-                    showAppBottomSheet(
+                    showAppBottomSheet<void>(
                       context,
                       builder: (ctx) => const AppBottomSheet(
                         header: Padding(
@@ -228,16 +228,16 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light,
-          home: ScrollScreenLayout(
+          home: const ScrollScreenLayout(
             children: [
               Section(
                 title: 'Upcoming',
                 eyebrow: 'Fixtures',
-                child: const Text('Match 1'),
+                child: Text('Match 1'),
               ),
               Section(
                 title: 'Past Results',
-                child: const Text('Match 2'),
+                child: Text('Match 2'),
               ),
             ],
           ),

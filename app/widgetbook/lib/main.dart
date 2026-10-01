@@ -9,6 +9,7 @@ import 'patterns/bottom_sheet.dart';
 import 'patterns/empty_state.dart';
 import 'patterns/error_state.dart';
 import 'patterns/headers.dart';
+import 'patterns/segmented_control.dart';
 import 'primitives/badge.dart';
 import 'primitives/button.dart';
 import 'primitives/chip.dart';
@@ -55,6 +56,7 @@ class MatchdayWidgetbookApp extends StatelessWidget {
             buildErrorStateComponent(),
             buildBottomSheetComponent(),
             buildHeadersComponent(),
+            buildSegmentedControlComponent(),
           ],
         ),
       ],

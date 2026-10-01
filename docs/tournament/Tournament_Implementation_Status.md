@@ -1335,7 +1335,134 @@ To ensure current Flutter runtime calls do not fail with runtime RPC errors, a m
 
 ---
 
-### 19.6 Phase 2 Final Verdict
+### 19.6 Phase 2.3 Verdict
+
+`PHASE 2.3 GATE: PASS`
+
+---
+
+## 20. Phase 2.4 — Cancellation Start Boundary & Concurrency Closure
+
+Phase 2.4 closes the remaining correctness invariants for tournament cancellation prior to Phase 2 sign-off.
+
+### 20.1 Architectural Invariant: Cancelled vs Abandoned
+
+The frozen Tournament Architecture Standard establishes the boundary between cancellation and abandonment:
+
+```text
+CANCELLED = Tournament terminated before meaningful competition begins.
+ABANDONED = Tournament terminated after competition begins.
+```
+
+- **Pre-Competition Only:** `tournament_cancel` is strictly an unstarted, pre-competition lifecycle operation.
+- **Match Execution as Authoritative Backstop:** During migration, distributed operations, or legacy interop, tournament `competition_state` may temporarily drift or remain stale. Match and sport execution history are authoritative evidence that competition has begun.
+- **Live Match Protection:** Live matches have already begun and must **never** be rewritten to `cancelled`.
+- **Completed Match Protection:** A completed match proves competition has commenced; its existence strictly blocks tournament cancellation. Scorecard and delivery history are permanently preserved.
+- **Started Timestamp Protection:** Any fixture where `actual_start_time IS NOT NULL` blocks tournament cancellation even if its status column has not yet updated or drifted.
+
+### 20.2 Started-Match Guard & Scheduled-Only Transition
+
+The transitional `public.tournament_cancel` function in `supabase/migrations/20261001000100_tournament_memberships.sql` was refined with a started-match guard:
+
+```sql
+-- 7. Started Match Guard: verify no tournament match has meaningfully started or completed.
+-- Live matches, completed matches, abandoned matches, or any match with actual_start_time IS NOT NULL
+-- are authoritative proof that competition has begun, even if tournament competition_state has drifted.
+IF EXISTS (
+  SELECT 1
+    FROM public.matches
+   WHERE tournament_id = p_tournament_id
+     AND (
+       status IN ('live', 'completed', 'abandoned')
+       OR actual_start_time IS NOT NULL
+     )
+) THEN
+  RAISE EXCEPTION 'Cannot cancel a tournament once matches have started or completed. Tournament abandonment is required.'
+    USING errcode = '22000';
+END IF;
+
+-- 8. Cancel only truly unstarted fixtures.
+-- Live or completed matches are blocked above and never rewritten.
+UPDATE public.matches
+   SET status = 'cancelled',
+       updated_at = now()
+ WHERE tournament_id = p_tournament_id
+   AND status = 'scheduled'
+   AND actual_start_time IS NULL;
+```
+
+If competition has begun, cancellation is rejected with SQLSTATE `22000` indicating that Tournament Abandonment is required. Tournament Abandonment is not implemented here and remains scheduled for **Phase 9**.
+
+### 20.3 Concurrency-Safe Serialization via Row Locking
+
+To eliminate race conditions between concurrent cancellation requests or announcement duplicates, `tournament_cancel` now acquires an exclusive transaction row lock on the tournament root:
+
+```sql
+-- 3. Inspect tournament exists and acquire row lock for concurrency-safe serialization
+SELECT competition_state, termination_state
+  INTO v_competition_state, v_termination_state
+  FROM public.tournaments
+ WHERE tournament_id = p_tournament_id
+   FOR UPDATE;
+```
+
+This guarantees:
+1. Two concurrent cancellation attempts serialize cleanly at the database root.
+2. The second request waits for the lock, reads `termination_state = 'cancelled'`, and exits immediately via the idempotency guard:
+   ```sql
+   IF v_termination_state = 'cancelled' THEN
+     RETURN;
+   END IF;
+   ```
+3. Announcement side effects (`tournament_announce`) are invoked at most once across concurrent callers. Exactly-once outbox delivery will be formalized in Phase 11.
+
+### 20.4 Authorization & Canonical Lifecycle Integrity
+
+- **Authorization:** Enforced via `public.can('tournament', p_tournament_id, 'tournament.cancel')`.
+  - **Owner (Rank 40):** Allowed.
+  - **Manager (Rank 30):** Denied (`42501`).
+  - **Former Creator (after transfer):** Denied (`42501`).
+  - **Stranger:** Denied (`42501`).
+- **Canonical Lifecycle:** Mutates **ONLY** `termination_state = 'cancelled'`. Trigger `tournaments_sync_status_projection` derives legacy `status = 'cancelled'`. Does not mutate `publication_state`, `registration_state`, `entry_state`, or `competition_state`.
+
+### 20.5 Remote Deployment Status
+
+| Environment | Migration File Present? | Applied to Database? | Phase 2.4 `tournament_cancel` Present? | Status |
+|---|---|---|---|---|
+| **Repository Code** | Yes (`20261001000100_tournament_memberships.sql`) | N/A | Yes (includes `FOR UPDATE`, started match guard, scheduled-only update) | Synced in Git |
+| **Local PostgreSQL (`supabase_db_crick`)** | Yes | Yes (applied) | Yes | **Verified working** |
+| **Connected Remote Supabase Project** | Pending deployment | Not yet applied | Not yet present | Pending remote migration run |
+
+### 20.6 Verification & Test Results
+
+1. **Direct Database Verification Matrix (PostgreSQL in `supabase_db_crick`):**
+   - **Test A:** Valid pre-start cancellation with scheduled-only matches -> **PASS** (Tournament `termination_state = 'cancelled'`, legacy `status = 'cancelled'`, scheduled match -> `cancelled`).
+   - **Test B:** Live match blocks cancellation -> **PASS** (Correctly rejected with `22000`; tournament remains `none`, live match remains untouched).
+   - **Test C:** Completed match blocks cancellation -> **PASS** (Correctly rejected with `22000`; tournament remains `none`, completed match and scorecard preserved).
+   - **Test D:** Started timestamp (`actual_start_time IS NOT NULL`) blocks cancellation even if status is scheduled -> **PASS** (Correctly rejected with `22000`).
+   - **Test E:** Owner allowed -> **PASS** (Permitted to cancel pre-start tournament).
+   - **Test F:** Manager denied -> **PASS** (Denied with `42501`).
+   - **Test G:** Former creator denied -> **PASS** (Denied with `42501`).
+   - **Test H:** Stranger denied -> **PASS** (Denied with `42501`).
+   - **Test I:** Repeat cancellation idempotency -> **PASS** (Returns cleanly without error or side-effect duplication).
+   - **Row-Lock Inspection:** `SELECT prosrc ILIKE '%for update%' FROM pg_proc WHERE proname = 'tournament_cancel'` -> **`true`**.
+
+2. **Automated Unit & Quality Gate Suites:**
+   - `flutter test test/features/tournaments/tournament_status_write_regression_test.dart` -> **PASS (16/16 passed)**
+   - `flutter test test/supabase/migration_layout_test.dart` -> **PASS (3/3 passed)**
+   - `flutter analyze lib/` -> **PASS (0 issues)**
+   - `flutter test test/architecture_test.dart` -> **PASS (9/9 passed)**
+   - Domain Purity (`grep -rlE ... lib/features/*/domain`) -> **PASS (0 matches)**
+   - `flutter test test/features/tournaments/baseline_safety_characterization_test.dart` -> **PASS (10/10 passed)**
+   - `flutter test test/features/tournaments/domain test/features/tournaments/data` -> **PASS (109/109 passed)**
+   - `flutter test test/features/tournaments/domain/tournament_root_lifecycle_membership_test.dart` -> **PASS (18/18 passed)**
+   - `flutter test test/features/matches/domain/scoring` -> **PASS (76/76 passed)**
+   - Deno Edge Function check (`cricket-match-action/index.ts`) -> **PASS (0 errors)**
+   - Deno Edge Function tests (`runtime_commands.test.ts`) -> **PASS (9/9 passed)**
+
+---
+
+### 20.7 Final Phase 2 Verdict
 
 `PHASE 2 GATE: PASS`
 

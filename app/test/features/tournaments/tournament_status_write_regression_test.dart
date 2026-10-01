@@ -267,7 +267,7 @@ void main() {
     });
   });
 
-  group('Phase 2.3 — Cancellation Compatibility Guard', () {
+  group('Phase 2.4 — Cancellation Start Boundary & Concurrency Closure Guard', () {
     Tournament createTestTournament({
       TournamentPublicationState publicationState = TournamentPublicationState.published,
       TournamentRegistrationState registrationState = TournamentRegistrationState.open,
@@ -323,21 +323,27 @@ void main() {
           reason: 'Must supply p_reason parameter');
     });
 
-    test('SQL migration declares tournament_cancel with canonical capability check and lifecycle rules', () {
+    test('SQL migration declares tournament_cancel with row lock, started-match guard, and scheduled-only cancellation', () {
       final migrationFile = File('../supabase/migrations/20261001000100_tournament_memberships.sql');
       expect(migrationFile.existsSync(), isTrue);
       final sql = migrationFile.readAsStringSync();
 
       expect(sql.contains('create or replace function public.tournament_cancel('), isTrue,
           reason: 'Must declare public.tournament_cancel');
+      expect(sql.contains('for update;'), isTrue,
+          reason: 'Must acquire row lock on tournaments for concurrency-safe serialization');
       expect(sql.contains("public.can('tournament', p_tournament_id, 'tournament.cancel')"), isTrue,
           reason: 'Must authorize via canonical tournament.cancel capability');
+      expect(sql.contains("v_competition_state != 'not_started'"), isTrue,
+          reason: 'Must reject cancellation once tournament competition_state has started');
+      expect(sql.contains("status in ('live', 'completed', 'abandoned')") && sql.contains("actual_start_time is not null"), isTrue,
+          reason: 'Must guard against started, live, completed, or abandoned matches');
+      expect(sql.contains("status in ('scheduled', 'live')"), isFalse,
+          reason: 'Must NEVER cancel live matches');
+      expect(sql.contains("and status = 'scheduled'") && sql.contains("and actual_start_time is null;"), isTrue,
+          reason: 'Must void ONLY unstarted scheduled fixtures');
       expect(sql.contains("termination_state = 'cancelled'"), isTrue,
           reason: 'Must set canonical termination_state to cancelled');
-      expect(sql.contains("v_competition_state != 'not_started'"), isTrue,
-          reason: 'Must reject cancellation once competition has started');
-      expect(sql.contains("status in ('scheduled', 'live')"), isTrue,
-          reason: 'Must preserve completed scorecards and void only scheduled/live fixtures');
     });
   });
 }

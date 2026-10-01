@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../core/theme/circk_theme.dart';
+import '../../../../../core/design_system/design_system.dart';
 import '../../state/my_matches_view.dart';
 
 /// A Past-tab result — `My Matches.dc.html` artboards 08 / 09 / 10.
 ///
 /// The result **sentence** is the hero, not the chip: "Lions won by 24 runs"
 /// says more than a green `WON` ever can, and the chip beside it is only the
-/// one-word summary. The losing side's name and score drop to ink-2 so the
-/// board can be read down the left edge without parsing numbers.
+/// one-word summary. The losing side's name and score drop to onSurfaceVariant
+/// so the board can be read down the left edge without parsing numbers.
 class PastCard extends StatelessWidget {
   const PastCard({super.key, required this.v, required this.onTap});
 
@@ -16,124 +16,136 @@ class PastCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onTap: onTap,
-    child: Container(
-      decoration: BoxDecoration(
-        color: CkColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: CkColors.line),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _head(),
-          // A walkover was never bowled. Printing 0/0 would be a lie, so
-          // the score block is replaced by the reason.
-          if (v.showScores) ...[
-            _scoreRow(
-              short: v.homeShort,
-              color: v.homeColor,
-              name: v.homeName,
-              runs: v.homeRuns,
-              wkts: v.homeWkts,
-              overs: v.homeOvers,
-              isYou: v.mineIsHome,
-              won: v.homeWon,
-              padding: const EdgeInsets.fromLTRB(13, 9, 13, 4),
-            ),
-            _scoreRow(
-              short: v.awayShort,
-              color: v.awayColor,
-              name: v.awayName,
-              runs: v.awayRuns,
-              wkts: v.awayWkts,
-              overs: v.awayOvers,
-              isYou: !v.mineIsHome,
-              won: !v.homeWon,
-              padding: const EdgeInsets.fromLTRB(13, 4, 13, 11),
-            ),
-          ],
-          if ((v.note ?? '').isNotEmpty) _note(),
-          if (v.mine.trim().isNotEmpty) _personal(),
-        ],
-      ),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
 
-  Widget _head() => Container(
-    padding: const EdgeInsets.fromLTRB(13, 11, 13, 9),
-    decoration: const BoxDecoration(
-      border: Border(bottom: BorderSide(color: CkColors.hairline)),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
+    return Material(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(layout.cardRadius),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(layout.cardRadius),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(layout.cardRadius),
+            border: Border.all(color: scheme.outline),
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                v.sentence.isEmpty ? v.result : v.sentence,
-                style: CkType.display(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.01,
-                  color: CkColors.ink,
+              _head(context),
+              if (v.showScores) ...[
+                _scoreRow(
+                  context,
+                  short: v.homeShort,
+                  color: v.homeColor,
+                  name: v.homeName,
+                  runs: v.homeRuns,
+                  wkts: v.homeWkts,
+                  overs: v.homeOvers,
+                  isYou: v.mineIsHome,
+                  won: v.homeWon,
+                  padding: EdgeInsets.fromLTRB(
+                    layout.inlineGap,
+                    layout.inlineGap - 3,
+                    layout.inlineGap,
+                    4,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                v.metaLine.toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: CkType.mono(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.07,
-                  color: CkColors.muted,
+                _scoreRow(
+                  context,
+                  short: v.awayShort,
+                  color: v.awayColor,
+                  name: v.awayName,
+                  runs: v.awayRuns,
+                  wkts: v.awayWkts,
+                  overs: v.awayOvers,
+                  isYou: !v.mineIsHome,
+                  won: !v.homeWon,
+                  padding: EdgeInsets.fromLTRB(
+                    layout.inlineGap,
+                    4,
+                    layout.inlineGap,
+                    layout.inlineGap - 1,
+                  ),
                 ),
-              ),
+              ],
+              if ((v.note ?? '').isNotEmpty) _note(context),
+              if (v.mine.trim().isNotEmpty) _personal(context),
             ],
           ),
-        ),
-        const SizedBox(width: 10),
-        _chip(),
-      ],
-    ),
-  );
-
-  /// Won is the only green on the board. Tied takes cream — it is a result,
-  /// but not a win. Everything else is neutral: a walkover or an abandonment
-  /// is not a defeat and must not be coloured like one.
-  Widget _chip() {
-    final (fg, bg, border) = switch (v.result) {
-      'Won' => (CkColors.greenInk, CkColors.greenSurface, CkColors.greenBorder),
-      'Tied' => (CkColors.amberInk, CkColors.cream, CkColors.creamBorder),
-      _ => (CkColors.ink2, CkColors.paper2, CkColors.line),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: border),
-      ),
-      child: Text(
-        v.result.toUpperCase(),
-        style: CkType.mono(
-          fontSize: 9.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.09,
-          color: fg,
         ),
       ),
     );
   }
 
-  Widget _scoreRow({
+  Widget _head(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
+    final textTokens = context.textTokens;
+
+    final tone = switch (v.result) {
+      'Won' => StatusTone.success,
+      'Tied' => StatusTone.warning,
+      _ => StatusTone.neutral,
+    };
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        layout.inlineGap,
+        layout.inlineGap - 1,
+        layout.inlineGap,
+        layout.inlineGap - 3,
+      ),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  v.sentence.isEmpty ? v.result : v.sentence,
+                  style: (textTheme.titleMedium ?? const TextStyle()).copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.01,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  v.metaLine.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTokens.mono.copyWith(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.07,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          StatusBadge(
+            label: v.result.toUpperCase(),
+            tone: tone,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _scoreRow(
+    BuildContext context, {
     required String short,
     required Color color,
     required String name,
@@ -144,6 +156,10 @@ class PastCard extends StatelessWidget {
     required bool won,
     required EdgeInsets padding,
   }) {
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
+    final textTokens = context.textTokens;
+
     // A tie has no loser, so neither side dims.
     final dim = !won && v.result != 'Tied';
     return Padding(
@@ -160,7 +176,7 @@ class PastCard extends StatelessWidget {
             ),
             child: Text(
               short.toUpperCase(),
-              style: CkType.display(
+              style: (textTheme.labelSmall ?? const TextStyle()).copyWith(
                 fontSize: 8.5,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
@@ -176,20 +192,20 @@ class PastCard extends StatelessWidget {
                   if (isYou)
                     TextSpan(
                       text: '  YOU',
-                      style: CkType.mono(
+                      style: textTokens.mono.copyWith(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
-                        color: CkColors.soft,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                 ],
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: CkType.display(
+              style: (textTheme.titleSmall ?? const TextStyle()).copyWith(
                 fontSize: 14.5,
                 fontWeight: dim ? FontWeight.w500 : FontWeight.w600,
-                color: dim ? CkColors.muted : CkColors.ink,
+                color: dim ? scheme.onSurfaceVariant : scheme.onSurface,
               ),
             ),
           ),
@@ -197,23 +213,24 @@ class PastCard extends StatelessWidget {
           Text(
             // Em-dashes rather than a fabricated 0/0 when innings are missing.
             overs.isEmpty && runs == 0 && wkts == 0 ? '—/—' : '$runs/$wkts',
-            style: CkType.mono(
+            style: textTokens.mono.copyWith(
               fontSize: 15,
               fontWeight: dim ? FontWeight.w600 : FontWeight.w700,
               letterSpacing: 0,
-              color: dim ? CkColors.ink2 : CkColors.ink,
-            ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+              color: dim ? scheme.onSurfaceVariant : scheme.onSurface,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
           SizedBox(
             width: 34,
             child: Text(
               overs,
               textAlign: TextAlign.right,
-              style: CkType.mono(
+              style: textTokens.mono.copyWith(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0,
-                color: CkColors.muted,
+                color: scheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -223,41 +240,59 @@ class PastCard extends StatelessWidget {
   }
 
   /// Says why a number is missing, rather than leaving a blank to interpret.
-  Widget _note() => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-    decoration: const BoxDecoration(
-      color: CkColors.paper,
-      border: Border(top: BorderSide(color: CkColors.hairline)),
-    ),
-    child: Text(
-      v.note!.toUpperCase(),
-      style: CkType.mono(
-        fontSize: 9.5,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.08,
-        color: CkColors.muted,
+  Widget _note(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTokens = context.textTokens;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: layout.inlineGap,
+        vertical: layout.inlineGap - 3,
       ),
-    ),
-  );
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Text(
+        v.note!.toUpperCase(),
+        style: textTokens.mono.copyWith(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.08,
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
 
   /// "YOU: 78 (52)". The design reserves this band so the row does not need
   /// re-laying-out when per-player aggregates land.
-  Widget _personal() => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-    decoration: const BoxDecoration(
-      color: CkColors.paper,
-      border: Border(top: BorderSide(color: CkColors.line)),
-    ),
-    child: Text(
-      v.mine.toUpperCase(),
-      style: CkType.mono(
-        fontSize: 9.5,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.08,
-        color: CkColors.ink2,
+  Widget _personal(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTokens = context.textTokens;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: layout.inlineGap,
+        vertical: layout.inlineGap - 4,
       ),
-    ),
-  );
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(top: BorderSide(color: scheme.outline)),
+      ),
+      child: Text(
+        v.mine.toUpperCase(),
+        style: textTokens.mono.copyWith(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.08,
+          color: scheme.onSurface,
+        ),
+      ),
+    );
+  }
 }

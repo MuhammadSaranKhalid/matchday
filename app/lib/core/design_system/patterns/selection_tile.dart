@@ -81,12 +81,12 @@ class SelectionTile extends StatelessWidget {
                           Text(
                             subtitle!,
                             style: textTheme.bodySmall?.copyWith(
-                                  color: scheme.outline,
+                                  color: scheme.onSurfaceVariant,
                                 ) ??
                                 TextStyle(
                                   fontFamily: 'Inter',
                                   fontSize: 13,
-                                  color: scheme.outline,
+                                  color: scheme.onSurfaceVariant,
                                 ),
                           ),
                         ],

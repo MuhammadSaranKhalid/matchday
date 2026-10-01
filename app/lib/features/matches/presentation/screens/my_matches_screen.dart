@@ -31,13 +31,14 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(myMatchesViewProvider);
+    final layout = context.layout;
     return ScreenLayout(
       header: PushHeader(
         title: 'My Matches',
         onBack: () => context.canPop() ? context.pop() : context.go('/home'),
         actions: [
           const ChallengesNavButton(),
-          const SizedBox(width: Spacing.xs),
+          SizedBox(width: layout.inlineGap / 2),
           ActionButton(
             label: 'CHALLENGE',
             icon: const Icon(Icons.add, size: 16),
@@ -52,12 +53,13 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
         error:
             (e, _) => StateRegion(
               child: ErrorState(
-                title: "Couldn't load your matches",
+                title: "Couldn't load your matches.",
                 description:
                     e is FailureWrapper
                         ? e.failure.message
                         : 'Nothing has been lost — fixtures, lineups and scorecards all '
                             'live on the server. Check your connection and try again.',
+                retryLabel: 'TRY AGAIN',
                 onRetry: () => ref.invalidate(myMatchesViewProvider),
               ),
             ),
@@ -79,7 +81,7 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
           child: EmptyState.fromIconData(
             kind: EmptyStateKind.firstRun,
             iconData: Icons.sports_cricket,
-            title: 'No matches yet',
+            title: 'No matches yet.',
             description:
                 'Every fixture starts as a challenge: propose a day, a ground '
                 'and a format, and it appears here the moment the other manager '
@@ -227,13 +229,13 @@ class _MyMatchesScreenState extends ConsumerState<MyMatchesScreen> {
       children: [
         for (final g in groups) ...[
           _DateRule(label: g.label, first: g == groups.first),
-          const SizedBox(height: Spacing.sm),
+          SizedBox(height: layout.itemGap),
           for (final p in g.items) ...[
             PastCard(
               v: p,
               onTap: () => context.push('/matches/${p.id}/summary'),
             ),
-            const SizedBox(height: Spacing.sm),
+            SizedBox(height: layout.itemGap),
           ],
         ],
         if (hidden > 0) _SeeAll(total: view.totalPastCount),

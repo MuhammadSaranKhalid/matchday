@@ -85,12 +85,12 @@ class PushHeader extends StatelessWidget implements PreferredSizeWidget {
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.bodySmall?.copyWith(
                           fontSize: 12,
-                          color: scheme.outline,
+                          color: scheme.onSurfaceVariant,
                         ) ??
                         TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 12,
-                          color: scheme.outline,
+                          color: scheme.onSurfaceVariant,
                         ),
                   ),
                 ],

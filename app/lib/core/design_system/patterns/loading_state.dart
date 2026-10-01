@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/spacing.dart';
+import '../theme/app_theme.dart';
 
 /// Animated shimmer container for skeleton loading placeholders.
 class ShimmerLoading extends StatefulWidget {
@@ -41,6 +40,8 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
 
+    final scheme = context.colorScheme;
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) => ShaderMask(
@@ -50,10 +51,10 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
           return LinearGradient(
             begin: Alignment(-1.5 + t * 3, 0),
             end: Alignment(-0.5 + t * 3, 0),
-            colors: const [
-              Palette.line,
-              Palette.paper2,
-              Palette.line,
+            colors: [
+              scheme.outline,
+              scheme.surfaceContainer,
+              scheme.outline,
             ],
             stops: const [0.0, 0.5, 1.0],
           ).createShader(rect);
@@ -73,20 +74,24 @@ class ShimmerBox extends StatelessWidget {
     this.height = 12.0,
     this.radius = 6.0,
     this.shape = BoxShape.rectangle,
+    this.color,
   });
 
   final double? width;
   final double height;
   final double radius;
   final BoxShape shape;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Palette.line,
+        color: color ?? scheme.outlineVariant,
         shape: shape,
         borderRadius:
             shape == BoxShape.rectangle ? BorderRadius.circular(radius) : null,
@@ -106,31 +111,38 @@ class LoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(Spacing.xl),
+        padding: EdgeInsets.all(layout.sectionGap),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(
+            SizedBox(
               width: 24,
               height: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2.2,
-                color: Palette.ink,
+                color: scheme.primary,
               ),
             ),
             if (message != null) ...[
-              const SizedBox(height: Spacing.sm),
+              SizedBox(height: layout.inlineGap),
               Text(
                 message!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  color: Palette.muted,
-                ),
+                style: textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ) ??
+                    TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: scheme.onSurfaceVariant,
+                    ),
               ),
             ],
           ],

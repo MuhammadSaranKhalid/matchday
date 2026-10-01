@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
+import '../theme/app_theme.dart';
 
 /// Standard non-scrolling screen scaffold layout.
 ///
@@ -26,8 +26,10 @@ class ScreenLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+
     return Scaffold(
-      backgroundColor: backgroundColor ?? Palette.paper,
+      backgroundColor: backgroundColor ?? scheme.surface,
       appBar: header,
       bottomNavigationBar: bottomNavigationBar,
       resizeToAvoidBottomInset: resizeToAvoidBottomInset,

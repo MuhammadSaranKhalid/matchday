@@ -116,13 +116,13 @@ class ErrorState extends StatelessWidget {
                   style: textTheme.bodySmall?.copyWith(
                         fontSize: 13.5,
                         height: 1.45,
-                        color: scheme.outline,
+                        color: scheme.onSurfaceVariant,
                       ) ??
                       TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 13.5,
                         height: 1.45,
-                        color: scheme.outline,
+                        color: scheme.onSurfaceVariant,
                       ),
                 ),
               ],

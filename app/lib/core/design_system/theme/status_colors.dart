@@ -66,7 +66,7 @@ class StatusColors extends ThemeExtension<StatusColors> {
     success: Palette.greenInk,
     successSurface: Palette.greenSurface,
     successBorder: Palette.greenBorder,
-    warning: Palette.amberInk,
+    warning: Palette.amberDark,
     warningSurface: Palette.cream,
     warningBorder: Palette.amber,
     cream: Palette.cream,

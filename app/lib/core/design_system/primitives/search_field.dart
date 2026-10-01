@@ -118,7 +118,7 @@ class _SearchFieldState extends State<SearchField> {
           isDense: true,
           hintText: widget.hintText,
           hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: scheme.outline,
+                color: scheme.onSurfaceVariant,
               ),
           filled: true,
           fillColor: fillColor,
@@ -131,7 +131,7 @@ class _SearchFieldState extends State<SearchField> {
             child: Icon(
               Icons.search,
               size: 20,
-              color: scheme.outline,
+              color: scheme.onSurfaceVariant,
             ),
           ),
           prefixIconConstraints: BoxConstraints(
@@ -146,7 +146,7 @@ class _SearchFieldState extends State<SearchField> {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: scheme.outline,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                 )
@@ -155,7 +155,7 @@ class _SearchFieldState extends State<SearchField> {
                       icon: Icon(
                         Icons.close,
                         size: 18,
-                        color: scheme.outline,
+                        color: scheme.onSurfaceVariant,
                       ),
                       onPressed: _handleClear,
                       tooltip: 'Clear search',

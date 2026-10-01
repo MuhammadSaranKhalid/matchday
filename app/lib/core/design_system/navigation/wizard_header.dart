@@ -82,7 +82,7 @@ class WizardHeader extends StatelessWidget {
                 Text(
                   eyebrow!.toUpperCase(),
                   style: textTokens.eyebrow.copyWith(
-                    color: scheme.outline,
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -110,13 +110,13 @@ class WizardHeader extends StatelessWidget {
                   style: textTheme.bodyMedium?.copyWith(
                         fontSize: 14,
                         height: 1.45,
-                        color: scheme.outline,
+                        color: scheme.onSurfaceVariant,
                       ) ??
                       TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 14,
                         height: 1.45,
-                        color: scheme.outline,
+                        color: scheme.onSurfaceVariant,
                       ),
                 ),
               ],

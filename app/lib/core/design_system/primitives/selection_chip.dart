@@ -5,8 +5,10 @@ import '../theme/app_theme.dart';
 
 /// Standardized interactive filter chip primitive.
 ///
-/// Used for tab filtering, category selection, and toggles (e.g. All, Following,
-/// T20, Nearby). Enforces accessible interaction targets (>= 48x48 dp).
+/// Used for independent filter facets, category selection, and optional
+/// multi-select filtering (e.g. T20, 40 Overs, Weekend, Nearby).
+/// Do NOT use for mutually exclusive primary screen views; use [SegmentedControl] instead.
+/// Enforces accessible interaction targets (>= 48x48 dp).
 class SelectionChip extends StatelessWidget {
   const SelectionChip({
     super.key,

@@ -11,23 +11,14 @@ extension DesignSystemThemeContext on BuildContext {
   ColorScheme get colorScheme => Theme.of(this).colorScheme;
   TextTheme get textTheme => Theme.of(this).textTheme;
 
-  LayoutTokens get layout {
-    final value = Theme.of(this).extension<LayoutTokens>();
-    assert(value != null, 'LayoutTokens missing from ThemeData');
-    return value ?? LayoutTokens.light;
-  }
+  LayoutTokens get layout =>
+      Theme.of(this).extension<LayoutTokens>() ?? LayoutTokens.light;
 
-  TextTokens get textTokens {
-    final value = Theme.of(this).extension<TextTokens>();
-    assert(value != null, 'TextTokens missing from ThemeData');
-    return value ?? TextTokens.light;
-  }
+  TextTokens get textTokens =>
+      Theme.of(this).extension<TextTokens>() ?? TextTokens.light;
 
-  StatusColors get statusColors {
-    final value = Theme.of(this).extension<StatusColors>();
-    assert(value != null, 'StatusColors missing from ThemeData');
-    return value ?? StatusColors.light;
-  }
+  StatusColors get statusColors =>
+      Theme.of(this).extension<StatusColors>() ?? StatusColors.light;
 }
 
 /// The authoritative Matchday application theme.
@@ -111,17 +102,37 @@ TextTheme buildAppTextTheme() {
 
 /// Constructs the primary ThemeData configured with Matchday tokens and extensions.
 ThemeData buildAppTheme() {
-  const scheme = ColorScheme.light(
+  const scheme = ColorScheme(
+    brightness: Brightness.light,
     primary: Palette.ink,
     onPrimary: Palette.paper,
+    primaryContainer: Palette.paper2,
+    onPrimaryContainer: Palette.ink,
     secondary: Palette.red,
     onSecondary: Palette.paper,
-    surface: Palette.paper,
-    onSurface: Palette.ink,
+    secondaryContainer: Palette.redSurface,
+    onSecondaryContainer: Palette.redInk,
+    tertiary: Palette.amberDark,
+    onTertiary: Palette.paper,
+    tertiaryContainer: Palette.cream,
+    onTertiaryContainer: Palette.amberDark,
     error: Palette.red,
     onError: Palette.paper,
+    errorContainer: Palette.redSurface,
+    onErrorContainer: Palette.redInk,
+    surface: Palette.paper,
+    onSurface: Palette.ink,
+    onSurfaceVariant: Palette.ink2,
+    surfaceContainerLowest: Palette.surface,
+    surfaceContainerLow: Palette.paper,
+    surfaceContainer: Palette.paper2,
+    surfaceContainerHigh: Palette.canvas,
+    surfaceContainerHighest: Palette.canvas,
     outline: Palette.line,
     outlineVariant: Palette.hairline,
+    shadow: Palette.ink,
+    scrim: Palette.ink,
+    surfaceTint: Colors.transparent,
   );
 
   final textTheme = buildAppTextTheme();

@@ -32,6 +32,7 @@ class _MyTournamentsScreenState extends ConsumerState<MyTournamentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
     final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
     final mineAsync = ref.watch(myTournamentsProvider);
     final playingAsync = ref.watch(myPlayingTournamentsProvider);
@@ -86,7 +87,7 @@ class _MyTournamentsScreenState extends ConsumerState<MyTournamentsScreen> {
         action:
             !isFirstRun
                 ? ActionButton(
-                  label: 'Create',
+                  label: 'CREATE',
                   icon: const Icon(Icons.add, size: 16),
                   size: ControlSize.compact,
                   expand: false,
@@ -108,11 +109,11 @@ class _MyTournamentsScreenState extends ConsumerState<MyTournamentsScreen> {
             child:
                 loading
                     ? ListView(
-                      padding: const EdgeInsets.all(Spacing.md),
-                      children: const [
-                        TournamentCardShimmer(),
-                        SizedBox(height: Spacing.sm),
-                        TournamentCardShimmer(),
+                      padding: EdgeInsets.all(layout.cardPadding),
+                      children: [
+                        const TournamentCardShimmer(),
+                        SizedBox(height: layout.itemGap),
+                        const TournamentCardShimmer(),
                       ],
                     )
                     : isFirstRun
@@ -244,27 +245,29 @@ class _OrganizingList extends ConsumerWidget {
       );
     }
 
+    final layout = context.layout;
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.md,
+      padding: EdgeInsets.fromLTRB(
+        layout.screenGutter,
         0,
-        Spacing.md,
-        Spacing.xl,
+        layout.screenGutter,
+        layout.screenBottom,
       ),
       children: [
         if (tournaments.isNotEmpty) ...[
           const _Eyebrow('Organizing (active)'),
           for (final t in tournaments) ...[
             _OrganizingCard(tournament: t),
-            const SizedBox(height: Spacing.sm),
+            SizedBox(height: layout.itemGap),
           ],
         ],
         if (drafts.isNotEmpty || localDraft != null) ...[
-          const SizedBox(height: Spacing.xs),
+          SizedBox(height: layout.inlineGap),
           _Eyebrow('Drafts (${drafts.length + (localDraft == null ? 0 : 1)})'),
           if (localDraft != null) _LocalDraftCard(draft: localDraft!),
           for (final t in drafts) ...[
-            const SizedBox(height: Spacing.sm),
+            SizedBox(height: layout.itemGap),
             HubCard(
               name: t.name,
               meta: 'Last edited ${_ago(t.updatedAt)}',
@@ -422,35 +425,37 @@ class _PlayingList extends StatelessWidget {
     final awaiting = entries.where((e) => e.isAwaitingApproval).toList();
     final past = entries.where((e) => e.isPast).toList();
 
+    final layout = context.layout;
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.md,
+      padding: EdgeInsets.fromLTRB(
+        layout.screenGutter,
         0,
-        Spacing.md,
-        Spacing.xl,
+        layout.screenGutter,
+        layout.screenBottom,
       ),
       children: [
         if (current.isNotEmpty) ...[
           const _Eyebrow('Currently playing'),
           for (final e in current) ...[
             _PlayingCard(entry: e),
-            const SizedBox(height: Spacing.sm),
+            SizedBox(height: layout.itemGap),
           ],
         ],
         if (awaiting.isNotEmpty) ...[
-          const SizedBox(height: Spacing.xs),
+          SizedBox(height: layout.inlineGap),
           _Eyebrow('Awaiting approval (${awaiting.length})'),
           for (final e in awaiting) ...[
             _PlayingCard(entry: e),
-            const SizedBox(height: Spacing.sm),
+            SizedBox(height: layout.itemGap),
           ],
         ],
         if (past.isNotEmpty) ...[
-          const SizedBox(height: Spacing.xs),
+          SizedBox(height: layout.inlineGap),
           _Eyebrow('Past (${past.length})'),
           for (final e in past) ...[
             _PlayingCard(entry: e),
-            const SizedBox(height: Spacing.sm),
+            SizedBox(height: layout.itemGap),
           ],
         ],
       ],
@@ -564,30 +569,32 @@ class _FollowingList extends StatelessWidget {
             .where((t) => t.status == TournamentStatus.completed)
             .toList();
 
+    final layout = context.layout;
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.md,
+      padding: EdgeInsets.fromLTRB(
+        layout.screenGutter,
         0,
-        Spacing.md,
-        Spacing.xl,
+        layout.screenGutter,
+        layout.screenBottom,
       ),
       children: [
         if (liveAndUpcoming.isNotEmpty) ...[
           const _Eyebrow('Live & upcoming'),
           for (final t in liveAndUpcoming) ...[
             _FollowingCard(tournament: t),
-            const SizedBox(height: Spacing.sm),
+            SizedBox(height: layout.itemGap),
           ],
         ],
         if (done.isNotEmpty) ...[
-          const SizedBox(height: Spacing.xs),
+          SizedBox(height: layout.inlineGap),
           const _Eyebrow('Completed'),
           for (final t in done) ...[
             _FollowingCard(tournament: t),
-            const SizedBox(height: Spacing.sm),
+            SizedBox(height: layout.itemGap),
           ],
         ],
-        const SizedBox(height: Spacing.xs),
+        SizedBox(height: layout.inlineGap),
         // The discovery nudge sits after the list, so it never competes with
         // content.
         const _DiscoveryNudge(),

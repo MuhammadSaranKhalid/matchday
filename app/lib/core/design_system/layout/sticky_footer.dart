@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/spacing.dart';
+import '../theme/app_theme.dart';
 
 /// Standard sticky bottom action footer pinned above navigation or keyboard insets.
 class StickyFooter extends StatelessWidget {
@@ -20,13 +19,16 @@ class StickyFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+
     return Container(
       width: double.infinity,
-      padding: padding ?? const EdgeInsets.all(Spacing.md),
+      padding: padding ?? EdgeInsets.all(layout.cardPadding),
       decoration: BoxDecoration(
-        color: backgroundColor ?? Palette.paper,
+        color: backgroundColor ?? scheme.surface,
         border: topBorder
-            ? const Border(top: BorderSide(color: Palette.hairline))
+            ? Border(top: BorderSide(color: scheme.outlineVariant))
             : null,
       ),
       child: SafeArea(

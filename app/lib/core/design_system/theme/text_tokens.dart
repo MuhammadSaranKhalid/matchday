@@ -14,6 +14,7 @@ class TextTokens extends ThemeExtension<TextTokens> {
     required this.eyebrow,
     required this.metric,
     required this.score,
+    required this.mono,
   });
 
   /// Monospace metadata (overs, time stamps, run rate).
@@ -27,6 +28,9 @@ class TextTokens extends ThemeExtension<TextTokens> {
 
   /// Large scoreboard score display.
   final TextStyle score;
+
+  /// Monospace body typography for cricket figures and tabular metadata.
+  final TextStyle mono;
 
   static const light = TextTokens(
     metadata: TextStyle(
@@ -55,6 +59,13 @@ class TextTokens extends ThemeExtension<TextTokens> {
       fontWeight: FontWeight.w700,
       color: Palette.ink,
     ),
+    mono: TextStyle(
+      fontFamily: 'JetBrains Mono',
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.14,
+      color: Palette.muted,
+    ),
   );
 
   @override
@@ -63,12 +74,14 @@ class TextTokens extends ThemeExtension<TextTokens> {
     TextStyle? eyebrow,
     TextStyle? metric,
     TextStyle? score,
+    TextStyle? mono,
   }) {
     return TextTokens(
       metadata: metadata ?? this.metadata,
       eyebrow: eyebrow ?? this.eyebrow,
       metric: metric ?? this.metric,
       score: score ?? this.score,
+      mono: mono ?? this.mono,
     );
   }
 
@@ -83,6 +96,7 @@ class TextTokens extends ThemeExtension<TextTokens> {
       eyebrow: TextStyle.lerp(eyebrow, other.eyebrow, t) ?? eyebrow,
       metric: TextStyle.lerp(metric, other.metric, t) ?? metric,
       score: TextStyle.lerp(score, other.score, t) ?? score,
+      mono: TextStyle.lerp(mono, other.mono, t) ?? mono,
     );
   }
 }

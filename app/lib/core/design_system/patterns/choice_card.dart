@@ -93,13 +93,13 @@ class ChoiceCard extends StatelessWidget {
                             description!,
                             style: textTheme.bodySmall?.copyWith(
                                   height: 1.4,
-                                  color: scheme.outline,
+                                  color: scheme.onSurfaceVariant,
                                 ) ??
                                 TextStyle(
                                   fontFamily: 'Inter',
                                   fontSize: 13,
                                   height: 1.4,
-                                  color: scheme.outline,
+                                  color: scheme.onSurfaceVariant,
                                 ),
                           ),
                         ],

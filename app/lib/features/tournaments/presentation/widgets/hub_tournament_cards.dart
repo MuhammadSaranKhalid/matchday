@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/theme/circk_theme.dart';
+import '../../../../core/design_system/design_system.dart';
 import '../../domain/entities/my_tournament_entry.dart';
 import '../../domain/entities/tournament.dart';
 import 'ck_pulse_dot.dart';
@@ -54,8 +54,15 @@ class HubCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
+
     final body = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: EdgeInsets.symmetric(
+        horizontal: layout.cardPadding,
+        vertical: layout.cardPadding - 2,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -66,19 +73,19 @@ class HubCard extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: CkColors.paper2,
+                  color: scheme.surfaceContainer,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: dashed ? CkColors.soft : CkColors.line,
+                    color: dashed ? scheme.outlineVariant : scheme.outline,
                   ),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   _initials,
-                  style: CkType.display(
+                  style: (textTheme.titleSmall ?? const TextStyle()).copyWith(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: dashed ? CkColors.muted : CkColors.ink,
+                    color: dashed ? scheme.onSurfaceVariant : scheme.onSurface,
                   ),
                 ),
               ),
@@ -92,10 +99,11 @@ class HubCard extends StatelessWidget {
                       name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: CkType.display(
+                      style: (textTheme.titleMedium ?? const TextStyle()).copyWith(
                         fontSize: 17,
                         height: 1.2,
-                        color: dashed ? CkColors.ink2 : CkColors.ink,
+                        fontWeight: FontWeight.w700,
+                        color: dashed ? scheme.onSurfaceVariant : scheme.onSurface,
                       ),
                     ),
                     if (meta != null) ...[
@@ -104,9 +112,9 @@ class HubCard extends StatelessWidget {
                         meta!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: CkType.body(
+                        style: (textTheme.bodySmall ?? const TextStyle()).copyWith(
                           fontSize: 11.5,
-                          color: CkColors.muted,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -119,7 +127,7 @@ class HubCard extends StatelessWidget {
           ),
           for (final section in sections) ...[
             const SizedBox(height: 11),
-            const Divider(height: 1, thickness: 1, color: CkColors.hairline),
+            Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
             const SizedBox(height: 11),
             section,
           ],
@@ -129,24 +137,24 @@ class HubCard extends StatelessWidget {
 
     if (dashed) {
       return CkDashedBox(
-        radius: CkRadii.md,
-        color: CkColors.line,
-        fill: CkColors.paper,
+        radius: layout.cardRadius,
+        color: scheme.outline,
+        fill: scheme.surface,
         onTap: onTap,
         child: body,
       );
     }
 
     return Material(
-      color: CkColors.paper,
-      borderRadius: BorderRadius.circular(CkRadii.md),
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(layout.cardRadius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(CkRadii.md),
+        borderRadius: BorderRadius.circular(layout.cardRadius),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(CkRadii.md),
-            border: Border.all(color: CkColors.hairline),
+            borderRadius: BorderRadius.circular(layout.cardRadius),
+            border: Border.all(color: scheme.outlineVariant),
           ),
           child: body,
         ),
@@ -155,8 +163,7 @@ class HubCard extends StatelessWidget {
   }
 }
 
-/// Status pill. Cream carries urgency, red carries live, and everything else
-/// recedes to paper2.
+/// Status pill backed by [StatusBadge].
 class HubStatusPill extends StatelessWidget {
   const HubStatusPill({super.key, required this.status, this.dashed = false});
 
@@ -165,60 +172,21 @@ class HubStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    late final String label;
-    late final Color bg;
-    late final Color fg;
-    Color? border;
-
-    switch (status) {
-      case TournamentStatus.live:
-        label = 'Live';
-        bg = CkColors.red;
-        fg = Colors.white;
-      case TournamentStatus.registration:
-        label = 'Reg open';
-        bg = CkColors.cream;
-        fg = CkColors.amberDark;
-        border = CkColors.creamBorder;
-      case TournamentStatus.draft:
-        label = 'Draft';
-        bg = CkColors.paper2;
-        fg = CkColors.muted;
-        border = CkColors.soft;
-      case TournamentStatus.completed:
-        label = 'Completed';
-        bg = CkColors.paper2;
-        fg = CkColors.ink2;
-        border = CkColors.line;
-      case TournamentStatus.cancelled:
-      case TournamentStatus.abandoned:
-        label = status.label;
-        bg = CkColors.redSurface;
-        fg = CkColors.redInk;
-        border = CkColors.redBorder;
-      case TournamentStatus.upcoming:
-        label = 'Upcoming';
-        bg = CkColors.paper2;
-        fg = CkColors.ink2;
-        border = CkColors.line;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(4),
-        border: border == null ? null : Border.all(color: border),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: CkType.mono(
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.12,
-          color: fg,
+    final (label, tone) = switch (status) {
+      TournamentStatus.live => ('LIVE', StatusTone.live),
+      TournamentStatus.registration => ('REG OPEN', StatusTone.warning),
+      TournamentStatus.draft => ('DRAFT', StatusTone.neutral),
+      TournamentStatus.completed => ('COMPLETED', StatusTone.neutral),
+      TournamentStatus.cancelled || TournamentStatus.abandoned => (
+          status.label.toUpperCase(),
+          StatusTone.live,
         ),
-      ),
+      TournamentStatus.upcoming => ('UPCOMING', StatusTone.neutral),
+    };
+
+    return StatusBadge(
+      label: label,
+      tone: tone,
     );
   }
 }
@@ -240,6 +208,9 @@ class HubProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    final textTokens = context.textTokens;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -250,20 +221,21 @@ class HubProgress extends StatelessWidget {
             Expanded(
               child: Text(
                 label.toUpperCase(),
-                style: CkType.mono(
+                style: textTokens.eyebrow.copyWith(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.10,
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
             ),
             Text(
               '$value / $total',
-              style: CkType.mono(
+              style: textTokens.mono.copyWith(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0,
-                color: CkColors.ink,
+                color: scheme.onSurface,
               ),
             ),
           ],
@@ -274,8 +246,8 @@ class HubProgress extends StatelessWidget {
           child: LinearProgressIndicator(
             value: total == 0 ? 0 : (value / total).clamp(0.0, 1.0),
             minHeight: 4,
-            backgroundColor: CkColors.paper2,
-            valueColor: const AlwaysStoppedAnimation<Color>(CkColors.ink),
+            backgroundColor: scheme.surfaceContainer,
+            valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
           ),
         ),
       ],
@@ -292,27 +264,30 @@ class HubCreamChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final status = context.statusColors;
+    final textTokens = context.textTokens;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: CkColors.cream,
-        borderRadius: BorderRadius.circular(CkRadii.sm),
-        border: Border.all(color: CkColors.creamBorder),
+        color: status.cream,
+        borderRadius: BorderRadius.circular(Radii.card - 4),
+        border: Border.all(color: status.creamBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 13, color: CkColors.amber),
+            Icon(icon, size: 13, color: status.warning),
             const SizedBox(width: 6),
           ],
           Text(
             label.toUpperCase(),
-            style: CkType.mono(
+            style: textTokens.eyebrow.copyWith(
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.08,
-              color: CkColors.amberDark,
+              color: status.warning,
             ),
           ),
         ],
@@ -330,21 +305,25 @@ class HubNeutralChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+    final textTheme = context.textTheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: good ? CkColors.greenSurface : CkColors.paper2,
-        borderRadius: BorderRadius.circular(CkRadii.sm),
+        color: good ? status.successSurface : scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(Radii.card - 4),
         border: Border.all(
-          color: good ? CkColors.greenBorder : CkColors.line,
+          color: good ? status.successBorder : scheme.outlineVariant,
         ),
       ),
       child: Text(
         label,
-        style: CkType.body(
+        style: (textTheme.bodySmall ?? const TextStyle()).copyWith(
           fontSize: 11.5,
           fontWeight: FontWeight.w500,
-          color: good ? CkColors.greenInk : CkColors.ink2,
+          color: good ? status.success : scheme.onSurfaceVariant,
         ),
       ),
     );
@@ -361,11 +340,16 @@ class HubLiveStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+    final textTheme = context.textTheme;
+    final textTokens = context.textTokens;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: CkColors.paper2,
-        borderRadius: BorderRadius.circular(CkRadii.sm),
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(Radii.card - 4),
       ),
       child: Row(
         children: [
@@ -376,17 +360,20 @@ class HubLiveStrip extends StatelessWidget {
               matchup,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: CkType.body(fontSize: 12, color: CkColors.ink),
+              style: (textTheme.bodySmall ?? const TextStyle()).copyWith(
+                fontSize: 12,
+                color: scheme.onSurface,
+              ),
             ),
           ),
           const SizedBox(width: 8),
           Text(
             score,
-            style: CkType.mono(
+            style: textTokens.mono.copyWith(
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: 0,
-              color: CkColors.red,
+              color: status.live,
             ),
           ),
         ],
@@ -406,13 +393,19 @@ class HubFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
+
     return Row(
       children: [
         Expanded(
           child: Text(
             note,
             maxLines: 2,
-            style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+            style: (textTheme.bodySmall ?? const TextStyle()).copyWith(
+              fontSize: 11.5,
+              color: scheme.onSurfaceVariant,
+            ),
           ),
         ),
         if (action != null) ...[
@@ -422,12 +415,13 @@ class HubFooter extends StatelessWidget {
             children: [
               Text(
                 action!,
-                style: CkType.display(
+                style: (textTheme.titleSmall ?? const TextStyle()).copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
                 ),
               ),
-              const Icon(Icons.chevron_right, size: 15, color: CkColors.ink),
+              Icon(Icons.chevron_right, size: 15, color: scheme.onSurface),
             ],
           ),
         ],
@@ -451,15 +445,20 @@ class HubNextMatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
+    final textTokens = context.textTokens;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'YOUR NEXT MATCH',
-          style: CkType.mono(
+          style: textTokens.eyebrow.copyWith(
             fontSize: 10,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.10,
+            color: scheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 6),
@@ -474,15 +473,19 @@ class HubNextMatch extends StatelessWidget {
                     matchup,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: CkType.display(
+                    style: (textTheme.titleSmall ?? const TextStyle()).copyWith(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
+                      color: scheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     when,
-                    style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+                    style: (textTheme.bodySmall ?? const TextStyle()).copyWith(
+                      fontSize: 11.5,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -514,6 +517,8 @@ class HubPlayingBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    final textTheme = context.textTheme;
     final reg = entry.registration;
     final paid = (reg.paymentStatus ?? '').toLowerCase() == 'paid';
 
@@ -522,7 +527,11 @@ class HubPlayingBody extends StatelessWidget {
       children: [
         Text(
           'Playing as ${reg.teamName ?? 'your team'}',
-          style: CkType.display(fontSize: 14, fontWeight: FontWeight.w600),
+          style: (textTheme.titleSmall ?? const TextStyle()).copyWith(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: scheme.onSurface,
+          ),
         ),
         const SizedBox(height: 9),
         Wrap(

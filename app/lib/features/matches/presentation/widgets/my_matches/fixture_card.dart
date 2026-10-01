@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../core/theme/circk_theme.dart';
+import '../../../../../core/design_system/design_system.dart';
 import '../../state/my_matches_view.dart';
 
 /// A Confirmed-tab fixture — `My Matches.dc.html` artboards 01 / 04 / 05 / 07.
@@ -26,30 +26,40 @@ class FixtureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+
     final toss = v.tossReady;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: CkColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          // Uniform border: Flutter forbids a borderRadius on a mixed-colour
-          // Border, so the 2px red top rule is drawn as a child below.
-          border: Border.all(color: toss ? CkColors.redBorder : CkColors.line),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (toss) Container(height: 2, color: CkColors.red),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [_gutter(), Expanded(child: _body())],
-              ),
+    return Material(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(layout.cardRadius),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(layout.cardRadius),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(layout.cardRadius),
+            border: Border.all(
+              color: toss ? status.liveBorder : scheme.outline,
             ),
-          ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (toss) Container(height: 2, color: status.live),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _gutter(context),
+                    Expanded(child: _body(context)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -57,56 +67,71 @@ class FixtureCard extends StatelessWidget {
 
   // ─── Time gutter ──────────────────────────────────────────────────────────
 
-  Widget _gutter() {
+  Widget _gutter(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+
     final toss = v.tossReady;
     final live = v.liveState != null;
     return Container(
       width: 84,
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: EdgeInsets.symmetric(vertical: layout.inlineGap),
       decoration: BoxDecoration(
-        color: toss ? CkColors.redSurface : CkColors.paper,
+        color: toss ? status.liveSurface : scheme.surfaceContainerLow,
         border: Border(
           right: BorderSide(
-            color: toss ? CkColors.redBorder : CkColors.hairline,
+            color: toss ? status.liveBorder : scheme.outlineVariant,
           ),
         ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: live ? _liveGutter() : _clockGutter(),
+        children: live ? _liveGutter(context) : _clockGutter(context),
       ),
     );
   }
 
   /// In play the clock is meaningless — what matters is that it is happening.
-  List<Widget> _liveGutter() => [
-    const _PulsingDot(size: 7),
-    const SizedBox(height: 3),
-    Text(
-      v.liveState!,
-      textAlign: TextAlign.center,
-      style: CkType.mono(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.10,
-        color: CkColors.redInk,
-      ),
-    ),
-    if ((v.liveSince ?? '').isNotEmpty) ...[
-      const SizedBox(height: 2),
+  List<Widget> _liveGutter(BuildContext context) {
+    final textTokens = context.textTokens;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+
+    return [
+      const _PulsingDot(size: 7),
+      const SizedBox(height: 3),
       Text(
-        v.liveSince!,
-        style: CkType.mono(
-          fontSize: 9,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.07,
-          color: CkColors.muted,
+        v.liveState!,
+        textAlign: TextAlign.center,
+        style: textTokens.mono.copyWith(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.10,
+          color: status.live,
         ),
       ),
-    ],
-  ];
+      if ((v.liveSince ?? '').isNotEmpty) ...[
+        const SizedBox(height: 2),
+        Text(
+          v.liveSince!,
+          style: textTokens.mono.copyWith(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.07,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    ];
+  }
 
-  List<Widget> _clockGutter() {
+  List<Widget> _clockGutter(BuildContext context) {
+    final textTokens = context.textTokens;
+    final textTheme = context.textTheme;
+    final scheme = context.colorScheme;
+    final status = context.statusColors;
+
     final t = v.startTime;
     final toss = v.tossReady;
     return [
@@ -114,47 +139,46 @@ class FixtureCard extends StatelessWidget {
         const _PulsingDot(size: 6),
         const SizedBox(height: 3),
         Text(
-          'SETUP',
-          style: CkType.mono(
+          'TOSS',
+          style: textTokens.mono.copyWith(
             fontSize: 10,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.09,
-            color: CkColors.redInk,
+            color: status.live,
           ),
         ),
         const SizedBox(height: 2),
       ],
       Text(
         t == null ? '—' : _hhmm(t),
-        style: CkType.display(
-          // The toss card gives two lines back to the label above it.
+        style: (textTheme.headlineSmall ?? const TextStyle()).copyWith(
           fontSize: toss ? 17 : 20,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.02,
-          color: CkColors.ink,
-        ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+          color: scheme.onSurface,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
       ),
       if (t != null)
         Text(
           _meridiem(t),
-          style: CkType.mono(
+          style: textTokens.mono.copyWith(
             fontSize: toss ? 9 : 9.5,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.08,
-            color: CkColors.muted,
+            color: scheme.onSurfaceVariant,
           ),
         ),
-      // The countdown carries the fine grain so the date header never has to.
       if (!toss && v.countdown.isNotEmpty) ...[
         const SizedBox(height: 5),
         Text(
           v.countdown.toUpperCase(),
           textAlign: TextAlign.center,
-          style: CkType.mono(
+          style: textTokens.mono.copyWith(
             fontSize: 9,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.07,
-            color: CkColors.muted,
+            color: scheme.onSurfaceVariant,
           ),
         ),
       ],
@@ -163,138 +187,164 @@ class FixtureCard extends StatelessWidget {
 
   // ─── Body ─────────────────────────────────────────────────────────────────
 
-  Widget _body() => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _teamRow(
-              short: v.homeShort,
-              color: v.homeColor,
-              name: v.homeName,
-              isYou: v.youIsHome,
-            ),
-            const SizedBox(height: 7),
-            _teamRow(
-              short: v.awayShort,
-              color: v.awayColor,
-              name: v.awayName,
-              isYou: !v.youIsHome,
-              // A bracket fixture with no opponent yet prints the feeder
-              // text where a team name would go, and drops the crest.
-              placeholder: v.opponentTbc,
-            ),
-            const SizedBox(height: 7),
-            Text(
-              v.metaLine.toUpperCase(),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: CkType.mono(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.07,
-                color: CkColors.muted,
+  Widget _body(BuildContext context) {
+    final layout = context.layout;
+    final textTokens = context.textTokens;
+    final textTheme = context.textTheme;
+    final scheme = context.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            layout.inlineGap,
+            layout.inlineGap - 1,
+            layout.inlineGap,
+            layout.inlineGap - 1,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _teamRow(
+                context,
+                short: v.homeShort,
+                color: v.homeColor,
+                name: v.homeName,
+                isYou: v.youIsHome,
               ),
-            ),
-            if ((v.tbcNote ?? '').isNotEmpty) ...[
-              const SizedBox(height: 5),
-              Text(
-                v.tbcNote!,
-                style: CkType.body(fontSize: 11.5, color: CkColors.muted),
+              const SizedBox(height: 7),
+              _teamRow(
+                context,
+                short: v.awayShort,
+                color: v.awayColor,
+                name: v.awayName,
+                isYou: !v.youIsHome,
+                placeholder: v.opponentTbc,
               ),
-            ],
-            if (v.tossReady && (v.helper ?? '').isNotEmpty) ...[
               const SizedBox(height: 7),
               Text(
-                v.helper!,
-                style: CkType.body(
-                  fontSize: 12,
-                  height: 1.45,
-                  color: CkColors.ink2,
+                v.metaLine.toUpperCase(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTokens.mono.copyWith(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.07,
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
+              if ((v.tbcNote ?? '').isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Text(
+                  v.tbcNote!,
+                  style: (textTheme.bodySmall ?? const TextStyle()).copyWith(
+                    fontSize: 11.5,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              if (v.tossReady && (v.helper ?? '').isNotEmpty) ...[
+                const SizedBox(height: 7),
+                Text(
+                  v.helper!,
+                  style: (textTheme.bodyMedium ?? const TextStyle()).copyWith(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
-      if (v.tossReady) _tossAction() else _roleStrip(),
-    ],
-  );
+        if (v.tossReady) _tossAction(context) else _roleStrip(context),
+      ],
+    );
+  }
 
-  Widget _teamRow({
+  Widget _teamRow(
+    BuildContext context, {
     required String short,
     required Color color,
     required String name,
     required bool isYou,
     bool placeholder = false,
-  }) => Row(
-    children: [
-      if (placeholder)
-        const SizedBox(width: 20, height: 20)
-      else
-        Container(
-          width: 20,
-          height: 20,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(6),
+  }) {
+    final textTokens = context.textTokens;
+    final textTheme = context.textTheme;
+    final scheme = context.colorScheme;
+
+    return Row(
+      children: [
+        if (placeholder)
+          const SizedBox(width: 20, height: 20)
+        else
+          Container(
+            width: 20,
+            height: 20,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              short.toUpperCase(),
+              style: (textTheme.labelSmall ?? const TextStyle()).copyWith(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
           ),
-          child: Text(
-            short.toUpperCase(),
-            style: CkType.display(
-              fontSize: 8.5,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              text: name,
+              children: [
+                if (isYou)
+                  TextSpan(
+                    text: '  YOU',
+                    style: textTokens.mono.copyWith(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.08,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: (textTheme.titleSmall ?? const TextStyle()).copyWith(
+              fontSize: 14.5,
+              fontWeight: placeholder ? FontWeight.w500 : FontWeight.w600,
+              letterSpacing: -0.01,
+              color: placeholder ? scheme.onSurfaceVariant : scheme.onSurface,
             ),
           ),
         ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Text.rich(
-          TextSpan(
-            text: name,
-            children: [
-              // YOU rides the team name in soft mono. It says which row is
-              // ours; it never says what we owe — that is the strip's job.
-              if (isYou)
-                TextSpan(
-                  text: '  YOU',
-                  style: CkType.mono(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08,
-                    color: CkColors.soft,
-                  ),
-                ),
-            ],
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: CkType.display(
-            fontSize: 14.5,
-            fontWeight: placeholder ? FontWeight.w500 : FontWeight.w600,
-            letterSpacing: -0.01,
-            color: placeholder ? CkColors.muted : CkColors.ink,
-          ),
-        ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 
-  /// Printed only when the viewer owes something, or when their participation
-  /// is itself the news. A spectator gets no band and the card is shorter.
-  Widget _roleStrip() {
+  Widget _roleStrip(BuildContext context) {
     if (v.role.trim().isEmpty) return const SizedBox.shrink();
+
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTokens = context.textTokens;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-      decoration: const BoxDecoration(
-        color: CkColors.paper,
-        border: Border(top: BorderSide(color: CkColors.hairline)),
+      padding: EdgeInsets.symmetric(
+        horizontal: layout.inlineGap,
+        vertical: layout.inlineGap - 3,
+      ),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
       child: Row(
         children: [
@@ -303,24 +353,22 @@ class FixtureCard extends StatelessWidget {
               v.role.toUpperCase(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: CkType.mono(
+              style: textTokens.mono.copyWith(
                 fontSize: 9.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.09,
-                color: CkColors.ink2,
+                color: scheme.onSurface,
               ),
             ),
           ),
-          // Duties route somewhere and take the arrow; states do not, so the
-          // arrow keeps meaning "there is something on the other side".
           if (v.roleIsDuty) ...[
             const SizedBox(width: 8),
             Text(
               '→',
-              style: CkType.mono(
+              style: textTokens.mono.copyWith(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: CkColors.muted,
+                color: scheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -329,28 +377,37 @@ class FixtureCard extends StatelessWidget {
     );
   }
 
-  /// The toss window's action replaces the role strip. Ink, not red — the red
-  /// rule above already marks the window.
-  Widget _tossAction() => Padding(
-    padding: const EdgeInsets.fromLTRB(13, 0, 13, 12),
-    child: Container(
-      height: 44,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: CkColors.ink,
-        borderRadius: BorderRadius.circular(10),
+  Widget _tossAction(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+    final textTokens = context.textTokens;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        layout.inlineGap,
+        0,
+        layout.inlineGap,
+        layout.inlineGap,
       ),
-      child: Text(
-        'START MATCH →',
-        style: CkType.mono(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.08,
-          color: CkColors.paper,
+      child: Container(
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: scheme.primary,
+          borderRadius: BorderRadius.circular(layout.controlRadius - 4),
+        ),
+        child: Text(
+          'START MATCH · TOSS →',
+          style: textTokens.mono.copyWith(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.08,
+            color: scheme.onPrimary,
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _PulsingDot extends StatefulWidget {
@@ -382,17 +439,21 @@ class _PulsingDotState extends State<_PulsingDot>
   }
 
   @override
-  Widget build(BuildContext context) => FadeTransition(
-    opacity: Tween<double>(begin: 1, end: 0.25).animate(_c),
-    child: Container(
-      width: widget.size,
-      height: widget.size,
-      decoration: const BoxDecoration(
-        color: CkColors.red,
-        shape: BoxShape.circle,
+  Widget build(BuildContext context) {
+    final status = context.statusColors;
+
+    return FadeTransition(
+      opacity: Tween<double>(begin: 1, end: 0.25).animate(_c),
+      child: Container(
+        width: widget.size,
+        height: widget.size,
+        decoration: BoxDecoration(
+          color: status.live,
+          shape: BoxShape.circle,
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 String _hhmm(DateTime t) {

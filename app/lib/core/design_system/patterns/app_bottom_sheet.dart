@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
 import '../foundation/radii.dart';
-import '../foundation/spacing.dart';
+import '../theme/app_theme.dart';
 
 /// Launches a standardized Matchday bottom sheet modal.
 Future<T?> showAppBottomSheet<T>(
@@ -14,17 +13,20 @@ Future<T?> showAppBottomSheet<T>(
   bool enableDrag = true,
   Color? backgroundColor,
 }) {
+  final layout = context.layout;
+  final scheme = context.colorScheme;
+
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: isScrollControlled,
     isDismissible: isDismissible,
     enableDrag: enableDrag,
     showDragHandle: showDragHandle,
-    backgroundColor: backgroundColor ?? Palette.paper,
-    barrierColor: Palette.ink.withValues(alpha: 0.45),
-    shape: const RoundedRectangleBorder(
+    backgroundColor: backgroundColor ?? scheme.surface,
+    barrierColor: scheme.shadow.withValues(alpha: 0.45),
+    shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(
-        top: Radius.circular(Radii.modal),
+        top: Radius.circular(layout.cardRadius + 8),
       ),
     ),
     builder: builder,
@@ -55,16 +57,18 @@ class AppBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
     final mediaQuery = MediaQuery.of(context);
     final maxHeight = mediaQuery.size.height * maxHeightFraction;
     final keyboardInset = mediaQuery.viewInsets.bottom;
 
     return Container(
       constraints: BoxConstraints(maxHeight: maxHeight),
-      decoration: const BoxDecoration(
-        color: Palette.paper,
+      decoration: BoxDecoration(
+        color: scheme.surface,
         borderRadius: BorderRadius.vertical(
-          top: Radius.circular(Radii.modal),
+          top: Radius.circular(layout.cardRadius + 8),
         ),
       ),
       child: SafeArea(
@@ -76,37 +80,37 @@ class AppBottomSheet extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (showDragHandle) ...[
-                const SizedBox(height: Spacing.xs),
+                SizedBox(height: layout.inlineGap / 2),
                 Center(
                   child: Container(
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Palette.line,
+                      color: scheme.outline,
                       borderRadius: BorderRadius.circular(Radii.pill),
                     ),
                   ),
                 ),
-                const SizedBox(height: Spacing.xs),
+                SizedBox(height: layout.inlineGap / 2),
               ],
               if (header != null) ...[
                 header!,
-                const Divider(height: 1, color: Palette.line),
+                Divider(height: 1, color: scheme.outlineVariant),
               ],
               Flexible(
                 child: Padding(
                   padding: padding ??
-                      const EdgeInsets.symmetric(
-                        horizontal: Spacing.md,
-                        vertical: Spacing.sm,
+                      EdgeInsets.symmetric(
+                        horizontal: layout.screenGutter,
+                        vertical: layout.inlineGap,
                       ),
                   child: body,
                 ),
               ),
               if (footer != null) ...[
-                const Divider(height: 1, color: Palette.line),
+                Divider(height: 1, color: scheme.outlineVariant),
                 Padding(
-                  padding: const EdgeInsets.all(Spacing.md),
+                  padding: EdgeInsets.all(layout.cardPadding),
                   child: footer!,
                 ),
               ],

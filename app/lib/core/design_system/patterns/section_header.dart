@@ -80,7 +80,7 @@ class SectionHeader extends StatelessWidget {
                   Text(
                     eyebrow!.toUpperCase(),
                     style: textTokens.eyebrow.copyWith(
-                      color: scheme.outline,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 3),

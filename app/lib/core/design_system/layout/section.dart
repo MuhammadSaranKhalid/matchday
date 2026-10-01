@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/spacing.dart';
 import '../patterns/section_header.dart';
+import '../theme/app_theme.dart';
 
 /// Standard structural section layout pattern.
 ///
@@ -16,8 +16,8 @@ class Section extends StatelessWidget {
     this.header,
     this.actionLabel,
     this.onAction,
-    this.spacing = Spacing.xs,
-    this.bottomGap = Spacing.xl,
+    this.spacing,
+    this.bottomGap,
   });
 
   final Widget child;
@@ -26,11 +26,15 @@ class Section extends StatelessWidget {
   final Widget? header;
   final String? actionLabel;
   final VoidCallback? onAction;
-  final double spacing;
-  final double bottomGap;
+  final double? spacing;
+  final double? bottomGap;
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final effectiveSpacing = spacing ?? layout.inlineGap;
+    final effectiveBottomGap = bottomGap ?? layout.sectionGap;
+
     final effectiveHeader = header ??
         (title != null
             ? SectionHeader(
@@ -42,14 +46,14 @@ class Section extends StatelessWidget {
             : null);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: bottomGap),
+      padding: EdgeInsets.only(bottom: effectiveBottomGap),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           if (effectiveHeader != null) ...[
             effectiveHeader,
-            SizedBox(height: spacing),
+            SizedBox(height: effectiveSpacing),
           ],
           child,
         ],

@@ -128,7 +128,6 @@ class ActionButton extends StatelessWidget {
   ButtonStyle _resolveStyle(BuildContext context, double visualHeight) {
     final layout = context.layout;
     final scheme = context.colorScheme;
-    final status = context.statusColors;
 
     final (fontSize, letterSpacing) = switch (size) {
       ControlSize.compact => (13.0, -0.1),
@@ -195,15 +194,15 @@ class ActionButton extends StatelessWidget {
           textStyle: textStyle,
         ),
       ActionButtonVariant.destructive => FilledButton.styleFrom(
-          backgroundColor: status.liveSurface,
-          foregroundColor: status.live,
-          disabledBackgroundColor: status.liveSurface.withValues(alpha: 0.4),
-          disabledForegroundColor: status.live.withValues(alpha: 0.4),
+          backgroundColor: scheme.errorContainer,
+          foregroundColor: scheme.onErrorContainer,
+          disabledBackgroundColor: scheme.errorContainer.withValues(alpha: 0.4),
+          disabledForegroundColor: scheme.onErrorContainer.withValues(alpha: 0.4),
           elevation: 0,
           minimumSize: minSize,
           tapTargetSize: MaterialTapTargetSize.padded,
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          side: BorderSide(color: status.liveBorder),
+          side: BorderSide(color: scheme.error.withValues(alpha: 0.25)),
           shape: shape,
           textStyle: textStyle,
         ),

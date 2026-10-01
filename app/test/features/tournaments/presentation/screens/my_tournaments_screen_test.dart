@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:matchday/features/auth/domain/entities/user.dart';
-import 'package:matchday/features/auth/domain/value_objects/email.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/core/design_system/design_system.dart';
+import 'package:matchday/core/supabase/supabase_client_provider.dart';
 import 'package:matchday/features/tournaments/domain/entities/my_tournament_entry.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_registration.dart';
 import 'package:matchday/features/tournaments/presentation/providers/tournaments_providers.dart';
 import 'package:matchday/features/tournaments/presentation/screens/my_tournaments_screen.dart';
+import '../../../../helpers/mock_auth.dart';
 
 void main() {
   group('MyTournamentsScreen widget tests', () {
-    final mockUser = User(
-      id: const UserId('user-1'),
-      email: Email.create('imran@example.com').getOrElse((_) => throw Exception()),
-      displayName: 'Captain Imran',
+    final mockSupabase = createMockSupabaseClient(
+      id: 'user-1',
+      email: 'imran@example.com',
     );
 
     final mockTournaments = <Tournament>[
@@ -62,8 +61,7 @@ void main() {
     }) =>
         ProviderScope(
           overrides: [
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
+            supabaseClientProvider.overrideWithValue(mockSupabase),
             myTournamentsProvider.overrideWith(
               (ref) => Future.value(tournaments ?? mockTournaments),
             ),
@@ -78,7 +76,10 @@ void main() {
             tournamentRegistrationsProvider('tourn-play-1')
                 .overrideWith((ref) => Future.value(const [])),
           ],
-          child: const MaterialApp(home: MyTournamentsScreen()),
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: const MyTournamentsScreen(),
+          ),
         );
 
     testWidgets('is a pushed screen with a Create pill and a segmented control',
@@ -89,11 +90,11 @@ void main() {
       expect(find.text('My Tournaments'), findsOneWidget);
       expect(find.text('CREATE'), findsOneWidget);
 
-      // A segmented filter, not a TabBar — counts ride in the labels.
+      // A segmented filter, not a TabBar — counts ride in the semantics and badges.
       expect(find.byType(TabBar), findsNothing);
-      expect(find.text('Organizing (1)'), findsOneWidget);
-      expect(find.text('Playing (0)'), findsOneWidget);
-      expect(find.text('Following (1)'), findsOneWidget);
+      expect(find.text('ORGANIZING'), findsOneWidget);
+      expect(find.text('PLAYING'), findsOneWidget);
+      expect(find.text('FOLLOWING'), findsOneWidget);
     });
 
     testWidgets('organizing cards carry the console verb and a fee note',
@@ -111,7 +112,7 @@ void main() {
       await tester.pumpWidget(hub());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Following (1)'));
+      await tester.tap(find.text('FOLLOWING'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
@@ -143,8 +144,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Single-relationship rule: three empty tabs would be three dead ends.
-      expect(find.textContaining('Organizing ('), findsNothing);
-      expect(find.textContaining('Following ('), findsNothing);
+      expect(find.text('ORGANIZING'), findsNothing);
+      expect(find.text('FOLLOWING'), findsNothing);
       // And the nav drops Create, because the body already owns that CTA.
       expect(find.text('CREATE'), findsNothing);
 
@@ -175,7 +176,7 @@ void main() {
       await tester.pumpWidget(hub(playing: [entry]));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Playing (1)'));
+      await tester.tap(find.text('PLAYING'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 

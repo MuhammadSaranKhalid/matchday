@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../foundation/motion.dart';
 import '../foundation/radii.dart';
 import '../theme/app_theme.dart';
 
@@ -111,8 +112,8 @@ class _SegmentTile<T> extends StatelessWidget {
     final textTokens = context.textTokens;
 
     final pill = AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeInOut,
+      duration: Motion.durationFast,
+      curve: Motion.curveFast,
       height: 40,
       padding: EdgeInsets.symmetric(horizontal: layout.compactCardPadding),
       alignment: Alignment.center,
@@ -147,7 +148,7 @@ class _SegmentTile<T> extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                 letterSpacing: 0.08,
-                color: isSelected ? scheme.onSurface : scheme.outline,
+                color: isSelected ? scheme.onSurface : scheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -180,7 +181,7 @@ class _SegmentTile<T> extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0,
-                  color: scheme.outline,
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
           ],

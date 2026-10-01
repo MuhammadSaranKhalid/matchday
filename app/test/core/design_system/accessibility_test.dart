@@ -174,5 +174,163 @@ void main() {
         expect(box.size.height, greaterThanOrEqualTo(48.0));
       }
     });
+
+    group('Text Contrast Guideline Verification', () {
+      testWidgets('EmptyState meets text contrast guidelines', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const Scaffold(
+              body: EmptyState(
+                title: 'No Matches Scheduled',
+                description: 'Check back later for upcoming fixtures.',
+              ),
+            ),
+          ),
+        );
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      });
+
+      testWidgets('ErrorState meets text contrast guidelines', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: ErrorState(
+                title: 'Could not load data',
+                description: 'Please check your connection and try again.',
+                onRetry: () {},
+              ),
+            ),
+          ),
+        );
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      });
+
+      testWidgets('ChoiceCard meets text contrast guidelines', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: Center(
+                child: ChoiceCard(
+                  title: 'Tournament Format',
+                  description: 'Round-robin league followed by playoffs',
+                  selected: false,
+                  onTap: () {},
+                ),
+              ),
+            ),
+          ),
+        );
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      });
+
+      testWidgets('TextInput meets text contrast guidelines', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: Center(
+                child: TextInput(
+                  controller: TextEditingController(text: 'Team Alpha'),
+                  label: 'Team Name',
+                  hint: 'Enter your team name',
+                ),
+              ),
+            ),
+          ),
+        );
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      });
+
+      testWidgets('SearchField meets text contrast guidelines', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: Center(
+                child: SearchField(
+                  hintText: 'Search teams or tournaments',
+                  onChanged: (_) {},
+                ),
+              ),
+            ),
+          ),
+        );
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      });
+
+      testWidgets('SegmentedControl meets text contrast guidelines', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: Center(
+                child: SegmentedControl<String>(
+                  options: const [
+                    SegmentOption(value: 'confirmed', label: 'Confirmed'),
+                    SegmentOption(value: 'past', label: 'Past Matches'),
+                  ],
+                  value: 'confirmed',
+                  onChanged: (_) {},
+                ),
+              ),
+            ),
+          ),
+        );
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      });
+
+      testWidgets('StatusBadge tones meet text contrast guidelines', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const Scaffold(
+              body: Column(
+                children: [
+                  StatusBadge(label: 'LIVE', tone: StatusTone.live),
+                  StatusBadge(label: 'COMPLETED', tone: StatusTone.success),
+                  StatusBadge(label: 'DELAYED', tone: StatusTone.warning),
+                  StatusBadge(label: 'UPCOMING', tone: StatusTone.neutral),
+                ],
+              ),
+            ),
+          ),
+        );
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      });
+
+      testWidgets('PushHeader meets text contrast guidelines', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const Scaffold(
+              body: PushHeader(
+                title: 'Match Details',
+                subtitle: 'Gaddafi Stadium, Lahore',
+              ),
+            ),
+          ),
+        );
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      });
+
+      testWidgets('WizardHeader meets text contrast guidelines', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const Scaffold(
+              body: WizardHeader(
+                eyebrow: 'Step 2 of 4',
+                title: 'Squad Selection',
+                description: 'Pick eleven starting players for the fixture.',
+              ),
+            ),
+          ),
+        );
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      });
+    });
   });
 }

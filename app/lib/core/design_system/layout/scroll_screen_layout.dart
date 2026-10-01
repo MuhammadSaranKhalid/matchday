@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../foundation/palette.dart';
-import '../foundation/spacing.dart';
+import '../theme/app_theme.dart';
 
 /// Standard scrolling screen layout.
 ///
@@ -31,15 +30,18 @@ class ScrollScreenLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.layout;
+    final scheme = context.colorScheme;
+
     Widget list = ListView(
       controller: controller,
       physics: physics ?? const AlwaysScrollableScrollPhysics(),
       padding: padding ??
-          const EdgeInsets.fromLTRB(
-            Spacing.md,
-            Spacing.md,
-            Spacing.md,
-            Spacing.xl,
+          EdgeInsets.fromLTRB(
+            layout.screenGutter,
+            layout.cardPadding,
+            layout.screenGutter,
+            layout.screenBottom,
           ),
       children: children,
     );
@@ -47,14 +49,14 @@ class ScrollScreenLayout extends StatelessWidget {
     if (onRefresh != null) {
       list = RefreshIndicator(
         onRefresh: onRefresh!,
-        color: Palette.ink,
-        backgroundColor: Palette.surface,
+        color: scheme.primary,
+        backgroundColor: scheme.surface,
         child: list,
       );
     }
 
     return Scaffold(
-      backgroundColor: backgroundColor ?? Palette.paper,
+      backgroundColor: backgroundColor ?? scheme.surface,
       appBar: header,
       body: SafeArea(
         top: header == null,

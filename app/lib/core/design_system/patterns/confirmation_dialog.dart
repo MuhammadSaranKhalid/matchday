@@ -98,17 +98,17 @@ class ConfirmationDialog extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: destructive ? status.liveSurface : status.neutralSurface,
+                color: destructive ? scheme.errorContainer : status.neutralSurface,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: destructive ? status.liveBorder : scheme.outline,
+                  color: destructive ? scheme.error.withValues(alpha: 0.25) : scheme.outline,
                 ),
               ),
               alignment: Alignment.center,
               child: Icon(
                 icon,
                 size: 20,
-                color: destructive ? status.live : scheme.onSurfaceVariant,
+                color: destructive ? scheme.onErrorContainer : scheme.onSurfaceVariant,
               ),
             ),
             SizedBox(height: layout.itemGap),

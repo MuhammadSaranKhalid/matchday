@@ -20,7 +20,8 @@ class TournamentSquadMember extends Equatable {
     required this.squadMemberId,
     required this.entryId,
     required this.tournamentId,
-    required this.userId,
+    this.userId,
+    this.unclaimedId,
     required this.membershipStatus,
     required this.addedAt,
     required this.createdAt,
@@ -37,7 +38,8 @@ class TournamentSquadMember extends Equatable {
   final String squadMemberId;
   final String entryId;
   final String tournamentId;
-  final String userId;
+  final String? userId;
+  final String? unclaimedId;
   final TournamentSquadMembershipStatus membershipStatus;
   final String? addedBy;
   final DateTime addedAt;
@@ -53,6 +55,8 @@ class TournamentSquadMember extends Equatable {
   final String? avatarUrl;
 
   bool get isActive => membershipStatus == TournamentSquadMembershipStatus.active;
+  bool get isClaimed => userId != null;
+  String get playerId => userId ?? unclaimedId ?? '';
 
   @override
   List<Object?> get props => [
@@ -60,6 +64,7 @@ class TournamentSquadMember extends Equatable {
         entryId,
         tournamentId,
         userId,
+        unclaimedId,
         membershipStatus,
         addedBy,
         addedAt,

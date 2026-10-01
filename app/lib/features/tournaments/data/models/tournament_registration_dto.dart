@@ -53,10 +53,11 @@ class TournamentRegistrationDto {
   factory TournamentRegistrationDto.fromJson(Map<String, dynamic> json) {
     final teamJson = json['teams'] as Map<String, dynamic>?;
     final teamColors = teamJson?['team_colors'] as Map<String, dynamic>?;
+    final directColors = json['team_colors'] as Map<String, dynamic>?;
     final profileJson = json['profiles'] as Map<String, dynamic>?;
 
     return TournamentRegistrationDto(
-      registrationId: json['registration_id'] as String,
+      registrationId: (json['registration_id'] ?? json['entry_id']) as String,
       tournamentId: json['tournament_id'] as String,
       teamId: json['team_id'] as String,
       registeredBy: json['registered_by'] as String?,
@@ -74,10 +75,10 @@ class TournamentRegistrationDto {
       decidedAt: json['decided_at'] as String?,
       decisionReason: json['decision_reason'] as String?,
       message: json['message'] as String?,
-      teamName: teamJson?['team_name'] as String?,
-      teamLogoUrl: teamJson?['logo_url'] as String?,
-      teamMonogram: teamJson?['logo_monogram'] as String?,
-      teamPrimaryColor: teamColors?['primary'] as String?,
+      teamName: json['team_name'] as String? ?? teamJson?['team_name'] as String?,
+      teamLogoUrl: json['logo_url'] as String? ?? teamJson?['logo_url'] as String?,
+      teamMonogram: json['logo_monogram'] as String? ?? teamJson?['logo_monogram'] as String?,
+      teamPrimaryColor: directColors?['primary'] as String? ?? teamColors?['primary'] as String?,
       captainName: null,
       registeredByName: profileJson?['display_name'] as String?,
       createdAt: json['created_at'] as String? ??

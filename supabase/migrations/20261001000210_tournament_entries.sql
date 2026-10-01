@@ -68,7 +68,7 @@ create table if not exists public.tournament_entries (
   constraint tournament_entries_source_registration_fk
     foreign key (registration_id, tournament_id, team_id)
     references public.tournament_registrations (registration_id, tournament_id, team_id)
-    on delete set null
+    on delete restrict
 );
 
 -- Unique constraint: A team cannot have two active entries in the same tournament.

@@ -121,10 +121,9 @@ class TournamentsRemoteDataSource {
       // `!inner` join drops the tournament row entirely when nobody is
       // approved yet, which is every cup on its first day.
       final countRes = await _supabase
-          .from(_registrationsTable)
-          .select('registration_id')
+          .from('tournament_public_participants')
+          .select('entry_id')
           .eq('tournament_id', tournamentId)
-          .eq('status', 'approved')
           .count(CountOption.exact);
 
       final copy = Map<String, dynamic>.from(response);
@@ -361,8 +360,17 @@ class TournamentsRemoteDataSource {
           .order('registered_at', ascending: true);
 
       return rows.map(TournamentRegistrationDto.fromJson).toList();
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
+    } on PostgrestException catch (_) {
+      // Fallback to sanitized public participants projection for spectator/unauthenticated access
+      try {
+        final publicRows = await _supabase
+            .from('tournament_public_participants')
+            .select()
+            .eq('tournament_id', tournamentId);
+        return publicRows.map(TournamentRegistrationDto.fromJson).toList();
+      } on PostgrestException catch (e) {
+        throw ServerException(e.message);
+      }
     }
   }
 
@@ -372,22 +380,21 @@ class TournamentsRemoteDataSource {
     required List<String> squadPlayerIds,
     String? message,
   }) async {
-    final uid = _requireUid();
+    _requireUid();
     try {
-      // 1. Authoritative canonical write: tournament_registrations
-      // Squad selection during application is stored as canonical squad_proposal
-      final insertData = {
-        'tournament_id': tournamentId,
-        'team_id': teamId,
-        'registered_by': uid,
-        'status': 'pending',
-        if (squadPlayerIds.isNotEmpty) 'squad_proposal': squadPlayerIds,
-        if (message != null) 'message': message,
-      };
+      // Server-stamped RPC inserting canonical registration and relational squad proposal
+      final regId = await _supabase.rpc<String>(
+        'tournament_register_team',
+        params: {
+          'p_tournament_id': tournamentId,
+          'p_team_id': teamId,
+          'p_player_ids': squadPlayerIds,
+          'p_message': message,
+        },
+      );
 
       final response = await _supabase
           .from(_canonicalRegistrationsTable)
-          .insert(insertData)
           .select('''
             *,
             teams (
@@ -397,6 +404,7 @@ class TournamentsRemoteDataSource {
               team_colors
             )
           ''')
+          .eq('registration_id', regId)
           .single();
 
       return TournamentRegistrationDto.fromJson(response);
@@ -500,12 +508,52 @@ class TournamentsRemoteDataSource {
               display_name,
               username,
               avatar_url
+            ),
+            unclaimed_players:unclaimed_id (
+              display_name
             )
           ''')
           .eq('entry_id', entryId)
           .order('added_at', ascending: true);
 
       return rows.map(TournamentSquadMemberDto.fromJson).toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<String> addSquadMember({
+    required String entryId,
+    String? userId,
+    String? unclaimedId,
+  }) async {
+    try {
+      final memberId = await _supabase.rpc<String>(
+        'tournament_squad_add_member',
+        params: {
+          'p_entry_id': entryId,
+          'p_user_id': userId,
+          'p_unclaimed_id': unclaimedId,
+        },
+      );
+      return memberId;
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  Future<void> removeSquadMember({
+    required String squadMemberId,
+    String? reason,
+  }) async {
+    try {
+      await _supabase.rpc<void>(
+        'tournament_squad_remove_member',
+        params: {
+          'p_squad_member_id': squadMemberId,
+          'p_reason': reason,
+        },
+      );
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

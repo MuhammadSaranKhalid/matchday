@@ -145,6 +145,19 @@ abstract class TournamentsRepository {
   /// Canonical query for squad members of a tournament entry.
   Future<Either<Failure, List<TournamentSquadMember>>> getEntrySquadMembers(String entryId);
 
+  /// Adds a player (claimed or unclaimed) to a tournament entry squad.
+  Future<Either<Failure, String>> addSquadMember({
+    required String entryId,
+    String? userId,
+    String? unclaimedId,
+  });
+
+  /// Removes a player from a tournament entry squad.
+  Future<Either<Failure, void>> removeSquadMember({
+    required String squadMemberId,
+    String? reason,
+  });
+
   /// Canonical query for payment ledger history of a tournament entry.
   Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(String entryId);
 

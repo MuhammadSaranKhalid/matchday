@@ -275,6 +275,44 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
+  Future<Either<Failure, String>> addSquadMember({
+    required String entryId,
+    String? userId,
+    String? unclaimedId,
+  }) async {
+    try {
+      final memberId = await _remote.addSquadMember(
+        entryId: entryId,
+        userId: userId,
+        unclaimedId: unclaimedId,
+      );
+      return Right(memberId);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> removeSquadMember({
+    required String squadMemberId,
+    String? reason,
+  }) async {
+    try {
+      await _remote.removeSquadMember(
+        squadMemberId: squadMemberId,
+        reason: reason,
+      );
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(
       String entryId) async {
     try {

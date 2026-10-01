@@ -1760,7 +1760,134 @@ All database guarantees were verified using comprehensive SQL and bash test suit
 
 ---
 
-### 22.8 Phase 3 Final Verdict
+### 22.8 Phase 3 Historical Status
+Phase 3 Foundation completed; Phase 3.1 Participation Privacy, Player Identity & Audit Closure executed below. Note: The earlier assumption that Phase 3 privacy was complete was incorrect while raw `tournament_teams` remained anonymously readable for public tournaments. Phase 3.1 definitively closed this privacy boundary.
+
+---
+
+## 23. Phase 3.1 — Participation Privacy, Player Identity & Audit Closure
+
+### 23.1 Legacy Raw-Table Privacy Restriction & Sanitized Compatibility Surface
+
+1. **Raw `tournament_teams` Lockdown:**
+   - The legacy `tournament_teams` SELECT policy (`tournament_teams_read`) previously allowed anonymous access if `tournament.privacy = 'public'`, leaking private administrative fields (`message`, `decision_reason`, `amount_paid`, `payment_channel`, `payment_reference`, `payment_recorded_by`, `registered_by`).
+   - Replaced by `tournament_teams_read_restricted` on `public.tournament_teams`, completely denying `anon` and restricting raw row access to:
+     - Tournament staff with review/entry management capabilities (`tournament.registration.review`, `tournament.entries.manage`).
+     - Participating Team authority (`team.tournament.enter`, `team.tournament.squad.manage`).
+
+2. **Sanitized Compatibility Projection View (`public.tournament_public_participants`):**
+   - Created security-invoker view `public.tournament_public_participants` granted to `anon, authenticated`.
+   - Exposes safe public display fields: `entry_id`, `tournament_id`, `team_id`, `status` ('approved'), `registered_at`, `seed_number`, `group_id`, `team_name`, `logo_url`, `logo_monogram`, `team_colors`.
+   - Strictly excludes all private registration messages, decision reasons/actors, payment ledgers, references, and audit actors.
+   - Flutter readers and approved count queries migrated to this safe projection.
+
+---
+
+### 23.2 Player Identity Model (Claimed & Unclaimed Support)
+
+1. **Tournament Squad XOR Identity (`tournament_squad_members`):**
+   - Supports both `user_id` (claimed player) and `unclaimed_id` (unclaimed player).
+   - Invariant enforced via check constraint:
+     ```sql
+     (membership_status = 'active' and num_nonnulls(user_id, unclaimed_id) = 1)
+     or (membership_status = 'removed' and num_nonnulls(user_id, unclaimed_id) <= 1)
+     ```
+   - Partial unique indexes enforce one person / one active entry per tournament across both identity types:
+     - `idx_tournament_squad_tournament_user` on `(tournament_id, user_id) WHERE membership_status = 'active' AND user_id IS NOT NULL`
+     - `idx_tournament_squad_tournament_unclaimed` on `(tournament_id, unclaimed_id) WHERE membership_status = 'active' AND unclaimed_id IS NOT NULL`
+
+2. **Pre-Approval Squad Proposal Relational Representation:**
+   - Replaced flat `uuid[]` with `public.tournament_registration_squad_members` (`20261001000205_tournament_registration_squad_members.sql`).
+   - Represents claimed (`user_id`) and unclaimed (`unclaimed_id`) proposed players with XOR integrity and active team roster verification.
+
+3. **Complete Proposal Validation & Atomic Materialization:**
+   - `approve_tournament_registration` validates the complete proposal before creating canonical entries.
+   - If any proposed claimed or unclaimed player is no longer on the team's active roster or is already active in another entry for the tournament, the entire approval aborts atomically with error `22000` (no silent player dropping, no partial squad materialization).
+
+---
+
+### 23.3 Account Deletion & Anonymization Semantics
+
+1. **Profile Deletion (`profiles`):**
+   - When a claimed player profile is deleted:
+     - `_strip_deleted_profile_from_arrays()` and AFTER UPDATE trigger `trg_tournament_squad_members_anonymize_on_delete` transition active squad rows to `membership_status = 'removed'`, with `removed_at = now()` and reason `'Profile deleted / anonymized'`.
+     - Direct identity `user_id` is set to `NULL` via FK `ON DELETE SET NULL`.
+     - Active eligibility is revoked; does NOT leave an active null-identity squad member.
+     - One-way legacy projection `project_canonical_squad_to_legacy()` filters `user_id IS NOT NULL` to prevent projecting nulls into `tournament_teams.squad`.
+
+2. **Unclaimed Identity Deletion / Merging:**
+   - `trg_tournament_squad_unclaimed_anonymize` on `unclaimed_players` transitions active squad rows to `removed` on deletion.
+   - `trg_tournament_squad_claim_unclaimed` propagates claim conversions from `unclaimed_players.claimed_by_user_id` to squad rows while verifying one-person/active-entry constraints.
+
+---
+
+### 23.4 Squad Audit Integrity & Server-Stamped Mutations
+
+1. **Direct Squad Mutation Blocked:**
+   - Canonical `tournament_squad_members` RLS blocks direct client `INSERT`, `UPDATE`, and `DELETE` via `WITH CHECK (false)` to eliminate audit forgery of `added_by`, `added_at`, `removed_by`, `removed_at`.
+
+2. **Server-Stamped Mutation RPCs:**
+   - `tournament_squad_add_member(p_entry_id, p_user_id, p_unclaimed_id)`:
+     - Verifies `team.tournament.squad.manage` or `team.tournament.enter`.
+     - Enforces XOR identity.
+     - Enforces active roster membership and one-person/one-active-entry.
+     - Enforces `entry.squad_state = 'editable'` (rejects when `frozen`).
+     - Stamps `added_by = auth.uid()` and `added_at = now()`.
+   - `tournament_squad_remove_member(p_squad_member_id, p_reason)`:
+     - Verifies squad state is editable.
+     - Stamps `removed_by = auth.uid()` and `removed_at = now()`.
+
+---
+
+### 23.5 Payment Void Concurrency & Idempotency
+
+1. **Unified Lock Boundary on Entry Root:**
+   - `void_tournament_entry_payment` resolves `entry_id` and locks the parent `tournament_entries` row `FOR UPDATE` before reading payments, computing totals, or projecting compatibility fields.
+   - Both payment recording and payment voiding serialize through the exact same deterministic lock boundary.
+
+2. **Deterministic Idempotency:**
+   - Under the Entry row lock, `void_tournament_entry_payment` checks `if is_void then return; end if;`.
+   - Repeat void requests return cleanly without modifying `voided_at`, `voided_by`, or `void_reason`.
+
+---
+
+### 23.6 Entry → Registration Referential Action
+
+- `tournament_entries_source_registration_fk` updated to `ON DELETE RESTRICT` (`20261001000210_tournament_entries.sql`).
+- Prevents invalid database attempts to nullify non-null composite identity columns (`tournament_id`, `team_id`) when a source registration exists.
+
+---
+
+### 23.7 Extended 6-Surface RLS Matrix Verification
+
+| Surface | Anonymous | Unrelated Authenticated | Team Authority | Tournament Staff | Owner |
+|---|---|---|---|---|---|
+| **`tournament_registrations`** | Denied (0 rows) | Denied (0 rows) | Read own (1 row) | Read all (1 row) | Read all (1 row) |
+| **`tournament_entries`** | Denied (0 rows) | Denied (0 rows) | Read own (1 row) | Read all (1 row) | Read all (1 row) |
+| **`tournament_squad_members`** | Denied (0 rows) | Denied (0 rows) | Read own (2 rows) | Read all (2 rows) | Read all (2 rows) |
+| **`tournament_entry_payments`** | Denied (0 rows) | Denied (0 rows) | Read own (1 row) | Read all (1 row) | Read all (1 row) |
+| **`tournament_teams` (raw legacy)** | Denied (0 rows) | Denied (0 rows) | Read own (1 row) | Read all (1 row) | Read all (1 row) |
+| **`tournament_public_participants`** | Allowed (1 row) | Allowed (1 row) | Allowed (1 row) | Allowed (1 row) | Allowed (1 row) |
+| **Direct Squad Write** | Denied | Denied | Denied (RPC required) | Denied | Denied |
+
+---
+
+### 23.8 Final Quality Gates Execution & Verification
+
+| Quality Gate | Command | Result |
+|---|---|---|
+| **Static Analysis** | `flutter analyze lib/` | **PASS (0 issues)** |
+| **Architecture Tests** | `flutter test test/architecture_test.dart` | **PASS (9/9 passed)** |
+| **Domain Package Purity** | `grep -rlE ... lib/features/*/domain` | **PASS (0 matches, pure Dart)** |
+| **Migration Layout Guard** | `flutter test test/supabase/migration_layout_test.dart` | **PASS (3/3 passed)** |
+| **Phase 3.1 Domain Invariants Suite** | `psql < test_phase3_1_domain_invariants.sql` | **PASS (9/9 passed)** |
+| **Phase 3.1 Extended 6-Surface RLS Matrix** | `psql < test_phase3_1_extended_rls.sql` | **PASS (All 6 surfaces / 5 actor groups passed)** |
+| **Full Repository Test Suite** | `flutter test` | **PASS (750 passed / 24 pre-existing failures; zero regressions)** |
+| **Scope Purity (Zero Phase 4 concepts)** | Source code audit for Stage / Group / DrawRevision / Round | **PASS (0 Phase 4 concepts implemented)** |
+
+---
+
+### 23.9 Phase 3 Final Verdict
 
 `PHASE 3 GATE: PASS`
 

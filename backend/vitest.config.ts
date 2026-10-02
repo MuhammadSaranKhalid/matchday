@@ -8,6 +8,7 @@ export default defineConfig({
       '@app/worker': fileURLToPath(new URL('./apps/worker/src', import.meta.url)),
       '@modules/posts': fileURLToPath(new URL('./libs/modules/posts/src/index.ts', import.meta.url)),
       '@modules/media': fileURLToPath(new URL('./libs/modules/media/src/index.ts', import.meta.url)),
+      '@modules/tournaments': fileURLToPath(new URL('./libs/modules/tournaments/src/index.ts', import.meta.url)),
       '@platform': fileURLToPath(new URL('./libs/platform/src', import.meta.url)),
       '@shared-kernel': fileURLToPath(new URL('./libs/shared-kernel/src', import.meta.url)),
     },

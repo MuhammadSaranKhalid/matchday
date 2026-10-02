@@ -11,12 +11,14 @@ import { PlatformConfigModule } from '../../../libs/platform/src/config/platform
 import { HealthModule } from '../../../libs/platform/src/health/health.module.js';
 import { LoggingModule } from '../../../libs/platform/src/logging/logging.module.js';
 import { PostsModule } from '@modules/posts';
+import { TournamentsModule } from '@modules/tournaments';
 
 @Module({
   imports: [
     PlatformConfigModule,
     LoggingModule,
     PostsModule,
+    TournamentsModule,
     HealthModule,
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],

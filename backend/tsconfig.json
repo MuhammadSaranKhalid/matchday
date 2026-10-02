@@ -22,6 +22,7 @@
       "@app/worker/*": ["./apps/worker/src/*"],
       "@modules/posts": ["./libs/modules/posts/src/index.ts"],
       "@modules/media": ["./libs/modules/media/src/index.ts"],
+      "@modules/tournaments": ["./libs/modules/tournaments/src/index.ts"],
       "@platform/*": ["./libs/platform/src/*"],
       "@shared-kernel": ["./libs/shared-kernel/src/index.ts"],
       "@shared-kernel/*": ["./libs/shared-kernel/src/*"]

@@ -475,4 +475,59 @@ describe('media execution and module isolation invariants', () => {
   });
 });
 
+describe('tournament module isolation and boundary invariants', () => {
+  const tournamentsRoot = join(repositoryRoot, 'libs', 'modules', 'tournaments', 'src');
+
+  it('keeps tournament domain independent of frameworks, platform, and outer layers', () => {
+    const domainFiles = sourceFiles().filter((p) => p.startsWith(join(tournamentsRoot, 'domain')));
+    const forbidden = ['@nestjs', '@platform', 'infrastructure', 'presentation', 'pg', '@supabase'];
+    const violations = domainFiles.flatMap((path) =>
+      importsIn(path)
+        .filter((specifier) => forbidden.some((term) => specifier.includes(term)))
+        .map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`),
+    );
+    expect(violations).toEqual([]);
+  });
+
+  it('does not import Supabase client in tournament application or domain', () => {
+    const innerFiles = sourceFiles().filter(
+      (p) =>
+        p.startsWith(join(tournamentsRoot, 'domain')) ||
+        p.startsWith(join(tournamentsRoot, 'application')),
+    );
+    const violations = innerFiles.flatMap((path) =>
+      importsIn(path)
+        .filter((specifier) => specifier.includes('@supabase') || specifier.includes('supabase-js'))
+        .map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`),
+    );
+    expect(violations).toEqual([]);
+  });
+
+  it('tournaments module does not import raw pg or instantiate Pool', () => {
+    const files = sourceFiles().filter((p) => p.startsWith(tournamentsRoot));
+    const violations = files.flatMap((path) => {
+      const imports = importsIn(path);
+      const hasPg = imports.some((specifier) => specifier === 'pg' || specifier.startsWith('pg/'));
+      const contents = readFileSync(path, 'utf8');
+      const hasNewPool = contents.includes('new Pool(');
+      if (hasPg || hasNewPool) {
+        return [`${relative(repositoryRoot, path)} (forbidden direct pg/Pool access)`];
+      }
+      return [];
+    });
+    expect(violations).toEqual([]);
+  });
+
+  it('tournaments module does not depend on Flutter or Edge Function code', () => {
+    const files = sourceFiles().filter((p) => p.startsWith(tournamentsRoot));
+    const violations = files.flatMap((path) =>
+      importsIn(path)
+        .filter((specifier) => targetsSiblingProject(path, specifier))
+        .map((specifier) => `${relative(repositoryRoot, path)} -> ${specifier}`),
+    );
+    expect(violations).toEqual([]);
+  });
+});
+
+
 

@@ -25,6 +25,20 @@ export class DatabaseExecutorService {
     });
   }
 
+  withCommandTransaction<T>(principal: AuthenticatedPrincipal, work: TransactionWork<T>): Promise<T> {
+    return this.transaction(async (database) => {
+      await database.query("select set_config('request.jwt.claims', $1, true)", [
+        JSON.stringify({
+          sub: principal.userId,
+          role: 'authenticated',
+          session_id: principal.sessionId,
+          app_metadata: principal.appMetadata ?? {},
+        }),
+      ]);
+      return work(database);
+    });
+  }
+
   withSystemTransaction<T>(work: TransactionWork<T>): Promise<T> {
     return this.transaction(work);
   }

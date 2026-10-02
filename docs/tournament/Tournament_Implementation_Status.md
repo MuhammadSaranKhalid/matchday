@@ -334,11 +334,11 @@ The implementation program follows a strict 19-phase sequential progression. No 
 - **Phase 4: Stage / Group / Round / Draw Revision / Fixture / Slot Foundation**
   - Create `tournament_stages`, `tournament_stage_entries`, `tournament_groups`, `tournament_rounds`, `tournament_fixtures`, `tournament_fixture_slots`, `tournament_draw_revisions`.
   - Support explicit slot sources (`seed`, `winner`, `loser`, `group_rank`, `bye`).
-- **Phase 5: `tournament-action` Edge Function Foundation**
-  - Scaffold `tournament-action` Edge Function with command envelope, authentication extraction, `commandId` idempotency, and optimistic revision checks.
+- **Phase 5: NestJS Tournament Command Infrastructure**
+  - Scaffold NestJS Tournament command execution framework (`TournamentsModule`) with command envelope, actor validation via `request.jwt.claims`, `commandId` idempotency receipts (`private.tournament_command_receipts`), transaction-scoped advisory locks, and pure optimistic aggregate revision checks.
 - **Phase 6: Participation Commands Migration**
   - Implement server commands: `RegisterTeam`, `ApproveRegistration`, `RejectRegistration`, `WithdrawRegistration`, `FreezeSquad`.
-  - Route Flutter participation actions to `tournament-action`.
+  - Route Flutter participation actions to NestJS Tournament API.
 - **Phase 7: Competition Generators & Draw Publication**
   - Implement server-side draw generation and atomic `PublishDraw` command for Knockout, Round Robin, and Group + Knockout.
   - Validate graph acyclicity, slot sources, and bye advancements prior to publication commit.
@@ -383,7 +383,7 @@ graph TD
     P1 --> P2[Phase 2: Root, Lifecycle & Membership]
     P2 --> P3[Phase 3: Registration, Entry, Squad & Payment]
     P3 --> P4[Phase 4: Stages, Groups, Rounds, Fixtures & Slots]
-    P4 --> P5[Phase 5: tournament-action Foundation]
+    P4 --> P5[Phase 5: NestJS Command Infrastructure]
     P5 --> P6[Phase 6: Participation Commands Migration]
     P6 --> P7[Phase 7: Draw Generators & Publication]
     P7 --> P8[Phase 8: Fixture-Match Materialization & Progression]
@@ -2336,6 +2336,68 @@ Key Verifications:
  17. Phase 5 has NOT begun.
 ================================================================================
 ```
+
+---
+
+## 28. Phase 5 — NestJS Tournament Command Infrastructure (COMPLETE)
+
+### 28.1 Canonical Write Architecture
+
+Tournament write mutations are strictly owned by the NestJS backend command execution infrastructure:
+
+```text
+Flutter
+   ↓
+NestJS Tournament API
+   ↓
+Tournament Application Commands
+   ↓
+ONE PostgreSQL transaction (withCommandTransaction)
+   ↓
+Supabase PostgreSQL
+```
+
+No Edge Function `supabase/functions/tournament-action` exists or will be created.
+
+### 28.2 Authorization and Security Boundaries
+
+1. **Client / Data API Boundary**:
+   - Direct mutation (`INSERT`, `UPDATE`, `DELETE`) by normal clients (`anon`, `authenticated`) is revoked on canonical tournament structural tables and `private.tournament_command_receipts`.
+   - Client access is constrained by RLS policies for read-only access.
+2. **NestJS Command Transaction Boundary**:
+   - `withCommandTransaction(principal, work)` runs under the trusted database role (`postgres`, `rolbypassrls = true`) and **DOES NOT** `SET ROLE authenticated`.
+   - Verified JWT claims are injected transaction-locally: `set_config('request.jwt.claims', ..., true)`.
+   - `auth.uid()` evaluates to `principal.userId`.
+   - Explicit domain capability authorization is performed in PostgreSQL via:
+     ```sql
+     public.can('tournament', $1::uuid, $2::text)
+     ```
+   - Normal client roles (`anon`, `authenticated`, `PUBLIC`) have zero privileges on `private.tournament_command_receipts`.
+
+### 28.3 Concurrency & Idempotency Invariants
+
+1. **Canonical Revisions**:
+   - `expectedRevision` represents an explicit integer version of the aggregate.
+   - `updated_at` is **never** used as an optimistic concurrency counter.
+   - Concurrency revision sources:
+     - Tournament root operations: `tournaments.revision`
+     - Entry-set operations: `tournaments.entry_revision`
+   - `assertExpectedRevision(expected, actual)` is a pure domain assertion that compares explicit integers.
+   - `TournamentRootRepository.lockTournament()` locks the aggregate via `FOR UPDATE` and exposes canonical `revision` and `entryRevision`.
+2. **Idempotency Execution Flow**:
+   - Step 1: Optional early receipt check prior to acquiring lock.
+   - Step 2: Acquire transaction-scoped advisory lock via `pg_advisory_xact_lock(hashtext(commandId))`.
+   - Step 3: Mandatory post-lock receipt re-check to serialize concurrent duplicate submissions safely.
+   - Step 4: Replay cached response if matching receipt exists (enforcing actor isolation and semantic equivalence).
+   - Step 5: Execute handler, persist receipt into `private.tournament_command_receipts`, and commit atomically.
+3. **Deterministic Fingerprinting**:
+   - `canonicalJsonStringify` recursively normalizes object key ordering at arbitrary nesting depth while preserving array ordering.
+   - Rejects unsupported non-JSON values (`undefined`, `BigInt`, `Date`, `function`, `symbol`, `NaN`, `Infinity`).
+
+### 28.4 Deferred Progressions
+
+Cross-subsystem atomicity between cricket match finalization and tournament progression remains explicitly deferred to Phase 8 / 10. `cricket-match-action` must NOT issue uncoordinated HTTP calls to NestJS for progression.
+
 
 
 

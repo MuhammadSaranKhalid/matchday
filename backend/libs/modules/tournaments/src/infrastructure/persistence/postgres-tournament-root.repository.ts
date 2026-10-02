@@ -16,6 +16,9 @@ interface TournamentRow extends Record<string, unknown> {
   termination_state: string;
   revision: number;
   entry_revision: number;
+  max_teams: number | null;
+  registration_deadline: string | Date | null;
+  entry_fee: string | number;
 }
 
 export class PostgresTournamentRootRepository implements TournamentRootRepository {
@@ -34,7 +37,10 @@ export class PostgresTournamentRootRepository implements TournamentRootRepositor
         competition_state,
         termination_state,
         revision,
-        entry_revision
+        entry_revision,
+        max_teams,
+        registration_deadline,
+        entry_fee
       FROM public.tournaments
       WHERE tournament_id = $1
       FOR UPDATE`,
@@ -67,7 +73,10 @@ export class PostgresTournamentRootRepository implements TournamentRootRepositor
         competition_state,
         termination_state,
         revision,
-        entry_revision
+        entry_revision,
+        max_teams,
+        registration_deadline,
+        entry_fee
       FROM public.tournaments
       WHERE tournament_id = $1`,
       [tournamentId],
@@ -89,6 +98,14 @@ export class PostgresTournamentRootRepository implements TournamentRootRepositor
       terminationState: row.termination_state,
       revision: Number(row.revision),
       entryRevision: Number(row.entry_revision),
+      maxTeams: row.max_teams !== null && row.max_teams !== undefined ? Number(row.max_teams) : null,
+      registrationDeadline:
+        row.registration_deadline instanceof Date
+          ? row.registration_deadline.toISOString().split('T')[0]!
+          : typeof row.registration_deadline === 'string'
+            ? row.registration_deadline
+            : null,
+      entryFee: Number(row.entry_fee ?? 0),
     };
   }
 }

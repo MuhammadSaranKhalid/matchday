@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:matchday/features/auth/domain/entities/user.dart';
-import 'package:matchday/features/auth/domain/value_objects/email.dart';
 import 'package:matchday/core/supabase/supabase_current_user_id_provider.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_fee_entry.dart';
@@ -26,12 +24,6 @@ void main() {
       when(() => repo.approveRegistration(any()))
           .thenAnswer((_) async => const Right(null));
     });
-
-    final mockUser = User(
-      id: const UserId('org-user-1'),
-      email: Email.create('organizer@example.com').getOrElse((_) => throw Exception()),
-      displayName: 'Tournament Organizer',
-    );
 
     final mockTournament = Tournament(
       id: 'tourn-console-1',
@@ -684,11 +676,6 @@ void main() {
 
     testWidgets('co-organizer cannot cancel tournament from console menu',
         (tester) async {
-      final coOrgUser = User(
-        id: const UserId('co-org-user-99'),
-        email: Email.create('coorg@example.com').getOrElse((_) => throw Exception()),
-        displayName: 'Co Organizer',
-      );
 
       final tournamentWithCoOrg = Tournament(
         id: 'tourn-console-1',

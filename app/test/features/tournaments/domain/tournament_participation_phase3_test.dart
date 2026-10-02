@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matchday/features/tournaments/data/models/tournament_entry_dto.dart';
 import 'package:matchday/features/tournaments/data/models/tournament_entry_payment_dto.dart';
-import 'package:matchday/features/tournaments/data/models/tournament_registration_dto.dart';
 import 'package:matchday/features/tournaments/data/models/tournament_squad_member_dto.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_entry.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_entry_payment.dart';
@@ -11,7 +10,6 @@ import 'package:matchday/features/tournaments/domain/entities/tournament_squad_m
 void main() {
   group('Phase 3 — Frozen Domain Separation Invariants', () {
     test('1. Registration != Entry != Squad != Match Lineup != Payment', () {
-      final now = DateTime(2026, 10, 1);
 
       // Registration is an application request
       final reg = TournamentRegistration(
